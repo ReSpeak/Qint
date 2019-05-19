@@ -6,8 +6,9 @@ use futures::prelude::*;
 use qint_shared::{InCommandMsg, MessageF2P, MessageP2F};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
-use tsclientlib::{Connection, PacketHandler, PHBox};
-use tsproto_packets::packets::{InAudio, InCommand};
+use tsclientlib::Connection;
+use tsproto::handler_data::InCommandObserver;
+use tsproto_packets::packets::InCommand;
 
 /// Define http actor
 struct Ws {
@@ -15,7 +16,7 @@ struct Ws {
 }
 
 #[derive(Clone)]
-struct ProxyPacketHandler {
+struct ProxyCommandObserver {
 	addr: Addr<Ws>,
 }
 
@@ -64,13 +65,19 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 
 				match msg {
 					MessageF2P::Connect(o) => {
+						let addr = ctx.address();
 						let con = Connection::new(tsclientlib::ConnectOptions::new(o.address)
 							.name(o.name)
 							.log_commands(o.log_commands)
 							.log_packets(o.log_packets)
 							.log_udp_packets(o.log_udp_packets)
-							.handle_packets(Box::new(ProxyPacketHandler {
-								addr: ctx.address(),
+							.prepare_client(Box::new(move |client| {
+								client.lock().add_in_command_observer(
+									"Qint".into(),
+									Box::new(ProxyCommandObserver {
+										addr: addr.clone(),
+									}),
+								);
 							}))
 						);
 
@@ -103,35 +110,12 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 	}
 }
 
-impl PacketHandler for ProxyPacketHandler {
-	fn new_connection(
-		&mut self,
-		command_stream: Box<
-			Stream<Item = InCommand, Error = tsproto::Error> + Send,
-		>,
-		audio_stream: Box<
-			Stream<Item = InAudio, Error = tsproto::Error> + Send,
-		>,
-	) {
-		let addr = self.addr.clone();
-		actix::spawn(command_stream.from_err::<Error>().for_each(move |p| {
-			addr.send(WsMessage::Packet((&p).into())).from_err()
-		}).map_err(move |e| {
-			// This happens when the websocket connection is lost.
-			// The ts connection will be closed automatically.
-			eprintln!("Command stream exited");
-			// TODO
-			//error!(logger, "Command stream exited with error ({:?})", e);
-		}));
-		actix::spawn(audio_stream.for_each(|_| Ok(())).map_err(move |e| {
-			eprintln!("Audio stream exited");
-			// TODO
-			//error!(logger, "Audio stream exited with error ({:?})", e);
+impl<T> InCommandObserver<T> for ProxyCommandObserver {
+	fn observe(&self, _: &mut (T, tsproto::connection::Connection), cmd: &InCommand) {
+		actix::spawn(self.addr.send(WsMessage::Packet(cmd.into())).map_err(|_| {
+			eprintln!("Failed to send packet");
 		}));
 	}
-
-	/// Clone into a box.
-	fn clone(&self) -> PHBox { Box::new(Clone::clone(self)) }
 }
 
 fn main() {
