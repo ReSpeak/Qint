@@ -1,0 +1,26 @@
+* {
+	margin: 0;
+}
+
+.connect-form {
+	max-width: 100%;
+	width: 20em;
+	padding: 4em 8em 4em 8em;
+	background-color: #ccdce2;
+
+	position: absolute;
+	top: 40%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+}
+
+.connect-item {
+	box-sizing: border-box;
+	left: 0;
+	right: 0;
+	margin: 1em;
+}
+
+.connect-item input:not([type='checkbox']), .connect-item button {
+	width: 100%;
+}

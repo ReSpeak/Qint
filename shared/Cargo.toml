@@ -1,0 +1,10 @@
+[package]
+name = "qint-shared"
+version = "0.1.0"
+authors = ["Flakebi <flakebi@t-online.de>"]
+edition = "2018"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }
+tsproto-types = { path = "../../tsclientlib/utils/tsproto-types" }

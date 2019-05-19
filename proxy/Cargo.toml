@@ -1,0 +1,20 @@
+[package]
+name = "qint-proxy"
+version = "0.1.0"
+authors = ["Flakebi <flakebi@t-online.de>"]
+edition = "2018"
+
+[dependencies]
+failure = "0.1"
+futures = "0.1"
+qint-shared = { path = "../shared" }
+rmp-serde = "0.13"
+serde = { version = "1", features = ["derive"] }
+tsclientlib = { path = "../../tsclientlib/tsclientlib" }
+tsproto = { path = "../../tsclientlib/tsproto" }
+tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }
+
+[dependencies.actix-web]
+version = "0.7"
+default-features = false
+features = ["brotli", "flate2-c", "cell"]

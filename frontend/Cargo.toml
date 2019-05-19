@@ -1,0 +1,14 @@
+[package]
+name = "qint-frontend"
+version = "0.1.0"
+authors = ["Flakebi <flakebi@t-online.de>"]
+edition = "2018"
+
+[dependencies]
+failure = "0.1"
+qint-shared = { path = "../shared" }
+serde = { version = "1", features = ["derive"] }
+stdweb = "0.4"
+tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }
+ts-bookkeeping = { path = "../../tsclientlib/utils/ts-bookkeeping" }
+yew = { version = "0.6", features = ["msgpack", "toml"] }
