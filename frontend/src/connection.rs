@@ -1,4 +1,5 @@
 use qint_shared::*;
+use slog::{error, info, warn, Logger};
 use stdweb::web::event::IEvent;
 use ts_bookkeeping::Uid;
 use ts_bookkeeping::data::Connection;
@@ -14,6 +15,7 @@ pub struct WsConnection {
 	state: ConnectionState,
 	ws_service: WebSocketService,
 	ws: Option<WebSocketTask>,
+	logger: Logger,
 }
 
 pub enum ConnectionMsg {
@@ -47,26 +49,27 @@ pub enum ConnectedMsg {
 }
 
 impl WsConnection {
-	pub fn new() -> Self {
+	pub fn new(logger: Logger) -> Self {
 		WsConnection {
 			state: ConnectionState::Disconnected(Disconnected::default()),
 			ws_service: WebSocketService::new(),
 			ws: None,
+			logger,
 		}
 	}
 
 	pub fn update(&mut self, msg: ConnectionMsg, link: &mut ComponentLink<Model>) -> ShouldRender {
 		match msg {
 			ConnectionMsg::Connect => {
-				let callback = link.send_back(|data: WsMsg| {
+				let logger = self.logger.clone();
+				let callback = link.send_back(move |data: WsMsg| {
 					match data {
 						WsMsg::Binary(data) => {
 							let MsgPack(data) = data.into();
 							let data = match data {
 								Ok(r) => r,
 								Err(e) => {
-									// TODO Log
-									eprintln!("Error parsing data {:?}", e);
+									error!(logger, "Error parsing data"; "error" => ?e);
 									return Msg::Ignore;
 								}
 							};
@@ -74,7 +77,7 @@ impl WsConnection {
 							Msg::Connection(ConnectionMsg::Message(data))
 						}
 						t => {
-							eprintln!("Got unknown data {:?}", t);
+							error!(logger, "Got unknown data"; "data" => ?t);
 							Msg::Ignore
 						}
 					}
@@ -85,7 +88,18 @@ impl WsConnection {
 						WebSocketStatus::Closed | WebSocketStatus::Error => WsAction::Lost.into(),
 					}
 				});
-				let task = self.ws_service.connect("ws://localhost:4422/ws", callback, notification);
+
+				// Get url
+				let url = stdweb::web::window()
+					.location()
+					.and_then(|l| l.origin().ok())
+					.and_then(|l| if l.starts_with("http") {
+						Some(format!("ws{}/ws", &l[4..]))
+					} else {
+						None
+					}).unwrap_or_else(|| "ws://localhost/ws".into());
+
+				let task = self.ws_service.connect(&url, callback, notification);
 				self.ws = Some(task);
 				true
 			}
@@ -94,49 +108,50 @@ impl WsConnection {
 					self.ws.as_mut().unwrap().send_binary(MsgPack(
 						&MessageF2P::Connect(state.options.clone())));
 				} else {
-					eprintln!("Wrong state");
+					error!(self.logger, "Wrong state"; "expected" => "Disconnected");
 				}
 				false
 			}
 			ConnectionMsg::Disconnected(dm) => match &mut self.state {
 				ConnectionState::Disconnected(s) => s.update(dm),
 				_ => {
-					eprintln!("Wrong state");
+					error!(self.logger, "Wrong state"; "expected" => "Disconnected");
 					false
 				}
 			}
 			ConnectionMsg::Connected(dm) => match &mut self.state {
-				ConnectionState::Connected(s) => s.update(dm),
+				ConnectionState::Connected(s) => s.update(dm, &self.logger),
 				_ => {
-					eprintln!("Wrong state");
+					error!(self.logger, "Wrong state"; "expected" => "Connected");
 					false
 				}
 			}
 			ConnectionMsg::Message(msg) => {
 				match msg {
 					MessageP2F::ConnectFailed() => {
-						eprintln!("Failed to connect");
+						warn!(self.logger, "Connect failed; trying next addres");
 						false
 					}
 					MessageP2F::Packet(packet) => {
 						match &mut self.state {
 							ConnectionState::Connected(s) =>
-								s.update(ConnectedMsg::Packet(packet)),
+								s.update(ConnectedMsg::Packet(packet), &self.logger),
 							ConnectionState::Disconnected(_) => {
 								let msg = match InMessage::new(packet.into()) {
 									Ok(r) => r,
 									Err(e) => {
-										eprintln!("Failed to parse packet: {:?}", e);
+										error!(self.logger, "Failed to parse packet"; "error" => ?e);
 										return false;
 									}
 								};
 								if let InMessages::InitServer(_) = msg.msg() {
+								} else if let InMessages::InitIvExpand2(_) = msg.msg() {
+									return false;
 								} else {
-									eprintln!("Got not an initserver packet");
-									console!(log, "Got no initserver");
+									error!(self.logger, "Got no initserver as first packet";
+										"packet" => ?msg);
 									return false;
 								}
-								console!(log, "Got initserver");
 
 								// TODO Uid
 								self.state = ConnectionState::Connected(Connected {
@@ -187,15 +202,8 @@ impl Default for Disconnected {
 	}
 }
 
-impl Component for Disconnected {
-	type Message = DisconnectedMsg;
-	type Properties = ();
-
-	fn create(_: Self::Properties, _: ComponentLink<Self>) -> Self {
-		panic!("Should not be called");
-	}
-
-	fn update(&mut self, msg: Self::Message) -> ShouldRender {
+impl Disconnected {
+	fn update(&mut self, msg: DisconnectedMsg) -> ShouldRender {
 		match msg {
 			DisconnectedMsg::Change(f) => f(&mut self.options),
 		}
@@ -203,15 +211,8 @@ impl Component for Disconnected {
 	}
 }
 
-impl Component for Connected {
-	type Message = ConnectedMsg;
-	type Properties = ();
-
-	fn create(_: Self::Properties, _: ComponentLink<Self>) -> Self {
-		panic!("Should not be called");
-	}
-
-	fn update(&mut self, msg: Self::Message) -> ShouldRender {
+impl Connected {
+	fn update(&mut self, msg: ConnectedMsg, logger: &Logger) -> ShouldRender {
 		match msg {
 			ConnectedMsg::Packet(packet) => {
 				let packet = packet.into();
@@ -226,12 +227,11 @@ impl Component for Connected {
 				match self.connection.handle_command(&packet) {
 					Ok(events) => {
 						// TODO
-						console!(log, "Got event");
+						info!(logger, "Got event");
 						true
 					}
 					Err(e) => {
-						console!(log, "Failed to handle");
-						eprintln!("Failed to handle command: {:?}", e);
+						error!(logger, "Failed to handle command"; "error" => ?e);
 						false
 					}
 				}

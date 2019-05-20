@@ -1,11 +1,12 @@
 use actix::*;
 use actix::fut::wrap_future;
 use actix_web::*;
-use failure::Error;
+use actix_web::fs::StaticFiles;
 use futures::prelude::*;
 use qint_shared::{InCommandMsg, MessageF2P, MessageP2F};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
+use slog::{o, Drain};
 use tsclientlib::Connection;
 use tsproto::handler_data::InCommandObserver;
 use tsproto_packets::packets::InCommand;
@@ -119,12 +120,29 @@ impl<T> InCommandObserver<T> for ProxyCommandObserver {
 }
 
 fn main() {
+	let logger = {
+		let decorator = slog_term::TermDecorator::new().build();
+		let drain = slog_term::CompactFormat::new(decorator).build().fuse();
+		let drain = slog_async::Async::new(drain).build().fuse();
+
+		slog::Logger::root(drain, o!())
+	};
+	let _scope_guard = slog_scope::set_global_logger(logger.clone());
+    let _log_guard = slog_stdlog::init().unwrap();
+
 	server::new(|| App::new()
+		.middleware(middleware::Logger::default())
 		.resource("/ws", |r| r.f(|req| ws::start(req, Ws {
 			connection: None,
 		})))
+		.handler("/", StaticFiles::new("../target/wasm32-unknown-unknown/release")
+			.expect("static files not found")
+			.default_handler(StaticFiles::new("../frontend/static/")
+				.expect("Static files not found")
+				.index_file("index.html"))
+		)
 		.finish())
-		.bind("127.0.0.1:4422")
+		.bind("0.0.0.0:4422")
 		.unwrap()
 		.run();
 }

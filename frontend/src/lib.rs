@@ -1,10 +1,8 @@
 #![recursion_limit="128"]
 
-#[macro_use]
-extern crate stdweb;
-
 use failure::Error;
 use serde::{Deserialize, Serialize};
+use slog::{o, Drain, Logger};
 use yew::{html, Component, ComponentLink, Html, Renderable, ShouldRender};
 use yew::format::{Binary, Nothing, Json, Text, Toml};
 use yew::services::Task;
@@ -31,6 +29,7 @@ pub struct Model {
 	ft: Option<FetchTask>,
 	ws: Option<WebSocketTask>,
 
+	logger: Logger,
 	connections: Vec<WsConnection>,
 	/// The currently selected connection.
 	current_con: usize,
@@ -83,6 +82,9 @@ impl Component for Model {
 	type Properties = ();
 
 	fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
+		web_logger::init();
+		let logger = slog::Logger::root(slog_stdlog::StdLog.fuse(), o!());
+
 		Model {
 			fetch_service: FetchService::new(),
 			ws_service: WebSocketService::new(),
@@ -92,7 +94,8 @@ impl Component for Model {
 			ft: None,
 			ws: None,
 
-			connections: vec![WsConnection::new()],
+			logger: logger.clone(),
+			connections: vec![WsConnection::new(logger)],
 			current_con: 0,
 		}
 	}

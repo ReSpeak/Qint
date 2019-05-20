@@ -8,7 +8,17 @@ edition = "2018"
 failure = "0.1"
 qint-shared = { path = "../shared" }
 serde = { version = "1", features = ["derive"] }
+slog-stdlog = "3"
 stdweb = "0.4"
 tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }
 ts-bookkeeping = { path = "../../tsclientlib/utils/ts-bookkeeping" }
+web_logger = "0.1"
 yew = { version = "0.6", features = ["msgpack", "toml"] }
+
+[dependencies.log]
+version = "0.4"
+features = ["max_level_debug", "release_max_level_debug"]
+
+[dependencies.slog]
+version = "2"
+features = ["max_level_debug", "release_max_level_debug"]

@@ -10,6 +10,10 @@ futures = "0.1"
 qint-shared = { path = "../shared" }
 rmp-serde = "0.13"
 serde = { version = "1", features = ["derive"] }
+slog-async = "2"
+slog-scope = "4"
+slog-stdlog = "3"
+slog-term = "2"
 tsclientlib = { path = "../../tsclientlib/tsclientlib" }
 tsproto = { path = "../../tsclientlib/tsproto" }
 tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }
@@ -18,3 +22,11 @@ tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }
 version = "0.7"
 default-features = false
 features = ["brotli", "flate2-c", "cell"]
+
+[dependencies.log]
+version = "0.4"
+features = ["max_level_debug", "release_max_level_debug"]
+
+[dependencies.slog]
+version = "2"
+features = ["max_level_debug", "release_max_level_debug"]
