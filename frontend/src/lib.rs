@@ -11,6 +11,7 @@ use yew::services::websocket::{WebSocketService, WebSocketTask, WebSocketStatus}
 
 use crate::connection::{WsConnection, ConnectionMsg};
 
+mod connected;
 mod connection;
 
 type AsBinary = bool;

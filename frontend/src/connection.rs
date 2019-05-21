@@ -1,15 +1,16 @@
 use qint_shared::*;
-use slog::{error, info, warn, Logger};
+use slog::{error, warn, Logger};
 use stdweb::web::event::IEvent;
 use ts_bookkeeping::Uid;
 use ts_bookkeeping::data::Connection;
 use ts_bookkeeping::messages::s2c::{InMessage, InMessages};
-use yew::{html};
+use yew::html;
 use yew::format::MsgPack;
 use yew::prelude::*;
 use yew::services::websocket::{WebSocketService, WebSocketTask, WebSocketStatus};
 
 use crate::{Model, Msg, WsAction, WsMsg};
+use crate::connected::{Connected, ConnectedMsg};
 
 pub struct WsConnection {
 	state: ConnectionState,
@@ -38,14 +39,6 @@ struct Disconnected {
 
 pub enum DisconnectedMsg {
 	Change(Box<FnOnce(&mut ConnectOptions)>),
-}
-
-struct Connected {
-	connection: Connection,
-}
-
-pub enum ConnectedMsg {
-	Packet(InCommandMsg),
 }
 
 impl WsConnection {
@@ -129,7 +122,7 @@ impl WsConnection {
 			ConnectionMsg::Message(msg) => {
 				match msg {
 					MessageP2F::ConnectFailed() => {
-						warn!(self.logger, "Connect failed; trying next addres");
+						warn!(self.logger, "Connect failed; trying next address");
 						false
 					}
 					MessageP2F::Packet(packet) => {
@@ -154,10 +147,11 @@ impl WsConnection {
 								}
 
 								// TODO Uid
-								self.state = ConnectionState::Connected(Connected {
-									connection: Connection::new(Uid("".into()),
-										&msg),
-								});
+								self.state = ConnectionState::Connected(
+									Connected::new(Connection::new(
+										Uid("".into()),
+										&msg,
+									)));
 								true
 							}
 						}
@@ -208,35 +202,6 @@ impl Disconnected {
 			DisconnectedMsg::Change(f) => f(&mut self.options),
 		}
 		false
-	}
-}
-
-impl Connected {
-	fn update(&mut self, msg: ConnectedMsg, logger: &Logger) -> ShouldRender {
-		match msg {
-			ConnectedMsg::Packet(packet) => {
-				let packet = packet.into();
-				/*let msg = match InMessage::new(packet) {
-					Ok(r) => r,
-					Err(e) => {
-						eprintln!("Failed to parse packet: {:?}", e);
-						return false;
-					}
-				};*/
-
-				match self.connection.handle_command(&packet) {
-					Ok(events) => {
-						// TODO
-						info!(logger, "Got event");
-						true
-					}
-					Err(e) => {
-						error!(logger, "Failed to handle command"; "error" => ?e);
-						false
-					}
-				}
-			}
-		}
 	}
 }
 
@@ -298,17 +263,4 @@ impl Renderable<Model> for Disconnected {
 
 impl Into<Msg> for DisconnectedMsg {
 	fn into(self) -> Msg { Msg::Connection(ConnectionMsg::Disconnected(self)) }
-}
-
-impl Renderable<Model> for Connected {
-	fn view(&self) -> Html<Model> {
-		html! {
-			<div class="connected-container",>
-			</div>
-		}
-	}
-}
-
-impl Into<Msg> for ConnectedMsg {
-	fn into(self) -> Msg { Msg::Connection(ConnectionMsg::Connected(self)) }
 }

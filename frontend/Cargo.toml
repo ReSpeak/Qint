@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["Flakebi <flakebi@t-online.de>"]
 edition = "2018"
 
+[profile.release]
+debug = true
+
 [dependencies]
 failure = "0.1"
 qint-shared = { path = "../shared" }
