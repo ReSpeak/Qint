@@ -1,4 +1,3 @@
-use log::debug;
 use ts_bookkeeping::ChannelId;
 use ts_bookkeeping::data::{Channel, Client, Connection};
 use yew::html;
@@ -43,7 +42,7 @@ impl ChannelTree {
 		let mut channels: Vec<_> = con.server.channels.values().collect();
 		let mut clients: Vec<_> = con.server.clients.values().collect();
 		channels.sort_by_key(|ch| ch.order);
-		clients.sort_by_key(|c| c.talk_power);
+		clients.sort_by_key(|c| -c.talk_power);
 		// TODO Make more efficient?
 
 		html! {

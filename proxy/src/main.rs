@@ -3,6 +3,7 @@ use actix::fut::wrap_future;
 use actix_web::*;
 use actix_web::fs::StaticFiles;
 use futures::prelude::*;
+use futures::future;
 use qint_shared::{InCommandMsg, MessageF2P, MessageP2F};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
@@ -33,15 +34,21 @@ impl Message for WsMessage {
 	type Result = ();
 }
 
+impl Ws {
+	fn send_message(msg: &MessageP2F, ctx: &mut ws::WebsocketContext<Self>) {
+		let mut buf = Vec::new();
+		let mut ser = Serializer::new(&mut buf);
+		msg.serialize(&mut ser).unwrap();
+		ctx.binary(buf);
+	}
+}
+
 impl Handler<WsMessage> for Ws {
 	type Result = ();
 	fn handle(&mut self, msg: WsMessage, ctx: &mut Self::Context) -> Self::Result {
 		match msg {
 			WsMessage::Packet(packet) => {
-				let mut buf = Vec::new();
-				let mut ser = Serializer::new(&mut buf);
-				MessageP2F::Packet(packet).serialize(&mut ser).unwrap();
-				ctx.binary(buf);
+				Self::send_message(&MessageP2F::Packet(packet), ctx);
 			}
 		}
 	}
@@ -86,25 +93,21 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 							actor.connection = Some(con);
 						})
 						.map_err(|_e, _actor, ctx| {
-							let val = MessageP2F::ConnectFailed();
-							let mut buf = Vec::new();
-							let mut ser = Serializer::new(&mut buf);
-							val.serialize(&mut ser).unwrap();
-							ctx.binary(buf);
+							Self::send_message(&MessageP2F::ConnectFailed(), ctx);
 						}));
 					}
 					MessageF2P::Packet(packet) => {
 						if let Some(con) = &mut self.connection {
-							ctx.spawn(wrap_future(con.send_packet(packet))
-								.map_err(|e, _actor: &mut Ws, _ctx| {
-									// TODO Return
-									eprintln!("Failed to send packet: {:?}", e);
-								}));
+							let sink = con.get_packet_sink();
+							ctx.spawn(wrap_future(future::lazy(move || {
+								sink.send(packet).map(|_| ())
+							})).map_err(|e, _actor: &mut Ws, _ctx| {
+								// TODO Return
+								eprintln!("Failed to send packet: {:?}", e);
+							}));
 						}
 					}
 				}
-
-				ctx.binary(bin);
 			}
 			_ => (),
 		}
@@ -128,7 +131,7 @@ fn main() {
 		slog::Logger::root(drain, o!())
 	};
 	let _scope_guard = slog_scope::set_global_logger(logger.clone());
-    let _log_guard = slog_stdlog::init().unwrap();
+	let _log_guard = slog_stdlog::init().unwrap();
 
 	server::new(|| App::new()
 		.middleware(middleware::Logger::default())

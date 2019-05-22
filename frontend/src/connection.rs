@@ -9,7 +9,7 @@ use yew::format::MsgPack;
 use yew::prelude::*;
 use yew::services::websocket::{WebSocketService, WebSocketTask, WebSocketStatus};
 
-use crate::{Model, Msg, WsAction, WsMsg};
+use crate::{Model, Msg, WsMsg};
 use crate::connected::{Connected, ConnectedMsg};
 
 pub struct WsConnection {
@@ -22,6 +22,7 @@ pub struct WsConnection {
 pub enum ConnectionMsg {
 	Connect,
 	WsConnected,
+	WsDisconnected,
 	Disconnected(DisconnectedMsg),
 	Connected(ConnectedMsg),
 	Message(MessageP2F),
@@ -51,6 +52,10 @@ impl WsConnection {
 		}
 	}
 
+	pub fn send_message(&mut self, msg: &MessageF2P) {
+		self.ws.as_mut().unwrap().send_binary(MsgPack(msg));
+	}
+
 	pub fn update(&mut self, msg: ConnectionMsg, link: &mut ComponentLink<Model>) -> ShouldRender {
 		match msg {
 			ConnectionMsg::Connect => {
@@ -78,7 +83,7 @@ impl WsConnection {
 				let notification = link.send_back(|status| {
 					match status {
 						WebSocketStatus::Opened => Msg::Connection(ConnectionMsg::WsConnected),
-						WebSocketStatus::Closed | WebSocketStatus::Error => WsAction::Lost.into(),
+						WebSocketStatus::Closed | WebSocketStatus::Error => ConnectionMsg::WsDisconnected.into(),
 					}
 				});
 
@@ -98,12 +103,20 @@ impl WsConnection {
 			}
 			ConnectionMsg::WsConnected => {
 				if let ConnectionState::Disconnected(state) = &mut self.state {
-					self.ws.as_mut().unwrap().send_binary(MsgPack(
-						&MessageF2P::Connect(state.options.clone())));
+					let options = state.options.clone();
+					self.send_message(&MessageF2P::Connect(options));
 				} else {
 					error!(self.logger, "Wrong state"; "expected" => "Disconnected");
 				}
 				false
+			}
+			ConnectionMsg::WsDisconnected => {
+				self.ws = None;
+				if let ConnectionState::Disconnected(_) = self.state {
+				} else {
+					self.state = ConnectionState::Disconnected(Disconnected::default());
+				}
+				true
 			}
 			ConnectionMsg::Disconnected(dm) => match &mut self.state {
 				ConnectionState::Disconnected(s) => s.update(dm),
@@ -113,7 +126,13 @@ impl WsConnection {
 				}
 			}
 			ConnectionMsg::Connected(dm) => match &mut self.state {
-				ConnectionState::Connected(s) => s.update(dm, &self.logger),
+				ConnectionState::Connected(s) => {
+					let (packets, should_render) = s.update(dm);
+					for p in packets {
+						self.send_message(&MessageF2P::Packet(p));
+					}
+					should_render
+				}
 				_ => {
 					error!(self.logger, "Wrong state"; "expected" => "Connected");
 					false
@@ -127,8 +146,13 @@ impl WsConnection {
 					}
 					MessageP2F::Packet(packet) => {
 						match &mut self.state {
-							ConnectionState::Connected(s) =>
-								s.update(ConnectedMsg::Packet(packet), &self.logger),
+							ConnectionState::Connected(s) => {
+								let (packets, should_render) = s.update(ConnectedMsg::Packet(packet));
+								for p in packets {
+									self.send_message(&MessageF2P::Packet(p));
+								}
+								should_render
+							}
 							ConnectionState::Disconnected(_) => {
 								let msg = match InMessage::new(packet.into()) {
 									Ok(r) => r,
@@ -151,7 +175,7 @@ impl WsConnection {
 									Connected::new(Connection::new(
 										Uid("".into()),
 										&msg,
-									)));
+									), self.logger.clone()));
 								true
 							}
 						}

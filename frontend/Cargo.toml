@@ -4,15 +4,12 @@ version = "0.1.0"
 authors = ["Flakebi <flakebi@t-online.de>"]
 edition = "2018"
 
-[profile.release]
-debug = true
-
 [dependencies]
 failure = "0.1"
+futures-preview = "0.3.0-alpha.16"
 qint-shared = { path = "../shared" }
 serde = { version = "1", features = ["derive"] }
 slog-stdlog = "3"
-stdweb = "0.4"
 tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }
 ts-bookkeeping = { path = "../../tsclientlib/utils/ts-bookkeeping" }
 web_logger = "0.1"
@@ -25,3 +22,7 @@ features = ["max_level_debug", "release_max_level_debug"]
 [dependencies.slog]
 version = "2"
 features = ["max_level_debug", "release_max_level_debug"]
+
+[dependencies.stdweb]
+version = "0.4"
+features = ["futures-support", "experimental_features_which_may_break_on_minor_version_bumps"]

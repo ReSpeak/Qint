@@ -1,13 +1,12 @@
+#![feature(async_await)]
 #![recursion_limit="128"]
 
 use failure::Error;
-use serde::{Deserialize, Serialize};
-use slog::{o, Drain, Logger};
+use serde::Deserialize;
+use slog::{o, Drain};
 use yew::{html, Component, ComponentLink, Html, Renderable, ShouldRender};
 use yew::format::{Binary, Nothing, Json, Text, Toml};
-use yew::services::Task;
 use yew::services::fetch::{FetchService, FetchTask, Request, Response};
-use yew::services::websocket::{WebSocketService, WebSocketTask, WebSocketStatus};
 
 use crate::connection::{WsConnection, ConnectionMsg};
 
@@ -23,40 +22,22 @@ pub enum Format {
 
 pub struct Model {
 	fetch_service: FetchService,
-	ws_service: WebSocketService,
 	link: ComponentLink<Model>,
 	fetching: bool,
 	data: Option<u32>,
 	ft: Option<FetchTask>,
-	ws: Option<WebSocketTask>,
 
-	logger: Logger,
 	connections: Vec<WsConnection>,
 	/// The currently selected connection.
 	current_con: usize,
 }
 
-pub enum WsAction {
-	Connect,
-	SendData(AsBinary),
-	Disconnect,
-	Lost,
-}
-
 pub enum Msg {
 	FetchData(Format, AsBinary),
-	WsAction(WsAction),
 	FetchReady(Result<DataFromFile, Error>),
-	WsReady(Result<WsResponse, Error>),
 	Ignore,
 
 	Connection(ConnectionMsg),
-}
-
-impl From<WsAction> for Msg {
-	fn from(action: WsAction) -> Self {
-		Msg::WsAction(action)
-	}
 }
 
 /// This type is used to parse data from `./static/data.json` file and
@@ -66,36 +47,20 @@ pub struct DataFromFile {
 	value: u32,
 }
 
-/// This type is used as a request which sent to websocket connection.
-#[derive(Serialize, Debug)]
-struct WsRequest {
-	value: u32,
-}
-
-/// This type is an expected response from a websocket connection.
-#[derive(Deserialize, Debug)]
-pub struct WsResponse {
-	value: u32,
-}
-
 impl Component for Model {
 	type Message = Msg;
 	type Properties = ();
 
 	fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
-		web_logger::init();
 		let logger = slog::Logger::root(slog_stdlog::StdLog.fuse(), o!());
 
 		Model {
 			fetch_service: FetchService::new(),
-			ws_service: WebSocketService::new(),
 			link,
 			fetching: false,
 			data: None,
 			ft: None,
-			ws: None,
 
-			logger: logger.clone(),
 			connections: vec![WsConnection::new(logger)],
 			current_con: 0,
 		}
@@ -143,42 +108,8 @@ impl Component for Model {
 				};
 				self.ft = Some(task);
 			}
-			Msg::WsAction(action) => {
-				match action {
-					WsAction::Connect => {
-						let callback = self.link.send_back(|Json(data)| Msg::WsReady(data));
-						let notification = self.link.send_back(|status| {
-							match status {
-								WebSocketStatus::Opened => Msg::Ignore,
-								WebSocketStatus::Closed | WebSocketStatus::Error => WsAction::Lost.into(),
-							}
-						});
-						let task = self.ws_service.connect("ws://localhost:9001/", callback, notification);
-						self.ws = Some(task);
-					}
-					WsAction::SendData(binary) => {
-						let request = WsRequest {
-							value: 321,
-						};
-						if binary {
-							self.ws.as_mut().unwrap().send_binary(Json(&request));
-						} else {
-							self.ws.as_mut().unwrap().send(Json(&request));
-						}
-					}
-					WsAction::Disconnect => {
-						self.ws.take().unwrap().cancel();
-					}
-					WsAction::Lost => {
-						self.ws = None;
-					}
-				}
-			}
 			Msg::FetchReady(response) => {
 				self.fetching = false;
-				self.data = response.map(|data| data.value).ok();
-			}
-			Msg::WsReady(response) => {
 				self.data = response.map(|data| data.value).ok();
 			}
 			Msg::Ignore => {
@@ -198,20 +129,6 @@ impl Renderable<Model> for Model {
 		let con = &self.connections[self.current_con];
 		html! {
 			<div>
-				/*<nav class="menu",>
-					<button onclick=|_| Msg::FetchData(Format::Json, false),>{ "Fetch Data" }</button>
-					<button onclick=|_| Msg::FetchData(Format::Json, true),>{ "Fetch Data [binary]" }</button>
-					<button onclick=|_| Msg::FetchData(Format::Toml, false),>{ "Fetch Data [toml]" }</button>
-					{ self.view_data() }
-					<button disabled=self.ws.is_some(),
-							onclick=|_| WsAction::Connect.into(),>{ "Connect To WebSocket" }</button>
-					<button disabled=self.ws.is_none(),
-							onclick=|_| WsAction::SendData(false).into(),>{ "Send To WebSocket" }</button>
-					<button disabled=self.ws.is_none(),
-							onclick=|_| WsAction::SendData(true).into(),>{ "Send To WebSocket [binary]" }</button>
-					<button disabled=self.ws.is_none(),
-							onclick=|_| WsAction::Disconnect.into(),>{ "Close WebSocket connection" }</button>
-				</nav>*/
 				{ con.view() }
 			</div>
 		}

@@ -25,7 +25,7 @@ features = ["brotli", "flate2-c", "cell"]
 
 [dependencies.log]
 version = "0.4"
-features = ["max_level_debug", "release_max_level_debug"]
+features = ["max_level_info", "release_max_level_debug"]
 
 [dependencies.slog]
 version = "2"
