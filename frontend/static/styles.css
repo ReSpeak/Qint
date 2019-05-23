@@ -1,6 +1,12 @@
+:root {
+	--channel-tree-width: 20em;
+}
+
 * {
 	margin: 0;
 }
+
+/* Connecting */
 
 .connect-form {
 	max-width: 100%;
@@ -23,4 +29,105 @@
 
 .connect-item input:not([type='checkbox']), .connect-item button {
 	width: 100%;
+}
+
+/* Connected */
+
+.connected-container > * {
+	display: inline-block;
+}
+
+.channel-tree {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	box-sizing: border-box;
+	width: var(--channel-tree-width);
+	padding: 0.5em;
+	background-color: #ccdce2;
+}
+
+.channel-tree ul {
+	list-style: none;
+}
+
+.channel-tree > ul {
+	padding: 0;
+}
+
+.channel-tree .channel {
+	cursor: pointer;
+}
+
+.channel-tree .channel.current {
+	cursor: auto;
+}
+
+.channel-tree .client.current {
+	font-weight: bold;
+}
+
+/* Chat */
+
+.chat {
+	display: inline-flex;
+	flex-direction: column;
+	justify-content: flex-end;
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: var(--channel-tree-width);
+	right: 0;
+}
+
+.chat-form {
+	display: flex;
+	width: 100%;
+}
+
+.chat-form > * {
+	box-sizing: border-box;
+	height: 2em;
+	font-size: 1em;
+}
+
+.chat-form input {
+	flex-grow: 1;
+	background-color: white;
+	color: black;
+	padding-left: 0.5em;
+	border-top: 1px solid black;
+	border-right: 1px solid black;
+	border-left: none;
+	border-bottom: none;
+}
+
+.chat-form button {
+	background-color: white;
+	color: blue;
+	vertical-align: middle;
+	border-top: 1px solid black;
+	border-left: none;
+	border-right: none;
+	border-bottom: none;
+}
+
+.chat-messages {
+	display: flex;
+	flex-direction: column;
+	list-style: none;
+	padding: 0.5em;
+	overflow-y: auto;
+}
+
+.chat-messages li {
+	padding-bottom: 0.8em;
+}
+
+.chat-messages .author {
+	font-size: 0.8em;
+}
+
+.chat-messages .chat-message {
+	/*padding-left: 0.3em;*/
 }
