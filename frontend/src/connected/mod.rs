@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::mem;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -12,6 +13,7 @@ use ts_bookkeeping::messages::s2c::{InCommandError, InMessageTrait, InTextMessag
 use tsproto_packets::packets::{InCommand, OutPacket};
 use yew::html;
 use yew::prelude::*;
+use yew::services::websocket::WebSocketTask;
 
 use crate::{Model, Msg};
 use crate::connection::ConnectionMsg;
@@ -24,7 +26,6 @@ mod chat;
 pub struct Connected {
 	logger: Logger,
 	connection: Connection,
-	message_handler: MessageHandler,
 
 	channel_tree: ChannelTree,
 	chat: Chat,
@@ -37,71 +38,12 @@ pub enum ConnectedMsg {
 	Chat(chat::ChatMsg),
 }
 
-pub struct MessageHandler {
-	return_codes: HashMap<usize, oneshot::Sender<TsError>>,
-	cur_return_code: AtomicUsize,
-	send_packets: Vec<OutPacket>,
-}
-
-impl MessageHandler {
-	/// Get a return code and a receiver which gets notified when an answer is
-	/// received.
-	pub(crate) fn get_return_code(
-		&mut self,
-	) -> (usize, oneshot::Receiver<TsError>) {
-		let code = self.cur_return_code.fetch_add(1, Ordering::Relaxed);
-		let (send, recv) = oneshot::channel();
-		// The receiver should fail when the sender is dropped, but usize should
-		// be enough for every platform.
-		self.return_codes.insert(code, send);
-		(code, recv)
-	}
-
-	/// Adds a `return_code` to the command and returns if the corresponding
-	/// answer is received. If an error occurs, the future will return an error.
-	#[must_use = "futures do nothing unless polled"]
-	pub fn send_message(
-		&mut self,
-		mut packet: OutPacket,
-	) -> impl Future<Output = Result<(), TsError>>
-	{
-		// Store waiting in HashMap<usize (return code), oneshot::Sender>
-		// The packet handler then sends a result to the sender if the answer is
-		// received.
-
-		let (code, recv) = self.get_return_code();
-		// Add return code
-		packet
-			.data_mut()
-			.extend_from_slice(" return_code=".as_bytes());
-		packet
-			.data_mut()
-			.extend_from_slice(code.to_string().as_bytes());
-
-		// Send a message and wait until we get an answer for the return code
-		self.send_packets.push(packet);
-		recv.map_err(|_| TsError::Undefined)
-			.and_then(|r| {
-				if r == TsError::Ok {
-					future::ok(())
-				} else {
-					future::err(r.into())
-				}
-			})
-	}
-}
-
 impl Connected {
 	pub fn new(connection: Connection, logger: Logger) -> Self {
 		let logger2 = logger.clone();
 		let mut con = Connected {
 			logger,
 			connection,
-			message_handler: MessageHandler {
-				return_codes: Default::default(),
-				cur_return_code: AtomicUsize::new(0),
-				send_packets: Default::default(),
-			},
 
 			channel_tree: Default::default(),
 			chat: Chat::new(logger2),

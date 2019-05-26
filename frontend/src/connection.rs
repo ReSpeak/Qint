@@ -9,8 +9,7 @@ use yew::format::MsgPack;
 use yew::prelude::*;
 use yew::services::websocket::{WebSocketService, WebSocketTask, WebSocketStatus};
 
-use crate::{Model, Msg, WsMsg};
-use crate::connected::{Connected, ConnectedMsg};
+use crate::{Model, Msg};
 
 pub struct WsConnection {
 	state: ConnectionState,
@@ -60,7 +59,7 @@ impl WsConnection {
 		match msg {
 			ConnectionMsg::Connect => {
 				let logger = self.logger.clone();
-				let callback = link.send_back(move |data: WsMsg| {
+				/*let callback = link.send_back(move |data: WsMsg| {
 					match data {
 						WsMsg::Binary(data) => {
 							let MsgPack(data) = data.into();
@@ -98,7 +97,7 @@ impl WsConnection {
 					}).unwrap_or_else(|| "ws://localhost/ws".into());
 
 				let task = self.ws_service.connect(&url, callback, notification);
-				self.ws = Some(task);
+				self.ws = Some(task);*/
 				true
 			}
 			ConnectionMsg::WsConnected => {
@@ -114,7 +113,7 @@ impl WsConnection {
 				self.ws = None;
 				if let ConnectionState::Disconnected(_) = self.state {
 				} else {
-					self.state = ConnectionState::Disconnected(Disconnected::default());
+					self.state = ConnectionState::default();
 				}
 				true
 			}
@@ -211,81 +210,4 @@ impl Renderable<Model> for WsConnection {
 
 impl Into<Msg> for ConnectionMsg {
 	fn into(self) -> Msg { Msg::Connection(self) }
-}
-
-impl Default for Disconnected {
-	fn default() -> Self {
-		Self {
-			options: ConnectOptions::new("localhost".into()),
-		}
-	}
-}
-
-impl Disconnected {
-	fn update(&mut self, msg: DisconnectedMsg) -> ShouldRender {
-		match msg {
-			DisconnectedMsg::Change(f) => f(&mut self.options),
-		}
-		false
-	}
-}
-
-fn checkbox_value(e: &ChangeData) -> bool {
-	if let ChangeData::Value(v) = e {
-		v == "true"
-	} else {
-		false
-	}
-}
-
-impl Renderable<Model> for Disconnected {
-	fn view(&self) -> Html<Model> {
-		html! {
-			<div class="connect-container",>
-			<form class="connect-form", onsubmit=|e| { e.prevent_default(); ConnectionMsg::Connect.into() },>
-				<div class="connect-item",>
-					<input name="username", type="text", placeholder="Username",
-						value=&self.options.name,
-						oninput=|e| DisconnectedMsg::Change({
-							Box::new(move |o| { o.name(e.value); })
-						}).into(), />
-				</div>
-				<div class="connect-item",>
-					<input name="server", type="text", placeholder="Server",
-						value=&self.options.address,
-						oninput=|e| DisconnectedMsg::Change({
-							Box::new(move |o| { o.address(e.value); })
-						}).into(), />
-				</div>
-				<div class="connect-item",>
-					<label>
-						<input name="log-commands", type="checkbox", value="true",
-							onchange=|e| DisconnectedMsg::Change({
-								Box::new(move |o| { o.log_commands(checkbox_value(&e)); })
-							}).into(), />
-						{ "Log commands" }
-					</label>
-				</div>
-				<div class="connect-item",>
-					<label>
-						<input name="log-packets", type="checkbox", value="true",
-							onchange=|e| DisconnectedMsg::Change({
-								Box::new(move |o| { o.log_packets(checkbox_value(&e)); })
-							}).into(), />
-						{ "Log packets" }
-					</label>
-				</div>
-				<div class="connect-item",>
-					<button name="connect", type="submit",>
-						{ "Connect" }
-					</button>
-				</div>
-			</form>
-			</div>
-		}
-	}
-}
-
-impl Into<Msg> for DisconnectedMsg {
-	fn into(self) -> Msg { Msg::Connection(ConnectionMsg::Disconnected(self)) }
 }

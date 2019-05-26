@@ -2,49 +2,37 @@
 #![recursion_limit="128"]
 
 use failure::Error;
-use serde::Deserialize;
-use slog::{o, Drain};
+use qint_shared::*;
+use slog::{error, o, warn, Drain, Logger};
+use ts_bookkeeping::Uid;
+use ts_bookkeeping::data::Connection;
+use ts_bookkeeping::messages::s2c::{InMessage, InMessages};
 use yew::{html, Component, ComponentLink, Html, Renderable, ShouldRender};
-use yew::format::{Binary, Nothing, Json, Text, Toml};
-use yew::services::fetch::{FetchService, FetchTask, Request, Response};
+use yew::format::{Binary, MsgPack, Text};
+use yew::services::websocket::{WebSocketService, WebSocketTask, WebSocketStatus};
 
-use crate::connection::{WsConnection, ConnectionMsg};
+use crate::connect::Connect;
+use crate::connection_service::{Connected, ConnectionId, ConnectionService, FrontendConnectionState};
 
-mod connected;
-mod connection;
-
-type AsBinary = bool;
-
-pub enum Format {
-	Json,
-	Toml,
-}
+mod connect;
+//mod connected;
+//mod connection;
+mod connection_service;
 
 pub struct Model {
-	fetch_service: FetchService,
+	ws_service: WebSocketService,
 	link: ComponentLink<Model>,
-	fetching: bool,
-	data: Option<u32>,
-	ft: Option<FetchTask>,
-
-	connections: Vec<WsConnection>,
+	logger: Logger,
 	/// The currently selected connection.
-	current_con: usize,
+	con: ConnectionId,
 }
 
 pub enum Msg {
-	FetchData(Format, AsBinary),
-	FetchReady(Result<DataFromFile, Error>),
 	Ignore,
-
-	Connection(ConnectionMsg),
-}
-
-/// This type is used to parse data from `./static/data.json` file and
-/// have to correspond the data layout from that file.
-#[derive(Deserialize, Debug)]
-pub struct DataFromFile {
-	value: u32,
+	Connect(ConnectOptions),
+	Connected,
+	Disconnected,
+	Message(MessageP2F),
 }
 
 impl Component for Model {
@@ -53,89 +41,156 @@ impl Component for Model {
 
 	fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
 		let logger = slog::Logger::root(slog_stdlog::StdLog.fuse(), o!());
+		let con = ConnectionService::add_connection(&logger);
 
 		Model {
-			fetch_service: FetchService::new(),
+			ws_service: WebSocketService::new(),
 			link,
-			fetching: false,
-			data: None,
-			ft: None,
-
-			connections: vec![WsConnection::new(logger)],
-			current_con: 0,
+			logger,
+			con,
 		}
 	}
 
 	fn update(&mut self, msg: Self::Message) -> ShouldRender {
 		match msg {
-			Msg::FetchData(format, binary) => {
-				self.fetching = true;
-				let task = match format {
-					Format::Json => {
-						let callback = self.link.send_back(move |response: Response<Json<Result<DataFromFile, Error>>>| {
-							let (meta, Json(data)) = response.into_parts();
-							println!("META: {:?}, {:?}", meta, data);
-							if meta.status.is_success() {
-								Msg::FetchReady(data)
-							} else {
-								Msg::Ignore  // FIXME: Handle this error accordingly.
-							}
-						});
-						let request = Request::get("/data.json").body(Nothing).unwrap();
-						if binary {
-							self.fetch_service.fetch_binary(request, callback)
-						} else {
-							self.fetch_service.fetch(request, callback)
-						}
-					},
-					Format::Toml => {
-						let callback = self.link.send_back(move |response: Response<Toml<Result<DataFromFile, Error>>>| {
-							let (meta, Toml(data)) = response.into_parts();
-							println!("META: {:?}, {:?}", meta, data);
-							if meta.status.is_success() {
-								Msg::FetchReady(data)
-							} else {
-								Msg::Ignore  // FIXME: Handle this error accordingly.
-							}
-						});
-						let request = Request::get("/data.toml").body(Nothing).unwrap();
-						if binary {
-							self.fetch_service.fetch_binary(request, callback)
-						} else {
-							self.fetch_service.fetch(request, callback)
-						}
-					},
-				};
-				self.ft = Some(task);
-			}
-			Msg::FetchReady(response) => {
-				self.fetching = false;
-				self.data = response.map(|data| data.value).ok();
-			}
-			Msg::Ignore => {
-				return false;
-			}
+			Msg::Ignore => false,
+			Msg::Connect(options) => {
+				let logger = self.logger.clone();
+				let callback = self.link.send_back(move |data: WsMsg| {
+					match data {
+						WsMsg::Binary(data) => {
+							let MsgPack(data) = data.into();
+							let data = match data {
+								Ok(r) => r,
+								Err(e) => {
+									error!(logger, "Error parsing data"; "error" => ?e);
+									return Msg::Ignore;
+								}
+							};
 
-			Msg::Connection(cm) => {
-				return self.connections[self.current_con].update(cm, &mut self.link);
+							Msg::Message(data)
+						}
+						t => {
+							error!(logger, "Got unknown data");
+							Msg::Ignore
+						}
+					}
+				});
+				let notification = self.link.send_back(|status| {
+					match status {
+						WebSocketStatus::Opened => Msg::Connected,
+						WebSocketStatus::Closed | WebSocketStatus::Error => Msg::Disconnected,
+					}
+				});
+
+				// Get url
+				let url = stdweb::web::window()
+					.location()
+					.and_then(|l| l.origin().ok())
+					.and_then(|l| if l.starts_with("http") {
+						Some(format!("ws{}/ws", &l[4..]))
+					} else {
+						None
+					}).unwrap_or_else(|| "ws://localhost/ws".into());
+
+				let task = self.ws_service.connect(&url, callback, notification);
+				ConnectionService::with_mut_con(self.con, move |con| if let
+					FrontendConnectionState::Disconnected(options, ws)
+					= &mut con.state {
+						*ws = Some(task);
+					} else {
+					}, || panic!("Should be in disconnected state"));
+				true
 			}
+			Msg::Connected => {
+				ConnectionService::with_mut_con(self.con, move |con| {
+					if let FrontendConnectionState::Disconnected(options, _) = &mut con.state {
+						let options = options.clone();
+						con.send_ws_message(&MessageF2P::Connect(options));
+					} else {
+						error!(self.logger, "Wrong state"; "expected" => "Disconnected");
+					}
+				}, || panic!("Should be in disconnected state"));
+				false
+			}
+			Msg::Disconnected => {
+				ConnectionService::with_mut_con(self.con, move |con| {
+					con.state = FrontendConnectionState::default();
+				}, || panic!("Should be in disconnected state"));
+				true
+			}
+			Msg::Message(msg) => {
+				match msg {
+					MessageP2F::ConnectFailed() => {
+						warn!(self.logger, "Connect failed; trying next address");
+						false
+					}
+					MessageP2F::Packet(packet) => {
+						ConnectionService::with_mut_con(self.con, move |con| match &mut con.state {
+							FrontendConnectionState::Disconnected(_, ws) => {
+								let msg = match InMessage::new(packet.into()) {
+									Ok(r) => r,
+									Err(e) => {
+										error!(self.logger, "Failed to parse packet"; "error" => ?e);
+										return false;
+									}
+								};
+								if let InMessages::InitServer(_) = msg.msg() {
+								} else if let InMessages::InitIvExpand2(_) = msg.msg() {
+									return false;
+								} else {
+									error!(self.logger, "Got no initserver as first packet";
+										"packet" => ?msg);
+									return false;
+								}
+
+								// TODO Uid
+								con.state = FrontendConnectionState::Connected(
+									Connected::new(ws.take().unwrap(), Connection::new(
+										Uid("".into()),
+										&msg,
+									)));
+								true
+							}
+							FrontendConnectionState::Connected(c) => {
+								// TODO
+								/*let (packets, should_render) = s.update(Msg::Packet(packet));
+								should_render*/
+								false
+							}
+						}, || panic!("Should be in disconnected state"))
+					}
+				}
+			}
+			/*Msg::Connection(cm) => {
+				return self.connections[self.con].update(cm, &mut self.link);
+			}*/
 		}
-		true
 	}
 }
 
 impl Renderable<Model> for Model {
 	fn view(&self) -> Html<Self> {
-		let con = &self.connections[self.current_con];
-		html! {
-			<div>
-				{ con.view() }
-			</div>
+		let is_connected = ConnectionService::with_con(
+			self.con,
+			|c| c.is_connected(),
+			|| false,
+		);
+		if !is_connected {
+			let con = Some(self.con);
+			html! {
+				<Connect: connection=con, onconnect=|o| Msg::Connect(o), />
+			}
+		} else {
+			// TODO
+			html! {
+				<div>
+				</div>
+			}
 		}
 	}
 }
 
-#[derive(Debug)]
 pub enum WsMsg {
 	Text(Text),
 	Binary(Binary),

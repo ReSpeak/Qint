@@ -154,7 +154,8 @@ fn main() {
 				.index_file("index.html"))
 		)
 		.finish())
-		.bind("0.0.0.0:4422")
+		//.bind("0.0.0.0:4422")
+		.bind("127.0.0.1:4422")
 		.unwrap()
 		.run();
 }

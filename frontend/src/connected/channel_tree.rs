@@ -86,3 +86,16 @@ impl ChannelTree {
 		}
 	}
 }
+
+impl Component for ChannelTree {
+	type Message = ();
+	type Properties = ();
+
+	fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
+		panic!()
+	}
+
+	fn update(&mut self, msg: Self::Message) -> ShouldRender {
+		false
+	}
+}

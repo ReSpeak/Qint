@@ -88,7 +88,6 @@ impl Chat {
 	}
 
 	pub fn view(&self, _con: &Connection) -> Html<Model> {
-		slog::info!(self.logger, "Message"; "value" => &self.composing);
 		html! {
 			<div class="chat",>
 				{ self.view_messages() }
