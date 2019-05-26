@@ -33,6 +33,7 @@ pub struct Connected {
 pub enum ConnectedMsg {
 	Packet(InCommandMsg),
 	ChangeChannel(ChannelId),
+	SetTalking(bool),
 	Chat(chat::ChatMsg),
 }
 
@@ -192,6 +193,10 @@ impl Connected {
 					}
 				}));
 				false
+			}
+			ConnectedMsg::SetTalking(talk) => {
+				self.channel_tree.is_talking = talk;
+				true
 			}
 			ConnectedMsg::Chat(msg) => {
 				self.chat.update(&self.connection, &mut self.message_handler, msg)

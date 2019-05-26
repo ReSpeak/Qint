@@ -47,7 +47,7 @@ impl Chat {
 		match msg {
 			ChatMsg::Change(f) => {
 				f(self);
-				false
+				true
 			}
 			ChatMsg::NewMessage(msg) => {
 				self.messages.push(msg);
@@ -81,8 +81,10 @@ impl Chat {
 			<ul class="chat-messages",>
 				{ for self.messages.iter()
 					.map(|m| self.view_message(m)) }
+				<span class="chat-end",></span>
 			</ul>
 		}
+		// TODO Use document.querySelectorAll('.chat-end')[0].scrollIntoView({behavior: "smooth"})
 	}
 
 	pub fn view(&self, _con: &Connection) -> Html<Model> {

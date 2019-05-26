@@ -131,6 +131,7 @@ impl WsConnection {
 					for p in packets {
 						self.send_message(&MessageF2P::Packet(p));
 					}
+
 					should_render
 				}
 				_ => {

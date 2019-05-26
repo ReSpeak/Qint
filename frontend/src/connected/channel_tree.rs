@@ -6,8 +6,12 @@ use yew::prelude::*;
 use crate::Model;
 use super::ConnectedMsg;
 
-#[derive(Default)]
 pub struct ChannelTree {
+	pub is_talking: bool,
+}
+
+impl Default for ChannelTree {
+	fn default() -> Self { Self { is_talking: false } }
 }
 
 impl ChannelTree {
@@ -67,9 +71,17 @@ impl ChannelTree {
 		let own_channel = con.server.clients.get(&own_client).map(|c| c.channel)
 			.unwrap_or(ChannelId(0));
 
+		let is_talking = self.is_talking;
+		let talking = if self.is_talking {
+			"Stop talking"
+		} else {
+			"Start talking"
+		};
+
 		html! {
 			<div class="channel-tree",>
 				{ self.view_channel(&clients, &channels, ChannelId(0), own_client, own_channel) }
+				<button onclick=|_| ConnectedMsg::SetTalking(!is_talking).into(),>{ talking }</button>
 			</div>
 		}
 	}

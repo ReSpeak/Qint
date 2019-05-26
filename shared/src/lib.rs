@@ -20,6 +20,7 @@ impl fmt::Display for Version {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum MessageF2P {
 	Connect(ConnectOptions),
+	SetTalking(bool),
 	Packet(OutPacket),
 }
 

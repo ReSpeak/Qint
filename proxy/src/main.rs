@@ -1,9 +1,11 @@
+#![feature(async_await)]
+
 use actix::*;
 use actix::fut::wrap_future;
 use actix_web::*;
 use actix_web::fs::StaticFiles;
-use futures::prelude::*;
-use futures::future;
+use futures01::sink::Sink as _;
+use futures01::Future as _;
 use qint_shared::{InCommandMsg, MessageF2P, MessageP2F};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
@@ -11,6 +13,8 @@ use slog::{o, Drain};
 use tsclientlib::Connection;
 use tsproto::handler_data::InCommandObserver;
 use tsproto_packets::packets::InCommand;
+
+mod audio;
 
 /// Define http actor
 struct Ws {
@@ -96,10 +100,13 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 							Self::send_message(&MessageP2F::ConnectFailed(), ctx);
 						}));
 					}
+					MessageF2P::SetTalking(talk) => {
+						// TODO
+					}
 					MessageF2P::Packet(packet) => {
 						if let Some(con) = &mut self.connection {
 							let sink = con.get_packet_sink();
-							ctx.spawn(wrap_future(future::lazy(move || {
+							ctx.spawn(wrap_future(futures01::future::lazy(move || {
 								sink.send(packet).map(|_| ())
 							})).map_err(|e, _actor: &mut Ws, _ctx| {
 								// TODO Return
@@ -132,6 +139,8 @@ fn main() {
 	};
 	let _scope_guard = slog_scope::set_global_logger(logger.clone());
 	let _log_guard = slog_stdlog::init().unwrap();
+
+	let (a2ts) = audio::start(logger.clone()).unwrap();
 
 	server::new(|| App::new()
 		.middleware(middleware::Logger::default())
