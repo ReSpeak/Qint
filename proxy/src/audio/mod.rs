@@ -10,14 +10,14 @@ use gst::prelude::*;
 use slog::{debug, error, Logger};
 
 use audio_to_ts::AudioToTs;
-//use ts_to_audio::TsToAudio;
+use ts_to_audio::TsToAudio;
 
 pub mod ts_to_audio;
 pub mod audio_to_ts;
 
 const VOICE_TIMEOUT_SECS: u64 = 1;
 
-pub fn start(logger: Logger) -> Result<(Addr<AudioToTs>), Error> {
+pub fn start(logger: Logger) -> Result<(Addr<AudioToTs>, Addr<TsToAudio>), Error> {
 	gst::init().expect("gstreamer failed to initialize");
 
 	let pool = ThreadPoolBuilder::new()
@@ -25,8 +25,9 @@ pub fn start(logger: Logger) -> Result<(Addr<AudioToTs>), Error> {
 		.name_prefix("audio")
 		.create()?;
 
-	let a2ts = AudioToTs::new(logger, pool.clone(), None)?;
-	Ok((a2ts.start()))
+	let a2ts = AudioToTs::new(logger.clone(), pool.clone(), None)?;
+	let ts2a = TsToAudio::new(logger, pool.clone())?;
+	Ok((a2ts.start(), ts2a.start()))
 }
 
 fn main_loop(
@@ -60,7 +61,7 @@ fn main_loop(
 			MessageView::Error(err) => {
 				error!(logger,
 					"gstreamer pipeline error";
-					"src" => ?err.get_src().map(|s| s.get_path_string()),
+					"src" => ?err.get_src().map(|s| s.get_path_string().as_str().to_string()),
 					"error" => %err.get_error(),
 					"debug" => ?err.get_debug()
 				);

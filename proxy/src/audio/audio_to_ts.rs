@@ -1,4 +1,4 @@
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 use actix_web::actix::*;
 use failure::{format_err, Error};
@@ -7,12 +7,13 @@ use futures::executor::ThreadPool;
 use gst::{gst_element_error, gst_element_warning};
 use gst_audio::StreamVolumeExt;
 use parking_lot::Mutex;
-use slog::{debug, error, info, o, Logger};
+use slog::{debug, error, o, Logger};
 use tsproto_packets::packets::{AudioData, CodecType, OutAudio};
 
 use super::*;
 
 pub struct SetListenerMsg {
+	// TODO Use weak connection
 	pub connection: tsclientlib::Connection,
 }
 
@@ -24,7 +25,6 @@ pub struct AudioToTs {
 	listeners: Arc<Mutex<Vec<ConnectionSinkCreator>>>,
 
 	logger: Logger,
-	executor: ThreadPool,
 	pipeline: gst::Pipeline,
 	volume: gst_audio::StreamVolume,
 }
@@ -48,7 +48,7 @@ impl Message for SetPlayingMsg { type Result = Result<(), Error>; }
 
 impl Handler<SetListenerMsg> for AudioToTs {
 	type Result = ();
-	fn handle(&mut self, msg: SetListenerMsg, ctx: &mut Self::Context) -> Self::Result {
+	fn handle(&mut self, msg: SetListenerMsg, _: &mut Self::Context) -> Self::Result {
 		let mut listeners = self.listeners.lock();
 		*listeners = vec![ConnectionSinkCreator {
 			con: msg.connection.get_tsproto_connection(),
@@ -58,7 +58,7 @@ impl Handler<SetListenerMsg> for AudioToTs {
 
 impl Handler<RemoveListenerMsg> for AudioToTs {
 	type Result = bool;
-	fn handle(&mut self, msg: RemoveListenerMsg, ctx: &mut Self::Context) -> Self::Result {
+	fn handle(&mut self, _: RemoveListenerMsg, _: &mut Self::Context) -> Self::Result {
 		let mut ls = self.listeners.lock();
 		let res = !ls.is_empty();
 		ls.clear();
@@ -71,21 +71,21 @@ impl Handler<RemoveListenerMsg> for AudioToTs {
 
 impl Handler<SetVolumeMsg> for AudioToTs {
 	type Result = ();
-	fn handle(&mut self, msg: SetVolumeMsg, ctx: &mut Self::Context) -> Self::Result {
+	fn handle(&mut self, msg: SetVolumeMsg, _: &mut Self::Context) -> Self::Result {
 		self.set_volume(msg.0);
 	}
 }
 
 impl Handler<SetPlayingMsg> for AudioToTs {
 	type Result = Result<(), Error>;
-	fn handle(&mut self, msg: SetPlayingMsg, ctx: &mut Self::Context) -> Self::Result {
+	fn handle(&mut self, msg: SetPlayingMsg, _: &mut Self::Context) -> Self::Result {
 		self.set_playing(msg.0)
 	}
 }
 
 impl AudioToTs {
-	/// We need an explicit executor because we want to spawn new tasks in callbacks
-	/// from gstreamer threads.
+	/// We need an explicit executor because we want to spawn new tasks in
+	/// callbacks from gstreamer threads.
 	pub fn new(
 		logger: Logger,
 		mut executor: ThreadPool,
@@ -221,7 +221,6 @@ impl AudioToTs {
 					});
 
 					// Write into packet sink
-					let logger2 = logger.clone();
 					let listeners = listeners2.lock();
 					for l in &*listeners {
 						let sink = l.con.as_packet_sink().sink_compat();
@@ -248,7 +247,6 @@ impl AudioToTs {
 			listeners,
 
 			logger: logger2,
-			executor,
 			pipeline,
 			volume: streamvolume,
 		})

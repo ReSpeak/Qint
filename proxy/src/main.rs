@@ -1,26 +1,42 @@
 #![feature(async_await)]
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use actix::*;
 use actix::fut::wrap_future;
 use actix_web::*;
 use actix_web::fs::StaticFiles;
 use futures01::sink::Sink as _;
+use futures01::stream::Stream;
 use futures01::Future as _;
 use qint_shared::{InCommandMsg, MessageF2P, MessageP2F};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use slog::{error, o, Drain, Logger};
-use tsclientlib::Connection;
+use tsclientlib::{Connection, PacketHandler, PHBox};
 use tsproto::handler_data::InCommandObserver;
-use tsproto_packets::packets::InCommand;
+use tsproto_packets::packets::{InAudio, InCommand};
 
 mod audio;
+
+static NEXT_CON_ID: AtomicU64 = AtomicU64::new(0);
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct ConnectionId(u64);
 
 /// Define http actor
 struct Ws {
 	logger: Logger,
+	id: ConnectionId,
 	a2ts: Addr<audio::audio_to_ts::AudioToTs>,
+	ts2a: Addr<audio::ts_to_audio::TsToAudio>,
 	connection: Option<Connection>,
+}
+
+#[derive(Clone)]
+struct ProxyPacketHandler {
+	logger: Logger,
+	con: ConnectionId,
+	addr: Addr<audio::ts_to_audio::TsToAudio>,
 }
 
 #[derive(Clone)]
@@ -30,6 +46,10 @@ struct ProxyCommandObserver {
 
 enum WsMessage {
 	Packet(InCommandMsg),
+}
+
+fn next_con_id() -> ConnectionId {
+	ConnectionId(NEXT_CON_ID.fetch_add(1, Ordering::Relaxed))
 }
 
 impl Actor for Ws {
@@ -79,6 +99,9 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 
 				match msg {
 					MessageF2P::Connect(o) => {
+						let ts2a = self.ts2a.clone();
+						let con = self.id;
+						let logger = self.logger.clone();
 						let addr = ctx.address();
 						let con = Connection::new(tsclientlib::ConnectOptions::new(o.address)
 							.name(o.name)
@@ -92,6 +115,11 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 										addr: addr.clone(),
 									}),
 								);
+							}))
+							.handle_packets(Box::new(ProxyPacketHandler {
+								logger,
+								con,
+								addr: ts2a.clone(),
 							}))
 						);
 
@@ -142,10 +170,50 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 	}
 }
 
+impl PacketHandler for ProxyPacketHandler {
+	fn new_connection(
+		&mut self,
+		command_stream: Box<
+			Stream<Item = InCommand, Error = tsproto::Error> + Send,
+		>,
+		audio_stream: Box<
+			Stream<Item = InAudio, Error = tsproto::Error> + Send,
+		>,
+	) {
+		let logger = self.logger.clone();
+		actix::spawn(command_stream.for_each(|_| Ok(())).map_err(move |e| {
+			error!(logger, "Failed to handle packets"; "error" => ?e);
+		}));
+
+		let logger = self.logger.clone();
+		let logger2 = self.logger.clone();
+		let con = self.con;
+		let addr = self.addr.clone();
+		actix::spawn(audio_stream.for_each(move |packet| {
+			let logger = logger.clone();
+			addr.send(audio::ts_to_audio::PlayMsg(con, packet)).then(move |r| {
+				match r {
+					Ok(Ok(())) => {}
+					Ok(Err(e)) => error!(logger, "Failed to play audio packet"; "error" => ?e),
+					Err(e) => error!(logger, "Failed to play audio packet"; "error" => ?e),
+				}
+				Ok(())
+			})
+		}).map_err(move |e| {
+			error!(logger2, "Failed to handle packets"; "error" => ?e);
+		}));
+	}
+
+	/// Clone into a box.
+	fn clone(&self) -> PHBox {
+		Box::new(Clone::clone(self))
+	}
+}
+
 impl<T> InCommandObserver<T> for ProxyCommandObserver {
 	fn observe(&self, _: &mut (T, tsproto::connection::Connection), cmd: &InCommand) {
 		actix::spawn(self.addr.send(WsMessage::Packet(cmd.into())).map_err(|_| {
-			eprintln!("Failed to send packet");
+			eprintln!("Failed to redirect packet to websocket connection");
 		}));
 	}
 }
@@ -161,16 +229,19 @@ fn main() {
 	let _scope_guard = slog_scope::set_global_logger(logger.clone());
 	let _log_guard = slog_stdlog::init().unwrap();
 
-	let (a2ts) = audio::start(logger.clone()).unwrap();
+	let (a2ts, ts2a) = audio::start(logger.clone()).unwrap();
 
 	server::new(move || {
 		let logger = logger.clone();
 		let a2ts = a2ts.clone();
+		let ts2a = ts2a.clone();
 		App::new()
 		.middleware(middleware::Logger::default())
 		.resource("/ws", |r| r.f(move |req| ws::start(req, Ws {
 			logger: logger.clone(),
+			id: next_con_id(),
 			a2ts: a2ts.clone(),
+			ts2a: ts2a.clone(),
 			connection: None,
 		})))
 		.handler("/", StaticFiles::new("../target/wasm32-unknown-unknown/release")
