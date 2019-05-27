@@ -1,12 +1,7 @@
 use qint_shared::*;
 use stdweb::web::event::IEvent;
-use ts_bookkeeping::Uid;
-use ts_bookkeeping::data::Connection;
-use ts_bookkeeping::messages::s2c::{InMessage, InMessages};
 use yew::html;
-use yew::format::MsgPack;
 use yew::prelude::*;
-use yew::services::websocket::{WebSocketService, WebSocketTask, WebSocketStatus};
 
 use crate::connection_service::{ConnectionId, ConnectionService, FrontendConnectionState};
 
@@ -31,7 +26,7 @@ impl Component for Connect {
 	type Message = Msg;
 	type Properties = Props;
 
-	fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
+	fn create(props: Self::Properties, _: ComponentLink<Self>) -> Self {
 		let con = props.connection.expect("Connect needs a connection id");
 
 		Self {
@@ -87,8 +82,8 @@ fn checkbox_value(e: &ChangeData) -> bool {
 	}
 }
 
-impl Renderable<Connect> for Connect {
-	fn view(&self) -> Html<Connect> {
+impl Renderable<Self> for Connect {
+	fn view(&self) -> Html<Self> {
 		ConnectionService::with_mut_con(self.con, |con| if let
 			FrontendConnectionState::Disconnected(options, _) = &mut con.state {
 			html! {

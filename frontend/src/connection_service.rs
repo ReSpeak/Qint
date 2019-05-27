@@ -5,10 +5,13 @@ use failure::{format_err, Error};
 use futures::channel::oneshot;
 use futures::prelude::*;
 use qint_shared::*;
-use ts_bookkeeping::{ChannelId, Invoker, TsError};
+use ts_bookkeeping::{Invoker, TsError, Uid};
 use ts_bookkeeping::data::Connection;
-use tsproto_packets::packets::OutPacket;
-use slog::{o, Logger};
+use ts_bookkeeping::events::Event;
+use ts_bookkeeping::messages::s2c::{InCommandError, InMessage, InMessages, InMessageTrait, InTextMessage};
+use tsproto_packets::packets::{InCommand, OutPacket};
+use slog::{error, o, Logger};
+use yew::ShouldRender;
 use yew::format::MsgPack;
 use yew::services::websocket::WebSocketTask;
 
@@ -20,6 +23,8 @@ thread_local! {
 pub struct FrontendConnection {
 	pub logger: Logger,
 	pub state: FrontendConnectionState,
+	pub packet_listeners: HashMap<String, Box<for<'a> Fn(&'a FrontendConnection, &'a InCommand)>>,
+	pub event_listeners: HashMap<String, Box<for<'a> Fn(&'a FrontendConnection, &'a [Event])>>,
 }
 
 pub enum FrontendConnectionState {
@@ -30,12 +35,20 @@ pub enum FrontendConnectionState {
 pub struct Connected {
 	ws: WebSocketTask,
 	message_handler: MessageHandler,
-	con: Connection,
+	pub con: Connection,
+
+	pub messages: Vec<Message>,
+	pub composing: String,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[repr(transparent)]
 pub struct ConnectionId(pub u32);
+
+pub struct Message {
+	pub(super) invoker: Invoker,
+	pub(super) message: String,
+}
 
 #[derive(Default)]
 pub struct ConnectionService;
@@ -56,6 +69,8 @@ impl ConnectionService {
 					let con = FrontendConnection {
 						logger: logger.new(o!("id" => id.0)),
 						state: Default::default(),
+						packet_listeners: Default::default(),
+						event_listeners: Default::default(),
 					};
 					cons.insert(id, con);
 					return id;
@@ -96,6 +111,9 @@ impl Connected {
 			ws,
 			message_handler: Default::default(),
 			con,
+
+			messages: Default::default(),
+			composing: Default::default(),
 		}
 	}
 }
@@ -125,6 +143,106 @@ impl FrontendConnection {
 		}
 	}
 
+	pub fn handle_packet(&mut self, packet: InCommandMsg) -> Result<ShouldRender, Error> {
+		let packet: InCommand = packet.into();
+		// Call listeners
+		for l in self.packet_listeners.values() {
+			l(self, &packet);
+		}
+
+		let res = match &mut self.state {
+			FrontendConnectionState::Disconnected(_, ws) => {
+				let msg = match InMessage::new(packet) {
+					Ok(r) => r,
+					Err(e) => {
+						error!(self.logger, "Failed to parse packet"; "error" => ?e);
+						return Ok(false);
+					}
+				};
+				if let InMessages::InitServer(_) = msg.msg() {
+				} else if let InMessages::InitIvExpand2(_) = msg.msg() {
+					return Ok(false);
+				} else {
+					error!(self.logger, "Got no initserver as first packet";
+						"packet" => ?msg);
+					return Ok(false);
+				}
+
+				// TODO Uid
+				self.state = FrontendConnectionState::Connected(
+					Connected::new(ws.take().unwrap(), Connection::new(
+						Uid("".into()),
+						&msg,
+					)));
+				true
+			}
+			FrontendConnectionState::Connected(c) => {
+				let mut res = false;
+				// Handle return codes
+				if packet.name() == "error" {
+					let error = match InCommandError::new(&packet) {
+						Ok(r) => r,
+						Err(e) => {
+							error!(self.logger, "Failed to parse error command"; "error" => ?e);
+							return Ok(false);
+						}
+					};
+					let error = error.iter().next().unwrap();
+
+					if let Some(code) =
+						error.return_code.as_ref().and_then(|c| c.parse().ok())
+					{
+						if let Some(return_sender) =
+							c.message_handler.return_codes.remove(&code)
+						{
+							// Ignore if sending fails
+							let _ = return_sender.send(error.id);
+						}
+					} else {
+						error!(self.logger, "Got error without return code"; "error" => ?error.id)
+					}
+					// Packet contains only handled return codes
+					return Ok(false);
+				} else if packet.name() == "notifytextmessage" {
+					let msg = match InTextMessage::new(&packet) {
+						Ok(r) => r,
+						Err(e) => {
+							error!(self.logger, "Failed to parse message command"; "error" => ?e);
+							return Ok(false);
+						}
+					};
+					let msg = msg.iter().next().unwrap();
+
+					let msg = Message {
+						invoker: Invoker {
+							id: msg.invoker_id,
+							name: msg.invoker_name.to_string(),
+							uid: msg.invoker_uid.as_ref().map(|u| u.clone().into()),
+						},
+						message: msg.message.to_string(),
+					};
+					c.messages.push(msg);
+				}
+
+				// Bookkeeping
+				match c.con.handle_command(&packet) {
+					Ok(events) => {
+						// Call listeners
+						for l in self.event_listeners.values() {
+							l(self, &events);
+						}
+						res
+					}
+					Err(e) => {
+						error!(self.logger, "Failed to handle command"; "error" => ?e);
+						res
+					}
+				}
+			}
+		};
+		Ok(res)
+	}
+
 	pub fn send_ws_message(&mut self, msg: &MessageF2P) -> Result<(), Error> {
 		match &mut self.state {
 			FrontendConnectionState::Disconnected(_, Some(ws)) => {
@@ -147,7 +265,7 @@ impl FrontendConnection {
 	pub fn send_message(
 		&mut self,
 		mut packet: OutPacket,
-	) -> Box<Future<Output = Result<(), TsError>>>
+	) -> Box<Future<Output = Result<(), TsError>> + Unpin>
 	{
 		let con = if let FrontendConnectionState::Connected(c) = &mut self.state {
 			c
