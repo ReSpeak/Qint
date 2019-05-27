@@ -9,7 +9,7 @@ use futures01::Future as _;
 use qint_shared::{InCommandMsg, MessageF2P, MessageP2F};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
-use slog::{o, Drain};
+use slog::{error, o, Drain, Logger};
 use tsclientlib::Connection;
 use tsproto::handler_data::InCommandObserver;
 use tsproto_packets::packets::InCommand;
@@ -18,6 +18,8 @@ mod audio;
 
 /// Define http actor
 struct Ws {
+	logger: Logger,
+	a2ts: Addr<audio::audio_to_ts::AudioToTs>,
 	connection: Option<Connection>,
 }
 
@@ -93,15 +95,34 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 							}))
 						);
 
-						ctx.spawn(wrap_future(con).map(|con, actor: &mut Ws, _ctx| {
-							actor.connection = Some(con);
-						})
-						.map_err(|_e, _actor, ctx| {
+						let logger = self.logger.clone();
+						let a2ts = self.a2ts.clone();
+						ctx.spawn(wrap_future(con).map_err(|_e, _actor, ctx| {
 							Self::send_message(&MessageP2F::ConnectFailed(), ctx);
+						}).map(move |con, actor: &mut Ws, _ctx| {
+							let c = con.clone();
+							actor.connection = Some(con);
+
+							// Activate audio
+							// TODO Handle disconnect
+							actix::spawn(a2ts.send(audio::audio_to_ts::SetListenerMsg {
+								connection: c,
+							}).map_err(move |e| {
+								error!(logger, "Failed to set listener"; "error" => ?e);
+							}));
 						}));
 					}
 					MessageF2P::SetTalking(talk) => {
-						// TODO
+						let logger = self.logger.clone();
+						actix::spawn(self.a2ts.send(audio::audio_to_ts::SetPlayingMsg(talk))
+							.then(move |r| {
+								match r {
+									Ok(Ok(())) => {}
+									Err(e) => error!(logger, "Failed to set playing state"; "error" => ?e),
+									Ok(Err(e)) => error!(logger, "Failed to set playing state"; "error" => ?e),
+								}
+								Ok(())
+							}));
 					}
 					MessageF2P::Packet(packet) => {
 						if let Some(con) = &mut self.connection {
@@ -142,9 +163,14 @@ fn main() {
 
 	let (a2ts) = audio::start(logger.clone()).unwrap();
 
-	server::new(|| App::new()
+	server::new(move || {
+		let logger = logger.clone();
+		let a2ts = a2ts.clone();
+		App::new()
 		.middleware(middleware::Logger::default())
-		.resource("/ws", |r| r.f(|req| ws::start(req, Ws {
+		.resource("/ws", |r| r.f(move |req| ws::start(req, Ws {
+			logger: logger.clone(),
+			a2ts: a2ts.clone(),
 			connection: None,
 		})))
 		.handler("/", StaticFiles::new("../target/wasm32-unknown-unknown/release")
@@ -153,7 +179,8 @@ fn main() {
 				.expect("Static files not found")
 				.index_file("index.html"))
 		)
-		.finish())
+		.finish()
+	})
 		//.bind("0.0.0.0:4422")
 		.bind("127.0.0.1:4422")
 		.unwrap()

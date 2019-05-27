@@ -1,4 +1,3 @@
-use std::fmt::Debug;
 use std::sync::{Arc, Weak};
 
 use actix_web::actix::*;
@@ -8,18 +7,18 @@ use futures::executor::ThreadPool;
 use gst::{gst_element_error, gst_element_warning};
 use gst_audio::StreamVolumeExt;
 use parking_lot::Mutex;
-use slog::{debug, error, o, Logger};
-use tsproto_packets::packets::{AudioData, CodecType, OutAudio, OutPacket};
+use slog::{debug, error, info, o, Logger};
+use tsproto_packets::packets::{AudioData, CodecType, OutAudio};
 
 use super::*;
 
 pub struct SetListenerMsg {
-	connection: tsclientlib::Connection,
+	pub connection: tsclientlib::Connection,
 }
 
 pub struct RemoveListenerMsg;
-pub struct SetVolumeMsg(f64);
-pub struct SetPlayingMsg(bool);
+pub struct SetVolumeMsg(pub f64);
+pub struct SetPlayingMsg(pub bool);
 
 pub struct AudioToTs {
 	listeners: Arc<Mutex<Vec<ConnectionSinkCreator>>>,

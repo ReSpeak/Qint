@@ -1,9 +1,7 @@
-use std::sync::{Once, ONCE_INIT};
-
 use actix_web::actix::*;
 use failure::Error;
 use futures::prelude::*;
-use futures::executor::{ThreadPool, ThreadPoolBuilder};
+use futures::executor::{ThreadPoolBuilder};
 use futures::task::SpawnExt;
 use gstreamer as gst;
 use gstreamer_audio as gst_audio;
@@ -36,10 +34,11 @@ fn main_loop(
 	logger: Logger,
 ) -> impl Future<Output = ()>
 {
-	pipeline
+	// TODO Not automatically
+	/*pipeline
 		.set_state(gst::State::Playing)
 		.expect("Unable to set the pipeline to the `Playing` state");
-	debug!(logger, "Pipeline is playing");
+	debug!(logger, "Pipeline is playing");*/
 
 	// We use an AbortHandle for having a Future that runs forever
 	// until we call handle.abort() to quit our event loop

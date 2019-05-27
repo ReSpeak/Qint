@@ -1,4 +1,5 @@
 use futures::prelude::*;
+use qint_shared::*;
 use slog::error;
 use ts_bookkeeping::{ChannelId, ClientId};
 use ts_bookkeeping::data::{Channel, Client, Connection};
@@ -49,14 +50,19 @@ impl Component for ChannelTree {
 			Msg::Redraw => true,
 			Msg::SetTalking(talk) => {
 				// TODO
-				false
+				ConnectionService::with_mut_con(self.con, |con| {
+					let logger = con.logger.clone();
+					con.send_ws_message(&MessageF2P::SetTalking(talk))
+						.unwrap();
+				}, || panic!("Should be in connected state"));
+				self.is_talking = talk;
+				true
 			}
 			Msg::ChangeChannel(id) => {
 				ConnectionService::with_mut_con(self.con, |con| if let
 					FrontendConnectionState::Connected(c) = &mut con.state {
 					let cmd = c.con.server.clients[&c.con.own_client]
 						.set_channel(id);
-					c.composing.clear();
 					let logger = con.logger.clone();
 					stdweb::spawn_local(con.send_message(cmd).map(move |r| {
 						if let Err(e) = r {
