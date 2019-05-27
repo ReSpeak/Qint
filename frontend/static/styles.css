@@ -43,16 +43,19 @@
 	bottom: 0;
 	box-sizing: border-box;
 	width: var(--channel-tree-width);
-	padding: 0.5em;
+	overflow-y: auto;
 	background-color: #ccdce2;
 }
 
 .channel-tree ul {
 	list-style: none;
+	padding-left: 1em;
+	border-left: solid 1px #0000001c;
 }
 
 .channel-tree > ul {
-	padding: 0;
+	padding-top: 0.5em;
+	padding-bottom: 0.5em;
 }
 
 .channel-tree .channel {
