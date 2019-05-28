@@ -128,7 +128,7 @@ impl TsToAudio {
 		{
 			if autosink.is_none() {
 				if let Some(sink) =
-					gst::ElementFactory::make("directsoundsink", "autosink")
+					gst::ElementFactory::make("directsoundsink", Some("autosink"))
 				{
 					autosink = Some(sink);
 				}
