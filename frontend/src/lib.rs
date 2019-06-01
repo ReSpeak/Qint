@@ -92,10 +92,15 @@ impl Component for Model {
 		let logger = slog::Logger::root(slog_stdlog::StdLog.fuse(), o!());
 		let con = ConnectionService::add_connection(&logger);
 
+							// Create webrtc connection
+							let callback = link.send_back(|data: WebrtcMsg| {
+								Msg::Send(MessageF2P::Webrtc(data))
+							});
+							let rtc = Some(webrtc::Webrtc::new(callback));
 		Self {
 			ws_service: WebSocketService::new(),
 			link,
-			rtc: None,
+			rtc,
 			logger,
 			con,
 		}

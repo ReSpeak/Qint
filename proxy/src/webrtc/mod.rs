@@ -108,16 +108,16 @@ impl Handler<SetupMsg> for WebrtcHandler {
 				webrtc2.emit("set-local-description", &[&offer, &None::<gst::Promise>]).unwrap();
 
 				let logger = logger.clone();
-				println!("Send {:?}", offer.get_sdp().as_text().unwrap());
-				executor.spawn(ws_addr.send(crate::WsMessage::Message(
+				println!("Send {}", offer.get_sdp().as_text().unwrap());
+				/*executor.spawn(*/ws_addr.do_send(crate::WsMessage::Message(
 					MessageP2F::Webrtc(WebrtcMsg::Sdp {
 						typ: "offer".to_string(),
 						sdp: offer.get_sdp().as_text().unwrap(),
-					}))).compat().map(move |r| {
+					})));/*.compat().map(move |r| {
 						if let Err(e) = r {
 							error!(logger, "Failed to send webrtc message"; "error" => ?e);
 						}
-					})).unwrap();
+					})).unwrap();*/
 			});
 
 			webrtc.emit("create-offer", &[&None::<gst::Structure>, &promise]).unwrap();
@@ -136,15 +136,15 @@ impl Handler<SetupMsg> for WebrtcHandler {
 			let logger2 = logger.clone();
 			let mut executor = executor.clone();
 			// Ignore failure when the websocket connection is gone
-			let _ = executor.spawn(ws_addr.send(crate::WsMessage::Message(
+			/*executor.spawn(*/ws_addr.do_send(crate::WsMessage::Message(
 				MessageP2F::Webrtc(WebrtcMsg::Ice {
 					candidate,
 					sdp_mline_index: mlineindex,
-				}))).compat().map(move |r| {
+				})));/*.compat().map(move |r| {
 					if let Err(e) = r {
 						error!(logger2, "Failed to send webrtc message"; "error" => ?e);
 					}
-				}));
+				})).unwrap();*/
 			None
 		})?;
 
@@ -152,6 +152,7 @@ impl Handler<SetupMsg> for WebrtcHandler {
 		let webrtc = self.webrtc.clone();
 		let logger = self.logger.clone();
 		self.webrtc.connect("pad-added", false, move |_| {
+			println!("Webrtc pad added");
 			let decodebin = gst::ElementFactory::make("decodebin", None).unwrap();
 			let pipeline2 = pipeline.clone();
 			let logger = logger.clone();
@@ -208,15 +209,15 @@ impl Handler<SetupMsg> for WebrtcHandler {
 				println!("Send {:?}", offer.get_sdp().as_text().unwrap());
 				// TODO This is not json
 				let logger = logger.clone();
-				executor.spawn(ws_addr.send(crate::WsMessage::Message(
+				/*executor.spawn(*/ws_addr.do_send(crate::WsMessage::Message(
 					MessageP2F::Webrtc(WebrtcMsg::Sdp {
 						typ: "offer".to_string(),
 						sdp: offer.get_sdp().as_text().unwrap(),
-					}))).compat().map(move |r| {
+					})));/*.compat().map(move |r| {
 						if let Err(e) = r {
 							error!(logger, "Failed to send webrtc message"; "error" => ?e);
 						}
-					})).unwrap();
+					})).unwrap();*/
 			});
 
 			webrtc.emit("create-offer", &[&None::<gst::Structure>, &promise]).unwrap();
@@ -263,10 +264,14 @@ impl WebrtcHandler {
 			return;
 		}
 
+		println!("{}", sdp);
 		let ret = gst_sdp::SDPMessage::parse_buffer(sdp.as_bytes()).unwrap();
+		// TODO Report: If this is None, we get a SEGFAULT in set-remote-description
+		//println!("Media: {:?}", ret.get_media(0));
 		let answer =
 			gst_webrtc::WebRTCSessionDescription::new(gst_webrtc::WebRTCSDPType::Answer, ret);
 		let promise = gst::Promise::new();
+		//promise.interrupt();
 		self.webrtc.emit("set-remote-description", &[&answer, &promise])
 			.unwrap();
 	}
@@ -414,6 +419,7 @@ fn add_audio_source(pipeline: &gst::Pipeline, webrtcbin: &gst::Element) -> Resul
 	])?;
 
 	queue3.link_filtered(webrtcbin, Some(&*RTP_CAPS_OPUS))?;
+	println!("Added audio source");
 
 	Ok(())
 }

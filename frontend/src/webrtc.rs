@@ -10,10 +10,10 @@ pub struct Webrtc {
 impl Webrtc {
 	pub fn new(callback: Callback<WebrtcMsg>) -> Self {
 		let call = callback.clone();
-		let got_ice = move |c| {
+		let got_ice = move |i, c| {
 			call.emit(WebrtcMsg::Ice {
 				candidate: c,
-				sdp_mline_index: 0,
+				sdp_mline_index: i,
 			});
 		};
 
@@ -31,23 +31,27 @@ impl Webrtc {
 			var con = new RTCPeerConnection(peerConnectionConfig);
 			con.onicecandidate = function(e) {
 				if (e.candidate != null) {
-					console.log(e);
-					@{got_ice}(JSON.stringify(e.candidate));
+					console.log("Local ICE");
+					console.log(e.candidate);
+					@{got_ice}(e.candidate.sdpMLineIndex, e.candidate.candidate);
 				}
 			};
-			con.onaddstream = function(event) {
+			con.ontrack = function(event) {
 				console.log("Got remote stream");
+				console.log(event);
 				var playback = document.getElementById("audio-playback");
-				playback.srcObject = event.stream;
+				playback.srcObject = event.streams[0];
 			};
 
 			var constraints = {
 				video: false,
 				audio: true,
 			};
-			navigator.mediaDevices.getUserMedia(constraints, function(stream) {
+			navigator.mediaDevices.getUserMedia(constraints).then(function(stream) {
 				con.addStream(stream);
-			}, function(e) {
+				console.log("Added stream");
+			})
+			.catch(function (e) {
 				console.log("Failed to get user media " + e);
 			});
 
@@ -70,12 +74,13 @@ impl Webrtc {
 	pub fn handle(&mut self, msg: WebrtcMsg) {
 		match msg {
 			WebrtcMsg::Ice { candidate, sdp_mline_index } => {
-				/*js! { @(no_return)
+				js! { @(no_return)
 					var con = @{&self.con};
-					var ice = {candidate: @{candidate}};
-					console.log("Got ice " + ice);
+					var ice = {candidate: @{candidate}, sdpMLineIndex: @{sdp_mline_index}};
+					console.log("Got ice ");
+					console.log(ice);
 					con.addIceCandidate(new RTCIceCandidate(ice));
-				};*/
+				};
 			}
 			WebrtcMsg::Sdp { typ, sdp } => {
 				let call = self.callback.clone();
@@ -101,7 +106,7 @@ impl Webrtc {
 						if(sdp.type == "offer") {
 							con.createAnswer(function(description) {
 								con.setLocalDescription(description, function () {
-									@{got_sdp}(description.type, JSON.stringify(description.sdp));
+									@{got_sdp}(description.type, description.sdp);
 								}, function() { console.log("set description error"); });
 							}, @{on_error});
 						}
