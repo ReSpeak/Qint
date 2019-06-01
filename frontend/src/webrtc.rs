@@ -60,10 +60,12 @@ impl Webrtc {
 			return con;
 		};
 
-		Self {
+		let mut res = Self {
 			callback,
 			con,
-		}
+		};
+		//res.set_talking(false);
+		res
 	}
 
 	pub fn handle(&mut self, msg: WebrtcMsg) {
@@ -105,6 +107,12 @@ impl Webrtc {
 					}).catch(@{on_error});
 				};
 			}
+		}
+	}
+
+	pub fn set_talking(&mut self, talk: bool) {
+		js! { @(no_return)
+			@{&self.con}.getSenders()[0].track.enabled = @{talk};
 		}
 	}
 }

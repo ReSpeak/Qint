@@ -341,8 +341,7 @@ fn main() {
 		)
 		.finish()
 	})
-		//.bind("0.0.0.0:4422")
-		.bind("127.0.0.1:4422")
+		.bind(args.address)
 		.unwrap()
 		.run();
 }

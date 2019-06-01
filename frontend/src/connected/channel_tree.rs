@@ -11,13 +11,11 @@ use crate::connection_service::*;
 pub struct ChannelTree {
 	con: ConnectionId,
 	callback: Callback<()>,
-	is_talking: bool,
 }
 
 pub enum Msg {
 	Ignore,
 	Redraw,
-	SetTalking(bool),
 	ChangeChannel(ChannelId),
 }
 
@@ -38,7 +36,6 @@ impl Component for ChannelTree {
 		let res = Self {
 			con,
 			callback,
-			is_talking: false,
 		};
 		res.add_listener();
 		res
@@ -48,16 +45,6 @@ impl Component for ChannelTree {
 		match msg {
 			Msg::Ignore => false,
 			Msg::Redraw => true,
-			Msg::SetTalking(talk) => {
-				// TODO
-				ConnectionService::with_mut_con(self.con, |con| {
-					let logger = con.logger.clone();
-					con.send_ws_message(&MessageF2P::SetTalking(talk))
-						.unwrap();
-				}, || panic!("Should be in connected state"));
-				self.is_talking = talk;
-				true
-			}
 			Msg::ChangeChannel(id) => {
 				ConnectionService::with_mut_con(self.con, |con| if let
 					FrontendConnectionState::Connected(c) = &mut con.state {
@@ -166,17 +153,9 @@ impl ChannelTree {
 		let own_channel = con.server.clients.get(&own_client).map(|c| c.channel)
 			.unwrap_or(ChannelId(0));
 
-		let is_talking = self.is_talking;
-		let talking = if self.is_talking {
-			"Stop talking"
-		} else {
-			"Start talking"
-		};
-
 		html! {
 			<div class="channel-tree",>
 				{ self.view_channel(&clients, &channels, ChannelId(0), own_client, own_channel) }
-				<button onclick=|_| Msg::SetTalking(!is_talking).into(),>{ talking }</button>
 			</div>
 		}
 	}

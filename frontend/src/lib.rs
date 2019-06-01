@@ -23,6 +23,7 @@ pub struct Model {
 	rtc: Option<webrtc::Webrtc>,
 	/// The currently selected connection.
 	con: ConnectionId,
+	is_talking: bool,
 }
 
 pub enum Msg {
@@ -32,6 +33,7 @@ pub enum Msg {
 	Disconnected,
 	Message(MessageP2F),
 	Send(MessageF2P),
+	SetTalking(bool),
 }
 
 impl Model {
@@ -92,17 +94,19 @@ impl Component for Model {
 		let logger = slog::Logger::root(slog_stdlog::StdLog.fuse(), o!());
 		let con = ConnectionService::add_connection(&logger);
 
-							// Create webrtc connection
-							let callback = link.send_back(|data: WebrtcMsg| {
-								Msg::Send(MessageF2P::Webrtc(data))
-							});
-							let rtc = Some(webrtc::Webrtc::new(callback));
+		// Create webrtc connection
+		let callback = link.send_back(|data: WebrtcMsg| {
+			Msg::Send(MessageF2P::Webrtc(data))
+		});
+		let rtc = Some(webrtc::Webrtc::new(callback));
+
 		Self {
 			ws_service: WebSocketService::new(),
 			link,
 			rtc,
 			logger,
 			con,
+			is_talking: false,
 		}
 	}
 
@@ -164,6 +168,18 @@ impl Component for Model {
 					}
 				}
 			}
+			Msg::SetTalking(talk) => {
+				ConnectionService::with_mut_con(self.con, |con| {
+					let logger = con.logger.clone();
+					con.send_ws_message(&MessageF2P::SetTalking(talk))
+						.unwrap();
+				}, || panic!("Should be in connected state"));
+				self.is_talking = talk;
+				if let Some(rtc) = &mut self.rtc {
+					rtc.set_talking(talk);
+				}
+				true
+			}
 			Msg::Send(msg) => {
 				ConnectionService::with_mut_con(self.con, move |con| {
 					if let Err(e) = con.send_ws_message(&msg) {
@@ -184,11 +200,19 @@ impl Renderable<Self> for Model {
 			|| false,
 		);
 		let con = Some(self.con);
+		let is_talking = self.is_talking;
+		let talking = if self.is_talking {
+			"Stop talking"
+		} else {
+			"Start talking"
+		};
+
 		if !is_connected {
 			html! {
 				<>
 				<audio id="audio-playback", autoplay="autoplay", />
 				<Connect: connection=con, onconnect=|_| Msg::Connect, />
+				<button style="position:absolute", onclick=|_| Msg::SetTalking(!is_talking).into(),>{ talking }</button>
 				</>
 			}
 		} else {
@@ -196,6 +220,7 @@ impl Renderable<Self> for Model {
 				<>
 				<audio id="audio-playback", autoplay="autoplay", />
 				<Connected: connection=con, />
+				<button style="position:absolute", onclick=|_| Msg::SetTalking(!is_talking).into(),>{ talking }</button>
 				</>
 			}
 		}
