@@ -2,8 +2,9 @@ use std::sync::Arc;
 
 use actix_web::actix::*;
 use failure::{format_err, Error};
-use futures::compat::*;
-use futures::executor::ThreadPool;
+use futures01::{Future, Sink};
+use futures_spawn::SpawnHelper;
+use futures_threadpool::ThreadPool;
 use gst::{gst_element_error, gst_element_warning};
 use gst_audio::StreamVolumeExt;
 use parking_lot::Mutex;
@@ -11,6 +12,7 @@ use slog::{debug, error, o, Logger};
 use tsproto_packets::packets::{AudioData, CodecType, OutAudio};
 
 use super::*;
+use super::webrtc::WebrtcHandler;
 
 pub struct SetListenerMsg {
 	pub connection: tsclientlib::Connection,
@@ -24,9 +26,8 @@ pub struct AudioToTs {
 	listeners: Arc<Mutex<Vec<ConnectionSinkCreator>>>,
 
 	logger: Logger,
-	pipeline: gst::Pipeline,
 	bin: gst::Bin,
-	volume: gst_audio::StreamVolume,
+	volume: Option<gst_audio::StreamVolume>,
 }
 
 struct ConnectionSinkCreator {
@@ -89,93 +90,145 @@ impl AudioToTs {
 	pub fn new(
 		logger: Logger,
 		pipeline: gst::Pipeline,
-		mut executor: ThreadPool,
+		executor: ThreadPool,
+		rtc: Option<&WebrtcHandler>,
 		uri: Option<&str>,
 	) -> Result<Self, Error> {
 		let logger = logger.new(o!("pipeline" => "audio-to-ts"));
 		// TODO Put everything into ts-to-audio bin and play/pause that
 		let bin = gst::Bin::new(Some("ts-to-audio"));
 
-		let decode;
-		if let Some(uri) = &uri {
-			decode = gst::ElementFactory::make("uridecodebin", Some("decode"))
-				.ok_or_else(|| format_err!("Missing uridecodebin"))?;
-			decode.set_property("uri", uri)?;
-		} else {
-			decode = gst::ElementFactory::make("autoaudiosrc", Some("audiosrc"))
-				.ok_or_else(|| format_err!("Missing autoaudiosrc"))?;
-		}
-
-		let resampler = gst::ElementFactory::make("audioresample", Some("resample"))
-			.ok_or_else(|| format_err!("Missing audioresample"))?;
-
-		let vol = gst::ElementFactory::make("volume", Some("vol"))
-			.ok_or_else(|| format_err!("Missing volume"))?;
-
-		let opusenc = gst::ElementFactory::make("opusenc", Some("opusenc"))
-			.ok_or_else(|| format_err!("Missing opusenc"))?;
 		let sink = gst::ElementFactory::make("appsink", Some("appsink"))
 			.ok_or_else(|| format_err!("Missing appsink"))?;
+		bin.add(&sink)?;
+		let volume;
 
-		opusenc.set_property_from_str("bitrate-type", "vbr");
-		opusenc.set_property_from_str("audio-type", "voice"); // or generic
-		// Discontinuous transmission: Reduce bandwidth of silence
-		// Unfortunately creates artifacts
-		//opusenc.set_property("dtx", &glib::Value::from(&true))?;
-		// Inband forward error correction
-		opusenc.set_property("inband-fec", &true)?;
-		// Packetloss between 0 - 100
-		opusenc.set_property("packet-loss-percentage", &0)?;
+		if let Some(rtc) = rtc {
+			volume = None;
+			let logger2 = logger.clone();
+			let pipeline2 = pipeline.clone();
+			let sink2 = sink.clone();
+			let webrtc2 = rtc.webrtc.clone();
+			rtc.webrtc.connect("pad-added", false, move |_| {
+				debug!(logger2, "Webrtc pad added");
+				let decodebin = gst::ElementFactory::make("decodebin", None).unwrap();
+				let pipeline = pipeline2.clone();
+				let logger = logger2.clone();
+				let sink = sink2.clone();
+				decodebin.connect("pad-added", false, move |values| {
+					let pad = values[1].get::<gst::Pad>().expect("Invalid argument");
+					if !pad.has_current_caps() {
+						println!("Pad {:?} has no caps, can't do anything, ignoring", pad);
+						return None;
+					}
 
-		bin.add_many(&[&decode, &resampler, &vol, &opusenc, &sink])?;
-		pipeline.add(&bin)?;
-		gst::Element::link_many(&[&resampler, &vol, &opusenc, &sink])?;
-		if uri.is_none() {
-			decode.link(&resampler)?;
-		}
+					let caps = pad.get_current_caps().unwrap();
+					let name = caps.get_structure(0).unwrap().get_name();
 
-		// Link decode to next element if a pad gets available
-		let next = resampler;
-		let logger2 = logger.clone();
-		decode.connect_pad_added(move |dbin, src_pad| {
-			debug!(logger2, "Got new pad"; "name" => src_pad.get_name().as_str());
-			let is_audio = src_pad.get_current_caps().and_then(|caps| {
-				caps.get_structure(0).map(|s| {
-					debug!(logger2, "Capabilities"; "name" => src_pad.get_name().as_str(),
-						"caps" => ?s);
-					s.get_name().starts_with("audio/")
+					let handled = if name.starts_with("video") {
+						Err(format_err!("Cannot handle video streams"))
+					} else if name.starts_with("audio") {
+						handle_audio_stream(&pad, &pipeline, &sink)
+					} else {
+						println!("Unknown pad {:?}, ignoring", pad);
+						Ok(())
+					};
+
+					if let Err(err) = handled {
+						error!(logger, "Error adding pad with caps"; "name" => name, "error" => ?err);
+					}
+					None
 				})
+				.unwrap();
+
+				pipeline2.add(&decodebin).unwrap();
+
+				decodebin.sync_state_with_parent().unwrap();
+				webrtc2.link(&decodebin).unwrap();
+				None
+			})?;
+
+		} else {
+			let decode;
+			if let Some(uri) = &uri {
+				decode = gst::ElementFactory::make("uridecodebin", Some("decode"))
+					.ok_or_else(|| format_err!("Missing uridecodebin"))?;
+				decode.set_property("uri", uri)?;
+			} else {
+				decode = gst::ElementFactory::make("autoaudiosrc", Some("audiosrc"))
+					.ok_or_else(|| format_err!("Missing autoaudiosrc"))?;
+			}
+
+			let resampler = gst::ElementFactory::make("audioresample", Some("resample"))
+				.ok_or_else(|| format_err!("Missing audioresample"))?;
+
+			let vol = gst::ElementFactory::make("volume", Some("vol"))
+				.ok_or_else(|| format_err!("Missing volume"))?;
+
+			let opusenc = gst::ElementFactory::make("opusenc", Some("opusenc"))
+				.ok_or_else(|| format_err!("Missing opusenc"))?;
+
+			opusenc.set_property_from_str("bitrate-type", "vbr");
+			opusenc.set_property_from_str("audio-type", "voice"); // or generic
+			// Discontinuous transmission: Reduce bandwidth of silence
+			// Unfortunately creates artifacts
+			//opusenc.set_property("dtx", &glib::Value::from(&true))?;
+			// Inband forward error correction
+			opusenc.set_property("inband-fec", &true)?;
+			// Packetloss between 0 - 100
+			opusenc.set_property("packet-loss-percentage", &0)?;
+
+			bin.add_many(&[&decode, &resampler, &vol, &opusenc])?;
+			gst::Element::link_many(&[&resampler, &vol, &opusenc, &sink])?;
+			if uri.is_none() {
+				decode.link(&resampler)?;
+			}
+
+			// Link decode to next element if a pad gets available
+			let next = resampler;
+			let logger2 = logger.clone();
+			decode.connect_pad_added(move |dbin, src_pad| {
+				debug!(logger2, "Got new pad"; "name" => src_pad.get_name().as_str());
+				let is_audio = src_pad.get_current_caps().and_then(|caps| {
+					caps.get_structure(0).map(|s| {
+						debug!(logger2, "Capabilities"; "name" => src_pad.get_name().as_str(),
+							"caps" => ?s);
+						s.get_name().starts_with("audio/")
+					})
+				});
+
+				let is_audio = if let Some(is_audio) = is_audio {
+					is_audio
+				} else {
+					gst_element_warning!(
+						dbin,
+						gst::CoreError::Negotiation,
+						("Failed to get media type from pad {}", src_pad.get_name())
+					);
+					return;
+				};
+				if !is_audio {
+					return;
+				}
+
+				// Link to sink pad of next element
+				let sink_pad = next
+					.get_static_pad("sink")
+					.expect("Next element has no sink pad");
+				if let Err(error) = src_pad.link(&sink_pad) {
+					error!(logger2, "Cannot link pads"; "error" => ?error);
+					gst_element_error!(
+						dbin,
+						gst::ResourceError::Failed,
+						("Failed to link decoder")
+					);
+				}
 			});
 
-			let is_audio = if let Some(is_audio) = is_audio {
-				is_audio
-			} else {
-				gst_element_warning!(
-					dbin,
-					gst::CoreError::Negotiation,
-					("Failed to get media type from pad {}", src_pad.get_name())
-				);
-				return;
-			};
-			if !is_audio {
-				return;
-			}
+			volume = Some(vol.dynamic_cast::<gst_audio::StreamVolume>().unwrap());
+		}
 
-			// Link to sink pad of next element
-			let sink_pad = next
-				.get_static_pad("sink")
-				.expect("Next element has no sink pad");
-			if let Err(error) = src_pad.link(&sink_pad) {
-				error!(logger2, "Cannot link pads"; "error" => ?error);
-				gst_element_error!(
-					dbin,
-					gst::ResourceError::Failed,
-					("Failed to link decoder")
-				);
-			}
-		});
-
-		let streamvolume = vol.dynamic_cast::<gst_audio::StreamVolume>().unwrap();
+		pipeline.add(&bin)?;
 
 		let appsink = sink.dynamic_cast::<gst_app::AppSink>().unwrap();
 		appsink.set_caps(Some(&gst::Caps::new_simple("audio/x-opus",
@@ -232,17 +285,12 @@ impl AudioToTs {
 							return false;
 						}
 
-						let sink = l.con.as_packet_sink().sink_compat();
+						let sink = l.con.as_packet_sink();
 						let logger = logger.clone();
 						let packet = packet.clone();
-						executor2.clone().spawn(async {
-							let logger = logger;
-							let mut sink = sink;
-							let r = sink.send(packet).await;
-							if let Err(e) = r {
-								error!(logger, "Failed to send packet"; "error" => ?e);
-							}
-						}).expect("Failed to start");
+						executor2.spawn(sink.send(packet).map(|_| ()).map_err(move |e| {
+							error!(logger, "Failed to send packet"; "error" => ?e);
+						})).detach();
 						true
 					});
 					Ok(gst::FlowSuccess::Ok)
@@ -254,17 +302,19 @@ impl AudioToTs {
 			listeners,
 
 			logger: logger2,
-			pipeline,
 			bin,
-			volume: streamvolume,
+			volume,
 		})
 	}
 
 	pub fn set_volume(&self, volume: f64) {
-		self.volume.set_volume(gst_audio::StreamVolumeFormat::Linear, volume);
+		if let Some(v) = &self.volume {
+			v.set_volume(gst_audio::StreamVolumeFormat::Linear, volume);
+		}
+		// TODO
 	}
 
-	pub fn is_playing(&self) -> Result<bool, failure::Error> {
+	/*pub fn is_playing(&self) -> Result<bool, failure::Error> {
 		// Returns (success, current state, pending state)
 		let state = self.bin.get_state(
 			gst::ClockTime::from_mseconds(10),
@@ -281,7 +331,7 @@ impl AudioToTs {
 		} else {
 			Err(format_err!("Failed to get current state ({:?})", state))
 		}
-	}
+	}*/
 
 	pub fn set_playing(&self, playing: bool) -> Result<(), Error> {
 		if playing {
@@ -295,11 +345,38 @@ impl AudioToTs {
 	}
 }
 
-impl Drop for AudioToTs {
-	fn drop(&mut self) {
-		// Cleanup gstreamer
-		// TODO Done in ts-to-audio
-		//self.pipeline.set_state(gst::State::Null).expect(
-			//"Failed to shutdown gstreamer pipeline");
-	}
+fn handle_audio_stream(
+	pad: &gst::Pad,
+	pipe: &gst::Pipeline,
+	appsink: &gst::Element,
+) -> Result<(), Error> {
+	let q = gst::ElementFactory::make("queue", None).unwrap();
+
+	let conv = gst::ElementFactory::make("audioconvert", None).unwrap();
+	let resample = gst::ElementFactory::make("audioresample", None).unwrap();
+	let opusenc = gst::ElementFactory::make("opusenc", None).unwrap();
+	opusenc.set_property_from_str("bitrate-type", "vbr");
+	opusenc.set_property_from_str("audio-type", "voice"); // or generic
+	// Discontinuous transmission: Reduce bandwidth of silence
+	// Unfortunately creates artifacts
+	//opusenc.set_property("dtx", &glib::Value::from(&true))?;
+	// Inband forward error correction
+	opusenc.set_property("inband-fec", &true)?;
+	// Packetloss between 0 - 100
+	opusenc.set_property("packet-loss-percentage", &0)?;
+
+
+	pipe.add_many(&[&q, &conv, &resample, &opusenc])?;
+	gst::Element::link_many(&[&q, &conv, &resample, &opusenc, appsink])?;
+
+	resample.sync_state_with_parent()?;
+
+	q.sync_state_with_parent()?;
+	conv.sync_state_with_parent()?;
+	opusenc.sync_state_with_parent()?;
+
+	let qpad = q.get_static_pad("sink").unwrap();
+	pad.link(&qpad)?;
+
+	Ok(())
 }

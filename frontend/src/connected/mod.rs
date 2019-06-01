@@ -68,7 +68,6 @@ impl Renderable<Self> for Connected {
 			<div class="connected-container",>
 				<ChannelTree: connection=con, />
 				<Chat: connection=con, />
-				<audio id="audio-playback", />
 			</div>
 		}
 	}

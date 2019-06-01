@@ -1,8 +1,8 @@
 use actix_web::actix::*;
 use failure::Error;
 use futures::prelude::*;
-use futures::executor::ThreadPoolBuilder;
-use futures::task::SpawnExt;
+use futures_spawn::SpawnHelper;
+use futures_threadpool::ThreadPool;
 use gstreamer as gst;
 use gstreamer_audio as gst_audio;
 use gstreamer_app as gst_app;
@@ -12,31 +12,55 @@ use slog::{debug, error, Logger};
 use audio_to_ts::AudioToTs;
 use ts_to_audio::TsToAudio;
 
-pub mod ts_to_audio;
 pub mod audio_to_ts;
+pub mod ts_to_audio;
+pub mod webrtc;
 
 const VOICE_TIMEOUT_SECS: u64 = 1;
 
-pub fn start(logger: Logger) -> Result<(Addr<AudioToTs>, Addr<TsToAudio>,
-										Addr<crate::webrtc::WebrtcHandler>), Error> {
+#[derive(Clone)]
+pub struct AudioData {
+	pub pool: ThreadPool,
+	pub pipeline: gst::Pipeline,
+	pub a2ts: Addr<AudioToTs>,
+	pub ts2a: Addr<TsToAudio>,
+}
+
+pub(crate) fn start(logger: Logger, webrtc: Option<Addr<crate::Ws>>)
+	-> Result<(AudioData, Option<Addr<webrtc::WebrtcHandler>>), Error> {
 	gst::init().expect("gstreamer failed to initialize");
 
-	let mut pool = ThreadPoolBuilder::new()
+	let pool = futures_threadpool::Builder::new()
 		.pool_size(2)
 		.name_prefix("audio")
-		.create()?;
+		.create();
 	let pipeline = gst::Pipeline::new(Some("ts-pipeline"));
 
-	let ts2a = TsToAudio::new(logger.clone(), pipeline.clone(), pool.clone())?;
-	let a2ts = AudioToTs::new(logger.clone(), pipeline.clone(), pool.clone(), None)?;
+	let rtc = if let Some(addr) = webrtc {
+		Some(webrtc::WebrtcHandler::new(
+			logger.clone(),
+			pool.clone(),
+			pipeline.clone(),
+			addr,
+		)?)
+	} else {
+		None
+	};
 
-	let rtc = crate::webrtc::WebrtcHandler::new(logger.clone(), pool.clone(),
-		pipeline.clone())?;
+	let ts2a = TsToAudio::new(logger.clone(), pipeline.clone(), rtc.as_ref())?;
+	let a2ts = AudioToTs::new(logger.clone(), pipeline.clone(), pool.clone(), rtc.as_ref(), None)?;
+
+	let rtc = rtc.map(|r| r.start());
 
 	// Run event handler in background
-	pool.spawn(main_loop(&pipeline, logger.clone())).unwrap();
+	pool.spawn(main_loop(&pipeline, logger.clone()).unit_error().compat()).detach();
 
-	Ok((a2ts.start(), ts2a.start(), rtc.start()))
+	Ok((AudioData {
+		pool,
+		pipeline,
+		a2ts: a2ts.start(),
+		ts2a: ts2a.start(),
+	}, rtc))
 }
 
 fn main_loop(

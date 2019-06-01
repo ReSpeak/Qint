@@ -186,11 +186,17 @@ impl Renderable<Self> for Model {
 		let con = Some(self.con);
 		if !is_connected {
 			html! {
+				<>
+				<audio id="audio-playback", autoplay="autoplay", />
 				<Connect: connection=con, onconnect=|_| Msg::Connect, />
+				</>
 			}
 		} else {
 			html! {
+				<>
+				<audio id="audio-playback", autoplay="autoplay", />
 				<Connected: connection=con, />
+				</>
 			}
 		}
 	}

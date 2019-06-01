@@ -9,7 +9,6 @@ use actix_web::actix::fut::wrap_future;
 use async_timer::oneshot::{Oneshot, Timer};
 use failure::{format_err, Error};
 use futures::prelude::*;
-use futures::executor::ThreadPool;
 use futures01::Future as _;
 use parking_lot::Mutex;
 use slog::{o, Logger};
@@ -18,6 +17,31 @@ use tsproto_packets::packets::{AudioData, CodecType, InAudio};
 
 use crate::ConnectionId;
 use super::*;
+use super::webrtc::WebrtcHandler;
+
+lazy_static::lazy_static! {
+	static ref RTP_CAPS_OPUS: gst::Caps = {
+		gst::Caps::new_simple(
+			"application/x-rtp",
+			&[
+				("media", &"audio"),
+				("encoding-name", &"OPUS"),
+				("payload", &(97i32)),
+			],
+		)
+	};
+
+	static ref RTP_CAPS_VP8: gst::Caps = {
+		gst::Caps::new_simple(
+			"application/x-rtp",
+			&[
+				("media", &"video"),
+				("encoding-name", &"VP8"),
+				("payload", &(96i32)),
+			],
+		)
+	};
+}
 
 pub struct TsToAudio {
 	logger: Logger,
@@ -87,9 +111,7 @@ impl Handler<PlayMsg> for TsToAudio {
 }
 
 impl TsToAudio {
-	/// We need an explicit executor because we want to spawn new tasks in
-	/// callbacks from gstreamer threads.
-	pub fn new(logger: Logger, pipeline: gst::Pipeline, mut executor: ThreadPool) -> Result<Self, Error> {
+	pub fn new(logger: Logger, pipeline: gst::Pipeline, rtc: Option<&WebrtcHandler>) -> Result<Self, Error> {
 		let logger = logger.new(o!("pipeline" => "ts-to-audio"));
 
 		let mixer = gst::ElementFactory::make("audiomixer", Some("mixer"))
@@ -97,55 +119,82 @@ impl TsToAudio {
 		let queue = gst::ElementFactory::make("queue", Some("queue"))
 			.ok_or_else(|| format_err!("Missing queue"))?;
 
-		// The latency with autoaudiosink is high
-		// Linux: Try pulsesink, alsasink
-		// Windows: Try directsoundsink
-		// Else use autoaudiosink
-		let mut autosink = None;
-		#[cfg(target_os = "linux")]
-		{
-			if autosink.is_none() {
-				if let Some(sink) =
-					gst::ElementFactory::make("pulsesink", Some("autosink"))
-				{
-					autosink = Some(sink);
-				}
-			}
-		}
-		#[cfg(target_os = "linux")]
-		{
-			if autosink.is_none() {
-				if let Some(sink) =
-					gst::ElementFactory::make("alsasink", Some("autosink"))
-				{
-					autosink = Some(sink);
-				}
-			}
-		}
+		let sink;
 
-		#[cfg(target_os = "windows")]
-		{
-			if autosink.is_none() {
-				if let Some(sink) =
-					gst::ElementFactory::make("directsoundsink", Some("autosink"))
-				{
-					autosink = Some(sink);
-				}
-			}
-		}
+		if let Some(rtc) = rtc {
+			let queue2 = gst::ElementFactory::make("queue", None).unwrap();
+			let opusenc = gst::ElementFactory::make("opusenc", None).unwrap();
+			let rtpopuspay = gst::ElementFactory::make("rtpopuspay", None).unwrap();
+			let queue3 = gst::ElementFactory::make("queue", None).unwrap();
 
-		let autosink = if let Some(sink) = autosink {
-			sink
+			pipeline.add_many(&[
+				&queue2,
+				&opusenc,
+				&rtpopuspay,
+				&queue3,
+			])?;
+
+			gst::Element::link_many(&[
+				&queue2,
+				&opusenc,
+				&rtpopuspay,
+				&queue3,
+			])?;
+
+			queue3.link_filtered(&rtc.webrtc, Some(&*RTP_CAPS_OPUS))?;
+			sink = queue2;
 		} else {
-			gst::ElementFactory::make("pulsesink", Some("autosink"))
-				.ok_or_else(|| format_err!("Missing autoaudiosink"))?
-		};
-		if autosink.has_property("buffer-time", None).is_ok() {
-			autosink
-				.set_property("buffer-time", &20_000i64)?;
-		}
-		if autosink.has_property("blocksize", None).is_ok() {
-			autosink.set_property("blocksize", &960u32)?;
+			// The latency with autoaudiosink is high
+			// Linux: Try pulsesink, alsasink
+			// Windows: Try directsoundsink
+			// Else use autoaudiosink
+			let mut autosink = None;
+			#[cfg(target_os = "linux")]
+			{
+				if autosink.is_none() {
+					if let Some(sink) =
+						gst::ElementFactory::make("pulsesink", Some("autosink"))
+					{
+						autosink = Some(sink);
+					}
+				}
+			}
+			#[cfg(target_os = "linux")]
+			{
+				if autosink.is_none() {
+					if let Some(sink) =
+						gst::ElementFactory::make("alsasink", Some("autosink"))
+					{
+						autosink = Some(sink);
+					}
+				}
+			}
+
+			#[cfg(target_os = "windows")]
+			{
+				if autosink.is_none() {
+					if let Some(sink) =
+						gst::ElementFactory::make("directsoundsink", Some("autosink"))
+					{
+						autosink = Some(sink);
+					}
+				}
+			}
+
+			sink = if let Some(sink) = autosink {
+				sink
+			} else {
+				gst::ElementFactory::make("autoaudiosink", Some("autosink"))
+					.ok_or_else(|| format_err!("Missing autoaudiosink"))?
+			};
+			if sink.has_property("buffer-time", None).is_ok() {
+				sink.set_property("buffer-time", &20_000i64)?;
+			}
+			if sink.has_property("blocksize", None).is_ok() {
+				sink.set_property("blocksize", &960u32)?;
+			}
+
+			pipeline.add(&sink)?;
 		}
 
 		// The audiotestsrc just has to exist and not be eos.
@@ -158,8 +207,8 @@ impl TsToAudio {
 		fakesrc.set_property("samplesperbuffer", &960i32)?; // 20ms at 48 000 kHz
 		fakesrc.set_property_from_str("wave", "Silence");
 
-		pipeline.add_many(&[&fakesrc, &mixer, &queue, &autosink])?;
-		gst::Element::link_many(&[&mixer, &queue, &autosink])?;
+		pipeline.add_many(&[&fakesrc, &mixer, &queue])?;
+		gst::Element::link_many(&[&mixer, &queue, &sink])?;
 		// Additionally, we use the audiotestsrc to force the output to stereo and 48000 kHz
 		fakesrc.link_filtered(
 			&mixer,
@@ -173,7 +222,7 @@ impl TsToAudio {
 		pipeline.set_state(gst::State::Playing)?;
 		mixer.set_state(gst::State::Paused)?;
 		queue.set_state(gst::State::Paused)?;
-		autosink.set_state(gst::State::Paused)?;
+		sink.set_state(gst::State::Paused)?;
 		fakesrc.set_state(gst::State::Paused)?;
 
 		Ok(Self {
@@ -181,7 +230,7 @@ impl TsToAudio {
 			pipeline,
 			mixer,
 			queue,
-			sink: autosink,
+			sink,
 
 			voices: Default::default(),
 		})

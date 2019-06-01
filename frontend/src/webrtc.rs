@@ -25,20 +25,15 @@ impl Webrtc {
 			});
 		};
 
-		// TODO Also handle received sdp offers?
 		let con = js! {
 			var peerConnectionConfig = {"iceServers": [{"urls": "stun:stun.services.mozilla.com"}, {"urls": "stun:stun.l.google.com:19302"}]};
 			var con = new RTCPeerConnection(peerConnectionConfig);
 			con.onicecandidate = function(e) {
 				if (e.candidate != null) {
-					console.log("Local ICE");
-					console.log(e.candidate);
 					@{got_ice}(e.candidate.sdpMLineIndex, e.candidate.candidate);
 				}
 			};
 			con.ontrack = function(event) {
-				console.log("Got remote stream");
-				console.log(event);
 				var playback = document.getElementById("audio-playback");
 				playback.srcObject = event.streams[0];
 			};
@@ -77,8 +72,6 @@ impl Webrtc {
 				js! { @(no_return)
 					var con = @{&self.con};
 					var ice = {candidate: @{candidate}, sdpMLineIndex: @{sdp_mline_index}};
-					console.log("Got ice ");
-					console.log(ice);
 					con.addIceCandidate(new RTCIceCandidate(ice));
 				};
 			}
@@ -99,7 +92,6 @@ impl Webrtc {
 				js! { @(no_return)
 					var con = @{&self.con};
 					var sdp = @{sdp};
-					console.log("Got sdp " + sdp);
 					var sdp = {type: @{typ}, sdp: sdp};
 					con.setRemoteDescription(new RTCSessionDescription(sdp)).then(function() {
 						// Only create answers in response to offers
