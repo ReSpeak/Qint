@@ -43,12 +43,6 @@ lazy_static! {
 	};
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum MediaType {
-	Audio,
-	Video,
-}
-
 pub struct WebrtcHandler {
 	logger: Logger,
 	pub webrtc: gst::Element,
@@ -84,8 +78,6 @@ impl WebrtcHandler {
 		webrtc.set_property_from_str("bundle-policy", "max-bundle");
 
 		pipeline.add(&webrtc)?;
-		//add_video_source(&pipeline, &webrtc)?;
-		//add_audio_source(&pipeline, &webrtc)?;
 
 		let webrtc2 = webrtc.clone();
 		let executor2 = executor.clone();
@@ -251,122 +243,4 @@ fn check_plugins() -> Result<(), Error> {
 	} else {
 		Ok(())
 	}
-}
-
-fn handle_media_stream(
-	pad: &gst::Pad,
-	pipe: &gst::Pipeline,
-	media_type: MediaType,
-) -> Result<(), Error> {
-	let (q, conv, sink) = match media_type {
-		MediaType::Audio => {
-			let q = gst::ElementFactory::make("queue", None).unwrap();
-			let conv = gst::ElementFactory::make("audioconvert", None).unwrap();
-			let resample = gst::ElementFactory::make("audioresample", None).unwrap();
-			let sink = gst::ElementFactory::make("autoaudiosink", None).unwrap();
-
-			pipe.add_many(&[&q, &conv, &resample, &sink])?;
-			gst::Element::link_many(&[&q, &conv, &resample, &sink])?;
-
-			resample.sync_state_with_parent()?;
-
-			(q, conv, sink)
-		}
-		MediaType::Video => {
-			/*let q = gst::ElementFactory::make("queue", None).unwrap();
-			let conv = gst::ElementFactory::make("videoconvert", None).unwrap();
-			let sink = gst::ElementFactory::make("autovideosink", None).unwrap();
-
-			pipe.add_many(&[&q, &conv, &sink])?;
-			gst::Element::link_many(&[&q, &conv, &sink])?;
-
-			(q, conv, sink)*/
-			return Err(format_err!("Video is not yet implemented"));
-		}
-	};
-	q.sync_state_with_parent()?;
-	conv.sync_state_with_parent()?;
-	sink.sync_state_with_parent()?;
-
-	let qpad = q.get_static_pad("sink").unwrap();
-	pad.link(&qpad)?;
-
-	Ok(())
-}
-
-/*fn add_video_source(pipeline: &gst::Pipeline, webrtcbin: &gst::Element) -> Result<(), Error> {
-	let videotestsrc = gst::ElementFactory::make("videotestsrc", None).unwrap();
-	let videoconvert = gst::ElementFactory::make("videoconvert", None).unwrap();
-	let queue = gst::ElementFactory::make("queue", None).unwrap();
-	let vp8enc = gst::ElementFactory::make("vp8enc", None).unwrap();
-
-	videotestsrc.set_property_from_str("pattern", "ball");
-	videotestsrc.set_property("is-live", &true).unwrap();
-	vp8enc.set_property("deadline", &1i64).unwrap();
-
-	let rtpvp8pay = gst::ElementFactory::make("rtpvp8pay", None).unwrap();
-	let queue2 = gst::ElementFactory::make("queue", None).unwrap();
-
-	pipeline.add_many(&[
-		&videotestsrc,
-		&videoconvert,
-		&queue,
-		&vp8enc,
-		&rtpvp8pay,
-		&queue2,
-	])?;
-
-	gst::Element::link_many(&[
-		&videotestsrc,
-		&videoconvert,
-		&queue,
-		&vp8enc,
-		&rtpvp8pay,
-		&queue2,
-	])?;
-
-	queue2.link_filtered(webrtcbin, &*RTP_CAPS_VP8)?;
-
-	Ok(())
-}*/
-
-fn add_audio_source(pipeline: &gst::Pipeline, webrtcbin: &gst::Element) -> Result<(), Error> {
-	let audiotestsrc = gst::ElementFactory::make("audiotestsrc", None).unwrap();
-	let queue = gst::ElementFactory::make("queue", None).unwrap();
-	let audioconvert = gst::ElementFactory::make("audioconvert", None).unwrap();
-	let audioresample = gst::ElementFactory::make("audioresample", None).unwrap();
-	let queue2 = gst::ElementFactory::make("queue", None).unwrap();
-	let opusenc = gst::ElementFactory::make("opusenc", None).unwrap();
-	let rtpopuspay = gst::ElementFactory::make("rtpopuspay", None).unwrap();
-	let queue3 = gst::ElementFactory::make("queue", None).unwrap();
-
-	audiotestsrc.set_property_from_str("wave", "red-noise");
-	audiotestsrc.set_property("is-live", &true).unwrap();
-
-	pipeline.add_many(&[
-		&audiotestsrc,
-		&queue,
-		&audioconvert,
-		&audioresample,
-		&queue2,
-		&opusenc,
-		&rtpopuspay,
-		&queue3,
-	])?;
-
-	gst::Element::link_many(&[
-		&audiotestsrc,
-		&queue,
-		&audioconvert,
-		&audioresample,
-		&queue2,
-		&opusenc,
-		&rtpopuspay,
-		&queue3,
-	])?;
-
-	queue3.link_filtered(webrtcbin, Some(&*RTP_CAPS_OPUS))?;
-	println!("Added audio source");
-
-	Ok(())
 }
