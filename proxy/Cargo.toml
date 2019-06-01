@@ -12,11 +12,14 @@ futures-preview = { version = "0.3.0-alpha", features = ["async-await", "compat"
 gstreamer = { git = "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs.git", features = ["futures"] }
 gstreamer-app = { git = "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs.git" }
 gstreamer-audio = { git = "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs.git" }
+gstreamer-sdp = { git = "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs.git" }
+gstreamer-webrtc = { git = "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs.git" }
 lazy_static = "1"
 parking_lot = "0.8"
 qint-shared = { path = "../shared" }
 rmp-serde = "0.13"
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 slog-async = "2"
 slog-scope = "4"
 slog-stdlog = "3"

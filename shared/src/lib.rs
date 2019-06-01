@@ -22,6 +22,7 @@ pub enum MessageF2P {
 	Connect(ConnectOptions),
 	SetTalking(bool),
 	Packet(OutPacket),
+	Webrtc(WebrtcMsg),
 }
 
 /// A message sent over a websocket connection from the proxy to the frontend.
@@ -29,6 +30,7 @@ pub enum MessageF2P {
 pub enum MessageP2F {
 	ConnectFailed(),
 	Packet(InCommandMsg),
+	Webrtc(WebrtcMsg),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -47,6 +49,21 @@ pub struct ConnectOptions {
 	pub log_commands: bool,
 	pub log_packets: bool,
 	pub log_udp_packets: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum WebrtcMsg {
+	Ice {
+		candidate: String,
+		#[serde(rename = "sdpMLineIndex")]
+		sdp_mline_index: u32,
+	},
+	Sdp {
+		#[serde(rename = "type")]
+		typ: String,
+		sdp: String,
+	},
 }
 
 impl From<&'_ InCommand> for InCommandMsg {

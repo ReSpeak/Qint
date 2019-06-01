@@ -1,5 +1,5 @@
 #![feature(async_await)]
-#![recursion_limit="128"]
+#![recursion_limit="256"]
 
 use qint_shared::*;
 use slog::{error, o, warn, Drain, Logger};
@@ -14,11 +14,13 @@ use crate::connection_service::{ConnectionId, ConnectionService, FrontendConnect
 mod connect;
 mod connected;
 mod connection_service;
+mod webrtc;
 
 pub struct Model {
 	ws_service: WebSocketService,
 	link: ComponentLink<Model>,
 	logger: Logger,
+	rtc: Option<webrtc::Webrtc>,
 	/// The currently selected connection.
 	con: ConnectionId,
 }
@@ -29,6 +31,7 @@ pub enum Msg {
 	Connected,
 	Disconnected,
 	Message(MessageP2F),
+	Send(MessageF2P),
 }
 
 impl Model {
@@ -85,13 +88,14 @@ impl Component for Model {
 	type Message = Msg;
 	type Properties = ();
 
-	fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
+	fn create(_: Self::Properties, mut link: ComponentLink<Self>) -> Self {
 		let logger = slog::Logger::root(slog_stdlog::StdLog.fuse(), o!());
 		let con = ConnectionService::add_connection(&logger);
 
 		Self {
 			ws_service: WebSocketService::new(),
 			link,
+			rtc: None,
 			logger,
 			con,
 		}
@@ -130,6 +134,14 @@ impl Component for Model {
 						false
 					}
 					MessageP2F::Packet(packet) => {
+						if self.rtc.is_none() {
+							// Create webrtc connection
+							let callback = self.link.send_back(|data: WebrtcMsg| {
+								Msg::Send(MessageF2P::Webrtc(data))
+							});
+							self.rtc = Some(webrtc::Webrtc::new(callback));
+						}
+
 						match ConnectionService::with_mut_con(self.con, move |con|
 							con.handle_packet(packet),
 							|| panic!("Should be in disconnected state")) {
@@ -141,7 +153,19 @@ impl Component for Model {
 							}
 						}
 					}
+					MessageP2F::Webrtc(msg) => {
+						self.rtc.as_mut().unwrap().handle(msg);
+						false
+					}
 				}
+			}
+			Msg::Send(msg) => {
+				ConnectionService::with_mut_con(self.con, move |con| {
+					if let Err(e) = con.send_ws_message(&msg) {
+						error!(self.logger, "Failed to send message"; "error" => ?e);
+					}
+				}, || panic!("Connection not found"));
+				false
 			}
 		}
 	}

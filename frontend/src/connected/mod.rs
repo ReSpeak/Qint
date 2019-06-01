@@ -35,7 +35,7 @@ impl Component for Connected {
 			let logger = con.logger.clone();
 			stdweb::spawn_local(con.send_message(cmd).map(move |r| {
 				if let Err(e) = r {
-					error!(logger, "Failed to subscribe"; "error" => ?e);
+					error!(logger, "Failed to subscribe to all channels"; "error" => ?e);
 				}
 			}));
 		}, || panic!("Should be in connected state"));
@@ -68,6 +68,7 @@ impl Renderable<Self> for Connected {
 			<div class="connected-container",>
 				<ChannelTree: connection=con, />
 				<Chat: connection=con, />
+				<audio id="audio-playback", />
 			</div>
 		}
 	}

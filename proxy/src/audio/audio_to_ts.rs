@@ -13,7 +13,6 @@ use tsproto_packets::packets::{AudioData, CodecType, OutAudio};
 use super::*;
 
 pub struct SetListenerMsg {
-	// TODO Use weak connection
 	pub connection: tsclientlib::Connection,
 }
 
@@ -26,6 +25,7 @@ pub struct AudioToTs {
 
 	logger: Logger,
 	pipeline: gst::Pipeline,
+	bin: gst::Bin,
 	volume: gst_audio::StreamVolume,
 }
 
@@ -88,11 +88,13 @@ impl AudioToTs {
 	/// callbacks from gstreamer threads.
 	pub fn new(
 		logger: Logger,
+		pipeline: gst::Pipeline,
 		mut executor: ThreadPool,
 		uri: Option<&str>,
 	) -> Result<Self, Error> {
 		let logger = logger.new(o!("pipeline" => "audio-to-ts"));
-		let pipeline = gst::Pipeline::new(Some("audio-to-ts-pipeline"));
+		// TODO Put everything into ts-to-audio bin and play/pause that
+		let bin = gst::Bin::new(Some("ts-to-audio"));
 
 		let decode;
 		if let Some(uri) = &uri {
@@ -125,7 +127,8 @@ impl AudioToTs {
 		// Packetloss between 0 - 100
 		opusenc.set_property("packet-loss-percentage", &0)?;
 
-		pipeline.add_many(&[&decode, &resampler, &vol, &opusenc, &sink])?;
+		bin.add_many(&[&decode, &resampler, &vol, &opusenc, &sink])?;
+		pipeline.add(&bin)?;
 		gst::Element::link_many(&[&resampler, &vol, &opusenc, &sink])?;
 		if uri.is_none() {
 			decode.link(&resampler)?;
@@ -175,6 +178,8 @@ impl AudioToTs {
 		let streamvolume = vol.dynamic_cast::<gst_audio::StreamVolume>().unwrap();
 
 		let appsink = sink.dynamic_cast::<gst_app::AppSink>().unwrap();
+		appsink.set_caps(Some(&gst::Caps::new_simple("audio/x-opus",
+			&[("channel-mapping-family", &0i32)])));
 
 		let listeners = Arc::new(Mutex::new(Vec::<ConnectionSinkCreator>::new()));
 
@@ -221,8 +226,12 @@ impl AudioToTs {
 					});
 
 					// Write into packet sink
-					let listeners = listeners2.lock();
-					for l in &*listeners {
+					let mut listeners = listeners2.lock();
+					listeners.retain(|l| {
+						if l.con.upgrade().is_none() {
+							return false;
+						}
+
 						let sink = l.con.as_packet_sink().sink_compat();
 						let logger = logger.clone();
 						let packet = packet.clone();
@@ -234,20 +243,19 @@ impl AudioToTs {
 								error!(logger, "Failed to send packet"; "error" => ?e);
 							}
 						}).expect("Failed to start");
-					}
+						true
+					});
 					Ok(gst::FlowSuccess::Ok)
 				})
 				.build(),
 		);
-
-		// Run event handler in background
-		executor.spawn(main_loop(&pipeline, logger2.clone())).unwrap();
 
 		Ok(Self {
 			listeners,
 
 			logger: logger2,
 			pipeline,
+			bin,
 			volume: streamvolume,
 		})
 	}
@@ -258,7 +266,7 @@ impl AudioToTs {
 
 	pub fn is_playing(&self) -> Result<bool, failure::Error> {
 		// Returns (success, current state, pending state)
-		let state = self.pipeline.get_state(
+		let state = self.bin.get_state(
 			gst::ClockTime::from_mseconds(10),
 		);
 
@@ -278,10 +286,10 @@ impl AudioToTs {
 	pub fn set_playing(&self, playing: bool) -> Result<(), Error> {
 		if playing {
 			debug!(self.logger, "Change to playing");
-			self.pipeline.set_state(gst::State::Playing)?;
+			self.bin.set_state(gst::State::Playing)?;
 		} else {
 			debug!(self.logger, "Change to paused");
-			self.pipeline.set_state(gst::State::Paused)?;
+			self.bin.set_state(gst::State::Paused)?;
 		}
 		Ok(())
 	}
@@ -290,7 +298,8 @@ impl AudioToTs {
 impl Drop for AudioToTs {
 	fn drop(&mut self) {
 		// Cleanup gstreamer
-		self.pipeline.set_state(gst::State::Null).expect(
-			"Failed to shutdown gstreamer pipeline");
+		// TODO Done in ts-to-audio
+		//self.pipeline.set_state(gst::State::Null).expect(
+			//"Failed to shutdown gstreamer pipeline");
 	}
 }

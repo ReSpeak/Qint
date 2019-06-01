@@ -1,7 +1,7 @@
 use actix_web::actix::*;
 use failure::Error;
 use futures::prelude::*;
-use futures::executor::{ThreadPoolBuilder};
+use futures::executor::ThreadPoolBuilder;
 use futures::task::SpawnExt;
 use gstreamer as gst;
 use gstreamer_audio as gst_audio;
@@ -17,17 +17,26 @@ pub mod audio_to_ts;
 
 const VOICE_TIMEOUT_SECS: u64 = 1;
 
-pub fn start(logger: Logger) -> Result<(Addr<AudioToTs>, Addr<TsToAudio>), Error> {
+pub fn start(logger: Logger) -> Result<(Addr<AudioToTs>, Addr<TsToAudio>,
+										Addr<crate::webrtc::WebrtcHandler>), Error> {
 	gst::init().expect("gstreamer failed to initialize");
 
-	let pool = ThreadPoolBuilder::new()
+	let mut pool = ThreadPoolBuilder::new()
 		.pool_size(2)
 		.name_prefix("audio")
 		.create()?;
+	let pipeline = gst::Pipeline::new(Some("ts-pipeline"));
 
-	let a2ts = AudioToTs::new(logger.clone(), pool.clone(), None)?;
-	let ts2a = TsToAudio::new(logger, pool.clone())?;
-	Ok((a2ts.start(), ts2a.start()))
+	let ts2a = TsToAudio::new(logger.clone(), pipeline.clone(), pool.clone())?;
+	let a2ts = AudioToTs::new(logger.clone(), pipeline.clone(), pool.clone(), None)?;
+
+	let rtc = crate::webrtc::WebrtcHandler::new(logger.clone(), pool.clone(),
+		pipeline.clone())?;
+
+	// Run event handler in background
+	pool.spawn(main_loop(&pipeline, logger.clone())).unwrap();
+
+	Ok((a2ts.start(), ts2a.start(), rtc.start()))
 }
 
 fn main_loop(

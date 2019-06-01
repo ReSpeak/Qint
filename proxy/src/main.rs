@@ -17,6 +17,7 @@ use tsproto::handler_data::InCommandObserver;
 use tsproto_packets::packets::{InAudio, InCommand};
 
 mod audio;
+mod webrtc;
 
 static NEXT_CON_ID: AtomicU64 = AtomicU64::new(0);
 
@@ -29,6 +30,7 @@ struct Ws {
 	id: ConnectionId,
 	a2ts: Addr<audio::audio_to_ts::AudioToTs>,
 	ts2a: Addr<audio::ts_to_audio::TsToAudio>,
+	rtc: Addr<webrtc::WebrtcHandler>,
 	connection: Option<Connection>,
 }
 
@@ -44,8 +46,10 @@ struct ProxyCommandObserver {
 	addr: Addr<Ws>,
 }
 
+// TODO Should not be an enum but two different messages
 enum WsMessage {
 	Packet(InCommandMsg),
+	Message(MessageP2F),
 }
 
 fn next_con_id() -> ConnectionId {
@@ -73,9 +77,9 @@ impl Handler<WsMessage> for Ws {
 	type Result = ();
 	fn handle(&mut self, msg: WsMessage, ctx: &mut Self::Context) -> Self::Result {
 		match msg {
-			WsMessage::Packet(packet) => {
-				Self::send_message(&MessageP2F::Packet(packet), ctx);
-			}
+			WsMessage::Packet(packet) =>
+				Self::send_message(&MessageP2F::Packet(packet), ctx),
+			WsMessage::Message(msg) => Self::send_message(&msg, ctx),
 		}
 	}
 }
@@ -105,6 +109,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 						let addr = ctx.address();
 						let con = Connection::new(tsclientlib::ConnectOptions::new(o.address)
 							.name(o.name)
+							.logger(logger.clone())
 							.log_commands(o.log_commands)
 							.log_packets(o.log_packets)
 							.log_udp_packets(o.log_udp_packets)
@@ -125,18 +130,32 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 
 						let logger = self.logger.clone();
 						let a2ts = self.a2ts.clone();
+						let rtc = self.rtc.clone();
+
 						ctx.spawn(wrap_future(con).map_err(|_e, _actor, ctx| {
 							Self::send_message(&MessageP2F::ConnectFailed(), ctx);
-						}).map(move |con, actor: &mut Ws, _ctx| {
+						}).map(move |con, actor: &mut Ws, ctx| {
 							let c = con.clone();
 							actor.connection = Some(con);
 
 							// Activate audio
 							// TODO Handle disconnect
+							let logger2 = logger.clone();
 							actix::spawn(a2ts.send(audio::audio_to_ts::SetListenerMsg {
 								connection: c,
 							}).map_err(move |e| {
-								error!(logger, "Failed to set listener"; "error" => ?e);
+								error!(logger2, "Failed to set listener"; "error" => ?e);
+							}));
+
+							// Start webrtc
+							let logger2 = logger.clone();
+							let logger3 = logger.clone();
+							actix::spawn(rtc.send(webrtc::SetupMsg(ctx.address())).map(move |r| {
+								if let Err(e) = r {
+									error!(logger2, "Failed to set listener"; "error" => ?e);
+								}
+							}).map_err(move |e| {
+								error!(logger3, "Failed to set listener"; "error" => ?e);
 							}));
 						}));
 					}
@@ -163,9 +182,20 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 							}));
 						}
 					}
+					MessageF2P::Webrtc(msg) => {
+						let logger = self.logger.clone();
+						actix::spawn(self.rtc.send(webrtc::SignallingMsg(msg))
+							.then(move |r| {
+								match r {
+									Ok(()) => {}
+									Err(e) => error!(logger, "Failed with webrtc"; "error" => ?e),
+								}
+								Ok(())
+							}));
+					}
 				}
 			}
-			_ => (),
+			_ => {}
 		}
 	}
 }
@@ -229,12 +259,13 @@ fn main() {
 	let _scope_guard = slog_scope::set_global_logger(logger.clone());
 	let _log_guard = slog_stdlog::init().unwrap();
 
-	let (a2ts, ts2a) = audio::start(logger.clone()).unwrap();
+	let (a2ts, ts2a, rtc) = audio::start(logger.clone()).unwrap();
 
 	server::new(move || {
 		let logger = logger.clone();
 		let a2ts = a2ts.clone();
 		let ts2a = ts2a.clone();
+		let rtc = rtc.clone();
 		App::new()
 		.middleware(middleware::Logger::default())
 		.resource("/ws", |r| r.f(move |req| ws::start(req, Ws {
@@ -242,6 +273,7 @@ fn main() {
 			id: next_con_id(),
 			a2ts: a2ts.clone(),
 			ts2a: ts2a.clone(),
+			rtc: rtc.clone(),
 			connection: None,
 		})))
 		.handler("/", StaticFiles::new("../target/wasm32-unknown-unknown/release")

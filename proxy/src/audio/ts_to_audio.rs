@@ -89,9 +89,8 @@ impl Handler<PlayMsg> for TsToAudio {
 impl TsToAudio {
 	/// We need an explicit executor because we want to spawn new tasks in
 	/// callbacks from gstreamer threads.
-	pub fn new(logger: Logger, mut executor: ThreadPool) -> Result<Self, Error> {
+	pub fn new(logger: Logger, pipeline: gst::Pipeline, mut executor: ThreadPool) -> Result<Self, Error> {
 		let logger = logger.new(o!("pipeline" => "ts-to-audio"));
-		let pipeline = gst::Pipeline::new(Some("ts-to-audio-pipeline"));
 
 		let mixer = gst::ElementFactory::make("audiomixer", Some("mixer"))
 			.ok_or_else(|| format_err!("Missing audiomixer"))?;
@@ -176,9 +175,6 @@ impl TsToAudio {
 		queue.set_state(gst::State::Paused)?;
 		autosink.set_state(gst::State::Paused)?;
 		fakesrc.set_state(gst::State::Paused)?;
-
-		// Run event handler in background
-		executor.spawn(main_loop(&pipeline, logger.clone())).unwrap();
 
 		Ok(Self {
 			logger,
