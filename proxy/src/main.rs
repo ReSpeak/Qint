@@ -1,17 +1,23 @@
 #![feature(async_await)]
+#[macro_use]
+extern crate diesel;
+
+use std::fs;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use actix::*;
 use actix::fut::wrap_future;
 use actix_web::*;
 use actix_web::fs::StaticFiles;
+use failure::{format_err, Error};
 use futures01::sink::Sink as _;
 use futures01::stream::Stream;
 use futures01::Future as _;
 use qint_shared::{InCommandMsg, MessageF2P, MessageP2F};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
-use slog::{error, o, Drain, Logger};
+use slog::{error, info, o, Drain, Logger};
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
 use tsclientlib::{Connection, PacketHandler, PHBox};
@@ -19,6 +25,8 @@ use tsproto::handler_data::InCommandObserver;
 use tsproto_packets::packets::{InAudio, InCommand};
 
 mod audio;
+mod db;
+
 use audio::webrtc;
 
 static NEXT_CON_ID: AtomicU64 = AtomicU64::new(0);
@@ -33,31 +41,70 @@ struct Args {
 	#[structopt(
 		short = "a",
 		long = "address",
-		default_value = "127.0.0.1:4422",
-		help = "The address where the server listenes"
+		//default_value = "127.0.0.1:4422",
+		help = "The address where the server listens"
 	)]
-	address: String,
+	listen_address: Option<String>,
 	#[structopt(
 		long = "webrtc",
 		help = "Use webrtc for sound"
 	)]
-	webrtc: bool,
+	use_webrtc: Option<bool>,
+	#[structopt(
+		short = "i",
+		long = "identity",
+		//default_value = "0",
+		help = "The id of the identity that is used by default"
+	)]
+	default_identity: Option<u8>,
+	/// The path for all the settings files. This makes only senses as a command
+	/// line argument, it is ignored in the settings file.
+	///
+	/// If no value is given, the configuration path depends on the operating
+	/// system.
+	#[structopt(
+		short = "c",
+		long = "config-path",
+		help = "The folder that contains all the configuration files"
+	)]
+	config_path: Option<String>,
+	/// How much log output do you want?
+	///
+	/// 0. Print nothing
+	/// 1. Print command string
+	/// 2. Print packets
+	/// 3. Print udp packets
 	#[structopt(
 		short = "v",
 		long = "verbose",
 		help = "Print the content of all packets",
 		parse(from_occurrences)
 	)]
-	verbose: u8,
-	// 0. Print nothing
-	// 1. Print command string
-	// 2. Print packets
-	// 3. Print udp packets
+	verbosity: u8,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+struct Settings {
+	#[serde(default = "default_listen_address")]
+	listen_address: String,
+	#[serde(default)]
+	use_webrtc: bool,
+	#[serde(default)]
+	default_identity: u8,
+	/// How much log output do you want?
+	///
+	/// 0. Print nothing
+	/// 1. Print command string
+	/// 2. Print packets
+	/// 3. Print udp packets
+	#[serde(default)]
+	verbosity: u8,
 }
 
 /// Define http actor
 struct Ws {
 	logger: Logger,
+	settings: Settings,
 	id: ConnectionId,
 	/// If the audio data is `None`, webrtc should be used
 	audio_data: Option<audio::AudioData>,
@@ -83,6 +130,8 @@ enum WsMessage {
 	Message(MessageP2F),
 }
 
+fn default_listen_address() -> String { "127.0.0.1:4422".into() }
+
 fn next_con_id() -> ConnectionId {
 	ConnectionId(NEXT_CON_ID.fetch_add(1, Ordering::Relaxed))
 }
@@ -99,10 +148,12 @@ impl Ws {
 	fn new(
 		logger: Logger,
 		audio_data: Option<audio::AudioData>,
+		settings: Settings,
 	) -> Self
 	{
 		Self {
 			logger,
+			settings,
 			id: next_con_id(),
 			audio_data,
 			rtc: None,
@@ -172,9 +223,9 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 						let con = Connection::new(tsclientlib::ConnectOptions::new(o.address)
 							.name(o.name)
 							.logger(logger.clone())
-							.log_commands(o.log_commands)
-							.log_packets(o.log_packets)
-							.log_udp_packets(o.log_udp_packets)
+							.log_commands(o.log_commands || self.settings.verbosity > 0)
+							.log_packets(o.log_packets || self.settings.verbosity > 1)
+							.log_udp_packets(o.log_udp_packets || self.settings.verbosity > 2)
 							.prepare_client(Box::new(move |client| {
 								client.lock().add_in_command_observer(
 									"Qint".into(),
@@ -304,7 +355,7 @@ impl<T> InCommandObserver<T> for ProxyCommandObserver {
 	}
 }
 
-fn main() {
+fn main() -> Result<(), Error> {
 	let logger = {
 		let decorator = slog_term::TermDecorator::new().build();
 		let drain = slog_term::CompactFormat::new(decorator).build().fuse();
@@ -318,20 +369,60 @@ fn main() {
 	// Parse command line options
 	let args = Args::from_args();
 
-	let audio_data = if args.webrtc {
+	let config_path: PathBuf = if let Some(p) = args.config_path {
+		p.into()
+	} else {
+		let proj_dirs = match directories::ProjectDirs::from("", "ReSpeak", "Qint") {
+			Some(r) => r,
+			None => {
+				return Err(format_err!("Failed to get project directory"));
+			}
+		};
+		proj_dirs.config_dir().into()
+	};
+
+	// Load settings
+	let mut settings = match fs::read_to_string(&config_path.join("config.toml")) {
+		Ok(r) => toml::from_str(&r)?,
+		Err(e) => {
+			// Only a soft error
+			info!(logger, "Failed to read settings, using defaults";
+				"error" => ?e);
+			Settings::default()
+		}
+	};
+
+	// Override settings with args
+	if let Some(a) = args.listen_address {
+		settings.listen_address = a;
+	}
+	if let Some(a) = args.use_webrtc {
+		settings.use_webrtc = a;
+	}
+	if let Some(a) = args.default_identity {
+		settings.default_identity = a;
+	}
+	if args.verbosity > settings.verbosity {
+		settings.verbosity = args.verbosity;
+	}
+
+	let audio_data = if settings.use_webrtc {
 		None
 	} else {
 		Some(audio::start(logger.clone(), None).unwrap().0)
 	};
 
+	let addr = settings.listen_address.clone();
 	server::new(move || {
 		let logger = logger.clone();
 		let audio_data = audio_data.clone();
+		let settings = settings.clone();
 		App::new()
 		.middleware(middleware::Logger::default())
 		.resource("/ws", |r| r.f(move |req| ws::start(req, Ws::new(
 			logger.clone(),
 			audio_data.clone(),
+			settings.clone(),
 		))))
 		.handler("/", StaticFiles::new("../target/wasm32-unknown-unknown/release")
 			.expect("static files not found")
@@ -341,7 +432,8 @@ fn main() {
 		)
 		.finish()
 	})
-		.bind(args.address)
+		.bind(addr)
 		.unwrap()
 		.run();
+	Ok(())
 }

@@ -6,6 +6,9 @@ edition = "2018"
 
 [dependencies]
 async-timer = "0.2"
+diesel = { version = "1.4", features = ["chrono", "sqlite"] }
+diesel_migrations = "1.4"
+directories = "2"
 failure = "0.1"
 futures01 = { package = "futures", version = "0.1" }
 futures-preview = { version = "0.3.0-alpha", features = ["async-await", "compat", "nightly"] }
@@ -28,6 +31,7 @@ slog-scope = "4"
 slog-stdlog = "3"
 slog-term = "2"
 structopt = "0.2"
+toml = "0.4"
 tsclientlib = { path = "../../tsclientlib/tsclientlib" }
 tsproto = { path = "../../tsclientlib/tsproto" }
 tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }
