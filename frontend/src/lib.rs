@@ -212,7 +212,6 @@ impl Renderable<Self> for Model {
 				<>
 				<audio id="audio-playback", autoplay="autoplay", />
 				<Connect: connection=con, onconnect=|_| Msg::Connect, />
-				<button style="position:absolute", onclick=|_| Msg::SetTalking(!is_talking).into(),>{ talking }</button>
 				</>
 			}
 		} else {

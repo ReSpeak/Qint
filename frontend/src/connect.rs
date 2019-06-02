@@ -88,45 +88,29 @@ impl Renderable<Self> for Connect {
 			FrontendConnectionState::Disconnected(options, _) = &mut con.state {
 			html! {
 				<div class="connect-container",>
+				<div class="inner-connect-container",>
 				<form class="connect-form", onsubmit=|e| { e.prevent_default(); Msg::Connect },>
-					<div class="connect-item",>
+					<div>
 						<input name="username", type="text", placeholder="Username",
 							value=&options.name,
 							oninput=|e| Msg::Change({
 								Box::new(move |o| { o.name(e.value); })
 							}), />
 					</div>
-					<div class="connect-item",>
+					<div>
 						<input name="server", type="text", placeholder="Server",
 							value=&options.address,
 							oninput=|e| Msg::Change({
 								Box::new(move |o| { o.address(e.value); })
 							}), />
 					</div>
-					<div class="connect-item",>
-						<label>
-							<input name="log-commands", type="checkbox", value="true",
-								onchange=|e| Msg::Change({
-									Box::new(move |o| { o.log_commands(checkbox_value(&e)); })
-								}), />
-							{ "Log commands" }
-						</label>
-					</div>
-					<div class="connect-item",>
-						<label>
-							<input name="log-packets", type="checkbox", value="true",
-								onchange=|e| Msg::Change({
-									Box::new(move |o| { o.log_packets(checkbox_value(&e)); })
-								}), />
-							{ "Log packets" }
-						</label>
-					</div>
-					<div class="connect-item",>
+					<div>
 						<button name="connect", type="submit",>
 							{ "Connect" }
 						</button>
 					</div>
 				</form>
+				</div>
 				</div>
 			}
 		} else {
