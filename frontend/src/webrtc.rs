@@ -3,39 +3,54 @@ use stdweb::{js, _js_impl, Value};
 use yew::callback::Callback;
 
 pub struct Webrtc {
-	callback: Callback<WebrtcMsg>,
+	callback: Callback<Option<WebrtcMsg>>,
 	con: Value,
 }
 
 impl Webrtc {
-	pub fn new(callback: Callback<WebrtcMsg>) -> Self {
+	pub fn new(callback: Callback<Option<WebrtcMsg>>) -> Self {
 		let call = callback.clone();
-		let got_ice = move |i, c| {
-			call.emit(WebrtcMsg::Ice {
+		let send_ice = move |i, c| {
+			call.emit(Some(WebrtcMsg::Ice {
 				candidate: c,
 				sdp_mline_index: i,
-			});
+			}));
 		};
 
-		let call = callback.clone();
-		let got_sdp = move |typ, sdp| {
-			call.emit(WebrtcMsg::Sdp {
+		/*let call = callback.clone();
+		let send_sdp = move |typ, sdp| {
+			call.emit(Some(WebrtcMsg::Sdp {
 				typ,
 				sdp,
-			});
+			}));
+		};*/
+
+		let call = callback.clone();
+		let send_ready = move || {
+			call.emit(None);
 		};
 
 		let con = js! {
-			var peerConnectionConfig = {"iceServers": [{"urls": "stun:stun.services.mozilla.com"}, {"urls": "stun:stun.l.google.com:19302"}]};
+			var peerConnectionConfig = {"iceServers": [
+				{"urls": "stun:stun.services.mozilla.com"},
+				{"urls": "stun:stun.l.google.com:19302"}
+			]};
 			var con = new RTCPeerConnection(peerConnectionConfig);
 			con.onicecandidate = function(e) {
 				if (e.candidate != null) {
-					@{got_ice}(e.candidate.sdpMLineIndex, e.candidate.candidate);
+					@{send_ice}(e.candidate.sdpMLineIndex, e.candidate.candidate);
 				}
 			};
-			con.ontrack = function(event) {
+			con.ontrack = function(ev) {
 				var playback = document.getElementById("audio-playback");
-				playback.srcObject = event.streams[0];
+				if (ev.streams && ev.streams[0]) {
+					playback.srcObject = ev.streams[0];
+				} else {
+					// Add the track to a stream (group of track) if there is no
+					// stream.
+					let inboundStream = new MediaStream(track);
+					playback.srcObject = inboundStream;
+				}
 			};
 
 			var constraints = {
@@ -43,29 +58,34 @@ impl Webrtc {
 				audio: true,
 			};
 			navigator.mediaDevices.getUserMedia(constraints).then(function(stream) {
-				con.addStream(stream);
-				console.log("Added stream");
+				stream.getTracks().forEach(function(track) {
+					con.addTrack(track, stream);
+					// Pause by default
+					//track.enabled = false;
+					console.log("Track added");
+				});
+				@{send_ready}();
 			})
 			.catch(function (e) {
 				console.log("Failed to get user media " + e);
 			});
 
-			/*con.createOffer(function(description) {
-				con.setLocalDescription(description, function () {
-					@{got_sdp}(description.type, JSON.stringify(description.sdp));
-				}, function() { console.log("set description error"); });
-			}, function(e) {
-				console.log("Failed to get offer" + e);
-			});*/
+			con.onnegotiationneeded = function() {
+				console.log("Renegotiation is not yet supported by gstreamer");
+				/*con.createOffer().then(function(description) {
+					@{send_sdp}(description.type, description.sdp);
+					return con.setLocalDescription(description);
+				}).catch(function(e) {
+					console.log("Failed to negotiate " + e);
+				});*/
+			};
 			return con;
 		};
 
-		let mut res = Self {
+		Self {
 			callback,
 			con,
-		};
-		//res.set_talking(false);
-		res
+		}
 	}
 
 	pub fn handle(&mut self, msg: WebrtcMsg) {
@@ -79,16 +99,11 @@ impl Webrtc {
 			}
 			WebrtcMsg::Sdp { typ, sdp } => {
 				let call = self.callback.clone();
-				let got_sdp = move |typ, sdp| {
-					call.emit(WebrtcMsg::Sdp {
+				let send_sdp = move |typ, sdp| {
+					call.emit(Some(WebrtcMsg::Sdp {
 						typ,
 						sdp,
-					});
-				};
-
-				let on_error = |e: Value| {
-					// TODO Use logger
-					log::error!("Failed");
+					}));
 				};
 
 				js! { @(no_return)
@@ -98,13 +113,14 @@ impl Webrtc {
 					con.setRemoteDescription(new RTCSessionDescription(sdp)).then(function() {
 						// Only create answers in response to offers
 						if(sdp.type == "offer") {
-							con.createAnswer(function(description) {
-								con.setLocalDescription(description, function () {
-									@{got_sdp}(description.type, description.sdp);
-								}, function() { console.log("set description error"); });
-							}, @{on_error});
+							return con.createAnswer().then(function(description) {
+								@{send_sdp}(description.type, description.sdp);
+								return con.setLocalDescription(description);
+							});
 						}
-					}).catch(@{on_error});
+					}).catch(function(e) {
+						console.log("Failed to set remote description " + e);
+					});
 				};
 			}
 		}
@@ -112,7 +128,9 @@ impl Webrtc {
 
 	pub fn set_talking(&mut self, talk: bool) {
 		js! { @(no_return)
-			@{&self.con}.getSenders()[0].track.enabled = @{talk};
+			let senders = @{&self.con}.getSenders();
+			if (senders[0])
+				senders[0].track.enabled = @{talk};
 		}
 	}
 }

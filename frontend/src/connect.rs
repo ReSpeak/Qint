@@ -89,6 +89,7 @@ impl Renderable<Self> for Connect {
 			html! {
 				<div class="connect-container",>
 				<div class="inner-connect-container",>
+				<div class="connect-blur",></div>
 				<form class="connect-form", onsubmit=|e| { e.prevent_default(); Msg::Connect },>
 					<div>
 						<input name="username", type="text", placeholder="Username",
@@ -105,7 +106,7 @@ impl Renderable<Self> for Connect {
 							}), />
 					</div>
 					<div>
-						<button name="connect", type="submit",>
+						<button class="btn", name="connect", type="submit",>
 							{ "Connect" }
 						</button>
 					</div>

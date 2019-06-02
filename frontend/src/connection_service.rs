@@ -177,7 +177,6 @@ impl FrontendConnection {
 				true
 			}
 			FrontendConnectionState::Connected(c) => {
-				let mut res = false;
 				// Handle return codes
 				if packet.name() == "error" {
 					let error = match InCommandError::new(&packet) {
@@ -231,11 +230,11 @@ impl FrontendConnection {
 						for l in self.event_listeners.values() {
 							l(self, &events);
 						}
-						res
+						false
 					}
 					Err(e) => {
 						error!(self.logger, "Failed to handle command"; "error" => ?e);
-						res
+						false
 					}
 				}
 			}

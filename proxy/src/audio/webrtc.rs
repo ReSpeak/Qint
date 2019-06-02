@@ -45,6 +45,8 @@ lazy_static! {
 
 pub struct WebrtcHandler {
 	logger: Logger,
+	executor: ThreadPool,
+	ws_addr: Addr<crate::Ws>,
 	pub webrtc: gst::Element,
 }
 
@@ -101,10 +103,20 @@ impl WebrtcHandler {
 
 				debug!(logger, "Send sdp"; "sdp" => offer.get_sdp().as_text().unwrap());
 				let logger = logger.clone();
+				let typ = match offer.get_type() {
+					gst_webrtc::WebRTCSDPType::Offer => "offer",
+					gst_webrtc::WebRTCSDPType::Pranswer => "pranswer",
+					gst_webrtc::WebRTCSDPType::Answer => "answer",
+					gst_webrtc::WebRTCSDPType::Rollback => "rollback",
+					t => {
+						error!(logger, "Unknown webrtc sdp type"; "type" => ?t);
+						return;
+					}
+				};
 				executor.spawn(future::lazy(move || {
 					ws_addr.send(crate::WsMessage::Message(
 						MessageP2F::Webrtc(WebrtcMsg::Sdp {
-							typ: "offer".to_string(),
+							typ: typ.into(),
 							sdp: offer.get_sdp().as_text().unwrap(),
 						}))).map_err(move |e| {
 							error!(logger, "Failed to send webrtc message"; "error" => ?e);
@@ -139,51 +151,10 @@ impl WebrtcHandler {
 			None
 		})?;
 
-		// TODO
-		/*let pipeline2 = pipeline.clone();
-		let webrtc2 = webrtc.clone();
-		let logger2 = logger.clone();
-		webrtc.connect("pad-added", false, move |_| {
-			debug!(logger2, "Webrtc pad added");
-			let decodebin = gst::ElementFactory::make("decodebin", None).unwrap();
-			let pipeline = pipeline2.clone();
-			let logger = logger2.clone();
-			decodebin
-				.connect("pad-added", false, move |values| {
-					let pad = values[1].get::<gst::Pad>().expect("Invalid argument");
-					if !pad.has_current_caps() {
-						println!("Pad {:?} has no caps, can't do anything, ignoring", pad);
-						return None;
-					}
-
-					let caps = pad.get_current_caps().unwrap();
-					let name = caps.get_structure(0).unwrap().get_name();
-
-					let handled = if name.starts_with("video") {
-						handle_media_stream(&pad, &pipeline, MediaType::Video)
-					} else if name.starts_with("audio") {
-						handle_media_stream(&pad, &pipeline, MediaType::Audio)
-					} else {
-						println!("Unknown pad {:?}, ignoring", pad);
-						Ok(())
-					};
-
-					if let Err(err) = handled {
-						error!(logger, "Error adding pad with caps"; "name" => name, "error" => ?err);
-					}
-					None
-				})
-				.unwrap();
-
-			pipeline2.add(&decodebin).unwrap();
-
-			decodebin.sync_state_with_parent().unwrap();
-			webrtc2.link(&decodebin).unwrap();
-			None
-		})?;*/
-
 		Ok(Self {
 			logger,
+			executor,
+			ws_addr,
 			webrtc,
 		})
 	}
@@ -197,23 +168,74 @@ impl WebrtcHandler {
 	}
 
 	fn handle_sdp(&mut self, typ: &str, sdp: &str) {
-		// TODO Handle offers
-		if typ != "answer" {
-			error!(self.logger, "Sdp type is not \"answer\""; "type" => typ);
-			return;
-		}
-
 		debug!(self.logger, "Received sdp"; "type" => typ, "sdp" => sdp);
+
+		let typ = if typ == "answer" {
+			gst_webrtc::WebRTCSDPType::Answer
+		} else if typ == "offer" {
+			gst_webrtc::WebRTCSDPType::Offer
+		} else {
+			error!(self.logger, "Unknown sdp type"; "type" => typ);
+			return;
+		};
+
 		let ret = gst_sdp::SDPMessage::parse_buffer(sdp.as_bytes()).unwrap();
 		if ret.get_media(0).is_none() {
-			// TODO Report bug: If this is None, we get a SEGFAULT in set-remote-description
+			// TODO Report bug: If this is None, we get a SEGFAULT in
+			// set-remote-description because of a null pointer.
 			error!(self.logger, "Media of sdp is None");
 			return;
 		}
-		let answer = gst_webrtc::WebRTCSessionDescription::new(
-			gst_webrtc::WebRTCSDPType::Answer, ret);
-		let promise = gst::Promise::new();
-		self.webrtc.emit("set-remote-description", &[&answer, &promise])
+		let sdp = gst_webrtc::WebRTCSessionDescription::new(typ, ret);
+		let promise;
+		if typ == gst_webrtc::WebRTCSDPType::Offer {
+			// Send answer
+			let logger = self.logger.clone();
+			let webrtc = self.webrtc.clone();
+			let executor = self.executor.clone();
+			let ws_addr = self.ws_addr.clone();
+			promise = gst::Promise::new_with_change_func(move |_| {
+				let webrtc2 = webrtc.clone();
+				let promise = gst::Promise::new_with_change_func(move |promise| {
+					let reply = promise.get_reply().unwrap();
+
+					let offer = reply
+						.get_value("answer")
+						.unwrap()
+						.get::<gst_webrtc::WebRTCSessionDescription>()
+						.expect("Invalid argument");
+					webrtc2.emit("set-local-description", &[&offer, &None::<gst::Promise>]).unwrap();
+
+					debug!(logger, "Send sdp"; "sdp" => offer.get_sdp().as_text().unwrap());
+					let logger = logger.clone();
+					let typ = match offer.get_type() {
+						gst_webrtc::WebRTCSDPType::Offer => "offer",
+						gst_webrtc::WebRTCSDPType::Pranswer => "pranswer",
+						gst_webrtc::WebRTCSDPType::Answer => "answer",
+						gst_webrtc::WebRTCSDPType::Rollback => "rollback",
+						t => {
+							error!(logger, "Unknown webrtc sdp type"; "type" => ?t);
+							return;
+						}
+					};
+					executor.spawn(future::lazy(move || {
+						ws_addr.send(crate::WsMessage::Message(
+							MessageP2F::Webrtc(WebrtcMsg::Sdp {
+								typ: typ.into(),
+								sdp: offer.get_sdp().as_text().unwrap(),
+							}))).map_err(move |e| {
+								error!(logger, "Failed to send webrtc message"; "error" => ?e);
+							})
+					})).detach();
+				});
+
+				webrtc.emit("create-answer", &[&None::<gst::Structure>, &promise]).unwrap();
+			});
+		} else {
+			promise = gst::Promise::new();
+		}
+
+		self.webrtc.emit("set-remote-description", &[&sdp, &promise])
 			.unwrap();
 	}
 }

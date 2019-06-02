@@ -21,6 +21,7 @@ pub struct Model {
 	link: ComponentLink<Model>,
 	logger: Logger,
 	rtc: Option<webrtc::Webrtc>,
+	rtc_queue: Vec<WebrtcMsg>,
 	/// The currently selected connection.
 	con: ConnectionId,
 	is_talking: bool,
@@ -32,6 +33,7 @@ pub enum Msg {
 	Connected,
 	Disconnected,
 	Message(MessageP2F),
+	WebrtcReady,
 	Send(MessageF2P),
 	SetTalking(bool),
 }
@@ -90,20 +92,26 @@ impl Component for Model {
 	type Message = Msg;
 	type Properties = ();
 
-	fn create(_: Self::Properties, mut link: ComponentLink<Self>) -> Self {
+	fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
 		let logger = slog::Logger::root(slog_stdlog::StdLog.fuse(), o!());
 		let con = ConnectionService::add_connection(&logger);
 
-		// Create webrtc connection
-		let callback = link.send_back(|data: WebrtcMsg| {
-			Msg::Send(MessageF2P::Webrtc(data))
+		// TODO Create webrtc connection
+		// For some reason it does not work if we do it afterwards
+		/*let callback = link.send_back(|data: Option<WebrtcMsg>| {
+			if let Some(data) = data {
+				Msg::Send(MessageF2P::Webrtc(data))
+			} else {
+				Msg::WebrtcReady
+			}
 		});
-		let rtc = Some(webrtc::Webrtc::new(callback));
+		let rtc = Some(webrtc::Webrtc::new(callback));*/
 
 		Self {
 			ws_service: WebSocketService::new(),
 			link,
-			rtc,
+			rtc: None,
+			rtc_queue: Default::default(),
 			logger,
 			con,
 			is_talking: false,
@@ -143,14 +151,6 @@ impl Component for Model {
 						false
 					}
 					MessageP2F::Packet(packet) => {
-						if self.rtc.is_none() {
-							// Create webrtc connection
-							let callback = self.link.send_back(|data: WebrtcMsg| {
-								Msg::Send(MessageF2P::Webrtc(data))
-							});
-							self.rtc = Some(webrtc::Webrtc::new(callback));
-						}
-
 						match ConnectionService::with_mut_con(self.con, move |con|
 							con.handle_packet(packet),
 							|| panic!("Should be in disconnected state")) {
@@ -163,22 +163,44 @@ impl Component for Model {
 						}
 					}
 					MessageP2F::Webrtc(msg) => {
-						self.rtc.as_mut().unwrap().handle(msg);
+						if self.rtc.is_none() {
+							// Create webrtc connection
+							let callback = self.link.send_back(|data: Option<WebrtcMsg>| {
+								if let Some(data) = data {
+									Msg::Send(MessageF2P::Webrtc(data))
+								} else {
+									Msg::WebrtcReady
+								}
+							});
+							self.rtc = Some(webrtc::Webrtc::new(callback));
+							self.rtc_queue.push(msg);
+						} else if self.rtc_queue.is_empty() {
+							// Webrtc is ready
+							self.rtc.as_mut().unwrap().handle(msg);
+						} else {
+							self.rtc_queue.push(msg);
+						}
 						false
 					}
 				}
 			}
 			Msg::SetTalking(talk) => {
 				ConnectionService::with_mut_con(self.con, |con| {
-					let logger = con.logger.clone();
-					con.send_ws_message(&MessageF2P::SetTalking(talk))
-						.unwrap();
+					if let Err(e) = con.send_ws_message(&MessageF2P::SetTalking(talk)) {
+						error!(con.logger, "Failed to send websocket message"; "error" => ?e);
+					}
 				}, || panic!("Should be in connected state"));
 				self.is_talking = talk;
 				if let Some(rtc) = &mut self.rtc {
 					rtc.set_talking(talk);
 				}
 				true
+			}
+			Msg::WebrtcReady => {
+				for msg in std::mem::replace(&mut self.rtc_queue, Vec::new()) {
+					self.rtc.as_mut().unwrap().handle(msg);
+				}
+				false
 			}
 			Msg::Send(msg) => {
 				ConnectionService::with_mut_con(self.con, move |con| {
@@ -219,7 +241,7 @@ impl Renderable<Self> for Model {
 				<>
 				<audio id="audio-playback", autoplay="autoplay", />
 				<Connected: connection=con, />
-				<button style="position:absolute", onclick=|_| Msg::SetTalking(!is_talking).into(),>{ talking }</button>
+				<button style="position:absolute; right: 0", onclick=|_| Msg::SetTalking(!is_talking).into(),>{ talking }</button>
 				</>
 			}
 		}

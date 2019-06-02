@@ -139,7 +139,7 @@ impl Renderable<Self> for Chat {
 							oninput=|e| Msg::Change({
 								Box::new(move |c| { c.composing = e.value; })
 							}).into(), />
-						<button name="send", type="submit",>
+						<button class="btn", name="send", type="submit",>
 							{ "Send" }
 						</button>
 					</form>

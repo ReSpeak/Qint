@@ -1,5 +1,4 @@
 use futures::prelude::*;
-use qint_shared::*;
 use slog::error;
 use ts_bookkeeping::{ChannelId, ClientId};
 use ts_bookkeeping::data::{Channel, Client, Connection};
@@ -90,6 +89,7 @@ impl ChannelTree {
 			con.event_listeners.insert("channeltree".into(), Box::new(move |_, events| {
 				for e in events {
 					// TODO If channel or clients are modified
+					// If the id is a ChannelId or ClientId
 				}
 				callback.emit(());
 			}));
