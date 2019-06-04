@@ -15,6 +15,7 @@ CREATE TABLE identities (
 	private_key BLOB NOT NULL,
 	name TEXT NOT NULL DEFAULT "Default",
 	offset INTEGER NOT NULL DEFAULT 0,
+	max_counter INTEGER NOT NULL DEFAULT 0,
 	client BLOB NOT NULL REFERENCES clients(uid)
 );
 

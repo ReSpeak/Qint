@@ -1,29 +1,29 @@
 table! {
     bookmarks (id) {
-        id -> Integer,
+        id -> BigInt,
         name -> Nullable<Text>,
         address -> Text,
-        channel -> Nullable<Integer>,
-        identity -> Integer,
+        channel -> Nullable<BigInt>,
+        identity -> BigInt,
         bookmark -> Bool,
         last_used -> Nullable<Timestamp>,
-        server -> Nullable<Integer>,
+        server -> Nullable<BigInt>,
     }
 }
 
 table! {
     channel_messages (server, channel, message) {
-        server -> Integer,
-        channel -> Integer,
-        message -> Integer,
+        server -> BigInt,
+        channel -> BigInt,
+        message -> BigInt,
     }
 }
 
 table! {
     channels (server, id) {
-        server -> Integer,
-        id -> Integer,
-        parent -> Nullable<Integer>,
+        server -> BigInt,
+        id -> BigInt,
+        parent -> Nullable<BigInt>,
         name -> Text,
         icon -> Nullable<Integer>,
         deleted -> Bool,
@@ -32,9 +32,9 @@ table! {
 
 table! {
     client_messages (server, client, message) {
-        server -> Integer,
+        server -> BigInt,
         client -> Binary,
-        message -> Integer,
+        message -> BigInt,
     }
 }
 
@@ -50,11 +50,11 @@ table! {
 
 table! {
     events (id) {
-        id -> Integer,
-        server -> Nullable<Integer>,
+        id -> BigInt,
+        server -> Nullable<BigInt>,
         invoker -> Nullable<Binary>,
-        channel1 -> Integer,
-        channel2 -> Integer,
+        channel1 -> BigInt,
+        channel2 -> BigInt,
         client -> Nullable<Binary>,
         typ -> Text,
         content -> Nullable<Binary>,
@@ -64,17 +64,18 @@ table! {
 
 table! {
     identities (id) {
-        id -> Integer,
+        id -> BigInt,
         private_key -> Binary,
         name -> Text,
-        offset -> Integer,
+        offset -> BigInt,
+        max_counter -> BigInt,
         client -> Binary,
     }
 }
 
 table! {
     messages (id) {
-        id -> Integer,
+        id -> BigInt,
         invoker -> Nullable<Binary>,
         content -> Text,
         time -> Timestamp,
@@ -83,14 +84,14 @@ table! {
 
 table! {
     server_messages (server, message) {
-        server -> Integer,
-        message -> Integer,
+        server -> BigInt,
+        message -> BigInt,
     }
 }
 
 table! {
     servers (id) {
-        id -> Integer,
+        id -> BigInt,
         name -> Text,
         address -> Text,
         icon -> Nullable<Integer>,
@@ -99,7 +100,7 @@ table! {
 
 table! {
     servers_clients (server, client) {
-        server -> Integer,
+        server -> BigInt,
         client -> Binary,
         last_seen -> Timestamp,
     }

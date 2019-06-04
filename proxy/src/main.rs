@@ -58,7 +58,7 @@ struct Args {
 		//default_value = "0",
 		help = "The id of the identity that is used by default"
 	)]
-	default_identity: Option<u8>,
+	default_identity: Option<u64>,
 	/// The path for all the settings files. This makes only senses as a command
 	/// line argument, it is ignored in the settings file.
 	///
@@ -94,7 +94,7 @@ struct Settings {
 	#[serde(skip)]
 	config_path: PathBuf,
 	#[serde(default)]
-	default_identity: u8,
+	default_identity: u64,
 	/// How much log output do you want?
 	///
 	/// 0. Print nothing
@@ -413,7 +413,6 @@ fn main() -> Result<(), Error> {
 	settings.config_path = config_path;
 
 	// Override settings with args
-	println!("{:?}, {:?}", settings.listen_address, args.listen_address);
 	if let Some(a) = args.listen_address {
 		settings.listen_address = a;
 	}
@@ -428,7 +427,7 @@ fn main() -> Result<(), Error> {
 	}
 
 	// Open database
-	let _database = db::connect(&logger, &settings)?;
+	let database = db::DbHandler::new(logger.clone(), &settings)?.start();
 
 	let audio_data = if settings.use_webrtc {
 		None

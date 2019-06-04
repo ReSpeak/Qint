@@ -1,6 +1,8 @@
 use chrono::{DateTime, Utc};
 use diesel_derive_enum::DbEnum;
 
+use super::schema::*;
+
 #[derive(Clone, Copy, DbEnum, Debug, Eq, Hash, PartialEq)]
 pub enum EventType {
 	ChannelSwitched,
@@ -16,7 +18,8 @@ pub struct Client {
 	pub custom_name: Option<String>,
 }
 
-#[derive(Queryable)]
+#[derive(Identifiable, Queryable)]
+#[table_name="identities"]
 pub struct Identity {
 	pub id: u64,
 	pub private_key: Vec<u8>,
