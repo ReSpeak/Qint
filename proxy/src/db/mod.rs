@@ -24,11 +24,18 @@ pub struct DbHandler {
 #[derive(Clone, Debug)]
 pub struct GetIdentityMsg(pub u64, pub bool);
 
+#[derive(Clone, Debug)]
+pub enum EventMsg {
+	Events(Vec<tsclientlib::events::Event>),
+	UpdateIdentity(Identity),
+}
+
 impl Actor for DbHandler {
 	type Context = Context<Self>;
 }
 
 impl Message for GetIdentityMsg { type Result = Result<Identity, Error>; }
+impl Message for EventMsg { type Result = Result<(), Error>; }
 
 impl DbHandler {
 	pub(crate) fn new(logger: Logger, settings: &Settings, secret: Secret) -> Result<Self, Error> {
@@ -61,6 +68,11 @@ impl Handler<GetIdentityMsg> for DbHandler {
 		match identities.find(msg.0 as i64).first::<models::Identity>(&self.con) {
 			Ok(r) => r.into_identity(&self.secret),
 			Err(_) => {
+				// Pick an existing identity if one exists
+				if let Ok(r) = identities.order_by(id).first::<models::Identity>(&self.con) {
+					return r.into_identity(&self.secret);
+				}
+
 				// Create new identity
 				let identity = tsclientlib::Identity::create()?;
 				let pub_key = identity.key().to_pub();
@@ -85,5 +97,29 @@ impl Handler<GetIdentityMsg> for DbHandler {
 				Ok(identity)
 			}
 		}
+	}
+}
+
+impl Handler<EventMsg> for DbHandler {
+	type Result = Result<(), Error>;
+	fn handle(&mut self, msg: EventMsg, _: &mut Self::Context) -> Self::Result {
+		match msg {
+			EventMsg::Events(es) => {
+				// TODO
+			}
+			EventMsg::UpdateIdentity(identity) => {
+				use schema::identities::dsl::*;
+
+				let pub_key = identity.key().to_pub();
+				let uid = pub_key.get_uid_no_base64()?;
+				diesel::update(identities.filter(client.eq(uid)))
+					.set((
+						counter.eq(identity.counter() as i64),
+						max_counter.eq(identity.max_counter() as i64),
+					))
+					.execute(&self.con)?;
+			}
+		}
+		Ok(())
 	}
 }

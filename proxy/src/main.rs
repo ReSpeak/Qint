@@ -45,7 +45,6 @@ struct Args {
 	#[structopt(
 		short = "a",
 		long = "address",
-		//default_value = "127.0.0.1:4422",
 		help = "The address where the server listens"
 	)]
 	listen_address: Option<String>,
@@ -57,7 +56,6 @@ struct Args {
 	#[structopt(
 		short = "i",
 		long = "identity",
-		//default_value = "0",
 		help = "The id of the identity that is used by default"
 	)]
 	default_identity: Option<u64>,
@@ -88,6 +86,7 @@ struct Args {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct Settings {
 	#[serde(default = "default_listen_address")]
 	listen_address: String,
@@ -230,6 +229,8 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 						ctx.spawn(wrap_future(self.database.send(db::GetIdentityMsg(id, true)).from_err().and_then(|r| r))
 							.and_then(move |identity, actor: &mut Self, ctx| {
 								let addr = ctx.address();
+								let db_addr = actor.database.clone();
+								let logger = actor.logger.clone();
 								let con = Connection::new(tsclientlib::ConnectOptions::new(o.address)
 									.name(o.name)
 									.identity(identity)
@@ -237,6 +238,31 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 									.log_commands(o.log_commands || actor.settings.verbosity > 0)
 									.log_packets(o.log_packets || actor.settings.verbosity > 1)
 									.log_udp_packets(o.log_udp_packets || actor.settings.verbosity > 2)
+									.add_event_listener("Qint".into(), Box::new(move |e| {
+										let event = match e {
+											tsclientlib::Event::ConEvents(_, events) => {
+												db::EventMsg::Events(events.iter().map(|e| e.clone()).collect())
+											}
+											tsclientlib::Event::IdentityLevelIncreased(id) => {
+												db::EventMsg::UpdateIdentity((*id).clone())
+											}
+											_ => return,
+										};
+										let logger = logger.clone();
+										actix::spawn(db_addr.send(event)
+											.then(move |r| {
+												match r {
+													Ok(Ok(())) => {}
+													Ok(Err(e)) => {
+														error!(logger, "Failed to handle event in database"; "error" => ?e);
+													}
+													Err(_) => {
+														error!(logger, "Failed to send event to database");
+													}
+												}
+												Ok(())
+											}));
+									}))
 									.prepare_client(Box::new(move |client| {
 										client.lock().add_in_command_observer(
 											"Qint".into(),
