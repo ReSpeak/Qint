@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use diesel_derive_enum::DbEnum;
 use failure::Error;
 
+use crate::secret::Secret;
 use super::schema::*;
 
 #[derive(Clone, Copy, DbEnum, Debug, Eq, Hash, PartialEq)]
@@ -10,17 +11,16 @@ pub enum EventType {
 	NameChanged,
 }
 
-#[derive(Queryable)]
+#[derive(Insertable, Queryable)]
 pub struct Client {
 	pub uid: Vec<u8>,
 	pub name: String,
 	pub public_key: Option<Vec<u8>>,
-	pub icon: Option<u32>,
 	pub custom_name: Option<String>,
 }
 
 #[derive(Identifiable, Queryable)]
-#[table_name="identities"]
+#[table_name = "identities"]
 pub struct Identity {
 	pub id: i64,
 	pub private_key: Vec<u8>,
@@ -89,14 +89,41 @@ pub struct Event {
 }
 
 
+#[derive(Insertable)]
+#[table_name = "identities"]
+pub struct NewIdentity {
+	pub private_key: Vec<u8>,
+	pub name: String,
+	/// The offset that reaches the highest identity level
+	pub counter: i64,
+	/// The maximum offset that we computed so far (can reach a lower level than
+	/// `counter`).
+	pub max_counter: i64,
+	/// Client uid
+	pub client: Vec<u8>,
+}
+
+
 impl Identity {
-	pub fn into_identity(self, secret_key: Vec<u8>) -> Result<tsclientlib::Identity, Error> {
-		// TODO Decrypt
-		let key = self.private_key;
+	pub fn into_identity(self, secret: &Secret) -> Result<tsclientlib::Identity, Error> {
+		let key = secret.open(self.private_key)?;
 		Ok(tsclientlib::Identity::new_with_max_counter(
 			tsproto::crypto::EccKeyPrivP256::import(&key)?,
 			self.counter as u64,
 			self.max_counter as u64,
 		))
+	}
+}
+
+impl NewIdentity {
+	pub fn new(id: tsclientlib::Identity, client_uid: Vec<u8>, secret: &Secret) -> Result<Self, Error> {
+		let private_key = secret.seal(id.key().to_short().to_vec())?;
+		Ok(Self {
+			private_key,
+			name: "Default".into(),
+			counter: id.counter() as i64,
+			max_counter: id.max_counter() as i64,
+			client: client_uid,
+		})
 	}
 }

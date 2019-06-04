@@ -1995,6 +1995,7 @@ dependencies = [
  "diesel_migrations 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "directories 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "flakebi-ring 0.14.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.27 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-preview 0.3.0-alpha.16 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-spawn 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",

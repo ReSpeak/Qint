@@ -1,8 +1,8 @@
 diff --git a/proxy/src/db/schema.rs b/proxy/src/db/schema.rs
-index 5a66ac4..81c405a 100644
+index b294d91..2be853d 100644
 --- a/proxy/src/db/schema.rs
 +++ b/proxy/src/db/schema.rs
-@@ -1,43 +1,43 @@
+@@ -1,29 +1,29 @@
  table! {
      bookmarks (id) {
 -        id -> Integer,
@@ -19,7 +19,7 @@ index 5a66ac4..81c405a 100644
 +        server -> Nullable<BigInt>,
      }
  }
-
+ 
  table! {
      channel_messages (server, channel, message) {
 -        server -> Integer,
@@ -30,7 +30,7 @@ index 5a66ac4..81c405a 100644
 +        message -> BigInt,
      }
  }
-
+ 
  table! {
      channels (server, id) {
 -        server -> Integer,
@@ -42,9 +42,8 @@ index 5a66ac4..81c405a 100644
          name -> Text,
          icon -> Nullable<Integer>,
          deleted -> Bool,
-     }
- }
-
+@@ -32,9 +32,9 @@ table! {
+ 
  table! {
      client_messages (server, client, message) {
 -        server -> Integer,
@@ -54,15 +53,9 @@ index 5a66ac4..81c405a 100644
 +        message -> BigInt,
      }
  }
-
- table! {
-     clients (uid) {
-         uid -> Binary,
-@@ -47,63 +47,63 @@ table! {
-         custom_name -> Nullable<Text>,
-     }
- }
-
+ 
+@@ -49,11 +49,11 @@ table! {
+ 
  table! {
      events (id) {
 -        id -> Integer,
@@ -77,10 +70,8 @@ index 5a66ac4..81c405a 100644
          client -> Nullable<Binary>,
          typ -> Text,
          content -> Nullable<Binary>,
-         time -> Timestamp,
-     }
- }
-
+@@ -63,18 +63,18 @@ table! {
+ 
  table! {
      identities (id) {
 -        id -> Integer,
@@ -94,7 +85,7 @@ index 5a66ac4..81c405a 100644
          client -> Binary,
      }
  }
-
+ 
  table! {
      messages (id) {
 -        id -> Integer,
@@ -102,9 +93,8 @@ index 5a66ac4..81c405a 100644
          invoker -> Nullable<Binary>,
          content -> Text,
          time -> Timestamp,
-     }
- }
-
+@@ -83,14 +83,14 @@ table! {
+ 
  table! {
      server_messages (server, message) {
 -        server -> Integer,
@@ -113,7 +103,7 @@ index 5a66ac4..81c405a 100644
 +        message -> BigInt,
      }
  }
-
+ 
  table! {
      servers (id) {
 -        id -> Integer,
@@ -121,16 +111,12 @@ index 5a66ac4..81c405a 100644
          name -> Text,
          address -> Text,
          icon -> Nullable<Integer>,
-     }
- }
-
+@@ -99,7 +99,7 @@ table! {
+ 
  table! {
      servers_clients (server, client) {
 -        server -> Integer,
 +        server -> BigInt,
          client -> Binary,
+         icon -> Nullable<Integer>,
          last_seen -> Timestamp,
-     }
- }
-
- joinable!(bookmarks -> identities (identity));

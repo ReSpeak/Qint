@@ -5,7 +5,6 @@ CREATE TABLE clients (
 	uid BLOB NOT NULL PRIMARY KEY,
 	name TEXT NOT NULL,
 	public_key BLOB,
-	icon INTEGER,
 	custom_name TEXT
 );
 
@@ -81,6 +80,7 @@ CREATE TABLE events (
 CREATE TABLE servers_clients (
 	server INTEGER NOT NULL REFERENCES servers(id),
 	client BLOB NOT NULL REFERENCES clients(uid),
+	icon INTEGER,
 	last_seen DATETIME NOT NULL,
 
 	PRIMARY KEY(server, client)

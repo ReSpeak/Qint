@@ -19,7 +19,7 @@ use futures01::Future as _;
 use qint_shared::{InCommandMsg, MessageF2P, MessageP2F};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
-use slog::{error, info, o, Drain, Logger};
+use slog::{error, info, o, warn, Drain, Logger};
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
 use tsclientlib::{Connection, PacketHandler, PHBox};
@@ -28,8 +28,10 @@ use tsproto_packets::packets::{InAudio, InCommand};
 
 mod audio;
 mod db;
+mod secret;
 
 use audio::webrtc;
+use secret::Secret;
 
 static NEXT_CON_ID: AtomicU64 = AtomicU64::new(0);
 
@@ -109,6 +111,7 @@ struct Settings {
 struct Ws {
 	logger: Logger,
 	settings: Settings,
+	database: Addr<db::DbHandler>,
 	id: ConnectionId,
 	/// If the audio data is `None`, webrtc should be used
 	audio_data: Option<audio::AudioData>,
@@ -153,11 +156,13 @@ impl Ws {
 		logger: Logger,
 		audio_data: Option<audio::AudioData>,
 		settings: Settings,
+		database: Addr<db::DbHandler>,
 	) -> Self
 	{
 		Self {
 			logger,
 			settings,
+			database,
 			id: next_con_id(),
 			audio_data,
 			rtc: None,
@@ -221,48 +226,53 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 						}
 
 						let ts2a = self.audio_data.as_ref().unwrap().ts2a.clone();
-						let con = self.id;
-						let logger = self.logger.clone();
-						let addr = ctx.address();
-						let con = Connection::new(tsclientlib::ConnectOptions::new(o.address)
-							.name(o.name)
-							.logger(logger.clone())
-							.log_commands(o.log_commands || self.settings.verbosity > 0)
-							.log_packets(o.log_packets || self.settings.verbosity > 1)
-							.log_udp_packets(o.log_udp_packets || self.settings.verbosity > 2)
-							.prepare_client(Box::new(move |client| {
-								client.lock().add_in_command_observer(
-									"Qint".into(),
-									Box::new(ProxyCommandObserver {
-										addr: addr.clone(),
-									}),
+						let id = self.settings.default_identity;
+						ctx.spawn(wrap_future(self.database.send(db::GetIdentityMsg(id, true)).from_err().and_then(|r| r))
+							.and_then(move |identity, actor: &mut Self, ctx| {
+								let addr = ctx.address();
+								let con = Connection::new(tsclientlib::ConnectOptions::new(o.address)
+									.name(o.name)
+									.identity(identity)
+									.logger(actor.logger.clone())
+									.log_commands(o.log_commands || actor.settings.verbosity > 0)
+									.log_packets(o.log_packets || actor.settings.verbosity > 1)
+									.log_udp_packets(o.log_udp_packets || actor.settings.verbosity > 2)
+									.prepare_client(Box::new(move |client| {
+										client.lock().add_in_command_observer(
+											"Qint".into(),
+											Box::new(ProxyCommandObserver {
+												addr: addr.clone(),
+											}),
+										);
+									}))
+									.handle_packets(Box::new(ProxyPacketHandler {
+										logger: actor.logger.clone(),
+										con: actor.id,
+										addr: ts2a.clone(),
+									}))
 								);
-							}))
-							.handle_packets(Box::new(ProxyPacketHandler {
-								logger,
-								con,
-								addr: ts2a.clone(),
-							}))
-						);
 
-						let logger = self.logger.clone();
-						let a2ts = self.audio_data.as_ref().unwrap().a2ts.clone();
+								wrap_future(con.from_err())
+							}).map_err(|_e, _actor, ctx| {
+								Self::send_message(&MessageP2F::ConnectFailed(), ctx);
+							}).map(move |con, actor: &mut Self, _| {
+									let c = con.clone();
+									actor.connection = Some(con);
 
-						ctx.spawn(wrap_future(con).map_err(|_e, _actor, ctx| {
-							Self::send_message(&MessageP2F::ConnectFailed(), ctx);
-						}).map(move |con, actor: &mut Ws, _| {
-							let c = con.clone();
-							actor.connection = Some(con);
-
-							// Activate audio
-							// TODO Handle disconnect
-							let logger2 = logger.clone();
-							actix::spawn(a2ts.send(audio::audio_to_ts::SetListenerMsg {
-								connection: c,
-							}).map_err(move |e| {
-								error!(logger2, "Failed to set listener"; "error" => ?e);
+									// Activate audio
+									// TODO Handle disconnect
+									let logger = actor.logger.clone();
+									let a2ts = actor.audio_data.as_ref().unwrap().a2ts.clone();
+									actix::spawn(a2ts.send(audio::audio_to_ts::SetListenerMsg {
+										connection: c,
+									}).map_err(move |e| {
+										error!(logger, "Failed to set listener"; "error" => ?e);
+									}));
+							})
+							.map_err(move |e, actor, _ctx| {
+								error!(actor.logger, "Failed to get identity for conection";
+									"error" => ?e);
 							}));
-						}));
 					}
 					MessageF2P::SetTalking(talk) => {
 						let logger = self.logger.clone();
@@ -410,8 +420,24 @@ fn main() -> Result<(), Error> {
 			Settings::default()
 		}
 	};
-	settings.config_path = config_path;
 
+	// Load secret key
+	let key_path = config_path.join("secret.key");
+	let key = match fs::read(&key_path) {
+		Ok(r) => Secret(r),
+		Err(e) => {
+			warn!(logger, "Failed to read secret key, all your current \
+				identities cannot be used anymore, creating new secret";
+				"error" => %e);
+
+			let secret = Secret::new()?;
+			fs::write(&key_path, &secret.0)?;
+
+			secret
+		}
+	};
+
+	settings.config_path = config_path;
 	// Override settings with args
 	if let Some(a) = args.listen_address {
 		settings.listen_address = a;
@@ -427,7 +453,7 @@ fn main() -> Result<(), Error> {
 	}
 
 	// Open database
-	let database = db::DbHandler::new(logger.clone(), &settings)?.start();
+	let database = db::DbHandler::new(logger.clone(), &settings, key)?.start();
 
 	let audio_data = if settings.use_webrtc {
 		None
@@ -440,12 +466,14 @@ fn main() -> Result<(), Error> {
 		let logger = logger.clone();
 		let audio_data = audio_data.clone();
 		let settings = settings.clone();
+		let database = database.clone();
 		App::new()
 		.middleware(middleware::Logger::default())
 		.resource("/ws", |r| r.f(move |req| ws::start(req, Ws::new(
 			logger.clone(),
 			audio_data.clone(),
 			settings.clone(),
+			database.clone(),
 		))))
 		.handler("/", StaticFiles::new("../target/wasm32-unknown-unknown/release")
 			.expect("static files not found")

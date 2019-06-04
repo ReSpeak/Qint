@@ -43,7 +43,6 @@ table! {
         uid -> Binary,
         name -> Text,
         public_key -> Nullable<Binary>,
-        icon -> Nullable<Integer>,
         custom_name -> Nullable<Text>,
     }
 }
@@ -102,6 +101,7 @@ table! {
     servers_clients (server, client) {
         server -> BigInt,
         client -> Binary,
+        icon -> Nullable<Integer>,
         last_seen -> Timestamp,
     }
 }

@@ -6,6 +6,7 @@ use failure::Error;
 use slog::{info, Logger};
 use tsclientlib::Identity;
 
+use crate::secret::Secret;
 use crate::Settings;
 
 mod models;
@@ -15,6 +16,7 @@ diesel_migrations::embed_migrations!();
 
 pub struct DbHandler {
 	logger: Logger,
+	secret: Secret,
 	con: SqliteConnection,
 }
 
@@ -29,7 +31,7 @@ impl Actor for DbHandler {
 impl Message for GetIdentityMsg { type Result = Result<Identity, Error>; }
 
 impl DbHandler {
-	pub(crate) fn new(logger: Logger, settings: &Settings) -> Result<Self, Error> {
+	pub(crate) fn new(logger: Logger, settings: &Settings, secret: Secret) -> Result<Self, Error> {
 		let database_url = settings.config_path.join("storage.sqlite");
 		let con = SqliteConnection::establish(database_url.to_str().unwrap())?;
 		// Enable foreign keys
@@ -45,6 +47,7 @@ impl DbHandler {
 
 		Ok(Self {
 			logger,
+			secret,
 			con,
 		})
 	}
@@ -56,10 +59,30 @@ impl Handler<GetIdentityMsg> for DbHandler {
 		use schema::identities::dsl::*;
 
 		match identities.find(msg.0 as i64).first::<models::Identity>(&self.con) {
-			Ok(r) => r.into_identity(vec![]),
+			Ok(r) => r.into_identity(&self.secret),
 			Err(_) => {
 				// Create new identity
-				panic!()
+				let identity = tsclientlib::Identity::create()?;
+				let pub_key = identity.key().to_pub();
+				let uid = pub_key.get_uid_no_base64()?;
+
+				let cli = models::Client {
+					uid: uid.clone(),
+					name: "TeamSpeakUser".into(),
+					public_key: Some(pub_key.to_short().to_vec()),
+					custom_name: None,
+				};
+				diesel::insert_into(schema::clients::table)
+					.values(&cli)
+					.execute(&self.con)?;
+
+				let new_identity = models::NewIdentity::new(identity.clone(),
+					uid, &self.secret)?;
+				diesel::insert_into(identities)
+					.values(&new_identity)
+					.execute(&self.con)?;
+
+				Ok(identity)
 			}
 		}
 	}
