@@ -1,6 +1,8 @@
 #![feature(async_await)]
 #[macro_use]
 extern crate diesel;
+#[macro_use]
+extern crate diesel_migrations;
 
 use std::fs;
 use std::path::PathBuf;
@@ -83,12 +85,14 @@ struct Args {
 	verbosity: u8,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 struct Settings {
 	#[serde(default = "default_listen_address")]
 	listen_address: String,
 	#[serde(default)]
 	use_webrtc: bool,
+	#[serde(skip)]
+	config_path: PathBuf,
 	#[serde(default)]
 	default_identity: u8,
 	/// How much log output do you want?
@@ -355,6 +359,18 @@ impl<T> InCommandObserver<T> for ProxyCommandObserver {
 	}
 }
 
+impl Default for Settings {
+	fn default() -> Self {
+		Self {
+			listen_address: default_listen_address(),
+			use_webrtc: Default::default(),
+			config_path: Default::default(),
+			default_identity: Default::default(),
+			verbosity: Default::default(),
+		}
+	}
+}
+
 fn main() -> Result<(), Error> {
 	let logger = {
 		let decorator = slog_term::TermDecorator::new().build();
@@ -387,12 +403,17 @@ fn main() -> Result<(), Error> {
 		Err(e) => {
 			// Only a soft error
 			info!(logger, "Failed to read settings, using defaults";
-				"error" => ?e);
+				"error" => %e);
+			// Create settings directory
+			fs::create_dir_all(&config_path)?;
+
 			Settings::default()
 		}
 	};
+	settings.config_path = config_path;
 
 	// Override settings with args
+	println!("{:?}, {:?}", settings.listen_address, args.listen_address);
 	if let Some(a) = args.listen_address {
 		settings.listen_address = a;
 	}
@@ -405,6 +426,9 @@ fn main() -> Result<(), Error> {
 	if args.verbosity > settings.verbosity {
 		settings.verbosity = args.verbosity;
 	}
+
+	// Open database
+	let _database = db::connect(&logger, &settings)?;
 
 	let audio_data = if settings.use_webrtc {
 		None

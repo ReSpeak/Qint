@@ -1,5 +1,14 @@
 PRAGMA foreign_keys = ON;
 
+CREATE TABLE clients (
+	-- sha1(base64(primary key))
+	uid BLOB NOT NULL PRIMARY KEY,
+	name TEXT NOT NULL,
+	public_key BLOB,
+	icon INTEGER,
+	custom_name TEXT
+);
+
 CREATE TABLE identities (
 	id INTEGER NOT NULL PRIMARY KEY,
 	-- encrypted
@@ -9,12 +18,12 @@ CREATE TABLE identities (
 	client BLOB NOT NULL REFERENCES clients(uid)
 );
 
-CREATE TABLE clients (
-	-- sha1(base64(primary key))
-	uid BLOB NOT NULL PRIMARY KEY,
+CREATE TABLE servers (
+	id INTEGER NOT NULL PRIMARY KEY,
 	name TEXT NOT NULL,
-	public_key TEXT,
-	custom_name TEXT
+	-- Last used address
+	address TEXT NOT NULL,
+	icon INTEGER
 );
 
 CREATE TABLE channels (
@@ -22,17 +31,11 @@ CREATE TABLE channels (
 	id INTEGER NOT NULL,
 	parent INTEGER,
 	name TEXT NOT NULL,
+	icon INTEGER,
 	deleted BOOLEAN NOT NULL DEFAULT false,
 
 	PRIMARY KEY(server, id),
 	FOREIGN KEY(server, parent) REFERENCES channels(server, id)
-);
-
-CREATE TABLE servers (
-	id INTEGER NOT NULL PRIMARY KEY,
-	name TEXT NOT NULL,
-	-- Last used address
-	address TEXT NOT NULL
 );
 
 CREATE TABLE bookmarks (
@@ -40,7 +43,7 @@ CREATE TABLE bookmarks (
 	name TEXT,
 	address TEXT NOT NULL,
 	channel INTEGER,
-	identity INTEGER REFERENCES identities(id),
+	identity INTEGER NOT NULL REFERENCES identities(id),
 	bookmark BOOLEAN NOT NULL DEFAULT false,
 	last_used DATETIME,
 	-- References the server if already connected once
@@ -51,9 +54,25 @@ CREATE TABLE bookmarks (
 
 CREATE TABLE messages (
 	id INTEGER NOT NULL PRIMARY KEY,
-	invoker BLOB NOT NULL REFERENCES clients(uid),
+	-- NULL if we got a message from the server
+	invoker BLOB REFERENCES clients(uid),
 	content TEXT NOT NULL,
 	time DATETIME NOT NULL
+);
+
+CREATE TABLE events (
+	id INTEGER NOT NULL PRIMARY KEY,
+	server INTEGER REFERENCES servers(id),
+	invoker BLOB REFERENCES clients(uid),
+	channel1 INTEGER NOT NULL,
+	channel2 INTEGER NOT NULL,
+	client BLOB REFERENCES clients(uid),
+	typ TEXT CHECK(typ IN ('channel_switched', 'name_changed')) NOT NULL,
+	content BLOB,
+	time DATETIME NOT NULL,
+
+	FOREIGN KEY(server, channel1) REFERENCES channels(server, id),
+	FOREIGN KEY(server, channel2) REFERENCES channels(server, id)
 );
 
 -- Connecting different tables

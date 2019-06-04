@@ -4,7 +4,7 @@ table! {
         name -> Nullable<Text>,
         address -> Text,
         channel -> Nullable<Integer>,
-        identity -> Nullable<Integer>,
+        identity -> Integer,
         bookmark -> Bool,
         last_used -> Nullable<Timestamp>,
         server -> Nullable<Integer>,
@@ -25,6 +25,7 @@ table! {
         id -> Integer,
         parent -> Nullable<Integer>,
         name -> Text,
+        icon -> Nullable<Integer>,
         deleted -> Bool,
     }
 }
@@ -41,8 +42,23 @@ table! {
     clients (uid) {
         uid -> Binary,
         name -> Text,
-        public_key -> Nullable<Text>,
+        public_key -> Nullable<Binary>,
+        icon -> Nullable<Integer>,
         custom_name -> Nullable<Text>,
+    }
+}
+
+table! {
+    events (id) {
+        id -> Integer,
+        server -> Nullable<Integer>,
+        invoker -> Nullable<Binary>,
+        channel1 -> Integer,
+        channel2 -> Integer,
+        client -> Nullable<Binary>,
+        typ -> Text,
+        content -> Nullable<Binary>,
+        time -> Timestamp,
     }
 }
 
@@ -59,7 +75,7 @@ table! {
 table! {
     messages (id) {
         id -> Integer,
-        invoker -> Binary,
+        invoker -> Nullable<Binary>,
         content -> Text,
         time -> Timestamp,
     }
@@ -77,6 +93,7 @@ table! {
         id -> Integer,
         name -> Text,
         address -> Text,
+        icon -> Nullable<Integer>,
     }
 }
 
@@ -94,6 +111,7 @@ joinable!(channels -> servers (server));
 joinable!(client_messages -> clients (client));
 joinable!(client_messages -> messages (message));
 joinable!(client_messages -> servers (server));
+joinable!(events -> servers (server));
 joinable!(identities -> clients (client));
 joinable!(messages -> clients (invoker));
 joinable!(server_messages -> messages (message));
@@ -107,6 +125,7 @@ allow_tables_to_appear_in_same_query!(
     channels,
     client_messages,
     clients,
+    events,
     identities,
     messages,
     server_messages,

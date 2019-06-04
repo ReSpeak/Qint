@@ -6,7 +6,9 @@ edition = "2018"
 
 [dependencies]
 async-timer = "0.2"
+chrono = "0.4"
 diesel = { version = "1.4", features = ["chrono", "sqlite"] }
+diesel-derive-enum = { version = "0.4", features = ["sqlite"] }
 diesel_migrations = "1.4"
 directories = "2"
 failure = "0.1"

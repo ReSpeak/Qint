@@ -84,6 +84,7 @@ impl Model {
 			= &mut con.state {
 				*ws = Some(task);
 			} else {
+				panic!("Should be in disconnected state");
 			}, || panic!("Should be in disconnected state"));
 	}
 }
