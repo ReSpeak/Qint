@@ -19,7 +19,7 @@ index 5a66ac4..81c405a 100644
 +        server -> Nullable<BigInt>,
      }
  }
- 
+
  table! {
      channel_messages (server, channel, message) {
 -        server -> Integer,
@@ -30,7 +30,7 @@ index 5a66ac4..81c405a 100644
 +        message -> BigInt,
      }
  }
- 
+
  table! {
      channels (server, id) {
 -        server -> Integer,
@@ -44,7 +44,7 @@ index 5a66ac4..81c405a 100644
          deleted -> Bool,
      }
  }
- 
+
  table! {
      client_messages (server, client, message) {
 -        server -> Integer,
@@ -54,7 +54,7 @@ index 5a66ac4..81c405a 100644
 +        message -> BigInt,
      }
  }
- 
+
  table! {
      clients (uid) {
          uid -> Binary,
@@ -62,7 +62,7 @@ index 5a66ac4..81c405a 100644
          custom_name -> Nullable<Text>,
      }
  }
- 
+
  table! {
      events (id) {
 -        id -> Integer,
@@ -80,21 +80,21 @@ index 5a66ac4..81c405a 100644
          time -> Timestamp,
      }
  }
- 
+
  table! {
      identities (id) {
 -        id -> Integer,
 +        id -> BigInt,
          private_key -> Binary,
          name -> Text,
--        offset -> Integer,
+-        counter -> Integer,
 -        max_counter -> Integer,
-+        offset -> BigInt,
++        counter -> BigInt,
 +        max_counter -> BigInt,
          client -> Binary,
      }
  }
- 
+
  table! {
      messages (id) {
 -        id -> Integer,
@@ -104,7 +104,7 @@ index 5a66ac4..81c405a 100644
          time -> Timestamp,
      }
  }
- 
+
  table! {
      server_messages (server, message) {
 -        server -> Integer,
@@ -113,7 +113,7 @@ index 5a66ac4..81c405a 100644
 +        message -> BigInt,
      }
  }
- 
+
  table! {
      servers (id) {
 -        id -> Integer,
@@ -123,7 +123,7 @@ index 5a66ac4..81c405a 100644
          icon -> Nullable<Integer>,
      }
  }
- 
+
  table! {
      servers_clients (server, client) {
 -        server -> Integer,
@@ -132,5 +132,5 @@ index 5a66ac4..81c405a 100644
          last_seen -> Timestamp,
      }
  }
- 
+
  joinable!(bookmarks -> identities (identity));

@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use diesel_derive_enum::DbEnum;
+use failure::Error;
 
 use super::schema::*;
 
@@ -21,21 +22,21 @@ pub struct Client {
 #[derive(Identifiable, Queryable)]
 #[table_name="identities"]
 pub struct Identity {
-	pub id: u64,
+	pub id: i64,
 	pub private_key: Vec<u8>,
 	pub name: String,
 	/// The offset that reaches the highest identity level
-	pub offset: u64,
+	pub counter: i64,
 	/// The maximum offset that we computed so far (can reach a lower level than
-	/// `offset`).
-	pub max_counter: u64,
+	/// `counter`).
+	pub max_counter: i64,
 	/// Client uid
 	pub client: Vec<u8>,
 }
 
 #[derive(Queryable)]
 pub struct Server {
-	pub id: u64,
+	pub id: i64,
 	pub name: String,
 	/// Last used address
 	pub address: String,
@@ -43,9 +44,9 @@ pub struct Server {
 
 #[derive(Queryable)]
 pub struct Channel {
-	pub server: u64,
-	pub id: u64,
-	pub parent: Option<u64>,
+	pub server: i64,
+	pub id: i64,
+	pub parent: Option<i64>,
 	pub name: String,
 	pub icon: Option<u32>,
 	pub deleted: bool,
@@ -53,21 +54,21 @@ pub struct Channel {
 
 #[derive(Queryable)]
 pub struct Bookmark {
-	pub id: u64,
+	pub id: i64,
 	pub name: Option<String>,
 	pub address: String,
-	pub channel: Option<u64>,
-	pub identity: u64,
+	pub channel: Option<i64>,
+	pub identity: i64,
 	pub bookmark: bool,
 	/// Time of last successful connection
 	pub last_used: Option<DateTime<Utc>>,
 	/// Reference to the server if we already connected once
-	pub server: Option<u64>,
+	pub server: Option<i64>,
 }
 
 #[derive(Queryable)]
 pub struct Message {
-	pub id: u64,
+	pub id: i64,
 	/// Client uid of sender, `None` if we got the message from the server.
 	pub invoker: Option<Vec<u8>>,
 	pub content: String,
@@ -76,13 +77,26 @@ pub struct Message {
 
 #[derive(Queryable)]
 pub struct Event {
-	pub id: u64,
-	pub server: Option<u64>,
+	pub id: i64,
+	pub server: Option<i64>,
 	pub invoker: Option<Vec<u8>>,
-	pub channel1: Option<u64>,
-	pub channel2: Option<u64>,
+	pub channel1: Option<i64>,
+	pub channel2: Option<i64>,
 	pub client: Option<Vec<u8>>,
 	pub typ: EventType,
 	pub content: Option<Vec<u8>>,
 	pub time: DateTime<Utc>,
+}
+
+
+impl Identity {
+	pub fn into_identity(self, secret_key: Vec<u8>) -> Result<tsclientlib::Identity, Error> {
+		// TODO Decrypt
+		let key = self.private_key;
+		Ok(tsclientlib::Identity::new_with_max_counter(
+			tsproto::crypto::EccKeyPrivP256::import(&key)?,
+			self.counter as u64,
+			self.max_counter as u64,
+		))
+	}
 }

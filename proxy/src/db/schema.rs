@@ -67,7 +67,7 @@ table! {
         id -> BigInt,
         private_key -> Binary,
         name -> Text,
-        offset -> BigInt,
+        counter -> BigInt,
         max_counter -> BigInt,
         client -> Binary,
     }

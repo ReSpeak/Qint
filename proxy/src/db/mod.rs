@@ -55,8 +55,12 @@ impl Handler<GetIdentityMsg> for DbHandler {
 	fn handle(&mut self, msg: GetIdentityMsg, _: &mut Self::Context) -> Self::Result {
 		use schema::identities::dsl::*;
 
-		//identities.find(msg.0)
-			//.first::<models::Identity>(&self.con)
-		panic!()
+		match identities.find(msg.0 as i64).first::<models::Identity>(&self.con) {
+			Ok(r) => r.into_identity(vec![]),
+			Err(_) => {
+				// Create new identity
+				panic!()
+			}
+		}
 	}
 }
