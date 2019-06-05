@@ -95,8 +95,8 @@ impl AudioToTs {
 		uri: Option<&str>,
 	) -> Result<Self, Error> {
 		let logger = logger.new(o!("pipeline" => "audio-to-ts"));
-		// TODO Put everything into ts-to-audio bin and play/pause that
-		let bin = gst::Bin::new(Some("ts-to-audio"));
+		// Put everything into audio-to-ts bin and play/pause that
+		let bin = gst::Bin::new(Some("audio-to-ts"));
 
 		let sink = gst::ElementFactory::make("appsink", Some("appsink"))
 			.ok_or_else(|| format_err!("Missing appsink"))?;
@@ -229,74 +229,69 @@ impl AudioToTs {
 		}
 
 		pipeline.add(&bin)?;
+		bin.set_state(gst::State::Paused)?;
 
 		let appsink = sink.dynamic_cast::<gst_app::AppSink>().unwrap();
 		appsink.set_caps(Some(&gst::Caps::new_simple("audio/x-opus",
 			&[("channel-mapping-family", &0i32)])));
+		appsink.set_emit_signals(true);
 
 		let listeners = Arc::new(Mutex::new(Vec::<ConnectionSinkCreator>::new()));
 
 		let logger2 = logger.clone();
 		let executor2 = executor.clone();
 		let listeners2 = listeners.clone();
-		appsink.set_callbacks(
-			gst_app::AppSinkCallbacks::new()
-				.new_sample(move |appsink| {
-					let sample = match appsink.pull_sample() {
-						None => return Err(gst::FlowError::Eos),
-						Some(sample) => sample,
-					};
+		appsink.connect_new_sample(move |appsink| {
+			while let Some(sample) = appsink.try_pull_sample(gst::ClockTime::from_nseconds(1)) {
+				let buffer = if let Some(buffer) = sample.get_buffer() {
+					buffer
+				} else {
+					gst_element_error!(
+						appsink,
+						gst::ResourceError::Failed,
+						("Failed to get buffer from appsink")
+					);
 
-					let buffer = if let Some(buffer) = sample.get_buffer() {
-						buffer
-					} else {
-						gst_element_error!(
-							appsink,
-							gst::ResourceError::Failed,
-							("Failed to get buffer from appsink")
-						);
+					return Err(gst::FlowError::Error);
+				};
 
-						return Err(gst::FlowError::Error);
-					};
+				let map = if let Some(map) = buffer.map_readable() {
+					map
+				} else {
+					gst_element_error!(
+						appsink,
+						gst::ResourceError::Failed,
+						("Failed to map buffer readable")
+					);
 
-					let map = if let Some(map) = buffer.map_readable() {
-						map
-					} else {
-						gst_element_error!(
-							appsink,
-							gst::ResourceError::Failed,
-							("Failed to map buffer readable")
-						);
+					return Err(gst::FlowError::Error);
+				};
 
-						return Err(gst::FlowError::Error);
-					};
+				// Create packet
+				let packet = OutAudio::new(&AudioData::C2S {
+					id: 0,
+					codec: CodecType::OpusMusic,
+					data: map.as_slice(),
+				});
 
-					// Create packet
-					let packet = OutAudio::new(&AudioData::C2S {
-						id: 0,
-						codec: CodecType::OpusMusic,
-						data: map.as_slice(),
-					});
+				// Write into packet sink
+				let mut listeners = listeners2.lock();
+				listeners.retain(|l| {
+					if l.con.upgrade().is_none() {
+						return false;
+					}
 
-					// Write into packet sink
-					let mut listeners = listeners2.lock();
-					listeners.retain(|l| {
-						if l.con.upgrade().is_none() {
-							return false;
-						}
-
-						let sink = l.con.as_packet_sink();
-						let logger = logger.clone();
-						let packet = packet.clone();
-						executor2.spawn(sink.send(packet).map(|_| ()).map_err(move |e| {
-							error!(logger, "Failed to send packet"; "error" => ?e);
-						})).detach();
-						true
-					});
-					Ok(gst::FlowSuccess::Ok)
-				})
-				.build(),
-		);
+					let sink = l.con.as_packet_sink();
+					let logger = logger.clone();
+					let packet = packet.clone();
+					executor2.spawn(sink.send(packet).map(|_| ()).map_err(move |e| {
+						error!(logger, "Failed to send packet"; "error" => ?e);
+					})).detach();
+					true
+				});
+			}
+			Ok(gst::FlowSuccess::Ok)
+		});
 
 		Ok(Self {
 			listeners,
@@ -334,12 +329,24 @@ impl AudioToTs {
 	}*/
 
 	pub fn set_playing(&self, playing: bool) -> Result<(), Error> {
+		// Setting the state of the bin does not work so we set the state of
+		// every element in the bin.
+		// When we try set the state of the bin to paused, the pipeline sets it
+		// to playing again and additionally we get stuttering audio.
 		if playing {
 			debug!(self.logger, "Change to playing");
-			self.bin.set_state(gst::State::Playing)?;
+			self.bin.iterate_elements().foreach(|e| {
+				if let Err(e) = e.set_state(gst::State::Playing) {
+					error!(self.logger, "Failed to change element state"; "error" => ?e);
+				}
+			})?;
 		} else {
 			debug!(self.logger, "Change to paused");
-			self.bin.set_state(gst::State::Paused)?;
+			self.bin.iterate_elements().foreach(|e| {
+				if let Err(e) = e.set_state(gst::State::Paused) {
+					error!(self.logger, "Failed to change element state"; "error" => ?e);
+				}
+			})?;
 		}
 		Ok(())
 	}

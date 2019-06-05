@@ -68,12 +68,6 @@ fn main_loop(
 	logger: Logger,
 ) -> impl Future<Output = ()>
 {
-	// TODO Not automatically
-	/*pipeline
-		.set_state(gst::State::Playing)
-		.expect("Unable to set the pipeline to the `Playing` state");
-	debug!(logger, "Pipeline is playing");*/
-
 	// We use an AbortHandle for having a Future that runs forever
 	// until we call handle.abort() to quit our event loop
 	let (quit_handle, quit_registration) = future::AbortHandle::new_pair();

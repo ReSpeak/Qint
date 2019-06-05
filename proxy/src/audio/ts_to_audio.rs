@@ -280,8 +280,7 @@ impl TsToAudio {
 		let decode2 = decode.clone();
 		let logger = self.logger.clone();
 		ctx.spawn(wrap_future(voice_timeout(last_sent)).map(move |_, ts2a: &mut TsToAudio, _ctx| {
-			let mut it = mixer.iterate_sink_pads();
-			let last_pad = it.next().is_err() || it.next().is_err() || it.next().is_err();
+			let last_pad = mixer.get_sink_pads().len() <= 3;
 			if last_pad {
 				// Pause pipeline
 				mixer.set_state(gst::State::Paused).unwrap();
@@ -309,32 +308,28 @@ impl TsToAudio {
 			// Cleanup
 			appsrc2.set_state(gst::State::Null).unwrap();
 			decode2.set_state(gst::State::Null).unwrap();
+
 			if ts2a.voices.remove(&id2).is_none() {
 				error!(logger, "Cannot find voice"; "id" => %id2);
 			}
 		}));
 
-		let mut it = self.mixer.iterate_sink_pads();
-		let first_pad = it.next().is_err() || it.next().is_err();
+		let first_pad = self.mixer.get_sink_pads().len() <= 1;
 		self.pipeline.add_many(&[&appsrc, &decode])?;
-		gst::Element::link_many(&[&appsrc, &decode, &self.mixer])?;
-		/*let sink_pad = mixer
+		//gst::Element::link_many(&[&appsrc, &decode, &self.mixer])?;
+		gst::Element::link_many(&[&appsrc, &decode])?;
+
+		let src_pad = decode.get_static_pad("src").expect("opusdec has no src pad");
+		let sink_pad = self.mixer
 			.get_request_pad("sink_%u")
-			.expect("Next element has no sink pad");
-		if let Err(error) = src_pad.link(&sink_pad) {
-			error!(logger, "Cannot link pads"; "error" => ?error);
-			gst_element_error!(
-				dbin,
-				gst::ResourceError::Failed,
-				("Failed to link decoder")
-			);
-		}*/
+			.expect("mixer element has no sink pad");
+		src_pad.link(&sink_pad)?;
 
 		if first_pad {
 			// Start pipeline
-			self.sink.set_state(gst::State::Playing).unwrap();
-			self.queue.set_state(gst::State::Playing).unwrap();
-			self.mixer.set_state(gst::State::Playing).unwrap();
+			self.sink.set_state(gst::State::Playing)?;
+			self.queue.set_state(gst::State::Playing)?;
+			self.mixer.set_state(gst::State::Playing)?;
 		}
 		decode.set_state(gst::State::Playing)?;
 		appsrc.set_state(gst::State::Playing)?;
