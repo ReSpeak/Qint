@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::io::Write;
 use std::sync::Arc;
+use std::thread;
 use std::time::{Duration, Instant};
 
 use actix_web::actix::*;
@@ -46,6 +47,7 @@ lazy_static::lazy_static! {
 pub struct TsToAudio {
 	logger: Logger,
 	pipeline: gst::Pipeline,
+	bin: gst::Bin,
 	mixer: gst::Element,
 	queue: gst::Element,
 	sink: gst::Element,
@@ -113,6 +115,8 @@ impl Handler<PlayMsg> for TsToAudio {
 impl TsToAudio {
 	pub fn new(logger: Logger, pipeline: gst::Pipeline, rtc: Option<&WebrtcHandler>) -> Result<Self, Error> {
 		let logger = logger.new(o!("pipeline" => "ts-to-audio"));
+		// Put everything into a bin
+		let bin = gst::Bin::new(Some("ts-to-audio"));
 
 		let mixer = gst::ElementFactory::make("audiomixer", Some("mixer"))
 			.ok_or_else(|| format_err!("Missing audiomixer"))?;
@@ -127,7 +131,7 @@ impl TsToAudio {
 			let rtpopuspay = gst::ElementFactory::make("rtpopuspay", None).unwrap();
 			let queue3 = gst::ElementFactory::make("queue", None).unwrap();
 
-			pipeline.add_many(&[
+			bin.add_many(&[
 				&queue2,
 				&opusenc,
 				&rtpopuspay,
@@ -194,7 +198,7 @@ impl TsToAudio {
 				sink.set_property("blocksize", &960u32)?;
 			}
 
-			pipeline.add(&sink)?;
+			bin.add(&sink)?;
 		}
 
 		// The audiotestsrc just has to exist and not be eos.
@@ -206,8 +210,9 @@ impl TsToAudio {
 		fakesrc.set_property("is-live", &true)?;
 		fakesrc.set_property("samplesperbuffer", &960i32)?; // 20ms at 48 000 kHz
 		fakesrc.set_property_from_str("wave", "Silence");
+		//fakesrc.set_property_from_str("wave", "sine");
 
-		pipeline.add_many(&[&fakesrc, &mixer, &queue])?;
+		bin.add_many(&[&fakesrc, &mixer, &queue])?;
 		gst::Element::link_many(&[&mixer, &queue, &sink])?;
 		// Additionally, we use the audiotestsrc to force the output to stereo and 48000 kHz
 		fakesrc.link_filtered(
@@ -217,17 +222,35 @@ impl TsToAudio {
 				&[("rate", &48000i32), ("channels", &2i32)],
 			)),
 		)?;
+		pipeline.add(&bin)?;
 
 		// Set playing only when someone sends audio
 		pipeline.set_state(gst::State::Playing)?;
-		mixer.set_state(gst::State::Paused)?;
-		queue.set_state(gst::State::Paused)?;
-		sink.set_state(gst::State::Paused)?;
-		fakesrc.set_state(gst::State::Paused)?;
+
+		let mixer2 = mixer.clone();
+		let queue2 = queue.clone();
+		let sink2 = sink.clone();
+		let fakesrc2 = fakesrc.clone();
+		let logger2 = logger.clone();
+		thread::spawn(move || {
+			// TODO Wait for something better
+			// Wait until everything is playing for a while
+			thread::sleep(Duration::from_millis(100));
+			if let Err(e) = (|| -> Result<(), Error> {
+				mixer2.set_state(gst::State::Paused)?;
+				queue2.set_state(gst::State::Paused)?;
+				sink2.set_state(gst::State::Paused)?;
+				fakesrc2.set_state(gst::State::Paused)?;
+				Ok(())
+			})() {
+				error!(logger2, "Failed to pause ts-to-audio pipeline"; "error" => ?e);
+			}
+		});
 
 		Ok(Self {
 			logger,
 			pipeline,
+			bin,
 			mixer,
 			queue,
 			sink,
@@ -246,7 +269,8 @@ impl TsToAudio {
 		src.set_caps(Some(&gst::Caps::new_simple("audio/x-opus",
 			&[("channel-mapping-family", &0i32)])));
 		src.set_property_format(gst::Format::Time);
-		src.set_property_min_latency((gst::SECOND_VAL / 50) as i64); // 20 ms in ns
+		src.set_property_max_latency((gst::SECOND_VAL / 50) as i64); // 20 ms in ns
+		//src.set_property_min_latency((gst::SECOND_VAL / 50) as i64); // 20 ms in ns
 		src.set_property_min_latency(0); // in ns
 		// Important to reduce the playback latency
 		src.set_property("do-timestamp", &true)?;
@@ -275,7 +299,7 @@ impl TsToAudio {
 		let mixer = self.mixer.clone();
 		let queue = self.queue.clone();
 		let sink = self.sink.clone();
-		let pipeline = self.pipeline.clone();
+		let bin = self.bin.clone();
 		let appsrc2 = appsrc.clone();
 		let decode2 = decode.clone();
 		let logger = self.logger.clone();
@@ -294,7 +318,7 @@ impl TsToAudio {
 			let mixer_pad = src_pad.get_peer();
 
 			gst::Element::unlink_many(&[&appsrc2, &decode2, &mixer]);
-			pipeline.remove_many(&[&appsrc2, &decode2]).unwrap();
+			bin.remove_many(&[&appsrc2, &decode2]).unwrap();
 
 			// Remove pad from mixer
 			if let Some(pad) = mixer_pad {
@@ -315,7 +339,7 @@ impl TsToAudio {
 		}));
 
 		let first_pad = self.mixer.get_sink_pads().len() <= 1;
-		self.pipeline.add_many(&[&appsrc, &decode])?;
+		self.bin.add_many(&[&appsrc, &decode])?;
 		//gst::Element::link_many(&[&appsrc, &decode, &self.mixer])?;
 		gst::Element::link_many(&[&appsrc, &decode])?;
 
