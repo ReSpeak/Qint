@@ -4,6 +4,13 @@ version = "0.1.0"
 authors = ["Flakebi <flakebi@t-online.de>"]
 edition = "2018"
 
+[profile.dev]
+lto = true
+opt-level = 3
+
+[profile.release]
+lto = true
+
 [dependencies]
 failure = "0.1"
 futures-preview = "0.3.0-alpha"
@@ -13,6 +20,7 @@ slog-stdlog = "3"
 tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }
 ts-bookkeeping = { path = "../../tsclientlib/utils/ts-bookkeeping" }
 web_logger = "0.1"
+wee_alloc = "0.4"
 yew = { version = "0.6", features = ["msgpack", "toml"] }
 
 [dependencies.log]
