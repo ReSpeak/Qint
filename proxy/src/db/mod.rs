@@ -118,20 +118,32 @@ impl Handler<EventMsg> for DbHandler {
 				self.handle_events(&con, &es)?;
 			}
 			EventMsg::Connected(addr, con) => {
+				use schema::servers::dsl::*;
+
 				let key = con.get_server_key()?;
 				let key = key.to_short();
 				let con = con.lock();
 
-				// TODO Check if we already know that address
-
-				let server = models::ServerInsert {
-					public_key: &key,
-					name: &con.server.name,
-					address: &addr,
-				};
-				diesel::insert_into(schema::servers::table)
-					.values(&server)
-					.execute(&self.con)?;
+				// Check if we already know that address
+				if diesel::select(diesel::dsl::exists(servers.filter(
+					public_key.eq(&key)))).get_result(&self.con)? {
+					// Update
+					diesel::update(servers.filter(public_key.eq(&key)))
+						.set((
+							name.eq(&con.server.name),
+							address.eq(&addr),
+						))
+						.execute(&self.con)?;
+				} else {
+					let server = models::ServerInsert {
+						public_key: &key,
+						name: &con.server.name,
+						address: &addr,
+					};
+					diesel::insert_into(schema::servers::table)
+						.values(&server)
+						.execute(&self.con)?;
+				}
 			}
 			EventMsg::UpdateIdentity(identity) => {
 				use schema::identities::dsl::*;

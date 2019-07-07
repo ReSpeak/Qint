@@ -108,12 +108,17 @@ table! {
 
 joinable!(bookmarks -> identities (identity));
 joinable!(channel_messages -> messages (message));
+joinable!(channels -> servers (server));
 joinable!(client_messages -> clients (client));
 joinable!(client_messages -> messages (message));
+joinable!(client_messages -> servers (server));
+joinable!(events -> servers (server));
 joinable!(identities -> clients (client));
 joinable!(messages -> clients (invoker));
 joinable!(server_messages -> messages (message));
+joinable!(server_messages -> servers (server));
 joinable!(servers_clients -> clients (client));
+joinable!(servers_clients -> servers (server));
 
 allow_tables_to_appear_in_same_query!(
     bookmarks,

@@ -27,7 +27,7 @@ CREATE TABLE servers (
 );
 
 CREATE TABLE channels (
-	server BLOB NOT NULL REFERENCES servers(id),
+	server BLOB NOT NULL REFERENCES servers(public_key),
 	id INTEGER NOT NULL,
 	parent INTEGER,
 	name TEXT NOT NULL,
@@ -62,7 +62,7 @@ CREATE TABLE messages (
 
 CREATE TABLE events (
 	id INTEGER NOT NULL PRIMARY KEY,
-	server BLOB REFERENCES servers(id),
+	server BLOB REFERENCES servers(public_key),
 	invoker BLOB REFERENCES clients(uid),
 	channel1 INTEGER NOT NULL,
 	channel2 INTEGER NOT NULL,
@@ -78,7 +78,7 @@ CREATE TABLE events (
 -- Connecting different tables
 
 CREATE TABLE servers_clients (
-	server BLOB NOT NULL REFERENCES servers(id),
+	server BLOB NOT NULL REFERENCES servers(public_key),
 	client BLOB NOT NULL REFERENCES clients(uid),
 	icon INTEGER,
 	last_seen DATETIME NOT NULL,
@@ -87,7 +87,7 @@ CREATE TABLE servers_clients (
 );
 
 CREATE TABLE server_messages (
-	server BLOB NOT NULL REFERENCES servers(id),
+	server BLOB NOT NULL REFERENCES servers(public_key),
 	message INTEGER NOT NULL REFERENCES messages(id),
 
 	PRIMARY KEY(server, message)
@@ -103,7 +103,7 @@ CREATE TABLE channel_messages (
 );
 
 CREATE TABLE client_messages (
-	server BLOB NOT NULL REFERENCES servers(id),
+	server BLOB NOT NULL REFERENCES servers(public_key),
 	-- Message author
 	client BLOB NOT NULL REFERENCES clients(uid),
 	message INTEGER NOT NULL REFERENCES messages(id),
