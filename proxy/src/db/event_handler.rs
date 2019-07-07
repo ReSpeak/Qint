@@ -87,9 +87,9 @@ impl EventHandler for super::DbHandler {
 						_ => {}
 					}
 				}
-				Event::PropertyChanged { id, .. } => {}
-				Event::PropertyRemoved { id, .. } => {}
-				Event::Message { from, invoker, message } => {}
+				Event::PropertyChanged { id: _, .. } => {}
+				Event::PropertyRemoved { id: _, .. } => {}
+				Event::Message { from: _, invoker: _, message: _ } => {}
 				Event::__NonExhaustive => unreachable!(),
 			}
 		}

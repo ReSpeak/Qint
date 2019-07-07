@@ -30,6 +30,9 @@ pub(crate) fn start(logger: Logger, webrtc: Option<Addr<crate::Ws>>)
 	-> Result<(AudioData, Option<Addr<webrtc::WebrtcHandler>>), Error> {
 	gst::init().expect("gstreamer failed to initialize");
 
+	let sdl_context = sdl2::init().unwrap();
+	let audio_subsystem = sdl_context.audio().unwrap();
+
 	let pool = futures_threadpool::Builder::new()
 		.pool_size(2)
 		.name_prefix("audio")

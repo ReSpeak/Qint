@@ -388,3 +388,25 @@ fn voice_timeout(last_sent: Arc<Mutex<Instant>>) -> Box<dyn futures01::Future<It
 		}
 	}))
 }
+
+pub struct TsToAudioSdl {
+}
+
+impl TsToAudioSdl {
+	pub fn new() {
+		let desired_spec = AudioSpecDesired {
+			freq: Some(48000),
+			channels: Some(1),
+			// Default sample size
+			samples: None,
+		};
+
+		let device = audio_subsystem.open_playback(None, &desired_spec, |spec| {
+			SquareWave {
+				phase_inc: 440.0 / spec.freq as f32,
+				phase: 0.0,
+				volume: 0.25
+			}
+		}).unwrap();
+	}
+}
