@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use actix_web::actix::*;
 use failure::{format_err, Error};
@@ -28,6 +29,7 @@ pub struct AudioToTs {
 	logger: Logger,
 	bin: gst::Bin,
 	volume: Option<gst_audio::StreamVolume>,
+	is_playing: Arc<AtomicBool>,
 }
 
 struct ConnectionSinkCreator {
@@ -241,8 +243,14 @@ impl AudioToTs {
 		let logger2 = logger.clone();
 		let executor2 = executor.clone();
 		let listeners2 = listeners.clone();
+		let is_playing = Arc::new(AtomicBool::new(false));
+		let is_playing2 = is_playing.clone();
 		appsink.connect_new_sample(move |appsink| {
 			while let Some(sample) = appsink.try_pull_sample(gst::ClockTime::from_nseconds(1)) {
+				if !is_playing2.load(Ordering::Relaxed) {
+					continue;
+				}
+
 				let buffer = if let Some(buffer) = sample.get_buffer() {
 					buffer
 				} else {
@@ -299,6 +307,7 @@ impl AudioToTs {
 			logger: logger2,
 			bin,
 			volume,
+			is_playing,
 		})
 	}
 
@@ -329,6 +338,7 @@ impl AudioToTs {
 	}*/
 
 	pub fn set_playing(&self, playing: bool) -> Result<(), Error> {
+		self.is_playing.store(playing, Ordering::Relaxed);
 		// Setting the state of the bin does not work so we set the state of
 		// every element in the bin.
 		// When we try set the state of the bin to paused, the pipeline sets it

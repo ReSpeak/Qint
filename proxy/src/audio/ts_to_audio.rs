@@ -377,9 +377,9 @@ impl Drop for TsToAudio {
 	}
 }
 
-fn voice_timeout(last_sent: Arc<Mutex<Instant>>) -> Box<futures01::Future<Item=(), Error=()>> {
+fn voice_timeout(last_sent: Arc<Mutex<Instant>>) -> Box<dyn futures01::Future<Item=(), Error=()>> {
 	let timeout = Timer::new(Duration::from_secs(VOICE_TIMEOUT_SECS)).unit_error().compat();
-	Box::new(timeout.and_then(move |_| -> Box::<futures01::Future<Item=_, Error=_>> {
+	Box::new(timeout.and_then(move |_| -> Box::<dyn futures01::Future<Item=_, Error=_>> {
 		let last = *last_sent.lock();
 		if Instant::now().duration_since(last).as_secs() >= VOICE_TIMEOUT_SECS {
 			Box::new(futures01::future::ok(()))

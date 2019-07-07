@@ -12,6 +12,7 @@ use actix::*;
 use actix::fut::wrap_future;
 use actix_web::*;
 use actix_web::fs::StaticFiles;
+use actix_web::http::Method;
 use failure::{format_err, Error};
 use futures01::sink::Sink as _;
 use futures01::stream::Stream;
@@ -351,10 +352,10 @@ impl PacketHandler for ProxyPacketHandler {
 	fn new_connection(
 		&mut self,
 		command_stream: Box<
-			Stream<Item = InCommand, Error = tsproto::Error> + Send,
+			dyn Stream<Item = InCommand, Error = tsproto::Error> + Send,
 		>,
 		audio_stream: Box<
-			Stream<Item = InAudio, Error = tsproto::Error> + Send,
+			dyn Stream<Item = InAudio, Error = tsproto::Error> + Send,
 		>,
 	) {
 		let logger = self.logger.clone();
@@ -489,25 +490,66 @@ fn main() -> Result<(), Error> {
 
 	let addr = settings.listen_address.clone();
 	server::new(move || {
-		let logger = logger.clone();
-		let audio_data = audio_data.clone();
+		let logger2 = logger.clone();
+		let audio_data2 = audio_data.clone();
 		let settings = settings.clone();
 		let database = database.clone();
-		App::new()
-		.middleware(middleware::Logger::default())
-		.resource("/ws", |r| r.f(move |req| ws::start(req, Ws::new(
-			logger.clone(),
-			audio_data.clone(),
-			settings.clone(),
-			database.clone(),
-		))))
-		.handler("/", StaticFiles::new("../target/wasm32-unknown-unknown/release")
+		let mut app = App::new()
+			.middleware(middleware::Logger::default())
+			.resource("/ws", |r| r.f(move |req| ws::start(req, Ws::new(
+				logger2.clone(),
+				audio_data2.clone(),
+				settings.clone(),
+				database.clone(),
+			))));
+
+		if let Some(audio_data) = &audio_data {
+			let addr = audio_data.a2ts.clone();
+			let addr2 = audio_data.a2ts.clone();
+			let logger = logger.clone();
+			let logger2 = logger.clone();
+			app = app.route("/audiosend/true", Method::POST, move |_: HttpRequest| {
+				let logger = logger.clone();
+				actix::spawn(addr.send(audio::audio_to_ts::SetPlayingMsg(true))
+					.then(move |r| {
+						match r {
+							Ok(Ok(())) => {}
+							Ok(Err(e)) => {
+								error!(logger, "Failed to set playing state"; "error" => ?e);
+							}
+							Err(_) => {
+								error!(logger, "Failed to set playing state");
+							}
+						}
+						Ok(())
+					}));
+				HttpResponse::Ok()
+			}).route("/audiosend/false", Method::POST, move |_: HttpRequest| {
+				let logger = logger2.clone();
+				actix::spawn(addr2.send(audio::audio_to_ts::SetPlayingMsg(false))
+					.then(move |r| {
+						match r {
+							Ok(Ok(())) => {}
+							Ok(Err(e)) => {
+								error!(logger, "Failed to set playing state"; "error" => ?e);
+							}
+							Err(_) => {
+								error!(logger, "Failed to set playing state");
+							}
+						}
+						Ok(())
+					}));
+				HttpResponse::Ok()
+			});
+		}
+		app = app.handler("/", StaticFiles::new("../target/wasm32-unknown-unknown/release")
 			.expect("static files not found")
 			.default_handler(StaticFiles::new("../frontend/static/")
 				.expect("Static files not found")
 				.index_file("index.html"))
-		)
-		.finish()
+		);
+
+		app.finish()
 	})
 		.bind(addr)
 		.unwrap()
