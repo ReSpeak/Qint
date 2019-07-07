@@ -1,8 +1,8 @@
 diff --git a/proxy/src/db/schema.rs b/proxy/src/db/schema.rs
-index b294d91..2be853d 100644
+index 46c2103..319f34e 100644
 --- a/proxy/src/db/schema.rs
 +++ b/proxy/src/db/schema.rs
-@@ -1,29 +1,29 @@
+@@ -1,10 +1,10 @@
  table! {
      bookmarks (id) {
 -        id -> Integer,
@@ -15,17 +15,13 @@ index b294d91..2be853d 100644
 +        identity -> BigInt,
          bookmark -> Bool,
          last_used -> Nullable<Timestamp>,
--        server -> Nullable<Integer>,
-+        server -> Nullable<BigInt>,
-     }
- }
- 
+         server -> Nullable<Binary>,
+@@ -14,16 +14,16 @@ table! {
  table! {
      channel_messages (server, channel, message) {
--        server -> Integer,
+         server -> Binary,
 -        channel -> Integer,
 -        message -> Integer,
-+        server -> BigInt,
 +        channel -> BigInt,
 +        message -> BigInt,
      }
@@ -33,21 +29,17 @@ index b294d91..2be853d 100644
  
  table! {
      channels (server, id) {
--        server -> Integer,
+         server -> Binary,
 -        id -> Integer,
 -        parent -> Nullable<Integer>,
-+        server -> BigInt,
 +        id -> BigInt,
 +        parent -> Nullable<BigInt>,
          name -> Text,
          icon -> Nullable<Integer>,
          deleted -> Bool,
-@@ -32,9 +32,9 @@ table! {
- 
- table! {
+@@ -34,7 +34,7 @@ table! {
      client_messages (server, client, message) {
--        server -> Integer,
-+        server -> BigInt,
+         server -> Binary,
          client -> Binary,
 -        message -> Integer,
 +        message -> BigInt,
@@ -59,9 +51,8 @@ index b294d91..2be853d 100644
  table! {
      events (id) {
 -        id -> Integer,
--        server -> Nullable<Integer>,
 +        id -> BigInt,
-+        server -> Nullable<BigInt>,
+         server -> Nullable<Binary>,
          invoker -> Nullable<Binary>,
 -        channel1 -> Integer,
 -        channel2 -> Integer,
@@ -70,53 +61,12 @@ index b294d91..2be853d 100644
          client -> Nullable<Binary>,
          typ -> Text,
          content -> Nullable<Binary>,
-@@ -63,18 +63,18 @@ table! {
- 
- table! {
-     identities (id) {
--        id -> Integer,
-+        id -> BigInt,
-         private_key -> Binary,
-         name -> Text,
--        counter -> Integer,
--        max_counter -> Integer,
-+        counter -> BigInt,
-+        max_counter -> BigInt,
-         client -> Binary,
-     }
- }
- 
- table! {
-     messages (id) {
--        id -> Integer,
-+        id -> BigInt,
-         invoker -> Nullable<Binary>,
-         content -> Text,
-         time -> Timestamp,
-@@ -83,14 +83,14 @@ table! {
- 
+@@ -84,7 +84,7 @@ table! {
  table! {
      server_messages (server, message) {
--        server -> Integer,
+         server -> Binary,
 -        message -> Integer,
-+        server -> BigInt,
 +        message -> BigInt,
      }
  }
  
- table! {
-     servers (id) {
--        id -> Integer,
-+        id -> BigInt,
-         name -> Text,
-         address -> Text,
-         icon -> Nullable<Integer>,
-@@ -99,7 +99,7 @@ table! {
- 
- table! {
-     servers_clients (server, client) {
--        server -> Integer,
-+        server -> BigInt,
-         client -> Binary,
-         icon -> Nullable<Integer>,
-         last_seen -> Timestamp,

@@ -351,6 +351,7 @@ impl AudioToTs {
 				}
 			})?;
 		} else {
+			// TODO Flush pipeline before pausing
 			debug!(self.logger, "Change to paused");
 			self.bin.iterate_elements().foreach(|e| {
 				if let Err(e) = e.set_state(gst::State::Paused) {

@@ -4,14 +4,14 @@
 
 * {
 	margin: 0;
+	color: black;
 }
 
 body {
 	background: white;
-	color: black;
 }
 
-input {
+input::placeholder {
 	color: black;
 }
 

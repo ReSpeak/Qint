@@ -11,12 +11,21 @@ pub enum EventType {
 	NameChanged,
 }
 
-#[derive(Insertable, Queryable)]
+#[derive(Queryable)]
 pub struct Client {
 	pub uid: Vec<u8>,
 	pub name: String,
 	pub public_key: Option<Vec<u8>>,
 	pub custom_name: Option<String>,
+}
+
+#[derive(Insertable)]
+#[table_name = "clients"]
+pub struct ClientInsert<'a> {
+	pub uid: &'a [u8],
+	pub name: &'a str,
+	pub public_key: Option<&'a [u8]>,
+	pub custom_name: Option<&'a str>,
 }
 
 #[derive(Identifiable, Queryable)]
@@ -36,19 +45,38 @@ pub struct Identity {
 
 #[derive(Queryable)]
 pub struct Server {
-	pub id: i64,
+	pub public_key: Vec<u8>,
 	pub name: String,
 	/// Last used address
 	pub address: String,
 }
 
+#[derive(Insertable)]
+#[table_name = "servers"]
+pub struct ServerInsert<'a> {
+	pub public_key: &'a [u8],
+	pub name: &'a str,
+	pub address: &'a str,
+}
+
 #[derive(Queryable)]
 pub struct Channel {
-	pub server: i64,
+	pub server: Vec<u8>,
 	pub id: i64,
 	pub parent: Option<i64>,
 	pub name: String,
 	pub icon: Option<u32>,
+	pub deleted: bool,
+}
+
+#[derive(Insertable)]
+#[table_name = "channels"]
+pub struct ChannelInsert<'a> {
+	pub server: &'a [u8],
+	pub id: i64,
+	pub parent: Option<i64>,
+	pub name: &'a str,
+	pub icon: Option<i32>,
 	pub deleted: bool,
 }
 
@@ -91,16 +119,16 @@ pub struct Event {
 
 #[derive(Insertable)]
 #[table_name = "identities"]
-pub struct NewIdentity {
+pub struct NewIdentity<'a> {
 	pub private_key: Vec<u8>,
-	pub name: String,
+	pub name: &'a str,
 	/// The offset that reaches the highest identity level
 	pub counter: i64,
 	/// The maximum offset that we computed so far (can reach a lower level than
 	/// `counter`).
 	pub max_counter: i64,
 	/// Client uid
-	pub client: Vec<u8>,
+	pub client: &'a [u8],
 }
 
 
@@ -115,12 +143,12 @@ impl Identity {
 	}
 }
 
-impl NewIdentity {
-	pub fn new(id: tsclientlib::Identity, client_uid: Vec<u8>, secret: &Secret) -> Result<Self, Error> {
+impl<'a> NewIdentity<'a> {
+	pub fn new(id: &tsclientlib::Identity, client_uid: &'a [u8], secret: &Secret) -> Result<Self, Error> {
 		let private_key = secret.seal(id.key().to_short().to_vec())?;
 		Ok(Self {
 			private_key,
-			name: "Default".into(),
+			name: "Default",
 			counter: id.counter() as i64,
 			max_counter: id.max_counter() as i64,
 			client: client_uid,

@@ -1,3 +1,5 @@
+use std::fs;
+
 use actix_web::actix::*;
 use diesel::prelude::*;
 use diesel::connection::SimpleConnection;
@@ -8,8 +10,10 @@ use tsclientlib::Identity;
 
 use crate::secret::Secret;
 use crate::Settings;
+use event_handler::EventHandler;
 
 mod models;
+mod event_handler;
 mod schema;
 
 diesel_migrations::embed_migrations!();
@@ -24,9 +28,11 @@ pub struct DbHandler {
 #[derive(Clone, Debug)]
 pub struct GetIdentityMsg(pub u64, pub bool);
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum EventMsg {
-	Events(Vec<tsclientlib::events::Event>),
+	Events(tsclientlib::Connection, Vec<tsclientlib::events::Event>),
+	/// The connection and the address that was used.
+	Connected(String, tsclientlib::Connection),
 	UpdateIdentity(Identity),
 }
 
@@ -41,6 +47,10 @@ impl DbHandler {
 	pub(crate) fn new(logger: Logger, settings: &Settings, secret: Secret) -> Result<Self, Error> {
 		let database_url = settings.config_path.join("storage.sqlite");
 		let con = SqliteConnection::establish(database_url.to_str().unwrap())?;
+
+		// The database can be opened successfully, create backup
+		fs::copy(database_url, settings.config_path.join("storage.sqlite.bak"))?;
+
 		// Enable foreign keys
 		con.batch_execute("PRAGMA foreign_keys = ON")?;
 
@@ -78,18 +88,18 @@ impl Handler<GetIdentityMsg> for DbHandler {
 				let pub_key = identity.key().to_pub();
 				let uid = pub_key.get_uid_no_base64()?;
 
-				let cli = models::Client {
-					uid: uid.clone(),
-					name: "TeamSpeakUser".into(),
-					public_key: Some(pub_key.to_short().to_vec()),
+				let cli = models::ClientInsert {
+					uid: &uid,
+					name: "TeamSpeakUser",
+					public_key: Some(pub_key.to_short()),
 					custom_name: None,
 				};
 				diesel::insert_into(schema::clients::table)
 					.values(&cli)
 					.execute(&self.con)?;
 
-				let new_identity = models::NewIdentity::new(identity.clone(),
-					uid, &self.secret)?;
+				let new_identity = models::NewIdentity::new(&identity,
+					&uid, &self.secret)?;
 				diesel::insert_into(identities)
 					.values(&new_identity)
 					.execute(&self.con)?;
@@ -104,8 +114,24 @@ impl Handler<EventMsg> for DbHandler {
 	type Result = Result<(), Error>;
 	fn handle(&mut self, msg: EventMsg, _: &mut Self::Context) -> Self::Result {
 		match msg {
-			EventMsg::Events(es) => {
-				// TODO
+			EventMsg::Events(con, es) => {
+				self.handle_events(&con, &es)?;
+			}
+			EventMsg::Connected(addr, con) => {
+				let key = con.get_server_key()?;
+				let key = key.to_short();
+				let con = con.lock();
+
+				// TODO Check if we already know that address
+
+				let server = models::ServerInsert {
+					public_key: &key,
+					name: &con.server.name,
+					address: &addr,
+				};
+				diesel::insert_into(schema::servers::table)
+					.values(&server)
+					.execute(&self.con)?;
 			}
 			EventMsg::UpdateIdentity(identity) => {
 				use schema::identities::dsl::*;

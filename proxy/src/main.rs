@@ -231,7 +231,9 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 							.and_then(move |identity, actor: &mut Self, ctx| {
 								let addr = ctx.address();
 								let db_addr = actor.database.clone();
+								let db_addr2 = db_addr.clone();
 								let logger = actor.logger.clone();
+								let server_addr = o.address.clone();
 								let con = Connection::new(tsclientlib::ConnectOptions::new(o.address)
 									.name(o.name)
 									.identity(identity)
@@ -241,8 +243,8 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 									.log_udp_packets(o.log_udp_packets || actor.settings.verbosity > 2)
 									.add_event_listener("Qint".into(), Box::new(move |e| {
 										let event = match e {
-											tsclientlib::Event::ConEvents(_, events) => {
-												db::EventMsg::Events(events.iter().map(|e| e.clone()).collect())
+											tsclientlib::Event::ConEvents(con, events) => {
+												db::EventMsg::Events(con.get_locked(), events.iter().map(|e| e.clone()).collect())
 											}
 											tsclientlib::Event::IdentityLevelIncreased(id) => {
 												db::EventMsg::UpdateIdentity((*id).clone())
@@ -279,7 +281,24 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 									}))
 								);
 
-								wrap_future(con.from_err())
+								let logger = actor.logger.clone();
+								wrap_future(con.from_err().map(move |r| {
+									let event = db::EventMsg::Connected(server_addr, r.clone());
+									actix::spawn(db_addr2.send(event)
+										.then(move |r| {
+											match r {
+												Ok(Ok(())) => {}
+												Ok(Err(e)) => {
+													error!(logger, "Failed to handle event in database"; "error" => ?e);
+												}
+												Err(_) => {
+													error!(logger, "Failed to send event to database");
+												}
+											}
+											Ok(())
+										}));
+									r
+								}))
 							}).map_err(|_e, _actor, ctx| {
 								Self::send_message(&MessageP2F::ConnectFailed(), ctx);
 							}).map(move |con, actor: &mut Self, _| {

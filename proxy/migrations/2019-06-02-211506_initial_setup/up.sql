@@ -19,7 +19,7 @@ CREATE TABLE identities (
 );
 
 CREATE TABLE servers (
-	id INTEGER NOT NULL PRIMARY KEY,
+	public_key BLOB NOT NULL PRIMARY KEY,
 	name TEXT NOT NULL,
 	-- Last used address
 	address TEXT NOT NULL,
@@ -27,7 +27,7 @@ CREATE TABLE servers (
 );
 
 CREATE TABLE channels (
-	server INTEGER NOT NULL REFERENCES servers(id),
+	server BLOB NOT NULL REFERENCES servers(id),
 	id INTEGER NOT NULL,
 	parent INTEGER,
 	name TEXT NOT NULL,
@@ -47,7 +47,7 @@ CREATE TABLE bookmarks (
 	bookmark BOOLEAN NOT NULL DEFAULT false,
 	last_used DATETIME,
 	-- References the server if already connected once
-	server INTEGER,
+	server BLOB,
 
 	FOREIGN KEY(server, channel) REFERENCES channels(server, id)
 );
@@ -62,7 +62,7 @@ CREATE TABLE messages (
 
 CREATE TABLE events (
 	id INTEGER NOT NULL PRIMARY KEY,
-	server INTEGER REFERENCES servers(id),
+	server BLOB REFERENCES servers(id),
 	invoker BLOB REFERENCES clients(uid),
 	channel1 INTEGER NOT NULL,
 	channel2 INTEGER NOT NULL,
@@ -78,7 +78,7 @@ CREATE TABLE events (
 -- Connecting different tables
 
 CREATE TABLE servers_clients (
-	server INTEGER NOT NULL REFERENCES servers(id),
+	server BLOB NOT NULL REFERENCES servers(id),
 	client BLOB NOT NULL REFERENCES clients(uid),
 	icon INTEGER,
 	last_seen DATETIME NOT NULL,
@@ -87,14 +87,14 @@ CREATE TABLE servers_clients (
 );
 
 CREATE TABLE server_messages (
-	server INTEGER NOT NULL REFERENCES servers(id),
+	server BLOB NOT NULL REFERENCES servers(id),
 	message INTEGER NOT NULL REFERENCES messages(id),
 
 	PRIMARY KEY(server, message)
 );
 
 CREATE TABLE channel_messages (
-	server INTEGER NOT NULL,
+	server BLOB NOT NULL,
 	channel INTEGER NOT NULL,
 	message INTEGER NOT NULL REFERENCES messages(id),
 
@@ -103,7 +103,7 @@ CREATE TABLE channel_messages (
 );
 
 CREATE TABLE client_messages (
-	server INTEGER NOT NULL REFERENCES servers(id),
+	server BLOB NOT NULL REFERENCES servers(id),
 	-- Message author
 	client BLOB NOT NULL REFERENCES clients(uid),
 	message INTEGER NOT NULL REFERENCES messages(id),
