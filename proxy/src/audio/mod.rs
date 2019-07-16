@@ -10,7 +10,7 @@ use gst::prelude::*;
 use slog::{debug, error, Logger};
 
 use audio_to_ts::AudioToTs;
-use ts_to_audio::TsToAudio;
+use ts_to_audio::{TsToAudio, TsToAudioSdl};
 
 pub mod audio_to_ts;
 pub mod ts_to_audio;
@@ -23,7 +23,7 @@ pub struct AudioData {
 	pub pool: ThreadPool,
 	pub pipeline: gst::Pipeline,
 	pub a2ts: Addr<AudioToTs>,
-	pub ts2a: Addr<TsToAudio>,
+	pub ts2a: Addr<TsToAudioSdl>,
 }
 
 pub(crate) fn start(logger: Logger, webrtc: Option<Addr<crate::Ws>>)
@@ -50,7 +50,9 @@ pub(crate) fn start(logger: Logger, webrtc: Option<Addr<crate::Ws>>)
 		None
 	};
 
-	let ts2a = TsToAudio::new(logger.clone(), pipeline.clone(), rtc.as_ref())?;
+	let ts2a = TsToAudioSdl::new(logger.clone(), &audio_subsystem)?;
+
+	//let ts2a = TsToAudio::new(logger.clone(), pipeline.clone(), rtc.as_ref())?;
 	let a2ts = AudioToTs::new(logger.clone(), pipeline.clone(), pool.clone(), rtc.as_ref(), None)?;
 
 	let rtc = rtc.map(|r| r.start());

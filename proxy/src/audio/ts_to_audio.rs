@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::fmt;
 use std::io::Write;
 use std::sync::Arc;
@@ -8,11 +9,14 @@ use std::time::{Duration, Instant};
 use actix_web::actix::*;
 use actix_web::actix::fut::wrap_future;
 use async_timer::oneshot::{Oneshot, Timer};
+use audiopus::coder::{Decoder, GenericCtl};
 use failure::{format_err, Error};
 use futures::prelude::*;
 use futures01::Future as _;
 use parking_lot::Mutex;
-use slog::{o, Logger};
+use sdl2::AudioSubsystem;
+use sdl2::audio::{AudioCallback, AudioDevice, AudioSpec, AudioSpecDesired};
+use slog::{info, o, Logger};
 use tsclientlib::ClientId;
 use tsproto_packets::packets::{AudioData, CodecType, InAudio};
 
@@ -389,24 +393,126 @@ fn voice_timeout(last_sent: Arc<Mutex<Instant>>) -> Box<dyn futures01::Future<It
 	}))
 }
 
+struct SdlVoice {
+	decoder: Decoder,
+}
+
 pub struct TsToAudioSdl {
+	logger: Logger,
+	device: AudioDevice<SdlCallback>,
+	voices: HashMap<Id, SdlVoice>,
+	data: Arc<Mutex<Vec<f32>>>,
+}
+
+impl Actor for TsToAudioSdl {
+	type Context = Context<Self>;
 }
 
 impl TsToAudioSdl {
-	pub fn new() {
+	pub fn new(logger: Logger, audio_subsystem: &AudioSubsystem) -> Result<Self, Error> {
 		let desired_spec = AudioSpecDesired {
 			freq: Some(48000),
 			channels: Some(1),
-			// Default sample size
-			samples: None,
+			// Default sample size, 20 ms per packet
+			samples: Some(48000 / 50),
 		};
 
-		let device = audio_subsystem.open_playback(None, &desired_spec, |spec| {
-			SquareWave {
-				phase_inc: 440.0 / spec.freq as f32,
-				phase: 0.0,
-				volume: 0.25
+		let data = Arc::new(Mutex::new(Default::default()));
+
+		let logger2 = logger.clone();
+		let data2 = data.clone();
+		let device = audio_subsystem.open_playback(None, &desired_spec, move |spec| {
+			info!(logger2, "Got playback spec"; "spec" => ?spec);
+			SdlCallback {
+				logger: logger2.clone(),
+				spec,
+				data: data2.clone(),
 			}
-		}).unwrap();
+		}).map_err(|e| format_err!("SDL error: {}", e))?;
+
+
+		Ok(Self {
+			logger,
+			device,
+			voices: Default::default(),
+			data,
+		})
+	}
+}
+
+impl Handler<PlayMsg> for TsToAudioSdl {
+	type Result = Result<(), Error>;
+	fn handle(&mut self, msg: PlayMsg, _: &mut Self::Context) -> Self::Result {
+		// TODO Whisper packets
+		if let AudioData::S2C { id: _, from, codec, data } = msg.1.data() {
+			if *codec != CodecType::OpusVoice && *codec != CodecType::OpusMusic {
+				return Err(format_err!("Got unsupported audio codec, only opus is supported"));
+			}
+
+			let id = Id { con: msg.0, client: ClientId(*from) };
+
+			info!(self.logger, "Getting voice"; "id" => %id);
+			let mut tmp_entry;
+			let voice = match self.voices.entry(id) {
+				Entry::Occupied(o) => {
+					tmp_entry = o;
+					tmp_entry.get_mut()
+				}
+				Entry::Vacant(v) => {
+					let decoder = Decoder::new(audiopus::SampleRate::Hz48000, audiopus::Channels::Mono)?;
+					v.insert(SdlVoice {
+						decoder,
+					})
+				}
+			};
+
+			if data.len() == 0 {
+				info!(self.logger, "Resetting decoder");
+				voice.decoder.reset_state()?;
+				return Ok(());
+			}
+
+			let mut output = vec![0f32; 48000 / 50];
+			let len = voice.decoder.decode_float(*data, &mut output, false)?;
+			output.truncate(len);
+			info!(self.logger, "Decoded bytes"; "len" => len);
+
+			// Put into queue
+			let mut data = self.data.lock();
+			data.append(&mut output);
+			self.device.resume();
+
+			// TODO Mix somewhere
+		}
+		Ok(())
+	}
+}
+
+struct SdlCallback {
+	logger: Logger,
+	spec: AudioSpec,
+	data: Arc<Mutex<Vec<f32>>>,
+}
+
+impl AudioCallback for SdlCallback {
+	type Channel = f32;
+	fn callback(&mut self, mut buffer: &mut [Self::Channel]) {
+		let mut data = self.data.lock();
+		info!(self.logger, "Filling buffer"; "buffer len" => buffer.len(), "data len" => data.len());
+		if buffer.len() > data.len() {
+			// Fill the rest with silence
+			for d in &mut buffer[data.len()..] {
+				*d = 0.0;
+			}
+			buffer = &mut buffer[..data.len()];
+		}
+
+		// Fill data
+		buffer.copy_from_slice(&data[..buffer.len()]);
+		if buffer.len() == data.len() {
+			data.clear();
+		} else {
+			*data = data.split_off(buffer.len());
+		}
 	}
 }

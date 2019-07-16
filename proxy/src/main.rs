@@ -123,7 +123,7 @@ struct Ws {
 struct ProxyPacketHandler {
 	logger: Logger,
 	con: ConnectionId,
-	addr: Addr<audio::ts_to_audio::TsToAudio>,
+	addr: Addr<audio::ts_to_audio::TsToAudioSdl>,
 }
 
 #[derive(Clone)]
