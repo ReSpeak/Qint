@@ -3,6 +3,7 @@ name = "qint-proxy"
 version = "0.1.0"
 authors = ["Flakebi <flakebi@t-online.de>"]
 edition = "2018"
+build = "build.rs"
 
 [dependencies]
 async-timer = "0.2"
@@ -19,12 +20,6 @@ futures01 = { package = "futures", version = "0.1" }
 futures-preview = { version = "0.3.0-alpha", features = ["async-await", "compat", "nightly"] }
 futures-spawn = "0.1"
 futures-threadpool = "0.1"
-glib = "0.8"
-gstreamer = { version = "0.14", features = ["futures"] }
-gstreamer-app = { version = "0.14", features = ["v1_10"] }
-gstreamer-audio = "0.14"
-gstreamer-sdp = "0.14"
-gstreamer-webrtc = "0.14"
 lazy_static = "1"
 parking_lot = "0.8"
 qint-shared = { path = "../shared" }
@@ -41,6 +36,7 @@ toml = "0.4"
 tsclientlib = { path = "../../tsclientlib/tsclientlib" }
 tsproto = { path = "../../tsclientlib/tsproto" }
 tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }
+libsqlite3-sys = { version = "0.9", features = ["bundled"] }
 
 [dependencies.actix-web]
 version = "0.7"

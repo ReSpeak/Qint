@@ -30,7 +30,6 @@ mod audio;
 mod db;
 mod secret;
 
-use audio::webrtc;
 use secret::Secret;
 
 static NEXT_CON_ID: AtomicU64 = AtomicU64::new(0);
@@ -114,7 +113,6 @@ struct Ws {
 	id: ConnectionId,
 	/// If the audio data is `None`, webrtc should be used
 	audio_data: Option<audio::AudioData>,
-	rtc: Option<Addr<webrtc::WebrtcHandler>>,
 	connection: Option<Connection>,
 }
 
@@ -164,7 +162,6 @@ impl Ws {
 			database,
 			id: next_con_id(),
 			audio_data,
-			rtc: None,
 			connection: None,
 		}
 	}
@@ -207,23 +204,6 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 
 				match msg {
 					MessageF2P::Connect(o) => {
-						// Setup webrtc
-						if self.audio_data.is_none() && self.rtc.is_none() {
-							let (data, rtc) = match crate::audio::start(
-								self.logger.clone(),
-								Some(ctx.address()),
-							) {
-								Ok(r) => r,
-								Err(e) => {
-									error!(self.logger, "Failed to start audio"; "error" => ?e);
-									ctx.terminate();
-									return;
-								}
-							};
-							self.audio_data = Some(data);
-							self.rtc = rtc;
-						}
-
 						let ts2a = self.audio_data.as_ref().unwrap().ts2a.clone();
 						let id = self.settings.default_identity;
 						ctx.spawn(wrap_future(self.database.send(db::GetIdentityMsg(id, true)).from_err().and_then(|r| r))
@@ -345,19 +325,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 						}
 					}
 					MessageF2P::Webrtc(msg) => {
-						if let Some(rtc) = &self.rtc {
-							let logger = self.logger.clone();
-							actix::spawn(rtc.send(webrtc::SignallingMsg(msg))
-								.then(move |r| {
-									match r {
-										Ok(()) => {}
-										Err(e) => error!(logger, "Failed with webrtc"; "error" => ?e),
-									}
-									Ok(())
-								}));
-						} else {
-							error!(self.logger, "Got webrtc message but it is disabled");
-						}
+						// @Splamy nada
 					}
 				}
 			}
@@ -503,7 +471,7 @@ fn main() -> Result<(), Error> {
 	let audio_data = if settings.use_webrtc {
 		None
 	} else {
-		Some(audio::start(logger.clone(), None).unwrap().0)
+		Some(audio::start(logger.clone(), None).unwrap())
 	};
 
 	let addr = settings.listen_address.clone();
@@ -560,7 +528,7 @@ fn main() -> Result<(), Error> {
 				HttpResponse::Ok()
 			});
 		}
-		app = app.handler("/", StaticFiles::new("../target/wasm32-unknown-unknown/debug")
+		app = app.handler("/", StaticFiles::new("../frontend/target/wasm32-unknown-unknown/release/")
 			.expect("static files not found")
 			.default_handler(StaticFiles::new("../frontend/static/")
 				.expect("Static files not found")
