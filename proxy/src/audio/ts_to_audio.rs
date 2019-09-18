@@ -1,18 +1,11 @@
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::fmt;
-use std::io::Write;
 use std::sync::Arc;
-use std::thread;
-use std::time::{Duration, Instant};
 
 use actix_web::actix::*;
-use actix_web::actix::fut::wrap_future;
-use async_timer::oneshot::{Oneshot, Timer};
 use audiopus::coder::{Decoder, GenericCtl};
 use failure::{format_err, Error};
-use futures::prelude::*;
-use futures01::Future as _;
 use parking_lot::Mutex;
 use sdl2::AudioSubsystem;
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpec, AudioSpecDesired};
@@ -21,7 +14,11 @@ use tsclientlib::ClientId;
 use tsproto_packets::packets::{AudioData, CodecType, InAudio};
 
 use crate::ConnectionId;
-use super::*;
+
+/// The maximum supported size of a decoded audio packet.
+///
+/// Use 48 kHz, 20 ms frames (50 times per second) and stereo data.
+const MAX_FRAME_SIZE: usize = 48000 / 50 * 2;
 
 pub struct PlayMsg(pub ConnectionId, pub InAudio);
 
@@ -37,19 +34,9 @@ impl fmt::Display for Id {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "{}-{}", self.con.0, self.client.0)
 	}
-}fn voice_timeout(last_sent: Arc<Mutex<Instant>>) -> Box<dyn futures01::Future<Item=(), Error=()>> {
-	let timeout = Timer::new(Duration::from_secs(VOICE_TIMEOUT_SECS)).unit_error().compat();
-	Box::new(timeout.and_then(move |_| -> Box::<dyn futures01::Future<Item=_, Error=_>> {
-		let last = *last_sent.lock();
-		if Instant::now().duration_since(last).as_secs() >= VOICE_TIMEOUT_SECS {
-			Box::new(futures01::future::ok(()))
-		} else {
-			voice_timeout(last_sent)
-		}
-	}))
 }
 
-struct SdlVoice {
+struct Voice {
 	decoder: Decoder,
 }
 
@@ -58,11 +45,15 @@ struct VoiceData {
 	channels: u8,
 }
 
-pub struct TsToAudioSdl {
+pub struct TsToAudio {
 	logger: Logger,
 	device: AudioDevice<SdlCallback>,
-	voices: HashMap<Id, SdlVoice>,
+	voices: HashMap<Id, Voice>,
 	data: Arc<Mutex<HashMap<Id, VoiceData>>>,
+
+	/// Decoded opus data
+	// TODO Support bigger packets?
+	opus_output: [f32; MAX_FRAME_SIZE],
 }
 
 impl VoiceData {
@@ -74,12 +65,13 @@ impl VoiceData {
 	}
 }
 
-impl Actor for TsToAudioSdl {
+impl Actor for TsToAudio {
 	type Context = Context<Self>;
 }
 
-impl TsToAudioSdl {
+impl TsToAudio {
 	pub fn new(logger: Logger, audio_subsystem: &AudioSubsystem) -> Result<Self, Error> {
+		let logger = logger.new(o!("pipeline" => "ts-to-audio"));
 		let desired_spec = AudioSpecDesired {
 			freq: Some(48000),
 			channels: Some(2),
@@ -92,9 +84,10 @@ impl TsToAudioSdl {
 		let logger2 = logger.clone();
 		let data2 = data.clone();
 		let device = audio_subsystem.open_playback(None, &desired_spec, move |spec| {
+			// This spec will always be the desired spec, the sdl wrapper passes
+			// zero as `allowed_changes`.
 			info!(logger2, "Got playback spec"; "spec" => ?spec);
 			SdlCallback {
-				logger: logger2.clone(),
 				spec,
 				data: data2.clone(),
 			}
@@ -106,11 +99,13 @@ impl TsToAudioSdl {
 			device,
 			voices: Default::default(),
 			data,
+
+			opus_output: [0f32; MAX_FRAME_SIZE],
 		})
 	}
 }
 
-impl Handler<PlayMsg> for TsToAudioSdl {
+impl Handler<PlayMsg> for TsToAudio {
 	type Result = Result<(), Error>;
 	fn handle(&mut self, msg: PlayMsg, _: &mut Self::Context) -> Self::Result {
 		// TODO Whisper packets
@@ -140,8 +135,10 @@ impl Handler<PlayMsg> for TsToAudioSdl {
 				Entry::Vacant(v) => {
 					info!(self.logger, "Creating opus decoder"; "channels" => channels);
 
+					// TODO Always use the channel count of SDL, opus automatically
+					// averages or duplicates samples for each channel.
 					let decoder = Decoder::new(audiopus::SampleRate::Hz48000, opus_channels)?;
-					v.insert(SdlVoice { decoder })
+					v.insert(Voice { decoder })
 				}
 			};
 
@@ -151,24 +148,21 @@ impl Handler<PlayMsg> for TsToAudioSdl {
 				return Ok(());
 			}
 
-			// TODO Support bigger packets
-			let mut output = vec![0f32; 48000 / 50 * channels];
 			//info!(self.logger, "Decode opus packets"; "len" => data.len());
-			let len = voice.decoder.decode_float(*data, &mut output, false)?;
-			output.truncate(len * channels);
-			//info!(self.logger, "Decoded bytes"; "len" => len);
+			let len = voice.decoder.decode_float(*data, &mut self.opus_output[..], false)?;
+			//info!(self.logger, "Decoded frames"; "len" => len);
 
 			// Put into queue
 			{
 				let mut data = self.data.lock();
 				let d = data.entry(id).or_insert_with(|| VoiceData::new(channels as u8));
 				let queue = &mut d.queue;
-				if queue.len() > output.len() * 2 {
+				if queue.len() > len * channels * 2 {
 					info!(self.logger, "Removing samples"; "count" => queue.len());
-					*queue = queue.split_off(queue.len() - output.len());
+					*queue = queue.split_off(queue.len() - len * channels);
 					queue.clear();
 				}
-				queue.append(&mut output);
+				queue.extend_from_slice(&self.opus_output[..len * channels]);
 			}
 			self.device.resume();
 		}
@@ -177,7 +171,6 @@ impl Handler<PlayMsg> for TsToAudioSdl {
 }
 
 struct SdlCallback {
-	logger: Logger,
 	spec: AudioSpec,
 	data: Arc<Mutex<HashMap<Id, VoiceData>>>,
 }

@@ -1,38 +1,39 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use actix_web::actix::*;
+use audiopus::coder::Encoder;
 use failure::{format_err, Error};
 use futures01::{Future, Sink};
 use futures_spawn::SpawnHelper;
 use futures_threadpool::ThreadPool;
 use parking_lot::Mutex;
-use slog::{debug, error, o, Logger};
+use sdl2::AudioSubsystem;
+use sdl2::audio::{AudioCallback, AudioDevice, AudioSpec, AudioSpecDesired};
+use slog::{error, info, o, Logger};
 use tsproto_packets::packets::{AudioData, CodecType, OutAudio};
 
-use super::*;
+const MAX_OPUS_FRAME_SIZE: usize = 1275;
 
 pub struct SetListenerMsg {
 	pub connection: tsclientlib::Connection,
 }
 
 pub struct RemoveListenerMsg;
-pub struct SetVolumeMsg(pub f64);
+pub struct SetVolumeMsg(pub f32);
 pub struct SetPlayingMsg(pub bool);
 
-pub struct AudioToTsSdl {
+pub struct AudioToTs {
 	listeners: Arc<Mutex<Vec<ConnectionSinkCreator>>>,
+	device: AudioDevice<SdlCallback>,
 
-	logger: Logger,
-	volume: Option<()>,
-	is_playing: Arc<AtomicBool>,
+	volume: Arc<Mutex<f32>>,
 }
 
 struct ConnectionSinkCreator {
 	con: tsproto::client::ClientConVal,
 }
 
-impl Actor for AudioToTsSdl {
+impl Actor for AudioToTs {
 	type Context = Context<Self>;
 }
 
@@ -45,7 +46,7 @@ impl Message for RemoveListenerMsg {
 impl Message for SetVolumeMsg { type Result = (); }
 impl Message for SetPlayingMsg { type Result = Result<(), Error>; }
 
-impl Handler<SetListenerMsg> for AudioToTsSdl {
+impl Handler<SetListenerMsg> for AudioToTs {
 	type Result = ();
 	fn handle(&mut self, msg: SetListenerMsg, _: &mut Self::Context) -> Self::Result {
 		let mut listeners = self.listeners.lock();
@@ -55,65 +56,146 @@ impl Handler<SetListenerMsg> for AudioToTsSdl {
 	}
 }
 
-impl Handler<RemoveListenerMsg> for AudioToTsSdl {
+impl Handler<RemoveListenerMsg> for AudioToTs {
 	type Result = bool;
 	fn handle(&mut self, _: RemoveListenerMsg, _: &mut Self::Context) -> Self::Result {
 		let mut ls = self.listeners.lock();
 		let res = !ls.is_empty();
 		ls.clear();
-		if let Err(e) = self.set_playing(false) {
-			error!(self.logger, "Failed to stop playing"; "error" => ?e);
-		}
+		self.set_playing(false);
 		res
 	}
 }
 
-impl Handler<SetVolumeMsg> for AudioToTsSdl {
+impl Handler<SetVolumeMsg> for AudioToTs {
 	type Result = ();
 	fn handle(&mut self, msg: SetVolumeMsg, _: &mut Self::Context) -> Self::Result {
 		self.set_volume(msg.0);
 	}
 }
 
-impl Handler<SetPlayingMsg> for AudioToTsSdl {
+impl Handler<SetPlayingMsg> for AudioToTs {
 	type Result = Result<(), Error>;
 	fn handle(&mut self, msg: SetPlayingMsg, _: &mut Self::Context) -> Self::Result {
-		self.set_playing(msg.0)
+		self.set_playing(msg.0);
+		Ok(())
 	}
 }
 
-impl AudioToTsSdl {
+impl AudioToTs {
 	pub fn new(
 		logger: Logger,
+		audio_subsystem: &AudioSubsystem,
 		executor: ThreadPool,
-		uri: Option<&str>,
 	) -> Result<Self, Error> {
 		let logger = logger.new(o!("pipeline" => "audio-to-ts"));
-		// Put everything into audio-to-ts bin and play/pause that
-		
+
 		let listeners = Arc::new(Mutex::new(Vec::<ConnectionSinkCreator>::new()));
 
-		let logger2 = logger.clone();
-		let executor2 = executor.clone();
 		let listeners2 = listeners.clone();
-		let is_playing = Arc::new(AtomicBool::new(false));
+		let volume = Arc::new(Mutex::new(1.0));
+		let volume2 = volume.clone();
+
+		let desired_spec = AudioSpecDesired {
+			freq: Some(48000),
+			channels: Some(1),
+			// Default sample size, 20 ms per packet
+			samples: Some(48000 / 50),
+		};
+
+		let device = audio_subsystem.open_capture(None, &desired_spec, move |spec| {
+			// This spec will always be the desired spec, the sdl wrapper passes
+			// zero as `allowed_changes`.
+			info!(logger, "Got capture spec"; "spec" => ?spec);
+			let opus_channels = audiopus::Channels::Mono;
+			let encoder = Encoder::new(audiopus::SampleRate::Hz48000,
+				opus_channels, audiopus::Application::Voip).expect("Could not create encoder");
+
+			SdlCallback {
+				logger: logger.clone(),
+				spec,
+				encoder,
+				executor: executor.clone(),
+				listeners: listeners2.clone(),
+				volume: volume2.clone(),
+
+				opus_output: [0; MAX_OPUS_FRAME_SIZE],
+			}
+		}).map_err(|e| format_err!("SDL error: {}", e))?;
 
 		Ok(Self {
 			listeners,
-			volume: Option::None,
-			logger: logger2,
-			is_playing,
+			device,
+			volume,
 		})
 	}
 
-	pub fn set_volume(&self, volume: f64) {
-		if let Some(v) = &self.volume {
-			
-		}
-		// TODO
+	pub fn set_volume(&mut self, volume: f32) {
+		let mut vol = self.volume.lock();
+		*vol = volume;
 	}
 
-	pub fn set_playing(&self, playing: bool) -> Result<(), Error> {
-		Ok(())
+	pub fn set_playing(&self, playing: bool) {
+		if playing {
+			self.device.resume();
+		} else {
+			self.device.pause();
+		}
+	}
+}
+
+struct SdlCallback {
+	logger: Logger,
+	spec: AudioSpec,
+	encoder: Encoder,
+	executor: ThreadPool,
+	listeners: Arc<Mutex<Vec<ConnectionSinkCreator>>>,
+	volume: Arc<Mutex<f32>>,
+
+	/// Encoded opus data, maximum opus frame size is 1275 as from RFC6716.
+	opus_output: [u8; MAX_OPUS_FRAME_SIZE],
+}
+
+impl AudioCallback for SdlCallback {
+	type Channel = f32;
+	fn callback(&mut self, buffer: &mut [Self::Channel]) {
+		// Handle volume
+		let volume = *self.volume.lock();
+		if volume != 1.0 {
+			for d in &mut *buffer {
+				*d *= volume;
+			}
+		}
+
+		// TODO Support stereo
+		match self.encoder.encode_float(buffer, &mut self.opus_output[..]) {
+			Err(e) => {
+				error!(self.logger, "Failed to encode opus"; "error" => ?e);
+			}
+			Ok(len) => {
+				// Create packet
+				let packet = OutAudio::new(&AudioData::C2S {
+					id: 0,
+					codec: CodecType::OpusVoice,
+					data: &self.opus_output[..len],
+				});
+
+				// Write into packet sink
+				let mut listeners = self.listeners.lock();
+				listeners.retain(|l| {
+					if l.con.upgrade().is_none() {
+						return false;
+					}
+
+					let sink = l.con.as_packet_sink();
+					let logger = self.logger.clone();
+					let packet = packet.clone();
+					self.executor.spawn(sink.send(packet).map(|_| ()).map_err(move |e| {
+						error!(logger, "Failed to send packet"; "error" => ?e);
+					})).detach();
+					true
+				});
+			}
+		}
 	}
 }

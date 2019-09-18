@@ -48,11 +48,6 @@ struct Args {
 	)]
 	listen_address: Option<String>,
 	#[structopt(
-		long = "webrtc",
-		help = "Use webrtc for sound"
-	)]
-	use_webrtc: Option<bool>,
-	#[structopt(
 		short = "i",
 		long = "identity",
 		help = "The id of the identity that is used by default"
@@ -89,8 +84,6 @@ struct Args {
 struct Settings {
 	#[serde(default = "default_listen_address")]
 	listen_address: String,
-	#[serde(default)]
-	use_webrtc: bool,
 	#[serde(skip)]
 	config_path: PathBuf,
 	#[serde(default)]
@@ -111,8 +104,7 @@ struct Ws {
 	settings: Settings,
 	database: Addr<db::DbHandler>,
 	id: ConnectionId,
-	/// If the audio data is `None`, webrtc should be used
-	audio_data: Option<audio::AudioData>,
+	audio_data: audio::AudioData,
 	connection: Option<Connection>,
 }
 
@@ -120,7 +112,7 @@ struct Ws {
 struct ProxyPacketHandler {
 	logger: Logger,
 	con: ConnectionId,
-	addr: Addr<audio::ts_to_audio::TsToAudioSdl>,
+	addr: Addr<audio::ts_to_audio::TsToAudio>,
 }
 
 #[derive(Clone)]
@@ -151,7 +143,7 @@ impl Message for WsMessage {
 impl Ws {
 	fn new(
 		logger: Logger,
-		audio_data: Option<audio::AudioData>,
+		audio_data: audio::AudioData,
 		settings: Settings,
 		database: Addr<db::DbHandler>,
 	) -> Self
@@ -204,7 +196,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 
 				match msg {
 					MessageF2P::Connect(o) => {
-						let ts2a = self.audio_data.as_ref().unwrap().ts2a.clone();
+						let ts2a = self.audio_data.ts2a.clone();
 						let id = self.settings.default_identity;
 						ctx.spawn(wrap_future(self.database.send(db::GetIdentityMsg(id, true)).from_err().and_then(|r| r))
 							.and_then(move |identity, actor: &mut Self, ctx| {
@@ -287,7 +279,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 									// Activate audio
 									// TODO Handle disconnect
 									let logger = actor.logger.clone();
-									let a2ts = actor.audio_data.as_ref().unwrap().a2ts.clone();
+									let a2ts = actor.audio_data.a2ts.clone();
 									actix::spawn(a2ts.send(audio::audio_to_ts::SetListenerMsg {
 										connection: c,
 									}).map_err(move |e| {
@@ -301,17 +293,15 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 					}
 					MessageF2P::SetTalking(talk) => {
 						let logger = self.logger.clone();
-						if let Some(audio_data) = &self.audio_data {
-							actix::spawn(audio_data.a2ts.send(audio::audio_to_ts::SetPlayingMsg(talk))
-								.then(move |r| {
-									match r {
-										Ok(Ok(())) => {}
-										Err(e) => error!(logger, "Failed to set playing state"; "error" => ?e),
-										Ok(Err(e)) => error!(logger, "Failed to set playing state"; "error" => ?e),
-									}
-									Ok(())
-								}));
-						}
+						actix::spawn(self.audio_data.a2ts.send(audio::audio_to_ts::SetPlayingMsg(talk))
+							.then(move |r| {
+								match r {
+									Ok(Ok(())) => {}
+									Err(e) => error!(logger, "Failed to set playing state"; "error" => ?e),
+									Ok(Err(e)) => error!(logger, "Failed to set playing state"; "error" => ?e),
+								}
+								Ok(())
+							}));
 					}
 					MessageF2P::Packet(packet) => {
 						if let Some(con) = &mut self.connection {
@@ -324,8 +314,9 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 							}));
 						}
 					}
-					MessageF2P::Webrtc(msg) => {
-						// @Splamy nada
+					MessageF2P::Webrtc(_) => {
+						// No webrtc
+						error!(self.logger, "Got unsupported webrtc message, ignore it");
 					}
 				}
 			}
@@ -386,7 +377,6 @@ impl Default for Settings {
 	fn default() -> Self {
 		Self {
 			listen_address: default_listen_address(),
-			use_webrtc: Default::default(),
 			config_path: Default::default(),
 			default_identity: Default::default(),
 			verbosity: Default::default(),
@@ -455,9 +445,6 @@ fn main() -> Result<(), Error> {
 	if let Some(a) = args.listen_address {
 		settings.listen_address = a;
 	}
-	if let Some(a) = args.use_webrtc {
-		settings.use_webrtc = a;
-	}
 	if let Some(a) = args.default_identity {
 		settings.default_identity = a;
 	}
@@ -468,11 +455,7 @@ fn main() -> Result<(), Error> {
 	// Open database
 	let database = db::DbHandler::new(logger.clone(), &settings, key)?.start();
 
-	let audio_data = if settings.use_webrtc {
-		None
-	} else {
-		Some(audio::start(logger.clone(), None).unwrap())
-	};
+	let audio_data = audio::start(logger.clone()).unwrap();
 
 	let addr = settings.listen_address.clone();
 	server::new(move || {
@@ -489,45 +472,43 @@ fn main() -> Result<(), Error> {
 				database.clone(),
 			))));
 
-		if let Some(audio_data) = &audio_data {
-			let addr = audio_data.a2ts.clone();
-			let addr2 = audio_data.a2ts.clone();
+		let addr = audio_data.a2ts.clone();
+		let addr2 = audio_data.a2ts.clone();
+		let logger = logger.clone();
+		let logger2 = logger.clone();
+		app = app.route("/audiosend/true", Method::POST, move |_: HttpRequest| {
 			let logger = logger.clone();
-			let logger2 = logger.clone();
-			app = app.route("/audiosend/true", Method::POST, move |_: HttpRequest| {
-				let logger = logger.clone();
-				actix::spawn(addr.send(audio::audio_to_ts::SetPlayingMsg(true))
-					.then(move |r| {
-						match r {
-							Ok(Ok(())) => {}
-							Ok(Err(e)) => {
-								error!(logger, "Failed to set playing state"; "error" => ?e);
-							}
-							Err(_) => {
-								error!(logger, "Failed to set playing state");
-							}
+			actix::spawn(addr.send(audio::audio_to_ts::SetPlayingMsg(true))
+				.then(move |r| {
+					match r {
+						Ok(Ok(())) => {}
+						Ok(Err(e)) => {
+							error!(logger, "Failed to set playing state"; "error" => ?e);
 						}
-						Ok(())
-					}));
-				HttpResponse::Ok()
-			}).route("/audiosend/false", Method::POST, move |_: HttpRequest| {
-				let logger = logger2.clone();
-				actix::spawn(addr2.send(audio::audio_to_ts::SetPlayingMsg(false))
-					.then(move |r| {
-						match r {
-							Ok(Ok(())) => {}
-							Ok(Err(e)) => {
-								error!(logger, "Failed to set playing state"; "error" => ?e);
-							}
-							Err(_) => {
-								error!(logger, "Failed to set playing state");
-							}
+						Err(_) => {
+							error!(logger, "Failed to set playing state");
 						}
-						Ok(())
-					}));
-				HttpResponse::Ok()
-			});
-		}
+					}
+					Ok(())
+				}));
+			HttpResponse::Ok()
+		}).route("/audiosend/false", Method::POST, move |_: HttpRequest| {
+			let logger = logger2.clone();
+			actix::spawn(addr2.send(audio::audio_to_ts::SetPlayingMsg(false))
+				.then(move |r| {
+					match r {
+						Ok(Ok(())) => {}
+						Ok(Err(e)) => {
+							error!(logger, "Failed to set playing state"; "error" => ?e);
+						}
+						Err(_) => {
+							error!(logger, "Failed to set playing state");
+						}
+					}
+					Ok(())
+				}));
+			HttpResponse::Ok()
+		});
 		app = app.handler("/", StaticFiles::new("../frontend/target/wasm32-unknown-unknown/release/")
 			.expect("static files not found")
 			.default_handler(StaticFiles::new("../frontend/static/")
