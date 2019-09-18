@@ -53,11 +53,25 @@ struct SdlVoice {
 	decoder: Decoder,
 }
 
+struct VoiceData {
+	queue: Vec<f32>,
+	channels: u8,
+}
+
 pub struct TsToAudioSdl {
 	logger: Logger,
 	device: AudioDevice<SdlCallback>,
 	voices: HashMap<Id, SdlVoice>,
-	data: Arc<Mutex<HashMap<Id, Vec<f32>>>>,
+	data: Arc<Mutex<HashMap<Id, VoiceData>>>,
+}
+
+impl VoiceData {
+	fn new(channels: u8) -> Self {
+		Self {
+			queue: Default::default(),
+			channels,
+		}
+	}
 }
 
 impl Actor for TsToAudioSdl {
@@ -68,7 +82,7 @@ impl TsToAudioSdl {
 	pub fn new(logger: Logger, audio_subsystem: &AudioSubsystem) -> Result<Self, Error> {
 		let desired_spec = AudioSpecDesired {
 			freq: Some(48000),
-			channels: Some(1),
+			channels: Some(2),
 			// Default sample size, 20 ms per packet
 			samples: Some(48000 / 50),
 		};
@@ -106,8 +120,17 @@ impl Handler<PlayMsg> for TsToAudioSdl {
 			}
 
 			let id = Id { con: msg.0, client: ClientId(*from) };
+			let channels;
+			let opus_channels;
+			if *codec == CodecType::OpusMusic {
+				channels = 2;
+				opus_channels = audiopus::Channels::Stereo;
+			} else {
+				channels = 1;
+				opus_channels = audiopus::Channels::Mono;
+			}
 
-			info!(self.logger, "Getting voice"; "id" => %id);
+			//info!(self.logger, "Getting voice"; "id" => %id);
 			let mut tmp_entry;
 			let voice = match self.voices.entry(id) {
 				Entry::Occupied(o) => {
@@ -115,15 +138,10 @@ impl Handler<PlayMsg> for TsToAudioSdl {
 					tmp_entry.get_mut()
 				}
 				Entry::Vacant(v) => {
-					let channels = if *codec == CodecType::OpusVoice {
-						audiopus::Channels::Mono
-					} else {
-						audiopus::Channels::Stereo
-					};
-					let decoder = Decoder::new(audiopus::SampleRate::Hz48000, channels)?;
-					v.insert(SdlVoice {
-						decoder,
-					})
+					info!(self.logger, "Creating opus decoder"; "channels" => channels);
+
+					let decoder = Decoder::new(audiopus::SampleRate::Hz48000, opus_channels)?;
+					v.insert(SdlVoice { decoder })
 				}
 			};
 
@@ -133,15 +151,23 @@ impl Handler<PlayMsg> for TsToAudioSdl {
 				return Ok(());
 			}
 
-			let mut output = vec![0f32; 48000 / 50];
+			// TODO Support bigger packets
+			let mut output = vec![0f32; 48000 / 50 * channels];
+			//info!(self.logger, "Decode opus packets"; "len" => data.len());
 			let len = voice.decoder.decode_float(*data, &mut output, false)?;
-			output.truncate(len);
-			info!(self.logger, "Decoded bytes"; "len" => len);
+			output.truncate(len * channels);
+			//info!(self.logger, "Decoded bytes"; "len" => len);
 
 			// Put into queue
 			{
 				let mut data = self.data.lock();
-				let queue = data.entry(id).or_insert_with(|| Default::default());
+				let d = data.entry(id).or_insert_with(|| VoiceData::new(channels as u8));
+				let queue = &mut d.queue;
+				if queue.len() > output.len() * 2 {
+					info!(self.logger, "Removing samples"; "count" => queue.len());
+					*queue = queue.split_off(queue.len() - output.len());
+					queue.clear();
+				}
 				queue.append(&mut output);
 			}
 			self.device.resume();
@@ -153,27 +179,42 @@ impl Handler<PlayMsg> for TsToAudioSdl {
 struct SdlCallback {
 	logger: Logger,
 	spec: AudioSpec,
-	data: Arc<Mutex<HashMap<Id, Vec<f32>>>>,
+	data: Arc<Mutex<HashMap<Id, VoiceData>>>,
 }
 
 impl AudioCallback for SdlCallback {
 	type Channel = f32;
 	fn callback(&mut self, buffer: &mut [Self::Channel]) {
-		let mut data = self.data.lock();
-		info!(self.logger, "Filling buffer"; "buffer len" => buffer.len());
+		//info!(self.logger, "Filling buffer"; "buffer len" => buffer.len());
 		// Fill the buffer with silence
 		for d in &mut *buffer {
 			*d = 0.0;
 		}
 
 		// Mix data
+		let mut data = self.data.lock();
 		data.retain(|_, d| {
-			let len = std::cmp::min(buffer.len(), d.len());
-			buffer.copy_from_slice(&d[..len]);
-			if d.len() == len {
+			let queue = &mut d.queue;
+
+			// TODO Dynamically check channel count
+			let len;
+			if d.channels == 2 {
+				len = std::cmp::min(buffer.len(), queue.len());
+				buffer[..len].copy_from_slice(&queue[..len]);
+			} else {
+				// Convert mono to stereo
+				len = std::cmp::min(buffer.len() / 2, queue.len());
+				for i in 0..len {
+					buffer[i * 2] = queue[i];
+					buffer[i * 2 + 1] = queue[i];
+				}
+			}
+
+			if queue.len() == len {
 				false
 			} else {
-				*d = d.split_off(len);
+				*queue = queue.split_off(len);
+				//info!(self.logger, "Left buffer"; "len" => queue.len());
 				true
 			}
 		});
