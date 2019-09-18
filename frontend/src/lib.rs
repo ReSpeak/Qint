@@ -1,4 +1,3 @@
-#![feature(async_await)]
 #![recursion_limit="256"]
 
 use qint_shared::*;
@@ -222,7 +221,6 @@ impl Renderable<Self> for Model {
 			|c| c.is_connected(),
 			|| false,
 		);
-		let con = Some(self.con);
 		let is_talking = self.is_talking;
 		let talking = if self.is_talking {
 			"Stop talking"
@@ -234,14 +232,14 @@ impl Renderable<Self> for Model {
 			html! {
 				<>
 				<audio id="audio-playback", autoplay="autoplay", />
-				<Connect: connection=con, onconnect=|_| Msg::Connect, />
+				<Connect: connection=self.con, onconnect=|_| Msg::Connect, />
 				</>
 			}
 		} else {
 			html! {
 				<>
 				<audio id="audio-playback", autoplay="autoplay", />
-				<Connected: connection=con, />
+				<Connected: connection=self.con, />
 				<button style="position:absolute; right: 0", onclick=|_| Msg::SetTalking(!is_talking).into(),>{ talking }</button>
 				</>
 			}

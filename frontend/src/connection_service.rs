@@ -23,8 +23,8 @@ thread_local! {
 pub struct FrontendConnection {
 	pub logger: Logger,
 	pub state: FrontendConnectionState,
-	pub packet_listeners: HashMap<String, Box<for<'a> Fn(&'a FrontendConnection, &'a InCommand)>>,
-	pub event_listeners: HashMap<String, Box<for<'a> Fn(&'a FrontendConnection, &'a [Event])>>,
+	pub packet_listeners: HashMap<String, Box<dyn for<'a> Fn(&'a FrontendConnection, &'a InCommand)>>,
+	pub event_listeners: HashMap<String, Box<dyn for<'a> Fn(&'a FrontendConnection, &'a [Event])>>,
 }
 
 pub enum FrontendConnectionState {
@@ -264,7 +264,7 @@ impl FrontendConnection {
 	pub fn send_message(
 		&mut self,
 		mut packet: OutPacket,
-	) -> Box<Future<Output = Result<(), TsError>> + Unpin>
+	) -> Box<dyn Future<Output = Result<(), TsError>> + Unpin>
 	{
 		let con = if let FrontendConnectionState::Connected(c) = &mut self.state {
 			c

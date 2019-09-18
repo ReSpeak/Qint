@@ -13,13 +13,15 @@ pub struct Connect {
 
 pub enum Msg {
 	Connect,
-	Change(Box<FnOnce(&mut ConnectOptions)>),
+	Change(Box<dyn FnOnce(&mut ConnectOptions)>),
 }
 
-#[derive(Clone, Default, PartialEq)]
+#[derive(Clone, PartialEq, Properties)]
 pub struct Props {
-	pub connection: Option<ConnectionId>,
-	pub onconnect: Option<Callback<ConnectOptions>>,
+	#[props(required)]
+	pub connection: ConnectionId,
+	#[props(required)]
+	pub onconnect: Callback<ConnectOptions>,
 }
 
 impl Component for Connect {
@@ -27,11 +29,9 @@ impl Component for Connect {
 	type Properties = Props;
 
 	fn create(props: Self::Properties, _: ComponentLink<Self>) -> Self {
-		let con = props.connection.expect("Connect needs a connection id");
-
 		Self {
-			con,
-			onconnect: props.onconnect,
+			con: props.connection,
+			onconnect: Some(props.onconnect),
 		}
 	}
 
@@ -63,10 +63,9 @@ impl Component for Connect {
 	}
 
 	fn change(&mut self, props: Self::Properties) -> ShouldRender {
-		self.onconnect = props.onconnect;
-		let con = props.connection.expect("Connect needs a connection id");
-		if self.con != con {
-			self.con = con;
+		self.onconnect = Some(props.onconnect);
+		if self.con != props.connection {
+			self.con = props.connection;
 			true
 		} else {
 			false

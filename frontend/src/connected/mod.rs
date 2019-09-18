@@ -17,9 +17,10 @@ pub struct Connected {
 pub enum Msg {
 }
 
-#[derive(Clone, Default, PartialEq)]
+#[derive(Clone, PartialEq, Properties)]
 pub struct Props {
-	pub connection: Option<ConnectionId>,
+	#[props(required)]
+	pub connection: ConnectionId,
 }
 
 impl Component for Connected {
@@ -27,9 +28,7 @@ impl Component for Connected {
 	type Properties = Props;
 
 	fn create(props: Self::Properties, _: ComponentLink<Self>) -> Self {
-		let con = props.connection.expect("Connected needs a connection id");
-
-		ConnectionService::with_mut_con(con, |con| if let
+		ConnectionService::with_mut_con(props.connection, |con| if let
 			FrontendConnectionState::Connected(c) = &mut con.state {
 			let cmd = c.con.server.set_subscribed(true);
 			let logger = con.logger.clone();
@@ -41,7 +40,7 @@ impl Component for Connected {
 		}, || panic!("Should be in connected state"));
 
 		Self {
-			con,
+			con: props.connection,
 		}
 	}
 
@@ -51,9 +50,8 @@ impl Component for Connected {
 	}
 
 	fn change(&mut self, props: Self::Properties) -> ShouldRender {
-		let con = props.connection.expect("Connect needs a connection id");
-		if self.con != con {
-			self.con = con;
+		if self.con != props.connection {
+			self.con = props.connection;
 			true
 		} else {
 			false
@@ -63,11 +61,10 @@ impl Component for Connected {
 
 impl Renderable<Self> for Connected {
 	fn view(&self) -> Html<Self> {
-		let con = Some(self.con);
 		html! {
 			<div class="connected-container",>
-				<ChannelTree: connection=con, />
-				<Chat: connection=con, />
+				<ChannelTree: connection=self.con, />
+				<Chat: connection=self.con, />
 			</div>
 		}
 	}

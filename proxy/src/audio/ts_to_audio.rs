@@ -489,8 +489,6 @@ impl Handler<PlayMsg> for TsToAudioSdl {
 				queue.append(&mut output);
 			}
 			self.device.resume();
-
-			// TODO Mix somewhere
 		}
 		Ok(())
 	}

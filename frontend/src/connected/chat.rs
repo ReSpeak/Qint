@@ -14,14 +14,15 @@ pub struct Chat {
 
 pub enum Msg {
 	Ignore,
-	Change(Box<FnOnce(&mut Connected)>),
+	Change(Box<dyn FnOnce(&mut Connected)>),
 	NewMessage,
 	Send,
 }
 
-#[derive(Clone, Default, PartialEq)]
+#[derive(Clone, PartialEq, Properties)]
 pub struct Props {
-	pub connection: Option<ConnectionId>,
+	#[props(required)]
+	pub connection: ConnectionId,
 }
 
 impl Component for Chat {
@@ -29,12 +30,10 @@ impl Component for Chat {
 	type Properties = Props;
 
 	fn create(props: Self::Properties, mut link: ComponentLink<Self>) -> Self {
-		let con = props.connection.expect("Chat needs a connection id");
-
 		let callback = link.send_back(|_| Msg::NewMessage);
 
 		let res = Self {
-			con,
+			con: props.connection,
 			callback,
 		};
 		res.add_listener();
@@ -75,14 +74,13 @@ impl Component for Chat {
 	}
 
 	fn change(&mut self, props: Self::Properties) -> ShouldRender {
-		let con = props.connection.expect("Connect needs a connection id");
-		if self.con != con {
+		if self.con != props.connection {
 			// Remove and add listener
-			ConnectionService::with_mut_con(con, |con| {
+			ConnectionService::with_mut_con(props.connection, |con| {
 				con.packet_listeners.remove("chat");
 			}, || {});
 
-			self.con = con;
+			self.con = props.connection;
 			self.add_listener();
 			true
 		} else {

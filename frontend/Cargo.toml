@@ -16,12 +16,12 @@ failure = "0.1"
 futures-preview = "0.3.0-alpha"
 qint-shared = { path = "../shared" }
 serde = { version = "1", features = ["derive"] }
-slog-stdlog = "3"
+slog-stdlog = "4"
 tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }
 ts-bookkeeping = { path = "../../tsclientlib/utils/ts-bookkeeping" }
-web_logger = "0.1"
+web_logger = "0.2"
 wee_alloc = "0.4"
-yew = { version = "0.6", features = ["msgpack", "toml"] }
+yew = { version = "0.8", features = ["msgpack", "toml"] }
 
 [dependencies.log]
 version = "0.4"
@@ -34,3 +34,6 @@ features = ["max_level_debug", "release_max_level_debug"]
 [dependencies.stdweb]
 version = "0.4"
 features = ["futures-support", "experimental_features_which_may_break_on_minor_version_bumps"]
+
+[patch.crates-io]
+stdweb = { git = "https://github.com/koute/stdweb.git" }

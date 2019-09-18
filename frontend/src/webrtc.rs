@@ -1,5 +1,5 @@
 use qint_shared::*;
-use stdweb::{js, _js_impl, Value};
+use stdweb::{js, Value};
 use yew::callback::Callback;
 
 pub struct Webrtc {
