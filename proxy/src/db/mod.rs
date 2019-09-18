@@ -59,7 +59,7 @@ impl DbHandler {
 		embedded_migrations::run_with_output(&con, &mut s)?;
 		let s = std::str::from_utf8(&s)?;
 		if !s.is_empty() {
-			info!(logger, "Run migrations"; "output" => s);
+			info!(logger, "Run database migrations"; "output" => s);
 		}
 
 		Ok(Self {

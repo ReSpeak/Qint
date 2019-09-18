@@ -1,4 +1,3 @@
-#![feature(async_await)]
 #[macro_use]
 extern crate diesel;
 #[macro_use]

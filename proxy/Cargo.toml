@@ -14,7 +14,7 @@ diesel-derive-enum = { version = "0.4", features = ["sqlite"] }
 diesel_migrations = "1.4"
 directories = "2"
 failure = "0.1"
-flakebi-ring = "0.14.6"
+flakebi-ring = "0.16.9"
 futures01 = { package = "futures", version = "0.1" }
 futures-preview = { version = "0.3.0-alpha", features = ["async-await", "compat", "nightly"] }
 futures-spawn = "0.1"

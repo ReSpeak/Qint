@@ -61,7 +61,7 @@ pub struct TsToAudio {
 
 pub struct PlayMsg(pub ConnectionId, pub InAudio);
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct Id {
 	con: ConnectionId,
 	client: ClientId,
@@ -401,7 +401,7 @@ pub struct TsToAudioSdl {
 	logger: Logger,
 	device: AudioDevice<SdlCallback>,
 	voices: HashMap<Id, SdlVoice>,
-	data: Arc<Mutex<Vec<f32>>>,
+	data: Arc<Mutex<HashMap<Id, Vec<f32>>>>,
 }
 
 impl Actor for TsToAudioSdl {
@@ -459,7 +459,12 @@ impl Handler<PlayMsg> for TsToAudioSdl {
 					tmp_entry.get_mut()
 				}
 				Entry::Vacant(v) => {
-					let decoder = Decoder::new(audiopus::SampleRate::Hz48000, audiopus::Channels::Mono)?;
+					let channels = if *codec == CodecType::OpusVoice {
+						audiopus::Channels::Mono
+					} else {
+						audiopus::Channels::Stereo
+					};
+					let decoder = Decoder::new(audiopus::SampleRate::Hz48000, channels)?;
 					v.insert(SdlVoice {
 						decoder,
 					})
@@ -478,8 +483,11 @@ impl Handler<PlayMsg> for TsToAudioSdl {
 			info!(self.logger, "Decoded bytes"; "len" => len);
 
 			// Put into queue
-			let mut data = self.data.lock();
-			data.append(&mut output);
+			{
+				let mut data = self.data.lock();
+				let queue = data.entry(id).or_insert_with(|| Default::default());
+				queue.append(&mut output);
+			}
 			self.device.resume();
 
 			// TODO Mix somewhere
@@ -491,28 +499,29 @@ impl Handler<PlayMsg> for TsToAudioSdl {
 struct SdlCallback {
 	logger: Logger,
 	spec: AudioSpec,
-	data: Arc<Mutex<Vec<f32>>>,
+	data: Arc<Mutex<HashMap<Id, Vec<f32>>>>,
 }
 
 impl AudioCallback for SdlCallback {
 	type Channel = f32;
-	fn callback(&mut self, mut buffer: &mut [Self::Channel]) {
+	fn callback(&mut self, buffer: &mut [Self::Channel]) {
 		let mut data = self.data.lock();
-		info!(self.logger, "Filling buffer"; "buffer len" => buffer.len(), "data len" => data.len());
-		if buffer.len() > data.len() {
-			// Fill the rest with silence
-			for d in &mut buffer[data.len()..] {
-				*d = 0.0;
-			}
-			buffer = &mut buffer[..data.len()];
+		info!(self.logger, "Filling buffer"; "buffer len" => buffer.len());
+		// Fill the buffer with silence
+		for d in &mut *buffer {
+			*d = 0.0;
 		}
 
-		// Fill data
-		buffer.copy_from_slice(&data[..buffer.len()]);
-		if buffer.len() == data.len() {
-			data.clear();
-		} else {
-			*data = data.split_off(buffer.len());
-		}
+		// Mix data
+		data.retain(|_, d| {
+			let len = std::cmp::min(buffer.len(), d.len());
+			buffer.copy_from_slice(&d[..len]);
+			if d.len() == len {
+				false
+			} else {
+				*d = d.split_off(len);
+				true
+			}
+		});
 	}
 }
