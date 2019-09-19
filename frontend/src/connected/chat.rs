@@ -106,8 +106,28 @@ impl Chat {
 	fn view_message(&self, msg: &Message) -> Html<Self> {
 		html! {
 			<li>
-				<div class="author",>{ &msg.invoker.name }</div>
-				<div class="chat-message",>{ &msg.message }</div>
+				<article class="media">
+					<figure class="media-left">
+						<p class="image is-32x32">
+							<img class="round" src="128x128.png" />
+						</p>
+					</figure>
+					<div class="media-content">
+						<div class="content">
+							<p>
+								<strong>{ &msg.invoker.name }</strong>
+								<br />
+								{ &msg.message }
+							</p>
+						</div>
+					</div>
+					// <div class="media-right">
+					// 	<button class="delete"></button>
+					// </div>
+				</article>
+
+				// <div class="author",>{ &msg.invoker.name }</div>
+				// <div class="chat-message",>{ &msg.message }</div>
 			</li>
 		}
 	}
@@ -117,7 +137,7 @@ impl Chat {
 			<ul class="chat-messages",>
 				{ for con.messages.iter()
 					.map(|m| self.view_message(m)) }
-				<span class="chat-end",></span>
+				<span class="chat-end"></span>
 			</ul>
 		}
 		// TODO Use document.querySelectorAll('.chat-end')[0].scrollIntoView({behavior: "smooth"})
@@ -129,15 +149,15 @@ impl Renderable<Self> for Chat {
 		ConnectionService::with_con(self.con, |con| if let
 			FrontendConnectionState::Connected(c) = &con.state {
 			html! {
-				<div class="chat",>
+				<div class="chat">
 					{ self.view_messages(c) }
-					<form class="chat-form", onsubmit=|e| { e.prevent_default(); Msg::Send.into() },>
-						<input name="message", type="text",
-							value=&c.composing,
+					<form class="chat-form" onsubmit=|e| { e.prevent_default(); Msg::Send.into() }>
+						<input class="input" name="message" type="text"
+							value=&c.composing
 							oninput=|e| Msg::Change({
 								Box::new(move |c| { c.composing = e.value; })
-							}).into(), />
-						<button class="btn", name="send", type="submit",>
+							}).into() />
+						<button class="button" name="send" type="submit">
 							{ "Send" }
 						</button>
 					</form>

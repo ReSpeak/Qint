@@ -62,9 +62,9 @@ impl Component for Connected {
 impl Renderable<Self> for Connected {
 	fn view(&self) -> Html<Self> {
 		html! {
-			<div class="connected-container",>
-				<ChannelTree: connection=self.con, />
-				<Chat: connection=self.con, />
+			<div class="connected-container">
+				<ChannelTree: connection=self.con />
+				<Chat: connection=self.con />
 			</div>
 		}
 	}

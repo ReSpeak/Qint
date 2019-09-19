@@ -86,26 +86,26 @@ impl Renderable<Self> for Connect {
 		ConnectionService::with_mut_con(self.con, |con| if let
 			FrontendConnectionState::Disconnected(options, _) = &mut con.state {
 			html! {
-				<div class="connect-container",>
-				<div class="inner-connect-container",>
-				<div class="connect-blur",></div>
-				<form class="connect-form", onsubmit=|e| { e.prevent_default(); Msg::Connect },>
+				<div class="connect-container">
+				<div class="inner-connect-container">
+				<div class="connect-blur"></div>
+				<form class="connect-form" onsubmit=|e| { e.prevent_default(); Msg::Connect }>
 					<div>
-						<input name="username", type="text", placeholder="Username",
-							value=&options.name,
+						<input name="username" class="input" type="text" placeholder="Username"
+							value=&options.name
 							oninput=|e| Msg::Change({
 								Box::new(move |o| { o.name(e.value); })
 							}), />
 					</div>
 					<div>
-						<input name="server", type="text", placeholder="Server",
-							value=&options.address,
+						<input name="server" class="input" type="text" placeholder="Server"
+							value=&options.address
 							oninput=|e| Msg::Change({
 								Box::new(move |o| { o.address(e.value); })
 							}), />
 					</div>
 					<div>
-						<button class="btn", name="connect", type="submit",>
+						<button class="button is-primary" name="connect" type="submit">
 							{ "Connect" }
 						</button>
 					</div>
