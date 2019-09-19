@@ -20,7 +20,7 @@ impl EventHandler for super::DbHandler {
 							use schema::clients::dsl::*;
 
 							let con = con.lock();
-							let client = &con.server.clients[id];
+							let client = &con.clients[id];
 
 							let client_uid = base64::decode(&client.uid.0).unwrap();
 
@@ -49,7 +49,7 @@ impl EventHandler for super::DbHandler {
 							let ch_server = con.get_server_key()?;
 							let ch_server = ch_server.to_short();
 							let con = con.lock();
-							let channel = &con.server.channels[ch_id];
+							let channel = &con.channels[ch_id];
 							let ch_parent = if channel.parent.0 == 0 {
 								None
 							} else {

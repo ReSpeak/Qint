@@ -296,9 +296,8 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Ws {
 						actix::spawn(self.audio_data.a2ts.send(audio::audio_to_ts::SetPlayingMsg(talk))
 							.then(move |r| {
 								match r {
-									Ok(Ok(())) => {}
+									Ok(()) => {}
 									Err(e) => error!(logger, "Failed to set playing state"; "error" => ?e),
-									Ok(Err(e)) => error!(logger, "Failed to set playing state"; "error" => ?e),
 								}
 								Ok(())
 							}));
@@ -481,10 +480,7 @@ fn main() -> Result<(), Error> {
 			actix::spawn(addr.send(audio::audio_to_ts::SetPlayingMsg(true))
 				.then(move |r| {
 					match r {
-						Ok(Ok(())) => {}
-						Ok(Err(e)) => {
-							error!(logger, "Failed to set playing state"; "error" => ?e);
-						}
+						Ok(()) => {}
 						Err(_) => {
 							error!(logger, "Failed to set playing state");
 						}
@@ -497,10 +493,7 @@ fn main() -> Result<(), Error> {
 			actix::spawn(addr2.send(audio::audio_to_ts::SetPlayingMsg(false))
 				.then(move |r| {
 					match r {
-						Ok(Ok(())) => {}
-						Ok(Err(e)) => {
-							error!(logger, "Failed to set playing state"; "error" => ?e);
-						}
+						Ok(()) => {}
 						Err(_) => {
 							error!(logger, "Failed to set playing state");
 						}
