@@ -76,8 +76,8 @@ pub(crate) fn start(logger: Logger)
 		.name_prefix("audio")
 		.create();
 
-	let ts2a = TsToAudio::new(logger.clone(), &audio_subsystem)?;
-	let a2ts = AudioToTs::new(logger.clone(), &audio_subsystem, pool.clone())?;
+	let ts2a = TsToAudio::new(logger.clone(), audio_subsystem.clone())?;
+	let a2ts = AudioToTs::new(logger.clone(), audio_subsystem, pool.clone())?;
 
 	Ok(AudioData {
 		pool,

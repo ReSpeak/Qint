@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use actix_web::actix::*;
 use audiopus::coder::Encoder;
@@ -8,7 +9,7 @@ use futures_spawn::SpawnHelper;
 use futures_threadpool::ThreadPool;
 use parking_lot::Mutex;
 use sdl2::AudioSubsystem;
-use sdl2::audio::{AudioCallback, AudioDevice, AudioSpec, AudioSpecDesired};
+use sdl2::audio::{AudioCallback, AudioDevice, AudioSpec, AudioSpecDesired, AudioStatus};
 use slog::{error, debug, o, Logger};
 use tsproto::client::ClientConVal;
 use tsproto_packets::packets::{AudioData, CodecType, OutAudio};
@@ -24,9 +25,13 @@ pub struct SetVolumeMsg(pub f32);
 pub struct SetPlayingMsg(pub bool);
 
 pub struct AudioToTs {
+	logger: Logger,
+	audio_subsystem: AudioSubsystem,
+	executor: ThreadPool,
 	listener: Arc<Mutex<Option<ClientConVal>>>,
 	device: AudioDevice<SdlCallback>,
 
+	is_playing: bool,
 	volume: Arc<Mutex<f32>>,
 }
 
@@ -43,6 +48,28 @@ struct SdlCallback {
 
 impl Actor for AudioToTs {
 	type Context = Context<Self>;
+
+	fn started(&mut self, ctx: &mut Self::Context) {
+		ctx.run_interval(Duration::from_secs(1), |a2t, _| {
+			if a2t.device.status() == AudioStatus::Stopped {
+				// Try to reconnect to audio
+				match Self::open_capture(a2t.logger.clone(),
+					&a2t.audio_subsystem, a2t.executor.clone(),
+					a2t.listener.clone(), a2t.volume.clone()) {
+					Ok(d) => {
+						a2t.device = d;
+						debug!(a2t.logger, "Reconnected to capture device");
+						if a2t.is_playing {
+							a2t.device.resume();
+						}
+					}
+					Err(e) => {
+						error!(a2t.logger, "Failed to open capture device"; "error" => ?e);
+					}
+				};
+			}
+		});
+	}
 }
 
 impl Message for SetListenerMsg { type Result = (); }
@@ -69,7 +96,8 @@ impl Handler<RemoveListenerMsg> for AudioToTs {
 		let res = ls.is_some();
 		*ls = None;
 		drop(ls);
-		self.set_playing(false);
+		self.device.pause();
+		self.is_playing = false;
 		res
 	}
 }
@@ -77,31 +105,51 @@ impl Handler<RemoveListenerMsg> for AudioToTs {
 impl Handler<SetVolumeMsg> for AudioToTs {
 	type Result = ();
 	fn handle(&mut self, msg: SetVolumeMsg, _: &mut Self::Context) -> Self::Result {
-		self.set_volume(msg.0);
+		let mut vol = self.volume.lock();
+		*vol = msg.0;
 	}
 }
 
 impl Handler<SetPlayingMsg> for AudioToTs {
 	type Result = ();
 	fn handle(&mut self, msg: SetPlayingMsg, _: &mut Self::Context) -> Self::Result {
-		self.set_playing(msg.0);
+		if msg.0 {
+			self.device.resume();
+		} else {
+			self.device.pause();
+		}
+		self.is_playing = msg.0;
 	}
 }
 
 impl AudioToTs {
 	pub fn new(
 		logger: Logger,
-		audio_subsystem: &AudioSubsystem,
+		audio_subsystem: AudioSubsystem,
 		executor: ThreadPool,
 	) -> Result<Self, Error> {
 		let logger = logger.new(o!("pipeline" => "audio-to-ts"));
-
 		let listener = Arc::new(Mutex::new(Default::default()));
-
-		let listener2 = listener.clone();
 		let volume = Arc::new(Mutex::new(1.0));
-		let volume2 = volume.clone();
 
+		let device = Self::open_capture(logger.clone(), &audio_subsystem,
+			executor.clone(), listener.clone(), volume.clone())?;
+
+		Ok(Self {
+			logger,
+			audio_subsystem,
+			executor,
+			listener,
+			device,
+
+			is_playing: false,
+			volume,
+		})
+	}
+
+	fn open_capture(logger: Logger, audio_subsystem: &AudioSubsystem,
+		executor: ThreadPool, listener: Arc<Mutex<Option<ClientConVal>>>,
+		volume: Arc<Mutex<f32>>) -> Result<AudioDevice<SdlCallback>, Error> {
 		let desired_spec = AudioSpecDesired {
 			freq: Some(48000),
 			channels: Some(1),
@@ -109,7 +157,7 @@ impl AudioToTs {
 			samples: Some(48000 / 50),
 		};
 
-		let device = audio_subsystem.open_capture(None, &desired_spec, move |spec| {
+		audio_subsystem.open_capture(None, &desired_spec, |spec| {
 			// This spec will always be the desired spec, the sdl wrapper passes
 			// zero as `allowed_changes`.
 			debug!(logger, "Got capture spec"; "spec" => ?spec, "driver" => audio_subsystem.current_audio_driver());
@@ -124,35 +172,16 @@ impl AudioToTs {
 				.expect("Could not create encoder");
 
 			SdlCallback {
-				logger: logger.clone(),
+				logger,
 				spec,
 				encoder,
-				executor: executor.clone(),
-				listener: listener2.clone(),
-				volume: volume2.clone(),
+				executor,
+				listener,
+				volume,
 
 				opus_output: [0; MAX_OPUS_FRAME_SIZE],
 			}
-		}).map_err(|e| format_err!("SDL error: {}", e))?;
-
-		Ok(Self {
-			listener,
-			device,
-			volume,
-		})
-	}
-
-	pub fn set_volume(&mut self, volume: f32) {
-		let mut vol = self.volume.lock();
-		*vol = volume;
-	}
-
-	pub fn set_playing(&self, playing: bool) {
-		if playing {
-			self.device.resume();
-		} else {
-			self.device.pause();
-		}
+		}).map_err(|e| format_err!("SDL error: {}", e).into())
 	}
 }
 
