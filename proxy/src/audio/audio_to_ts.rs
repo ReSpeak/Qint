@@ -112,7 +112,7 @@ impl AudioToTs {
 		let device = audio_subsystem.open_capture(None, &desired_spec, move |spec| {
 			// This spec will always be the desired spec, the sdl wrapper passes
 			// zero as `allowed_changes`.
-			debug!(logger, "Got capture spec"; "spec" => ?spec);
+			debug!(logger, "Got capture spec"; "spec" => ?spec, "driver" => audio_subsystem.current_audio_driver());
 			let opus_channels = if spec.channels == 1 {
 				audiopus::Channels::Mono
 			} else {

@@ -1,6 +1,7 @@
 use actix_web::actix::*;
 use failure::Error;
 use futures_threadpool::ThreadPool;
+use sdl2::log::{Category, Priority};
 use slog::Logger;
 
 use audio_to_ts::AudioToTs;
@@ -39,11 +40,36 @@ pub struct AudioData {
 	pub ts2a: Addr<TsToAudio>,
 }
 
+fn sdl_log(prio: Priority, cat: Category, msg: &str) {
+	slog_scope::with_logger(|l| {
+		match prio {
+			Priority::Verbose =>
+				slog::trace!(l, "SDL"; "message" => msg, "category" => ?cat),
+			Priority::Debug =>
+				slog::debug!(l, "SDL"; "message" => msg, "category" => ?cat),
+			Priority::Info =>
+				slog::info!(l, "SDL"; "message" => msg, "category" => ?cat),
+			Priority::Warn =>
+				slog::warn!(l, "SDL"; "message" => msg, "category" => ?cat),
+			Priority::Error =>
+				slog::error!(l, "SDL"; "message" => msg, "category" => ?cat),
+			Priority::Critical =>
+				slog::crit!(l, "SDL"; "message" => msg, "category" => ?cat),
+		}
+	})
+}
+
 pub(crate) fn start(logger: Logger)
 	-> Result<AudioData, Error> {
 
 	let sdl_context = sdl2::init().unwrap();
+	sdl2::log::set_output_function(sdl_log);
+
 	let audio_subsystem = sdl_context.audio().unwrap();
+	// SDL automatically disables the screensaver, enable it again
+	if let Ok(video_subsystem) = sdl_context.video() {
+		video_subsystem.enable_screen_saver();
+	}
 
 	let pool = futures_threadpool::Builder::new()
 		.pool_size(2)

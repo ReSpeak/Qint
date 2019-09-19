@@ -74,7 +74,7 @@ impl TsToAudio {
 		let device = audio_subsystem.open_playback(None, &desired_spec, move |spec| {
 			// This spec will always be the desired spec, the sdl wrapper passes
 			// zero as `allowed_changes`.
-			debug!(logger2, "Got playback spec"; "spec" => ?spec);
+			debug!(logger2, "Got playback spec"; "spec" => ?spec, "driver" => audio_subsystem.current_audio_driver());
 			SdlCallback {
 				logger: logger2,
 				data: data2.clone(),
@@ -189,9 +189,13 @@ impl AudioCallback for SdlCallback {
 			let len = std::cmp::min(buffer.len(), queue.len());
 			let (a, b) = queue.as_slices();
 			let alen = std::cmp::min(a.len(), len);
-			buffer[..alen].copy_from_slice(&a[..alen]);
+			for i in 0..alen {
+				buffer[i] += a[i];
+			}
 			if alen < len {
-				buffer[alen..len].copy_from_slice(&b[..len - alen]);
+				for i in 0..len - alen {
+					buffer[alen + i] += b[i];
+				}
 			}
 
 			if queue.len() == len {
