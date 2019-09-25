@@ -39,6 +39,7 @@ pub struct Connected {
 
 	pub messages: Vec<Message>,
 	pub composing: String,
+	pub composing_command: String,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -114,6 +115,7 @@ impl Connected {
 
 			messages: Default::default(),
 			composing: Default::default(),
+			composing_command: Default::default(),
 		}
 	}
 }

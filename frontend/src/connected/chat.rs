@@ -1,7 +1,10 @@
+use std::borrow::Cow;
+
 use futures::prelude::*;
 use slog::error;
 use stdweb::web::event::IEvent;
 use ts_bookkeeping::MessageTarget;
+use tsproto_packets::packets::{Direction, Flags, OutCommand, OutPacket, PacketType};
 use yew::html;
 use yew::prelude::*;
 
@@ -17,6 +20,7 @@ pub enum Msg {
 	Change(Box<dyn FnOnce(&mut Connected)>),
 	NewMessage,
 	Send,
+	SendCommand,
 }
 
 #[derive(Clone, PartialEq, Properties)]
@@ -60,6 +64,29 @@ impl Component for Chat {
 					c.composing.clear();
 					let logger = con.logger.clone();
 					stdweb::spawn_local(con.send_message(cmd).map(move |r| {
+						if let Err(e) = r {
+							// TODO Display notification
+							error!(logger, "Failed to send message"; "error" => ?e);
+						}
+					}));
+				} else {
+					panic!("Should be in connected state");
+				}, || panic!("Should be in connected state"));
+				true
+			}
+			Msg::SendCommand => {
+				ConnectionService::with_mut_con(self.con, |con| if let
+					FrontendConnectionState::Connected(c) = &mut con.state {
+					let mut packet = OutPacket::new_with_dir(Direction::C2S,
+						Flags::empty(), PacketType::Command);
+					let static_args = std::iter::empty();
+					let list_args = std::iter::empty();
+					OutCommand::new_into::<&'static str, Cow<str>, &'static str, Cow<str>, _, _, std::iter::Empty<_>>(
+						&c.composing_command, static_args, list_args, packet.data_mut());
+
+					c.composing_command.clear();
+					let logger = con.logger.clone();
+					stdweb::spawn_local(con.send_message(packet).map(move |r| {
 						if let Err(e) = r {
 							// TODO Display notification
 							error!(logger, "Failed to send message"; "error" => ?e);
@@ -159,6 +186,16 @@ impl Renderable<Self> for Chat {
 							}).into() />
 						<button class="button" name="send" type="submit">
 							{ "Send" }
+						</button>
+					</form>
+					<form class="chat-form" onsubmit=|e| { e.prevent_default(); Msg::SendCommand.into() }>
+						<input class="input" name="message" type="text"
+							value=&c.composing_command
+							oninput=|e| Msg::Change({
+								Box::new(move |c| { c.composing_command = e.value; })
+							}).into() />
+						<button class="button" name="send" type="submit">
+							{ "Send Command" }
 						</button>
 					</form>
 				</div>
