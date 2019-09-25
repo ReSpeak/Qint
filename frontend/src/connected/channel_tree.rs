@@ -67,7 +67,7 @@ impl Component for ChannelTree {
 			Msg::ChangeChannel(id) => {
 				ConnectionService::with_mut_con(self.con, |con| if let
 					FrontendConnectionState::Connected(c) = &mut con.state {
-					let cmd = c.con.server.clients[&c.con.own_client]
+					let cmd = c.con.clients[&c.con.own_client]
 						.set_channel(id);
 					let logger = con.logger.clone();
 					stdweb::spawn_local(con.send_message(cmd).map(move |r| {
@@ -117,7 +117,7 @@ impl ChannelTree {
 	}
 
 	fn view_client(&self, client: &Client, own_client: ClientId) -> Html<Self> {
-		html! { 
+		html! {
 		<li>
 			<div class="channel-line">
 				<a class="entry-expand">
@@ -158,16 +158,17 @@ impl ChannelTree {
 	}
 
 	pub fn view(&self, con: &Connection) -> Html<Self> {
-		let mut channels: Vec<_> = con.server.channels.values().collect();
-		let mut clients: Vec<_> = con.server.clients.values().collect();
-		channels.sort_by_key(|ch| ch.order);
+		let mut channels: Vec<_> = con.channels.values().collect();
+		let mut clients: Vec<_> = con.clients.values().collect();
+		// TODO This is not the right order
+		channels.sort_by_key(|ch| ch.order.0);
 		clients.sort_by_key(|c| -c.talk_power);
 		// TODO Make more efficient?
 		// TODO Also sort clients by name?
 
 		// Get own client and channel
 		let own_client = con.own_client;
-		let own_channel = con.server.clients.get(&own_client).map(|c| c.channel)
+		let own_channel = con.clients.get(&own_client).map(|c| c.channel)
 			.unwrap_or(ChannelId(0));
 
 		html! {
