@@ -7,6 +7,27 @@ use yew::prelude::*;
 
 use crate::connection_service::*;
 
+macro_rules! cl {
+	( $( $x:tt ),* ) => {
+		{
+			let mut temp_vec = String::new();
+			$(
+				cl_intern!(temp_vec, $x);
+			)*
+			temp_vec
+		}
+	};
+}
+
+macro_rules! cl_intern {
+	($st:expr, ($x:expr, $y:expr)) => {
+		if $y {
+			$st.push_str($x);
+		}
+	};
+	($st:expr, $x:expr) => { $st.push_str($x) };
+}
+
 pub struct ChannelTree {
 	con: ConnectionId,
 	callback: Callback<()>,
@@ -96,10 +117,14 @@ impl ChannelTree {
 	}
 
 	fn view_client(&self, client: &Client, own_client: ClientId) -> Html<Self> {
-		if client.id == own_client {
-			html! { <li class="client current",>{ &client.name }</li> }
-		} else {
-			html! { <li class="client",>{ &client.name }</li> }
+		html! { 
+		<li>
+			<div class="channel-line">
+				<a class="entry-expand">
+					<span class="entry-expand" style="display:flex;">{ &client.name }</span>
+				</a>
+			</div>
+		</li>
 		}
 	}
 
@@ -107,34 +132,28 @@ impl ChannelTree {
 		&self,
 		clients: &[&Client],
 		channels: &[&Channel],
-		parent: ChannelId,
+		channel: &Channel,
 		own_client: ClientId,
 		own_channel: ChannelId,
 	) -> Html<Self>
 	{
-		let this_channel = if let Some(channel) = channels.iter().find(|c| c.id == parent) {
-			let id = channel.id;
-			if id == own_channel {
-				html! { <li class="channel current",>{ &channel.name }</li> }
-			} else {
-				html! { <li class="channel", onclick=|_| Msg::ChangeChannel(id).into(),>{ &channel.name }</li> }
-			}
-		} else {
-			html! { <></> }
-		};
-
+		let id = channel.id;
 		html! {
-			<>
-				{ this_channel }
-				<ul class="subchannels",>
+			<li onclick=|_| Msg::ChangeChannel(id).into() >
+				<div class="channel-line">
+					<a class="entry-expand">
+						<span class="entry-expand" style="display:flex;">{ &channel.name }</span>
+					</a>
+				</div>
+				<ul class="menu-list">
 					// Clients
-					{ for clients.iter().filter(|c| c.channel == parent)
+					{ for clients.iter().filter(|c| c.channel == id)
 						.map(|c| self.view_client(c, own_client)) }
 					// Channels
-					{ for channels.iter().filter(|c| c.parent == parent)
-						.map(|c| self.view_channel(clients, channels, c.id, own_client, own_channel)) }
+					{ for channels.iter().filter(|c| c.parent == id)
+						.map(|c| self.view_channel(clients, channels, c, own_client, own_channel)) }
 				</ul>
-			</>
+			</li>
 		}
 	}
 
@@ -152,8 +171,14 @@ impl ChannelTree {
 			.unwrap_or(ChannelId(0));
 
 		html! {
-			<div class="channel-tree",>
-				{ self.view_channel(&clients, &channels, ChannelId(0), own_client, own_channel) }
+			<div class="channel-tree">
+				<aside class="menu">
+					<ul class="menu-list">
+						<p class="menu-label">{ &con.server.name }</p>
+						{ for channels.iter().filter(|c| c.parent == ChannelId(0))
+							.map(|c| self.view_channel(&clients, &channels, c, own_client, own_channel)) }
+					</ul>
+				</aside>
 			</div>
 		}
 	}

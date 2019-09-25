@@ -88,7 +88,7 @@ input::placeholder {
 	display: inline-block;
 }
 
-.channel-tree {
+ .channel-tree {
 	position: absolute;
 	top: 0;
 	bottom: 0;
@@ -98,6 +98,7 @@ input::placeholder {
 	background-color: #ccdce2;
 }
 
+/*
 .channel-tree ul {
 	list-style: none;
 	padding-left: 1em;
@@ -119,7 +120,7 @@ input::placeholder {
 
 .channel-tree .client.current {
 	font-weight: bold;
-}
+} */
 
 /* Chat */
 
@@ -139,10 +140,7 @@ input::placeholder {
 	width: 100%;
 	padding: 0.5em;
 
-	border-top: 1px solid black;
-	border-right: 1px solid black;
-	border-left: none;
-	border-bottom: none;
+	box-shadow: 0px -5px 20px -5px #BBB;
 }
 
 .chat-form > * {
@@ -189,4 +187,22 @@ input::placeholder {
 
 .chat-messages .chat-message {
 	/*padding-left: 0.3em;*/
+}
+
+.round {
+	border-radius: 100%;
+}
+
+/* Tree 2.0 */
+.channel-line {
+	display: flex;
+	align-items: center;
+}
+.entry-expand {
+	flex: 1;
+}
+
+/* overwrite to prevent right stacking */
+.menu-list li ul {
+	margin-right: 0 !important;
 }
