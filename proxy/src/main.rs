@@ -28,9 +28,13 @@ use tsproto_packets::packets::{InAudio, InCommand};
 
 mod audio;
 mod db;
+mod files;
 mod secret;
 
 use secret::Secret;
+
+const DIR_ORGANIZATION: &str = "ReSpeak";
+const DIR_PROJECT: &str = "Qint";
 
 static NEXT_CON_ID: AtomicU64 = AtomicU64::new(0);
 
@@ -64,6 +68,15 @@ struct Args {
 		help = "The folder that contains all the configuration files"
 	)]
 	config_path: Option<String>,
+	/// The path for cached files. This is used for the `FileCache`.
+	///
+	/// If no value is given, the configuration path depends on the operating
+	/// system.
+	#[structopt(
+		long = "cache-path",
+		help = "The folder that contains cached files"
+	)]
+	cache_path: Option<String>,
 	/// How much log output do you want?
 	///
 	/// 0. Print nothing
@@ -79,13 +92,15 @@ struct Args {
 	verbosity: u8,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Settings {
 	#[serde(default = "default_listen_address")]
 	listen_address: String,
 	#[serde(skip)]
 	config_path: PathBuf,
+	#[serde(default = "default_cache_path")]
+	cache_path: PathBuf,
 	#[serde(default)]
 	default_identity: u64,
 	/// How much log output do you want?
@@ -103,6 +118,7 @@ struct Ws {
 	logger: Logger,
 	settings: Settings,
 	database: Addr<db::DbHandler>,
+	file_cache: Addr<files::FileCache>,
 	id: ConnectionId,
 	audio_data: audio::AudioData,
 	connection: Option<Connection>,
@@ -128,6 +144,17 @@ enum WsMessage {
 
 fn default_listen_address() -> String { "127.0.0.1:4422".into() }
 
+fn default_cache_path() -> PathBuf {
+	let proj_dirs = match directories::ProjectDirs::from("", DIR_ORGANIZATION,
+		DIR_PROJECT) {
+		Some(r) => r,
+		None => {
+			return Default::default();
+		}
+	};
+	proj_dirs.cache_dir().into()
+}
+
 fn next_con_id() -> ConnectionId {
 	ConnectionId(NEXT_CON_ID.fetch_add(1, Ordering::Relaxed))
 }
@@ -146,12 +173,14 @@ impl Ws {
 		audio_data: audio::AudioData,
 		settings: Settings,
 		database: Addr<db::DbHandler>,
+		file_cache: Addr<files::FileCache>,
 	) -> Self
 	{
 		Self {
 			logger,
 			settings,
 			database,
+			file_cache,
 			id: next_con_id(),
 			audio_data,
 			connection: None,
@@ -377,6 +406,7 @@ impl Default for Settings {
 		Self {
 			listen_address: default_listen_address(),
 			config_path: Default::default(),
+			cache_path: default_cache_path(),
 			default_identity: Default::default(),
 			verbosity: Default::default(),
 		}
@@ -400,7 +430,8 @@ fn main() -> Result<(), Error> {
 	let config_path: PathBuf = if let Some(p) = args.config_path {
 		p.into()
 	} else {
-		let proj_dirs = match directories::ProjectDirs::from("", "ReSpeak", "Qint") {
+		let proj_dirs = match directories::ProjectDirs::from("",
+			DIR_ORGANIZATION, DIR_PROJECT) {
 			Some(r) => r,
 			None => {
 				return Err(format_err!("Failed to get project directory"));
@@ -441,6 +472,9 @@ fn main() -> Result<(), Error> {
 
 	settings.config_path = config_path;
 	// Override settings with args
+	if let Some(a) = args.cache_path {
+		settings.cache_path = a.into();
+	}
 	if let Some(a) = args.listen_address {
 		settings.listen_address = a;
 	}
@@ -454,7 +488,11 @@ fn main() -> Result<(), Error> {
 	// Open database
 	let database = db::DbHandler::new(logger.clone(), &settings, key)?.start();
 
-	let audio_data = audio::start(logger.clone()).unwrap();
+	// Open cache
+	let file_cache = files::FileCache::new(settings.cache_path.clone())?.start();
+
+	// Start sound
+	let audio_data = audio::start(logger.clone())?;
 
 	let addr = settings.listen_address.clone();
 	server::new(move || {
@@ -462,6 +500,7 @@ fn main() -> Result<(), Error> {
 		let audio_data2 = audio_data.clone();
 		let settings = settings.clone();
 		let database = database.clone();
+		let file_cache = file_cache.clone();
 		let mut app = App::new()
 			.middleware(middleware::Logger::default())
 			.resource("/ws", |r| r.f(move |req| ws::start(req, Ws::new(
@@ -469,6 +508,7 @@ fn main() -> Result<(), Error> {
 				audio_data2.clone(),
 				settings.clone(),
 				database.clone(),
+				file_cache.clone(),
 			))));
 
 		let addr = audio_data.a2ts.clone();
