@@ -15,7 +15,7 @@ use slog::{error, debug, o, trace, Logger};
 use tsclientlib::ClientId;
 use tsproto_packets::packets::{AudioData, CodecType, InAudio};
 
-use crate::websocket::ConnectionId;
+use crate::ConnectionId;
 use super::*;
 
 /// After this amount of seconds, a decoder will be removed.

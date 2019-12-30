@@ -3,8 +3,10 @@ extern crate diesel;
 #[macro_use]
 extern crate diesel_migrations;
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::{mpsc, Arc, Mutex};
 
 use actix::*;
 use actix_web::*;
@@ -17,6 +19,7 @@ use slog::{error, info, o, warn, Drain};
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
 use tsclientlib::Uid;
+use uuid::Uuid;
 
 mod audio;
 mod db;
@@ -31,6 +34,9 @@ const DIR_ORGANIZATION: &str = "ReSpeak";
 const DIR_PROJECT: &str = "Qint";
 
 type BoxFuture<T, E=Error> = Box<dyn futures01::Future<Item=T, Error=E>>;
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct ConnectionId(pub Uuid);
 
 #[derive(StructOpt, Debug)]
 #[structopt(raw(global_settings = "&[AppSettings::ColoredHelp, \
@@ -201,6 +207,10 @@ fn main() -> Result<(), Error> {
 		settings.verbosity = args.verbosity;
 	}
 
+	// The list of all currently existing connections
+	let connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>> =
+		Arc::new(Mutex::new(HashMap::new()));
+
 	// Open database
 	let database = db::DbHandler::new(logger.clone(), &settings, key)?.start();
 
@@ -213,19 +223,48 @@ fn main() -> Result<(), Error> {
 	let addr = settings.listen_address.clone();
 	server::new(move || {
 		let logger2 = logger.clone();
+		let connections2 = connections.clone();
 		let audio_data2 = audio_data.clone();
 		let settings = settings.clone();
 		let database = database.clone();
 		let file_cache2 = file_cache.clone();
 		let mut app = App::new()
 			.middleware(middleware::Logger::default())
-			.resource("/ws", |r| r.f(move |req| ws::start(req, Ws::new(
-				logger2.clone(),
-				audio_data2.clone(),
-				settings.clone(),
-				database.clone(),
-				file_cache2.clone(),
-			))));
+			.resource("/ws/{id}", |r| r.f(move |req| {
+				let id = req.match_info().get("id").unwrap();
+				let uuid = match Uuid::parse_str(id) {
+					Ok(r) => r,
+					Err(e) => {
+						error!(logger2, "Failed to parse uuid"; "uuid" => id,
+							"error" => ?e);
+						return Ok(HttpResponse::BadRequest().finish());
+					}
+				};
+				let id = ConnectionId(uuid);
+
+				// Check that the id does not exist
+				let mut cons = connections2.lock().unwrap();
+				if cons.contains_key(&id) {
+					return Ok(HttpResponse::PreconditionFailed().finish());
+				}
+
+				let ws_con = Ws::new(
+					id,
+					logger2.clone(),
+					audio_data2.clone(),
+					settings.clone(),
+					database.clone(),
+					file_cache2.clone(),
+					connections2.clone(),
+				);
+
+				let res = ws::start(req, ws_con);
+				if res.is_ok() {
+					//let addr = recv.recv().unwrap();
+					//cons.insert(id, addr);
+				}
+				res
+			}));
 
 		let addr = audio_data.a2ts.clone();
 		let addr2 = audio_data.a2ts.clone();
@@ -260,9 +299,10 @@ fn main() -> Result<(), Error> {
 			HttpResponse::Ok()
 		}).resource("/files/{server}/{type}/{name}", |r| {
 			r.get().a(move |req| -> BoxFuture<HttpResponse> {
-				let server = Uid(req.match_info().get("server").unwrap().into());
-				let name = req.match_info().get("name").unwrap();
-				let file = match req.match_info().get("type").unwrap() {
+				let info = req.match_info();
+				let server = Uid(info.get("server").unwrap().into());
+				let name = info.get("name").unwrap();
+				let file = match info.get("type").unwrap() {
 					"avatar" => files::CachedFile::Avatar {
 						server,
 						client: Uid(name.into()),

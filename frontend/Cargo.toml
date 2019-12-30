@@ -5,7 +5,6 @@ authors = ["Flakebi <flakebi@t-online.de>"]
 edition = "2018"
 
 [profile.dev]
-# lto = true
 opt-level = 3
 
 [profile.release]
@@ -19,6 +18,7 @@ serde = { version = "1", features = ["derive"] }
 slog-stdlog = "4"
 tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }
 ts-bookkeeping = { path = "../../tsclientlib/utils/ts-bookkeeping" }
+uuid = { version = "0.8", features = ["stdweb", "v4"] }
 web_logger = "0.2"
 wee_alloc = "0.4"
 yew = { version = "0.10", features = ["msgpack", "toml"] }

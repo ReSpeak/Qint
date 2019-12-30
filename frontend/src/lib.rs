@@ -69,14 +69,16 @@ impl Model {
 		});
 
 		// Get url
-		let url = stdweb::web::window()
+		let domain = stdweb::web::window()
 			.location()
 			.and_then(|l| l.origin().ok())
 			.and_then(|l| if l.starts_with("http") {
-				Some(format!("ws{}/ws", &l[4..]))
+				Some(format!("ws{}", &l[4..]))
 			} else {
 				None
-			}).unwrap_or_else(|| "ws://localhost/ws".into());
+			}).unwrap_or_else(|| "ws://localhost".into());
+		// Create id
+		let url = format!("{}/ws/{}", domain, self.con.0);
 
 		let task = self.ws_service.connect(&url, callback, notification).map_err(|e| format_err!("{}", e))?;
 		ConnectionService::with_mut_con(self.con, move |con| if let

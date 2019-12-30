@@ -30,6 +30,8 @@ CREATE TABLE channels (
 	server BLOB NOT NULL REFERENCES servers(public_key),
 	id INTEGER NOT NULL,
 	parent INTEGER,
+	-- References the channel above this one (zero if the first)
+	order_id INTEGER,
 	name TEXT NOT NULL,
 	icon INTEGER,
 	deleted BOOLEAN NOT NULL DEFAULT false,
@@ -45,9 +47,12 @@ CREATE TABLE bookmarks (
 	channel INTEGER,
 	identity INTEGER NOT NULL REFERENCES identities(id),
 	bookmark BOOLEAN NOT NULL DEFAULT false,
+	-- In UTC
 	last_used DATETIME,
+	-- Offset from UTC in minutes to the east
+	timezone INTEGER NOT NULL,
 	-- References the server if already connected once
-	server BLOB,
+	server BLOB REFERENCES servers(public_key),
 
 	FOREIGN KEY(server, channel) REFERENCES channels(server, id)
 );
@@ -57,7 +62,10 @@ CREATE TABLE messages (
 	-- NULL if we got a message from the server
 	invoker BLOB REFERENCES clients(uid),
 	content TEXT NOT NULL,
-	time DATETIME NOT NULL
+	-- In UTC
+	time DATETIME NOT NULL,
+	-- Offset from UTC in minutes to the east
+	timezone INTEGER NOT NULL
 );
 
 CREATE TABLE events (
@@ -69,7 +77,10 @@ CREATE TABLE events (
 	client BLOB REFERENCES clients(uid),
 	typ TEXT CHECK(typ IN ('channel_switched', 'name_changed')) NOT NULL,
 	content BLOB,
+	-- In UTC
 	time DATETIME NOT NULL,
+	-- Offset from UTC in minutes to the east
+	timezone INTEGER NOT NULL,
 
 	FOREIGN KEY(server, channel1) REFERENCES channels(server, id),
 	FOREIGN KEY(server, channel2) REFERENCES channels(server, id)
@@ -81,7 +92,10 @@ CREATE TABLE servers_clients (
 	server BLOB NOT NULL REFERENCES servers(public_key),
 	client BLOB NOT NULL REFERENCES clients(uid),
 	icon INTEGER,
+	-- In UTC
 	last_seen DATETIME NOT NULL,
+	-- Offset from UTC in minutes to the east
+	timezone INTEGER NOT NULL,
 
 	PRIMARY KEY(server, client)
 );

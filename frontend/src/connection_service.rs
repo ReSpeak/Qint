@@ -11,6 +11,7 @@ use ts_bookkeeping::events::Event;
 use ts_bookkeeping::messages::s2c::{InCommandError, InMessage, InMessages, InMessageTrait, InTextMessage};
 use tsproto_packets::packets::{InCommand, OutPacket};
 use slog::{error, o, Logger};
+use uuid::Uuid;
 use yew::ShouldRender;
 use yew::format::MsgPack;
 use yew::services::websocket::WebSocketTask;
@@ -44,7 +45,7 @@ pub struct Connected {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[repr(transparent)]
-pub struct ConnectionId(pub u32);
+pub struct ConnectionId(pub Uuid);
 
 pub struct Message {
 	pub(super) invoker: Invoker,
@@ -64,11 +65,11 @@ impl ConnectionService {
 	pub fn add_connection(logger: &Logger) -> ConnectionId {
 		CONNECTIONS.with(|cons| {
 			let mut cons = cons.borrow_mut();
-			for i in 0..=(cons.len() as u32) {
-				if !cons.contains_key(&ConnectionId(i)) {
-					let id = ConnectionId(i);
+			for _ in 0..5 {
+				let id = ConnectionId(Uuid::new_v4());
+				if !cons.contains_key(&id) {
 					let con = FrontendConnection {
-						logger: logger.new(o!("id" => id.0)),
+						logger: logger.new(o!("id" => id.0.to_string())),
 						state: Default::default(),
 						packet_listeners: Default::default(),
 						event_listeners: Default::default(),

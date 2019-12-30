@@ -1,4 +1,6 @@
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::collections::HashMap;
+use std::sync::{mpsc, Arc, Mutex};
+use std::sync::mpsc::SyncSender;
 
 use actix::fut::wrap_future;
 use actix::*;
@@ -14,12 +16,7 @@ use tsproto::handler_data::InCommandObserver;
 use tsproto_packets::packets::{InAudio, InCommand};
 use tsclientlib::{Connection, PacketHandler, PHBox};
 
-use crate::{audio, db, files, Settings};
-
-static NEXT_CON_ID: AtomicU64 = AtomicU64::new(0);
-
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct ConnectionId(pub u64);
+use crate::{audio, db, files, ConnectionId, Settings};
 
 /// Define http actor
 pub(crate) struct Ws {
@@ -30,6 +27,7 @@ pub(crate) struct Ws {
 	id: ConnectionId,
 	audio_data: audio::AudioData,
 	connection: Option<Connection>,
+	connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
 }
 
 #[derive(Clone)]
@@ -50,12 +48,14 @@ enum WsMessage {
 	Message(MessageP2F),
 }
 
-fn next_con_id() -> ConnectionId {
-	ConnectionId(NEXT_CON_ID.fetch_add(1, Ordering::Relaxed))
-}
-
 impl Actor for Ws {
 	type Context = ws::WebsocketContext<Self>;
+}
+
+impl Drop for Ws {
+	fn drop(&mut self) {
+		self.connections.lock().unwrap().remove(&self.id);
+	}
 }
 
 impl Message for WsMessage {
@@ -64,11 +64,13 @@ impl Message for WsMessage {
 
 impl Ws {
 	pub(crate) fn new(
+		id: ConnectionId,
 		logger: Logger,
 		audio_data: audio::AudioData,
 		settings: Settings,
 		database: Addr<db::DbHandler>,
 		file_cache: Addr<files::FileCache>,
+		connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
 	) -> Self
 	{
 		Self {
@@ -76,9 +78,10 @@ impl Ws {
 			settings,
 			database,
 			file_cache,
-			id: next_con_id(),
+			id,
 			audio_data,
 			connection: None,
+			connections,
 		}
 	}
 
