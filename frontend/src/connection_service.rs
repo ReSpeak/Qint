@@ -104,6 +104,47 @@ impl ConnectionService {
 			cons.get_mut(&id).map(f)
 		}).unwrap_or_else(else_f)
 	}
+
+	pub fn with_mut_ready_unwrap<R, F: FnOnce(&mut Connected) -> R>(
+		id: ConnectionId,
+		f: F,
+	) -> R
+	{
+		CONNECTIONS.with(|cons| {
+			let mut cons = cons.borrow_mut();
+			cons.get_mut(&id)
+			.and_then(|con| {
+				if let FrontendConnectionState::Connected(c) = &mut con.state {
+					Some(f(c))
+				} else { None }
+			})
+		}).expect("Should be in connected state")
+	}
+
+	pub fn with_mut_send_unwrap<F: FnOnce(&mut Connected) -> Option<OutPacket>>(
+		id: ConnectionId,
+		f: F,
+	)
+	{
+		CONNECTIONS.with(|cons| {
+			let mut cons = cons.borrow_mut();
+			cons.get_mut(&id)
+			.and_then(|con| {
+				if let FrontendConnectionState::Connected(c) = &mut con.state {
+					f(c)
+				} else { None }
+				.map(|opt_pack| {
+					let logger = con.logger.clone();
+					stdweb::spawn_local(con.send_message(opt_pack).map(move |r| {
+						if let Err(e) = r {
+							// TODO Display notification
+							error!(logger, "Failed to send message"; "error" => ?e);
+						}
+					}))
+				})
+			})
+		}).expect("Should be in connected state")
+	}
 }
 
 impl Connected {

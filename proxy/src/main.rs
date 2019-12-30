@@ -542,7 +542,7 @@ fn main() -> Result<(), Error> {
 				}));
 			HttpResponse::Ok()
 		});
-		app = app.handler("/", StaticFiles::new("../frontend/target/wasm32-unknown-unknown/release/")
+		app = app.handler("/", StaticFiles::new("../frontend/target/wasm32-unknown-unknown/debug/")
 			.expect("static files not found")
 			.default_handler(StaticFiles::new("../frontend/static/")
 				.expect("Static files not found")

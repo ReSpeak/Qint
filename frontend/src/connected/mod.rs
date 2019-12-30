@@ -4,11 +4,12 @@ use yew::html;
 use yew::prelude::*;
 
 use crate::connection_service::*;
-use channel_tree::ChannelTree;
+use sidebar::SideBar;
 use chat::Chat;
 
 mod channel_tree;
 mod chat;
+mod sidebar;
 
 pub struct Connected {
 	con: ConnectionId,
@@ -63,7 +64,7 @@ impl Renderable<Self> for Connected {
 	fn view(&self) -> Html<Self> {
 		html! {
 			<div class="connected-container">
-				<ChannelTree: connection=self.con />
+				<SideBar: connection=self.con />
 				<Chat: connection=self.con />
 			</div>
 		}

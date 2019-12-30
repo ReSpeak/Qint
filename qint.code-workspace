@@ -1,0 +1,19 @@
+{
+	"folders": [
+		{
+			"path": "frontend"
+		},
+		{
+			"path": "proxy"
+		},
+		{
+			"path": "shared"
+		}
+	],
+	"settings": {
+		"less.compile": {
+			"main": ["${workspaceRoot}/static/css/less/main.less"],
+			"out": "${workspaceRoot}/static/css/styles.css"
+		},
+	}
+}

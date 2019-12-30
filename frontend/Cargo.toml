@@ -5,7 +5,7 @@ authors = ["Flakebi <flakebi@t-online.de>"]
 edition = "2018"
 
 [profile.dev]
-lto = true
+# lto = true
 opt-level = 3
 
 [profile.release]

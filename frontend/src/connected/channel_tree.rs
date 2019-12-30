@@ -172,14 +172,12 @@ impl ChannelTree {
 			.unwrap_or(ChannelId(0));
 
 		html! {
-			<div class="channel-tree">
-				<aside class="menu">
-					<ul class="menu-list">
-						<p class="menu-label">{ &con.server.name }</p>
-						{ for channels.iter().filter(|c| c.parent == ChannelId(0))
-							.map(|c| self.view_channel(&clients, &channels, c, own_client, own_channel)) }
-					</ul>
-				</aside>
+			<div class="menu">
+				<ul class="menu-list">
+					<p class="menu-label">{ &con.server.name }</p>
+					{ for channels.iter().filter(|c| c.parent == ChannelId(0))
+						.map(|c| self.view_channel(&clients, &channels, c, own_client, own_channel)) }
+				</ul>
 			</div>
 		}
 	}

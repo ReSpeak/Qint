@@ -48,35 +48,20 @@ impl Component for Chat {
 		match msg {
 			Msg::Ignore => false,
 			Msg::Change(f) => {
-				ConnectionService::with_mut_con(self.con, |con| if let
-					FrontendConnectionState::Connected(c) = &mut con.state {
-					f(c);
-				} else {
-					panic!("Should be in connected state");
-				}, || panic!("Should be in connected state"));
+				ConnectionService::with_mut_ready_unwrap(self.con, f);
 				true
 			}
 			Msg::NewMessage => true,
 			Msg::Send => {
-				ConnectionService::with_mut_con(self.con, |con| if let
-					FrontendConnectionState::Connected(c) = &mut con.state {
+				ConnectionService::with_mut_send_unwrap(self.con, |c| {
 					let cmd = c.con.send_message(MessageTarget::Channel, &c.composing);
 					c.composing.clear();
-					let logger = con.logger.clone();
-					stdweb::spawn_local(con.send_message(cmd).map(move |r| {
-						if let Err(e) = r {
-							// TODO Display notification
-							error!(logger, "Failed to send message"; "error" => ?e);
-						}
-					}));
-				} else {
-					panic!("Should be in connected state");
-				}, || panic!("Should be in connected state"));
+					Some(cmd)
+				});
 				true
 			}
 			Msg::SendCommand => {
-				ConnectionService::with_mut_con(self.con, |con| if let
-					FrontendConnectionState::Connected(c) = &mut con.state {
+				ConnectionService::with_mut_ready_unwrap(self.con, |c| {
 					let mut packet = OutPacket::new_with_dir(Direction::C2S,
 						Flags::empty(), PacketType::Command);
 					let static_args = std::iter::empty();
@@ -85,16 +70,7 @@ impl Component for Chat {
 						&c.composing_command, static_args, list_args, packet.data_mut());
 
 					c.composing_command.clear();
-					let logger = con.logger.clone();
-					stdweb::spawn_local(con.send_message(packet).map(move |r| {
-						if let Err(e) = r {
-							// TODO Display notification
-							error!(logger, "Failed to send message"; "error" => ?e);
-						}
-					}));
-				} else {
-					panic!("Should be in connected state");
-				}, || panic!("Should be in connected state"));
+				});
 				true
 			}
 		}
