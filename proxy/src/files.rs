@@ -12,18 +12,24 @@
 
 use std::path::{Path, PathBuf};
 
+use actix_web::*;
 use actix_web::actix::*;
 use failure::Error;
 use futures01::Future;
+use futures01::Stream;
+use tokio::codec::{BytesCodec, FramedRead};
 use tokio::fs::{self, File};
 use tokio::net::TcpStream;
 use tsclientlib::Uid;
+
+use crate::BoxFuture;
 
 pub(crate) struct FileCache {
 	cache_path: PathBuf,
 	// TODO Lock single files?
 }
 
+#[derive(Clone, Debug)]
 pub enum CachedFile {
 	Avatar {
 		server: Uid,
@@ -78,7 +84,7 @@ impl CachedFile {
 }
 
 impl Handler<GetFile> for FileCache {
-	type Result = Box<dyn Future<Item=File, Error=Error>>;
+	type Result = BoxFuture<File>;
 	fn handle(&mut self, msg: GetFile, _: &mut Self::Context) -> Self::Result {
 		let path = msg.0.get_path(&self.cache_path);
 		Box::new(File::open(path).from_err())
@@ -98,4 +104,24 @@ impl Handler<AddFile> for FileCache {
 			.map(|_| ())
 			.from_err())
 	}
+}
+
+/// Return the wanted file or download and cache it.
+pub(crate) fn handle_request(file: CachedFile, addr: &Addr<FileCache>) -> crate::BoxFuture<HttpResponse> {
+	// Check if we have the file
+	Box::new(addr.send(GetFile(file.clone())).then(|r| {
+		match r {
+			Ok(Ok(file)) => {
+				let stream = FramedRead::new(file, BytesCodec::new())
+					.map(|b| b.freeze());
+				Ok(HttpResponse::Ok().streaming(stream))
+			}
+			Ok(Err(_)) => {
+				Ok(HttpResponse::NotFound().finish())
+			}
+			_ => {
+				Ok(HttpResponse::InternalServerError().finish())
+			}
+		}
+	}))
 }
