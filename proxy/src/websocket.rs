@@ -53,6 +53,13 @@ impl Actor for Ws {
 impl Drop for Ws {
 	fn drop(&mut self) {
 		self.state.connections.lock().unwrap().remove(&self.id);
+
+		// Spawn disconnect here in a tokio compat environment
+		if let Some(con) = self.connection.as_ref().map(|c| c.clone()) {
+			thread::spawn(|| tokio_compat::runtime::run(futures01::future::lazy(move || {
+				con.disconnect(None).map_err(|_| ())
+			})));
+		}
 	}
 }
 
