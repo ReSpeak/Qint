@@ -2,7 +2,7 @@
 
 use qint_shared::*;
 use slog::{error, o, warn, Drain, Logger};
-use yew::{html, Component, ComponentLink, Html, Renderable, ShouldRender};
+use yew::{html, Component, ComponentLink, Html, ShouldRender};
 use yew::format::{Binary, MsgPack, Text};
 use yew::services::websocket::{WebSocketService, WebSocketStatus};
 use failure::{Error,format_err};

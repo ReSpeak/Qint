@@ -26,7 +26,7 @@ impl Component for SideBar {
 	type Message = Msg;
 	type Properties = Props;
 
-	fn create(props: Self::Properties, mut link: ComponentLink<Self>) -> Self {
+	fn create(props: Self::Properties, _link: ComponentLink<Self>) -> Self {
 		let res = Self {
 			con: props.connection,
 		};
@@ -45,7 +45,7 @@ impl Component for SideBar {
 		}
 	}
 
-	fn change(&mut self, props: Self::Properties) -> ShouldRender {
+	fn change(&mut self, _props: Self::Properties) -> ShouldRender {
 		false
 	}
 

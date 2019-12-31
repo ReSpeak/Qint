@@ -1,7 +1,4 @@
 use std::borrow::Cow;
-
-use futures::prelude::*;
-use slog::error;
 use stdweb::web::event::IEvent;
 use ts_bookkeeping::MessageTarget;
 use tsproto_packets::packets::{Direction, Flags, OutCommand, OutPacket, PacketType};
@@ -16,7 +13,6 @@ pub struct Chat {
 }
 
 pub enum Msg {
-	Ignore,
 	Change(Box<dyn FnOnce(&mut Connected)>),
 	NewMessage,
 	Send,
@@ -46,7 +42,6 @@ impl Component for Chat {
 
 	fn update(&mut self, msg: Self::Message) -> ShouldRender {
 		match msg {
-			Msg::Ignore => false,
 			Msg::Change(f) => {
 				ConnectionService::with_mut_ready_unwrap(self.con, f);
 				true

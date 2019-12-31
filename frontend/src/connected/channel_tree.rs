@@ -1,9 +1,10 @@
-use futures::prelude::*;
-use slog::error;
 use ts_bookkeeping::{ChannelId, ClientId};
 use ts_bookkeeping::data::{Channel, Client, Connection};
 use yew::html;
 use yew::prelude::*;
+use std::collections::HashMap;
+use std::iter;
+use stdweb::js;
 
 use crate::connection_service::*;
 
@@ -34,7 +35,6 @@ pub struct ChannelTree {
 }
 
 pub enum Msg {
-	Ignore,
 	Redraw,
 	ChangeChannel(ChannelId),
 }
@@ -62,7 +62,6 @@ impl Component for ChannelTree {
 
 	fn update(&mut self, msg: Self::Message) -> ShouldRender {
 		match msg {
-			Msg::Ignore => false,
 			Msg::Redraw => true,
 			Msg::ChangeChannel(id) => {
 				ConnectionService::with_mut_send_unwrap(self.con, |c| {
@@ -127,14 +126,17 @@ impl ChannelTree {
 
 	fn view_channel(
 		&self,
-		clients: &[&Client],
-		channels: &[&Channel],
-		channel: &Channel,
+		con: &Connection,
+		channels: &HashMap<ChannelId,ChannelBuildNode>,
+		id: ChannelId,
 		own_client: ClientId,
 		own_channel: ChannelId,
 	) -> Html<Self>
 	{
-		let id = channel.id;
+		let cbn = channels.get(&id);
+		if let None = cbn { return html!{} } 
+		let cbn = cbn.unwrap();
+		let channel = cbn.own.unwrap();
 		html! {
 			<li onclick=|_| Msg::ChangeChannel(id).into() >
 				<div class="channel-line">
@@ -144,24 +146,41 @@ impl ChannelTree {
 				</div>
 				<ul class="menu-list">
 					// Clients
-					{ for clients.iter().filter(|c| c.channel == id)
-						.map(|c| self.view_client(c, own_client)) }
+					{ for cbn.clients.iter().filter_map(|client_id|  con.clients.get(client_id).map(|client| self.view_client(client, own_client))) }
 					// Channels
-					{ for channels.iter().filter(|c| c.parent == id)
-						.map(|c| self.view_channel(clients, channels, c, own_client, own_channel)) }
+					{ for iter::successors(cbn.first_child, |c| channels.get(c).and_then(|c| c.after))
+						.map(|channel_id| self.view_channel(con, channels, channel_id, own_client, own_channel)) }
 				</ul>
 			</li>
 		}
 	}
 
 	pub fn view(&self, con: &Connection) -> Html<Self> {
-		let mut channels: Vec<_> = con.channels.values().collect();
-		let mut clients: Vec<_> = con.clients.values().collect();
-		// TODO This is not the right order
-		channels.sort_by_key(|ch| ch.order.0);
-		clients.sort_by_key(|c| -c.talk_power);
-		// TODO Make more efficient?
+		let mut channels: HashMap<_,_> = con.channels.values()
+			.map(|c| (c.id, ChannelBuildNode { own: Some(c), after: None, first_child: None, clients: vec![] })).collect();
+		channels.insert(ChannelId(0), ChannelBuildNode { own: None, after: None, first_child: None, clients: vec![] }); // Server root
+
+		// TODO clients.sort_by_key(|c| -c.talk_power);
 		// TODO Also sort clients by name?
+
+		// Build Tree
+		for channel in con.channels.values() {
+			if channel.order.0 == 0 {
+				if let Some(cbn) = channels.get_mut(&channel.parent) {
+					cbn.first_child = Some(channel.id);
+				}
+			} else {
+				if let Some(cbn) = channels.get_mut(&channel.order) {
+					cbn.after = Some(channel.id);
+				}
+			}
+		}
+		// Add all clients
+		for client in con.clients.values() {
+			if let Some(cbn) = channels.get_mut(&client.channel) {
+				cbn.clients.push(client.id);
+			}
+		}
 
 		// Get own client and channel
 		let own_client = con.own_client;
@@ -172,10 +191,18 @@ impl ChannelTree {
 			<div class="menu">
 				<ul class="menu-list">
 					<p class="menu-label">{ &con.server.name }</p>
-					{ for channels.iter().filter(|c| c.parent == ChannelId(0))
-						.map(|c| self.view_channel(&clients, &channels, c, own_client, own_channel)) }
+					{ for iter::successors(channels.get(&ChannelId(0)).unwrap().first_child, |c| channels.get(c).and_then(|c| c.after))
+						.map(|c| self.view_channel(con, &channels, c, own_client, own_channel)) }
 				</ul>
 			</div>
 		}
 	}
+}
+
+#[derive(Debug)]
+struct ChannelBuildNode<'a> {
+	own: Option<&'a Channel>,
+	after: Option<ChannelId>,
+	first_child: Option<ChannelId>,
+	clients: Vec<ClientId>,
 }
