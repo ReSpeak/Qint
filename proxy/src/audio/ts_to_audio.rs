@@ -5,7 +5,7 @@ use std::fmt;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use actix_web::actix::*;
+use actix::*;
 use audiopus::coder::{Decoder, GenericCtl};
 use failure::{format_err, Error};
 use parking_lot::Mutex;

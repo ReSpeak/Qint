@@ -1,6 +1,6 @@
 use std::fs;
 
-use actix_web::actix::*;
+use actix::*;
 use diesel::prelude::*;
 use diesel::connection::SimpleConnection;
 use diesel::sqlite::SqliteConnection;

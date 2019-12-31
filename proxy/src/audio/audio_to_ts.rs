@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use actix_web::actix::*;
+use actix::*;
 use audiopus::coder::Encoder;
 use failure::{format_err, Error};
 use futures01::{Future, Sink};

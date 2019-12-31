@@ -5,25 +5,24 @@ extern crate diesel_migrations;
 
 use std::collections::HashMap;
 use std::fs;
+use std::ops::Deref;
 use std::path::PathBuf;
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{Arc, Mutex};
 
 use actix::*;
+use actix_files::Files;
 use actix_web::*;
-use actix_web::fs::StaticFiles;
-use actix_web::http::Method;
+use actix_web_actors::ws;
 use failure::{format_err, Error};
-use futures01::Future as _;
 use serde::Deserialize;
-use slog::{error, info, o, warn, Drain};
+use slog::{error, info, o, warn, Drain, Logger};
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
-use tsclientlib::Uid;
 use uuid::Uuid;
 
 mod audio;
 mod db;
-mod files;
+//mod files;
 mod secret;
 mod websocket;
 
@@ -32,8 +31,6 @@ use websocket::Ws;
 
 const DIR_ORGANIZATION: &str = "ReSpeak";
 const DIR_PROJECT: &str = "Qint";
-
-type BoxFuture<T, E=Error> = Box<dyn futures01::Future<Item=T, Error=E>>;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct ConnectionId(pub Uuid);
@@ -110,6 +107,16 @@ struct Settings {
 	verbosity: u8,
 }
 
+#[derive(Clone)]
+struct State {
+	logger: Logger,
+	/// The list of all currently existing connections
+	connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
+	audio_data: audio::AudioData,
+	settings: Settings,
+	database: Addr<db::DbHandler>,
+}
+
 fn default_listen_address() -> String { "127.0.0.1:4422".into() }
 
 fn default_cache_path() -> PathBuf {
@@ -135,7 +142,59 @@ impl Default for Settings {
 	}
 }
 
-fn main() -> Result<(), Error> {
+#[get("/ws/{id}")]
+async fn create_ws(state: web::Data<State>, uuid: web::Path<Uuid>,
+	req: HttpRequest, stream: web::Payload) -> impl Responder {
+	// TODO Take uuid directly?
+	/*let uuid = match Uuid::parse_str(id) {
+		Ok(r) => r,
+		Err(e) => {
+			error!(state.logger, "Failed to parse uuid"; "uuid" => id,
+				"error" => ?e);
+			return Ok(HttpResponse::BadRequest().finish());
+		}
+	};*/
+	let id = ConnectionId(*uuid);
+
+	// Check that the id does not exist
+	let mut cons = state.connections.lock().unwrap();
+	if cons.contains_key(&id) {
+		return Ok(HttpResponse::PreconditionFailed().finish());
+	}
+
+	let ws_con = Ws::new(
+		state.deref().clone(),
+		id,
+	);
+
+	ws::start_with_addr(ws_con, &req, stream).map(|(addr, resp)| {
+		cons.insert(id, addr);
+		resp
+	})
+}
+
+#[post("/audiosend/true")]
+async fn audiosend_true(state: web::Data<State>) -> impl Responder {
+	if state.audio_data.a2ts.send(audio::audio_to_ts::SetPlayingMsg(true)).await.is_err() {
+		error!(state.logger, "Failed to set playing state");
+		HttpResponse::InternalServerError()
+	} else {
+		HttpResponse::Ok()
+	}
+}
+
+#[post("/audiosend/false")]
+async fn audiosend_false(state: web::Data<State>) -> impl Responder {
+	if state.audio_data.a2ts.send(audio::audio_to_ts::SetPlayingMsg(false)).await.is_err() {
+		error!(state.logger, "Failed to set playing state");
+		HttpResponse::InternalServerError()
+	} else {
+		HttpResponse::Ok()
+	}
+}
+
+#[actix_rt::main]
+async fn main() -> Result<(), Error> {
 	let logger = {
 		let decorator = slog_term::TermDecorator::new().build();
 		let drain = slog_term::CompactFormat::new(decorator).build().fuse();
@@ -207,126 +266,39 @@ fn main() -> Result<(), Error> {
 		settings.verbosity = args.verbosity;
 	}
 
-	// The list of all currently existing connections
-	let connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>> =
-		Arc::new(Mutex::new(HashMap::new()));
-
 	// Open database
 	let database = db::DbHandler::new(logger.clone(), &settings, key)?.start();
 
-	// Open cache
-	let file_cache = files::FileCache::new(settings.cache_path.clone())?.start();
+	// TODO Open file cache
+	//let file_cache = files::FileCache::new(settings.cache_path.clone())?.start();
 
 	// Start sound
 	let audio_data = audio::start(logger.clone())?;
 
 	let addr = settings.listen_address.clone();
-	server::new(move || {
-		let logger2 = logger.clone();
-		let connections2 = connections.clone();
-		let audio_data2 = audio_data.clone();
-		let settings = settings.clone();
-		let database = database.clone();
-		let file_cache2 = file_cache.clone();
-		let mut app = App::new()
-			.middleware(middleware::Logger::default())
-			.resource("/ws/{id}", |r| r.f(move |req| {
-				let id = req.match_info().get("id").unwrap();
-				let uuid = match Uuid::parse_str(id) {
-					Ok(r) => r,
-					Err(e) => {
-						error!(logger2, "Failed to parse uuid"; "uuid" => id,
-							"error" => ?e);
-						return Ok(HttpResponse::BadRequest().finish());
-					}
-				};
-				let id = ConnectionId(uuid);
 
-				// Check that the id does not exist
-				let mut cons = connections2.lock().unwrap();
-				if cons.contains_key(&id) {
-					return Ok(HttpResponse::PreconditionFailed().finish());
-				}
+	let state = State {
+		logger,
+		connections: Arc::new(Mutex::new(HashMap::new())),
+		audio_data,
+		settings,
+		database,
+	};
 
-				let ws_con = Ws::new(
-					id,
-					logger2.clone(),
-					audio_data2.clone(),
-					settings.clone(),
-					database.clone(),
-					file_cache2.clone(),
-					connections2.clone(),
-				);
-
-				let res = ws::start(req, ws_con);
-				if res.is_ok() {
-					//let addr = recv.recv().unwrap();
-					//cons.insert(id, addr);
-				}
-				res
-			}));
-
-		let addr = audio_data.a2ts.clone();
-		let addr2 = audio_data.a2ts.clone();
-		let file_cache_addr = file_cache.clone();
-		let logger = logger.clone();
-		let logger2 = logger.clone();
-		app = app.route("/audiosend/true", Method::POST, move |_: HttpRequest| {
-			let logger = logger.clone();
-			actix::spawn(addr.send(audio::audio_to_ts::SetPlayingMsg(true))
-				.then(move |r| {
-					match r {
-						Ok(()) => {}
-						Err(_) => {
-							error!(logger, "Failed to set playing state");
-						}
-					}
-					Ok(())
-				}));
-			HttpResponse::Ok()
-		}).route("/audiosend/false", Method::POST, move |_: HttpRequest| {
-			let logger = logger2.clone();
-			actix::spawn(addr2.send(audio::audio_to_ts::SetPlayingMsg(false))
-				.then(move |r| {
-					match r {
-						Ok(()) => {}
-						Err(_) => {
-							error!(logger, "Failed to set playing state");
-						}
-					}
-					Ok(())
-				}));
-			HttpResponse::Ok()
-		}).resource("/files/{server}/{type}/{name}", |r| {
-			r.get().a(move |req| -> BoxFuture<HttpResponse> {
-				let info = req.match_info();
-				let server = Uid(info.get("server").unwrap().into());
-				let name = info.get("name").unwrap();
-				let file = match info.get("type").unwrap() {
-					"avatar" => files::CachedFile::Avatar {
-						server,
-						client: Uid(name.into()),
-					},
-					"icon" => files::CachedFile::Icon {
-						server,
-						name: name.into(),
-					},
-					_ => return Box::new(futures01::future::ok(HttpResponse::BadRequest().finish())),
-				};
-				files::handle_request(file, &file_cache_addr)
-			});
-		});
-		app = app.handler("/", StaticFiles::new("../frontend/target/wasm32-unknown-unknown/debug/")
-			.expect("static files not found")
-			.default_handler(StaticFiles::new("../frontend/static/")
-				.expect("Static files not found")
-				.index_file("index.html"))
-		);
-
-		app.finish()
+	Ok(HttpServer::new(move || {
+		let state = state.clone();
+		App::new()
+			.wrap(middleware::Logger::default())
+			.data(state)
+			.service(create_ws)
+			.service(audiosend_true)
+			.service(audiosend_false)
+			.service(Files::new("", "../frontend/static/")
+				.index_file("index.html")
+				.default_handler(Files::new("",
+						"../frontend/target/wasm32-unknown-unknown/debug/")))
 	})
-		.bind(addr)
-		.unwrap()
-		.run();
-	Ok(())
+	.bind(addr)?
+	.run()
+	.await?)
 }

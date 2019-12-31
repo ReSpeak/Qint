@@ -6,6 +6,11 @@ edition = "2018"
 build = "build.rs"
 
 [dependencies]
+actix = "0.9"
+actix-files = "0.2"
+actix-rt = "1.0"
+actix-web = "2.0"
+actix-web-actors = "2.0"
 async-timer = "0.2"
 audiopus = "0.1"
 base64 = "0.10"
@@ -17,7 +22,7 @@ directories = "2"
 failure = "0.1"
 flakebi-ring = "0.16.9"
 futures01 = { package = "futures", version = "0.1" }
-futures-preview = { version = "0.3.0-alpha", features = ["async-await", "compat", "nightly"] }
+futures = { version = "0.3", features = ["compat"] }
 futures-spawn = "0.1"
 futures-threadpool = "0.1"
 hex = "0.4"
@@ -35,16 +40,12 @@ slog-stdlog = "3"
 slog-term = "2"
 structopt = "0.2"
 toml = "0.4"
-tokio = "0.1"
+tokio = "0.2"
+tokio-compat = "0.1"
 tsclientlib = { path = "../../tsclientlib/tsclientlib" }
 tsproto = { path = "../../tsclientlib/tsproto" }
 tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }
-uuid = "0.8"
-
-[dependencies.actix-web]
-version = "0.7"
-default-features = false
-features = ["brotli", "flate2-c", "cell"]
+uuid = { version = "0.8", features = ["serde"] }
 
 [dependencies.log]
 version = "0.4"

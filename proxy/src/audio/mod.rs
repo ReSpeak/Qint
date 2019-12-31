@@ -1,4 +1,4 @@
-use actix_web::actix::*;
+use actix::*;
 use failure::Error;
 use futures_threadpool::ThreadPool;
 use sdl2::log::{Category, Priority};
