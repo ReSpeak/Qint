@@ -13,16 +13,21 @@ use actix::*;
 use actix_files::Files;
 use actix_web::*;
 use actix_web_actors::ws;
+use bytes::BytesMut;
 use failure::{format_err, Error};
+use futures::prelude::*;
 use serde::Deserialize;
 use slog::{error, info, o, warn, Drain, Logger};
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
+use tokio::net::TcpStream;
+use tokio_util::codec::{BytesCodec, FramedRead};
+//use tokio01::codec::{BytesCodec, FramedRead};
+use tsclientlib::ChannelId;
 use uuid::Uuid;
 
 mod audio;
 mod db;
-//mod files;
 mod secret;
 mod websocket;
 
@@ -62,15 +67,6 @@ struct Args {
 		help = "The folder that contains all the configuration files"
 	)]
 	config_path: Option<String>,
-	/// The path for cached files. This is used for the `FileCache`.
-	///
-	/// If no value is given, the configuration path depends on the operating
-	/// system.
-	#[structopt(
-		long = "cache-path",
-		help = "The folder that contains cached files"
-	)]
-	cache_path: Option<String>,
 	/// How much log output do you want?
 	///
 	/// 0. Print nothing
@@ -93,8 +89,6 @@ struct Settings {
 	listen_address: String,
 	#[serde(skip)]
 	config_path: PathBuf,
-	#[serde(default = "default_cache_path")]
-	cache_path: PathBuf,
 	#[serde(default)]
 	default_identity: u64,
 	/// How much log output do you want?
@@ -119,23 +113,11 @@ struct State {
 
 fn default_listen_address() -> String { "127.0.0.1:4422".into() }
 
-fn default_cache_path() -> PathBuf {
-	let proj_dirs = match directories::ProjectDirs::from("", DIR_ORGANIZATION,
-		DIR_PROJECT) {
-		Some(r) => r,
-		None => {
-			return Default::default();
-		}
-	};
-	proj_dirs.cache_dir().into()
-}
-
 impl Default for Settings {
 	fn default() -> Self {
 		Self {
 			listen_address: default_listen_address(),
 			config_path: Default::default(),
-			cache_path: default_cache_path(),
 			default_identity: Default::default(),
 			verbosity: Default::default(),
 		}
@@ -145,15 +127,6 @@ impl Default for Settings {
 #[get("/ws/{id}")]
 async fn create_ws(state: web::Data<State>, uuid: web::Path<Uuid>,
 	req: HttpRequest, stream: web::Payload) -> impl Responder {
-	// TODO Take uuid directly?
-	/*let uuid = match Uuid::parse_str(id) {
-		Ok(r) => r,
-		Err(e) => {
-			error!(state.logger, "Failed to parse uuid"; "uuid" => id,
-				"error" => ?e);
-			return Ok(HttpResponse::BadRequest().finish());
-		}
-	};*/
 	let id = ConnectionId(*uuid);
 
 	// Check that the id does not exist
@@ -190,6 +163,26 @@ async fn audiosend_false(state: web::Data<State>) -> impl Responder {
 		HttpResponse::InternalServerError()
 	} else {
 		HttpResponse::Ok()
+	}
+}
+
+#[get("/file/{id}/{channel}/{path:.*}")]
+async fn download_file(state: web::Data<State>, data: web::Path<(Uuid, u64, PathBuf)>)
+	-> Result<HttpResponse, Error> {
+	let channel = ChannelId(data.1);
+	let cons = state.connections.lock().unwrap();
+	if let Some(con) = cons.get(&ConnectionId(data.0)) {
+		let (len, file_stream): (u64, TcpStream) = con.send(websocket::DownloadFile {
+			channel,
+			path: data.2.clone(),
+		}).await??;
+		let stream = FramedRead::new(file_stream, BytesCodec::new())
+			.map(|r| r.map(BytesMut::freeze));
+		println!("Streaming {} from {:?}", len, stream);
+		//Ok(HttpResponse::Ok().streaming(stream))
+		Ok(HttpResponse::Ok().content_length(len).streaming(stream))
+	} else {
+		Ok(HttpResponse::Gone().finish())
 	}
 }
 
@@ -253,9 +246,6 @@ async fn main() -> Result<(), Error> {
 
 	settings.config_path = config_path;
 	// Override settings with args
-	if let Some(a) = args.cache_path {
-		settings.cache_path = a.into();
-	}
 	if let Some(a) = args.listen_address {
 		settings.listen_address = a;
 	}
@@ -268,9 +258,6 @@ async fn main() -> Result<(), Error> {
 
 	// Open database
 	let database = db::DbHandler::new(logger.clone(), &settings, key)?.start();
-
-	// TODO Open file cache
-	//let file_cache = files::FileCache::new(settings.cache_path.clone())?.start();
 
 	// Start sound
 	let audio_data = audio::start(logger.clone())?;
@@ -293,6 +280,7 @@ async fn main() -> Result<(), Error> {
 			.service(create_ws)
 			.service(audiosend_true)
 			.service(audiosend_false)
+			.service(download_file)
 			.service(Files::new("", "../frontend/static/")
 				.index_file("index.html")
 				.default_handler(Files::new("",

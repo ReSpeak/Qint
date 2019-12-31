@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
 
@@ -15,9 +16,10 @@ use rmp_serde::{Deserializer, Serializer};
 use qint_shared::ConnectOptions;
 use serde::{Deserialize, Serialize};
 use slog::{error, Logger};
+use tokio::net::TcpStream;
 use tsproto::handler_data::InCommandObserver;
 use tsproto_packets::packets::{InAudio, InCommand};
-use tsclientlib::{Connection, Identity, PacketHandler, PHBox};
+use tsclientlib::{ChannelId, Connection, Identity, PacketHandler, PHBox};
 
 use crate::{audio, db, ConnectionId, State};
 
@@ -46,6 +48,11 @@ enum WsMessage {
 	Message(MessageP2F),
 }
 
+pub(crate) struct DownloadFile {
+	pub channel: ChannelId,
+	pub path: PathBuf,
+}
+
 impl Actor for Ws {
 	type Context = ws::WebsocketContext<Self>;
 }
@@ -65,6 +72,11 @@ impl Drop for Ws {
 
 impl Message for WsMessage {
 	type Result = ();
+}
+
+impl Message for DownloadFile {
+	/// The size of the file and the stream
+	type Result = Result<(u64, TcpStream), Error>;
 }
 
 impl Ws {
@@ -175,6 +187,27 @@ impl Handler<WsMessage> for Ws {
 			WsMessage::Packet(packet) =>
 				Self::send_message(&MessageP2F::Packet(packet), ctx),
 			WsMessage::Message(msg) => Self::send_message(&msg, ctx),
+		}
+	}
+}
+
+impl Handler<DownloadFile> for Ws {
+	type Result = ResponseFuture<Result<(u64, TcpStream), Error>>;
+	fn handle(&mut self, msg: DownloadFile, _: &mut Self::Context) -> Self::Result {
+		if let Some(con) = &self.connection {
+			let con = con.clone();
+			let (send, recv) = oneshot::channel();
+
+			thread::spawn(|| tokio_compat::runtime::run(futures01::future::lazy(move || {
+				con.download_file(msg.channel, &format!("/{}", msg.path.into_os_string().into_string().unwrap()), None, None)
+			}).then(|r| {
+				let _ = send.send(r);
+				Ok(())
+			})));
+
+			Box::pin(recv.map(|r| r.unwrap().map_err(|e| e.into())))
+		} else {
+			Box::pin(futures::future::err(format_err!("Connection does not exist")))
 		}
 	}
 }

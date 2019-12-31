@@ -14,6 +14,7 @@ actix-web-actors = "2.0"
 async-timer = "0.2"
 audiopus = "0.1"
 base64 = "0.10"
+bytes = "0.5"
 chrono = "0.4"
 diesel = { version = "1.4", features = ["chrono", "sqlite"] }
 diesel-derive-enum = { version = "0.4", features = ["sqlite"] }
@@ -41,7 +42,9 @@ slog-term = "2"
 structopt = "0.2"
 toml = "0.4"
 tokio = "0.2"
+tokio01 = { package = "tokio", version = "0.1" }
 tokio-compat = "0.1"
+tokio-util = "0.2"
 tsclientlib = { path = "../../tsclientlib/tsclientlib" }
 tsproto = { path = "../../tsclientlib/tsproto" }
 tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }
