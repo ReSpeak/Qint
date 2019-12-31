@@ -65,20 +65,11 @@ impl Component for ChannelTree {
 			Msg::Ignore => false,
 			Msg::Redraw => true,
 			Msg::ChangeChannel(id) => {
-				ConnectionService::with_mut_con(self.con, |con| if let
-					FrontendConnectionState::Connected(c) = &mut con.state {
+				ConnectionService::with_mut_send_unwrap(self.con, |c| {
 					let cmd = c.con.clients[&c.con.own_client]
 						.set_channel(id);
-					let logger = con.logger.clone();
-					stdweb::spawn_local(con.send_message(cmd).map(move |r| {
-						if let Err(e) = r {
-							// TODO Display notification
-							error!(logger, "Failed to change channel"; "error" => ?e);
-						}
-					}));
-				} else {
-					panic!("Should be in connected state");
-				}, || panic!("Should be in connected state"));
+					Some(cmd)
+				}, "Failed to change channel");
 				false
 			}
 		}
@@ -97,6 +88,12 @@ impl Component for ChannelTree {
 		} else {
 			false
 		}
+	}
+
+	fn view(&self) -> Html<Self> {
+		ConnectionService::with_ready_unwrap(self.con, |c| {
+			self.view(&c.con)
+		})
 	}
 }
 
@@ -180,16 +177,5 @@ impl ChannelTree {
 				</ul>
 			</div>
 		}
-	}
-}
-
-impl Renderable<Self> for ChannelTree {
-	fn view(&self) -> Html<Self> {
-		ConnectionService::with_con(self.con, |con| if let
-			FrontendConnectionState::Connected(c) = &con.state {
-			self.view(&c.con)
-		} else {
-			panic!("Should be in connected state");
-		}, || panic!("Should be in connected state"))
 	}
 }

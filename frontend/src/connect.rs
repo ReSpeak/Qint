@@ -71,17 +71,7 @@ impl Component for Connect {
 			false
 		}
 	}
-}
 
-fn checkbox_value(e: &ChangeData) -> bool {
-	if let ChangeData::Value(v) = e {
-		v == "true"
-	} else {
-		false
-	}
-}
-
-impl Renderable<Self> for Connect {
 	fn view(&self) -> Html<Self> {
 		ConnectionService::with_mut_con(self.con, |con| if let
 			FrontendConnectionState::Disconnected(options, _) = &mut con.state {
@@ -116,5 +106,13 @@ impl Renderable<Self> for Connect {
 		} else {
 			panic!("Should be in disconnected state");
 		}, || panic!("Should be in disconnected state"))
+	}
+}
+
+fn checkbox_value(e: &ChangeData) -> bool {
+	if let ChangeData::Value(v) = e {
+		v == "true"
+	} else {
+		false
 	}
 }

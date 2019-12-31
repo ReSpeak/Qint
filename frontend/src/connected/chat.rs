@@ -57,7 +57,7 @@ impl Component for Chat {
 					let cmd = c.con.send_message(MessageTarget::Channel, &c.composing);
 					c.composing.clear();
 					Some(cmd)
-				});
+				}, "Failed to send message");
 				true
 			}
 			Msg::SendCommand => {
@@ -89,6 +89,36 @@ impl Component for Chat {
 		} else {
 			false
 		}
+	}
+
+	fn view(&self) -> Html<Self> {
+		ConnectionService::with_ready_unwrap(self.con, |c| {
+			html! {
+				<div class="chat">
+					{ self.view_messages(c) }
+					<form class="chat-form" onsubmit=|e| { e.prevent_default(); Msg::Send.into() }>
+						<input class="input" name="message" type="text"
+							value=&c.composing
+							oninput=|e| Msg::Change({
+								Box::new(move |c| { c.composing = e.value; })
+							}).into() />
+						<button class="button" name="send" type="submit">
+							{ "Send" }
+						</button>
+					</form>
+					<form class="chat-form" onsubmit=|e| { e.prevent_default(); Msg::SendCommand.into() }>
+						<input class="input" name="message" type="text"
+							value=&c.composing_command
+							oninput=|e| Msg::Change({
+								Box::new(move |c| { c.composing_command = e.value; })
+							}).into() />
+						<button class="button" name="send" type="submit">
+							{ "Send Command" }
+						</button>
+					</form>
+				</div>
+			}
+		})
 	}
 }
 
@@ -144,40 +174,5 @@ impl Chat {
 			</ul>
 		}
 		// TODO Use document.querySelectorAll('.chat-end')[0].scrollIntoView({behavior: "smooth"})
-	}
-}
-
-impl Renderable<Self> for Chat {
-	fn view(&self) -> Html<Self> {
-		ConnectionService::with_con(self.con, |con| if let
-			FrontendConnectionState::Connected(c) = &con.state {
-			html! {
-				<div class="chat">
-					{ self.view_messages(c) }
-					<form class="chat-form" onsubmit=|e| { e.prevent_default(); Msg::Send.into() }>
-						<input class="input" name="message" type="text"
-							value=&c.composing
-							oninput=|e| Msg::Change({
-								Box::new(move |c| { c.composing = e.value; })
-							}).into() />
-						<button class="button" name="send" type="submit">
-							{ "Send" }
-						</button>
-					</form>
-					<form class="chat-form" onsubmit=|e| { e.prevent_default(); Msg::SendCommand.into() }>
-						<input class="input" name="message" type="text"
-							value=&c.composing_command
-							oninput=|e| Msg::Change({
-								Box::new(move |c| { c.composing_command = e.value; })
-							}).into() />
-						<button class="button" name="send" type="submit">
-							{ "Send Command" }
-						</button>
-					</form>
-				</div>
-			}
-		} else {
-			panic!("Should be in connected state");
-		}, || panic!("Should be in connected state"))
 	}
 }

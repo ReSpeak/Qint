@@ -58,9 +58,7 @@ impl Component for Connected {
 			false
 		}
 	}
-}
 
-impl Renderable<Self> for Connected {
 	fn view(&self) -> Html<Self> {
 		html! {
 			<div class="connected-container">

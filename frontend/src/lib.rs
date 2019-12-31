@@ -5,6 +5,7 @@ use slog::{error, o, warn, Drain, Logger};
 use yew::{html, Component, ComponentLink, Html, Renderable, ShouldRender};
 use yew::format::{Binary, MsgPack, Text};
 use yew::services::websocket::{WebSocketService, WebSocketStatus};
+use failure::{Error,format_err};
 
 use crate::connect::Connect;
 use crate::connected::Connected;
@@ -38,7 +39,7 @@ pub enum Msg {
 }
 
 impl Model {
-	fn connect(&mut self) {
+	fn connect(&mut self) -> Result<(),Error> {
 		let logger = self.logger.clone();
 		let callback = self.link.send_back(move |data: WsMsg| {
 			match data {
@@ -77,7 +78,7 @@ impl Model {
 				None
 			}).unwrap_or_else(|| "ws://localhost/ws".into());
 
-		let task = self.ws_service.connect(&url, callback, notification);
+		let task = self.ws_service.connect(&url, callback, notification).map_err(|e| format_err!("{}", e))?;
 		ConnectionService::with_mut_con(self.con, move |con| if let
 			FrontendConnectionState::Disconnected(_, ws)
 			= &mut con.state {
@@ -85,6 +86,7 @@ impl Model {
 			} else {
 				panic!("Should be in disconnected state");
 			}, || panic!("Should be in disconnected state"));
+		Ok(())
 	}
 }
 
@@ -122,7 +124,9 @@ impl Component for Model {
 		match msg {
 			Msg::Ignore => false,
 			Msg::Connect => {
-				self.connect();
+				if let Err(e) = self.connect() {
+					error!(self.logger, "Failed to connect to proxy"; "error" => ?e);
+				}
 				true
 			}
 			Msg::Connected => {
@@ -212,9 +216,7 @@ impl Component for Model {
 			}
 		}
 	}
-}
 
-impl Renderable<Self> for Model {
 	fn view(&self) -> Html<Self> {
 		let is_connected = ConnectionService::with_con(
 			self.con,

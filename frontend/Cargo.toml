@@ -21,7 +21,7 @@ tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }
 ts-bookkeeping = { path = "../../tsclientlib/utils/ts-bookkeeping" }
 web_logger = "0.2"
 wee_alloc = "0.4"
-yew = { version = "0.8", features = ["msgpack", "toml"] }
+yew = { version = "0.10", features = ["msgpack", "toml"] }
 
 [dependencies.log]
 version = "0.4"

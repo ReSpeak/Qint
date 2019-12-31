@@ -93,6 +93,22 @@ impl ConnectionService {
 		}).unwrap_or_else(else_f)
 	}
 
+	pub fn with_ready_unwrap<R, F: FnOnce(&Connected) -> R>(
+		id: ConnectionId,
+		f: F,
+	) -> R
+	{
+		CONNECTIONS.with(|cons| {
+			let cons = cons.borrow();
+			cons.get(&id)
+			.and_then(|con| {
+				if let FrontendConnectionState::Connected(c) = &con.state {
+					Some(f(c))
+				} else { None }
+			})
+		}).expect("Should be in connected state")
+	}
+
 	pub fn with_mut_con<R, F: FnOnce(&mut FrontendConnection) -> R, F2: FnOnce() -> R>(
 		id: ConnectionId,
 		f: F,
@@ -124,6 +140,7 @@ impl ConnectionService {
 	pub fn with_mut_send_unwrap<F: FnOnce(&mut Connected) -> Option<OutPacket>>(
 		id: ConnectionId,
 		f: F,
+		error_msg: &'static str,
 	)
 	{
 		CONNECTIONS.with(|cons| {
@@ -138,7 +155,7 @@ impl ConnectionService {
 					stdweb::spawn_local(con.send_message(opt_pack).map(move |r| {
 						if let Err(e) = r {
 							// TODO Display notification
-							error!(logger, "Failed to send message"; "error" => ?e);
+							error!(logger, "{}", error_msg; "error" => ?e);
 						}
 					}))
 				})

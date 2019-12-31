@@ -39,7 +39,7 @@ impl Component for SideBar {
 			Msg::Disconnect => {
 				ConnectionService::with_mut_send_unwrap(self.con, |c| {
 						Some(c.con.disconnect(DisconnectOptions::new().message("Bye noobs")))
-				});
+				}, "Failed to disconnect");
 				true
 			}
 		}
@@ -48,9 +48,7 @@ impl Component for SideBar {
 	fn change(&mut self, props: Self::Properties) -> ShouldRender {
 		false
 	}
-}
 
-impl Renderable<Self> for SideBar {
 	fn view(&self) -> Html<Self> {
 		html! {
 			<aside class="sidebar">
