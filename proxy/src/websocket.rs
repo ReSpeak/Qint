@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
 
@@ -17,6 +16,7 @@ use qint_shared::ConnectOptions;
 use serde::{Deserialize, Serialize};
 use slog::{error, Logger};
 use tokio::net::TcpStream;
+use tokio::prelude::*;
 use tsproto::handler_data::InCommandObserver;
 use tsproto_packets::packets::{InAudio, InCommand};
 use tsclientlib::{ChannelId, Connection, Identity, PacketHandler, PHBox};
@@ -50,7 +50,7 @@ enum WsMessage {
 
 pub(crate) struct DownloadFile {
 	pub channel: ChannelId,
-	pub path: PathBuf,
+	pub path: String,
 }
 
 impl Actor for Ws {
@@ -199,13 +199,24 @@ impl Handler<DownloadFile> for Ws {
 			let (send, recv) = oneshot::channel();
 
 			thread::spawn(|| tokio_compat::runtime::run(futures01::future::lazy(move || {
-				con.download_file(msg.channel, &format!("/{}", msg.path.into_os_string().into_string().unwrap()), None, None)
+				con.download_file_token(msg.channel, &format!("/{}", msg.path), None, None)
 			}).then(|r| {
 				let _ = send.send(r);
 				Ok(())
 			})));
 
-			Box::pin(recv.map(|r| r.unwrap().map_err(|e| e.into())))
+			Box::pin(recv.map(|r| r.unwrap().map_err(|e| e.into()))
+				.then(|r| async {
+					match r {
+						Ok((token, size, addr)) => {
+							let mut s = TcpStream::connect(&addr).await?;
+							s.write_all(token.token.as_bytes()).await?;
+							s.flush().await?;
+							Ok((size, s))
+						}
+						Err(e) => Err(e),
+					}
+				}))
 		} else {
 			Box::pin(futures::future::err(format_err!("Connection does not exist")))
 		}

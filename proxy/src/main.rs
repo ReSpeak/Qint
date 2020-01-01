@@ -167,7 +167,7 @@ async fn audiosend_false(state: web::Data<State>) -> impl Responder {
 }
 
 #[get("/file/{id}/{channel}/{path:.*}")]
-async fn download_file(state: web::Data<State>, data: web::Path<(Uuid, u64, PathBuf)>)
+async fn download_file(state: web::Data<State>, data: web::Path<(Uuid, u64, String)>)
 	-> Result<HttpResponse, Error> {
 	let channel = ChannelId(data.1);
 	let cons = state.connections.lock().unwrap();
@@ -178,8 +178,6 @@ async fn download_file(state: web::Data<State>, data: web::Path<(Uuid, u64, Path
 		}).await??;
 		let stream = FramedRead::new(file_stream, BytesCodec::new())
 			.map(|r| r.map(BytesMut::freeze));
-		println!("Streaming {} from {:?}", len, stream);
-		//Ok(HttpResponse::Ok().streaming(stream))
 		Ok(HttpResponse::Ok().content_length(len).streaming(stream))
 	} else {
 		Ok(HttpResponse::Gone().finish())
