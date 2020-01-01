@@ -33,6 +33,7 @@ impl Component for Connected {
 			FrontendConnectionState::Connected(c) = &mut con.state {
 			let cmd = c.con.server.set_subscribed(true);
 			let logger = con.logger.clone();
+			// TODO This does never resolve??
 			stdweb::spawn_local(con.send_message(cmd).map(move |r| {
 				if let Err(e) = r {
 					error!(logger, "Failed to subscribe to all channels"; "error" => ?e);

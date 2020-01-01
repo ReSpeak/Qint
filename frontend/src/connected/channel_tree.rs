@@ -1,10 +1,10 @@
-use ts_bookkeeping::{ChannelId, ClientId};
+use std::collections::HashMap;
+use std::iter;
+
+use ts_bookkeeping::{ChannelId, ClientId, IconHash};
 use ts_bookkeeping::data::{Channel, Client, Connection};
 use yew::html;
 use yew::prelude::*;
-use std::collections::HashMap;
-use std::iter;
-use stdweb::js;
 
 use crate::connection_service::*;
 
@@ -112,12 +112,26 @@ impl ChannelTree {
 
 	}
 
+	fn icon(&self, icon: IconHash) -> Html<Self> {
+		if icon.0 != 0 {
+			html! {
+				<span class="icon">
+					<img src=format!("/file/{}/0/icon_{}", self.con.0, icon.0) />
+				</span>
+			}
+		} else {
+			html! {}
+		}
+	}
+
 	fn view_client(&self, client: &Client, own_client: ClientId) -> Html<Self> {
+		let icon = self.icon(client.icon_id);
 		html! {
 		<li>
 			<div class="channel-line">
-				<a class="entry-expand">
-					<span class="entry-expand" style="display:flex;">{ &client.name }</span>
+				<a class="entry-expand" style="display:flex;">
+					{ icon }
+					<span class="entry-expand">{ &client.name }</span>
 				</a>
 			</div>
 		</li>
@@ -134,19 +148,28 @@ impl ChannelTree {
 	) -> Html<Self>
 	{
 		let cbn = channels.get(&id);
-		if let None = cbn { return html!{} } 
+		if let None = cbn { return html!{} }
 		let cbn = cbn.unwrap();
 		let channel = cbn.own.unwrap();
+
+		// Sort clients by descending talk power and name
+		let mut clients = cbn.clients.iter().filter_map(|client_id|
+			con.clients.get(client_id)).collect::<Vec<_>>();
+		clients.sort_by(|a, b| a.talk_power.cmp(&b.talk_power).reverse()
+			.then_with(|| a.name.cmp(&b.name)));
+
+		let icon = channel.icon_id.map(|i| self.icon(i)).unwrap_or_else(|| html! {});
 		html! {
-			<li onclick=|_| Msg::ChangeChannel(id).into() >
+			<li>
 				<div class="channel-line">
-					<a class="entry-expand">
-						<span class="entry-expand" style="display:flex;">{ &channel.name }</span>
+					<a class="entry-expand" style="display:flex;" onclick=|_| Msg::ChangeChannel(id).into() >
+						{ icon }
+						<span class="entry-expand">{ &channel.name }</span>
 					</a>
 				</div>
 				<ul class="menu-list">
 					// Clients
-					{ for cbn.clients.iter().filter_map(|client_id|  con.clients.get(client_id).map(|client| self.view_client(client, own_client))) }
+					{ for clients.iter().map(|client| self.view_client(client, own_client)) }
 					// Channels
 					{ for iter::successors(cbn.first_child, |c| channels.get(c).and_then(|c| c.after))
 						.map(|channel_id| self.view_channel(con, channels, channel_id, own_client, own_channel)) }
@@ -159,9 +182,6 @@ impl ChannelTree {
 		let mut channels: HashMap<_,_> = con.channels.values()
 			.map(|c| (c.id, ChannelBuildNode { own: Some(c), after: None, first_child: None, clients: vec![] })).collect();
 		channels.insert(ChannelId(0), ChannelBuildNode { own: None, after: None, first_child: None, clients: vec![] }); // Server root
-
-		// TODO clients.sort_by_key(|c| -c.talk_power);
-		// TODO Also sort clients by name?
 
 		// Build Tree
 		for channel in con.channels.values() {
@@ -187,10 +207,14 @@ impl ChannelTree {
 		let own_channel = con.clients.get(&own_client).map(|c| c.channel)
 			.unwrap_or(ChannelId(0));
 
+		let icon = self.icon(con.server.icon_id);
 		html! {
 			<div class="menu">
 				<ul class="menu-list">
-					<p class="menu-label">{ &con.server.name }</p>
+					<p class="menu-label">
+						{ icon }
+						<span class="entry-expand">{ &con.server.name }</span>
+					</p>
 					{ for iter::successors(channels.get(&ChannelId(0)).unwrap().first_child, |c| channels.get(c).and_then(|c| c.after))
 						.map(|c| self.view_channel(con, &channels, c, own_client, own_channel)) }
 				</ul>
