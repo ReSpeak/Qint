@@ -43,6 +43,7 @@ CREATE TABLE channels (
 CREATE TABLE bookmarks (
 	id INTEGER NOT NULL PRIMARY KEY,
 	name TEXT,
+	username TEXT NOT NULL,
 	address TEXT NOT NULL,
 	channel INTEGER,
 	identity INTEGER NOT NULL REFERENCES identities(id),

@@ -2,6 +2,7 @@ table! {
     bookmarks (id) {
         id -> BigInt,
         name -> Nullable<Text>,
+        username -> Text,
         address -> Text,
         channel -> Nullable<BigInt>,
         identity -> BigInt,
