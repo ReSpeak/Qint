@@ -102,7 +102,7 @@ impl ChannelTree {
 		ConnectionService::with_mut_con(self.con, |con| {
 			let callback = self.callback.clone();
 			con.event_listeners.insert("channeltree".into(), Box::new(move |_, events| {
-				for e in events {
+				for _e in events {
 					// TODO If channel or clients are modified
 					// If the id is a ChannelId or ClientId
 				}
@@ -124,7 +124,7 @@ impl ChannelTree {
 		}
 	}
 
-	fn view_client(&self, client: &Client, own_client: ClientId) -> Html<Self> {
+	fn view_client(&self, client: &Client, _own_client: ClientId) -> Html<Self> {
 		let icon = self.icon(client.icon_id);
 		html! {
 		<li>

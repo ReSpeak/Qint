@@ -1,8 +1,14 @@
+#[cfg(feature="db")]
+#[macro_use]
+extern crate diesel;
+
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
 use tsproto_packets::packets::{Direction, InCommand, OutPacket, PacketType};
 //use tsproto_types::versions::Version;
+
+pub mod models;
 
 // TODO
 #[derive(Clone, Debug, Deserialize, Serialize)]

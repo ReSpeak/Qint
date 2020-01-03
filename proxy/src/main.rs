@@ -22,7 +22,6 @@ use structopt::clap::AppSettings;
 use structopt::StructOpt;
 use tokio::net::TcpStream;
 use tokio_util::codec::{BytesCodec, FramedRead};
-//use tokio01::codec::{BytesCodec, FramedRead};
 use tsclientlib::ChannelId;
 use uuid::Uuid;
 
@@ -313,6 +312,7 @@ async fn main() -> Result<(), Error> {
 			.service(audiosend_true)
 			.service(audiosend_false)
 			.service(download_file)
+			.service(db::bookmarks)
 			.service(Files::new("", "../frontend/static/")
 				.index_file("index.html")
 				.default_handler(Files::new("",
