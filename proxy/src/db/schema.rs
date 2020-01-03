@@ -7,6 +7,7 @@ table! {
         identity -> BigInt,
         bookmark -> Bool,
         last_used -> Nullable<Timestamp>,
+        timezone -> Integer,
         server -> Nullable<Binary>,
     }
 }
@@ -24,6 +25,7 @@ table! {
         server -> Binary,
         id -> BigInt,
         parent -> Nullable<BigInt>,
+        order_id -> Nullable<BigInt>,
         name -> Text,
         icon -> Nullable<Integer>,
         deleted -> Bool,
@@ -58,6 +60,7 @@ table! {
         typ -> Text,
         content -> Nullable<Binary>,
         time -> Timestamp,
+        timezone -> Integer,
     }
 }
 
@@ -78,6 +81,7 @@ table! {
         invoker -> Nullable<Binary>,
         content -> Text,
         time -> Timestamp,
+        timezone -> Integer,
     }
 }
 
@@ -103,10 +107,12 @@ table! {
         client -> Binary,
         icon -> Nullable<Integer>,
         last_seen -> Timestamp,
+        timezone -> Integer,
     }
 }
 
 joinable!(bookmarks -> identities (identity));
+joinable!(bookmarks -> servers (server));
 joinable!(channel_messages -> messages (message));
 joinable!(channels -> servers (server));
 joinable!(client_messages -> clients (client));
