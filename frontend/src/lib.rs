@@ -39,6 +39,28 @@ pub enum Msg {
 }
 
 impl Model {
+	fn get_http_domain() -> String {
+		stdweb::web::window()
+			.location()
+			.and_then(|l| l.origin().ok())
+			.and_then(|l| if l.starts_with("http") {
+				Some(l)
+			} else {
+				None
+			}).unwrap_or_else(|| "http://localhost".into())
+	}
+
+	fn get_ws_domain() -> String {
+		stdweb::web::window()
+			.location()
+			.and_then(|l| l.origin().ok())
+			.and_then(|l| if l.starts_with("http") {
+				Some(format!("ws{}", &l[4..]))
+			} else {
+				None
+			}).unwrap_or_else(|| "ws://localhost".into())
+	}
+
 	fn connect(&mut self) -> Result<(),Error> {
 		let logger = self.logger.clone();
 		let callback = self.link.send_back(move |data: WsMsg| {
@@ -68,26 +90,13 @@ impl Model {
 			}
 		});
 
-		// Get url
-		let domain = stdweb::web::window()
-			.location()
-			.and_then(|l| l.origin().ok())
-			.and_then(|l| if l.starts_with("http") {
-				Some(format!("ws{}", &l[4..]))
-			} else {
-				None
-			}).unwrap_or_else(|| "ws://localhost".into());
 		// Create id
-		let url = format!("{}/ws/{}", domain, self.con.0);
+		let url = format!("{}/ws/{}", Self::get_ws_domain(), self.con.0);
 
 		let task = self.ws_service.connect(&url, callback, notification).map_err(|e| format_err!("{}", e))?;
-		ConnectionService::with_mut_con(self.con, move |con| if let
-			FrontendConnectionState::Disconnected(_, ws)
-			= &mut con.state {
-				*ws = Some(task);
-			} else {
-				panic!("Should be in disconnected state");
-			}, || panic!("Should be in disconnected state"));
+		ConnectionService::with_mut_disconnected_unwrap(self.con, move |_, ws|
+			*ws = Some(task)
+		);
 		Ok(())
 	}
 }
@@ -132,7 +141,7 @@ impl Component for Model {
 				true
 			}
 			Msg::Connected => {
-				ConnectionService::with_mut_con(self.con, move |con| {
+				ConnectionService::with_mut(self.con, move |con| {
 					if let FrontendConnectionState::Disconnected(options, _) = &mut con.state {
 						let options = options.clone();
 						if let Err(e) = con.send_ws_message(&MessageF2P::Connect(options)) {
@@ -145,9 +154,9 @@ impl Component for Model {
 				false
 			}
 			Msg::Disconnected => {
-				ConnectionService::with_mut_con(self.con, move |con| {
+				ConnectionService::with_mut(self.con, move |con| {
 					con.state = FrontendConnectionState::default();
-				}, || panic!("Should be in disconnected state"));
+				}, || panic!("Connection not found"));
 				true
 			}
 			Msg::Message(msg) => {
@@ -157,9 +166,9 @@ impl Component for Model {
 						false
 					}
 					MessageP2F::Packet(packet) => {
-						match ConnectionService::with_mut_con(self.con, move |con|
+						match ConnectionService::with_mut(self.con, move |con|
 							con.handle_packet(packet),
-							|| panic!("Should be in disconnected state")) {
+							|| panic!("Connection not found")) {
 							Ok(r) => r,
 							Err(e) => {
 								error!(self.logger, "Failed to handle packet";
@@ -191,11 +200,11 @@ impl Component for Model {
 				}
 			}
 			Msg::SetTalking(talk) => {
-				ConnectionService::with_mut_con(self.con, |con| {
+				ConnectionService::with_mut(self.con, |con| {
 					if let Err(e) = con.send_ws_message(&MessageF2P::SetTalking(talk)) {
 						error!(con.logger, "Failed to send websocket message"; "error" => ?e);
 					}
-				}, || panic!("Should be in connected state"));
+				}, || panic!("Connection not found"));
 				self.is_talking = talk;
 				if let Some(rtc) = &mut self.rtc {
 					rtc.set_talking(talk);
@@ -209,7 +218,7 @@ impl Component for Model {
 				false
 			}
 			Msg::Send(msg) => {
-				ConnectionService::with_mut_con(self.con, move |con| {
+				ConnectionService::with_mut(self.con, move |con| {
 					if let Err(e) = con.send_ws_message(&msg) {
 						error!(self.logger, "Failed to send message"; "error" => ?e);
 					}
@@ -220,7 +229,7 @@ impl Component for Model {
 	}
 
 	fn view(&self) -> Html<Self> {
-		let is_connected = ConnectionService::with_con(
+		let is_connected = ConnectionService::with(
 			self.con,
 			|c| c.is_connected(),
 			|| false,

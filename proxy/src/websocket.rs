@@ -14,7 +14,7 @@ use qint_shared::{InCommandMsg, MessageF2P, MessageP2F};
 use rmp_serde::{Deserializer, Serializer};
 use qint_shared::ConnectOptions;
 use serde::{Deserialize, Serialize};
-use slog::{error, Logger};
+use slog::{error, warn, Logger};
 use tokio::net::TcpStream;
 use tokio::prelude::*;
 use tsproto::handler_data::InCommandObserver;
@@ -244,6 +244,8 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 				match msg {
 					MessageF2P::Connect(o) => {
 						let id = self.state.settings.default_identity;
+						let address = o.address.clone();
+						let username = o.name.clone();
 						ctx.spawn(wrap_future(self.state.database.send(db::GetIdentityMsg(id, true))
 								.map(|r| r.map_err(|e| e.into()).and_then(|r| r)))
 							.then(move |identity, actor: &mut Self, ctx| {
@@ -263,6 +265,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 								match con {
 									Ok(con) => {
 										let c = con.clone();
+										let c2 = con.clone();
 										actor.connection = Some(con);
 
 										// Activate audio
@@ -274,6 +277,26 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 										}).map(move |r| if let Err(e) = r {
 											error!(logger, "Failed to set listener"; "error" => ?e);
 										}));
+
+										match c2.get_server_key() {
+											Ok(server_key) => {
+												// Save in database
+												let logger = actor.state.logger.clone();
+												actix::spawn(actor.state.database.send(db::ConnectedMsg {
+													bookmark: None,
+													username,
+													address,
+													channel: None,
+													identity: id as i64,
+													server_key,
+												}).map(move |r| match r {
+													Ok(Err(e)) => warn!(logger, "Failed to save connection in database"; "error" => ?e),
+													Err(e) => warn!(logger, "Failed to save connection in database"; "error" => ?e),
+													_ => {}
+												}));
+											}
+											Err(e) => error!(actor.state.logger, "Failed to get server key"; "error" => ?e),
+										}
 									}
 									Err(e) => error!(actor.state.logger,
 										"Failed to get identity for conection";

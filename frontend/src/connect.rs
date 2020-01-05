@@ -1,17 +1,26 @@
+use failure::Error;
 use qint_shared::*;
+use qint_shared::models::Bookmark;
 use stdweb::web::event::IEvent;
+use yew::format::{MsgPack, Nothing};
 use yew::html;
 use yew::prelude::*;
+use yew::services::fetch::{FetchService, FetchTask, Request, Response};
 
-use crate::connection_service::{ConnectionId, ConnectionService, FrontendConnectionState};
+use crate::connection_service::{ConnectionId, ConnectionService};
 
 /// Shows the login form
 pub struct Connect {
 	con: ConnectionId,
+	/// If the options were changed since the start
+	changed: bool,
 	onconnect: Option<Callback<ConnectOptions>>,
+	_bookmarks_fetch_task: FetchTask,
 }
 
 pub enum Msg {
+	Ignore,
+	GotBookmarks(Vec<Bookmark>),
 	Connect,
 	Change(Box<dyn FnOnce(&mut ConnectOptions)>),
 }
@@ -28,35 +37,62 @@ impl Component for Connect {
 	type Message = Msg;
 	type Properties = Props;
 
-	fn create(props: Self::Properties, _: ComponentLink<Self>) -> Self {
+	fn create(props: Self::Properties, mut link: ComponentLink<Self>) -> Self {
+		let mut fetch = FetchService::new();
+		let request = Request::get(&format!("{}/bookmarks", crate::Model::get_http_domain()))
+			.body(Nothing)
+			.unwrap();
+		let fetch_task = fetch.fetch_binary(request, link
+			.send_back(|resp: Response<MsgPack<Result<Vec<Bookmark>, Error>>>| {
+				match resp.into_body().0 {
+					Ok(r) => Msg::GotBookmarks(r),
+					Err(e) => {
+						// TODO Display error message
+						log::error!("Failed to fetch bookmarks: {:?}", e);
+						Msg::Ignore
+					}
+				}
+			}));
+
 		Self {
 			con: props.connection,
+			changed: false,
 			onconnect: Some(props.onconnect),
+			_bookmarks_fetch_task: fetch_task,
 		}
 	}
 
 	fn update(&mut self, msg: Self::Message) -> ShouldRender {
 		match msg {
+			Msg::Ignore => {}
+			Msg::GotBookmarks(bookmarks) => {
+				if !self.changed {
+					// TODO This does not work too well with paging
+					if let Some(b) = bookmarks.iter()
+						.filter(|b| b.last_used.is_some())
+						.max_by_key(|b| b.last_used.unwrap()) {
+						// Set options to last used connection
+						ConnectionService::with_mut_disconnected_unwrap(self.con, |options, _| {
+							options.name = b.username.clone();
+							options.address = b.address.clone();
+						});
+						return true;
+					}
+				}
+			}
 			Msg::Connect => {
 				if let Some(c) = &mut self.onconnect {
-					let opts = ConnectionService::with_mut_con(self.con, |con| if let
-						FrontendConnectionState::Disconnected(options, _)
-						= &mut con.state {
+					let opts = ConnectionService::with_mut_disconnected_unwrap(self.con, |options, _|
 						options.clone()
-					} else {
-						panic!("Should be in disconnected state");
-					}, || panic!("Should be in disconnected state"));
+					);
 					c.emit(opts)
 				}
 			}
 			Msg::Change(f) => {
-				ConnectionService::with_mut_con(self.con, |con| if let
-					FrontendConnectionState::Disconnected(options, _)
-					= &mut con.state {
-					f(options);
-				} else {
-					panic!("Should be in disconnected state");
-				}, || panic!("Should be in disconnected state"));
+				self.changed = true;
+				ConnectionService::with_mut_disconnected_unwrap(self.con, |options, _|
+					f(options)
+				);
 			}
 		}
 		false
@@ -73,8 +109,7 @@ impl Component for Connect {
 	}
 
 	fn view(&self) -> Html<Self> {
-		ConnectionService::with_mut_con(self.con, |con| if let
-			FrontendConnectionState::Disconnected(options, _) = &mut con.state {
+		ConnectionService::with_disconnected_unwrap(self.con, |options, _|
 			html! {
 				<div class="connect-container">
 				<div class="inner-connect-container">
@@ -103,9 +138,7 @@ impl Component for Connect {
 				</div>
 				</div>
 			}
-		} else {
-			panic!("Should be in disconnected state");
-		}, || panic!("Should be in disconnected state"))
+		)
 	}
 }
 

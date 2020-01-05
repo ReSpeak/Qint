@@ -74,7 +74,7 @@ impl Component for Chat {
 	fn change(&mut self, props: Self::Properties) -> ShouldRender {
 		if self.con != props.connection {
 			// Remove and add listener
-			ConnectionService::with_mut_con(props.connection, |con| {
+			ConnectionService::with_mut(props.connection, |con| {
 				con.packet_listeners.remove("chat");
 			}, || {});
 
@@ -120,7 +120,7 @@ impl Component for Chat {
 impl Chat {
 	fn add_listener(&self) {
 		// Listen for new messages
-		ConnectionService::with_mut_con(self.con, |con| {
+		ConnectionService::with_mut(self.con, |con| {
 			let callback = self.callback.clone();
 			con.packet_listeners.insert("chat".into(), Box::new(move |_, msg| {
 				if msg.name() == "notifytextmessage" {

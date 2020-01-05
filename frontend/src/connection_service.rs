@@ -82,7 +82,7 @@ impl ConnectionService {
 		})
 	}
 
-	pub fn with_con<R, F: FnOnce(&FrontendConnection) -> R, F2: FnOnce() -> R>(
+	pub fn with<R, F: FnOnce(&FrontendConnection) -> R, F2: FnOnce() -> R>(
 		id: ConnectionId,
 		f: F,
 		else_f: F2,
@@ -94,23 +94,7 @@ impl ConnectionService {
 		}).unwrap_or_else(else_f)
 	}
 
-	pub fn with_ready_unwrap<R, F: FnOnce(&Connected) -> R>(
-		id: ConnectionId,
-		f: F,
-	) -> R
-	{
-		CONNECTIONS.with(|cons| {
-			let cons = cons.borrow();
-			cons.get(&id)
-			.and_then(|con| {
-				if let FrontendConnectionState::Connected(c) = &con.state {
-					Some(f(c))
-				} else { None }
-			})
-		}).expect("Should be in connected state")
-	}
-
-	pub fn with_mut_con<R, F: FnOnce(&mut FrontendConnection) -> R, F2: FnOnce() -> R>(
+	pub fn with_mut<R, F: FnOnce(&mut FrontendConnection) -> R, F2: FnOnce() -> R>(
 		id: ConnectionId,
 		f: F,
 		else_f: F2,
@@ -122,20 +106,76 @@ impl ConnectionService {
 		}).unwrap_or_else(else_f)
 	}
 
+	pub fn with_unwrap<R, F: FnOnce(&FrontendConnection) -> Option<R>>(
+		id: ConnectionId,
+		f: F,
+		error_message: &str,
+	) -> R
+	{
+		CONNECTIONS.with(|cons| {
+			let cons = cons.borrow();
+			cons.get(&id).and_then(f)
+		}).expect(error_message)
+	}
+
+	pub fn with_mut_unwrap<R, F: FnOnce(&mut FrontendConnection) -> Option<R>>(
+		id: ConnectionId,
+		f: F,
+		error_message: &str,
+	) -> R
+	{
+		CONNECTIONS.with(|cons| {
+			let mut cons = cons.borrow_mut();
+			cons.get_mut(&id).and_then(f)
+		}).expect(error_message)
+	}
+
+	pub fn with_disconnected_unwrap<R, F: FnOnce(&ConnectOptions, &Option<WebSocketTask>) -> R>(
+		id: ConnectionId,
+		f: F,
+	) -> R
+	{
+		Self::with_unwrap(id, |con| {
+			if let FrontendConnectionState::Disconnected(o, t) = &con.state {
+				Some(f(o, t))
+			} else { None }
+		}, "Should be in disconnected state")
+	}
+
+	pub fn with_mut_disconnected_unwrap<R, F: FnOnce(&mut ConnectOptions, &mut Option<WebSocketTask>) -> R>(
+		id: ConnectionId,
+		f: F,
+	) -> R
+	{
+		Self::with_mut_unwrap(id, |con| {
+			if let FrontendConnectionState::Disconnected(o, t) = &mut con.state {
+				Some(f(o, t))
+			} else { None }
+		}, "Should be in disconnected state")
+	}
+
+	pub fn with_ready_unwrap<R, F: FnOnce(&Connected) -> R>(
+		id: ConnectionId,
+		f: F,
+	) -> R
+	{
+		Self::with_unwrap(id, |con| {
+			if let FrontendConnectionState::Connected(c) = &con.state {
+				Some(f(c))
+			} else { None }
+		}, "Should be in connected state")
+	}
+
 	pub fn with_mut_ready_unwrap<R, F: FnOnce(&mut Connected) -> R>(
 		id: ConnectionId,
 		f: F,
 	) -> R
 	{
-		CONNECTIONS.with(|cons| {
-			let mut cons = cons.borrow_mut();
-			cons.get_mut(&id)
-			.and_then(|con| {
-				if let FrontendConnectionState::Connected(c) = &mut con.state {
-					Some(f(c))
-				} else { None }
-			})
-		}).expect("Should be in connected state")
+		Self::with_mut_unwrap(id, |con| {
+			if let FrontendConnectionState::Connected(c) = &mut con.state {
+				Some(f(c))
+			} else { None }
+		}, "Should be in connected state")
 	}
 
 	pub fn with_mut_send_unwrap<F: FnOnce(&mut Connected) -> Option<OutPacket>>(
@@ -144,24 +184,20 @@ impl ConnectionService {
 		error_msg: &'static str,
 	)
 	{
-		CONNECTIONS.with(|cons| {
-			let mut cons = cons.borrow_mut();
-			cons.get_mut(&id)
-			.and_then(|con| {
-				if let FrontendConnectionState::Connected(c) = &mut con.state {
-					f(c)
-				} else { None }
-				.map(|opt_pack| {
-					let logger = con.logger.clone();
-					stdweb::spawn_local(con.send_message(opt_pack).map(move |r| {
-						if let Err(e) = r {
-							// TODO Display notification
-							error!(logger, "{}", error_msg; "error" => ?e);
-						}
-					}))
-				})
+		Self::with_mut_unwrap(id, |con| {
+			if let FrontendConnectionState::Connected(c) = &mut con.state {
+				f(c)
+			} else { None }
+			.map(|opt_pack| {
+				let logger = con.logger.clone();
+				stdweb::spawn_local(con.send_message(opt_pack).map(move |r| {
+					if let Err(e) = r {
+						// TODO Display notification
+						error!(logger, "{}", error_msg; "error" => ?e);
+					}
+				}))
 			})
-		}).expect("Should be in connected state")
+		}, "Should be in connected state")
 	}
 }
 

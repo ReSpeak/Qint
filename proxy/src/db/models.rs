@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use diesel_derive_enum::DbEnum;
 use failure::Error;
 
@@ -57,6 +57,7 @@ pub struct ServerInsert<'a> {
 	pub public_key: &'a [u8],
 	pub name: &'a str,
 	pub address: &'a str,
+	pub icon: Option<i32>,
 }
 
 #[derive(Queryable)]
@@ -80,18 +81,20 @@ pub struct ChannelInsert<'a> {
 	pub deleted: bool,
 }
 
-#[derive(Queryable)]
-pub struct Bookmark {
-	pub id: i64,
-	pub name: Option<String>,
-	pub address: String,
+#[derive(Debug, Insertable)]
+#[table_name = "bookmarks"]
+pub struct BookmarkInsert<'a> {
+	pub name: Option<&'a str>,
+	pub username: &'a str,
+	pub address: &'a str,
 	pub channel: Option<i64>,
 	pub identity: i64,
 	pub bookmark: bool,
 	/// Time of last successful connection
-	pub last_used: Option<DateTime<Utc>>,
+	pub last_used: Option<NaiveDateTime>,
+	pub timezone: i32,
 	/// Reference to the server if we already connected once
-	pub server: Option<i64>,
+	pub server: Option<&'a [u8]>,
 }
 
 #[derive(Queryable)]

@@ -2,16 +2,18 @@ use std::fs;
 
 use actix::*;
 use actix_web::*;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, Utc};
+use chrono::offset::{FixedOffset, TimeZone};
 use diesel::prelude::*;
 use diesel::connection::SimpleConnection;
 use diesel::sqlite::SqliteConnection;
 use failure::Error;
 use qint_shared::models::Bookmark;
-use rmp_serde::{Deserializer, Serializer};
-use serde::{Deserialize, Serialize};
+use rmp_serde::Serializer;
+use serde::Serialize;
 use slog::{info, Logger};
 use tsclientlib::Identity;
+use tsproto::crypto::EccKeyPubP256;
 
 use crate::secret::Secret;
 use crate::{Settings, State};
@@ -41,6 +43,15 @@ pub enum EventMsg {
 	UpdateIdentity(Identity),
 }
 
+pub struct ConnectedMsg {
+	pub bookmark: Option<i64>,
+	pub username: String,
+	pub address: String,
+	pub channel: Option<i64>,
+	pub identity: i64,
+	pub server_key: EccKeyPubP256,
+}
+
 struct GetBookmarksMsg {
 	/// The start for paging.
 	/// (bookmark, last_used) have to be greater than this.
@@ -67,6 +78,7 @@ impl Actor for DbHandler {
 impl Message for GetIdentityMsg { type Result = Result<Identity, Error>; }
 impl Message for EventMsg { type Result = Result<(), Error>; }
 impl Message for GetBookmarksMsg { type Result = Result<Vec<Bookmark>, Error>; }
+impl Message for ConnectedMsg { type Result = Result<(), Error>; }
 
 impl DbHandler {
 	pub(crate) fn new(logger: Logger, settings: &Settings, secret: Secret) -> Result<Self, Error> {
@@ -148,6 +160,11 @@ impl Handler<EventMsg> for DbHandler {
 				let key = con.get_server_key()?;
 				let key = key.to_short();
 				let con = con.lock();
+				let icon_id = if con.server.icon_id.0 != 0 {
+					Some(con.server.icon_id.0 as i32)
+				} else {
+					None
+				};
 
 				// Check if we already know that address
 				if diesel::select(diesel::dsl::exists(servers.filter(
@@ -164,6 +181,7 @@ impl Handler<EventMsg> for DbHandler {
 						public_key: &key,
 						name: &con.server.name,
 						address: &addr,
+						icon: icon_id,
 					};
 					diesel::insert_into(schema::servers::table)
 						.values(&server)
@@ -205,9 +223,10 @@ impl Handler<GetBookmarksMsg> for DbHandler {
 					.and(bookmarks::channel.eq(channels::id.nullable()))))
 			.order((bookmarks::bookmark, bookmarks::last_used))
 			.limit(20)
-			.select((bookmarks::id, bookmarks::name, bookmarks::address,
-				bookmarks::bookmark, bookmarks::last_used, bookmarks::timezone,
-				channels::name.nullable(), servers::icon.nullable()));
+			.select((bookmarks::id, bookmarks::name, bookmarks::username,
+				bookmarks::address, bookmarks::bookmark, bookmarks::last_used,
+				bookmarks::timezone, channels::name.nullable(),
+				servers::icon.nullable()));
 		let result = if let Some((book, last)) = msg.start {
 			// (bookmark == book AND last_used > last) OR (!bookmark AND book)
 			query.filter(bookmarks::bookmark.eq(book)
@@ -219,5 +238,75 @@ impl Handler<GetBookmarksMsg> for DbHandler {
 		}?;
 
 		Ok(result)
+	}
+}
+
+impl Handler<ConnectedMsg> for DbHandler {
+	type Result = Result<(), Error>;
+	fn handle(&mut self, msg: ConnectedMsg, _: &mut Self::Context) -> Self::Result {
+		use diesel::dsl::not;
+		use schema::{bookmarks, identities};
+		let server = msg.server_key.to_short();
+
+		// Find identity
+		let identity = match identities::table.find(msg.identity as i64)
+			.select(identities::id).first::<i64>(&self.con) {
+			Ok(r) => r,
+			Err(_) => {
+				// Pick an existing identity
+				identities::table.order_by(identities::id).select(identities::id)
+					.first::<i64>(&self.con)?
+			}
+		};
+
+		let utc_time = Utc::now().naive_utc();
+		let dummy_offset = FixedOffset::east(0);
+		let local_zone = Local::from_offset(&dummy_offset);
+		let utc_to_local_offset = local_zone.offset_from_utc_datetime(&utc_time).local_minus_utc();
+
+		// Compare channel
+		// https://stackoverflow.com/questions/10416789/how-to-rewrite-is-distinct-from-and-is-not-distinct-from
+		// a IS NOT DISTINCT FROM b can be rewritten as:
+		// (NOT (a <> b OR a IS NULL OR b IS NULL) OR (a IS NULL AND b IS NULL))
+		let cmp = not(bookmarks::channel.ne(msg.channel).or(bookmarks::channel.is_null()).or(msg.channel.is_none()))
+			.or(bookmarks::channel.is_null().and(msg.channel.is_none()));
+
+		// Check if we already know that address
+		let id = msg.bookmark.map(Ok).or_else(|| {
+			bookmarks::table.filter(cmp
+				.and(bookmarks::address.eq(&msg.address))
+				.and(bookmarks::identity.eq(identity))
+				.and(bookmarks::server.eq(&server)))
+				.select(bookmarks::id)
+				.first::<i64>(&self.con)
+				.optional()
+				.transpose()
+		}).transpose()?;
+		if let Some(id) = id {
+			// Update
+			diesel::update(bookmarks::table.filter(bookmarks::id.eq(id)))
+				.set((
+					bookmarks::username.eq(&msg.username),
+					bookmarks::last_used.eq(Some(utc_time)),
+					bookmarks::timezone.eq(utc_to_local_offset),
+				))
+				.execute(&self.con)?;
+		} else {
+			let bookmark = models::BookmarkInsert {
+				name: None,
+				username: &msg.username,
+				address: &msg.address,
+				channel: msg.channel,
+				identity,
+				bookmark: false,
+				last_used: Some(utc_time),
+				timezone: utc_to_local_offset,
+				server: Some(&server),
+			};
+			diesel::insert_into(bookmarks::table)
+				.values(&bookmark)
+				.execute(&self.con)?;
+		}
+		Ok(())
 	}
 }

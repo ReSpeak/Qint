@@ -50,7 +50,7 @@ CREATE TABLE bookmarks (
 	bookmark BOOLEAN NOT NULL DEFAULT false,
 	-- In UTC
 	last_used DATETIME,
-	-- Offset from UTC in minutes to the east
+	-- Offset from UTC in seconds to the east
 	timezone INTEGER NOT NULL,
 	-- References the server if already connected once
 	server BLOB REFERENCES servers(public_key),
@@ -65,7 +65,7 @@ CREATE TABLE messages (
 	content TEXT NOT NULL,
 	-- In UTC
 	time DATETIME NOT NULL,
-	-- Offset from UTC in minutes to the east
+	-- Offset from UTC in seconds to the east
 	timezone INTEGER NOT NULL
 );
 
@@ -80,7 +80,7 @@ CREATE TABLE events (
 	content BLOB,
 	-- In UTC
 	time DATETIME NOT NULL,
-	-- Offset from UTC in minutes to the east
+	-- Offset from UTC in seconds to the east
 	timezone INTEGER NOT NULL,
 
 	FOREIGN KEY(server, channel1) REFERENCES channels(server, id),
@@ -95,7 +95,7 @@ CREATE TABLE servers_clients (
 	icon INTEGER,
 	-- In UTC
 	last_seen DATETIME NOT NULL,
-	-- Offset from UTC in minutes to the east
+	-- Offset from UTC in seconds to the east
 	timezone INTEGER NOT NULL,
 
 	PRIMARY KEY(server, client)

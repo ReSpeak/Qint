@@ -8,7 +8,7 @@ use yew::prelude::*;
 
 use crate::connection_service::*;
 
-macro_rules! cl {
+/*macro_rules! cl {
 	( $( $x:tt ),* ) => {
 		{
 			let mut temp_vec = String::new();
@@ -27,7 +27,7 @@ macro_rules! cl_intern {
 		}
 	};
 	($st:expr, $x:expr) => { $st.push_str($x) };
-}
+}*/
 
 pub struct ChannelTree {
 	con: ConnectionId,
@@ -77,7 +77,7 @@ impl Component for ChannelTree {
 	fn change(&mut self, props: Self::Properties) -> ShouldRender {
 		if self.con != props.connection {
 			// Remove and add listener
-			ConnectionService::with_mut_con(props.connection, |con| {
+			ConnectionService::with_mut(props.connection, |con| {
 				con.packet_listeners.remove("channeltree");
 			}, || {});
 
@@ -99,7 +99,7 @@ impl Component for ChannelTree {
 impl ChannelTree {
 	fn add_listener(&self) {
 		// Listen for new messages
-		ConnectionService::with_mut_con(self.con, |con| {
+		ConnectionService::with_mut(self.con, |con| {
 			let callback = self.callback.clone();
 			con.event_listeners.insert("channeltree".into(), Box::new(move |_, events| {
 				for _e in events {

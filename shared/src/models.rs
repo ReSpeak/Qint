@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 pub struct Bookmark {
 	pub id: i64,
 	pub name: Option<String>,
+	pub username: String,
 	pub address: String,
 	pub bookmark: bool,
 	pub last_used: Option<NaiveDateTime>,
