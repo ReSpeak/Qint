@@ -153,6 +153,8 @@ impl Handler<EventMsg> for DbHandler {
 		match msg {
 			EventMsg::Events(con, es) => {
 				self.handle_events(&con, &es)?;
+				// TODO On channellistfinished: Mark channels as removed which
+				// are no longer there
 			}
 			EventMsg::Connected(addr, con) => {
 				use schema::servers::dsl::*;

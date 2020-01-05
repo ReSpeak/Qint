@@ -125,3 +125,12 @@ CREATE TABLE client_messages (
 
 	PRIMARY KEY(server, client, message)
 );
+
+CREATE TABLE client_pokes (
+	server BLOB NOT NULL REFERENCES servers(public_key),
+	-- Message author
+	client BLOB NOT NULL REFERENCES clients(uid),
+	message INTEGER NOT NULL REFERENCES messages(id),
+
+	PRIMARY KEY(server, client, message)
+);

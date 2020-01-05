@@ -42,6 +42,14 @@ table! {
 }
 
 table! {
+    client_pokes (server, client, message) {
+        server -> Binary,
+        client -> Binary,
+        message -> BigInt,
+    }
+}
+
+table! {
     clients (uid) {
         uid -> Binary,
         name -> Text,
@@ -119,6 +127,9 @@ joinable!(channels -> servers (server));
 joinable!(client_messages -> clients (client));
 joinable!(client_messages -> messages (message));
 joinable!(client_messages -> servers (server));
+joinable!(client_pokes -> clients (client));
+joinable!(client_pokes -> messages (message));
+joinable!(client_pokes -> servers (server));
 joinable!(events -> servers (server));
 joinable!(identities -> clients (client));
 joinable!(messages -> clients (invoker));
@@ -132,6 +143,7 @@ allow_tables_to_appear_in_same_query!(
     channel_messages,
     channels,
     client_messages,
+    client_pokes,
     clients,
     events,
     identities,
