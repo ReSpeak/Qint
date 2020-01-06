@@ -7,11 +7,9 @@ use yew::html;
 use yew::prelude::*;
 use yew::services::fetch::{FetchService, FetchTask, Request, Response};
 
-use crate::connection_service::{ConnectionId, ConnectionService};
-
 /// Shows the login form
 pub struct Connect {
-	con: ConnectionId,
+	options: ConnectOptions,
 	/// If the options were changed since the start
 	changed: bool,
 	onconnect: Option<Callback<ConnectOptions>>,
@@ -27,8 +25,6 @@ pub enum Msg {
 
 #[derive(Clone, PartialEq, Properties)]
 pub struct Props {
-	#[props(required)]
-	pub connection: ConnectionId,
 	#[props(required)]
 	pub onconnect: Callback<ConnectOptions>,
 }
@@ -55,7 +51,7 @@ impl Component for Connect {
 			}));
 
 		Self {
-			con: props.connection,
+			options: ConnectOptions::new("localhost".into()),
 			changed: false,
 			onconnect: Some(props.onconnect),
 			_bookmarks_fetch_task: fetch_task,
@@ -72,27 +68,20 @@ impl Component for Connect {
 						.filter(|b| b.last_used.is_some())
 						.max_by_key(|b| b.last_used.unwrap()) {
 						// Set options to last used connection
-						ConnectionService::with_mut_disconnected_unwrap(self.con, |options, _| {
-							options.name = b.username.clone();
-							options.address = b.address.clone();
-						});
+						self.options.name = b.username.clone();
+						self.options.address = b.address.clone();
 						return true;
 					}
 				}
 			}
 			Msg::Connect => {
 				if let Some(c) = &mut self.onconnect {
-					let opts = ConnectionService::with_mut_disconnected_unwrap(self.con, |options, _|
-						options.clone()
-					);
-					c.emit(opts)
+					c.emit(self.options.clone())
 				}
 			}
 			Msg::Change(f) => {
 				self.changed = true;
-				ConnectionService::with_mut_disconnected_unwrap(self.con, |options, _|
-					f(options)
-				);
+				f(&mut self.options)
 			}
 		}
 		false
@@ -100,45 +89,38 @@ impl Component for Connect {
 
 	fn change(&mut self, props: Self::Properties) -> ShouldRender {
 		self.onconnect = Some(props.onconnect);
-		if self.con != props.connection {
-			self.con = props.connection;
-			true
-		} else {
-			false
-		}
+		false
 	}
 
 	fn view(&self) -> Html<Self> {
-		ConnectionService::with_disconnected_unwrap(self.con, |options, _|
-			html! {
-				<div class="connect-container">
-				<div class="inner-connect-container">
-				<div class="connect-blur"></div>
-				<form class="connect-form" onsubmit=|e| { e.prevent_default(); Msg::Connect }>
-					<div>
-						<input name="username" class="input" type="text" placeholder="Username"
-							value=&options.name
-							oninput=|e| Msg::Change({
-								Box::new(move |o| { o.name(e.value); })
-							}), />
-					</div>
-					<div>
-						<input name="server" class="input" type="text" placeholder="Server"
-							value=&options.address
-							oninput=|e| Msg::Change({
-								Box::new(move |o| { o.address(e.value); })
-							}), />
-					</div>
-					<div>
-						<button class="button is-primary" name="connect" type="submit">
-							{ "Connect" }
-						</button>
-					</div>
-				</form>
+		html! {
+			<div class="connect-container">
+			<div class="inner-connect-container">
+			<div class="connect-blur"></div>
+			<form class="connect-form" onsubmit=|e| { e.prevent_default(); Msg::Connect }>
+				<div>
+					<input name="username" class="input" type="text" placeholder="Username"
+						value=&self.options.name
+						oninput=|e| Msg::Change({
+							Box::new(move |o| { o.name(e.value); })
+						}), />
 				</div>
+				<div>
+					<input name="server" class="input" type="text" placeholder="Server"
+						value=&self.options.address
+						oninput=|e| Msg::Change({
+							Box::new(move |o| { o.address(e.value); })
+						}), />
 				</div>
-			}
-		)
+				<div>
+					<button class="button is-primary" name="connect" type="submit">
+						{ "Connect" }
+					</button>
+				</div>
+			</form>
+			</div>
+			</div>
+		}
 	}
 }
 

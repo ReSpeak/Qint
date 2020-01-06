@@ -11,9 +11,7 @@ use futures01::Future as _;
 use futures::prelude::*;
 use futures::channel::oneshot;
 use qint_shared::{InCommandMsg, MessageF2P, MessageP2F};
-use rmp_serde::{Deserializer, Serializer};
 use qint_shared::ConnectOptions;
-use serde::{Deserialize, Serialize};
 use slog::{error, warn, Logger};
 use tokio::net::TcpStream;
 use tokio::prelude::*;
@@ -93,10 +91,7 @@ impl Ws {
 	}
 
 	fn send_message(msg: &MessageP2F, ctx: &mut ws::WebsocketContext<Self>) {
-		let mut buf = Vec::new();
-		let mut ser = Serializer::new(&mut buf);
-		msg.serialize(&mut ser).unwrap();
-		ctx.binary(buf);
+		ctx.binary(rmp_serde::to_vec(&msg));
 	}
 
 	fn connect_intern(o: ConnectOptions, identity: Identity, actor: &mut Self, ctx: &mut ws::WebsocketContext<Self>)
@@ -231,12 +226,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 			Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
 			Ok(ws::Message::Text(text)) => ctx.text(text),
 			Ok(ws::Message::Binary(bin)) => {
-				let mut de = Deserializer::new(bin.as_ref());
-				let msg: MessageF2P = match Deserialize::deserialize(&mut de) {
+				let msg: MessageF2P = match rmp_serde::from_read_ref(bin.as_ref()) {
 					Ok(r) => r,
 					Err(e) => {
-						// TODO log
-						eprintln!("Error deserializing message: {:?}", e);
+						error!(self.state.logger, "Error deserializing message"; "error" => ?e);
 						return;
 					}
 				};
@@ -301,16 +294,6 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 									Err(e) => error!(actor.state.logger,
 										"Failed to get identity for conection";
 										"error" => ?e),
-								}
-							}));
-					}
-					MessageF2P::SetTalking(talk) => {
-						let logger = self.state.logger.clone();
-						actix::spawn(self.state.audio_data.a2ts.send(audio::audio_to_ts::SetPlayingMsg(talk))
-							.map(move |r| {
-								match r {
-									Ok(()) => {}
-									Err(e) => error!(logger, "Failed to set playing state"; "error" => ?e),
 								}
 							}));
 					}

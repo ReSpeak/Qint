@@ -26,7 +26,6 @@ impl fmt::Display for Version {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum MessageF2P {
 	Connect(ConnectOptions),
-	SetTalking(bool),
 	Packet(OutPacket),
 	Webrtc(WebrtcMsg),
 }
@@ -55,6 +54,28 @@ pub struct ConnectOptions {
 	pub log_commands: bool,
 	pub log_packets: bool,
 	pub log_udp_packets: bool,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+pub struct ChatId {
+	/// The uid of the server.
+	pub server: Vec<u8>,
+	pub chat_type: ChatType,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+pub enum ChatType {
+	Server,
+	Channel(u64),
+	/// A chat with a client, identified by the client uid.
+	Client(Vec<u8>),
+	/// Pokes with a client, identified by the client uid.
+	Poke(Vec<u8>),
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+pub struct MessagesRequest {
+	pub chat: ChatId,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

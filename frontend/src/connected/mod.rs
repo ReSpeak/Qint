@@ -29,7 +29,7 @@ impl Component for Connected {
 	type Properties = Props;
 
 	fn create(props: Self::Properties, _: ComponentLink<Self>) -> Self {
-		ConnectionService::with_mut(props.connection, |con| if let
+		ConnectionService::with_mut(&props.connection, |con| if let
 			FrontendConnectionState::Connected(c) = &mut con.state {
 			let cmd = c.con.server.set_subscribed(true);
 			let logger = con.logger.clone();
@@ -63,8 +63,8 @@ impl Component for Connected {
 	fn view(&self) -> Html<Self> {
 		html! {
 			<div class="connected-container">
-				<SideBar: connection=self.con />
-				<Chat: connection=self.con />
+				<SideBar: connection=self.con.clone() />
+				<Chat: connection=self.con.clone() />
 			</div>
 		}
 	}

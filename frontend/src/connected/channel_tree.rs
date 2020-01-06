@@ -64,7 +64,7 @@ impl Component for ChannelTree {
 		match msg {
 			Msg::Redraw => true,
 			Msg::ChangeChannel(id) => {
-				ConnectionService::with_mut_send_unwrap(self.con, |c| {
+				ConnectionService::with_mut_send_unwrap(&self.con, |c| {
 					let cmd = c.con.clients[&c.con.own_client]
 						.set_channel(id);
 					Some(cmd)
@@ -77,7 +77,7 @@ impl Component for ChannelTree {
 	fn change(&mut self, props: Self::Properties) -> ShouldRender {
 		if self.con != props.connection {
 			// Remove and add listener
-			ConnectionService::with_mut(props.connection, |con| {
+			ConnectionService::with_mut(&props.connection, |con| {
 				con.packet_listeners.remove("channeltree");
 			}, || {});
 
@@ -90,7 +90,7 @@ impl Component for ChannelTree {
 	}
 
 	fn view(&self) -> Html<Self> {
-		ConnectionService::with_ready_unwrap(self.con, |c| {
+		ConnectionService::with_ready_unwrap(&self.con, |c| {
 			self.view(&c.con)
 		})
 	}
@@ -99,7 +99,7 @@ impl Component for ChannelTree {
 impl ChannelTree {
 	fn add_listener(&self) {
 		// Listen for new messages
-		ConnectionService::with_mut(self.con, |con| {
+		ConnectionService::with_mut(&self.con, |con| {
 			let callback = self.callback.clone();
 			con.event_listeners.insert("channeltree".into(), Box::new(move |_, events| {
 				for _e in events {

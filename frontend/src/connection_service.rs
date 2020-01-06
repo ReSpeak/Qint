@@ -13,8 +13,9 @@ use tsproto_packets::packets::{InCommand, OutPacket};
 use slog::{error, o, Logger};
 use uuid::Uuid;
 use yew::ShouldRender;
+use yew::prelude::Callback;
 use yew::format::MsgPack;
-use yew::services::websocket::WebSocketTask;
+use yew::services::websocket::{WebSocketService, WebSocketStatus, WebSocketTask};
 
 thread_local! {
 	/// Each tab is a connection
@@ -29,7 +30,8 @@ pub struct FrontendConnection {
 }
 
 pub enum FrontendConnectionState {
-	Disconnected(ConnectOptions, Option<WebSocketTask>),
+	Uninitialized,
+	Connecting(ConnectOptions, WebSocketTask),
 	Connected(Connected),
 }
 
@@ -43,7 +45,7 @@ pub struct Connected {
 	pub composing_command: String,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[repr(transparent)]
 pub struct ConnectionId(pub Uuid);
 
@@ -62,100 +64,89 @@ struct MessageHandler {
 }
 
 impl ConnectionService {
-	pub fn add_connection(logger: &Logger) -> ConnectionId {
+	pub fn add(logger: &Logger, options: ConnectOptions, callback: Callback<crate::WsMsg>, notification: Callback<WebSocketStatus>) -> Result<ConnectionId, Error> {
+		let mut ws_service = WebSocketService::new();
+
 		CONNECTIONS.with(|cons| {
 			let mut cons = cons.borrow_mut();
 			for _ in 0..5 {
 				let id = ConnectionId(Uuid::new_v4());
 				if !cons.contains_key(&id) {
+					// Create connection
+					let url = format!("{}/ws/{}", crate::Model::get_ws_domain(), id.0);
+					let task = ws_service.connect(&url, callback, notification).map_err(|e| format_err!("{}", e))?;
+
 					let con = FrontendConnection {
 						logger: logger.new(o!("id" => id.0.to_string())),
-						state: Default::default(),
+						state: FrontendConnectionState::Connecting(options, task),
 						packet_listeners: Default::default(),
 						event_listeners: Default::default(),
 					};
-					cons.insert(id, con);
-					return id;
+					cons.insert(id.clone(), con);
+					return Ok(id);
 				}
 			}
 			panic!("Too many connections");
 		})
 	}
 
+	pub fn remove(id: &ConnectionId) -> Option<FrontendConnection> {
+		CONNECTIONS.with(|cons| {
+			let mut cons = cons.borrow_mut();
+			cons.remove(id)
+		})
+	}
+
 	pub fn with<R, F: FnOnce(&FrontendConnection) -> R, F2: FnOnce() -> R>(
-		id: ConnectionId,
+		id: &ConnectionId,
 		f: F,
 		else_f: F2,
 	) -> R
 	{
 		CONNECTIONS.with(|cons| {
 			let cons = cons.borrow();
-			cons.get(&id).map(f)
+			cons.get(id).map(f)
 		}).unwrap_or_else(else_f)
 	}
 
 	pub fn with_mut<R, F: FnOnce(&mut FrontendConnection) -> R, F2: FnOnce() -> R>(
-		id: ConnectionId,
+		id: &ConnectionId,
 		f: F,
 		else_f: F2,
 	) -> R
 	{
 		CONNECTIONS.with(|cons| {
 			let mut cons = cons.borrow_mut();
-			cons.get_mut(&id).map(f)
+			cons.get_mut(id).map(f)
 		}).unwrap_or_else(else_f)
 	}
 
 	pub fn with_unwrap<R, F: FnOnce(&FrontendConnection) -> Option<R>>(
-		id: ConnectionId,
+		id: &ConnectionId,
 		f: F,
 		error_message: &str,
 	) -> R
 	{
 		CONNECTIONS.with(|cons| {
 			let cons = cons.borrow();
-			cons.get(&id).and_then(f)
+			cons.get(id).and_then(f)
 		}).expect(error_message)
 	}
 
 	pub fn with_mut_unwrap<R, F: FnOnce(&mut FrontendConnection) -> Option<R>>(
-		id: ConnectionId,
+		id: &ConnectionId,
 		f: F,
 		error_message: &str,
 	) -> R
 	{
 		CONNECTIONS.with(|cons| {
 			let mut cons = cons.borrow_mut();
-			cons.get_mut(&id).and_then(f)
+			cons.get_mut(id).and_then(f)
 		}).expect(error_message)
 	}
 
-	pub fn with_disconnected_unwrap<R, F: FnOnce(&ConnectOptions, &Option<WebSocketTask>) -> R>(
-		id: ConnectionId,
-		f: F,
-	) -> R
-	{
-		Self::with_unwrap(id, |con| {
-			if let FrontendConnectionState::Disconnected(o, t) = &con.state {
-				Some(f(o, t))
-			} else { None }
-		}, "Should be in disconnected state")
-	}
-
-	pub fn with_mut_disconnected_unwrap<R, F: FnOnce(&mut ConnectOptions, &mut Option<WebSocketTask>) -> R>(
-		id: ConnectionId,
-		f: F,
-	) -> R
-	{
-		Self::with_mut_unwrap(id, |con| {
-			if let FrontendConnectionState::Disconnected(o, t) = &mut con.state {
-				Some(f(o, t))
-			} else { None }
-		}, "Should be in disconnected state")
-	}
-
 	pub fn with_ready_unwrap<R, F: FnOnce(&Connected) -> R>(
-		id: ConnectionId,
+		id: &ConnectionId,
 		f: F,
 	) -> R
 	{
@@ -167,7 +158,7 @@ impl ConnectionService {
 	}
 
 	pub fn with_mut_ready_unwrap<R, F: FnOnce(&mut Connected) -> R>(
-		id: ConnectionId,
+		id: &ConnectionId,
 		f: F,
 	) -> R
 	{
@@ -179,7 +170,7 @@ impl ConnectionService {
 	}
 
 	pub fn with_mut_send_unwrap<F: FnOnce(&mut Connected) -> Option<OutPacket>>(
-		id: ConnectionId,
+		id: &ConnectionId,
 		f: F,
 		error_msg: &'static str,
 	)
@@ -247,8 +238,8 @@ impl FrontendConnection {
 			l(self, &packet);
 		}
 
-		let res = match &mut self.state {
-			FrontendConnectionState::Disconnected(_, ws) => {
+		let res = match std::mem::replace(&mut self.state, FrontendConnectionState::Uninitialized) {
+			FrontendConnectionState::Connecting(_, ws) => {
 				let msg = match InMessage::new(packet) {
 					Ok(r) => r,
 					Err(e) => {
@@ -267,13 +258,13 @@ impl FrontendConnection {
 
 				// TODO Uid
 				self.state = FrontendConnectionState::Connected(
-					Connected::new(ws.take().unwrap(), Connection::new(
+					Connected::new(ws, Connection::new(
 						Uid("".into()),
 						&msg,
 					)));
 				true
 			}
-			FrontendConnectionState::Connected(c) => {
+			FrontendConnectionState::Connected(mut c) => {
 				// Handle return codes
 				if packet.name() == "error" {
 					let error = match InCommandError::new(&packet) {
@@ -335,13 +326,14 @@ impl FrontendConnection {
 					}
 				}
 			}
+			_ => panic!("Frontend connection is in uninitialized state"),
 		};
 		Ok(res)
 	}
 
 	pub fn send_ws_message(&mut self, msg: &MessageF2P) -> Result<(), Error> {
 		match &mut self.state {
-			FrontendConnectionState::Disconnected(_, Some(ws)) => {
+			FrontendConnectionState::Connecting(_, ws) => {
 				ws.send_binary(MsgPack(msg));
 				Ok(())
 			}
@@ -395,14 +387,5 @@ impl FrontendConnection {
 					future::err(r.into())
 				}
 			}))
-	}
-}
-
-impl Default for FrontendConnectionState {
-	fn default() -> Self {
-		FrontendConnectionState::Disconnected(
-			ConnectOptions::new("localhost".into()),
-			None,
-		)
 	}
 }

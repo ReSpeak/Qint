@@ -2,15 +2,15 @@ use std::fs;
 
 use actix::*;
 use actix_web::*;
+use bytes::Bytes;
 use chrono::{DateTime, Duration, Local, Utc};
 use chrono::offset::{FixedOffset, TimeZone};
 use diesel::prelude::*;
 use diesel::connection::SimpleConnection;
 use diesel::sqlite::SqliteConnection;
 use failure::Error;
-use qint_shared::models::Bookmark;
-use rmp_serde::Serializer;
-use serde::Serialize;
+use qint_shared::{ChatId, ChatType, MessagesRequest};
+use qint_shared::models::{Bookmark, Message as TextMessage};
 use slog::{info, Logger};
 use tsclientlib::Identity;
 use tsproto::crypto::EccKeyPubP256;
@@ -24,6 +24,9 @@ mod event_handler;
 mod schema;
 
 diesel_migrations::embed_migrations!();
+
+const BOOKMARKS_LIMIT: i64 = 20;
+const MESSAGES_LIMIT: i64 = 50;
 
 pub struct DbHandler {
 	logger: Logger,
@@ -59,17 +62,24 @@ struct GetBookmarksMsg {
 	start: Option<(bool, DateTime<Utc>)>,
 }
 
+struct GetMessagesMsg(MessagesRequest);
+
 #[get("/bookmarks")]
 pub(crate) async fn bookmarks(state: web::Data<State>) -> Result<HttpResponse, Error> {
 	let msg = GetBookmarksMsg {
 		start: None,
 	};
 	let bookmarks = state.database.send(msg).await??;
-	let mut buf = Vec::new();
-	let mut ser = Serializer::new(&mut buf);
-	bookmarks.serialize(&mut ser).unwrap();
 
-	Ok(HttpResponse::Ok().body(buf))
+	Ok(HttpResponse::Ok().body(rmp_serde::to_vec(&bookmarks)?))
+}
+
+#[post("/messages")]
+pub(crate) async fn messages(state: web::Data<State>, body: Bytes) -> Result<HttpResponse, Error> {
+	let msg: MessagesRequest = rmp_serde::from_read_ref(&body)?;
+	let messages = state.database.send(GetMessagesMsg(msg)).await??;
+
+	Ok(HttpResponse::Ok().body(rmp_serde::to_vec(&messages)?))
 }
 
 impl Actor for DbHandler {
@@ -79,6 +89,7 @@ impl Actor for DbHandler {
 impl Message for GetIdentityMsg { type Result = Result<Identity, Error>; }
 impl Message for EventMsg { type Result = Result<(), Error>; }
 impl Message for GetBookmarksMsg { type Result = Result<Vec<Bookmark>, Error>; }
+impl Message for GetMessagesMsg { type Result = Result<Vec<TextMessage>, Error>; }
 impl Message for ConnectedMsg { type Result = Result<(), Error>; }
 
 impl DbHandler {
@@ -106,6 +117,29 @@ impl DbHandler {
 			con,
 			last_message_id: 0,
 		})
+	}
+
+	fn get_chat(&self, id: &ChatId) -> Result<Option<i64>, diesel::result::Error> {
+		use schema::{channel_chats, client_chats, client_pokes, server_chats};
+
+		match &id.chat_type {
+			ChatType::Server => server_chats::table.find(&id.server)
+				.select(server_chats::chat)
+				.first(&self.con)
+				.optional(),
+			ChatType::Channel(cid) => channel_chats::table.find((&id.server, *cid as i64))
+				.select(channel_chats::chat)
+				.first(&self.con)
+				.optional(),
+			ChatType::Client(cid) => client_chats::table.find((&id.server, cid))
+				.select(client_chats::chat)
+				.first(&self.con)
+				.optional(),
+			ChatType::Poke(cid) => client_pokes::table.find((&id.server, cid))
+				.select(client_pokes::chat)
+				.first(&self.con)
+				.optional(),
+		}
 	}
 
 	/// Create a new chat entry in the database and returns the id.
@@ -246,7 +280,7 @@ impl Handler<GetBookmarksMsg> for DbHandler {
 					bookmarks::server.eq(channels::server.nullable())
 					.and(bookmarks::channel.eq(channels::id.nullable()))))
 			.order((bookmarks::bookmark, bookmarks::last_used))
-			.limit(20)
+			.limit(BOOKMARKS_LIMIT)
 			.select((bookmarks::id, bookmarks::name, bookmarks::username,
 				bookmarks::address, bookmarks::bookmark, bookmarks::last_used,
 				bookmarks::timezone, channels::name.nullable(),
@@ -260,6 +294,34 @@ impl Handler<GetBookmarksMsg> for DbHandler {
 		} else {
 			query.load::<Bookmark>(&self.con)
 		}?;
+
+		Ok(result)
+	}
+}
+
+impl Handler<GetMessagesMsg> for DbHandler {
+	type Result = Result<Vec<TextMessage>, Error>;
+	fn handle(&mut self, msg: GetMessagesMsg, _: &mut Self::Context) -> Self::Result {
+		use schema::{clients, messages};
+
+		let chat = if let Some(chat) = self.get_chat(&msg.0.chat)? {
+			chat
+		} else {
+			return Ok(Vec::new());
+		};
+
+		// Order by (bookmark, last_used)
+		// Select id, name, address, bookmark, last_used, timezone
+		// Join channel.name
+		// Join server.icon
+		let result = messages::table.filter(messages::chat.eq(chat))
+			.left_outer_join(clients::table)
+			.order((messages::time.desc(), messages::id))
+			.limit(MESSAGES_LIMIT)
+			.select((messages::id, messages::invoker, messages::invoker_name,
+				messages::content, messages::time, messages::timezone,
+				clients::name.nullable()))
+			.load::<TextMessage>(&self.con)?;
 
 		Ok(result)
 	}
@@ -279,7 +341,7 @@ impl Handler<ConnectedMsg> for DbHandler {
 			Ok(r) => r,
 			Err(_) => {
 				// Pick an existing identity
-				identities::table.order_by(identities::id).select(identities::id)
+				identities::table.order(identities::id).select(identities::id)
 					.first::<i64>(&self.con)?
 			}
 		};

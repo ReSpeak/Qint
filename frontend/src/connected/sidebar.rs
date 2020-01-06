@@ -37,7 +37,7 @@ impl Component for SideBar {
 		match msg {
 			Msg::Ignore => false,
 			Msg::Disconnect => {
-				ConnectionService::with_mut_send_unwrap(self.con, |c| {
+				ConnectionService::with_mut_send_unwrap(&self.con, |c| {
 						Some(c.con.disconnect(DisconnectOptions::new().message("Bye noobs")))
 				}, "Failed to disconnect");
 				true
@@ -63,11 +63,11 @@ impl Component for SideBar {
 						</div>
 						<div class="dropdown-menu" id="dropdown-menu3" role="menu">
 							<div class="dropdown-content">
-								<a href="#" class="dropdown-item">{"Options"}</a>
+								<a href="#" class="dropdown-item">{ "Options" }</a>
 								<hr class="dropdown-divider" />
-								<a href="#" class="dropdown-item" onclick=|_|{
+								<a href="#" class="dropdown-item" onclick=|_| {
 									Msg::Disconnect
-								}>{"Disconnect"}</a>
+								}>{ "Disconnect" }</a>
 							</div>
 						</div>
 					</div>
@@ -83,7 +83,7 @@ impl Component for SideBar {
 
 				<hr />
 
-				<ChannelTree: connection=self.con />
+				<ChannelTree: connection=self.con.clone() />
 
 				<hr />
 
@@ -93,7 +93,7 @@ impl Component for SideBar {
 							<div class="channel-line">
 								<a class="entry-expand">
 									<span class="entry-expand" style="display:flex;">
-										{"Splamy (maybe)"}
+										{ "Splamy (maybe)" }
 									</span>
 								</a>
 							</div>

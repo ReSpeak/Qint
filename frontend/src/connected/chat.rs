@@ -43,12 +43,12 @@ impl Component for Chat {
 	fn update(&mut self, msg: Self::Message) -> ShouldRender {
 		match msg {
 			Msg::Change(f) => {
-				ConnectionService::with_mut_ready_unwrap(self.con, f);
+				ConnectionService::with_mut_ready_unwrap(&self.con, f);
 				true
 			}
 			Msg::NewMessage => true,
 			Msg::Send => {
-				ConnectionService::with_mut_send_unwrap(self.con, |c| {
+				ConnectionService::with_mut_send_unwrap(&self.con, |c| {
 					let cmd = c.con.send_message(MessageTarget::Channel, &c.composing);
 					c.composing.clear();
 					Some(cmd)
@@ -56,7 +56,7 @@ impl Component for Chat {
 				true
 			}
 			Msg::SendCommand => {
-				ConnectionService::with_mut_ready_unwrap(self.con, |c| {
+				ConnectionService::with_mut_ready_unwrap(&self.con, |c| {
 					let mut packet = OutPacket::new_with_dir(Direction::C2S,
 						Flags::empty(), PacketType::Command);
 					let static_args = std::iter::empty();
@@ -74,7 +74,7 @@ impl Component for Chat {
 	fn change(&mut self, props: Self::Properties) -> ShouldRender {
 		if self.con != props.connection {
 			// Remove and add listener
-			ConnectionService::with_mut(props.connection, |con| {
+			ConnectionService::with_mut(&props.connection, |con| {
 				con.packet_listeners.remove("chat");
 			}, || {});
 
@@ -87,7 +87,7 @@ impl Component for Chat {
 	}
 
 	fn view(&self) -> Html<Self> {
-		ConnectionService::with_ready_unwrap(self.con, |c| {
+		ConnectionService::with_ready_unwrap(&self.con, |c| {
 			html! {
 				<div class="chat">
 					{ self.view_messages(c) }
@@ -120,7 +120,7 @@ impl Component for Chat {
 impl Chat {
 	fn add_listener(&self) {
 		// Listen for new messages
-		ConnectionService::with_mut(self.con, |con| {
+		ConnectionService::with_mut(&self.con, |con| {
 			let callback = self.callback.clone();
 			con.packet_listeners.insert("chat".into(), Box::new(move |_, msg| {
 				if msg.name() == "notifytextmessage" {

@@ -1,11 +1,12 @@
 #![recursion_limit="512"]
 
+use failure::Error;
 use qint_shared::*;
 use slog::{error, o, warn, Drain, Logger};
 use yew::{html, Component, ComponentLink, Html, ShouldRender};
-use yew::format::{Binary, MsgPack, Text};
-use yew::services::websocket::{WebSocketService, WebSocketStatus};
-use failure::{Error,format_err};
+use yew::format::{Binary, MsgPack, Nothing, Text};
+use yew::services::fetch::{FetchService, FetchTask, Request, Response};
+use yew::services::websocket::WebSocketStatus;
 
 use crate::connect::Connect;
 use crate::connected::Connected;
@@ -17,19 +18,19 @@ mod connection_service;
 mod webrtc;
 
 pub struct Model {
-	ws_service: WebSocketService,
 	link: ComponentLink<Model>,
 	logger: Logger,
 	rtc: Option<webrtc::Webrtc>,
 	rtc_queue: Vec<WebrtcMsg>,
-	/// The currently selected connection.
-	con: ConnectionId,
+	/// The currently selected connection if there is one.
+	con: Option<ConnectionId>,
 	is_talking: bool,
+	_set_talking_fetch_task: Option<FetchTask>,
 }
 
 pub enum Msg {
 	Ignore,
-	Connect,
+	Connect(ConnectOptions),
 	Connected,
 	Disconnected,
 	Message(MessageP2F),
@@ -61,7 +62,7 @@ impl Model {
 			}).unwrap_or_else(|| "ws://localhost".into())
 	}
 
-	fn connect(&mut self) -> Result<(),Error> {
+	fn connect(&mut self, options: ConnectOptions) -> Result<(),Error> {
 		let logger = self.logger.clone();
 		let callback = self.link.send_back(move |data: WsMsg| {
 			match data {
@@ -91,12 +92,7 @@ impl Model {
 		});
 
 		// Create id
-		let url = format!("{}/ws/{}", Self::get_ws_domain(), self.con.0);
-
-		let task = self.ws_service.connect(&url, callback, notification).map_err(|e| format_err!("{}", e))?;
-		ConnectionService::with_mut_disconnected_unwrap(self.con, move |_, ws|
-			*ws = Some(task)
-		);
+		self.con = Some(ConnectionService::add(&self.logger, options, callback, notification)?);
 		Ok(())
 	}
 }
@@ -107,7 +103,6 @@ impl Component for Model {
 
 	fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
 		let logger = slog::Logger::root(slog_stdlog::StdLog.fuse(), o!());
-		let con = ConnectionService::add_connection(&logger);
 
 		// TODO Create webrtc connection
 		// For some reason it does not work if we do it afterwards
@@ -121,42 +116,46 @@ impl Component for Model {
 		let rtc = Some(webrtc::Webrtc::new(callback));*/
 
 		Self {
-			ws_service: WebSocketService::new(),
 			link,
 			rtc: None,
 			rtc_queue: Default::default(),
 			logger,
-			con,
+			con: None,
 			is_talking: false,
+			_set_talking_fetch_task: None,
 		}
 	}
 
 	fn update(&mut self, msg: Self::Message) -> ShouldRender {
 		match msg {
 			Msg::Ignore => false,
-			Msg::Connect => {
-				if let Err(e) = self.connect() {
+			Msg::Connect(options) => {
+				if let Err(e) = self.connect(options) {
 					error!(self.logger, "Failed to connect to proxy"; "error" => ?e);
 				}
 				true
 			}
 			Msg::Connected => {
-				ConnectionService::with_mut(self.con, move |con| {
-					if let FrontendConnectionState::Disconnected(options, _) = &mut con.state {
+				let logger = &self.logger;
+				ConnectionService::with_mut(self.con.as_ref().unwrap(), move |con| {
+					if let FrontendConnectionState::Connecting(options, _) = &mut con.state {
 						let options = options.clone();
 						if let Err(e) = con.send_ws_message(&MessageF2P::Connect(options)) {
-							error!(self.logger, "Failed to send message"; "error" => ?e);
+							error!(logger, "Failed to send message"; "error" => ?e);
 						}
 					} else {
-						error!(self.logger, "Wrong state"; "expected" => "Disconnected");
+						error!(logger, "Wrong state"; "expected" => "connecting");
 					}
-				}, || panic!("Should be in disconnected state"));
+				}, || panic!("Should be in connecting state"));
 				false
 			}
 			Msg::Disconnected => {
-				ConnectionService::with_mut(self.con, move |con| {
-					con.state = FrontendConnectionState::default();
-				}, || panic!("Connection not found"));
+				let state = ConnectionService::remove(&self.con.take().unwrap());
+				if let Some(connection_service::FrontendConnection {
+					state: FrontendConnectionState::Connecting(_options, _), ..
+				}) = state {
+					// TODO Show options
+				}
 				true
 			}
 			Msg::Message(msg) => {
@@ -166,7 +165,7 @@ impl Component for Model {
 						false
 					}
 					MessageP2F::Packet(packet) => {
-						match ConnectionService::with_mut(self.con, move |con|
+						match ConnectionService::with_mut(self.con.as_ref().unwrap(), move |con|
 							con.handle_packet(packet),
 							|| panic!("Connection not found")) {
 							Ok(r) => r,
@@ -200,11 +199,23 @@ impl Component for Model {
 				}
 			}
 			Msg::SetTalking(talk) => {
-				ConnectionService::with_mut(self.con, |con| {
-					if let Err(e) = con.send_ws_message(&MessageF2P::SetTalking(talk)) {
-						error!(con.logger, "Failed to send websocket message"; "error" => ?e);
-					}
-				}, || panic!("Connection not found"));
+				let mut fetch = FetchService::new();
+				let request = Request::post(&format!("{}/audiosend/{}", Self::get_http_domain(), talk))
+					.body(Nothing)
+					.unwrap();
+				let fetch_task = fetch.fetch(request, self.link
+					.send_back(|resp: Response<Result<String, Error>>| {
+						match resp.into_body() {
+							Ok(_) => Msg::Ignore,
+							Err(e) => {
+								// TODO Display error message
+								log::error!("Failed to set talking state: {:?}", e);
+								Msg::Ignore
+							}
+						}
+					}));
+				self._set_talking_fetch_task = Some(fetch_task);
+
 				self.is_talking = talk;
 				if let Some(rtc) = &mut self.rtc {
 					rtc.set_talking(talk);
@@ -218,9 +229,10 @@ impl Component for Model {
 				false
 			}
 			Msg::Send(msg) => {
-				ConnectionService::with_mut(self.con, move |con| {
+				let logger = &self.logger;
+				ConnectionService::with_mut(self.con.as_ref().expect("Connection not found"), move |con| {
 					if let Err(e) = con.send_ws_message(&msg) {
-						error!(self.logger, "Failed to send message"; "error" => ?e);
+						error!(logger, "Failed to send message"; "error" => ?e);
 					}
 				}, || panic!("Connection not found"));
 				false
@@ -229,11 +241,11 @@ impl Component for Model {
 	}
 
 	fn view(&self) -> Html<Self> {
-		let is_connected = ConnectionService::with(
-			self.con,
+		let is_connected = self.con.as_ref().map(|con| ConnectionService::with(
+			con,
 			|c| c.is_connected(),
 			|| false,
-		);
+		)).unwrap_or_default();
 		let is_talking = self.is_talking;
 		let talking = if self.is_talking {
 			"Stop talking"
@@ -245,14 +257,14 @@ impl Component for Model {
 			html! {
 				<>
 				<audio id="audio-playback", autoplay="autoplay", />
-				<Connect: connection=self.con, onconnect=|_| Msg::Connect, />
+				<Connect: onconnect=|o| Msg::Connect(o), />
 				</>
 			}
 		} else {
 			html! {
 				<>
 				<audio id="audio-playback", autoplay="autoplay", />
-				<Connected: connection=self.con, />
+				<Connected: connection=self.con.clone().unwrap(), />
 				<button style="position:absolute; right: 0", onclick=|_| Msg::SetTalking(!is_talking).into(),>{ talking }</button>
 				</>
 			}
