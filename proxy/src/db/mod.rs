@@ -2,7 +2,7 @@ use std::fs;
 
 use actix::*;
 use actix_web::*;
-use chrono::{DateTime, Local, Utc};
+use chrono::{DateTime, Duration, Local, Utc};
 use chrono::offset::{FixedOffset, TimeZone};
 use diesel::prelude::*;
 use diesel::connection::SimpleConnection;
@@ -29,6 +29,7 @@ pub struct DbHandler {
 	logger: Logger,
 	secret: Secret,
 	con: SqliteConnection,
+	last_message_id: i64,
 }
 
 /// Identity id, `true` will create a new identity if this id does not exist.
@@ -103,7 +104,28 @@ impl DbHandler {
 			logger,
 			secret,
 			con,
+			last_message_id: 0,
 		})
+	}
+
+	/// Create a new chat entry in the database and returns the id.
+	/// This has to be executed inside a transaction.
+	fn create_chat(&self) -> Result<i64, diesel::result::Error> {
+		use schema::chats;
+
+		// Make sure it does not count as read
+		let utc_time = Utc::now().naive_utc() - Duration::days(1);
+		let dummy_offset = FixedOffset::east(0);
+		let local_zone = Local::from_offset(&dummy_offset);
+		let utc_to_local_offset = local_zone.offset_from_utc_datetime(&utc_time).local_minus_utc();
+
+		diesel::insert_into(chats::table)
+			.values(&(chats::last_read.eq(&utc_time),
+				chats::timezone.eq(utc_to_local_offset)))
+			.execute(&self.con)?;
+		chats::table.order(chats::id.desc())
+			.select(chats::id)
+			.first::<i64>(&self.con)
 	}
 }
 
@@ -251,6 +273,7 @@ impl Handler<ConnectedMsg> for DbHandler {
 		let server = msg.server_key.to_short();
 
 		// Find identity
+		// TODO Put into own function
 		let identity = match identities::table.find(msg.identity as i64)
 			.select(identities::id).first::<i64>(&self.con) {
 			Ok(r) => r,
@@ -266,7 +289,9 @@ impl Handler<ConnectedMsg> for DbHandler {
 		let local_zone = Local::from_offset(&dummy_offset);
 		let utc_to_local_offset = local_zone.offset_from_utc_datetime(&utc_time).local_minus_utc();
 
-		// Compare channel
+		// Compare channel: bookmarks::channel == msg.channel
+		// But with null == null
+		//
 		// https://stackoverflow.com/questions/10416789/how-to-rewrite-is-distinct-from-and-is-not-distinct-from
 		// a IS NOT DISTINCT FROM b can be rewritten as:
 		// (NOT (a <> b OR a IS NULL OR b IS NULL) OR (a IS NULL AND b IS NULL))

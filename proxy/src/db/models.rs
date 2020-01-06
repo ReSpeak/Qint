@@ -98,12 +98,30 @@ pub struct BookmarkInsert<'a> {
 }
 
 #[derive(Queryable)]
+pub struct Chat {
+	pub id: i64,
+	pub last_read: NaiveDateTime,
+	pub timezone: i32,
+}
+
+#[derive(Queryable)]
 pub struct Message {
 	pub id: i64,
 	/// Client uid of sender, `None` if we got the message from the server.
 	pub invoker: Option<Vec<u8>>,
 	pub content: String,
 	pub time: DateTime<Utc>,
+}
+
+#[derive(Debug, Insertable)]
+#[table_name = "messages"]
+pub struct MessageInsert<'a> {
+	pub chat: i64,
+	pub invoker: Option<&'a [u8]>,
+	pub invoker_name: Option<&'a str>,
+	pub content: &'a str,
+	pub time: &'a NaiveDateTime,
+	pub timezone: i32,
 }
 
 #[derive(Queryable)]
