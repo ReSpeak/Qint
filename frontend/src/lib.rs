@@ -64,7 +64,7 @@ impl Model {
 
 	fn connect(&mut self, options: ConnectOptions) -> Result<(),Error> {
 		let logger = self.logger.clone();
-		let callback = self.link.send_back(move |data: WsMsg| {
+		let callback = self.link.callback(move |data: WsMsg| {
 			match data {
 				WsMsg::Binary(data) => {
 					let MsgPack(data) = data.into();
@@ -84,7 +84,7 @@ impl Model {
 				}
 			}
 		});
-		let notification = self.link.send_back(|status| {
+		let notification = self.link.callback(|status| {
 			match status {
 				WebSocketStatus::Opened => Msg::Connected,
 				WebSocketStatus::Closed | WebSocketStatus::Error => Msg::Disconnected,
@@ -106,7 +106,7 @@ impl Component for Model {
 
 		// TODO Create webrtc connection
 		// For some reason it does not work if we do it afterwards
-		/*let callback = link.send_back(|data: Option<WebrtcMsg>| {
+		/*let callback = link.callback(|data: Option<WebrtcMsg>| {
 			if let Some(data) = data {
 				Msg::Send(MessageF2P::Webrtc(data))
 			} else {
@@ -179,7 +179,7 @@ impl Component for Model {
 					MessageP2F::Webrtc(msg) => {
 						if self.rtc.is_none() {
 							// Create webrtc connection
-							let callback = self.link.send_back(|data: Option<WebrtcMsg>| {
+							let callback = self.link.callback(|data: Option<WebrtcMsg>| {
 								if let Some(data) = data {
 									Msg::Send(MessageF2P::Webrtc(data))
 								} else {
@@ -204,7 +204,7 @@ impl Component for Model {
 					.body(Nothing)
 					.unwrap();
 				let fetch_task = fetch.fetch(request, self.link
-					.send_back(|resp: Response<Result<String, Error>>| {
+					.callback(|resp: Response<Result<String, Error>>| {
 						match resp.into_body() {
 							Ok(_) => Msg::Ignore,
 							Err(e) => {
@@ -240,7 +240,7 @@ impl Component for Model {
 		}
 	}
 
-	fn view(&self) -> Html<Self> {
+	fn view(&self) -> Html {
 		let is_connected = self.con.as_ref().map(|con| ConnectionService::with(
 			con,
 			|c| c.is_connected(),
@@ -254,18 +254,20 @@ impl Component for Model {
 		};
 
 		if !is_connected {
+			let onconnect = self.link.callback(|o| Msg::Connect(o));
 			html! {
 				<>
-				<audio id="audio-playback", autoplay="autoplay", />
-				<Connect: onconnect=|o| Msg::Connect(o), />
+				<audio id="audio-playback" autoplay="autoplay" />
+				<Connect: onconnect=onconnect />
 				</>
 			}
 		} else {
+			let switchtalking = self.link.callback(move |_| Msg::SetTalking(!is_talking).into());
 			html! {
 				<>
-				<audio id="audio-playback", autoplay="autoplay", />
-				<Connected: connection=self.con.clone().unwrap(), />
-				<button style="position:absolute; right: 0", onclick=|_| Msg::SetTalking(!is_talking).into(),>{ talking }</button>
+				<audio id="audio-playback" autoplay="autoplay" />
+				<Connected: connection=self.con.clone().unwrap() />
+				<button style="position:absolute; right: 0" onclick=switchtalking>{ talking }</button>
 				</>
 			}
 		}

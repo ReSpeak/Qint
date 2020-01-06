@@ -10,7 +10,7 @@ use ts_bookkeeping::data::Connection;
 use ts_bookkeeping::events::Event;
 use ts_bookkeeping::messages::s2c::{InCommandError, InMessage, InMessages, InMessageTrait, InTextMessage};
 use tsproto_packets::packets::{InCommand, OutPacket};
-use slog::{error, o, Logger};
+use slog::{debug, error, o, Logger};
 use uuid::Uuid;
 use yew::ShouldRender;
 use yew::prelude::Callback;
@@ -82,6 +82,7 @@ impl ConnectionService {
 						packet_listeners: Default::default(),
 						event_listeners: Default::default(),
 					};
+					debug!(con.logger, "Creating connection");
 					cons.insert(id.clone(), con);
 					return Ok(id);
 				}
@@ -93,7 +94,11 @@ impl ConnectionService {
 	pub fn remove(id: &ConnectionId) -> Option<FrontendConnection> {
 		CONNECTIONS.with(|cons| {
 			let mut cons = cons.borrow_mut();
-			cons.remove(id)
+			let res = cons.remove(id);
+			if let Some(con) = &res {
+				debug!(con.logger, "Removing connection");
+			}
+			res
 		})
 	}
 
@@ -238,8 +243,8 @@ impl FrontendConnection {
 			l(self, &packet);
 		}
 
-		let res = match std::mem::replace(&mut self.state, FrontendConnectionState::Uninitialized) {
-			FrontendConnectionState::Connecting(_, ws) => {
+		let res = match &mut self.state {
+			FrontendConnectionState::Connecting(_, _) => {
 				let msg = match InMessage::new(packet) {
 					Ok(r) => r,
 					Err(e) => {
@@ -257,14 +262,19 @@ impl FrontendConnection {
 				}
 
 				// TODO Uid
-				self.state = FrontendConnectionState::Connected(
-					Connected::new(ws, Connection::new(
-						Uid("".into()),
-						&msg,
-					)));
+				if let FrontendConnectionState::Connecting(_, ws) =
+					std::mem::replace(&mut self.state, FrontendConnectionState::Uninitialized) {
+					self.state = FrontendConnectionState::Connected(
+						Connected::new(ws, Connection::new(
+							Uid("".into()),
+							&msg,
+						)));
+				} else {
+					unreachable!()
+				}
 				true
 			}
-			FrontendConnectionState::Connected(mut c) => {
+			FrontendConnectionState::Connected(c) => {
 				// Handle return codes
 				if packet.name() == "error" {
 					let error = match InCommandError::new(&packet) {

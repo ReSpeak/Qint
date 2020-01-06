@@ -60,7 +60,7 @@ impl Component for Connected {
 		}
 	}
 
-	fn view(&self) -> Html<Self> {
+	fn view(&self) -> Html {
 		html! {
 			<div class="connected-container">
 				<SideBar: connection=self.con.clone() />

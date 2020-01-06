@@ -9,6 +9,7 @@ use yew::services::fetch::{FetchService, FetchTask, Request, Response};
 
 /// Shows the login form
 pub struct Connect {
+	link: ComponentLink<Self>,
 	options: ConnectOptions,
 	/// If the options were changed since the start
 	changed: bool,
@@ -33,13 +34,13 @@ impl Component for Connect {
 	type Message = Msg;
 	type Properties = Props;
 
-	fn create(props: Self::Properties, mut link: ComponentLink<Self>) -> Self {
+	fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
 		let mut fetch = FetchService::new();
 		let request = Request::get(&format!("{}/bookmarks", crate::Model::get_http_domain()))
 			.body(Nothing)
 			.unwrap();
 		let fetch_task = fetch.fetch_binary(request, link
-			.send_back(|resp: Response<MsgPack<Result<Vec<Bookmark>, Error>>>| {
+			.callback(|resp: Response<MsgPack<Result<Vec<Bookmark>, Error>>>| {
 				match resp.into_body().0 {
 					Ok(r) => Msg::GotBookmarks(r),
 					Err(e) => {
@@ -51,6 +52,7 @@ impl Component for Connect {
 			}));
 
 		Self {
+			link,
 			options: ConnectOptions::new("localhost".into()),
 			changed: false,
 			onconnect: Some(props.onconnect),
@@ -92,25 +94,32 @@ impl Component for Connect {
 		false
 	}
 
-	fn view(&self) -> Html<Self> {
+	fn view(&self) -> Html {
+		let connect_submit = self.link.callback(|e: SubmitEvent| {
+			e.prevent_default();
+			Msg::Connect
+		});
+		let username_change = self.link.callback(|e: InputData| {
+			Msg::Change(Box::new(move |o| { o.name(e.value); }))
+		});
+		let address_change = self.link.callback(|e: InputData| {
+			Msg::Change(Box::new(move |o| { o.address(e.value); }))
+		});
+
 		html! {
 			<div class="connect-container">
 			<div class="inner-connect-container">
 			<div class="connect-blur"></div>
-			<form class="connect-form" onsubmit=|e| { e.prevent_default(); Msg::Connect }>
+			<form class="connect-form" onsubmit=connect_submit>
 				<div>
 					<input name="username" class="input" type="text" placeholder="Username"
 						value=&self.options.name
-						oninput=|e| Msg::Change({
-							Box::new(move |o| { o.name(e.value); })
-						}), />
+						oninput=username_change />
 				</div>
 				<div>
 					<input name="server" class="input" type="text" placeholder="Server"
 						value=&self.options.address
-						oninput=|e| Msg::Change({
-							Box::new(move |o| { o.address(e.value); })
-						}), />
+						oninput=address_change />
 				</div>
 				<div>
 					<button class="button is-primary" name="connect" type="submit">

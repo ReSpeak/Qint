@@ -12,7 +12,7 @@ use futures::prelude::*;
 use futures::channel::oneshot;
 use qint_shared::{InCommandMsg, MessageF2P, MessageP2F};
 use qint_shared::ConnectOptions;
-use slog::{error, warn, Logger};
+use slog::{debug, error, o, warn, Logger};
 use tokio::net::TcpStream;
 use tokio::prelude::*;
 use tsproto::handler_data::InCommandObserver;
@@ -23,6 +23,7 @@ use crate::{audio, db, ConnectionId, State};
 
 /// Define http actor
 pub(crate) struct Ws {
+	logger: Logger,
 	state: Arc<State>,
 	id: ConnectionId,
 	connection: Option<Connection>,
@@ -37,6 +38,7 @@ struct ProxyPacketHandler {
 
 #[derive(Clone)]
 struct ProxyCommandObserver {
+	logger: Logger,
 	addr: Addr<Ws>,
 }
 
@@ -51,24 +53,23 @@ pub(crate) struct DownloadFile {
 	pub path: String,
 }
 
+struct DisconnectMsg;
+
 impl Actor for Ws {
 	type Context = ws::WebsocketContext<Self>;
 }
 
 impl Drop for Ws {
 	fn drop(&mut self) {
-		self.state.connections.lock().unwrap().remove(&self.id);
-
-		// Spawn disconnect here in a tokio compat environment
-		if let Some(con) = self.connection.as_ref().map(|c| c.clone()) {
-			thread::spawn(|| tokio_compat::runtime::run(futures01::future::lazy(move || {
-				con.disconnect(None).map_err(|_| ())
-			})));
-		}
+		debug!(self.logger, "Removing connection");
 	}
 }
 
 impl Message for WsMessage {
+	type Result = ();
+}
+
+impl Message for DisconnectMsg {
 	type Result = ();
 }
 
@@ -78,12 +79,23 @@ impl Message for DownloadFile {
 }
 
 impl Ws {
-	pub(crate) fn new(
-		state: Arc<State>,
-		id: ConnectionId,
-	) -> Self
-	{
+	fn close(&mut self, ctx: &mut <Self as Actor>::Context) {
+		self.state.connections.lock().unwrap().remove(&self.id);
+		ctx.stop();
+
+		// Spawn disconnect here in a tokio compat environment
+		if let Some(con) = self.connection.as_ref().map(|c| c.clone()) {
+			thread::spawn(|| tokio_compat::runtime::run(futures01::future::lazy(move || {
+				con.disconnect(None).map_err(|_| ())
+			})));
+		}
+	}
+
+	pub(crate) fn new(state: Arc<State>, id: ConnectionId) -> Self {
+		let logger = state.logger.new(o!("id" => id.0.to_string()));
+		debug!(logger, "Creating connection");
 		Self {
+			logger,
 			state,
 			id,
 			connection: None,
@@ -91,28 +103,30 @@ impl Ws {
 	}
 
 	fn send_message(msg: &MessageP2F, ctx: &mut ws::WebsocketContext<Self>) {
-		ctx.binary(rmp_serde::to_vec(&msg));
+		ctx.binary(rmp_serde::to_vec(&msg).unwrap());
 	}
 
 	fn connect_intern(o: ConnectOptions, identity: Identity, actor: &mut Self, ctx: &mut ws::WebsocketContext<Self>)
 		-> Box<dyn Future<Output=Result<tsclientlib::Connection, Error>> + Unpin> {
 		let addr = ctx.address();
+		let addr2 = ctx.address();
 		let db_addr = actor.state.database.clone();
 		let db_addr2 = db_addr.clone();
-		let logger = actor.state.logger.clone();
+		let logger = actor.logger.clone();
 		let server_addr = o.address.clone();
-		let logger2 = actor.state.logger.clone();
+		let logger2 = actor.logger.clone();
+		let logger3 = actor.logger.clone();
 		let options = tsclientlib::ConnectOptions::new(o.address)
 			.name(o.name)
 			.identity(identity)
-			.logger(actor.state.logger.clone())
+			.logger(actor.logger.clone())
 			.log_commands(o.log_commands || actor.state.settings.verbosity > 0)
 			.log_packets(o.log_packets || actor.state.settings.verbosity > 1)
 			.log_udp_packets(o.log_udp_packets || actor.state.settings.verbosity > 2)
 			.add_event_listener("Qint".into(), Box::new(move |e| {
 				let event = match e {
 					tsclientlib::Event::ConEvents(con, events) => {
-						db::EventMsg::Events(con.get_locked(), events.iter().map(|e| e.clone()).collect())
+						db::EventMsg::Events(con.get_locked(), events.iter().cloned().collect())
 					}
 					tsclientlib::Event::IdentityLevelIncreased(id) => {
 						db::EventMsg::UpdateIdentity((*id).clone())
@@ -137,12 +151,13 @@ impl Ws {
 				client.lock().add_in_command_observer(
 					"Qint".into(),
 					Box::new(ProxyCommandObserver {
+						logger: logger3.clone(),
 						addr: addr.clone(),
 					}),
 				);
 			}))
 			.handle_packets(Box::new(ProxyPacketHandler {
-				logger: actor.state.logger.clone(),
+				logger: actor.logger.clone(),
 				con: actor.id,
 				addr: actor.state.audio_data.ts2a.clone(),
 			}));
@@ -151,6 +166,8 @@ impl Ws {
 
 		thread::spawn(|| tokio_compat::runtime::run(futures01::future::lazy(move || {
 				Connection::new(options).map(move |r| {
+				r.add_on_disconnect(Box::new(move || { tokio::spawn(addr2.send(DisconnectMsg)); }));
+
 				let event = db::EventMsg::Connected(server_addr, r.clone());
 				tokio::spawn(db_addr2.send(event)
 					.map(move |r| {
@@ -183,6 +200,13 @@ impl Handler<WsMessage> for Ws {
 				Self::send_message(&MessageP2F::Packet(packet), ctx),
 			WsMessage::Message(msg) => Self::send_message(&msg, ctx),
 		}
+	}
+}
+
+impl Handler<DisconnectMsg> for Ws {
+	type Result = ();
+	fn handle(&mut self, _: DisconnectMsg, ctx: &mut Self::Context) -> Self::Result {
+		self.close(ctx);
 	}
 }
 
@@ -229,7 +253,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 				let msg: MessageF2P = match rmp_serde::from_read_ref(bin.as_ref()) {
 					Ok(r) => r,
 					Err(e) => {
-						error!(self.state.logger, "Error deserializing message"; "error" => ?e);
+						error!(self.logger, "Error deserializing message"; "error" => ?e);
 						return;
 					}
 				};
@@ -263,7 +287,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 
 										// Activate audio
 										// TODO Handle disconnect
-										let logger = actor.state.logger.clone();
+										let logger = actor.logger.clone();
 										let a2ts = actor.state.audio_data.a2ts.clone();
 										actix::spawn(a2ts.send(audio::audio_to_ts::SetListenerMsg {
 											connection: c,
@@ -274,7 +298,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 										match c2.get_server_key() {
 											Ok(server_key) => {
 												// Save in database
-												let logger = actor.state.logger.clone();
+												let logger = actor.logger.clone();
 												actix::spawn(actor.state.database.send(db::ConnectedMsg {
 													bookmark: None,
 													username,
@@ -288,10 +312,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 													_ => {}
 												}));
 											}
-											Err(e) => error!(actor.state.logger, "Failed to get server key"; "error" => ?e),
+											Err(e) => error!(actor.logger, "Failed to get server key"; "error" => ?e),
 										}
 									}
-									Err(e) => error!(actor.state.logger,
+									Err(e) => error!(actor.logger,
 										"Failed to get identity for conection";
 										"error" => ?e),
 								}
@@ -318,10 +342,11 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 					}
 					MessageF2P::Webrtc(_) => {
 						// No webrtc
-						error!(self.state.logger, "Got unsupported webrtc message, ignore it");
+						error!(self.logger, "Got unsupported webrtc message, ignore it");
 					}
 				}
 			}
+			Ok(ws::Message::Close(_)) => self.close(ctx),
 			_ => {}
 		}
 	}
@@ -379,9 +404,11 @@ impl PacketHandler for ProxyPacketHandler {
 
 impl<T> InCommandObserver<T> for ProxyCommandObserver {
 	fn observe(&self, _: &mut (T, tsproto::connection::Connection), cmd: &InCommand) {
-		tokio::spawn(self.addr.send(WsMessage::Packet(cmd.into())).map(|r| {
-			if r.is_err() {
-				eprintln!("Failed to redirect packet to websocket connection");
+		let logger = self.logger.clone();
+		tokio::spawn(self.addr.send(WsMessage::Packet(cmd.into())).map(move |r| {
+			if let Err(e) = r {
+				error!(logger, "Failed to redirect packet to websocket connection";
+					"error" => ?e);
 			}
 		}));
 	}

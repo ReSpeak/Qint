@@ -8,6 +8,7 @@ use yew::prelude::*;
 use crate::connection_service::*;
 
 pub struct Chat {
+	link: ComponentLink<Self>,
 	con: ConnectionId,
 	callback: Callback<()>,
 }
@@ -29,10 +30,11 @@ impl Component for Chat {
 	type Message = Msg;
 	type Properties = Props;
 
-	fn create(props: Self::Properties, mut link: ComponentLink<Self>) -> Self {
-		let callback = link.send_back(|_| Msg::NewMessage);
+	fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
+		let callback = link.callback(|_| Msg::NewMessage);
 
 		let res = Self {
+			link,
 			con: props.connection,
 			callback,
 		};
@@ -86,27 +88,38 @@ impl Component for Chat {
 		}
 	}
 
-	fn view(&self) -> Html<Self> {
+	fn view(&self) -> Html {
+		let send_chat = self.link.callback(|e: SubmitEvent| {
+			e.prevent_default();
+			Msg::Send.into()
+		});
+		let chat_change = self.link.callback(|e: InputData|
+			Msg::Change(Box::new(move |c| c.composing = e.value)).into()
+		);
+		let send_command = self.link.callback(|e: SubmitEvent| {
+			e.prevent_default();
+			Msg::SendCommand.into()
+		});
+		let command_change = self.link.callback(|e: InputData|
+			Msg::Change(Box::new(move |c| c.composing_command = e.value)).into()
+		);
+
 		ConnectionService::with_ready_unwrap(&self.con, |c| {
 			html! {
 				<div class="chat">
 					{ self.view_messages(c) }
-					<form class="chat-form" onsubmit=|e| { e.prevent_default(); Msg::Send.into() }>
+					<form class="chat-form" onsubmit=send_chat>
 						<input class="input" name="message" type="text"
 							value=&c.composing
-							oninput=|e| Msg::Change({
-								Box::new(move |c| { c.composing = e.value; })
-							}).into() />
+							oninput=chat_change />
 						<button class="button" name="send" type="submit">
 							{ "Send" }
 						</button>
 					</form>
-					<form class="chat-form" onsubmit=|e| { e.prevent_default(); Msg::SendCommand.into() }>
+					<form class="chat-form" onsubmit=send_command>
 						<input class="input" name="message" type="text"
 							value=&c.composing_command
-							oninput=|e| Msg::Change({
-								Box::new(move |c| { c.composing_command = e.value; })
-							}).into() />
+							oninput=command_change />
 						<button class="button" name="send" type="submit">
 							{ "Send Command" }
 						</button>
@@ -131,7 +144,7 @@ impl Chat {
 
 	}
 
-	fn view_message(&self, msg: &Message) -> Html<Self> {
+	fn view_message(&self, msg: &Message) -> Html {
 		html! {
 			<li>
 				<article class="media">
@@ -160,7 +173,7 @@ impl Chat {
 		}
 	}
 
-	fn view_messages(&self, con: &Connected) -> Html<Self> {
+	fn view_messages(&self, con: &Connected) -> Html {
 		html! {
 			<ul class="chat-messages",>
 				{ for con.messages.iter()

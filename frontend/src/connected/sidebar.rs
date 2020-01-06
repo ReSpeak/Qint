@@ -8,6 +8,7 @@ use crate::connection_service::*;
 use super::channel_tree::ChannelTree;
 
 pub struct SideBar {
+	link: ComponentLink<Self>,
 	con: ConnectionId,
 }
 
@@ -26,8 +27,9 @@ impl Component for SideBar {
 	type Message = Msg;
 	type Properties = Props;
 
-	fn create(props: Self::Properties, _link: ComponentLink<Self>) -> Self {
+	fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
 		let res = Self {
+			link,
 			con: props.connection,
 		};
 		res
@@ -49,11 +51,17 @@ impl Component for SideBar {
 		false
 	}
 
-	fn view(&self) -> Html<Self> {
+	fn view(&self) -> Html {
+		let dropdown_click = self.link.callback(|e: ClickEvent| {
+			js!(dropdown_click(@{e}));
+			Msg::Ignore
+		});
+		let disconnect_click = self.link.callback(|_| Msg::Disconnect);
+
 		html! {
 			<aside class="sidebar">
 				<div class="level" style="padding: 0.5em;">
-					<div class="dropdown" onclick = |e| { js!(dropdown_click(@{e})); Msg::Ignore } >
+					<div class="dropdown" onclick=dropdown_click>
 						<div class="dropdown-trigger">
 							<figure class="media-left" style="cursor: pointer;">
 								<p class="image is-32x32">
@@ -65,9 +73,7 @@ impl Component for SideBar {
 							<div class="dropdown-content">
 								<a href="#" class="dropdown-item">{ "Options" }</a>
 								<hr class="dropdown-divider" />
-								<a href="#" class="dropdown-item" onclick=|_| {
-									Msg::Disconnect
-								}>{ "Disconnect" }</a>
+								<a href="#" class="dropdown-item" onclick=disconnect_click>{ "Disconnect" }</a>
 							</div>
 						</div>
 					</div>

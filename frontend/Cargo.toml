@@ -21,7 +21,7 @@ ts-bookkeeping = { path = "../../tsclientlib/utils/ts-bookkeeping" }
 uuid = { version = "0.8", features = ["stdweb", "v4"] }
 web_logger = "0.2"
 wee_alloc = "0.4"
-yew = { version = "0.10", features = ["msgpack", "toml"] }
+yew = { version = "0.11", features = ["msgpack"] }
 
 [dependencies.log]
 version = "0.4"

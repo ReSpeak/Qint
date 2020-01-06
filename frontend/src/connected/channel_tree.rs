@@ -30,6 +30,7 @@ macro_rules! cl_intern {
 }*/
 
 pub struct ChannelTree {
+	link: ComponentLink<Self>,
 	con: ConnectionId,
 	callback: Callback<()>,
 }
@@ -49,10 +50,11 @@ impl Component for ChannelTree {
 	type Message = Msg;
 	type Properties = Props;
 
-	fn create(props: Self::Properties, mut link: ComponentLink<Self>) -> Self {
-		let callback = link.send_back(|_| Msg::Redraw);
+	fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
+		let callback = link.callback(|_| Msg::Redraw);
 
 		let res = Self {
+			link,
 			con: props.connection,
 			callback,
 		};
@@ -89,7 +91,7 @@ impl Component for ChannelTree {
 		}
 	}
 
-	fn view(&self) -> Html<Self> {
+	fn view(&self) -> Html {
 		ConnectionService::with_ready_unwrap(&self.con, |c| {
 			self.view(&c.con)
 		})
@@ -112,7 +114,7 @@ impl ChannelTree {
 
 	}
 
-	fn icon(&self, icon: IconHash) -> Html<Self> {
+	fn icon(&self, icon: IconHash) -> Html {
 		if icon.0 != 0 {
 			html! {
 				<span class="icon">
@@ -124,7 +126,7 @@ impl ChannelTree {
 		}
 	}
 
-	fn view_client(&self, client: &Client, _own_client: ClientId) -> Html<Self> {
+	fn view_client(&self, client: &Client, _own_client: ClientId) -> Html {
 		let icon = self.icon(client.icon_id);
 		html! {
 		<li>
@@ -145,7 +147,7 @@ impl ChannelTree {
 		id: ChannelId,
 		own_client: ClientId,
 		own_channel: ChannelId,
-	) -> Html<Self>
+	) -> Html
 	{
 		let cbn = channels.get(&id);
 		if let None = cbn { return html!{} }
@@ -159,10 +161,11 @@ impl ChannelTree {
 			.then_with(|| a.name.cmp(&b.name)));
 
 		let icon = channel.icon_id.map(|i| self.icon(i)).unwrap_or_else(|| html! {});
+		let change_channel = self.link.callback(move |_| Msg::ChangeChannel(id).into());
 		html! {
 			<li>
 				<div class="channel-line">
-					<a class="entry-expand" style="display:flex;" onclick=|_| Msg::ChangeChannel(id).into() >
+					<a class="entry-expand" style="display:flex;" onclick=change_channel >
 						{ icon }
 						<span class="entry-expand">{ &channel.name }</span>
 					</a>
@@ -178,7 +181,7 @@ impl ChannelTree {
 		}
 	}
 
-	pub fn view(&self, con: &Connection) -> Html<Self> {
+	pub fn view(&self, con: &Connection) -> Html {
 		let mut channels: HashMap<_,_> = con.channels.values()
 			.map(|c| (c.id, ChannelBuildNode { own: Some(c), after: None, first_child: None, clients: vec![] })).collect();
 		channels.insert(ChannelId(0), ChannelBuildNode { own: None, after: None, first_child: None, clients: vec![] }); // Server root
