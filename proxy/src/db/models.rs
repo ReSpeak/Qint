@@ -2,8 +2,8 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use diesel_derive_enum::DbEnum;
 use failure::Error;
 
-use crate::secret::Secret;
 use super::schema::*;
+use crate::secret::Secret;
 
 #[derive(Clone, Copy, DbEnum, Debug, Eq, Hash, PartialEq)]
 pub enum EventType {
@@ -137,7 +137,6 @@ pub struct Event {
 	pub time: DateTime<Utc>,
 }
 
-
 #[derive(Insertable)]
 #[table_name = "identities"]
 pub struct NewIdentity<'a> {
@@ -163,9 +162,12 @@ pub struct ServersClientsInsert<'a> {
 	pub timezone: i32,
 }
 
-
 impl Identity {
-	pub fn into_identity(self, secret: &Secret) -> Result<tsclientlib::Identity, Error> {
+	pub fn into_identity(
+		self,
+		secret: &Secret,
+	) -> Result<tsclientlib::Identity, Error>
+	{
 		let key = secret.open(self.private_key)?;
 		Ok(tsclientlib::Identity::new_with_max_counter(
 			tsproto::crypto::EccKeyPrivP256::import(&key)?,
@@ -176,7 +178,12 @@ impl Identity {
 }
 
 impl<'a> NewIdentity<'a> {
-	pub fn new(id: &tsclientlib::Identity, client_uid: &'a [u8], secret: &Secret) -> Result<Self, Error> {
+	pub fn new(
+		id: &tsclientlib::Identity,
+		client_uid: &'a [u8],
+		secret: &Secret,
+	) -> Result<Self, Error>
+	{
 		let private_key = secret.seal(id.key().to_short().to_vec())?;
 		Ok(Self {
 			private_key,

@@ -1,7 +1,7 @@
 use failure::{format_err, Error};
-use ring::error::Unspecified;
-use ring::aead::*;
 use ring::aead::CHACHA20_POLY1305 as ALG;
+use ring::aead::*;
+use ring::error::Unspecified;
 use ring::rand::{SecureRandom, SystemRandom};
 
 pub struct Secret(pub Vec<u8>);
@@ -32,8 +32,11 @@ impl Secret {
 		let nonce = Nonce::assume_unique_for_key(nonce_data.clone());
 		let nonce = SingleNonce(Some(nonce));
 
-		let mut key = SealingKey::new(UnboundKey::new(&ALG, &self.0)
-			.map_err(|_| format_err!("Failed to create key"))?, nonce);
+		let mut key = SealingKey::new(
+			UnboundKey::new(&ALG, &self.0)
+				.map_err(|_| format_err!("Failed to create key"))?,
+			nonce,
+		);
 
 		key.seal_in_place_append_tag(Aad::empty(), &mut data)
 			.map_err(|_| format_err!("Failed to create key"))?;
@@ -54,10 +57,14 @@ impl Secret {
 		let nonce = SingleNonce(Some(nonce));
 		data.truncate(data.len() - nonce_len);
 
-		let mut key = OpeningKey::new(UnboundKey::new(&ALG, &self.0)
-			.map_err(|_| format_err!("Failed to create key"))?, nonce);
+		let mut key = OpeningKey::new(
+			UnboundKey::new(&ALG, &self.0)
+				.map_err(|_| format_err!("Failed to create key"))?,
+			nonce,
+		);
 
-		let len = key.open_in_place(Aad::empty(), &mut data)
+		let len = key
+			.open_in_place(Aad::empty(), &mut data)
 			.map_err(|_| format_err!("Failed to create key"))?
 			.len();
 		data.truncate(len);

@@ -1,7 +1,7 @@
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 
-#[cfg_attr(feature="db", derive(Queryable))]
+#[cfg_attr(feature = "db", derive(Queryable))]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Bookmark {
 	pub id: i64,
@@ -15,7 +15,7 @@ pub struct Bookmark {
 	pub server_icon: Option<i32>,
 }
 
-#[cfg_attr(feature="db", derive(Queryable))]
+#[cfg_attr(feature = "db", derive(Queryable))]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Message {
 	pub id: i64,
@@ -28,7 +28,7 @@ pub struct Message {
 	pub client_name: Option<String>,
 }
 
-#[cfg_attr(feature="db", derive(Queryable))]
+#[cfg_attr(feature = "db", derive(Queryable))]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Chat {
 	pub last_read: NaiveDateTime,

@@ -41,7 +41,7 @@ pub struct ConnectionId(pub Uuid);
 
 #[derive(StructOpt, Debug)]
 #[structopt(raw(global_settings = "&[AppSettings::ColoredHelp, \
-	AppSettings::VersionlessSubcommands]"))]
+                                   AppSettings::VersionlessSubcommands]"))]
 struct Args {
 	#[structopt(
 		short = "a",
@@ -124,13 +124,14 @@ struct State {
 fn default_listen_address() -> String { "127.0.0.1:4422".into() }
 
 fn default_cache_path() -> PathBuf {
-	let proj_dirs = match directories::ProjectDirs::from("", DIR_ORGANIZATION,
-		DIR_PROJECT) {
-		Some(r) => r,
-		None => {
-			return Default::default();
-		}
-	};
+	let proj_dirs =
+		match directories::ProjectDirs::from("", DIR_ORGANIZATION, DIR_PROJECT)
+		{
+			Some(r) => r,
+			None => {
+				return Default::default();
+			}
+		};
 	proj_dirs.cache_dir().into()
 }
 
@@ -147,8 +148,13 @@ impl Default for Settings {
 }
 
 #[get("/ws/{id}")]
-async fn create_ws(state: web::Data<State>, uuid: web::Path<Uuid>,
-	req: HttpRequest, stream: web::Payload) -> impl Responder {
+async fn create_ws(
+	state: web::Data<State>,
+	uuid: web::Path<Uuid>,
+	req: HttpRequest,
+	stream: web::Payload,
+) -> impl Responder
+{
 	let id = ConnectionId(*uuid);
 
 	// Check that the id does not exist
@@ -157,10 +163,7 @@ async fn create_ws(state: web::Data<State>, uuid: web::Path<Uuid>,
 		return Ok(HttpResponse::PreconditionFailed().finish());
 	}
 
-	let ws_con = Ws::new(
-		state.deref().clone(),
-		id,
-	);
+	let ws_con = Ws::new(state.deref().clone(), id);
 
 	ws::start_with_addr(ws_con, &req, stream).map(|(addr, resp)| {
 		cons.insert(id, addr);
@@ -170,7 +173,13 @@ async fn create_ws(state: web::Data<State>, uuid: web::Path<Uuid>,
 
 #[post("/audiosend/true")]
 async fn audiosend_true(state: web::Data<State>) -> impl Responder {
-	if state.audio_data.a2ts.send(audio::audio_to_ts::SetPlayingMsg(true)).await.is_err() {
+	if state
+		.audio_data
+		.a2ts
+		.send(audio::audio_to_ts::SetPlayingMsg(true))
+		.await
+		.is_err()
+	{
 		error!(state.logger, "Failed to set playing state");
 		HttpResponse::InternalServerError()
 	} else {
@@ -180,7 +189,13 @@ async fn audiosend_true(state: web::Data<State>) -> impl Responder {
 
 #[post("/audiosend/false")]
 async fn audiosend_false(state: web::Data<State>) -> impl Responder {
-	if state.audio_data.a2ts.send(audio::audio_to_ts::SetPlayingMsg(false)).await.is_err() {
+	if state
+		.audio_data
+		.a2ts
+		.send(audio::audio_to_ts::SetPlayingMsg(false))
+		.await
+		.is_err()
+	{
 		error!(state.logger, "Failed to set playing state");
 		HttpResponse::InternalServerError()
 	} else {
@@ -189,15 +204,17 @@ async fn audiosend_false(state: web::Data<State>) -> impl Responder {
 }
 
 #[get("/file/{id}/{channel}/{path:.*}")]
-async fn download_file(state: web::Data<State>, data: web::Path<(Uuid, u64, String)>)
-	-> Result<HttpResponse, Error> {
+async fn download_file(
+	state: web::Data<State>,
+	data: web::Path<(Uuid, u64, String)>,
+) -> Result<HttpResponse, Error>
+{
 	let channel = ChannelId(data.1);
 	let cons = state.connections.lock().unwrap();
 	if let Some(con) = cons.get(&ConnectionId(data.0)) {
-		let (len, file_stream): (u64, TcpStream) = con.send(websocket::DownloadFile {
-			channel,
-			path: data.2.clone(),
-		}).await??;
+		let (len, file_stream): (u64, TcpStream) = con
+			.send(websocket::DownloadFile { channel, path: data.2.clone() })
+			.await??;
 
 		// TODO Cache icons and avatars for offline usage
 		// Use a general file cache (e.g. also for sent images) by TS-Server
@@ -232,8 +249,11 @@ async fn main() -> Result<(), Error> {
 	let config_path: PathBuf = if let Some(p) = args.config_path {
 		p.into()
 	} else {
-		let proj_dirs = match directories::ProjectDirs::from("",
-			DIR_ORGANIZATION, DIR_PROJECT) {
+		let proj_dirs = match directories::ProjectDirs::from(
+			"",
+			DIR_ORGANIZATION,
+			DIR_PROJECT,
+		) {
 			Some(r) => r,
 			None => {
 				return Err(format_err!("Failed to get project directory"));
@@ -243,18 +263,19 @@ async fn main() -> Result<(), Error> {
 	};
 
 	// Load settings
-	let mut settings = match fs::read_to_string(&config_path.join("config.toml")) {
-		Ok(r) => toml::from_str(&r)?,
-		Err(e) => {
-			// Only a soft error
-			info!(logger, "Failed to read settings, using defaults";
+	let mut settings =
+		match fs::read_to_string(&config_path.join("config.toml")) {
+			Ok(r) => toml::from_str(&r)?,
+			Err(e) => {
+				// Only a soft error
+				info!(logger, "Failed to read settings, using defaults";
 				"error" => %e);
-			// Create settings directory
-			fs::create_dir_all(&config_path)?;
+				// Create settings directory
+				fs::create_dir_all(&config_path)?;
 
-			Settings::default()
-		}
-	};
+				Settings::default()
+			}
+		};
 
 	// Load secret key
 	let key_path = config_path.join("secret.key");
@@ -313,10 +334,14 @@ async fn main() -> Result<(), Error> {
 			.service(audiosend_false)
 			.service(download_file)
 			.service(db::bookmarks)
-			.service(Files::new("", "../frontend/static/")
-				.index_file("index.html")
-				.default_handler(Files::new("",
-						"../frontend/target/wasm32-unknown-unknown/debug/")))
+			.service(
+				Files::new("", "../frontend/static/")
+					.index_file("index.html")
+					.default_handler(Files::new(
+						"",
+						"../frontend/target/wasm32-unknown-unknown/debug/",
+					)),
+			)
 	})
 	.bind(addr)?
 	.run()

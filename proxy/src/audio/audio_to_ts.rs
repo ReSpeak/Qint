@@ -8,9 +8,11 @@ use futures01::{Future, Sink};
 use futures_spawn::SpawnHelper;
 use futures_threadpool::ThreadPool;
 use parking_lot::Mutex;
+use sdl2::audio::{
+	AudioCallback, AudioDevice, AudioSpec, AudioSpecDesired, AudioStatus,
+};
 use sdl2::AudioSubsystem;
-use sdl2::audio::{AudioCallback, AudioDevice, AudioSpec, AudioSpecDesired, AudioStatus};
-use slog::{error, debug, o, Logger};
+use slog::{debug, error, o, Logger};
 use tsproto::client::ClientConVal;
 use tsproto_packets::packets::{AudioData, CodecType, OutAudio};
 
@@ -53,9 +55,13 @@ impl Actor for AudioToTs {
 		ctx.run_interval(Duration::from_secs(1), |a2t, _| {
 			if a2t.device.status() == AudioStatus::Stopped {
 				// Try to reconnect to audio
-				match Self::open_capture(a2t.logger.clone(),
-					&a2t.audio_subsystem, a2t.executor.clone(),
-					a2t.listener.clone(), a2t.volume.clone()) {
+				match Self::open_capture(
+					a2t.logger.clone(),
+					&a2t.audio_subsystem,
+					a2t.executor.clone(),
+					a2t.listener.clone(),
+					a2t.volume.clone(),
+				) {
 					Ok(d) => {
 						a2t.device = d;
 						debug!(a2t.logger, "Reconnected to capture device");
@@ -72,18 +78,29 @@ impl Actor for AudioToTs {
 	}
 }
 
-impl Message for SetListenerMsg { type Result = (); }
+impl Message for SetListenerMsg {
+	type Result = ();
+}
 
 impl Message for RemoveListenerMsg {
 	/// `true` if there was a listener registered before, `false` if not.
 	type Result = bool;
 }
-impl Message for SetVolumeMsg { type Result = (); }
-impl Message for SetPlayingMsg { type Result = (); }
+impl Message for SetVolumeMsg {
+	type Result = ();
+}
+impl Message for SetPlayingMsg {
+	type Result = ();
+}
 
 impl Handler<SetListenerMsg> for AudioToTs {
 	type Result = ();
-	fn handle(&mut self, msg: SetListenerMsg, _: &mut Self::Context) -> Self::Result {
+	fn handle(
+		&mut self,
+		msg: SetListenerMsg,
+		_: &mut Self::Context,
+	) -> Self::Result
+	{
 		let mut listener = self.listener.lock();
 		*listener = Some(msg.connection.get_tsproto_connection());
 	}
@@ -91,7 +108,12 @@ impl Handler<SetListenerMsg> for AudioToTs {
 
 impl Handler<RemoveListenerMsg> for AudioToTs {
 	type Result = bool;
-	fn handle(&mut self, _: RemoveListenerMsg, _: &mut Self::Context) -> Self::Result {
+	fn handle(
+		&mut self,
+		_: RemoveListenerMsg,
+		_: &mut Self::Context,
+	) -> Self::Result
+	{
 		let mut ls = self.listener.lock();
 		let res = ls.is_some();
 		*ls = None;
@@ -104,7 +126,12 @@ impl Handler<RemoveListenerMsg> for AudioToTs {
 
 impl Handler<SetVolumeMsg> for AudioToTs {
 	type Result = ();
-	fn handle(&mut self, msg: SetVolumeMsg, _: &mut Self::Context) -> Self::Result {
+	fn handle(
+		&mut self,
+		msg: SetVolumeMsg,
+		_: &mut Self::Context,
+	) -> Self::Result
+	{
 		let mut vol = self.volume.lock();
 		*vol = msg.0;
 	}
@@ -112,7 +139,12 @@ impl Handler<SetVolumeMsg> for AudioToTs {
 
 impl Handler<SetPlayingMsg> for AudioToTs {
 	type Result = ();
-	fn handle(&mut self, msg: SetPlayingMsg, _: &mut Self::Context) -> Self::Result {
+	fn handle(
+		&mut self,
+		msg: SetPlayingMsg,
+		_: &mut Self::Context,
+	) -> Self::Result
+	{
 		if msg.0 {
 			self.device.resume();
 		} else {
@@ -127,13 +159,19 @@ impl AudioToTs {
 		logger: Logger,
 		audio_subsystem: AudioSubsystem,
 		executor: ThreadPool,
-	) -> Result<Self, Error> {
+	) -> Result<Self, Error>
+	{
 		let logger = logger.new(o!("pipeline" => "audio-to-ts"));
 		let listener = Arc::new(Mutex::new(Default::default()));
 		let volume = Arc::new(Mutex::new(1.0));
 
-		let device = Self::open_capture(logger.clone(), &audio_subsystem,
-			executor.clone(), listener.clone(), volume.clone())?;
+		let device = Self::open_capture(
+			logger.clone(),
+			&audio_subsystem,
+			executor.clone(),
+			listener.clone(),
+			volume.clone(),
+		)?;
 
 		Ok(Self {
 			logger,
@@ -147,9 +185,14 @@ impl AudioToTs {
 		})
 	}
 
-	fn open_capture(logger: Logger, audio_subsystem: &AudioSubsystem,
-		executor: ThreadPool, listener: Arc<Mutex<Option<ClientConVal>>>,
-		volume: Arc<Mutex<f32>>) -> Result<AudioDevice<SdlCallback>, Error> {
+	fn open_capture(
+		logger: Logger,
+		audio_subsystem: &AudioSubsystem,
+		executor: ThreadPool,
+		listener: Arc<Mutex<Option<ClientConVal>>>,
+		volume: Arc<Mutex<f32>>,
+	) -> Result<AudioDevice<SdlCallback>, Error>
+	{
 		let desired_spec = AudioSpecDesired {
 			freq: Some(48000),
 			channels: Some(1),
@@ -224,9 +267,13 @@ impl AudioCallback for SdlCallback {
 					let sink = con.as_packet_sink();
 					let logger = self.logger.clone();
 					let packet = packet.clone();
-					self.executor.spawn(sink.send(packet).map(|_| ()).map_err(move |e| {
-						error!(logger, "Failed to send packet"; "error" => ?e);
-					})).detach();
+					self.executor
+						.spawn(sink.send(packet).map(|_| ()).map_err(
+							move |e| {
+								error!(logger, "Failed to send packet"; "error" => ?e);
+							},
+						))
+						.detach();
 				}
 			}
 		}

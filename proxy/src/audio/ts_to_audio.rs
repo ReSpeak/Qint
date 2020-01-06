@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::fmt;
 use std::sync::Arc;
@@ -9,14 +9,14 @@ use actix::*;
 use audiopus::coder::{Decoder, GenericCtl};
 use failure::{format_err, Error};
 use parking_lot::Mutex;
-use sdl2::AudioSubsystem;
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired, AudioStatus};
-use slog::{error, debug, o, trace, Logger};
+use sdl2::AudioSubsystem;
+use slog::{debug, error, o, trace, Logger};
 use tsclientlib::ClientId;
 use tsproto_packets::packets::{AudioData, CodecType, InAudio};
 
-use crate::ConnectionId;
 use super::*;
+use crate::ConnectionId;
 
 /// After this amount of seconds, a decoder will be removed.
 const VOICE_TIMEOUT_SECS: u64 = 1;
@@ -50,7 +50,9 @@ struct SdlCallback {
 	data: Arc<Mutex<HashMap<Id, VecDeque<f32>>>>,
 }
 
-impl Message for PlayMsg { type Result = Result<(), Error>; }
+impl Message for PlayMsg {
+	type Result = Result<(), Error>;
+}
 
 impl fmt::Display for Id {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -85,8 +87,11 @@ impl Actor for TsToAudio {
 
 			if t2a.device.status() == AudioStatus::Stopped {
 				// Try to reconnect to audio
-				match Self::open_playback(t2a.logger.clone(),
-					&t2a.audio_subsystem, t2a.data.clone()) {
+				match Self::open_playback(
+					t2a.logger.clone(),
+					&t2a.audio_subsystem,
+					t2a.data.clone(),
+				) {
 					Ok(d) => {
 						t2a.device = d;
 						debug!(t2a.logger, "Reconnected to playback device");
@@ -104,12 +109,19 @@ impl Actor for TsToAudio {
 }
 
 impl TsToAudio {
-	pub fn new(logger: Logger, audio_subsystem: AudioSubsystem) -> Result<Self, Error> {
+	pub fn new(
+		logger: Logger,
+		audio_subsystem: AudioSubsystem,
+	) -> Result<Self, Error>
+	{
 		let logger = logger.new(o!("pipeline" => "ts-to-audio"));
 		let data = Arc::new(Mutex::new(Default::default()));
 
-		let device = Self::open_playback(logger.clone(), &audio_subsystem,
-			data.clone())?;
+		let device = Self::open_playback(
+			logger.clone(),
+			&audio_subsystem,
+			data.clone(),
+		)?;
 
 		Ok(Self {
 			logger,
@@ -122,8 +134,12 @@ impl TsToAudio {
 		})
 	}
 
-	fn open_playback(logger: Logger, audio_subsystem: &AudioSubsystem,
-		data: Arc<Mutex<HashMap<Id, VecDeque<f32>>>>) -> Result<AudioDevice<SdlCallback>, Error> {
+	fn open_playback(
+		logger: Logger,
+		audio_subsystem: &AudioSubsystem,
+		data: Arc<Mutex<HashMap<Id, VecDeque<f32>>>>,
+	) -> Result<AudioDevice<SdlCallback>, Error>
+	{
 		let desired_spec = AudioSpecDesired {
 			freq: Some(48000),
 			channels: Some(2),
@@ -139,17 +155,20 @@ impl TsToAudio {
 				data,
 			}
 		}).map_err(|e| format_err!("SDL error: {}", e).into())
-
 	}
 }
 
 impl Handler<PlayMsg> for TsToAudio {
 	type Result = Result<(), Error>;
 	fn handle(&mut self, msg: PlayMsg, _: &mut Self::Context) -> Self::Result {
-		if let AudioData::S2C { id: _, from, codec, data } |
-			AudioData::S2CWhisper { id: _, from, codec, data } = msg.1.data() {
-			if *codec != CodecType::OpusVoice && *codec != CodecType::OpusMusic {
-				return Err(format_err!("Got unsupported audio codec, only opus is supported"));
+		if let AudioData::S2C { id: _, from, codec, data }
+		| AudioData::S2CWhisper { id: _, from, codec, data } = msg.1.data()
+		{
+			if *codec != CodecType::OpusVoice && *codec != CodecType::OpusMusic
+			{
+				return Err(format_err!(
+					"Got unsupported audio codec, only opus is supported"
+				));
 			}
 
 			let id = Id { con: msg.0, client: ClientId(*from) };
@@ -174,7 +193,10 @@ impl Handler<PlayMsg> for TsToAudio {
 
 					// Always use the channel count of SDL, opus automatically
 					// averages or duplicates samples for each channel.
-					let decoder = Decoder::new(audiopus::SampleRate::Hz48000, opus_channels)?;
+					let decoder = Decoder::new(
+						audiopus::SampleRate::Hz48000,
+						opus_channels,
+					)?;
 					&mut v.insert((decoder, Instant::now())).0
 				}
 			};
@@ -186,16 +208,26 @@ impl Handler<PlayMsg> for TsToAudio {
 			}
 
 			let len = loop {
-				match decoder.decode_float(*data, &mut self.opus_output[..], false) {
+				match decoder.decode_float(
+					*data,
+					&mut self.opus_output[..],
+					false,
+				) {
 					Ok(len) => break len,
-					Err(audiopus::error::Error::Opus(audiopus::error::ErrorCode::BufferTooSmall)) => {
+					Err(audiopus::error::Error::Opus(
+						audiopus::error::ErrorCode::BufferTooSmall,
+					)) => {
 						// Enlarge the buffer
 						if self.opus_output.len() == MAX_FRAME_SIZE {
-							return Err(format_err!("Bad opus packet, maximum buffer size exceeded").into());
+							return Err(format_err!(
+								"Bad opus packet, maximum buffer size exceeded"
+							)
+							.into());
 						} else if self.opus_output.len() * 2 > MAX_FRAME_SIZE {
 							self.opus_output.resize(MAX_FRAME_SIZE, 0f32);
 						} else {
-							self.opus_output.resize(self.opus_output.len() * 2, 0f32);
+							self.opus_output
+								.resize(self.opus_output.len() * 2, 0f32);
 						}
 					}
 					Err(e) => return Err(e.into()),
@@ -212,7 +244,8 @@ impl Handler<PlayMsg> for TsToAudio {
 			// Put into queue
 			{
 				let mut data = self.data.lock();
-				let queue = data.entry(id).or_insert_with(|| Default::default());
+				let queue =
+					data.entry(id).or_insert_with(|| Default::default());
 				if queue.len() > size * 2 {
 					debug!(self.logger, "Removing samples from playback queue"; "id" => %id, "count" => queue.len() - size);
 					*queue = queue.split_off(queue.len() - size);

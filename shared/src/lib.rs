@@ -1,4 +1,4 @@
-#[cfg(feature="db")]
+#[cfg(feature = "db")]
 #[macro_use]
 extern crate diesel;
 
@@ -208,15 +208,9 @@ impl fmt::Debug for ConnectOptions {
 		} = self;
 		write!(
 			f,
-			"ConnectOptions {{ address: {:?}, \
-			 name: {}, version: {}, \
+			"ConnectOptions {{ address: {:?}, name: {}, version: {}, \
 			 log_commands: {}, log_packets: {}, log_udp_packets: {},",
-			address,
-			name,
-			version,
-			log_commands,
-			log_packets,
-			log_udp_packets,
+			address, name, version, log_commands, log_packets, log_udp_packets,
 		)?;
 		write!(f, " }}")?;
 		Ok(())

@@ -41,27 +41,29 @@ pub struct AudioData {
 }
 
 fn sdl_log(prio: Priority, cat: Category, msg: &str) {
-	slog_scope::with_logger(|l| {
-		match prio {
-			Priority::Verbose =>
-				slog::trace!(l, "SDL"; "message" => msg, "category" => ?cat),
-			Priority::Debug =>
-				slog::debug!(l, "SDL"; "message" => msg, "category" => ?cat),
-			Priority::Info =>
-				slog::info!(l, "SDL"; "message" => msg, "category" => ?cat),
-			Priority::Warn =>
-				slog::warn!(l, "SDL"; "message" => msg, "category" => ?cat),
-			Priority::Error =>
-				slog::error!(l, "SDL"; "message" => msg, "category" => ?cat),
-			Priority::Critical =>
-				slog::crit!(l, "SDL"; "message" => msg, "category" => ?cat),
+	slog_scope::with_logger(|l| match prio {
+		Priority::Verbose => {
+			slog::trace!(l, "SDL"; "message" => msg, "category" => ?cat)
+		}
+		Priority::Debug => {
+			slog::debug!(l, "SDL"; "message" => msg, "category" => ?cat)
+		}
+		Priority::Info => {
+			slog::info!(l, "SDL"; "message" => msg, "category" => ?cat)
+		}
+		Priority::Warn => {
+			slog::warn!(l, "SDL"; "message" => msg, "category" => ?cat)
+		}
+		Priority::Error => {
+			slog::error!(l, "SDL"; "message" => msg, "category" => ?cat)
+		}
+		Priority::Critical => {
+			slog::crit!(l, "SDL"; "message" => msg, "category" => ?cat)
 		}
 	})
 }
 
-pub(crate) fn start(logger: Logger)
-	-> Result<AudioData, Error> {
-
+pub(crate) fn start(logger: Logger) -> Result<AudioData, Error> {
 	let sdl_context = sdl2::init().unwrap();
 	sdl2::log::set_output_function(sdl_log);
 
@@ -79,9 +81,5 @@ pub(crate) fn start(logger: Logger)
 	let ts2a = TsToAudio::new(logger.clone(), audio_subsystem.clone())?;
 	let a2ts = AudioToTs::new(logger.clone(), audio_subsystem, pool.clone())?;
 
-	Ok(AudioData {
-		pool,
-		a2ts: a2ts.start(),
-		ts2a: ts2a.start(),
-	})
+	Ok(AudioData { pool, a2ts: a2ts.start(), ts2a: ts2a.start() })
 }
