@@ -154,7 +154,7 @@ impl TsToAudio {
 				logger,
 				data,
 			}
-		}).map_err(|e| format_err!("SDL error: {}", e).into())
+		}).map_err(|e| format_err!("SDL error: {}", e))
 	}
 }
 
@@ -201,7 +201,7 @@ impl Handler<PlayMsg> for TsToAudio {
 				}
 			};
 
-			if data.len() == 0 {
+			if data.is_empty() {
 				debug!(self.logger, "Resetting decoder"; "id" => %id);
 				decoder.reset_state()?;
 				return Ok(());
@@ -221,8 +221,7 @@ impl Handler<PlayMsg> for TsToAudio {
 						if self.opus_output.len() == MAX_FRAME_SIZE {
 							return Err(format_err!(
 								"Bad opus packet, maximum buffer size exceeded"
-							)
-							.into());
+							));
 						} else if self.opus_output.len() * 2 > MAX_FRAME_SIZE {
 							self.opus_output.resize(MAX_FRAME_SIZE, 0f32);
 						} else {
@@ -245,7 +244,7 @@ impl Handler<PlayMsg> for TsToAudio {
 			{
 				let mut data = self.data.lock();
 				let queue =
-					data.entry(id).or_insert_with(|| Default::default());
+					data.entry(id).or_insert_with(Default::default);
 				if queue.len() > size * 2 {
 					debug!(self.logger, "Removing samples from playback queue"; "id" => %id, "count" => queue.len() - size);
 					*queue = queue.split_off(queue.len() - size);

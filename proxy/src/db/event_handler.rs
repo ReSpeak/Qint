@@ -148,7 +148,7 @@ impl EventHandler for super::DbHandler {
 						_ => {}
 					}
 				}
-				Event::PropertyChanged { id: _, .. } => {}
+				Event::PropertyChanged { .. } => {}
 				Event::PropertyRemoved { id, old, .. } => {
 					match id {
 						PropertyId::Client(_) => {

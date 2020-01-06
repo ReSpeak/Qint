@@ -84,7 +84,7 @@ impl Ws {
 		ctx.stop();
 
 		// Spawn disconnect here in a tokio compat environment
-		if let Some(con) = self.connection.as_ref().map(|c| c.clone()) {
+		if let Some(con) = self.connection.as_ref().cloned() {
 			thread::spawn(|| {
 				tokio_compat::runtime::run(futures01::future::lazy(move || {
 					con.disconnect(None).map_err(|_| ())
@@ -134,7 +134,7 @@ impl Ws {
 						tsclientlib::Event::ConEvents(con, events) => {
 							db::EventMsg::Events(
 								con.get_locked(),
-								events.iter().cloned().collect(),
+								events.to_vec(),
 							)
 						}
 						tsclientlib::Event::IdentityLevelIncreased(id) => {

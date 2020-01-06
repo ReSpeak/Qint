@@ -254,7 +254,7 @@ impl Component for Model {
 		};
 
 		if !is_connected {
-			let onconnect = self.link.callback(|o| Msg::Connect(o));
+			let onconnect = self.link.callback(Msg::Connect);
 			html! {
 				<>
 				<audio id="audio-playback" autoplay="autoplay" />
@@ -262,7 +262,7 @@ impl Component for Model {
 				</>
 			}
 		} else {
-			let switchtalking = self.link.callback(move |_| Msg::SetTalking(!is_talking).into());
+			let switchtalking = self.link.callback(move |_| Msg::SetTalking(!is_talking));
 			html! {
 				<>
 				<audio id="audio-playback" autoplay="autoplay" />

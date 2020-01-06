@@ -22,11 +22,13 @@ thread_local! {
 	pub static CONNECTIONS: RefCell<HashMap<ConnectionId, FrontendConnection>> = RefCell::new(HashMap::new());
 }
 
+pub type Listener<T> = Box<dyn for<'a> Fn(&'a FrontendConnection, &'a T)>;
+
 pub struct FrontendConnection {
 	pub logger: Logger,
 	pub state: FrontendConnectionState,
-	pub packet_listeners: HashMap<String, Box<dyn for<'a> Fn(&'a FrontendConnection, &'a InCommand)>>,
-	pub event_listeners: HashMap<String, Box<dyn for<'a> Fn(&'a FrontendConnection, &'a [Event])>>,
+	pub packet_listeners: HashMap<String, Listener<InCommand>>,
+	pub event_listeners: HashMap<String, Listener<[Event]>>,
 }
 
 pub enum FrontendConnectionState {
@@ -380,13 +382,13 @@ impl FrontendConnection {
 		// Add return code
 		packet
 			.data_mut()
-			.extend_from_slice(" return_code=".as_bytes());
+			.extend_from_slice(b" return_code=");
 		packet
 			.data_mut()
 			.extend_from_slice(code.to_string().as_bytes());
 
 		// Send a message and wait until we get an answer for the return code
-		if let Err(_) = self.send_ws_message(&MessageF2P::Packet(packet)) {
+		if self.send_ws_message(&MessageF2P::Packet(packet)).is_err() {
 			return Box::new(future::err(TsError::Undefined));
 		}
 		Box::new(recv.map_err(|_| TsError::Undefined)
@@ -394,7 +396,7 @@ impl FrontendConnection {
 				if r == TsError::Ok {
 					future::ok(())
 				} else {
-					future::err(r.into())
+					future::err(r)
 				}
 			}))
 	}

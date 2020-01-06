@@ -224,7 +224,7 @@ impl AudioToTs {
 
 				opus_output: [0; MAX_OPUS_FRAME_SIZE],
 			}
-		}).map_err(|e| format_err!("SDL error: {}", e).into())
+		}).map_err(|e| format_err!("SDL error: {}", e))
 	}
 }
 
@@ -266,7 +266,6 @@ impl AudioCallback for SdlCallback {
 
 					let sink = con.as_packet_sink();
 					let logger = self.logger.clone();
-					let packet = packet.clone();
 					self.executor
 						.spawn(sink.send(packet).map(|_| ()).map_err(
 							move |e| {

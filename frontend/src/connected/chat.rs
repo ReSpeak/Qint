@@ -91,17 +91,17 @@ impl Component for Chat {
 	fn view(&self) -> Html {
 		let send_chat = self.link.callback(|e: SubmitEvent| {
 			e.prevent_default();
-			Msg::Send.into()
+			Msg::Send
 		});
 		let chat_change = self.link.callback(|e: InputData|
-			Msg::Change(Box::new(move |c| c.composing = e.value)).into()
+			Msg::Change(Box::new(move |c| c.composing = e.value))
 		);
 		let send_command = self.link.callback(|e: SubmitEvent| {
 			e.prevent_default();
-			Msg::SendCommand.into()
+			Msg::SendCommand
 		});
 		let command_change = self.link.callback(|e: InputData|
-			Msg::Change(Box::new(move |c| c.composing_command = e.value)).into()
+			Msg::Change(Box::new(move |c| c.composing_command = e.value))
 		);
 
 		ConnectionService::with_ready_unwrap(&self.con, |c| {

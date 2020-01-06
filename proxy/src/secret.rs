@@ -29,7 +29,7 @@ impl Secret {
 		let mut nonce_data = [0; 12];
 		rand.fill(&mut nonce_data[..])
 			.map_err(|_| format_err!("Failed to create random numbers"))?;
-		let nonce = Nonce::assume_unique_for_key(nonce_data.clone());
+		let nonce = Nonce::assume_unique_for_key(nonce_data);
 		let nonce = SingleNonce(Some(nonce));
 
 		let mut key = SealingKey::new(

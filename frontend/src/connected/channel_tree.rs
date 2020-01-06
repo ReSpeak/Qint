@@ -150,7 +150,7 @@ impl ChannelTree {
 	) -> Html
 	{
 		let cbn = channels.get(&id);
-		if let None = cbn { return html!{} }
+		if cbn.is_none() { return html!{} }
 		let cbn = cbn.unwrap();
 		let channel = cbn.own.unwrap();
 
@@ -161,7 +161,7 @@ impl ChannelTree {
 			.then_with(|| a.name.cmp(&b.name)));
 
 		let icon = channel.icon_id.map(|i| self.icon(i)).unwrap_or_else(|| html! {});
-		let change_channel = self.link.callback(move |_| Msg::ChangeChannel(id).into());
+		let change_channel = self.link.callback(move |_| Msg::ChangeChannel(id));
 		html! {
 			<li>
 				<div class="channel-line">
@@ -192,10 +192,8 @@ impl ChannelTree {
 				if let Some(cbn) = channels.get_mut(&channel.parent) {
 					cbn.first_child = Some(channel.id);
 				}
-			} else {
-				if let Some(cbn) = channels.get_mut(&channel.order) {
-					cbn.after = Some(channel.id);
-				}
+			} else if let Some(cbn) = channels.get_mut(&channel.order) {
+				cbn.after = Some(channel.id);
 			}
 		}
 		// Add all clients

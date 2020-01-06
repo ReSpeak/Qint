@@ -28,11 +28,10 @@ impl Component for SideBar {
 	type Properties = Props;
 
 	fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-		let res = Self {
+		Self {
 			link,
 			con: props.connection,
-		};
-		res
+		}
 	}
 
 	fn update(&mut self, msg: Self::Message) -> ShouldRender {

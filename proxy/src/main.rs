@@ -241,7 +241,7 @@ async fn main() -> Result<(), Error> {
 		slog::Logger::root(drain, o!())
 	};
 	let _scope_guard = slog_scope::set_global_logger(logger.clone());
-	let _log_guard = slog_stdlog::init().unwrap();
+	slog_stdlog::init().unwrap();
 
 	// Parse command line options
 	let args = Args::from_args();
