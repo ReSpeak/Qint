@@ -3,10 +3,12 @@ DROP TABLE IF EXISTS clients;
 DROP TABLE IF EXISTS channels;
 DROP TABLE IF EXISTS servers;
 DROP TABLE IF EXISTS bookmarks;
+DROP TABLE IF EXISTS chats;
 DROP TABLE IF EXISTS messages;
 DROP TABLE IF EXISTS events;
 
 DROP TABLE IF EXISTS servers_clients;
-DROP TABLE IF EXISTS server_messages;
-DROP TABLE IF EXISTS channel_messages;
-DROP TABLE IF EXISTS client_messages;
+DROP TABLE IF EXISTS server_chats;
+DROP TABLE IF EXISTS channel_chats;
+DROP TABLE IF EXISTS client_chats;
+DROP TABLE IF EXISTS client_pokes;

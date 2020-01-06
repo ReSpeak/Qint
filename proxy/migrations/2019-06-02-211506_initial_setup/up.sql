@@ -17,6 +17,7 @@ CREATE TABLE identities (
 	max_counter INTEGER NOT NULL DEFAULT 0,
 	client BLOB NOT NULL REFERENCES clients(uid)
 );
+CREATE INDEX identities_client_index ON identities(client);
 
 CREATE TABLE servers (
 	public_key BLOB NOT NULL PRIMARY KEY,
@@ -39,6 +40,8 @@ CREATE TABLE channels (
 	PRIMARY KEY(server, id),
 	FOREIGN KEY(server, parent) REFERENCES channels(server, id)
 );
+CREATE INDEX channels_server_index ON channels(server);
+CREATE INDEX channels_parent_index ON channels(server, parent);
 
 CREATE TABLE bookmarks (
 	id INTEGER NOT NULL PRIMARY KEY,
@@ -57,17 +60,33 @@ CREATE TABLE bookmarks (
 
 	FOREIGN KEY(server, channel) REFERENCES channels(server, id)
 );
+CREATE INDEX bookmarks_identity_index ON bookmarks(identity);
+CREATE INDEX bookmarks_server_index ON bookmarks(server);
+CREATE INDEX bookmarks_channel_index ON bookmarks(server, channel);
+
+CREATE TABLE chats (
+	id INTEGER NOT NULL PRIMARY KEY,
+	-- In UTC
+	last_read DATETIME NOT NULL,
+	-- Offset from UTC in seconds to the east
+	timezone INTEGER NOT NULL
+);
 
 CREATE TABLE messages (
 	id INTEGER NOT NULL PRIMARY KEY,
+	chat INTEGER NOT NULL REFERENCES chats(id),
 	-- NULL if we got a message from the server
 	invoker BLOB REFERENCES clients(uid),
+	-- The name if the uid is not known
+	invoker_name TEXT,
 	content TEXT NOT NULL,
 	-- In UTC
 	time DATETIME NOT NULL,
 	-- Offset from UTC in seconds to the east
 	timezone INTEGER NOT NULL
 );
+CREATE INDEX messages_chat_index ON messages(chat);
+CREATE INDEX messages_client_index ON messages(invoker);
 
 CREATE TABLE events (
 	id INTEGER NOT NULL PRIMARY KEY,
@@ -86,6 +105,9 @@ CREATE TABLE events (
 	FOREIGN KEY(server, channel1) REFERENCES channels(server, id),
 	FOREIGN KEY(server, channel2) REFERENCES channels(server, id)
 );
+CREATE INDEX events_server_index ON events(server);
+CREATE INDEX events_invoker_index ON events(invoker);
+CREATE INDEX events_client_index ON events(invoker);
 
 -- Connecting different tables
 
@@ -93,6 +115,7 @@ CREATE TABLE servers_clients (
 	server BLOB NOT NULL REFERENCES servers(public_key),
 	client BLOB NOT NULL REFERENCES clients(uid),
 	icon INTEGER,
+	avatar TEXT,
 	-- In UTC
 	last_seen DATETIME NOT NULL,
 	-- Offset from UTC in seconds to the east
@@ -101,36 +124,38 @@ CREATE TABLE servers_clients (
 	PRIMARY KEY(server, client)
 );
 
-CREATE TABLE server_messages (
-	server BLOB NOT NULL REFERENCES servers(public_key),
-	message INTEGER NOT NULL REFERENCES messages(id),
-
-	PRIMARY KEY(server, message)
+CREATE TABLE server_chats (
+	server BLOB NOT NULL PRIMARY KEY REFERENCES servers(public_key),
+	chat INTEGER NOT NULL REFERENCES chats(id)
 );
+CREATE INDEX server_chats_chat_index ON server_chats(chat);
 
-CREATE TABLE channel_messages (
+CREATE TABLE channel_chats (
 	server BLOB NOT NULL,
 	channel INTEGER NOT NULL,
-	message INTEGER NOT NULL REFERENCES messages(id),
+	chat INTEGER NOT NULL REFERENCES chats(id),
 
-	PRIMARY KEY(server, channel, message),
+	PRIMARY KEY(server, channel),
 	FOREIGN KEY(server, channel) REFERENCES channels(server, id)
 );
+CREATE INDEX channel_chats_chat_index ON channel_chats(chat);
 
-CREATE TABLE client_messages (
+CREATE TABLE client_chats (
 	server BLOB NOT NULL REFERENCES servers(public_key),
 	-- Message author
 	client BLOB NOT NULL REFERENCES clients(uid),
-	message INTEGER NOT NULL REFERENCES messages(id),
+	chat INTEGER NOT NULL REFERENCES chats(id),
 
-	PRIMARY KEY(server, client, message)
+	PRIMARY KEY(server, client)
 );
+CREATE INDEX client_chats_chat_index ON client_chats(chat);
 
 CREATE TABLE client_pokes (
 	server BLOB NOT NULL REFERENCES servers(public_key),
 	-- Message author
 	client BLOB NOT NULL REFERENCES clients(uid),
-	message INTEGER NOT NULL REFERENCES messages(id),
+	chat INTEGER NOT NULL REFERENCES chats(id),
 
-	PRIMARY KEY(server, client, message)
+	PRIMARY KEY(server, client)
 );
+CREATE INDEX client_pokes_chat_index ON client_pokes(chat);

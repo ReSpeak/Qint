@@ -134,6 +134,17 @@ pub struct NewIdentity<'a> {
 	pub client: &'a [u8],
 }
 
+#[derive(Debug, Insertable)]
+#[table_name = "servers_clients"]
+pub struct ServersClientsInsert<'a> {
+	pub server: &'a [u8],
+	pub client: &'a [u8],
+	pub icon: Option<i32>,
+	pub avatar: Option<&'a str>,
+	pub last_seen: NaiveDateTime,
+	pub timezone: i32,
+}
+
 
 impl Identity {
 	pub fn into_identity(self, secret: &Secret) -> Result<tsclientlib::Identity, Error> {

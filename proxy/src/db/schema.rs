@@ -14,10 +14,10 @@ table! {
 }
 
 table! {
-    channel_messages (server, channel, message) {
+    channel_chats (server, channel) {
         server -> Binary,
         channel -> BigInt,
-        message -> BigInt,
+        chat -> BigInt,
     }
 }
 
@@ -34,18 +34,26 @@ table! {
 }
 
 table! {
-    client_messages (server, client, message) {
-        server -> Binary,
-        client -> Binary,
-        message -> BigInt,
+    chats (id) {
+        id -> BigInt,
+        last_read -> Timestamp,
+        timezone -> Integer,
     }
 }
 
 table! {
-    client_pokes (server, client, message) {
+    client_chats (server, client) {
         server -> Binary,
         client -> Binary,
-        message -> BigInt,
+        chat -> BigInt,
+    }
+}
+
+table! {
+    client_pokes (server, client) {
+        server -> Binary,
+        client -> Binary,
+        chat -> BigInt,
     }
 }
 
@@ -87,7 +95,9 @@ table! {
 table! {
     messages (id) {
         id -> BigInt,
+        chat -> BigInt,
         invoker -> Nullable<Binary>,
+        invoker_name -> Nullable<Text>,
         content -> Text,
         time -> Timestamp,
         timezone -> Integer,
@@ -95,9 +105,9 @@ table! {
 }
 
 table! {
-    server_messages (server, message) {
+    server_chats (server) {
         server -> Binary,
-        message -> BigInt,
+        chat -> BigInt,
     }
 }
 
@@ -115,6 +125,7 @@ table! {
         server -> Binary,
         client -> Binary,
         icon -> Nullable<Integer>,
+        avatar -> Nullable<Text>,
         last_seen -> Timestamp,
         timezone -> Integer,
     }
@@ -122,33 +133,35 @@ table! {
 
 joinable!(bookmarks -> identities (identity));
 joinable!(bookmarks -> servers (server));
-joinable!(channel_messages -> messages (message));
+joinable!(channel_chats -> chats (chat));
 joinable!(channels -> servers (server));
-joinable!(client_messages -> clients (client));
-joinable!(client_messages -> messages (message));
-joinable!(client_messages -> servers (server));
+joinable!(client_chats -> chats (chat));
+joinable!(client_chats -> clients (client));
+joinable!(client_chats -> servers (server));
+joinable!(client_pokes -> chats (chat));
 joinable!(client_pokes -> clients (client));
-joinable!(client_pokes -> messages (message));
 joinable!(client_pokes -> servers (server));
 joinable!(events -> servers (server));
 joinable!(identities -> clients (client));
+joinable!(messages -> chats (chat));
 joinable!(messages -> clients (invoker));
-joinable!(server_messages -> messages (message));
-joinable!(server_messages -> servers (server));
+joinable!(server_chats -> chats (chat));
+joinable!(server_chats -> servers (server));
 joinable!(servers_clients -> clients (client));
 joinable!(servers_clients -> servers (server));
 
 allow_tables_to_appear_in_same_query!(
     bookmarks,
-    channel_messages,
+    channel_chats,
     channels,
-    client_messages,
+    chats,
+    client_chats,
     client_pokes,
     clients,
     events,
     identities,
     messages,
-    server_messages,
+    server_chats,
     servers,
     servers_clients,
 );

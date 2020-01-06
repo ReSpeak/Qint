@@ -1,5 +1,7 @@
 //! Handle incoming events and update the database accordingly.
 
+use chrono::{Local, Utc};
+use chrono::offset::{FixedOffset, TimeZone};
 use diesel::prelude::*;
 use failure::Error;
 use tsclientlib::events::{Event, PropertyId};
@@ -18,7 +20,10 @@ impl EventHandler for super::DbHandler {
 					match id {
 						PropertyId::Client(id) => {
 							use schema::clients::dsl::*;
+							use schema::servers_clients;
 
+							let server = con.get_server_key()?;
+							let server = server.to_short();
 							let con = con.lock();
 							let client = &con.clients[id];
 
@@ -42,6 +47,35 @@ impl EventHandler for super::DbHandler {
 									.values(&client)
 									.execute(&self.con)?;
 							}
+
+							// Update last seen
+							let icon = if client.icon_id.0 == 0 {
+								None
+							} else {
+								Some(client.icon_id.0 as i32)
+							};
+							let avatar = if client.avatar_hash.is_empty() {
+								None
+							} else {
+								Some(client.avatar_hash.as_str())
+							};
+
+							let utc_time = Utc::now().naive_utc();
+							let dummy_offset = FixedOffset::east(0);
+							let local_zone = Local::from_offset(&dummy_offset);
+							let utc_to_local_offset = local_zone.offset_from_utc_datetime(&utc_time).local_minus_utc();
+
+							let server_client = models::ServersClientsInsert {
+								server: &server,
+								client: &client_uid,
+								icon,
+								avatar,
+								last_seen: utc_time,
+								timezone: utc_to_local_offset,
+							};
+							diesel::replace_into(servers_clients::table)
+								.values(&server_client)
+								.execute(&self.con)?;
 						}
 						PropertyId::Channel(ch_id) => {
 							use schema::channels::dsl::*;
@@ -55,6 +89,11 @@ impl EventHandler for super::DbHandler {
 							} else {
 								Some(channel.parent.0 as i64)
 							};
+							let icon_id = channel.icon_id.and_then(|i| if i.0 == 0 {
+								None
+							} else {
+								Some(i.0 as i32)
+							});
 
 							// Check if we already know this channel
 							if diesel::select(diesel::dsl::exists(channels
@@ -76,7 +115,7 @@ impl EventHandler for super::DbHandler {
 									id: ch_id.0 as i64,
 									parent: ch_parent,
 									name: &channel.name,
-									icon: None,
+									icon: icon_id,
 									deleted: false,
 								};
 								diesel::insert_into(schema::channels::table)
