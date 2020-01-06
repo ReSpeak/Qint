@@ -243,8 +243,7 @@ impl Handler<PlayMsg> for TsToAudio {
 			// Put into queue
 			{
 				let mut data = self.data.lock();
-				let queue =
-					data.entry(id).or_insert_with(Default::default);
+				let queue = data.entry(id).or_insert_with(Default::default);
 				if queue.len() > size * 2 {
 					debug!(self.logger, "Removing samples from playback queue"; "id" => %id, "count" => queue.len() - size);
 					*queue = queue.split_off(queue.len() - size);

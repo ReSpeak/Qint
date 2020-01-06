@@ -266,7 +266,7 @@ impl Component for Model {
 			html! {
 				<>
 				<audio id="audio-playback" autoplay="autoplay" />
-				<Connected: connection=self.con.clone().unwrap() />
+				<Connected: connection=self.con.as_ref().unwrap() />
 				<button style="position:absolute; right: 0" onclick=switchtalking>{ talking }</button>
 				</>
 			}

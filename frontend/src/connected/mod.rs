@@ -63,8 +63,8 @@ impl Component for Connected {
 	fn view(&self) -> Html {
 		html! {
 			<div class="connected-container">
-				<SideBar: connection=self.con.clone() />
-				<Chat: connection=self.con.clone() />
+				<SideBar: connection=&self.con />
+				<Chat: connection=&self.con />
 			</div>
 		}
 	}

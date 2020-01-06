@@ -18,7 +18,6 @@ use failure::{format_err, Error};
 use futures::prelude::*;
 use serde::Deserialize;
 use slog::{error, info, o, warn, Drain, Logger};
-use structopt::clap::AppSettings;
 use structopt::StructOpt;
 use tokio::net::TcpStream;
 use tokio_util::codec::{BytesCodec, FramedRead};
@@ -40,40 +39,26 @@ const DIR_PROJECT: &str = "Qint";
 pub struct ConnectionId(pub Uuid);
 
 #[derive(StructOpt, Debug)]
-#[structopt(raw(global_settings = "&[AppSettings::ColoredHelp, \
-                                   AppSettings::VersionlessSubcommands]"))]
+#[structopt(author, about)]
 struct Args {
-	#[structopt(
-		short = "a",
-		long = "address",
-		help = "The address where the server listens"
-	)]
+	/// The address where the server listens
+	#[structopt(short = "l", long)]
 	listen_address: Option<String>,
-	#[structopt(
-		short = "i",
-		long = "identity",
-		help = "The id of the identity that is used by default"
-	)]
+	/// The id of the identity that is used by default
+	#[structopt(short = "i", long)]
 	default_identity: Option<u64>,
 	/// The path for all the settings files. This makes only senses as a command
 	/// line argument, it is ignored in the settings file.
 	///
 	/// If no value is given, the configuration path depends on the operating
 	/// system.
-	#[structopt(
-		short = "c",
-		long = "config-path",
-		help = "The folder that contains all the configuration files"
-	)]
+	#[structopt(short = "c", long)]
 	config_path: Option<String>,
 	/// The path for cached files. This is used for the `FileCache`.
 	///
 	/// If no value is given, the configuration path depends on the operating
 	/// system.
-	#[structopt(
-		long = "cache-path",
-		help = "The folder that contains cached files"
-	)]
+	#[structopt(long)]
 	cache_path: Option<String>,
 	/// How much log output do you want?
 	///
@@ -81,12 +66,7 @@ struct Args {
 	/// 1. Print command string
 	/// 2. Print packets
 	/// 3. Print udp packets
-	#[structopt(
-		short = "v",
-		long = "verbose",
-		help = "Print the content of all packets",
-		parse(from_occurrences)
-	)]
+	#[structopt(short = "v", long, parse(from_occurrences))]
 	verbosity: u8,
 }
 
