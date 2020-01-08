@@ -4,6 +4,7 @@ extern crate diesel;
 
 use std::fmt;
 
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use tsproto_packets::packets::{Direction, InCommand, OutPacket, PacketType};
 //use tsproto_types::versions::Version;
@@ -34,6 +35,9 @@ pub enum MessageF2P {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum MessageP2F {
 	ConnectFailed(),
+	/// Send before the initserver, so the frontend knows the public key of the
+	/// server.
+	ServerKey(Vec<u8>),
 	Packet(InCommandMsg),
 	Webrtc(WebrtcMsg),
 }
@@ -56,14 +60,14 @@ pub struct ConnectOptions {
 	pub log_udp_packets: bool,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ChatId {
-	/// The uid of the server.
+	/// The public key of the server.
 	pub server: Vec<u8>,
 	pub chat_type: ChatType,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum ChatType {
 	Server,
 	Channel(u64),
@@ -73,9 +77,12 @@ pub enum ChatType {
 	Poke(Vec<u8>),
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MessagesRequest {
 	pub chat: ChatId,
+	/// The time and id of the last message which was received before.
+	/// The response will only include messages **after** the referred message.
+	pub start: Option<(NaiveDateTime, i64)>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

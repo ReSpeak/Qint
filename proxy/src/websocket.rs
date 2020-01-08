@@ -27,6 +27,7 @@ pub(crate) struct Ws {
 	state: Arc<State>,
 	id: ConnectionId,
 	connection: Option<Connection>,
+	pk_recv: Option<oneshot::Receiver<()>>,
 }
 
 #[derive(Clone)]
@@ -66,7 +67,7 @@ impl Drop for Ws {
 }
 
 impl Message for WsMessage {
-	type Result = ();
+	type Result = Result<(), ()>;
 }
 
 impl Message for DisconnectMsg {
@@ -96,7 +97,7 @@ impl Ws {
 	pub(crate) fn new(state: Arc<State>, id: ConnectionId) -> Self {
 		let logger = state.logger.new(o!("id" => id.0.to_string()));
 		debug!(logger, "Creating connection");
-		Self { logger, state, id, connection: None }
+		Self { logger, state, id, connection: None, pk_recv: None }
 	}
 
 	fn send_message(msg: &MessageP2F, ctx: &mut ws::WebsocketContext<Self>) {
@@ -205,12 +206,27 @@ impl Ws {
 			}))
 		});
 
-		Box::new(recv.map(|r| r.unwrap()))
+		let (pk_send, pk_recv) = oneshot::channel();
+		actor.pk_recv = Some(pk_recv);
+
+		let (send2, recv2) = oneshot::channel();
+		ctx.spawn(wrap_future(recv.map(|r| r.unwrap()))
+			.map(|r, _, ctx| {
+				if let Ok(con) = &r {
+					Self::send_message(&MessageP2F::ServerKey(con
+						.get_server_key().unwrap().to_short().to_vec()), ctx);
+					let _ = pk_send.send(());
+				}
+				let _ = send2.send(r);
+			}));
+
+
+		Box::new(recv2.map(Result::unwrap))
 	}
 }
 
 impl Handler<WsMessage> for Ws {
-	type Result = ();
+	type Result = Box<dyn ActorFuture<Output = Result<(), ()>, Actor = Self>>;
 	fn handle(
 		&mut self,
 		msg: WsMessage,
@@ -219,10 +235,23 @@ impl Handler<WsMessage> for Ws {
 	{
 		match msg {
 			WsMessage::Packet(packet) => {
-				Self::send_message(&MessageP2F::Packet(packet), ctx)
+				// Block sending the initserver until the public key is sent
+				if let Some(recv) = self.pk_recv.take() {
+					let (send2, recv2) = oneshot::channel();
+					self.pk_recv = Some(recv2);
+					return Box::new(wrap_future(recv).map(|_, _, ctx| {
+						Self::send_message(&MessageP2F::Packet(packet), ctx);
+						let _ = send2.send(());
+						Ok(())
+					}));
+				} else {
+					Self::send_message(&MessageP2F::Packet(packet), ctx);
+				}
+
 			}
 			WsMessage::Message(msg) => Self::send_message(&msg, ctx),
 		}
+		Box::new(wrap_future(future::ok(())))
 	}
 }
 

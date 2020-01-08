@@ -1,21 +1,34 @@
+use chrono::NaiveDateTime;
+use failure::Error;
+use qint_shared::{ChatId, ChatType, MessagesRequest};
+use qint_shared::models::Message;
 use std::borrow::Cow;
 use stdweb::web::event::IEvent;
 use ts_bookkeeping::MessageTarget;
 use tsproto_packets::packets::{Direction, Flags, OutCommand, OutPacket, PacketType};
+use yew::format::MsgPack;
 use yew::html;
 use yew::prelude::*;
+use yew::services::fetch::{FetchService, FetchTask, Request, Response};
 
 use crate::connection_service::*;
 
 pub struct Chat {
 	link: ComponentLink<Self>,
 	con: ConnectionId,
-	callback: Callback<()>,
+	chat: ChatId,
+	// TODO More than one
+	fetch_task: Option<FetchTask>,
+
+	messages: Vec<Message>,
 }
 
 pub enum Msg {
+	Ignore,
 	Change(Box<dyn FnOnce(&mut Connected)>),
+	GotMessages(Vec<Message>),
 	NewMessage,
+	SetChatToChannel,
 	Send,
 	SendCommand,
 }
@@ -31,24 +44,58 @@ impl Component for Chat {
 	type Properties = Props;
 
 	fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-		let callback = link.callback(|_| Msg::NewMessage);
+		let server = ConnectionService::with_ready_unwrap(&props.connection, |con|
+			con.key.clone()
+		);
+		// On channel change:
+		// TODO Update chat id to new channel if current id points to current channel
+		// TODO Add this as event listener
 
-		let res = Self {
+		let chat = ChatId {
+			server,
+			// TODO Default chat should be channel
+			chat_type: ChatType::Server,
+		};
+
+		let mut res = Self {
 			link,
 			con: props.connection,
-			callback,
+			chat,
+			fetch_task: None,
+
+			messages: Vec::new(),
 		};
 		res.add_listener();
+		// Request messages
+		res.request_messages(None);
+
 		res
 	}
 
 	fn update(&mut self, msg: Self::Message) -> ShouldRender {
 		match msg {
+			Msg::Ignore => false,
 			Msg::Change(f) => {
 				ConnectionService::with_mut_ready_unwrap(&self.con, f);
 				true
 			}
-			Msg::NewMessage => true,
+			Msg::GotMessages(msgs) => {
+				// TODO Clever insert
+				self.messages = msgs;
+				true
+			}
+			Msg::NewMessage => {
+				self.request_messages(None);
+				false
+			}
+			Msg::SetChatToChannel => {
+				// Set chat id to channel
+				self.chat.chat_type = ChatType::Channel(ConnectionService::with_mut_ready_unwrap(&self.con, |c| {
+					c.con.clients[&c.con.own_client].channel.0
+				}));
+				self.request_messages(None);
+				false
+			}
 			Msg::Send => {
 				ConnectionService::with_mut_send_unwrap(&self.con, |c| {
 					let cmd = c.con.send_message(MessageTarget::Channel, &c.composing);
@@ -107,7 +154,7 @@ impl Component for Chat {
 		ConnectionService::with_ready_unwrap(&self.con, |c| {
 			html! {
 				<div class="chat">
-					{ self.view_messages(c) }
+					{ self.view_messages() }
 					<form class="chat-form" onsubmit=send_chat>
 						<input class="input" name="message" type="text"
 							value=&c.composing
@@ -134,14 +181,39 @@ impl Chat {
 	fn add_listener(&self) {
 		// Listen for new messages
 		ConnectionService::with_mut(&self.con, |con| {
-			let callback = self.callback.clone();
+			let new_msg = self.link.callback(|_| Msg::NewMessage);
+			let channel_msg = self.link.callback(|_| Msg::SetChatToChannel);
 			con.packet_listeners.insert("chat".into(), Box::new(move |_, msg| {
 				if msg.name() == "notifytextmessage" {
-					callback.emit(());
+					new_msg.emit(());
+				} else if msg.name() == "channellistfinished" {
+					channel_msg.emit(());
 				}
 			}));
 		}, || panic!("Should be in connected state"));
+	}
 
+	fn request_messages(&mut self, start: Option<(NaiveDateTime, i64)>) {
+		let mut fetch = FetchService::new();
+		let msg_request = MessagesRequest {
+			chat: self.chat.clone(),
+			start,
+		};
+
+		let request = Request::post(&format!("{}/messages", crate::Model::get_http_domain()))
+			.body(MsgPack(&msg_request))
+			.unwrap();
+		self.fetch_task = Some(fetch.fetch_binary(request, self.link
+			.callback(|resp: Response<MsgPack<Result<Vec<Message>, Error>>>| {
+				match resp.into_body().0 {
+					Ok(r) => Msg::GotMessages(r),
+					Err(e) => {
+						// TODO Display error message
+						log::error!("Failed to fetch messages: {:?}", e);
+						Msg::Ignore
+					}
+				}
+			})));
 	}
 
 	fn view_message(&self, msg: &Message) -> Html {
@@ -156,9 +228,9 @@ impl Chat {
 					<div class="media-content">
 						<div class="content">
 							<p>
-								<strong>{ &msg.invoker.name }</strong>
+								<strong>{ msg.client_name.as_ref().or(msg.invoker_name.as_ref()).unwrap() }</strong>
 								<br />
-								{ &msg.message }
+								{ &msg.content }
 							</p>
 						</div>
 					</div>
@@ -173,10 +245,10 @@ impl Chat {
 		}
 	}
 
-	fn view_messages(&self, con: &Connected) -> Html {
+	fn view_messages(&self) -> Html {
 		html! {
 			<ul class="chat-messages",>
-				{ for con.messages.iter()
+				{ for self.messages.iter().rev()
 					.map(|m| self.view_message(m)) }
 				<span class="chat-end"></span>
 			</ul>

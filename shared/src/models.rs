@@ -1,4 +1,4 @@
-use chrono::NaiveDateTime;
+use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone};
 use serde::{Deserialize, Serialize};
 
 #[cfg_attr(feature = "db", derive(Queryable))]
@@ -33,4 +33,10 @@ pub struct Message {
 pub struct Chat {
 	pub last_read: NaiveDateTime,
 	pub timezone: i32,
+}
+
+impl Message {
+	pub fn get_date_time(&self) -> DateTime<FixedOffset> {
+		FixedOffset::east(self.timezone).from_utc_datetime(&self.time)
+	}
 }

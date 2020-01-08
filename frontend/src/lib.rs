@@ -138,7 +138,7 @@ impl Component for Model {
 			Msg::Connected => {
 				let logger = &self.logger;
 				ConnectionService::with_mut(self.con.as_ref().unwrap(), move |con| {
-					if let FrontendConnectionState::Connecting(options, _) = &mut con.state {
+					if let FrontendConnectionState::Connecting(options, _, _) = &mut con.state {
 						let options = options.clone();
 						if let Err(e) = con.send_ws_message(&MessageF2P::Connect(options)) {
 							error!(logger, "Failed to send message"; "error" => ?e);
@@ -152,7 +152,7 @@ impl Component for Model {
 			Msg::Disconnected => {
 				let state = ConnectionService::remove(&self.con.take().unwrap());
 				if let Some(connection_service::FrontendConnection {
-					state: FrontendConnectionState::Connecting(_options, _), ..
+					state: FrontendConnectionState::Connecting(_options, _, _), ..
 				}) = state {
 					// TODO Show options
 				}
@@ -162,6 +162,15 @@ impl Component for Model {
 				match msg {
 					MessageP2F::ConnectFailed() => {
 						warn!(self.logger, "Connect failed; trying next address");
+						false
+					}
+					MessageP2F::ServerKey(key) => {
+						ConnectionService::with_mut_unwrap(self.con.as_ref().unwrap(), move |con| {
+							if let FrontendConnectionState::Connecting(_, _, k) = &mut con.state {
+								*k = Some(key);
+								Some(())
+							} else { None }
+						}, "Should be in connecting state");
 						false
 					}
 					MessageP2F::Packet(packet) => {

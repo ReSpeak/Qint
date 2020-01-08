@@ -314,6 +314,7 @@ async fn main() -> Result<(), Error> {
 			.service(audiosend_false)
 			.service(download_file)
 			.service(db::bookmarks)
+			.service(db::messages)
 			.service(
 				Files::new("", "../frontend/static/")
 					.index_file("index.html")

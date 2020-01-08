@@ -11,6 +11,8 @@ opt-level = 3
 lto = true
 
 [dependencies]
+base64 = "0.10"
+chrono = "0.4"
 failure = "0.1"
 futures-preview = "0.3.0-alpha"
 qint-shared = { path = "../shared" }

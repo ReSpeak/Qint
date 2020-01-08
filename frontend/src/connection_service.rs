@@ -5,10 +5,10 @@ use failure::{format_err, Error};
 use futures::channel::oneshot;
 use futures::prelude::*;
 use qint_shared::*;
-use ts_bookkeeping::{Invoker, TsError, Uid};
+use ts_bookkeeping::{TsError, Uid};
 use ts_bookkeeping::data::Connection;
 use ts_bookkeeping::events::Event;
-use ts_bookkeeping::messages::s2c::{InCommandError, InMessage, InMessages, InMessageTrait, InTextMessage};
+use ts_bookkeeping::messages::s2c::{InCommandError, InMessage, InMessages, InMessageTrait};
 use tsproto_packets::packets::{InCommand, OutPacket};
 use slog::{debug, error, o, Logger};
 use uuid::Uuid;
@@ -33,7 +33,9 @@ pub struct FrontendConnection {
 
 pub enum FrontendConnectionState {
 	Uninitialized,
-	Connecting(ConnectOptions, WebSocketTask),
+	/// The used options, the websocket and the public key of the server, which
+	/// we should get before the initserver.
+	Connecting(ConnectOptions, WebSocketTask, Option<Vec<u8>>),
 	Connected(Connected),
 }
 
@@ -41,8 +43,9 @@ pub struct Connected {
 	ws: WebSocketTask,
 	message_handler: MessageHandler,
 	pub con: Connection,
+	/// The public key of the server
+	pub key: Vec<u8>,
 
-	pub messages: Vec<Message>,
 	pub composing: String,
 	pub composing_command: String,
 }
@@ -50,11 +53,6 @@ pub struct Connected {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[repr(transparent)]
 pub struct ConnectionId(pub Uuid);
-
-pub struct Message {
-	pub(super) invoker: Invoker,
-	pub(super) message: String,
-}
 
 #[derive(Default)]
 pub struct ConnectionService;
@@ -80,7 +78,7 @@ impl ConnectionService {
 
 					let con = FrontendConnection {
 						logger: logger.new(o!("id" => id.0.to_string())),
-						state: FrontendConnectionState::Connecting(options, task),
+						state: FrontendConnectionState::Connecting(options, task, None),
 						packet_listeners: Default::default(),
 						event_listeners: Default::default(),
 					};
@@ -200,13 +198,13 @@ impl ConnectionService {
 }
 
 impl Connected {
-	pub fn new(ws: WebSocketTask, con: Connection) -> Self {
+	pub fn new(ws: WebSocketTask, key: Vec<u8>, con: Connection) -> Self {
 		Self {
 			ws,
 			message_handler: Default::default(),
 			con,
+			key,
 
-			messages: Default::default(),
 			composing: Default::default(),
 			composing_command: Default::default(),
 		}
@@ -246,14 +244,8 @@ impl FrontendConnection {
 		}
 
 		let res = match &mut self.state {
-			FrontendConnectionState::Connecting(_, _) => {
-				let msg = match InMessage::new(packet) {
-					Ok(r) => r,
-					Err(e) => {
-						error!(self.logger, "Failed to parse packet"; "error" => ?e);
-						return Ok(false);
-					}
-				};
+			FrontendConnectionState::Connecting(_, _, key) => {
+				let msg = InMessage::new(packet).map_err(|(_, e)| e)?;
 				if let InMessages::InitServer(_) = msg.msg() {
 				} else if let InMessages::InitIvExpand2(_) = msg.msg() {
 					return Ok(false);
@@ -262,12 +254,14 @@ impl FrontendConnection {
 						"packet" => ?msg);
 					return Ok(false);
 				}
+				let key = key.take().expect("Public key of server has to be \
+					sent before initserver");
 
-				// TODO Uid
-				if let FrontendConnectionState::Connecting(_, ws) =
+				// TODO Save key instead of uid
+				if let FrontendConnectionState::Connecting(_, ws, _) =
 					std::mem::replace(&mut self.state, FrontendConnectionState::Uninitialized) {
 					self.state = FrontendConnectionState::Connected(
-						Connected::new(ws, Connection::new(
+						Connected::new(ws, key, Connection::new(
 							Uid("".into()),
 							&msg,
 						)));
@@ -279,13 +273,7 @@ impl FrontendConnection {
 			FrontendConnectionState::Connected(c) => {
 				// Handle return codes
 				if packet.name() == "error" {
-					let error = match InCommandError::new(&packet) {
-						Ok(r) => r,
-						Err(e) => {
-							error!(self.logger, "Failed to parse error command"; "error" => ?e);
-							return Ok(false);
-						}
-					};
+					let error = InCommandError::new(&packet)?;
 					let error = error.iter().next().unwrap();
 
 					if let Some(code) =
@@ -302,41 +290,15 @@ impl FrontendConnection {
 					}
 					// Packet contains only handled return codes
 					return Ok(false);
-				} else if packet.name() == "notifytextmessage" {
-					let msg = match InTextMessage::new(&packet) {
-						Ok(r) => r,
-						Err(e) => {
-							error!(self.logger, "Failed to parse message command"; "error" => ?e);
-							return Ok(false);
-						}
-					};
-					let msg = msg.iter().next().unwrap();
-
-					let msg = Message {
-						invoker: Invoker {
-							id: msg.invoker_id,
-							name: msg.invoker_name.to_string(),
-							uid: msg.invoker_uid.as_ref().map(|u| u.clone().into()),
-						},
-						message: msg.message.to_string(),
-					};
-					c.messages.push(msg);
 				}
 
 				// Bookkeeping
-				match c.con.handle_command(&packet) {
-					Ok(events) => {
-						// Call listeners
-						for l in self.event_listeners.values() {
-							l(self, &events);
-						}
-						false
-					}
-					Err(e) => {
-						error!(self.logger, "Failed to handle command"; "error" => ?e);
-						false
-					}
+				let events = c.con.handle_command(&packet)?;
+				// Call listeners
+				for l in self.event_listeners.values() {
+					l(self, &events);
 				}
+				false
 			}
 			_ => panic!("Frontend connection is in uninitialized state"),
 		};
@@ -345,7 +307,7 @@ impl FrontendConnection {
 
 	pub fn send_ws_message(&mut self, msg: &MessageF2P) -> Result<(), Error> {
 		match &mut self.state {
-			FrontendConnectionState::Connecting(_, ws) => {
+			FrontendConnectionState::Connecting(_, ws, _) => {
 				ws.send_binary(MsgPack(msg));
 				Ok(())
 			}

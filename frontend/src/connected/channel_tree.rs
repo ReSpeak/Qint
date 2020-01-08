@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::iter;
 
+use qint_shared::ChatType;
 use ts_bookkeeping::{ChannelId, ClientId, IconHash};
 use ts_bookkeeping::data::{Channel, Client, Connection};
 use yew::html;
@@ -32,11 +33,11 @@ macro_rules! cl_intern {
 pub struct ChannelTree {
 	link: ComponentLink<Self>,
 	con: ConnectionId,
-	callback: Callback<()>,
 }
 
 pub enum Msg {
-	Redraw,
+	Ignore,
+	ChannelChanged,
 	ChangeChannel(ChannelId),
 }
 
@@ -51,12 +52,9 @@ impl Component for ChannelTree {
 	type Properties = Props;
 
 	fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-		let callback = link.callback(|_| Msg::Redraw);
-
 		let res = Self {
 			link,
 			con: props.connection,
-			callback,
 		};
 		res.add_listener();
 		res
@@ -64,7 +62,8 @@ impl Component for ChannelTree {
 
 	fn update(&mut self, msg: Self::Message) -> ShouldRender {
 		match msg {
-			Msg::Redraw => true,
+			Msg::Ignore => false,
+			Msg::ChannelChanged => true,
 			Msg::ChangeChannel(id) => {
 				ConnectionService::with_mut_send_unwrap(&self.con, |c| {
 					let cmd = c.con.clients[&c.con.own_client]
@@ -102,7 +101,7 @@ impl ChannelTree {
 	fn add_listener(&self) {
 		// Listen for new messages
 		ConnectionService::with_mut(&self.con, |con| {
-			let callback = self.callback.clone();
+			let callback = self.link.callback(|_| Msg::ChannelChanged);
 			con.event_listeners.insert("channeltree".into(), Box::new(move |_, events| {
 				for _e in events {
 					// TODO If channel or clients are modified
@@ -128,15 +127,20 @@ impl ChannelTree {
 
 	fn view_client(&self, client: &Client, _own_client: ClientId) -> Html {
 		let icon = self.icon(client.icon_id);
+		let set_chat = self.link.callback(move |_| {
+			// TODO
+			//Msg::ChangeChat(ChatType::Client(client.id.0))
+			Msg::Ignore
+		});
 		html! {
-		<li>
-			<div class="channel-line">
-				<a class="entry-expand" style="display:flex;">
-					{ icon }
-					<span class="entry-expand">{ &client.name }</span>
-				</a>
-			</div>
-		</li>
+			<li>
+				<div class="channel-line">
+					<a class="entry-expand" style="display:flex;" onclick=set_chat>
+						{ icon }
+						<span class="entry-expand">{ &client.name }</span>
+					</a>
+				</div>
+			</li>
 		}
 	}
 
@@ -162,10 +166,15 @@ impl ChannelTree {
 
 		let icon = channel.icon_id.map(|i| self.icon(i)).unwrap_or_else(|| html! {});
 		let change_channel = self.link.callback(move |_| Msg::ChangeChannel(id));
+		let set_chat = self.link.callback(move |_| {
+			// TODO
+			//Msg::ChangeChat(ChatType::Channel(id.0))
+			Msg::Ignore
+		});
 		html! {
 			<li>
 				<div class="channel-line">
-					<a class="entry-expand" style="display:flex;" onclick=change_channel >
+					<a class="entry-expand" style="display:flex;" ondoubleclick=change_channel onclick=set_chat>
 						{ icon }
 						<span class="entry-expand">{ &channel.name }</span>
 					</a>

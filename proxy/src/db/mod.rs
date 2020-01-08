@@ -11,7 +11,7 @@ use diesel::sqlite::SqliteConnection;
 use failure::Error;
 use qint_shared::models::{Bookmark, Message as TextMessage};
 use qint_shared::{ChatId, ChatType, MessagesRequest};
-use slog::{info, Logger};
+use slog::{debug, info, Logger};
 use tsclientlib::Identity;
 use tsproto::crypto::EccKeyPubP256;
 
@@ -81,7 +81,9 @@ pub(crate) async fn messages(
 ) -> Result<HttpResponse, Error>
 {
 	let msg: MessagesRequest = rmp_serde::from_read_ref(&body)?;
+	debug!(state.logger, "Requesting messages"; "req" => ?msg);
 	let messages = state.database.send(GetMessagesMsg(msg)).await??;
+	debug!(state.logger, "Returning messages"; "messages" => ?messages);
 
 	Ok(HttpResponse::Ok().body(rmp_serde::to_vec(&messages)?))
 }
@@ -374,7 +376,7 @@ impl Handler<GetMessagesMsg> for DbHandler {
 		// Select id, name, address, bookmark, last_used, timezone
 		// Join channel.name
 		// Join server.icon
-		let result = messages::table
+		let query = messages::table
 			.filter(messages::chat.eq(chat))
 			.left_outer_join(clients::table)
 			.order((messages::time.desc(), messages::id))
@@ -387,8 +389,15 @@ impl Handler<GetMessagesMsg> for DbHandler {
 				messages::time,
 				messages::timezone,
 				clients::name.nullable(),
-			))
-			.load::<TextMessage>(&self.con)?;
+			));
+		let result = if let Some((time, id)) = msg.0.start {
+			// messages::(time, id) < (time, id), i.e. previous messages
+			query.filter(messages::time.lt(&time).or(
+				messages::time.eq(&time).and(messages::id.lt(id))))
+				.load::<TextMessage>(&self.con)?
+		} else {
+			query.load::<TextMessage>(&self.con)?
+		};
 
 		Ok(result)
 	}
