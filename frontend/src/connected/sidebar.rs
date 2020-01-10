@@ -1,7 +1,8 @@
-use yew::html;
-use yew::prelude::*;
+use qint_shared::ChatType;
 use stdweb::js;
 use ts_bookkeeping::DisconnectOptions;
+use yew::html;
+use yew::prelude::*;
 
 use crate::connection_service::*;
 
@@ -10,6 +11,7 @@ use super::channel_tree::ChannelTree;
 pub struct SideBar {
 	link: ComponentLink<Self>,
 	con: ConnectionId,
+	set_chat: Callback<ChatType>,
 }
 
 pub enum Msg {
@@ -21,6 +23,8 @@ pub enum Msg {
 pub struct Props {
 	#[props(required)]
 	pub connection: ConnectionId,
+	#[props(required)]
+	pub set_chat: Callback<ChatType>,
 }
 
 impl Component for SideBar {
@@ -31,6 +35,7 @@ impl Component for SideBar {
 		Self {
 			link,
 			con: props.connection,
+			set_chat: props.set_chat,
 		}
 	}
 
@@ -46,8 +51,20 @@ impl Component for SideBar {
 		}
 	}
 
-	fn change(&mut self, _props: Self::Properties) -> ShouldRender {
-		false
+	fn change(&mut self, props: Self::Properties) -> ShouldRender {
+		let mut changed = false;
+
+		if self.con != props.connection {
+			self.con = props.connection;
+			changed = true;
+		}
+
+		if self.set_chat != props.set_chat {
+			self.set_chat = props.set_chat;
+			changed = true;
+		}
+
+		changed
 	}
 
 	fn view(&self) -> Html {
@@ -88,7 +105,7 @@ impl Component for SideBar {
 
 				<hr />
 
-				<ChannelTree: connection=self.con.clone() />
+				<ChannelTree connection=&self.con set_chat=&self.set_chat />
 
 				<hr />
 

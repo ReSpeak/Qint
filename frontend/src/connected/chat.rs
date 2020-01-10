@@ -18,6 +18,7 @@ pub struct Chat {
 	con: ConnectionId,
 	chat: ChatId,
 	// TODO More than one
+	// TODO Display loading spinner when there is an active fetch task
 	fetch_task: Option<FetchTask>,
 
 	messages: Vec<Message>,
@@ -37,6 +38,8 @@ pub enum Msg {
 pub struct Props {
 	#[props(required)]
 	pub connection: ConnectionId,
+	#[props(required)]
+	pub chat_type: ChatType,
 }
 
 impl Component for Chat {
@@ -54,7 +57,7 @@ impl Component for Chat {
 		let chat = ChatId {
 			server,
 			// TODO Default chat should be channel
-			chat_type: ChatType::Server,
+			chat_type: props.chat_type,
 		};
 
 		let mut res = Self {
@@ -90,15 +93,24 @@ impl Component for Chat {
 			}
 			Msg::SetChatToChannel => {
 				// Set chat id to channel
-				self.chat.chat_type = ChatType::Channel(ConnectionService::with_mut_ready_unwrap(&self.con, |c| {
+				self.set_chat(ChatType::Channel(ConnectionService::with_mut_ready_unwrap(&self.con, |c| {
 					c.con.clients[&c.con.own_client].channel.0
-				}));
-				self.request_messages(None);
+				})));
 				false
 			}
 			Msg::Send => {
+				let message_target = match &self.chat.chat_type {
+					ChatType::Server => MessageTarget::Server,
+					ChatType::Channel(_) => MessageTarget::Channel,
+					ChatType::Client(_id) => {
+						// TODO Find a client matching the uid
+						MessageTarget::Client(ts_bookkeeping::ClientId(0))
+					}
+					ChatType::Poke(_) => panic!("Poke is not valid for the chat"),
+				};
+
 				ConnectionService::with_mut_send_unwrap(&self.con, |c| {
-					let cmd = c.con.send_message(MessageTarget::Channel, &c.composing);
+					let cmd = c.con.send_message(message_target, &c.composing);
 					c.composing.clear();
 					Some(cmd)
 				}, "Failed to send message");
@@ -121,18 +133,26 @@ impl Component for Chat {
 	}
 
 	fn change(&mut self, props: Self::Properties) -> ShouldRender {
-		if self.con != props.connection {
+		let res = if self.con != props.connection {
 			// Remove and add listener
 			ConnectionService::with_mut(&props.connection, |con| {
 				con.packet_listeners.remove("chat");
 			}, || {});
 
-			self.con = props.connection;
+			self.con = props.connection.clone();
 			self.add_listener();
+
+			self.set_chat(props.chat_type.clone());
+
 			true
 		} else {
 			false
+		};
+
+		if self.chat.chat_type != props.chat_type && self.con == props.connection {
+			self.set_chat(props.chat_type);
 		}
+		res
 	}
 
 	fn view(&self) -> Html {
@@ -191,6 +211,14 @@ impl Chat {
 				}
 			}));
 		}, || panic!("Should be in connected state"));
+	}
+
+	pub fn set_chat(&mut self, chat: ChatType) {
+		if self.chat.chat_type != chat {
+			self.chat.chat_type = chat;
+			self.messages.clear();
+			self.request_messages(None);
+		}
 	}
 
 	fn request_messages(&mut self, start: Option<(NaiveDateTime, i64)>) {

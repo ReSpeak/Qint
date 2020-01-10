@@ -33,6 +33,7 @@ macro_rules! cl_intern {
 pub struct ChannelTree {
 	link: ComponentLink<Self>,
 	con: ConnectionId,
+	set_chat: Callback<ChatType>,
 }
 
 pub enum Msg {
@@ -45,6 +46,8 @@ pub enum Msg {
 pub struct Props {
 	#[props(required)]
 	pub connection: ConnectionId,
+	#[props(required)]
+	pub set_chat: Callback<ChatType>,
 }
 
 impl Component for ChannelTree {
@@ -55,6 +58,7 @@ impl Component for ChannelTree {
 		let res = Self {
 			link,
 			con: props.connection,
+			set_chat: props.set_chat,
 		};
 		res.add_listener();
 		res
@@ -76,6 +80,8 @@ impl Component for ChannelTree {
 	}
 
 	fn change(&mut self, props: Self::Properties) -> ShouldRender {
+		let mut changed = false;
+
 		if self.con != props.connection {
 			// Remove and add listener
 			ConnectionService::with_mut(&props.connection, |con| {
@@ -84,10 +90,15 @@ impl Component for ChannelTree {
 
 			self.con = props.connection;
 			self.add_listener();
-			true
-		} else {
-			false
+			changed = true;
 		}
+
+		if self.set_chat != props.set_chat {
+			self.set_chat = props.set_chat;
+			changed = true;
+		}
+
+		changed
 	}
 
 	fn view(&self) -> Html {
@@ -127,9 +138,10 @@ impl ChannelTree {
 
 	fn view_client(&self, client: &Client, _own_client: ClientId) -> Html {
 		let icon = self.icon(client.icon_id);
+		let set = self.set_chat.clone();
+		let uid = base64::decode(&client.uid.0).unwrap();
 		let set_chat = self.link.callback(move |_| {
-			// TODO
-			//Msg::ChangeChat(ChatType::Client(client.id.0))
+			set.emit(ChatType::Client(uid.clone()));
 			Msg::Ignore
 		});
 		html! {
@@ -166,9 +178,9 @@ impl ChannelTree {
 
 		let icon = channel.icon_id.map(|i| self.icon(i)).unwrap_or_else(|| html! {});
 		let change_channel = self.link.callback(move |_| Msg::ChangeChannel(id));
+		let set = self.set_chat.clone();
 		let set_chat = self.link.callback(move |_| {
-			// TODO
-			//Msg::ChangeChat(ChatType::Channel(id.0))
+			set.emit(ChatType::Channel(id.0));
 			Msg::Ignore
 		});
 		html! {
@@ -217,11 +229,16 @@ impl ChannelTree {
 		let own_channel = con.clients.get(&own_client).map(|c| c.channel)
 			.unwrap_or(ChannelId(0));
 
+		let set = self.set_chat.clone();
+		let set_chat = self.link.callback(move |_| {
+			set.emit(ChatType::Server);
+			Msg::Ignore
+		});
 		let icon = self.icon(con.server.icon_id);
 		html! {
 			<div class="menu">
 				<ul class="menu-list">
-					<p class="menu-label">
+					<p class="menu-label" onclick=set_chat>
 						{ icon }
 						<span class="entry-expand">{ &con.server.name }</span>
 					</p>
