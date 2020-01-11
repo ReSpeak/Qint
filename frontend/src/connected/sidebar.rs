@@ -10,6 +10,7 @@ use super::channel_tree::ChannelTree;
 pub struct SideBar {
 	link: ComponentLink<Self>,
 	con: ConnectionId,
+	chat: SelectedChat,
 	set_chat: Callback<SelectedChat>,
 }
 
@@ -23,6 +24,8 @@ pub struct Props {
 	#[props(required)]
 	pub connection: ConnectionId,
 	#[props(required)]
+	pub chat: SelectedChat,
+	#[props(required)]
 	pub set_chat: Callback<SelectedChat>,
 }
 
@@ -34,6 +37,7 @@ impl Component for SideBar {
 		Self {
 			link,
 			con: props.connection,
+			chat: props.chat,
 			set_chat: props.set_chat,
 		}
 	}
@@ -55,6 +59,11 @@ impl Component for SideBar {
 
 		if self.con != props.connection {
 			self.con = props.connection;
+			changed = true;
+		}
+
+		if self.chat != props.chat {
+			self.chat = props.chat;
 			changed = true;
 		}
 
@@ -104,7 +113,7 @@ impl Component for SideBar {
 
 				<hr />
 
-				<ChannelTree connection=&self.con set_chat=&self.set_chat />
+				<ChannelTree connection=&self.con chat=&self.chat set_chat=&self.set_chat />
 
 				<hr />
 

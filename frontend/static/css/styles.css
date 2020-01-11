@@ -1,3 +1,6 @@
+.mdi-dummy::before {
+  content: "";
+}
 .connect-container {
   /* https://www.goodfreephotos.com/other-landscapes/scenic-view-of-the-mountains-and-pond-landscape.jpg.php */
   background: url("/background.jpg") repeat fixed center center / cover;
@@ -58,18 +61,37 @@
 .connected-container > * {
   display: inline-block;
 }
-.channel-line {
+.channel-list {
+  background-color: white;
+  padding: 1em 0em 1em 1em;
+}
+.channel-list .channel-line {
   display: flex;
   align-items: center;
 }
-.entry-expand {
+.channel-list .entry-expand {
   flex: 1;
 }
-.menu-list li ul {
+.channel-list .menu-list li ul {
   margin-right: 0 !important;
 }
-.menu-list li ul {
+.channel-list .menu-list li ul {
   margin: 0 !important;
+}
+.channel-list .menu-list a {
+  padding-left: 0 !important;
+}
+.channel-list .own-client,
+.channel-list .own-channel {
+  font-weight: bold;
+}
+.channel-list .selected-channel a,
+.channel-list .selected-client a {
+  background-image: linear-gradient(to left, rgba(74, 75, 234, 0.3), rgba(255, 255, 255, 0));
+}
+.channel-list .line-main-icon {
+  font-size: 16px;
+  margin-right: 0.25em;
 }
 .chat {
   display: inline-flex;
@@ -136,7 +158,7 @@
   box-sizing: border-box;
   width: var(--channel-tree-width);
   overflow-y: auto;
-  background-color: #ccdce2;
+  background-color: #eeeeee;
 }
 :root {
   --channel-tree-width: 20em;
@@ -144,6 +166,9 @@
 * {
   margin: 0;
   color: black;
+}
+html {
+  overflow: hidden !important;
 }
 body {
   background: white;

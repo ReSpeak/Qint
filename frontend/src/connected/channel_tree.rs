@@ -9,11 +9,12 @@ use yew::prelude::*;
 
 use crate::connection_service::*;
 
-/*macro_rules! cl {
+macro_rules! cl {
 	( $( $x:tt ),* ) => {
 		{
 			let mut temp_vec = String::new();
 			$(
+				if !temp_vec.is_empty() { temp_vec.push_str(" "); }
 				cl_intern!(temp_vec, $x);
 			)*
 			temp_vec
@@ -28,11 +29,16 @@ macro_rules! cl_intern {
 		}
 	};
 	($st:expr, $x:expr) => { $st.push_str($x) };
-}*/
+}
+
+const SERVER_ICON: &str = "server";
+const CHANNEL_ICON: &str = "chat-outline";
+const CLIENT_ICON: &str = "account-outline";
 
 pub struct ChannelTree {
 	link: ComponentLink<Self>,
 	con: ConnectionId,
+	chat: SelectedChat,
 	set_chat: Callback<SelectedChat>,
 }
 
@@ -47,6 +53,8 @@ pub struct Props {
 	#[props(required)]
 	pub connection: ConnectionId,
 	#[props(required)]
+	pub chat: SelectedChat,
+	#[props(required)]
 	pub set_chat: Callback<SelectedChat>,
 }
 
@@ -58,6 +66,7 @@ impl Component for ChannelTree {
 		let res = Self {
 			link,
 			con: props.connection,
+			chat: props.chat,
 			set_chat: props.set_chat,
 		};
 		res.add_listener();
@@ -93,6 +102,11 @@ impl Component for ChannelTree {
 			changed = true;
 		}
 
+		if self.chat != props.chat {
+			self.chat = props.chat;
+			changed = true;
+		}
+
 		if self.set_chat != props.set_chat {
 			self.set_chat = props.set_chat;
 			changed = true;
@@ -103,7 +117,7 @@ impl Component for ChannelTree {
 
 	fn view(&self) -> Html {
 		ConnectionService::with_ready_unwrap(&self.con, |c| {
-			self.view(&c.con)
+			self.view(&c)
 		})
 	}
 }
@@ -124,20 +138,29 @@ impl ChannelTree {
 
 	}
 
-	fn icon(&self, icon: IconHash) -> Html {
+	fn icon(&self, icon: IconHash) -> Option<Html> {
 		if icon.0 != 0 {
-			html! {
-				<span class="icon">
-					<img src=format!("/file/{}/0/icon_{}", self.con.0, icon.0) />
+			Some(html! {
+				<span class="icon is-small line-main-icon" style=format!("background: url(/file/{}/0/icon_{})", self.con.0, icon.0)>
+					<i class="mdi mdi-dummy"></i>
 				</span>
-			}
+			})
 		} else {
-			html! {}
+			None
 		}
 	}
 
-	fn view_client(&self, client: &Client, _own_client: ClientId) -> Html {
-		let icon = self.icon(client.icon_id);
+	fn mdi_icon(name: &str) -> Html {
+		let name = if name.is_empty() { "dummy" } else { name };
+		html! {
+			<span class="icon is-small line-main-icon">
+				<i class={format!("mdi mdi-{}", name)}></i>
+			</span>
+		}
+	}
+
+	fn view_client(&self, ctx: &ViewContext, client: &Client) -> Html {
+		let icon = self.icon(client.icon_id).unwrap_or_else(|| Self::mdi_icon(CLIENT_ICON));
 		let set = self.set_chat.clone();
 		let uid = base64::decode(&client.uid.0).unwrap();
 		let id = client.id;
@@ -150,8 +173,12 @@ impl ChannelTree {
 		});
 		html! {
 			<li>
-				<div class="channel-line">
-					<a class="entry-expand" style="display:flex;" onclick=set_chat>
+				<div class={ cl![
+						"channel-line",
+						("own-client", ctx.own_client == id),
+						("selected-client", ctx.selected_client == Some(id))] } >
+					{ Self::mdi_icon("") }
+					<a class="entry-expand" onclick=set_chat>
 						{ icon }
 						<span class="entry-expand">{ &client.name }</span>
 					</a>
@@ -160,16 +187,8 @@ impl ChannelTree {
 		}
 	}
 
-	fn view_channel(
-		&self,
-		con: &Connection,
-		channels: &HashMap<ChannelId,ChannelBuildNode>,
-		id: ChannelId,
-		own_client: ClientId,
-		own_channel: ChannelId,
-	) -> Html
-	{
-		let cbn = channels.get(&id);
+	fn view_channel(&self, con: &Connection, ctx: &ViewContext, id: ChannelId) -> Html {
+		let cbn = ctx.channels.get(&id);
 		if cbn.is_none() { return html!{} }
 		let cbn = cbn.unwrap();
 		let channel = cbn.own.unwrap();
@@ -180,7 +199,7 @@ impl ChannelTree {
 		clients.sort_by(|a, b| a.talk_power.cmp(&b.talk_power).reverse()
 			.then_with(|| a.name.cmp(&b.name)));
 
-		let icon = channel.icon_id.map(|i| self.icon(i)).unwrap_or_else(|| html! {});
+		let icon = channel.icon_id.and_then(|i| self.icon(i)).unwrap_or_else(|| Self::mdi_icon(CHANNEL_ICON));
 		let change_channel = self.link.callback(move |_| Msg::ChangeChannel(id));
 		let set = self.set_chat.clone();
 		let set_chat = self.link.callback(move |_| {
@@ -192,24 +211,29 @@ impl ChannelTree {
 		});
 		html! {
 			<li>
-				<div class="channel-line">
-					<a class="entry-expand" style="display:flex;" ondoubleclick=change_channel onclick=set_chat>
+				<div class={cl![
+						"channel-line",
+						("own-client", ctx.own_channel == id),
+						("selected-channel", ctx.selected_channel == Some(id))]}>
+					{ Self::mdi_icon(if cbn.first_child.is_some() || !clients.is_empty() { "chevron-down" } else { "" }) }
+					<a class="entry-expand" ondoubleclick=change_channel onclick=set_chat>
 						{ icon }
 						<span class="entry-expand">{ &channel.name }</span>
 					</a>
 				</div>
 				<ul class="menu-list">
 					// Clients
-					{ for clients.iter().map(|client| self.view_client(client, own_client)) }
+					{ for clients.iter().map(|client| self.view_client(ctx, client)) }
 					// Channels
-					{ for iter::successors(cbn.first_child, |c| channels.get(c).and_then(|c| c.after))
-						.map(|channel_id| self.view_channel(con, channels, channel_id, own_client, own_channel)) }
+					{ for iter::successors(cbn.first_child, |c| ctx.channels.get(c).and_then(|c| c.after))
+						.map(|channel_id| self.view_channel(con, ctx, channel_id)) }
 				</ul>
 			</li>
 		}
 	}
 
-	pub fn view(&self, con: &Connection) -> Html {
+	pub fn view(&self, c: &Connected) -> Html {
+		let con = &c.con;
 		let mut channels: HashMap<_,_> = con.channels.values()
 			.map(|c| (c.id, ChannelBuildNode { own: Some(c), after: None, first_child: None, clients: vec![] })).collect();
 		channels.insert(ChannelId(0), ChannelBuildNode { own: None, after: None, first_child: None, clients: vec![] }); // Server root
@@ -231,10 +255,26 @@ impl ChannelTree {
 			}
 		}
 
-		// Get own client and channel
-		let own_client = con.own_client;
-		let own_channel = con.clients.get(&own_client).map(|c| c.channel)
-			.unwrap_or(ChannelId(0));
+		// Get all special ids for highlighting convenience
+		let mut selected_channel = None;
+		let mut selected_client = None;
+		let mut selected_server = false;
+		match &self.chat.chat_type {
+			ChatType::Client(_) => { selected_client = c.chat.client; },
+			ChatType::Channel(c) => { selected_channel = Some(ChannelId(*c)) },
+			ChatType::Server => { selected_server = true; },
+			_ => {},
+		}
+
+		let ctx = ViewContext {
+			channels,
+			own_client: con.own_client,
+			own_channel: con.clients.get(&con.own_client).map(|c| c.channel)
+				.unwrap_or(ChannelId(0)),
+			selected_channel,
+			selected_client,
+			selected_server,
+		};
 
 		let set = self.set_chat.clone();
 		let set_chat = self.link.callback(move |_| {
@@ -244,16 +284,16 @@ impl ChannelTree {
 			});
 			Msg::Ignore
 		});
-		let icon = self.icon(con.server.icon_id);
+		let icon = self.icon(con.server.icon_id).unwrap_or_else(|| Self::mdi_icon(SERVER_ICON));
 		html! {
-			<div class="menu">
+			<div class="menu channel-list">
 				<ul class="menu-list">
 					<p class="menu-label" onclick=set_chat>
 						{ icon }
 						<span class="entry-expand">{ &con.server.name }</span>
 					</p>
-					{ for iter::successors(channels.get(&ChannelId(0)).unwrap().first_child, |c| channels.get(c).and_then(|c| c.after))
-						.map(|c| self.view_channel(con, &channels, c, own_client, own_channel)) }
+					{ for iter::successors(ctx.channels.get(&ChannelId(0)).unwrap().first_child, |c| ctx.channels.get(c).and_then(|c| c.after))
+						.map(|c| self.view_channel(con, &ctx, c)) }
 				</ul>
 			</div>
 		}
@@ -266,4 +306,13 @@ struct ChannelBuildNode<'a> {
 	after: Option<ChannelId>,
 	first_child: Option<ChannelId>,
 	clients: Vec<ClientId>,
+}
+
+struct ViewContext<'a> {
+	channels: HashMap<ChannelId,ChannelBuildNode<'a>>,
+	own_client: ClientId,
+	own_channel: ChannelId,
+	selected_channel: Option<ChannelId>,
+	selected_client: Option<ClientId>,
+	selected_server: bool,
 }
