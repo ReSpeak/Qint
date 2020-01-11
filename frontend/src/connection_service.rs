@@ -5,7 +5,7 @@ use failure::{format_err, Error};
 use futures::channel::oneshot;
 use futures::prelude::*;
 use qint_shared::*;
-use ts_bookkeeping::{TsError, Uid};
+use ts_bookkeeping::{ClientId, TsError, Uid};
 use ts_bookkeeping::data::Connection;
 use ts_bookkeeping::events::Event;
 use ts_bookkeeping::messages::s2c::{InCommandError, InMessage, InMessages, InMessageTrait};
@@ -46,8 +46,16 @@ pub struct Connected {
 	/// The public key of the server
 	pub key: Vec<u8>,
 
-	pub composing: String,
+	pub chat: SelectedChat,
+	pub composing: HashMap<SelectedChat, String>,
 	pub composing_command: String,
+}
+
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+pub struct SelectedChat {
+	pub chat_type: ChatType,
+	/// If a client on the current server is selected, this is its id.
+	pub client: Option<ClientId>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -199,12 +207,17 @@ impl ConnectionService {
 
 impl Connected {
 	pub fn new(ws: WebSocketTask, key: Vec<u8>, con: Connection) -> Self {
+		let chat = SelectedChat {
+			chat_type: ChatType::Server,
+			client: None,
+		};
 		Self {
 			ws,
 			message_handler: Default::default(),
 			con,
 			key,
 
+			chat,
 			composing: Default::default(),
 			composing_command: Default::default(),
 		}

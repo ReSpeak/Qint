@@ -1,4 +1,3 @@
-use qint_shared::ChatType;
 use yew::html;
 use yew::prelude::*;
 
@@ -11,13 +10,12 @@ mod chat;
 mod sidebar;
 
 pub struct Connected {
-	link: ComponentLink<Self>,
 	con: ConnectionId,
-	chat_type: ChatType,
+	set_chat: Callback<SelectedChat>,
 }
 
 pub enum Msg {
-	SetChat(ChatType),
+	SetChat(SelectedChat),
 }
 
 #[derive(Clone, PartialEq, Properties)]
@@ -31,20 +29,25 @@ impl Component for Connected {
 	type Properties = Props;
 
 	fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
+		let set_chat = link.callback(move |c| {
+			Msg::SetChat(c)
+		});
 		Self {
-			link,
 			con: props.connection,
-			chat_type: ChatType::Server,
+			set_chat,
 		}
 	}
 
 	fn update(&mut self, msg: Self::Message) -> ShouldRender {
 		match msg {
-			Msg::SetChat(c) => {
-				// TODO This is not optimal and should call Chat::set_chat
-				self.chat_type = c;
-				true
-			}
+			Msg::SetChat(c) => ConnectionService::with_mut_ready_unwrap(&self.con, |con| {
+				if con.chat != c {
+					con.chat = c;
+					true
+				} else {
+					false
+				}
+			}),
 		}
 	}
 
@@ -58,14 +61,13 @@ impl Component for Connected {
 	}
 
 	fn view(&self) -> Html {
-		let set_chat = self.link.callback(move |c| {
-			Msg::SetChat(c)
-		});
-		html! {
-			<div class="connected-container">
-				<SideBar connection=&self.con set_chat=set_chat />
-				<Chat connection=&self.con chat_type=&self.chat_type />
-			</div>
-		}
+		ConnectionService::with_ready_unwrap(&self.con, |con| {
+			html! {
+				<div class="connected-container">
+					<SideBar connection=&self.con set_chat=&self.set_chat />
+					<Chat connection=&self.con chat=&con.chat />
+				</div>
+			}
+		})
 	}
 }

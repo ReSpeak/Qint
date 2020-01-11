@@ -10,7 +10,7 @@ use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use failure::Error;
 use qint_shared::models::{Bookmark, Message as TextMessage};
-use qint_shared::{ChatId, ChatType, MessagesRequest};
+use qint_shared::{BOOKMARKS_LIMIT, ChatId, ChatType, MESSAGES_LIMIT, MessagesRequest};
 use slog::{debug, info, Logger};
 use tsclientlib::Identity;
 use tsproto::crypto::EccKeyPubP256;
@@ -24,9 +24,6 @@ mod models;
 mod schema;
 
 diesel_migrations::embed_migrations!();
-
-const BOOKMARKS_LIMIT: i64 = 20;
-const MESSAGES_LIMIT: i64 = 50;
 
 pub struct DbHandler {
 	logger: Logger,
@@ -262,6 +259,8 @@ impl Handler<EventMsg> for DbHandler {
 				} else {
 					None
 				};
+				let server_name = con.server.name.clone();
+				drop(con);
 
 				// Check if we already know that address
 				if diesel::select(diesel::dsl::exists(
@@ -271,12 +270,12 @@ impl Handler<EventMsg> for DbHandler {
 				{
 					// Update
 					diesel::update(servers.filter(public_key.eq(&key)))
-						.set((name.eq(&con.server.name), address.eq(&addr)))
+						.set((name.eq(&server_name), address.eq(&addr)))
 						.execute(&self.con)?;
 				} else {
 					let server = models::ServerInsert {
 						public_key: &key,
-						name: &con.server.name,
+						name: &server_name,
 						address: &addr,
 						icon: icon_id,
 					};
@@ -326,7 +325,7 @@ impl Handler<GetBookmarksMsg> for DbHandler {
 					.and(bookmarks::channel.eq(channels::id.nullable()))),
 			)
 			.order((bookmarks::bookmark, bookmarks::last_used))
-			.limit(BOOKMARKS_LIMIT)
+			.limit(BOOKMARKS_LIMIT as i64)
 			.select((
 				bookmarks::id,
 				bookmarks::name,
@@ -380,7 +379,7 @@ impl Handler<GetMessagesMsg> for DbHandler {
 			.filter(messages::chat.eq(chat))
 			.left_outer_join(clients::table)
 			.order((messages::time.desc(), messages::id))
-			.limit(MESSAGES_LIMIT)
+			.limit(MESSAGES_LIMIT as i64)
 			.select((
 				messages::id,
 				messages::invoker,

@@ -1,4 +1,3 @@
-use qint_shared::ChatType;
 use stdweb::js;
 use ts_bookkeeping::DisconnectOptions;
 use yew::html;
@@ -11,7 +10,7 @@ use super::channel_tree::ChannelTree;
 pub struct SideBar {
 	link: ComponentLink<Self>,
 	con: ConnectionId,
-	set_chat: Callback<ChatType>,
+	set_chat: Callback<SelectedChat>,
 }
 
 pub enum Msg {
@@ -24,7 +23,7 @@ pub struct Props {
 	#[props(required)]
 	pub connection: ConnectionId,
 	#[props(required)]
-	pub set_chat: Callback<ChatType>,
+	pub set_chat: Callback<SelectedChat>,
 }
 
 impl Component for SideBar {

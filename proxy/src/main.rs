@@ -17,7 +17,7 @@ use bytes::BytesMut;
 use failure::{format_err, Error};
 use futures::prelude::*;
 use serde::Deserialize;
-use slog::{error, info, o, warn, Drain, Logger};
+use slog::{debug, error, info, o, warn, Drain, Logger};
 use structopt::StructOpt;
 use tokio::net::TcpStream;
 use tokio_util::codec::{BytesCodec, FramedRead};
@@ -191,7 +191,9 @@ async fn download_file(
 {
 	let channel = ChannelId(data.1);
 	let cons = state.connections.lock().unwrap();
-	if let Some(con) = cons.get(&ConnectionId(data.0)) {
+	if let Some(con) = cons.get(&ConnectionId(data.0)).cloned() {
+		drop(cons);
+		debug!(state.logger, "Downloading file"; "channel" => data.1, "path" => &data.2);
 		let (len, file_stream): (u64, TcpStream) = con
 			.send(websocket::DownloadFile { channel, path: data.2.clone() })
 			.await??;

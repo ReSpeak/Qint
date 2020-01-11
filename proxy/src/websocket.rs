@@ -43,11 +43,7 @@ struct ProxyCommandObserver {
 	addr: Addr<Ws>,
 }
 
-// TODO Should not be an enum but two different messages
-enum WsMessage {
-	Packet(InCommandMsg),
-	Message(MessageP2F),
-}
+struct WsCommandMsg(InCommandMsg);
 
 pub(crate) struct DownloadFile {
 	pub channel: ChannelId,
@@ -66,7 +62,7 @@ impl Drop for Ws {
 	}
 }
 
-impl Message for WsMessage {
+impl Message for WsCommandMsg {
 	type Result = Result<(), ()>;
 }
 
@@ -225,31 +221,25 @@ impl Ws {
 	}
 }
 
-impl Handler<WsMessage> for Ws {
+impl Handler<WsCommandMsg> for Ws {
 	type Result = Box<dyn ActorFuture<Output = Result<(), ()>, Actor = Self>>;
 	fn handle(
 		&mut self,
-		msg: WsMessage,
+		WsCommandMsg(packet): WsCommandMsg,
 		ctx: &mut Self::Context,
 	) -> Self::Result
 	{
-		match msg {
-			WsMessage::Packet(packet) => {
-				// Block sending the initserver until the public key is sent
-				if let Some(recv) = self.pk_recv.take() {
-					let (send2, recv2) = oneshot::channel();
-					self.pk_recv = Some(recv2);
-					return Box::new(wrap_future(recv).map(|_, _, ctx| {
-						Self::send_message(&MessageP2F::Packet(packet), ctx);
-						let _ = send2.send(());
-						Ok(())
-					}));
-				} else {
-					Self::send_message(&MessageP2F::Packet(packet), ctx);
-				}
-
-			}
-			WsMessage::Message(msg) => Self::send_message(&msg, ctx),
+		// Block sending the initserver until the public key is sent
+		if let Some(recv) = self.pk_recv.take() {
+			let (send2, recv2) = oneshot::channel();
+			self.pk_recv = Some(recv2);
+			return Box::new(wrap_future(recv).map(|_, _, ctx| {
+				Self::send_message(&MessageP2F::Packet(packet), ctx);
+				let _ = send2.send(());
+				Ok(())
+			}));
+		} else {
+			Self::send_message(&MessageP2F::Packet(packet), ctx);
 		}
 		Box::new(wrap_future(future::ok(())))
 	}
@@ -557,7 +547,7 @@ impl<T> InCommandObserver<T> for ProxyCommandObserver {
 	)
 	{
 		let logger = self.logger.clone();
-		tokio::spawn(self.addr.send(WsMessage::Packet(cmd.into())).map(
+		tokio::spawn(self.addr.send(WsCommandMsg(cmd.into())).map(
 			move |r| {
 				if let Err(e) = r {
 					error!(logger, "Failed to redirect packet to websocket connection";

@@ -11,6 +11,9 @@ use tsproto_packets::packets::{Direction, InCommand, OutPacket, PacketType};
 
 pub mod models;
 
+pub const BOOKMARKS_LIMIT: usize = 20;
+pub const MESSAGES_LIMIT: usize = 50;
+
 // TODO
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum Version {
@@ -60,14 +63,14 @@ pub struct ConnectOptions {
 	pub log_udp_packets: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct ChatId {
 	/// The public key of the server.
 	pub server: Vec<u8>,
 	pub chat_type: ChatType,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum ChatType {
 	Server,
 	Channel(u64),

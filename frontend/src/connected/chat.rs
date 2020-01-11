@@ -1,7 +1,8 @@
 use chrono::NaiveDateTime;
 use failure::Error;
-use qint_shared::{ChatId, ChatType, MessagesRequest};
+use qint_shared::{ChatId, ChatType, MESSAGES_LIMIT, MessagesRequest};
 use qint_shared::models::Message;
+use slog::error;
 use std::borrow::Cow;
 use stdweb::web::event::IEvent;
 use ts_bookkeeping::MessageTarget;
@@ -16,7 +17,10 @@ use crate::connection_service::*;
 pub struct Chat {
 	link: ComponentLink<Self>,
 	con: ConnectionId,
-	chat: ChatId,
+	chat: SelectedChat,
+	/// If `true`, all messages are loaded and there are no older messages available.
+	/// If `false`, we can still load older messages.
+	all_loaded: bool,
 	// TODO More than one
 	// TODO Display loading spinner when there is an active fetch task
 	fetch_task: Option<FetchTask>,
@@ -26,7 +30,8 @@ pub struct Chat {
 
 pub enum Msg {
 	Ignore,
-	Change(Box<dyn FnOnce(&mut Connected)>),
+	ChatChange(String),
+	CommandChange(String),
 	GotMessages(Vec<Message>),
 	NewMessage,
 	SetChatToChannel,
@@ -39,7 +44,7 @@ pub struct Props {
 	#[props(required)]
 	pub connection: ConnectionId,
 	#[props(required)]
-	pub chat_type: ChatType,
+	pub chat: SelectedChat,
 }
 
 impl Component for Chat {
@@ -47,30 +52,21 @@ impl Component for Chat {
 	type Properties = Props;
 
 	fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-		let server = ConnectionService::with_ready_unwrap(&props.connection, |con|
-			con.key.clone()
-		);
 		// On channel change:
 		// TODO Update chat id to new channel if current id points to current channel
 		// TODO Add this as event listener
 
-		let chat = ChatId {
-			server,
-			// TODO Default chat should be channel
-			chat_type: props.chat_type,
-		};
-
 		let mut res = Self {
 			link,
 			con: props.connection,
-			chat,
+			chat: props.chat.clone(),
+			all_loaded: false,
 			fetch_task: None,
 
 			messages: Vec::new(),
 		};
 		res.add_listener();
-		// Request messages
-		res.request_messages(None);
+		res.set_chat(props.chat);
 
 		res
 	}
@@ -78,13 +74,47 @@ impl Component for Chat {
 	fn update(&mut self, msg: Self::Message) -> ShouldRender {
 		match msg {
 			Msg::Ignore => false,
-			Msg::Change(f) => {
-				ConnectionService::with_mut_ready_unwrap(&self.con, f);
+			Msg::ChatChange(s) => {
+				ConnectionService::with_mut_ready_unwrap(&self.con, |con| {
+					con.composing.insert(self.chat.clone(), s);
+				});
 				true
 			}
-			Msg::GotMessages(msgs) => {
-				// TODO Clever insert
-				self.messages = msgs;
+			Msg::CommandChange(s) => {
+				ConnectionService::with_mut_ready_unwrap(&self.con, |con| {
+					con.composing_command = s;
+				});
+				true
+			}
+			Msg::GotMessages(mut msgs) => {
+				self.all_loaded = msgs.len() < MESSAGES_LIMIT;
+				if msgs.is_empty() {
+					return false;
+				}
+				if self.messages.is_empty() {
+					self.messages = msgs;
+					return true;
+				}
+
+				if msgs[0] <= self.messages[0] {
+					// Prepend msgs
+					if let Ok(i) = msgs.binary_search(&self.messages[0]) {
+						ConnectionService::with_unwrap(&self.con, |con| {
+							slog::debug!(con.logger, "Prepend msgs"; "i" => i, "messages[0]" => ?&self.messages[0], "msgs[0]" => ?&msgs[0]);
+							Some(())
+						}, "Connection not found for logging");
+						msgs.truncate(i);
+						msgs.append(&mut self.messages);
+						self.messages = msgs;
+					} else {
+						// There may be a gap between msgs and self.messages,
+						// so we just replace them.
+						self.messages = msgs;
+					}
+				} else {
+					// Append msgs
+					self.messages.append(&mut msgs);
+				}
 				true
 			}
 			Msg::NewMessage => {
@@ -92,26 +122,43 @@ impl Component for Chat {
 				false
 			}
 			Msg::SetChatToChannel => {
-				// Set chat id to channel
-				self.set_chat(ChatType::Channel(ConnectionService::with_mut_ready_unwrap(&self.con, |c| {
+				// TODO Set chat id to channel
+				/*self.set_chat(ChatType::Channel(ConnectionService::with_mut_ready_unwrap(&self.con, |c| {
 					c.con.clients[&c.con.own_client].channel.0
-				})));
+				})));*/
 				false
 			}
 			Msg::Send => {
 				let message_target = match &self.chat.chat_type {
 					ChatType::Server => MessageTarget::Server,
 					ChatType::Channel(_) => MessageTarget::Channel,
-					ChatType::Client(_id) => {
-						// TODO Find a client matching the uid
-						MessageTarget::Client(ts_bookkeeping::ClientId(0))
+					ChatType::Client(_) => {
+						if let Some(id) = self.chat.client {
+							MessageTarget::Client(id)
+						} else {
+							// TODO Show notification
+							ConnectionService::with_unwrap(&self.con, |con| {
+								error!(con.logger, "Cannot send a message without a client id");
+								Some(())
+							}, "Connection not found for sending message");
+							return false;
+						}
 					}
-					ChatType::Poke(_) => panic!("Poke is not valid for the chat"),
+					ChatType::Poke(_) => {
+						// TODO Show notification
+						ConnectionService::with_unwrap(&self.con, |con| {
+							error!(con.logger, "Poke is not valid for the chat");
+							Some(())
+						}, "Connection not found for sending message");
+						return false;
+					}
 				};
 
 				ConnectionService::with_mut_send_unwrap(&self.con, |c| {
-					let cmd = c.con.send_message(message_target, &c.composing);
-					c.composing.clear();
+					let cmd = c.con.send_message(message_target,
+						&c.composing.get(&self.chat).map(String::as_str)
+						.unwrap_or_default());
+					c.composing.remove(&self.chat);
 					Some(cmd)
 				}, "Failed to send message");
 				true
@@ -142,15 +189,15 @@ impl Component for Chat {
 			self.con = props.connection.clone();
 			self.add_listener();
 
-			self.set_chat(props.chat_type.clone());
+			self.set_chat(props.chat.clone());
 
 			true
 		} else {
 			false
 		};
 
-		if self.chat.chat_type != props.chat_type && self.con == props.connection {
-			self.set_chat(props.chat_type);
+		if self.chat != props.chat && self.con == props.connection {
+			self.set_chat(props.chat);
 		}
 		res
 	}
@@ -161,23 +208,25 @@ impl Component for Chat {
 			Msg::Send
 		});
 		let chat_change = self.link.callback(|e: InputData|
-			Msg::Change(Box::new(move |c| c.composing = e.value))
+			Msg::ChatChange(e.value)
 		);
 		let send_command = self.link.callback(|e: SubmitEvent| {
 			e.prevent_default();
 			Msg::SendCommand
 		});
 		let command_change = self.link.callback(|e: InputData|
-			Msg::Change(Box::new(move |c| c.composing_command = e.value))
+			Msg::CommandChange(e.value)
 		);
 
 		ConnectionService::with_ready_unwrap(&self.con, |c| {
+			let msg = c.composing.get(&self.chat).map(String::as_str)
+				.unwrap_or_default();
 			html! {
 				<div class="chat">
 					{ self.view_messages() }
 					<form class="chat-form" onsubmit=send_chat>
 						<input class="input" name="message" type="text"
-							value=&c.composing
+							value=msg
 							oninput=chat_change />
 						<button class="button" name="send" type="submit">
 							{ "Send" }
@@ -213,21 +262,25 @@ impl Chat {
 		}, || panic!("Should be in connected state"));
 	}
 
-	pub fn set_chat(&mut self, chat: ChatType) {
-		if self.chat.chat_type != chat {
-			self.chat.chat_type = chat;
-			self.messages.clear();
-			self.request_messages(None);
-		}
+	pub fn set_chat(&mut self, chat: SelectedChat) {
+		self.chat = chat;
+		self.messages.clear();
+		self.request_messages(None);
 	}
 
 	fn request_messages(&mut self, start: Option<(NaiveDateTime, i64)>) {
-		let mut fetch = FetchService::new();
+		let server = ConnectionService::with_ready_unwrap(&self.con, |con|
+			con.key.clone()
+		);
 		let msg_request = MessagesRequest {
-			chat: self.chat.clone(),
+			chat: ChatId {
+				server,
+				chat_type: self.chat.chat_type.clone(),
+			},
 			start,
 		};
 
+		let mut fetch = FetchService::new();
 		let request = Request::post(&format!("{}/messages", crate::Model::get_http_domain()))
 			.body(MsgPack(&msg_request))
 			.unwrap();

@@ -1,3 +1,5 @@
+use std::cmp::{Ordering, Ord};
+
 use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone};
 use serde::{Deserialize, Serialize};
 
@@ -16,7 +18,7 @@ pub struct Bookmark {
 }
 
 #[cfg_attr(feature = "db", derive(Queryable))]
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Message {
 	pub id: i64,
 	pub invoker: Option<Vec<u8>>,
@@ -38,5 +40,17 @@ pub struct Chat {
 impl Message {
 	pub fn get_date_time(&self) -> DateTime<FixedOffset> {
 		FixedOffset::east(self.timezone).from_utc_datetime(&self.time)
+	}
+}
+
+impl Ord for Message {
+	fn cmp(&self, other: &Self) -> Ordering {
+		self.time.cmp(&other.time).then_with(|| self.id.cmp(&other.id))
+	}
+}
+
+impl PartialOrd for Message {
+	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+		Some(self.cmp(other))
 	}
 }

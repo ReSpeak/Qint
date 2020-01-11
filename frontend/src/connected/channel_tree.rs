@@ -33,7 +33,7 @@ macro_rules! cl_intern {
 pub struct ChannelTree {
 	link: ComponentLink<Self>,
 	con: ConnectionId,
-	set_chat: Callback<ChatType>,
+	set_chat: Callback<SelectedChat>,
 }
 
 pub enum Msg {
@@ -47,7 +47,7 @@ pub struct Props {
 	#[props(required)]
 	pub connection: ConnectionId,
 	#[props(required)]
-	pub set_chat: Callback<ChatType>,
+	pub set_chat: Callback<SelectedChat>,
 }
 
 impl Component for ChannelTree {
@@ -140,8 +140,12 @@ impl ChannelTree {
 		let icon = self.icon(client.icon_id);
 		let set = self.set_chat.clone();
 		let uid = base64::decode(&client.uid.0).unwrap();
+		let id = client.id;
 		let set_chat = self.link.callback(move |_| {
-			set.emit(ChatType::Client(uid.clone()));
+			set.emit(SelectedChat {
+				chat_type: ChatType::Client(uid.clone()),
+				client: Some(id),
+			});
 			Msg::Ignore
 		});
 		html! {
@@ -180,7 +184,10 @@ impl ChannelTree {
 		let change_channel = self.link.callback(move |_| Msg::ChangeChannel(id));
 		let set = self.set_chat.clone();
 		let set_chat = self.link.callback(move |_| {
-			set.emit(ChatType::Channel(id.0));
+			set.emit(SelectedChat {
+				chat_type: ChatType::Channel(id.0),
+				client: None,
+			});
 			Msg::Ignore
 		});
 		html! {
@@ -231,7 +238,10 @@ impl ChannelTree {
 
 		let set = self.set_chat.clone();
 		let set_chat = self.link.callback(move |_| {
-			set.emit(ChatType::Server);
+			set.emit(SelectedChat {
+				chat_type: ChatType::Server,
+				client: None,
+			});
 			Msg::Ignore
 		});
 		let icon = self.icon(con.server.icon_id);
