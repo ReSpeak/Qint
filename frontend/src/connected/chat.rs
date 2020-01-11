@@ -1,9 +1,11 @@
+use std::borrow::Cow;
+
 use chrono::NaiveDateTime;
 use failure::Error;
 use qint_shared::{ChatId, ChatType, MESSAGES_LIMIT, MessagesRequest};
 use qint_shared::models::Message;
 use slog::error;
-use std::borrow::Cow;
+use stdweb::{js, Value};
 use stdweb::web::event::IEvent;
 use ts_bookkeeping::MessageTarget;
 use tsproto_packets::packets::{Direction, Flags, OutCommand, OutPacket, PacketType};
@@ -24,19 +26,30 @@ pub struct Chat {
 	// TODO More than one
 	// TODO Display loading spinner when there is an active fetch task
 	fetch_task: Option<FetchTask>,
+	scroll_down: Callback<()>,
 
 	messages: Vec<Message>,
 }
 
 pub enum Msg {
 	Ignore,
+	/// The user changed the content of the text input
 	ChatChange(String),
+	/// The user changed the content of the command text input
 	CommandChange(String),
+	/// Requested messages arrived arrived from the proxy
 	GotMessages(Vec<Message>),
+	/// A new message arrived
+	// TODO Check if arrived in currently displayed chat
 	NewMessage,
+	// TODO Should be done in mod.rs
 	SetChatToChannel,
+	/// When the user clicked on 'Send'
 	Send,
+	/// When the user clicked on 'Send Command'
 	SendCommand,
+	/// Scroll to the end of the chat
+	ScrollDown,
 }
 
 #[derive(Clone, PartialEq, Properties)]
@@ -55,6 +68,7 @@ impl Component for Chat {
 		// On channel change:
 		// TODO Update chat id to new channel if current id points to current channel
 		// TODO Add this as event listener
+		let scroll_down = link.callback(|()| Msg::ScrollDown);
 
 		let mut res = Self {
 			link,
@@ -62,6 +76,7 @@ impl Component for Chat {
 			chat: props.chat.clone(),
 			all_loaded: false,
 			fetch_task: None,
+			scroll_down,
 
 			messages: Vec::new(),
 		};
@@ -96,13 +111,9 @@ impl Component for Chat {
 					return true;
 				}
 
-				if msgs[0] <= self.messages[0] {
+				if msgs[0] >= self.messages[0] {
 					// Prepend msgs
 					if let Ok(i) = msgs.binary_search(&self.messages[0]) {
-						ConnectionService::with_unwrap(&self.con, |con| {
-							slog::debug!(con.logger, "Prepend msgs"; "i" => i, "messages[0]" => ?&self.messages[0], "msgs[0]" => ?&msgs[0]);
-							Some(())
-						}, "Connection not found for logging");
 						msgs.truncate(i);
 						msgs.append(&mut self.messages);
 						self.messages = msgs;
@@ -176,11 +187,18 @@ impl Component for Chat {
 				});
 				true
 			}
+			Msg::ScrollDown => {
+				js! { @(no_return)
+					document.querySelectorAll(".chat-end")[0].scrollIntoView({behavior: "smooth"});
+				};
+				false
+			}
 		}
 	}
 
 	fn change(&mut self, props: Self::Properties) -> ShouldRender {
-		let res = if self.con != props.connection {
+		let mut changed = false;
+		if self.con != props.connection {
 			// Remove and add listener
 			ConnectionService::with_mut(&props.connection, |con| {
 				con.packet_listeners.remove("chat");
@@ -191,18 +209,18 @@ impl Component for Chat {
 
 			self.set_chat(props.chat.clone());
 
-			true
-		} else {
-			false
-		};
+			changed = true;
+		}
 
 		if self.chat != props.chat && self.con == props.connection {
 			self.set_chat(props.chat);
+			changed = true;
 		}
-		res
+		changed
 	}
 
 	fn view(&self) -> Html {
+		// TODO Store in struct
 		let send_chat = self.link.callback(|e: SubmitEvent| {
 			e.prevent_default();
 			Msg::Send
@@ -327,13 +345,27 @@ impl Chat {
 	}
 
 	fn view_messages(&self) -> Html {
+		// Check if we are at bottom of chat window, if so, scroll to the bottom
+		// after adding new messages.
+		// https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollHeight
+		if let Value::Bool(true) = js! {
+			const elements = document.querySelectorAll(".chat-messages");
+			if (elements.length === 0) {
+				return false;
+			}
+
+			const element = elements[0];
+			return element.scrollHeight - element.scrollTop === element.clientHeight;
+		} {
+			self.scroll_down.emit(());
+		}
+
 		html! {
-			<ul class="chat-messages",>
+			<ul class="chat-messages">
 				{ for self.messages.iter().rev()
 					.map(|m| self.view_message(m)) }
 				<span class="chat-end"></span>
 			</ul>
 		}
-		// TODO Use document.querySelectorAll('.chat-end')[0].scrollIntoView({behavior: "smooth"})
 	}
 }
