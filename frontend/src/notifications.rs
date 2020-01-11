@@ -7,6 +7,7 @@ pub struct Notification {
 
 pub struct Notifications {
 	link: ComponentLink<Self>,
+	notifications: Vec<Notification>,
 }
 
 pub enum Msg {
@@ -24,6 +25,7 @@ impl Component for Notifications {
 	fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
 		Self {
 			link,
+			notifications: Vec::new(),
 		}
 	}
 
@@ -35,8 +37,15 @@ impl Component for Notifications {
 
 	fn view(&self) -> Html {
 		html! {
-			<>
-			</>
+			<div class="notifications">
+				{ for self.notifications.iter().map(|n| self.view_notification(n)) }
+			</div>
 		}
+	}
+}
+
+impl Notifications {
+	fn view_notification(&self, notification: &Notification) -> Html {
+		html! {}
 	}
 }

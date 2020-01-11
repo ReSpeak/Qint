@@ -94,7 +94,7 @@ impl Component for ChannelTree {
 		if self.con != props.connection {
 			// Remove and add listener
 			ConnectionService::with_mut(&props.connection, |con| {
-				con.packet_listeners.remove("channeltree");
+				con.event_listeners.remove("channeltree");
 			}, || {});
 
 			self.con = props.connection;
@@ -118,6 +118,12 @@ impl Component for ChannelTree {
 		ConnectionService::with_ready_unwrap(&self.con, |c| {
 			self.view(&c)
 		})
+	}
+
+	fn destroy(&mut self) {
+		ConnectionService::with_mut(&self.con, |con| {
+			con.event_listeners.remove("channeltree");
+		}, || {});
 	}
 }
 

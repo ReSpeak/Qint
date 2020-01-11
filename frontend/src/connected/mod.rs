@@ -10,12 +10,14 @@ mod chat;
 mod sidebar;
 
 pub struct Connected {
+	link: ComponentLink<Self>,
 	con: ConnectionId,
 	set_chat: Callback<SelectedChat>,
 }
 
 pub enum Msg {
 	SetChat(SelectedChat),
+	SubscribeAll,
 }
 
 #[derive(Clone, PartialEq, Properties)]
@@ -32,10 +34,13 @@ impl Component for Connected {
 		let set_chat = link.callback(move |c| {
 			Msg::SetChat(c)
 		});
-		Self {
+		let res = Self {
+			link,
 			con: props.connection,
 			set_chat,
-		}
+		};
+		res.add_listener();
+		res
 	}
 
 	fn update(&mut self, msg: Self::Message) -> ShouldRender {
@@ -48,12 +53,24 @@ impl Component for Connected {
 					false
 				}
 			}),
+			Msg::SubscribeAll => {
+				ConnectionService::with_mut_send_unwrap(&self.con, |c| {
+					Some(c.con.server.set_subscribed(true))
+				}, "Failed to subscribe channels");
+				false
+			}
 		}
 	}
 
 	fn change(&mut self, props: Self::Properties) -> ShouldRender {
 		if self.con != props.connection {
+			// Remove and add listener
+			ConnectionService::with_mut(&self.con, |con| {
+				con.packet_listeners.remove("connected");
+			}, || {});
+
 			self.con = props.connection;
+			self.add_listener();
 			true
 		} else {
 			false
@@ -69,5 +86,24 @@ impl Component for Connected {
 				</div>
 			}
 		})
+	}
+
+	fn destroy(&mut self) {
+		ConnectionService::with_mut(&self.con, |con| {
+			con.packet_listeners.remove("connected");
+		}, || {});
+	}
+}
+
+impl Connected {
+	fn add_listener(&self) {
+		ConnectionService::with_mut(&self.con, |con| {
+			let subscribe = self.link.callback(|()| Msg::SubscribeAll);
+			con.packet_listeners.insert("connected".into(), Box::new(move |_, packet| {
+				if packet.name() == "channellistfinished" {
+					subscribe.emit(());
+				}
+			}));
+		}, || panic!("Should be in connected state"));
 	}
 }

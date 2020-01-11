@@ -223,7 +223,7 @@ impl Component for Chat {
 				true
 			}
 			Msg::SendCommand => {
-				ConnectionService::with_mut_ready_unwrap(&self.con, |c| {
+				ConnectionService::with_mut_send_unwrap(&self.con, |c| {
 					let mut packet = OutPacket::new_with_dir(Direction::C2S,
 						Flags::empty(), PacketType::Command);
 					let static_args = std::iter::empty();
@@ -232,7 +232,8 @@ impl Component for Chat {
 						&c.composing_command, static_args, list_args, packet.data_mut());
 
 					c.composing_command.clear();
-				});
+					Some(packet)
+				}, "Failed to send command");
 				true
 			}
 			Msg::ScrollDown => {
@@ -298,6 +299,12 @@ impl Component for Chat {
 				</div>
 			}
 		})
+	}
+
+	fn destroy(&mut self) {
+		ConnectionService::with_mut(&self.con, |con| {
+			con.event_listeners.remove("chat");
+		}, || {});
 	}
 }
 

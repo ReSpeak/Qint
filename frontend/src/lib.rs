@@ -63,7 +63,8 @@ impl Model {
 			}).unwrap_or_else(|| "ws://localhost".into())
 	}
 
-	fn connect(&mut self, options: ConnectOptions) -> Result<(),Error> {
+	fn connect(&mut self, mut options: ConnectOptions) -> Result<(),Error> {
+		//options.log_commands = true;
 		let logger = self.logger.clone();
 		let callback = self.link.callback(move |data: WsMsg| {
 			match data {
