@@ -65,7 +65,7 @@ impl Component for Connected {
 			html! {
 				<div class="connected-container">
 					<SideBar connection=&self.con chat=&con.chat set_chat=&self.set_chat />
-					<Chat connection=&self.con chat=&con.chat />
+					<Chat connection=&self.con chat=&con.chat set_chat=&self.set_chat />
 				</div>
 			}
 		})

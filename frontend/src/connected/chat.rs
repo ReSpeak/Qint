@@ -1,13 +1,14 @@
 use std::borrow::Cow;
 
 use chrono::NaiveDateTime;
-use failure::Error;
+use failure::{format_err, Error};
 use qint_shared::{ChatId, ChatType, MESSAGES_LIMIT, MessagesRequest};
 use qint_shared::models::Message;
 use slog::error;
 use stdweb::{js, Value};
 use stdweb::web::event::IEvent;
-use ts_bookkeeping::MessageTarget;
+use ts_bookkeeping::{ChannelId, MessageTarget};
+use ts_bookkeeping::events::{Event, PropertyId, PropertyValue};
 use tsproto_packets::packets::{Direction, Flags, OutCommand, OutPacket, PacketType};
 use yew::format::MsgPack;
 use yew::html;
@@ -23,9 +24,13 @@ pub struct Chat {
 	/// If `true`, all messages are loaded and there are no older messages available.
 	/// If `false`, we can still load older messages.
 	all_loaded: bool,
-	// TODO More than one
-	// TODO Display loading spinner when there is an active fetch task
 	fetch_task: Option<FetchTask>,
+	set_chat: Callback<SelectedChat>,
+
+	send_chat: Callback<SubmitEvent>,
+	chat_change: Callback<InputData>,
+	send_command: Callback<SubmitEvent>,
+	command_change: Callback<InputData>,
 	scroll_down: Callback<()>,
 
 	messages: Vec<Message>,
@@ -40,10 +45,17 @@ pub enum Msg {
 	/// Requested messages arrived arrived from the proxy
 	GotMessages(Vec<Message>),
 	/// A new message arrived
-	// TODO Check if arrived in currently displayed chat
-	NewMessage,
-	// TODO Should be done in mod.rs
-	SetChatToChannel,
+	NewMessage(MessageTarget),
+	/// Set the chat to our channel when connecting to a server.
+	///
+	/// We can do this after we known in which channel our client is.
+	/// If the user already changed the chat to a channel or client chat, we do
+	/// nothing.
+	SetChatToChannel(ChannelId),
+	/// Our client changed channel.
+	///
+	/// If the chat displayed the old channel, switch to the new channel.
+	ChannelChanged { old: ChannelId, new: ChannelId },
 	/// When the user clicked on 'Send'
 	Send,
 	/// When the user clicked on 'Send Command'
@@ -58,6 +70,8 @@ pub struct Props {
 	pub connection: ConnectionId,
 	#[props(required)]
 	pub chat: SelectedChat,
+	#[props(required)]
+	pub set_chat: Callback<SelectedChat>,
 }
 
 impl Component for Chat {
@@ -65,9 +79,20 @@ impl Component for Chat {
 	type Properties = Props;
 
 	fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-		// On channel change:
-		// TODO Update chat id to new channel if current id points to current channel
-		// TODO Add this as event listener
+		let send_chat = link.callback(|e: SubmitEvent| {
+			e.prevent_default();
+			Msg::Send
+		});
+		let chat_change = link.callback(|e: InputData|
+			Msg::ChatChange(e.value)
+		);
+		let send_command = link.callback(|e: SubmitEvent| {
+			e.prevent_default();
+			Msg::SendCommand
+		});
+		let command_change = link.callback(|e: InputData|
+			Msg::CommandChange(e.value)
+		);
 		let scroll_down = link.callback(|()| Msg::ScrollDown);
 
 		let mut res = Self {
@@ -76,6 +101,12 @@ impl Component for Chat {
 			chat: props.chat.clone(),
 			all_loaded: false,
 			fetch_task: None,
+			set_chat: props.set_chat,
+
+			send_chat,
+			chat_change,
+			send_command,
+			command_change,
 			scroll_down,
 
 			messages: Vec::new(),
@@ -102,12 +133,14 @@ impl Component for Chat {
 				true
 			}
 			Msg::GotMessages(mut msgs) => {
+				self.fetch_task = None;
 				self.all_loaded = msgs.len() < MESSAGES_LIMIT;
 				if msgs.is_empty() {
-					return false;
+					return true;
 				}
 				if self.messages.is_empty() {
 					self.messages = msgs;
+					self.check_load_messages();
 					return true;
 				}
 
@@ -126,45 +159,60 @@ impl Component for Chat {
 					// Append msgs
 					self.messages.append(&mut msgs);
 				}
+				self.check_load_messages();
 				true
 			}
-			Msg::NewMessage => {
-				self.request_messages(None);
-				false
-			}
-			Msg::SetChatToChannel => {
-				// TODO Set chat id to channel
-				/*self.set_chat(ChatType::Channel(ConnectionService::with_mut_ready_unwrap(&self.con, |c| {
-					c.con.clients[&c.con.own_client].channel.0
-				})));*/
-				false
-			}
-			Msg::Send => {
-				let message_target = match &self.chat.chat_type {
-					ChatType::Server => MessageTarget::Server,
-					ChatType::Channel(_) => MessageTarget::Channel,
-					ChatType::Client(_) => {
-						if let Some(id) = self.chat.client {
-							MessageTarget::Client(id)
-						} else {
-							// TODO Show notification
-							ConnectionService::with_unwrap(&self.con, |con| {
-								error!(con.logger, "Cannot send a message without a client id");
-								Some(())
-							}, "Connection not found for sending message");
-							return false;
-						}
-					}
-					ChatType::Poke(_) => {
+			Msg::NewMessage(from) => {
+				let target = match self.get_message_target() {
+					Ok(r) => r,
+					Err(e) => {
 						// TODO Show notification
 						ConnectionService::with_unwrap(&self.con, |con| {
-							error!(con.logger, "Poke is not valid for the chat");
+							error!(con.logger, "Failed to get message target";
+								"error" => ?e);
 							Some(())
-						}, "Connection not found for sending message");
+						}, "Connection not found for logger");
 						return false;
 					}
 				};
-
+				if from == target {
+					self.request_messages(None);
+					true
+				} else {
+					false
+				}
+			}
+			Msg::SetChatToChannel(channel) => {
+				if self.chat.chat_type == ChatType::Server {
+					self.set_chat.emit(SelectedChat {
+						chat_type: ChatType::Channel(channel.0),
+						client: None,
+					});
+				}
+				false
+			}
+			Msg::ChannelChanged { old, new } => {
+				if self.chat.chat_type == ChatType::Channel(old.0) {
+					self.set_chat.emit(SelectedChat {
+						chat_type: ChatType::Channel(new.0),
+						client: None,
+					});
+				}
+				false
+			}
+			Msg::Send => {
+				let message_target = match self.get_message_target() {
+					Ok(r) => r,
+					Err(e) => {
+						// TODO Show notification
+						ConnectionService::with_unwrap(&self.con, |con| {
+							error!(con.logger, "Failed to get message target";
+								"error" => ?e);
+							Some(())
+						}, "Connection not found for logger");
+						return false;
+					}
+				};
 				ConnectionService::with_mut_send_unwrap(&self.con, |c| {
 					let cmd = c.con.send_message(message_target,
 						&c.composing.get(&self.chat).map(String::as_str)
@@ -201,7 +249,7 @@ impl Component for Chat {
 		if self.con != props.connection {
 			// Remove and add listener
 			ConnectionService::with_mut(&props.connection, |con| {
-				con.packet_listeners.remove("chat");
+				con.event_listeners.remove("chat");
 			}, || {});
 
 			self.con = props.connection.clone();
@@ -216,44 +264,33 @@ impl Component for Chat {
 			self.set_chat(props.chat);
 			changed = true;
 		}
+
+		if self.set_chat != props.set_chat {
+			self.set_chat = props.set_chat;
+		}
+
 		changed
 	}
 
 	fn view(&self) -> Html {
-		// TODO Store in struct
-		let send_chat = self.link.callback(|e: SubmitEvent| {
-			e.prevent_default();
-			Msg::Send
-		});
-		let chat_change = self.link.callback(|e: InputData|
-			Msg::ChatChange(e.value)
-		);
-		let send_command = self.link.callback(|e: SubmitEvent| {
-			e.prevent_default();
-			Msg::SendCommand
-		});
-		let command_change = self.link.callback(|e: InputData|
-			Msg::CommandChange(e.value)
-		);
-
 		ConnectionService::with_ready_unwrap(&self.con, |c| {
 			let msg = c.composing.get(&self.chat).map(String::as_str)
 				.unwrap_or_default();
 			html! {
 				<div class="chat">
 					{ self.view_messages() }
-					<form class="chat-form" onsubmit=send_chat>
+					<form class="chat-form" onsubmit=&self.send_chat>
 						<input class="input" name="message" type="text"
 							value=msg
-							oninput=chat_change />
+							oninput=&self.chat_change />
 						<button class="button" name="send" type="submit">
 							{ "Send" }
 						</button>
 					</form>
-					<form class="chat-form" onsubmit=send_command>
+					<form class="chat-form" onsubmit=&self.send_command>
 						<input class="input" name="message" type="text"
 							value=&c.composing_command
-							oninput=command_change />
+							oninput=&self.command_change />
 						<button class="button" name="send" type="submit">
 							{ "Send Command" }
 						</button>
@@ -268,19 +305,48 @@ impl Chat {
 	fn add_listener(&self) {
 		// Listen for new messages
 		ConnectionService::with_mut(&self.con, |con| {
-			let new_msg = self.link.callback(|_| Msg::NewMessage);
-			let channel_msg = self.link.callback(|_| Msg::SetChatToChannel);
-			con.packet_listeners.insert("chat".into(), Box::new(move |_, msg| {
-				if msg.name() == "notifytextmessage" {
-					new_msg.emit(());
-				} else if msg.name() == "channellistfinished" {
-					channel_msg.emit(());
+			let new_msg = self.link.callback(|from| Msg::NewMessage(from));
+			let chat_to_channel = self.link.callback(|c| Msg::SetChatToChannel(c));
+			let channel_changed = self.link.callback(|(old, new)|
+				Msg::ChannelChanged { old, new });
+			con.event_listeners.insert("chat".into(), Box::new(move |con, events| {
+				for e in events {
+					match e {
+						Event::PropertyAdded { id, .. } => {
+							if let FrontendConnectionState::Connected(con) = &con.state {
+								if let PropertyId::Client(id) = id {
+									if *id == con.con.own_client {
+										// We can switch to our own channel
+										chat_to_channel.emit(con.con.clients[id].channel);
+									}
+								}
+							}
+						}
+						Event::PropertyChanged { id, old, .. } => {
+							// On channel change
+							if let FrontendConnectionState::Connected(con) = &con.state {
+								if let PropertyId::ClientChannel(id) = id {
+									if *id == con.con.own_client {
+										if let PropertyValue::ChannelId(chan) = old {
+											channel_changed.emit((*chan,
+												con.con.clients[id].channel));
+										}
+									}
+								}
+							}
+						}
+						Event::Message { from, .. } => {
+							new_msg.emit(from.clone());
+						}
+						_ => {}
+					}
 				}
 			}));
 		}, || panic!("Should be in connected state"));
 	}
 
 	pub fn set_chat(&mut self, chat: SelectedChat) {
+		self.all_loaded = false;
 		self.chat = chat;
 		self.messages.clear();
 		self.request_messages(None);
@@ -313,6 +379,49 @@ impl Chat {
 					}
 				}
 			})));
+	}
+
+	/// Check if more messages should be loaded.
+	fn check_load_messages(&mut self) {
+		if self.all_loaded {
+			return;
+		}
+
+		if let Value::Bool(true) = js! {
+			const elements = document.querySelectorAll(".chat-messages");
+			if (elements.length === 0) {
+				return false;
+			}
+
+			const element = elements[0];
+			// Less than 10% of the screen height is left as a buffer
+			return element.scrollTop / element.clientHeight <= 0.1;
+		} {
+			// Need more messages
+			let start = if let Some(msg) = self.messages.last() {
+				Some((msg.time, msg.id))
+			} else {
+				None
+			};
+			self.request_messages(start);
+		}
+	}
+
+	fn get_message_target(&self) -> Result<MessageTarget, Error> {
+		match &self.chat.chat_type {
+			ChatType::Server => Ok(MessageTarget::Server),
+			ChatType::Channel(_) => Ok(MessageTarget::Channel),
+			ChatType::Client(_) => {
+				if let Some(id) = self.chat.client {
+					Ok(MessageTarget::Client(id))
+				} else {
+					Err(format_err!("Cannot send a message without a client id"))
+				}
+			}
+			ChatType::Poke(_) => {
+				Err(format_err!("Poke is not valid for the chat"))
+			}
+		}
 	}
 
 	fn view_message(&self, msg: &Message) -> Html {
@@ -360,8 +469,18 @@ impl Chat {
 			self.scroll_down.emit(());
 		}
 
+		// Display loading spinner when there is an active fetch task
+		let spinner = if self.fetch_task.is_some() {
+			html! {
+				<div class="is-loading" style="color: gray; font-style: italic; text-align: center;">{ "Loading…" }</div>
+			}
+		} else {
+			html!{}
+		};
+
 		html! {
 			<ul class="chat-messages">
+				{ spinner }
 				{ for self.messages.iter().rev()
 					.map(|m| self.view_message(m)) }
 				<span class="chat-end"></span>

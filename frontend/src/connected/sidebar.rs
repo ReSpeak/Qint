@@ -16,7 +16,7 @@ pub struct SideBar {
 
 pub enum Msg {
 	Ignore,
-	Disconnect
+	Disconnect,
 }
 
 #[derive(Clone, PartialEq, Properties)]

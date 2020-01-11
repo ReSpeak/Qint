@@ -15,6 +15,7 @@ use crate::connection_service::{ConnectionId, ConnectionService, FrontendConnect
 mod connect;
 mod connected;
 mod connection_service;
+mod notifications;
 mod webrtc;
 
 pub struct Model {
@@ -274,9 +275,10 @@ impl Component for Model {
 			let switchtalking = self.link.callback(move |_| Msg::SetTalking(!is_talking));
 			html! {
 				<>
-				<audio id="audio-playback" autoplay="autoplay" />
-				<Connected connection=self.con.as_ref().unwrap() />
-				<button style="position:absolute; right: 0" onclick=switchtalking>{ talking }</button>
+					<audio id="audio-playback" autoplay="autoplay" />
+					<Connected connection=self.con.as_ref().unwrap() />
+					<button style="position:absolute; right: 0" onclick=switchtalking>{ talking }</button>
+					<notifications::Notifications />
 				</>
 			}
 		}

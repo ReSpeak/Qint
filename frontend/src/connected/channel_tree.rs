@@ -109,7 +109,6 @@ impl Component for ChannelTree {
 
 		if self.set_chat != props.set_chat {
 			self.set_chat = props.set_chat;
-			changed = true;
 		}
 
 		changed
