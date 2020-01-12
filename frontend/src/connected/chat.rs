@@ -240,7 +240,13 @@ impl Component for Chat {
 			}
 			Msg::ScrollDown => {
 				js! { @(no_return)
-					document.querySelectorAll(".chat-end")[0].scrollIntoView({behavior: "smooth"});
+					document.querySelectorAll(".chat-messages .latex_proc").forEach(elem => {
+						elem.classList.remove("latex_proc");
+						renderMathInElement(elem, {
+							errorCallback: (err) => { console.log("Failed to LaTeX", err); }
+						});
+					});
+					document.querySelector(".chat-end").scrollIntoView({behavior: "smooth"});
 				};
 				false
 			}
@@ -463,7 +469,7 @@ impl Chat {
 						{ msg.get_date_time().format("%H:%M") }
 					</span>
 				</div>
-				<div class="message-content">
+				<div class="message-content latex_proc">
 					{ &msg.content }
 				</div>
 			</>
