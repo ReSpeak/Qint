@@ -61,9 +61,22 @@
 .connected-container > * {
   display: inline-block;
 }
+.sidebar {
+  border-right: 1px solid black;
+}
 .channel-list {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background-color: white;
-  padding: 1em 0em 1em 1em;
+  padding: 0;
+}
+.channel-list .menu-label:not(:last-child) {
+  padding: 1.5em 0.5em;
+  margin-bottom: 0;
+  position: relative;
+  box-shadow: 0 0.3em 0.3em #BBB;
+  font-weight: bold;
 }
 .channel-list .channel-line {
   display: flex;
@@ -71,9 +84,6 @@
 }
 .channel-list .entry-expand {
   flex: 1;
-}
-.channel-list .menu-list li ul {
-  margin-right: 0 !important;
 }
 .channel-list .menu-list li ul {
   margin: 0 !important;
@@ -85,16 +95,22 @@
 .channel-list .own-channel {
   font-weight: bold;
 }
-.channel-list .selected-channel a.description,
-.channel-list .selected-client a.description {
+.channel-list .selected-channel a,
+.channel-list .selected-client a {
   background-image: linear-gradient(to left, rgba(74, 75, 234, 0.3), rgba(255, 255, 255, 0));
 }
 .channel-list .line-main-icon {
   font-size: 16px;
   margin-right: 0.25em;
 }
+.channel-list .collapse-button {
+  margin-left: 0.5em;
+}
 .channel-list .collapsed {
   display: none;
+}
+.channel-list > .menu-list {
+  overflow-y: auto;
 }
 .chat {
   display: inline-flex;
@@ -160,12 +176,13 @@
   box-shadow: 0.2em 0.2em 0.5em gray;
 }
 .sidebar {
+  display: inline-flex;
+  flex-direction: column;
   position: absolute;
   top: 0;
   bottom: 0;
   box-sizing: border-box;
   width: var(--channel-tree-width);
-  overflow-y: auto;
   background-color: #eeeeee;
   border-right: #b3b3b3 2px solid;
 }
@@ -175,6 +192,9 @@
   right: 0;
   top: 0;
   bottom: 0;
+}
+.sidebar .level:not(:last-child) {
+  margin-bottom: 0;
 }
 :root {
   --channel-tree-width: 20em;

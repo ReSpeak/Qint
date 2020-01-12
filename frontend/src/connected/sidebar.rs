@@ -111,11 +111,7 @@ impl Component for SideBar {
 					</div>
 				</div>
 
-				<hr />
-
 				<ChannelTree connection=&self.con chat=&self.chat set_chat=&self.set_chat />
-
-				<hr />
 
 				<div class="menu">
 					<ul class="menu-list">

@@ -1,6 +1,17 @@
 .channel-list {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
 	background-color: white;
-	padding: 1em 0em 1em 1em;
+	padding: 0;
+
+	.menu-label:not(:last-child) {
+		padding: 1.5em 0.5em;
+		margin-bottom: 0;
+		position: relative;
+		box-shadow: 0 0.3em 0.3em #BBB;
+		font-weight: bold;
+	}
 
 	.channel-line {
 		display: flex;
@@ -16,18 +27,15 @@
 		flex: 1;
 	}
 	
-	// overwrite to prevent right stacking
-	.menu-list li ul {
-		margin-right: 0 !important;
-	}
-	
 	// Compress layout
-	.menu-list li ul {
-		margin: 0 !important;
-	}
+	.menu-list {
+		li ul {
+			margin: 0 !important;
+		}
 
-	.menu-list a {
-		padding-left: 0 !important;
+		a {
+			padding-left: 0 !important;
+		}
 	}
 
 	.own-client, .own-channel {
@@ -35,7 +43,7 @@
 	}
 
 	.selected-channel, .selected-client {
-		a.description {
+		a {
 			background-image: linear-gradient(to left, rgba(74,75,234,0.3), rgba(255,255,255,0));
 		}
 	}
@@ -45,7 +53,15 @@
 		margin-right: 0.25em;
 	}
 
+	.collapse-button {
+		margin-left: 0.5em;
+	}
+
 	.collapsed {
 		display: none;
 	}
+}
+
+.channel-list > .menu-list {
+	overflow-y: auto;
 }

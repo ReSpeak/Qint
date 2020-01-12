@@ -319,7 +319,7 @@ impl ChannelTree {
 						"channel-line",
 						("own-client", ctx.own_channel == id),
 						("selected-channel", ctx.selected_channel == Some(id))]}>
-					<a onclick=toggle_collapse>{ Self::mdi_icon(collapse_icon) }</a>
+					<span class="collapse-button" onclick=toggle_collapse>{ Self::mdi_icon(collapse_icon) }</span>
 					<a class="entry-expand" ondoubleclick=change_channel onclick=set_chat oncontextmenu=context_request>
 						{ icon }
 						<span class="entry-expand">{ &channel.name }</span>
@@ -391,11 +391,11 @@ impl ChannelTree {
 		let icon = self.icon(con.server.icon_id).unwrap_or_else(|| Self::mdi_icon(SERVER_ICON));
 		html! {
 			<div class="menu channel-list">
+				<p class="menu-label" onclick=set_chat>
+					{ icon }
+					<span class="entry-expand">{ &con.server.name }</span>
+				</p>
 				<ul class="menu-list">
-					<p class="menu-label" onclick=set_chat>
-						{ icon }
-						<span class="entry-expand">{ &con.server.name }</span>
-					</p>
 					{ for iter::successors(ctx.channels.get(&ChannelId(0)).unwrap().first_child, |c| ctx.channels.get(c).and_then(|c| c.after))
 						.map(|c| self.view_channel(con, &ctx, c)) }
 				</ul>
