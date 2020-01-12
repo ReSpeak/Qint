@@ -377,7 +377,6 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 										actor.connection = Some(con);
 
 										// Activate audio
-										// TODO Handle disconnect
 										let logger = actor.logger.clone();
 										let a2ts =
 											actor.state.audio_data.a2ts.clone();

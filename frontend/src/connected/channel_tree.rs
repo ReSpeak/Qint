@@ -1,9 +1,10 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::iter;
 
 use qint_shared::ChatType;
 use ts_bookkeeping::{ChannelId, ClientId, IconHash};
 use ts_bookkeeping::data::{Channel, Client, Connection};
+use ts_bookkeeping::events::{Event, PropertyId};
 use yew::html;
 use yew::prelude::*;
 
@@ -40,12 +41,16 @@ pub struct ChannelTree {
 	con: ConnectionId,
 	chat: SelectedChat,
 	set_chat: Callback<SelectedChat>,
+	/// All collapsed channels.
+	collapsed: HashSet<ChannelId>,
 }
 
 pub enum Msg {
 	Ignore,
 	ChannelChanged,
 	ChangeChannel(ChannelId),
+	ToggleCollapse(ChannelId, bool),
+	ChannelRemoved(ChannelId),
 }
 
 #[derive(Clone, PartialEq, Properties)]
@@ -68,6 +73,7 @@ impl Component for ChannelTree {
 			con: props.connection,
 			chat: props.chat,
 			set_chat: props.set_chat,
+			collapsed: Default::default(),
 		};
 		res.add_listener();
 		res
@@ -83,6 +89,18 @@ impl Component for ChannelTree {
 						.set_channel(id);
 					Some(cmd)
 				}, "Failed to change channel");
+				false
+			}
+			Msg::ToggleCollapse(chan, col) => {
+				if col {
+					self.collapsed.insert(chan);
+				} else {
+					self.collapsed.remove(&chan);
+				}
+				true
+			}
+			Msg::ChannelRemoved(chan) => {
+				self.collapsed.remove(&chan);
 				false
 			}
 		}
@@ -132,12 +150,27 @@ impl ChannelTree {
 		// Listen for new messages
 		ConnectionService::with_mut(&self.con, |con| {
 			let callback = self.link.callback(|_| Msg::ChannelChanged);
+			let chan_rem = self.link.callback(|id| Msg::ChannelRemoved(id));
 			con.event_listeners.insert("channeltree".into(), Box::new(move |_, events| {
-				for _e in events {
-					// TODO If channel or clients are modified
-					// If the id is a ChannelId or ClientId
+				let mut should_emit = false;
+				for e in events {
+					if let Event::PropertyRemoved { id: PropertyId::Channel(id), .. } = e {
+						chan_rem.emit(*id);
+					}
+
+					// Check if something changed in the tree
+					match e {
+						// Ignore messages
+						Event::Message { .. } => {}
+						_ => {
+							should_emit = true;
+							break;
+						}
+					}
 				}
-				callback.emit(());
+				if should_emit {
+					callback.emit(());
+				}
 			}));
 		}, || panic!("Should be in connected state"));
 
@@ -183,7 +216,7 @@ impl ChannelTree {
 						("own-client", ctx.own_client == id),
 						("selected-client", ctx.selected_client == Some(id))] } >
 					{ Self::mdi_icon("") }
-					<a class="entry-expand" onclick=set_chat>
+					<a class="entry-expand description" onclick=set_chat>
 						{ icon }
 						<span class="entry-expand">{ &client.name }</span>
 					</a>
@@ -204,8 +237,22 @@ impl ChannelTree {
 		clients.sort_by(|a, b| a.talk_power.cmp(&b.talk_power).reverse()
 			.then_with(|| a.name.cmp(&b.name)));
 
+		let collapsed = self.collapsed.contains(&id);
+		let collapse_icon = if cbn.first_child.is_some() || !clients.is_empty() {
+			if collapsed {
+				"chevron-right"
+			} else {
+				"chevron-right mdi-rotate-90"
+			}
+		} else {
+			""
+		};
+
 		let icon = channel.icon_id.and_then(|i| self.icon(i)).unwrap_or_else(|| Self::mdi_icon(CHANNEL_ICON));
 		let change_channel = self.link.callback(move |_| Msg::ChangeChannel(id));
+		let toggle_collapse = self.link.callback(move |_| {
+			Msg::ToggleCollapse(id, !collapsed)
+		});
 		let set = self.set_chat.clone();
 		let set_chat = self.link.callback(move |_| {
 			set.emit(SelectedChat {
@@ -220,13 +267,13 @@ impl ChannelTree {
 						"channel-line",
 						("own-client", ctx.own_channel == id),
 						("selected-channel", ctx.selected_channel == Some(id))]}>
-					{ Self::mdi_icon(if cbn.first_child.is_some() || !clients.is_empty() { "chevron-down" } else { "" }) }
-					<a class="entry-expand" ondoubleclick=change_channel onclick=set_chat>
+					<a onclick=toggle_collapse>{ Self::mdi_icon(collapse_icon) }</a>
+					<a class="entry-expand description" ondoubleclick=change_channel onclick=set_chat>
 						{ icon }
 						<span class="entry-expand">{ &channel.name }</span>
 					</a>
 				</div>
-				<ul class="menu-list">
+				<ul class=cl!["menu-list", ("collapsed", collapsed)]>
 					// Clients
 					{ for clients.iter().map(|client| self.view_client(ctx, client)) }
 					// Channels

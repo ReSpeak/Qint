@@ -85,13 +85,16 @@
 .channel-list .own-channel {
   font-weight: bold;
 }
-.channel-list .selected-channel a,
-.channel-list .selected-client a {
+.channel-list .selected-channel a.description,
+.channel-list .selected-client a.description {
   background-image: linear-gradient(to left, rgba(74, 75, 234, 0.3), rgba(255, 255, 255, 0));
 }
 .channel-list .line-main-icon {
   font-size: 16px;
   margin-right: 0.25em;
+}
+.channel-list .collapsed {
+  display: none;
 }
 .chat {
   display: inline-flex;
