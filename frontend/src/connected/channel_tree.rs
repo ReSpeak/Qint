@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::iter;
 
 use qint_shared::ChatType;
-use ts_bookkeeping::{ChannelId, ClientId, IconHash};
+use ts_bookkeeping::{ChannelId, ClientId};
 use ts_bookkeeping::data::{Channel, Client, Connection};
 use ts_bookkeeping::events::{Event, PropertyId};
 use yew::html;
@@ -11,8 +11,8 @@ use stdweb::js;
 use stdweb::web::event::IEvent;
 use crate::controls::context_menu::{ContextMenu, Pos2D};
 
-use crate::{CHANNEL_ICON, CLIENT_ICON, SERVER_ICON};
 use crate::connection_service::*;
+use crate::controls::icon::Icon;
 
 macro_rules! cl {
 	( $( $x:tt ),* ) => {
@@ -191,29 +191,8 @@ impl ChannelTree {
 
 	}
 
-	fn icon(&self, icon: IconHash) -> Option<Html> {
-		if icon.0 != 0 {
-			Some(html! {
-				<span class="icon is-small line-main-icon" style=format!("background: url(/file/{}/0/icon_{})", self.con.0, icon.0)>
-					<i class="mdi mdi-dummy"></i>
-				</span>
-			})
-		} else {
-			None
-		}
-	}
-
-	fn mdi_icon(name: &str) -> Html {
-		let name = if name.is_empty() { "dummy" } else { name };
-		html! {
-			<span class="icon is-small line-main-icon">
-				<i class={format!("mdi mdi-{}", name)}></i>
-			</span>
-		}
-	}
-
 	fn view_client(&self, ctx: &ViewContext, client: &Client) -> Html {
-		let icon = self.icon(client.icon_id).unwrap_or_else(|| Self::mdi_icon(CLIENT_ICON));
+		let icon = Icon::client_icon(&self.con, client);
 		let set = self.set_chat.clone();
 		let uid = base64::decode(&client.uid.0).unwrap();
 		let id = client.id;
@@ -248,7 +227,7 @@ impl ChannelTree {
 						"channel-line",
 						("own-client", ctx.own_client == id),
 						("selected-client", ctx.selected_client == Some(id))] } >
-					{ Self::mdi_icon("") }
+					{ Icon::mdi_icon("") }
 					<a class="entry-expand" onclick=set_chat oncontextmenu=context_request>
 						{ icon }
 						<span class="entry-expand">{ &client.name }</span>
@@ -281,7 +260,7 @@ impl ChannelTree {
 			""
 		};
 
-		let icon = channel.icon_id.and_then(|i| self.icon(i)).unwrap_or_else(|| Self::mdi_icon(CHANNEL_ICON));
+		let icon = Icon::channel_icon(&self.con, channel);
 		let change_channel = self.link.callback(move |_| Msg::ChangeChannel(id));
 		let toggle_collapse = self.link.callback(move |_| {
 			Msg::ToggleCollapse(id, !collapsed)
@@ -319,7 +298,7 @@ impl ChannelTree {
 						"channel-line",
 						("own-client", ctx.own_channel == id),
 						("selected-channel", ctx.selected_channel == Some(id))]}>
-					<span class="collapse-button" onclick=toggle_collapse>{ Self::mdi_icon(collapse_icon) }</span>
+					<span class="collapse-button" onclick=toggle_collapse>{ Icon::mdi_icon(collapse_icon) }</span>
 					<a class="entry-expand" ondoubleclick=change_channel onclick=set_chat oncontextmenu=context_request>
 						{ icon }
 						<span class="entry-expand">{ &channel.name }</span>
@@ -388,7 +367,7 @@ impl ChannelTree {
 			});
 			Msg::Ignore
 		});
-		let icon = self.icon(con.server.icon_id).unwrap_or_else(|| Self::mdi_icon(SERVER_ICON));
+		let icon = Icon::server_icon(&self.con, &con.server);
 		html! {
 			<div class="menu channel-list">
 				<p class="menu-label" onclick=set_chat>

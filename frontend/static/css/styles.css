@@ -1,6 +1,10 @@
 .mdi-dummy::before {
   content: "";
 }
+.icon {
+  background-size: contain;
+  background-repeat: no-repeat;
+}
 .connect-container {
   /* https://www.goodfreephotos.com/other-landscapes/scenic-view-of-the-mountains-and-pond-landscape.jpg.php */
   background: url("/background.jpg") repeat fixed center center / cover;
@@ -61,9 +65,6 @@
 .connected-container > * {
   display: inline-block;
 }
-.sidebar {
-  border-right: 1px solid black;
-}
 .channel-list {
   display: flex;
   flex-direction: column;
@@ -99,7 +100,7 @@
 .channel-list .selected-client a {
   background-image: linear-gradient(to left, rgba(74, 75, 234, 0.3), rgba(255, 255, 255, 0));
 }
-.channel-list .line-main-icon {
+.channel-list .icon {
   font-size: 16px;
   margin-right: 0.25em;
 }
@@ -152,20 +153,36 @@
 	border-bottom: none;
 }*/
 .chat-messages {
-  display: flex;
-  flex-direction: column;
-  list-style: none;
   padding: 0.5em;
   overflow-y: auto;
 }
 .chat-messages li {
+  display: grid;
+  grid-template-columns: max-content auto;
   padding-bottom: 0.8em;
 }
-.chat-messages .author {
+.chat-messages li > * {
+  padding: 0.1em 0.5em;
+}
+.chat-messages .invoker-icon {
+  grid-column: 1;
+  grid-row: 1;
+}
+.chat-messages .invoker-name {
+  grid-column: 2;
+  grid-row: 1;
+  margin-top: auto;
+  margin-bottom: auto;
+}
+.chat-messages .message-time {
+  grid-column: 1;
   font-size: 0.8em;
 }
-.chat-messages .chat-message {
-  /*padding-left: 0.3em;*/
+.chat-messages .message-time * {
+  color: gray;
+}
+.chat-messages .message-content {
+  grid-column: 2;
 }
 .round {
   border-radius: 100%;
@@ -186,15 +203,15 @@
   background-color: #eeeeee;
   border-right: #b3b3b3 2px solid;
 }
+.sidebar .level:not(:last-child) {
+  margin-bottom: 0;
+}
 #overlay-plane {
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
   bottom: 0;
-}
-.sidebar .level:not(:last-child) {
-  margin-bottom: 0;
 }
 :root {
   --channel-tree-width: 20em;

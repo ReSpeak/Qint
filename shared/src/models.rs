@@ -28,6 +28,8 @@ pub struct Message {
 	pub timezone: i32,
 
 	pub client_name: Option<String>,
+	pub client_icon: Option<i32>,
+	pub client_avatar: Option<String>,
 }
 
 #[cfg_attr(feature = "db", derive(Queryable))]

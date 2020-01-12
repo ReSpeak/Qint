@@ -363,7 +363,7 @@ impl Handler<GetMessagesMsg> for DbHandler {
 		_: &mut Self::Context,
 	) -> Self::Result
 	{
-		use schema::{clients, messages};
+		use schema::{clients, messages, servers_clients};
 
 		let chat = if let Some(chat) = self.get_chat(&msg.0.chat)? {
 			chat
@@ -378,6 +378,9 @@ impl Handler<GetMessagesMsg> for DbHandler {
 		let query = messages::table
 			.filter(messages::chat.eq(chat))
 			.left_outer_join(clients::table)
+			.left_outer_join(servers_clients::table.on(
+				servers_clients::client.nullable().eq(messages::invoker)
+				.and(servers_clients::server.eq(&msg.0.chat.server))))
 			.order((messages::time.desc(), messages::id))
 			.limit(MESSAGES_LIMIT as i64)
 			.select((
@@ -387,7 +390,10 @@ impl Handler<GetMessagesMsg> for DbHandler {
 				messages::content,
 				messages::time,
 				messages::timezone,
+
 				clients::name.nullable(),
+				servers_clients::icon.nullable(),
+				servers_clients::avatar.nullable(),
 			));
 		let result = if let Some((time, id)) = msg.0.start {
 			// messages::(time, id) < (time, id), i.e. previous messages

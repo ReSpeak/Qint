@@ -7,7 +7,7 @@ use qint_shared::models::Message;
 use slog::error;
 use stdweb::{js, Value};
 use stdweb::web::event::IEvent;
-use ts_bookkeeping::{ChannelId, MessageTarget};
+use ts_bookkeeping::{ChannelId, IconHash, MessageTarget, UidRef};
 use ts_bookkeeping::events::{Event, PropertyId, PropertyValue};
 use tsproto_packets::packets::{Direction, Flags, OutCommand, OutPacket, PacketType};
 use yew::format::MsgPack;
@@ -15,7 +15,9 @@ use yew::html;
 use yew::prelude::*;
 use yew::services::fetch::{FetchService, FetchTask, Request, Response};
 
+use crate::CLIENT_ICON;
 use crate::connection_service::*;
+use crate::controls::icon::Icon;
 
 pub struct Chat {
 	link: ComponentLink<Self>,
@@ -431,31 +433,48 @@ impl Chat {
 		}
 	}
 
+	fn view_message_header(&self, msg: &Message) -> Html {
+		let icon = if msg.client_avatar.as_ref().map(|a| !a.is_empty()).unwrap_or_default() {
+			Icon::client_avatar(&self.con, UidRef(&base64::encode(msg.invoker.as_ref().unwrap())))
+		} else if let Some(icon) = msg.client_icon {
+			Icon::icon_hash(&self.con, IconHash(icon as u32))
+				.unwrap_or_else(|| Icon::mdi_icon(CLIENT_ICON))
+		} else {
+			Icon::mdi_icon(CLIENT_ICON)
+		};
+
+		html! {
+			<>
+				<div class="invoker-icon">
+					{ icon }
+				</div>
+				<div class="invoker-name">
+					{ msg.client_name.as_ref().or(msg.invoker_name.as_ref()).unwrap() }
+				</div>
+			</>
+		}
+	}
+
 	fn view_message(&self, msg: &Message) -> Html {
 		html! {
-			<li>
-				<article class="media">
-					<figure class="media-left">
-						<p class="image is-32x32">
-							<img class="round" src="128x128.png" />
-						</p>
-					</figure>
-					<div class="media-content">
-						<div class="content">
-							<p>
-								<strong>{ msg.client_name.as_ref().or(msg.invoker_name.as_ref()).unwrap() }</strong>
-								<br />
-								{ &msg.content }
-							</p>
-						</div>
-					</div>
-					// <div class="media-right">
-					// 	<button class="delete"></button>
-					// </div>
-				</article>
+			<>
+				<div class="message-time">
+					<span title={ format!("{}", msg.get_date_time().format("%Y-%m-%d %H:%M, UTC%:z")) }>
+						{ msg.get_date_time().format("%H:%M") }
+					</span>
+				</div>
+				<div class="message-content">
+					{ &msg.content }
+				</div>
+			</>
+		}
+	}
 
-				// <div class="author",>{ &msg.invoker.name }</div>
-				// <div class="chat-message",>{ &msg.message }</div>
+	fn view_message_group(&self, group: &[&Message]) -> Html {
+		html! {
+			<li>
+				{ self.view_message_header(group[0]) }
+				{ for group.iter().map(|m| self.view_message(m)) }
 			</li>
 		}
 	}
@@ -485,11 +504,23 @@ impl Chat {
 			html!{}
 		};
 
+		// Group by same author messages following each other
+		let mut groups: Vec<Vec<&Message>> = Vec::new();
+		for m in self.messages.iter().rev() {
+			if groups.last().map(|l| {
+				let l = l[0];
+				l.invoker == m.invoker && l.invoker_name == m.invoker_name
+			}).unwrap_or_default() {
+				groups.last_mut().unwrap().push(m);
+			} else {
+				groups.push(vec![m]);
+			}
+		}
+
 		html! {
 			<ul class="chat-messages">
 				{ spinner }
-				{ for self.messages.iter().rev()
-					.map(|m| self.view_message(m)) }
+				{ for groups.iter().map(|g| self.view_message_group(g)) }
 				<span class="chat-end"></span>
 			</ul>
 		}

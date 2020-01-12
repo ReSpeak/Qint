@@ -44,23 +44,43 @@
 }*/
 
 .chat-messages {
-	display: flex;
-	flex-direction: column;
-	list-style: none;
 	padding: 0.5em;
 	overflow-y: auto;
-}
 
-.chat-messages li {
-	padding-bottom: 0.8em;
-}
+	li {
+		display: grid;
+		grid-template-columns: max-content auto;
+		padding-bottom: 0.8em;
+	}
 
-.chat-messages .author {
-	font-size: 0.8em;
-}
+	li > * {
+		padding: 0.1em 0.5em;
+	}
 
-.chat-messages .chat-message {
-	/*padding-left: 0.3em;*/
+	.invoker-icon {
+		grid-column: 1;
+		grid-row: 1;
+	}
+
+	.invoker-name {
+		grid-column: 2;
+		grid-row: 1;
+		margin-top: auto;
+		margin-bottom: auto;
+		//font-size: 0.8em;
+	}
+
+	.message-time {
+		grid-column: 1;
+		font-size: 0.8em;
+		* {
+			color: gray;
+		}
+	}
+
+	.message-content {
+		grid-column: 2;
+	}
 }
 
 .round {
