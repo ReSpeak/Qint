@@ -7,6 +7,9 @@ use ts_bookkeeping::data::{Channel, Client, Connection};
 use ts_bookkeeping::events::{Event, PropertyId};
 use yew::html;
 use yew::prelude::*;
+use stdweb::js;
+use stdweb::web::event::IEvent;
+use crate::controls::context_menu::{ContextMenu, Pos2D};
 
 use crate::{CHANNEL_ICON, CLIENT_ICON, SERVER_ICON};
 use crate::connection_service::*;
@@ -38,6 +41,8 @@ pub struct ChannelTree {
 	con: ConnectionId,
 	chat: SelectedChat,
 	set_chat: Callback<SelectedChat>,
+	context_menu: ContextMenuData,
+	close_ctxm: Callback<()>,
 	/// All collapsed channels.
 	collapsed: HashSet<ChannelId>,
 }
@@ -48,6 +53,8 @@ pub enum Msg {
 	ChangeChannel(ChannelId),
 	ToggleCollapse(ChannelId, bool),
 	ChannelRemoved(ChannelId),
+	ContextOpened(ContextMenuData),
+	ContextClosed,
 }
 
 #[derive(Clone, PartialEq, Properties)]
@@ -65,12 +72,15 @@ impl Component for ChannelTree {
 	type Properties = Props;
 
 	fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
+		let close_ctxm = link.callback(|_| { Msg::ContextClosed });
 		let res = Self {
 			link,
 			con: props.connection,
 			chat: props.chat,
 			set_chat: props.set_chat,
 			collapsed: Default::default(),
+			context_menu: ContextMenuData { source: ContextMenuType::None, pos: Pos2D{ x:0, y:0 } },
+			close_ctxm,
 		};
 		res.add_listener();
 		res
@@ -87,6 +97,14 @@ impl Component for ChannelTree {
 					Some(cmd)
 				}, "Failed to change channel");
 				false
+			},
+			Msg::ContextOpened(ctxm) => {
+				self.context_menu = ctxm;
+				true
+			},
+			Msg::ContextClosed => {
+				self.context_menu.source = ContextMenuType::None;
+				true
 			}
 			Msg::ToggleCollapse(chan, col) => {
 				if col {
@@ -206,14 +224,32 @@ impl ChannelTree {
 			});
 			Msg::Ignore
 		});
+		
+		let context_request = self.link.callback(move |e: ContextMenuEvent| {
+			e.prevent_default();
+			Msg::ContextOpened(ContextMenuData{
+				source: ContextMenuType::Client(id),
+				pos: Pos2D { x:e.client_x(), y:e.client_y() },
+			})
+		});
+
+		let cm = if self.context_menu.source == ContextMenuType::Client(id) {
+			html! {
+				<ContextMenu pos=&self.context_menu.pos close_cb=&self.close_ctxm>
+					<a>{"Kick client"}</a>
+				</ContextMenu>
+			}
+		} else { html!{} };
+
 		html! {
 			<li>
+				{ cm }
 				<div class={ cl![
 						"channel-line",
 						("own-client", ctx.own_client == id),
 						("selected-client", ctx.selected_client == Some(id))] } >
 					{ Self::mdi_icon("") }
-					<a class="entry-expand description" onclick=set_chat>
+					<a class="entry-expand" onclick=set_chat oncontextmenu=context_request>
 						{ icon }
 						<span class="entry-expand">{ &client.name }</span>
 					</a>
@@ -258,14 +294,33 @@ impl ChannelTree {
 			});
 			Msg::Ignore
 		});
+
+		let context_request = self.link.callback(move |e: ContextMenuEvent| {
+			e.prevent_default();
+			Msg::ContextOpened(ContextMenuData{
+				source: ContextMenuType::Channel(id),
+				pos: Pos2D { x:e.client_x(), y:e.client_y() },
+			})
+		});
+
+		let cm = if self.context_menu.source == ContextMenuType::Channel(id) {
+			html! {
+				<ContextMenu pos=&self.context_menu.pos close_cb=&self.close_ctxm>
+					<a>{"Rename"}</a>
+					<a>{"Subscribe or I reporte u"}</a>
+				</ContextMenu>
+			}
+		} else { html!{} };
+
 		html! {
 			<li>
+				{ cm }
 				<div class={cl![
 						"channel-line",
 						("own-client", ctx.own_channel == id),
 						("selected-channel", ctx.selected_channel == Some(id))]}>
 					<a onclick=toggle_collapse>{ Self::mdi_icon(collapse_icon) }</a>
-					<a class="entry-expand description" ondoubleclick=change_channel onclick=set_chat>
+					<a class="entry-expand" ondoubleclick=change_channel onclick=set_chat oncontextmenu=context_request>
 						{ icon }
 						<span class="entry-expand">{ &channel.name }</span>
 					</a>
@@ -364,4 +419,16 @@ struct ViewContext<'a> {
 	selected_channel: Option<ChannelId>,
 	selected_client: Option<ClientId>,
 	selected_server: bool,
+}
+
+pub struct ContextMenuData {
+	source: ContextMenuType,
+	pos: Pos2D,
+}
+
+#[derive(PartialEq)]
+pub enum ContextMenuType {
+	None,
+	Client(ClientId),
+	Channel(ChannelId),
 }

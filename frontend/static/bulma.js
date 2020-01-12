@@ -1,9 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-  function getAll(selector) {
-    return Array.prototype.slice.call(document.querySelectorAll(selector), 0);
-  }
-
   // Get all "navbar-burger" elements
   const $navbarBurgers = getAll('.navbar-burger');
 
@@ -21,7 +17,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // Toggle the "is-active" class on both the "navbar-burger" and the "navbar-menu"
         el.classList.toggle('is-active');
         $target.classList.toggle('is-active');
-
       });
     });
   }
@@ -38,21 +33,37 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   document.addEventListener('click', function (event) {
-    closeDropdowns();
+    closeDropdowns(event.target);
   });
   document.addEventListener("keydown", event => {
     if (event.isComposing || event.keyCode === 27) {
       closeDropdowns();
     }
   });
-
-  function closeDropdowns() {
-    var $dropdowns = getAll('.dropdown:not(.is-hoverable)'); // TODO improve
-    $dropdowns.forEach(function ($el) {
-      $el.classList.remove('is-active');
-    });
-  }
 });
+
+function getAll(selector) {
+  return Array.prototype.slice.call(document.querySelectorAll(selector), 0);
+}
+
+function closeDropdowns(target) {
+  while(target) {
+    if (target.classList.contains("dropdown"))
+      return;
+    target = target.parentElement;
+  }
+  var $dropdowns = getAll('.dropdown:not(.is-hoverable):not(.keep-active)'); // TODO improve
+  $dropdowns.forEach(function ($el) {
+    $el.classList.remove('is-active');
+  });
+  // Close yew context menu
+  let global_cb = document.global_ctxm;
+  if (global_cb) {
+    document.global_ctxm = undefined;
+    global_cb();
+    global_cb.drop();
+  }
+}
 
 function dropdown_click(event)
 {

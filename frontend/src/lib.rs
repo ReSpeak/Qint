@@ -15,6 +15,7 @@ use crate::connection_service::{ConnectionId, ConnectionService, FrontendConnect
 mod connect;
 mod connected;
 mod connection_service;
+mod controls;
 mod notifications;
 mod webrtc;
 

@@ -167,6 +167,14 @@
   width: var(--channel-tree-width);
   overflow-y: auto;
   background-color: #eeeeee;
+  border-right: #b3b3b3 2px solid;
+}
+#overlay-plane {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
 }
 :root {
   --channel-tree-width: 20em;
