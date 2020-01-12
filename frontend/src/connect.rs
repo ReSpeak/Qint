@@ -7,6 +7,8 @@ use yew::html;
 use yew::prelude::*;
 use yew::services::fetch::{FetchService, FetchTask, Request, Response};
 
+use crate::{CLIENT_ICON, SERVER_ICON};
+
 /// Shows the login form
 pub struct Connect {
 	link: ComponentLink<Self>,
@@ -112,14 +114,24 @@ impl Component for Connect {
 			<div class="connect-blur"></div>
 			<form class="connect-form" onsubmit=connect_submit>
 				<div>
-					<input name="username" class="input" type="text" placeholder="Username"
-						value=&self.options.name
-						oninput=username_change />
+					<p class="control has-icons-left">
+						<input name="username" id="username" class="input" type="text" placeholder="Username"
+							value=&self.options.name
+							oninput=username_change />
+						<span class="icon is-small is-left">
+							<i class=format!("mdi mdi-{}", CLIENT_ICON)></i>
+						</span>
+					</p>
 				</div>
 				<div>
-					<input name="server" class="input" type="text" placeholder="Server"
-						value=&self.options.address
-						oninput=address_change />
+					<p class="control has-icons-left">
+						<input name="server" id="server" class="input" type="text" placeholder="Server"
+							value=&self.options.address
+							oninput=address_change />
+						<span class="icon is-small is-left">
+							<i class=format!("mdi mdi-{}", SERVER_ICON)></i>
+						</span>
+					</p>
 				</div>
 				<div>
 					<button class="button is-primary" name="connect" type="submit">

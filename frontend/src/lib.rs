@@ -18,6 +18,10 @@ mod connection_service;
 mod notifications;
 mod webrtc;
 
+const SERVER_ICON: &str = "server";
+const CHANNEL_ICON: &str = "chat-outline";
+const CLIENT_ICON: &str = "account-outline";
+
 pub struct Model {
 	link: ComponentLink<Model>,
 	logger: Logger,

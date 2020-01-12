@@ -8,6 +8,7 @@ use ts_bookkeeping::events::{Event, PropertyId};
 use yew::html;
 use yew::prelude::*;
 
+use crate::{CHANNEL_ICON, CLIENT_ICON, SERVER_ICON};
 use crate::connection_service::*;
 
 macro_rules! cl {
@@ -31,10 +32,6 @@ macro_rules! cl_intern {
 	};
 	($st:expr, $x:expr) => { $st.push_str($x) };
 }
-
-const SERVER_ICON: &str = "server";
-const CHANNEL_ICON: &str = "chat-outline";
-const CLIENT_ICON: &str = "account-outline";
 
 pub struct ChannelTree {
 	link: ComponentLink<Self>,
