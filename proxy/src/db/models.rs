@@ -1,15 +1,9 @@
 use chrono::{DateTime, NaiveDateTime, Utc};
-use diesel_derive_enum::DbEnum;
 use failure::Error;
+use qint_shared::models::{EventType, MessageStatus};
 
 use super::schema::*;
 use crate::secret::Secret;
-
-#[derive(Clone, Copy, DbEnum, Debug, Eq, Hash, PartialEq)]
-pub enum EventType {
-	ChannelSwitched,
-	NameChanged,
-}
 
 #[derive(Queryable)]
 pub struct Client {
@@ -110,6 +104,7 @@ pub struct Message {
 	/// Client uid of sender, `None` if we got the message from the server.
 	pub invoker: Option<Vec<u8>>,
 	pub content: String,
+	pub status: MessageStatus,
 	pub time: DateTime<Utc>,
 }
 
@@ -120,6 +115,7 @@ pub struct MessageInsert<'a> {
 	pub invoker: Option<&'a [u8]>,
 	pub invoker_name: Option<&'a str>,
 	pub content: &'a str,
+	pub status: MessageStatus,
 	pub time: &'a NaiveDateTime,
 	pub timezone: i32,
 }

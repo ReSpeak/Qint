@@ -1,7 +1,24 @@
 use std::cmp::{Ordering, Ord};
 
 use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone};
+#[cfg(feature = "db")]
+use diesel_derive_enum::DbEnum;
 use serde::{Deserialize, Serialize};
+
+#[cfg_attr(feature = "db", derive(DbEnum))]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub enum EventType {
+	ChannelSwitched,
+	NameChanged,
+}
+
+#[cfg_attr(feature = "db", derive(DbEnum))]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub enum MessageStatus {
+	Sending,
+	Success,
+	Error,
+}
 
 #[cfg_attr(feature = "db", derive(Queryable))]
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -24,6 +41,7 @@ pub struct Message {
 	pub invoker: Option<Vec<u8>>,
 	pub invoker_name: Option<String>,
 	pub content: String,
+	pub status: MessageStatus,
 	pub time: NaiveDateTime,
 	pub timezone: i32,
 

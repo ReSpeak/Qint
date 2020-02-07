@@ -7,7 +7,6 @@ use ts_bookkeeping::data::{Channel, Client, Connection};
 use ts_bookkeeping::events::{Event, PropertyId};
 use yew::html;
 use yew::prelude::*;
-use stdweb::js;
 use stdweb::web::event::IEvent;
 use crate::controls::context_menu::{ContextMenu, Pos2D};
 
@@ -203,7 +202,7 @@ impl ChannelTree {
 			});
 			Msg::Ignore
 		});
-		
+
 		let context_request = self.link.callback(move |e: ContextMenuEvent| {
 			e.prevent_default();
 			Msg::ContextOpened(ContextMenuData{

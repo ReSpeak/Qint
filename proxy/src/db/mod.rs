@@ -388,6 +388,7 @@ impl Handler<GetMessagesMsg> for DbHandler {
 				messages::invoker,
 				messages::invoker_name,
 				messages::content,
+				messages::status,
 				messages::time,
 				messages::timezone,
 

@@ -33,7 +33,6 @@ pub struct TsToAudio {
 	logger: Logger,
 	audio_subsystem: AudioSubsystem,
 	device: AudioDevice<SdlCallback>,
-	// TODO Remove inactive decoders
 	/// For each client, store the opus decoder and the instant when it was last
 	/// used.
 	decoders: HashMap<Id, (Decoder, Instant)>,

@@ -527,7 +527,7 @@ impl Chat {
 			<ul class="chat-messages">
 				{ spinner }
 				{ for groups.iter().map(|g| self.view_message_group(g)) }
-				<span class="chat-end"></span>
+				<div class="chat-end"></div>
 			</ul>
 		}
 	}

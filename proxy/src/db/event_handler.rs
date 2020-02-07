@@ -4,6 +4,7 @@ use chrono::offset::{FixedOffset, TimeZone};
 use chrono::{Duration, Local, Utc};
 use diesel::prelude::*;
 use failure::Error;
+use qint_shared::models::MessageStatus;
 use tsclientlib::events::{Event, PropertyId, PropertyValue};
 use tsclientlib::MessageTarget;
 
@@ -424,6 +425,7 @@ impl EventHandler for super::DbHandler {
 									.map(|v| v.as_slice()),
 								invoker_name,
 								content: message,
+								status: MessageStatus::Success,
 								time: &utc_time,
 								timezone: utc_to_local_offset,
 							};
