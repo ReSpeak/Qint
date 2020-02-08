@@ -30,14 +30,14 @@ impl Icon {
 
 	pub fn client_avatar(con: &ConnectionId, client_uid: UidRef) -> Html {
 		Self::icon_intern("dummy",
-			&format!("background-image: url(/file/{}/0/avatar_{})", con.0,
+			&format!("background-image: url(/con/{}/file/0/avatar_{})", con.0,
 				client_uid.as_avatar()))
 	}
 
 	pub fn icon_hash(con: &ConnectionId, icon: IconHash) -> Option<Html> {
 		if icon.0 != 0 {
 			Some(Self::icon_intern("dummy",
-				&format!("background-image: url(/file/{}/0/icon_{})", con.0, icon.0)))
+				&format!("background-image: url(/con/{}/file/0/icon_{})", con.0, icon.0)))
 		} else {
 			None
 		}

@@ -30,7 +30,7 @@ mod secret;
 mod websocket;
 
 use secret::Secret;
-use websocket::Ws;
+use websocket::{AddWsMsg, TsConnection, Ws};
 
 const DIR_ORGANIZATION: &str = "ReSpeak";
 const DIR_PROJECT: &str = "Qint";
@@ -95,10 +95,25 @@ struct Settings {
 struct State {
 	logger: Logger,
 	/// The list of all currently existing connections
-	connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
+	connections: Arc<Mutex<HashMap<ConnectionId, Addr<TsConnection>>>>,
 	audio_data: audio::AudioData,
 	settings: Settings,
 	database: Addr<db::DbHandler>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+enum WsFormat {
+	Msgpack,
+	Json,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct WsOptions {
+	format: WsFormat,
+	/// A TeamSpeak connection gets closed if no strong (= non-weak) connections
+	/// remain. This is analogous to `Rc`.
+	#[serde(default)]
+	weak: bool,
 }
 
 fn default_listen_address() -> String { "127.0.0.1:4422".into() }
@@ -127,10 +142,11 @@ impl Default for Settings {
 	}
 }
 
-#[get("/ws/{id}")]
+#[get("/con/{id}/ws")]
 async fn create_ws(
 	state: web::Data<State>,
 	uuid: web::Path<Uuid>,
+	options: web::Query<WsOptions>,
 	req: HttpRequest,
 	stream: web::Payload,
 ) -> impl Responder
@@ -139,14 +155,19 @@ async fn create_ws(
 
 	// Check that the id does not exist
 	let mut cons = state.connections.lock().unwrap();
-	if cons.contains_key(&id) {
-		return Ok(HttpResponse::PreconditionFailed().finish());
-	}
+	let ts_con = if let Some(con) = cons.get(&id) {
+		con.clone()
+	} else {
+		let ts_con = TsConnection::new(state.deref().clone(), id).start();
+		cons.insert(id, ts_con.clone());
+		ts_con
+	};
 
-	let ws_con = Ws::new(state.deref().clone(), id);
+	let weak = options.weak;
+	let ws_con = Ws::new(state.logger.clone(), ts_con.clone(), options.0);
 
-	ws::start_with_addr(ws_con, &req, stream).map(|(addr, resp)| {
-		cons.insert(id, addr);
+	ws::start_with_addr(ws_con, &req, stream).map(move |(addr, resp)| {
+		tokio::spawn(ts_con.send(AddWsMsg(addr, weak)));
 		resp
 	})
 }
@@ -183,7 +204,7 @@ async fn audiosend_false(state: web::Data<State>) -> impl Responder {
 	}
 }
 
-#[get("/file/{id}/{channel}/{path:.*}")]
+#[get("/con/{id}/file/{channel}/{path:.*}")]
 async fn download_file(
 	state: web::Data<State>,
 	data: web::Path<(Uuid, u64, String)>,

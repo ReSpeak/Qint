@@ -81,7 +81,7 @@ impl ConnectionService {
 				let id = ConnectionId(Uuid::new_v4());
 				if !cons.contains_key(&id) {
 					// Create connection
-					let url = format!("{}/ws/{}", crate::Model::get_ws_domain(), id.0);
+					let url = format!("{}/con/{}/ws?format=Msgpack", crate::Model::get_ws_domain(), id.0);
 					let task = ws_service.connect(&url, callback, notification).map_err(|e| format_err!("{}", e))?;
 
 					let con = FrontendConnection {

@@ -3,6 +3,7 @@ use std::thread;
 
 use actix::fut::wrap_future;
 use actix::*;
+use actix_web::web::Bytes;
 use actix_web_actors::ws;
 use failure::{format_err, Error};
 use futures::channel::oneshot;
@@ -26,15 +27,24 @@ use tsproto_packets::packets::{
 	Direction, Flags, InAudio, InCommand, PacketType,
 };
 
-use crate::{audio, db, ConnectionId, State};
+use crate::{audio, db, ConnectionId, State, WsOptions};
 
-/// Define http actor
-pub(crate) struct Ws {
+/// A connection to a TeamSpeak server
+pub(crate) struct TsConnection {
 	logger: Logger,
 	state: Arc<State>,
 	id: ConnectionId,
 	connection: Option<Connection>,
 	pk_recv: Option<oneshot::Receiver<()>>,
+	sockets: Vec<Addr<Ws>>,
+	weak_sockets: Vec<Addr<Ws>>,
+}
+
+/// A websocket connection
+pub(crate) struct Ws {
+	logger: Logger,
+	connection: Addr<TsConnection>,
+	options: WsOptions,
 }
 
 #[derive(Clone)]
@@ -47,10 +57,17 @@ struct ProxyPacketHandler {
 #[derive(Clone)]
 struct ProxyCommandObserver {
 	logger: Logger,
-	addr: Addr<Ws>,
+	addr: Addr<TsConnection>,
 }
 
 struct WsCommandMsg(InCommandMsg);
+struct WsMsg(Bytes);
+struct SendMessageMsg(MessageP2F);
+/// Add a websocket connection to a TeamSpeak connection.
+///
+/// The `bool` is `true` for a weak connection.
+pub(crate) struct AddWsMsg(pub Addr<Ws>, pub bool);
+struct RemoveWsMsg(pub Addr<Ws>);
 
 pub(crate) struct DownloadFile {
 	pub channel: ChannelId,
@@ -59,18 +76,44 @@ pub(crate) struct DownloadFile {
 
 struct DisconnectMsg;
 
+impl Actor for TsConnection {
+	type Context = Context<Self>;
+}
+
 impl Actor for Ws {
 	type Context = ws::WebsocketContext<Self>;
 }
 
-impl Drop for Ws {
+impl Drop for TsConnection {
 	fn drop(&mut self) {
 		debug!(self.logger, "Removing connection");
 	}
 }
 
+impl Drop for Ws {
+	fn drop(&mut self) {
+		debug!(self.logger, "Removing websocket"; "weak" => self.options.weak);
+	}
+}
+
 impl Message for WsCommandMsg {
 	type Result = Result<(), ()>;
+}
+
+impl Message for WsMsg {
+	type Result = ();
+}
+
+impl Message for SendMessageMsg {
+	type Result = ();
+}
+
+impl Message for AddWsMsg {
+	type Result = ();
+}
+
+impl Message for RemoveWsMsg {
+	type Result = ();
 }
 
 impl Message for DisconnectMsg {
@@ -82,7 +125,7 @@ impl Message for DownloadFile {
 	type Result = Result<(u64, TcpStream), Error>;
 }
 
-impl Ws {
+impl TsConnection {
 	fn close(&mut self, ctx: &mut <Self as Actor>::Context) {
 		self.state.connections.lock().unwrap().remove(&self.id);
 		ctx.stop();
@@ -100,18 +143,34 @@ impl Ws {
 	pub(crate) fn new(state: Arc<State>, id: ConnectionId) -> Self {
 		let logger = state.logger.new(o!("id" => id.0.to_string()));
 		debug!(logger, "Creating connection");
-		Self { logger, state, id, connection: None, pk_recv: None }
+		Self {
+			logger,
+			state,
+			id,
+			connection: None,
+			pk_recv: None,
+			sockets: Vec::new(),
+			weak_sockets: Vec::new(),
+		}
 	}
 
-	fn send_message(msg: &MessageP2F, ctx: &mut ws::WebsocketContext<Self>) {
-		ctx.binary(rmp_serde::to_vec(&msg).unwrap());
+	fn send_message(&self, msg: &MessageP2F) {
+		for s in self.sockets.iter().chain(self.weak_sockets.iter()) {
+			let logger = self.logger.clone();
+			tokio::spawn(s.send(SendMessageMsg(msg.clone())).map(move |r| {
+				if let Err(e) = r {
+					error!(logger, "Failed to send message to websockte";
+						"error" => ?e);
+				}
+			}));
+		}
 	}
 
 	fn connect_intern(
 		o: ConnectOptions,
 		identity: Identity,
 		actor: &mut Self,
-		ctx: &mut ws::WebsocketContext<Self>,
+		ctx: &mut Context<Self>,
 	) -> Box<dyn Future<Output = Result<tsclientlib::Connection, Error>> + Unpin>
 	{
 		let addr = ctx.address();
@@ -213,48 +272,49 @@ impl Ws {
 		actor.pk_recv = Some(pk_recv);
 
 		let (send2, recv2) = oneshot::channel();
-		ctx.spawn(wrap_future(recv.map(|r| r.unwrap())).map(|r, _, ctx| {
-			if let Ok(con) = &r {
-				Self::send_message(
-					&MessageP2F::ServerKey(
+		ctx.spawn(wrap_future(recv.map(|r| r.unwrap())).map(
+			|r, actor: &mut Self, _| {
+				if let Ok(con) = &r {
+					actor.send_message(&MessageP2F::ServerKey(
 						con.get_server_key().unwrap().to_short().to_vec(),
-					),
-					ctx,
-				);
-				let _ = pk_send.send(());
-			}
-			let _ = send2.send(r);
-		}));
+					));
+					let _ = pk_send.send(());
+				}
+				let _ = send2.send(r);
+			},
+		));
 
 		Box::new(recv2.map(Result::unwrap))
 	}
 }
 
-impl Handler<WsCommandMsg> for Ws {
+impl Handler<WsCommandMsg> for TsConnection {
 	type Result = Box<dyn ActorFuture<Output = Result<(), ()>, Actor = Self>>;
 	fn handle(
 		&mut self,
 		WsCommandMsg(packet): WsCommandMsg,
-		ctx: &mut Self::Context,
+		_: &mut Self::Context,
 	) -> Self::Result
 	{
 		// Block sending the initserver until the public key is sent
 		if let Some(recv) = self.pk_recv.take() {
 			let (send2, recv2) = oneshot::channel();
 			self.pk_recv = Some(recv2);
-			return Box::new(wrap_future(recv).map(|_, _, ctx| {
-				Self::send_message(&MessageP2F::Packet(packet), ctx);
-				let _ = send2.send(());
-				Ok(())
-			}));
+			return Box::new(wrap_future(recv).map(
+				|_, actor: &mut Self, _| {
+					actor.send_message(&MessageP2F::Packet(packet));
+					let _ = send2.send(());
+					Ok(())
+				},
+			));
 		} else {
-			Self::send_message(&MessageP2F::Packet(packet), ctx);
+			self.send_message(&MessageP2F::Packet(packet));
 		}
 		Box::new(wrap_future(future::ok(())))
 	}
 }
 
-impl Handler<DisconnectMsg> for Ws {
+impl Handler<DisconnectMsg> for TsConnection {
 	type Result = ();
 	fn handle(
 		&mut self,
@@ -266,7 +326,7 @@ impl Handler<DisconnectMsg> for Ws {
 	}
 }
 
-impl Handler<DownloadFile> for Ws {
+impl Handler<DownloadFile> for TsConnection {
 	type Result = ResponseFuture<Result<(u64, TcpStream), Error>>;
 	fn handle(
 		&mut self,
@@ -317,6 +377,335 @@ impl Handler<DownloadFile> for Ws {
 }
 
 /// Handler for ws::Message message
+impl Handler<WsMsg> for TsConnection {
+	type Result = ();
+	fn handle(
+		&mut self,
+		WsMsg(msg): WsMsg,
+		ctx: &mut Self::Context,
+	) -> Self::Result
+	{
+		let msg: MessageF2P = match rmp_serde::from_read_ref(msg.as_ref()) {
+			Ok(r) => r,
+			Err(e) => {
+				error!(self.logger, "Error deserializing message"; "error" => ?e);
+				return;
+			}
+		};
+
+		match msg {
+			MessageF2P::Connect(o) => {
+				let id = self.state.settings.default_identity;
+				let address = o.address.clone();
+				let username = o.name.clone();
+				ctx.spawn(
+					wrap_future(
+						self.state
+							.database
+							.send(db::GetIdentityMsg(id, true))
+							.map(|r| r.map_err(|e| e.into()).and_then(|r| r)),
+					)
+					.then(move |identity, actor: &mut Self, ctx| match identity
+					{
+						Ok(id) => {
+							wrap_future(Self::connect_intern(o, id, actor, ctx))
+						}
+						Err(e) => {
+							let fut: Box<
+								dyn Future<
+										Output = Result<
+											tsclientlib::Connection,
+											Error,
+										>,
+									> + Unpin,
+							> = Box::new(futures::future::err(e));
+							wrap_future(fut)
+						}
+					})
+					.map(|r, actor, _| {
+						if r.is_err() {
+							actor.send_message(&MessageP2F::ConnectFailed());
+						}
+						r
+					})
+					.map(move |con, actor: &mut Self, _| {
+						match con {
+							Ok(con) => {
+								let c = con.clone();
+								let c2 = con.clone();
+								actor.connection = Some(con);
+
+								// Activate audio
+								let logger = actor.logger.clone();
+								let a2ts = actor.state.audio_data.a2ts.clone();
+								actix::spawn(
+									a2ts.send(
+										audio::audio_to_ts::SetListenerMsg {
+											connection: c,
+										},
+									)
+									.map(move |r| {
+										if let Err(e) = r {
+											error!(logger, "Failed to set listener"; "error" => ?e);
+										}
+									}),
+								);
+
+								match c2.get_server_key() {
+									Ok(server_key) => {
+										// Save in database
+										let logger = actor.logger.clone();
+										actix::spawn(
+											actor
+												.state
+												.database
+												.send(db::ConnectedMsg {
+													bookmark: None,
+													username,
+													address,
+													channel: None,
+													identity: id as i64,
+													server_key,
+												})
+												.map(move |r| match r {
+													Ok(Err(e)) => {
+														warn!(logger, "Failed to save connection in database"; "error" => ?e)
+													}
+													Err(e) => {
+														warn!(logger, "Failed to save connection in database"; "error" => ?e)
+													}
+													_ => {}
+												}),
+										);
+									}
+									Err(e) => {
+										error!(actor.logger, "Failed to get server key"; "error" => ?e)
+									}
+								}
+							}
+							Err(e) => error!(actor.logger,
+								"Failed to get identity for conection";
+								"error" => ?e),
+						}
+					}),
+				);
+			}
+			MessageF2P::Packet(packet) => {
+				if let Some(con) = &mut self.connection {
+					let sink = con.get_packet_sink();
+
+					let logger = self.state.logger.clone();
+					let db = self.state.database.clone();
+					(|| {
+						if packet.header().packet_type() == PacketType::Command
+							&& (packet
+								.content()
+								.starts_with(b"sendtextmessage ")
+								|| packet.content().starts_with(b"clientpoke "))
+						{
+							let command = InCommand::new(
+								packet.content().to_vec(),
+								packet.header().packet_type(),
+								packet
+									.header()
+									.flags()
+									.contains(Flags::NEWPROTOCOL),
+								Direction::C2S,
+							)
+							.unwrap();
+
+							let server = match con.get_server_key() {
+								Ok(key) => key,
+								Err(e) => {
+									error!(logger, "Failed to get server key"; "error" => ?e);
+									return;
+								}
+							};
+							let server = server.to_short().to_vec();
+							let invoker_uid = {
+								let con = con.lock();
+								if let Some(client) =
+									con.clients.get(&con.own_client)
+								{
+									base64::decode(&client.uid.0).unwrap()
+								} else {
+									error!(logger, "Failed to get own client");
+									return;
+								}
+							};
+
+							let chat_type;
+							let message;
+							if packet.content().starts_with(b"sendtextmessage ")
+							{
+								let msg = c2s::InSendTextMessage::new(&command)
+									.unwrap();
+								let msg = msg.iter().next().unwrap();
+								message = msg.message.into();
+								chat_type = match msg.target {
+									TextMessageTargetMode::Server => {
+										ChatType::Server
+									}
+									TextMessageTargetMode::Channel => {
+										let con = con.lock();
+										let own_client =
+											&con.clients[&con.own_client];
+										ChatType::Channel(own_client.channel.0)
+									}
+									TextMessageTargetMode::Client => {
+										let id = if let Some(id) =
+											msg.target_client_id
+										{
+											id
+										} else {
+											error!(
+												logger,
+												"Invalid sendtextmessage to a \
+												 client without client id"
+											);
+											return;
+										};
+										let con = con.lock();
+										let client = &con.clients[&id];
+										ChatType::Client(
+											base64::decode(&client.uid.0)
+												.unwrap(),
+										)
+									}
+									TextMessageTargetMode::Unknown => {
+										error!(
+											logger,
+											"Invalid sendtextmessage to a \
+											 client with unknown target mode"
+										);
+										return;
+									}
+								};
+							} else {
+								// Poke
+								let msg =
+									c2s::InClientPokeRequest::new(&command)
+										.unwrap();
+								let msg = msg.iter().next().unwrap();
+								message = msg.message.into();
+								let con = con.lock();
+								let client = &con.clients[&msg.client_id];
+								chat_type = ChatType::Poke(
+									base64::decode(&client.uid.0).unwrap(),
+								);
+							}
+
+							let msg = db::WriteMessageMsg {
+								message,
+								invoker_uid,
+								chat: ChatId { server, chat_type },
+							};
+							tokio::spawn(db.send(msg).map(move |r| match r {
+								Ok(Ok(())) => {}
+								Ok(Err(e)) => {
+									error!(logger, "Failed to handle event in database"; "error" => ?e);
+								}
+								Err(_) => {
+									error!(
+										logger,
+										"Failed to send event to database"
+									);
+								}
+							}));
+						}
+					})();
+
+					let (send, recv) = oneshot::channel();
+					thread::spawn(|| {
+						tokio_compat::runtime::run(
+							futures01::future::lazy(move || sink.send(packet))
+								.then(|r| {
+									let _ = send.send(r);
+									Ok(())
+								}),
+						)
+					});
+
+					ctx.spawn(wrap_future(recv.map(|r| {
+						if let Err(e) = r.unwrap() {
+							// TODO Return
+							eprintln!("Failed to send packet: {:?}", e);
+						}
+					})));
+				}
+			}
+			MessageF2P::Webrtc(_) => {
+				// No webrtc
+				error!(
+					self.logger,
+					"Got unsupported webrtc message, ignore it"
+				);
+			}
+		}
+	}
+}
+
+impl Handler<AddWsMsg> for TsConnection {
+	type Result = ();
+	fn handle(
+		&mut self,
+		AddWsMsg(addr, weak): AddWsMsg,
+		_: &mut Self::Context,
+	) -> Self::Result
+	{
+		if weak {
+			self.weak_sockets.push(addr);
+		} else {
+			self.sockets.push(addr);
+		}
+	}
+}
+
+impl Handler<RemoveWsMsg> for TsConnection {
+	type Result = ();
+	fn handle(
+		&mut self,
+		RemoveWsMsg(addr): RemoveWsMsg,
+		ctx: &mut Self::Context,
+	) -> Self::Result
+	{
+		if let Some(i) = self.sockets.iter().position(|a| *a == addr) {
+			self.sockets.remove(i);
+			if self.sockets.is_empty() {
+				// Close if all strong connections are gone
+				self.close(ctx);
+			}
+		} else if let Some(i) =
+			self.weak_sockets.iter().position(|a| *a == addr)
+		{
+			self.weak_sockets.remove(i);
+		}
+	}
+}
+
+impl Ws {
+	pub fn new(
+		logger: Logger,
+		connection: Addr<TsConnection>,
+		options: WsOptions,
+	) -> Self
+	{
+		Self { logger, connection, options }
+	}
+}
+
+impl Handler<SendMessageMsg> for Ws {
+	type Result = ();
+	fn handle(
+		&mut self,
+		SendMessageMsg(msg): SendMessageMsg,
+		ctx: &mut Self::Context,
+	) -> Self::Result
+	{
+		// TODO Support json
+		ctx.binary(rmp_serde::to_vec(&msg).unwrap());
+	}
+}
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 	fn handle(
 		&mut self,
@@ -326,294 +715,18 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 	{
 		match msg {
 			Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
-			Ok(ws::Message::Text(text)) => ctx.text(text),
-			Ok(ws::Message::Binary(bin)) => {
-				let msg: MessageF2P =
-					match rmp_serde::from_read_ref(bin.as_ref()) {
-						Ok(r) => r,
-						Err(e) => {
-							error!(self.logger, "Error deserializing message"; "error" => ?e);
-							return;
-						}
-					};
-
-				match msg {
-					MessageF2P::Connect(o) => {
-						let id = self.state.settings.default_identity;
-						let address = o.address.clone();
-						let username = o.name.clone();
-						ctx.spawn(
-							wrap_future(
-								self.state
-									.database
-									.send(db::GetIdentityMsg(id, true))
-									.map(|r| {
-										r.map_err(|e| e.into()).and_then(|r| r)
-									}),
-							)
-							.then(move |identity, actor: &mut Self, ctx| {
-								match identity {
-									Ok(id) => wrap_future(
-										Self::connect_intern(o, id, actor, ctx),
-									),
-									Err(e) => {
-										let fut: Box<
-											dyn Future<
-													Output = Result<
-														tsclientlib::Connection,
-														Error,
-													>,
-												> + Unpin,
-										> = Box::new(futures::future::err(e));
-										wrap_future(fut)
-									}
-								}
-							})
-							.map(|r, _, ctx| {
-								if r.is_err() {
-									Self::send_message(
-										&MessageP2F::ConnectFailed(),
-										ctx,
-									);
-								}
-								r
-							})
-							.map(move |con, actor: &mut Self, _| {
-								match con {
-									Ok(con) => {
-										let c = con.clone();
-										let c2 = con.clone();
-										actor.connection = Some(con);
-
-										// Activate audio
-										let logger = actor.logger.clone();
-										let a2ts =
-											actor.state.audio_data.a2ts.clone();
-										actix::spawn(a2ts.send(audio::audio_to_ts::SetListenerMsg {
-											connection: c,
-										}).map(move |r| if let Err(e) = r {
-											error!(logger, "Failed to set listener"; "error" => ?e);
-										}));
-
-										match c2.get_server_key() {
-											Ok(server_key) => {
-												// Save in database
-												let logger =
-													actor.logger.clone();
-												actix::spawn(
-													actor
-														.state
-														.database
-														.send(
-															db::ConnectedMsg {
-																bookmark: None,
-																username,
-																address,
-																channel: None,
-																identity: id
-																	as i64,
-																server_key,
-															},
-														)
-														.map(
-															move |r| match r {
-																Ok(Err(e)) => {
-																	warn!(logger, "Failed to save connection in database"; "error" => ?e)
-																}
-																Err(e) => {
-																	warn!(logger, "Failed to save connection in database"; "error" => ?e)
-																}
-																_ => {}
-															},
-														),
-												);
-											}
-											Err(e) => {
-												error!(actor.logger, "Failed to get server key"; "error" => ?e)
-											}
-										}
-									}
-									Err(e) => error!(actor.logger,
-										"Failed to get identity for conection";
-										"error" => ?e),
-								}
-							}),
-						);
-					}
-					MessageF2P::Packet(packet) => {
-						if let Some(con) = &mut self.connection {
-							let sink = con.get_packet_sink();
-
-							let logger = self.state.logger.clone();
-							let db = self.state.database.clone();
-							(|| {
-								if packet.header().packet_type()
-									== PacketType::Command && (packet
-									.content()
-									.starts_with(b"sendtextmessage ")
-									|| packet
-										.content()
-										.starts_with(b"clientpoke "))
-								{
-									let command = InCommand::new(
-										packet.content().to_vec(),
-										packet.header().packet_type(),
-										packet
-											.header()
-											.flags()
-											.contains(Flags::NEWPROTOCOL),
-										Direction::C2S,
-									)
-									.unwrap();
-
-									let server = match con.get_server_key() {
-										Ok(key) => key,
-										Err(e) => {
-											error!(logger, "Failed to get server key"; "error" => ?e);
-											return;
-										}
-									};
-									let server = server.to_short().to_vec();
-									let invoker_uid = {
-										let con = con.lock();
-										if let Some(client) =
-											con.clients.get(&con.own_client)
-										{
-											base64::decode(&client.uid.0)
-												.unwrap()
-										} else {
-											error!(
-												logger,
-												"Failed to get own client"
-											);
-											return;
-										}
-									};
-
-									let chat_type;
-									let message;
-									if packet
-										.content()
-										.starts_with(b"sendtextmessage ")
-									{
-										let msg = c2s::InSendTextMessage::new(
-											&command,
-										)
-										.unwrap();
-										let msg = msg.iter().next().unwrap();
-										message = msg.message.into();
-										chat_type = match msg.target {
-											TextMessageTargetMode::Server => {
-												ChatType::Server
-											}
-											TextMessageTargetMode::Channel => {
-												let con = con.lock();
-												let own_client = &con.clients
-													[&con.own_client];
-												ChatType::Channel(
-													own_client.channel.0,
-												)
-											}
-											TextMessageTargetMode::Client => {
-												let id = if let Some(id) =
-													msg.target_client_id
-												{
-													id
-												} else {
-													error!(logger, "Invalid sendtextmessage to a client without client id");
-													return;
-												};
-												let con = con.lock();
-												let client = &con.clients[&id];
-												ChatType::Client(
-													base64::decode(
-														&client.uid.0,
-													)
-													.unwrap(),
-												)
-											}
-											TextMessageTargetMode::Unknown => {
-												error!(
-													logger,
-													"Invalid sendtextmessage \
-													 to a client with unknown \
-													 target mode"
-												);
-												return;
-											}
-										};
-									} else {
-										// Poke
-										let msg =
-											c2s::InClientPokeRequest::new(
-												&command,
-											)
-											.unwrap();
-										let msg = msg.iter().next().unwrap();
-										message = msg.message.into();
-										let con = con.lock();
-										let client =
-											&con.clients[&msg.client_id];
-										chat_type = ChatType::Poke(
-											base64::decode(&client.uid.0)
-												.unwrap(),
-										);
-									}
-
-									let msg = db::WriteMessageMsg {
-										message,
-										invoker_uid,
-										chat: ChatId { server, chat_type },
-									};
-									tokio::spawn(db.send(msg).map(move |r| {
-										match r {
-											Ok(Ok(())) => {}
-											Ok(Err(e)) => {
-												error!(logger, "Failed to handle event in database"; "error" => ?e);
-											}
-											Err(_) => {
-												error!(
-													logger,
-													"Failed to send event to \
-													 database"
-												);
-											}
-										}
-									}));
-								}
-							})();
-
-							let (send, recv) = oneshot::channel();
-							thread::spawn(|| {
-								tokio_compat::runtime::run(
-									futures01::future::lazy(move || {
-										sink.send(packet)
-									})
-									.then(|r| {
-										let _ = send.send(r);
-										Ok(())
-									}),
-								)
-							});
-
-							ctx.spawn(wrap_future(recv.map(|r| {
-								if let Err(e) = r.unwrap() {
-									// TODO Return
-									eprintln!("Failed to send packet: {:?}", e);
-								}
-							})));
-						}
-					}
-					MessageF2P::Webrtc(_) => {
-						// No webrtc
-						error!(
-							self.logger,
-							"Got unsupported webrtc message, ignore it"
-						);
-					}
-				}
+			Ok(ws::Message::Text(_)) => {
+				warn!(
+					self.logger,
+					"Received text message over websocket, ignoring"
+				);
 			}
-			Ok(ws::Message::Close(_)) => self.close(ctx),
+			Ok(ws::Message::Binary(bin)) => {
+				tokio::spawn(self.connection.send(WsMsg(bin)));
+			}
+			Ok(ws::Message::Close(_)) => {
+				tokio::spawn(self.connection.send(RemoveWsMsg(ctx.address())));
+			}
 			_ => {}
 		}
 	}
