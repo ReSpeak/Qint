@@ -4,8 +4,8 @@ use chrono::offset::{FixedOffset, TimeZone};
 use chrono::{Duration, Local, Utc};
 use diesel::prelude::*;
 use failure::{bail, Error};
-use qint_shared::{ChatId, ChatType};
 use qint_shared::models::MessageStatus;
+use qint_shared::{ChatId, ChatType};
 use tsclientlib::events::{Event, PropertyId, PropertyValue};
 use tsclientlib::MessageTarget;
 
@@ -275,13 +275,17 @@ impl EventHandler for super::DbHandler {
 							} else {
 								bail!("Failed to find client");
 							};
-							chat = ChatType::Client(base64::decode(client_uid).unwrap());
+							chat = ChatType::Client(
+								base64::decode(client_uid).unwrap(),
+							);
 						}
 						MessageTarget::Poke(id) => {
 							can_be_duplicate = false;
 							let con = con.lock();
 							let client = &con.clients[id];
-							chat = ChatType::Client(base64::decode(&client.uid.0).unwrap());
+							chat = ChatType::Client(
+								base64::decode(&client.uid.0).unwrap(),
+							);
 						}
 					}
 					let chat = self.get_or_create_chat(&ChatId {
@@ -322,11 +326,18 @@ impl EventHandler for super::DbHandler {
 									.eq(chat)
 									.and(messages::invoker.eq(&invoker_uid))
 									.and(messages::content.eq(message))
-									.and(messages::status.eq(MessageStatus::Sending));
+									.and(
+										messages::status
+											.eq(MessageStatus::Sending),
+									);
 								// Update status
-								let res = diesel::update(messages::table.filter(cmp))
-									.set(messages::status.eq(MessageStatus::Success))
-									.execute(&self.con)?;
+								let res =
+									diesel::update(messages::table.filter(cmp))
+										.set(
+											messages::status
+												.eq(MessageStatus::Success),
+										)
+										.execute(&self.con)?;
 
 								if res != 0 {
 									// Successfully updated

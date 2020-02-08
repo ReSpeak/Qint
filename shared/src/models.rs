@@ -1,4 +1,4 @@
-use std::cmp::{Ordering, Ord};
+use std::cmp::{Ord, Ordering};
 
 use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone};
 #[cfg(feature = "db")]

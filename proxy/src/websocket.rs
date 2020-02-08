@@ -10,14 +10,21 @@ use futures::prelude::*;
 use futures01::sink::Sink as _;
 use futures01::stream::Stream;
 use futures01::Future as _;
-use qint_shared::{ChatId, ChatType, ConnectOptions, InCommandMsg, MessageF2P, MessageP2F};
+use qint_shared::{
+	ChatId, ChatType, ConnectOptions, InCommandMsg, MessageF2P, MessageP2F,
+};
 use slog::{debug, error, o, warn, Logger};
 use tokio::net::TcpStream;
 use tokio::prelude::*;
-use tsclientlib::{ChannelId, Connection, Identity, PHBox, PacketHandler, TextMessageTargetMode};
 use tsclientlib::messages::c2s::{self, InMessageTrait};
+use tsclientlib::{
+	ChannelId, Connection, Identity, PHBox, PacketHandler,
+	TextMessageTargetMode,
+};
 use tsproto::handler_data::InCommandObserver;
-use tsproto_packets::packets::{Direction, Flags, InAudio, InCommand, PacketType};
+use tsproto_packets::packets::{
+	Direction, Flags, InAudio, InCommand, PacketType,
+};
 
 use crate::{audio, db, ConnectionId, State};
 
@@ -206,16 +213,18 @@ impl Ws {
 		actor.pk_recv = Some(pk_recv);
 
 		let (send2, recv2) = oneshot::channel();
-		ctx.spawn(wrap_future(recv.map(|r| r.unwrap()))
-			.map(|r, _, ctx| {
-				if let Ok(con) = &r {
-					Self::send_message(&MessageP2F::ServerKey(con
-						.get_server_key().unwrap().to_short().to_vec()), ctx);
-					let _ = pk_send.send(());
-				}
-				let _ = send2.send(r);
-			}));
-
+		ctx.spawn(wrap_future(recv.map(|r| r.unwrap())).map(|r, _, ctx| {
+			if let Ok(con) = &r {
+				Self::send_message(
+					&MessageP2F::ServerKey(
+						con.get_server_key().unwrap().to_short().to_vec(),
+					),
+					ctx,
+				);
+				let _ = pk_send.send(());
+			}
+			let _ = send2.send(r);
+		}));
 
 		Box::new(recv2.map(Result::unwrap))
 	}
@@ -437,84 +446,141 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 
 							let logger = self.state.logger.clone();
 							let db = self.state.database.clone();
-							(|| if packet.header().packet_type() == PacketType::Command && (packet.content().starts_with(b"sendtextmessage ") || packet.content().starts_with(b"clientpoke ")) {
-								let command = InCommand::new(packet.content().to_vec(),
-									packet.header().packet_type(), packet.header().flags().contains(Flags::NEWPROTOCOL), Direction::C2S).unwrap();
+							(|| {
+								if packet.header().packet_type()
+									== PacketType::Command && (packet
+									.content()
+									.starts_with(b"sendtextmessage ")
+									|| packet
+										.content()
+										.starts_with(b"clientpoke "))
+								{
+									let command = InCommand::new(
+										packet.content().to_vec(),
+										packet.header().packet_type(),
+										packet
+											.header()
+											.flags()
+											.contains(Flags::NEWPROTOCOL),
+										Direction::C2S,
+									)
+									.unwrap();
 
-								let server = match con.get_server_key() {
-									Ok(key) => key,
-									Err(e) => {
-										error!(logger, "Failed to get server key"; "error" => ?e);
-										return;
-									}
-								};
-								let server = server.to_short().to_vec();
-								let invoker_uid = {
-									let con = con.lock();
-									if let Some(client) = con.clients.get(&con.own_client) {
-										base64::decode(&client.uid.0).unwrap()
-									} else {
-										error!(logger, "Failed to get own client");
-										return;
-									}
-								};
-
-								let chat_type;
-								let message;
-								if packet.content().starts_with(b"sendtextmessage ") {
-									let msg = c2s::InSendTextMessage::new(&command).unwrap();
-									let msg = msg.iter().next().unwrap();
-									message = msg.message.into();
-									chat_type = match msg.target {
-										TextMessageTargetMode::Server => ChatType::Server,
-										TextMessageTargetMode::Channel => {
-											let con = con.lock();
-											let own_client = &con.clients[&con.own_client];
-											ChatType::Channel(own_client.channel.0)
-										}
-										TextMessageTargetMode::Client => {
-											let id = if let Some(id) = msg.target_client_id {
-												id
-											} else {
-												error!(logger, "Invalid sendtextmessage to a client without client id");
-												return;
-											};
-											let con = con.lock();
-											let client = &con.clients[&id];
-											ChatType::Client(base64::decode(&client.uid.0).unwrap())
-										}
-										TextMessageTargetMode::Unknown => {
-											error!(logger, "Invalid sendtextmessage to a client with unknown target mode");
+									let server = match con.get_server_key() {
+										Ok(key) => key,
+										Err(e) => {
+											error!(logger, "Failed to get server key"; "error" => ?e);
 											return;
 										}
 									};
-								} else {
-									// Poke
-									let msg = c2s::InClientPokeRequest::new(&command).unwrap();
-									let msg = msg.iter().next().unwrap();
-									message = msg.message.into();
-									let con = con.lock();
-									let client = &con.clients[&msg.client_id];
-									chat_type = ChatType::Poke(base64::decode(&client.uid.0).unwrap());
-								}
+									let server = server.to_short().to_vec();
+									let invoker_uid = {
+										let con = con.lock();
+										if let Some(client) =
+											con.clients.get(&con.own_client)
+										{
+											base64::decode(&client.uid.0)
+												.unwrap()
+										} else {
+											error!(
+												logger,
+												"Failed to get own client"
+											);
+											return;
+										}
+									};
 
-								let msg = db::WriteMessageMsg {
-									message,
-									invoker_uid,
-									chat: ChatId {
-										server,
-										chat_type,
-									},
-								};
-								tokio::spawn(db.send(msg).map(move |r| match r {
-									Ok(Ok(())) => {}
-									Ok(Err(e)) => {
-										error!(logger, "Failed to handle event in database"; "error" => ?e);
+									let chat_type;
+									let message;
+									if packet
+										.content()
+										.starts_with(b"sendtextmessage ")
+									{
+										let msg = c2s::InSendTextMessage::new(
+											&command,
+										)
+										.unwrap();
+										let msg = msg.iter().next().unwrap();
+										message = msg.message.into();
+										chat_type = match msg.target {
+											TextMessageTargetMode::Server => {
+												ChatType::Server
+											}
+											TextMessageTargetMode::Channel => {
+												let con = con.lock();
+												let own_client = &con.clients
+													[&con.own_client];
+												ChatType::Channel(
+													own_client.channel.0,
+												)
+											}
+											TextMessageTargetMode::Client => {
+												let id = if let Some(id) =
+													msg.target_client_id
+												{
+													id
+												} else {
+													error!(logger, "Invalid sendtextmessage to a client without client id");
+													return;
+												};
+												let con = con.lock();
+												let client = &con.clients[&id];
+												ChatType::Client(
+													base64::decode(
+														&client.uid.0,
+													)
+													.unwrap(),
+												)
+											}
+											TextMessageTargetMode::Unknown => {
+												error!(
+													logger,
+													"Invalid sendtextmessage \
+													 to a client with unknown \
+													 target mode"
+												);
+												return;
+											}
+										};
+									} else {
+										// Poke
+										let msg =
+											c2s::InClientPokeRequest::new(
+												&command,
+											)
+											.unwrap();
+										let msg = msg.iter().next().unwrap();
+										message = msg.message.into();
+										let con = con.lock();
+										let client =
+											&con.clients[&msg.client_id];
+										chat_type = ChatType::Poke(
+											base64::decode(&client.uid.0)
+												.unwrap(),
+										);
 									}
-									Err(_) => {
-										error!(logger, "Failed to send event to database");
-									}
-								}));
+
+									let msg = db::WriteMessageMsg {
+										message,
+										invoker_uid,
+										chat: ChatId { server, chat_type },
+									};
+									tokio::spawn(db.send(msg).map(move |r| {
+										match r {
+											Ok(Ok(())) => {}
+											Ok(Err(e)) => {
+												error!(logger, "Failed to handle event in database"; "error" => ?e);
+											}
+											Err(_) => {
+												error!(
+													logger,
+													"Failed to send event to \
+													 database"
+												);
+											}
+										}
+									}));
+								}
 							})();
 
 							let (send, recv) = oneshot::channel();
@@ -627,13 +693,11 @@ impl<T> InCommandObserver<T> for ProxyCommandObserver {
 	)
 	{
 		let logger = self.logger.clone();
-		tokio::spawn(self.addr.send(WsCommandMsg(cmd.into())).map(
-			move |r| {
-				if let Err(e) = r {
-					error!(logger, "Failed to redirect packet to websocket connection";
+		tokio::spawn(self.addr.send(WsCommandMsg(cmd.into())).map(move |r| {
+			if let Err(e) = r {
+				error!(logger, "Failed to redirect packet to websocket connection";
 					"error" => ?e);
-				}
-			},
-		));
+			}
+		}));
 	}
 }

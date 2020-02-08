@@ -10,7 +10,9 @@ use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use failure::Error;
 use qint_shared::models::{Bookmark, Message as TextMessage, MessageStatus};
-use qint_shared::{BOOKMARKS_LIMIT, ChatId, ChatType, MESSAGES_LIMIT, MessagesRequest};
+use qint_shared::{
+	ChatId, ChatType, MessagesRequest, BOOKMARKS_LIMIT, MESSAGES_LIMIT,
+};
 use slog::{debug, info, Logger};
 use tsclientlib::Identity;
 use tsproto::crypto::EccKeyPubP256;
@@ -198,135 +200,108 @@ impl DbHandler {
 			.first::<i64>(&self.con)
 	}
 
-	fn get_or_create_chat(&self, id: &ChatId) -> Result<i64, diesel::result::Error> {
-		use schema::{
-			channel_chats, client_chats, client_pokes,
-			server_chats,
-		};
+	fn get_or_create_chat(
+		&self,
+		id: &ChatId,
+	) -> Result<i64, diesel::result::Error>
+	{
+		use schema::{channel_chats, client_chats, client_pokes, server_chats};
 
 		match &id.chat_type {
 			ChatType::Server => {
-				self
-					.con
-					.transaction::<_, diesel::result::Error, _>(
-						|| {
-							if let Some(chat) = server_chats::table
-								.find(&id.server)
-								.select(server_chats::chat)
-								.first::<i64>(&self.con)
-								.optional()?
-							{
-								Ok(chat)
-							} else {
-								// Create new chat
-								let chat = self.create_chat()?;
+				self.con.transaction::<_, diesel::result::Error, _>(|| {
+					if let Some(chat) = server_chats::table
+						.find(&id.server)
+						.select(server_chats::chat)
+						.first::<i64>(&self.con)
+						.optional()?
+					{
+						Ok(chat)
+					} else {
+						// Create new chat
+						let chat = self.create_chat()?;
 
-								diesel::insert_into(
-									server_chats::table,
-								)
-								.values(&(
-									server_chats::server.eq(&id.server),
-									server_chats::chat.eq(chat),
-								))
-								.execute(&self.con)?;
-								Ok(chat)
-							}
-						},
-					)
+						diesel::insert_into(server_chats::table)
+							.values(&(
+								server_chats::server.eq(&id.server),
+								server_chats::chat.eq(chat),
+							))
+							.execute(&self.con)?;
+						Ok(chat)
+					}
+				})
 			}
 			ChatType::Channel(channel) => {
-				self
-					.con
-					.transaction::<_, diesel::result::Error, _>(
-						|| {
-							if let Some(chat) = channel_chats::table
-								.find((&id.server, *channel as i64))
-								.select(channel_chats::chat)
-								.first::<i64>(&self.con)
-								.optional()?
-							{
-								Ok(chat)
-							} else {
-								// Create new chat
-								let chat = self.create_chat()?;
+				self.con.transaction::<_, diesel::result::Error, _>(|| {
+					if let Some(chat) = channel_chats::table
+						.find((&id.server, *channel as i64))
+						.select(channel_chats::chat)
+						.first::<i64>(&self.con)
+						.optional()?
+					{
+						Ok(chat)
+					} else {
+						// Create new chat
+						let chat = self.create_chat()?;
 
-								diesel::insert_into(
-									channel_chats::table,
-								)
-								.values(&(
-									channel_chats::server
-										.eq(&id.server),
-									channel_chats::channel
-										.eq(*channel as i64),
-									channel_chats::chat.eq(chat),
-								))
-								.execute(&self.con)?;
-								Ok(chat)
-							}
-						},
-					)
+						diesel::insert_into(channel_chats::table)
+							.values(&(
+								channel_chats::server.eq(&id.server),
+								channel_chats::channel.eq(*channel as i64),
+								channel_chats::chat.eq(chat),
+							))
+							.execute(&self.con)?;
+						Ok(chat)
+					}
+				})
 			}
 			ChatType::Client(client) => {
-				self
-					.con
-					.transaction::<_, diesel::result::Error, _>(
-						|| {
-							if let Some(chat) = client_chats::table
-								.find((&id.server, &client))
-								.select(client_chats::chat)
-								.first::<i64>(&self.con)
-								.optional()?
-							{
-								Ok(chat)
-							} else {
-								// Create new chat
-								let chat = self.create_chat()?;
+				self.con.transaction::<_, diesel::result::Error, _>(|| {
+					if let Some(chat) = client_chats::table
+						.find((&id.server, &client))
+						.select(client_chats::chat)
+						.first::<i64>(&self.con)
+						.optional()?
+					{
+						Ok(chat)
+					} else {
+						// Create new chat
+						let chat = self.create_chat()?;
 
-								diesel::insert_into(
-									client_chats::table,
-								)
-								.values(&(
-									client_chats::server.eq(&id.server),
-									client_chats::client
-										.eq(&client),
-									client_chats::chat.eq(chat),
-								))
-								.execute(&self.con)?;
-								Ok(chat)
-							}
-						},
-					)
+						diesel::insert_into(client_chats::table)
+							.values(&(
+								client_chats::server.eq(&id.server),
+								client_chats::client.eq(&client),
+								client_chats::chat.eq(chat),
+							))
+							.execute(&self.con)?;
+						Ok(chat)
+					}
+				})
 			}
 			ChatType::Poke(client) => {
-				self
-					.con
-					.transaction::<_, diesel::result::Error, _>(
-						|| {
-							if let Some(chat) = client_pokes::table
-								.find((&id.server, &client))
-								.select(client_pokes::chat)
-								.first::<i64>(&self.con)
-								.optional()?
-							{
-								Ok(chat)
-							} else {
-								// Create new chat
-								let chat = self.create_chat()?;
+				self.con.transaction::<_, diesel::result::Error, _>(|| {
+					if let Some(chat) = client_pokes::table
+						.find((&id.server, &client))
+						.select(client_pokes::chat)
+						.first::<i64>(&self.con)
+						.optional()?
+					{
+						Ok(chat)
+					} else {
+						// Create new chat
+						let chat = self.create_chat()?;
 
-								diesel::insert_into(
-									client_pokes::table,
-								)
-								.values(&(
-									client_pokes::server.eq(&id.server),
-									client_pokes::client
-										.eq(&client),
-									client_pokes::chat.eq(chat),
-								))
-								.execute(&self.con)?;
-								Ok(chat)
-							}
-						},
-					)
+						diesel::insert_into(client_pokes::table)
+							.values(&(
+								client_pokes::server.eq(&id.server),
+								client_pokes::client.eq(&client),
+								client_pokes::chat.eq(chat),
+							))
+							.execute(&self.con)?;
+						Ok(chat)
+					}
+				})
 			}
 		}
 	}
@@ -519,9 +494,12 @@ impl Handler<GetMessagesMsg> for DbHandler {
 		let query = messages::table
 			.filter(messages::chat.eq(chat))
 			.left_outer_join(clients::table)
-			.left_outer_join(servers_clients::table.on(
-				servers_clients::client.nullable().eq(messages::invoker)
-				.and(servers_clients::server.eq(&msg.0.chat.server))))
+			.left_outer_join(
+				servers_clients::table.on(servers_clients::client
+					.nullable()
+					.eq(messages::invoker)
+					.and(servers_clients::server.eq(&msg.0.chat.server))),
+			)
 			.order((messages::time.desc(), messages::id))
 			.limit(MESSAGES_LIMIT as i64)
 			.select((
@@ -532,15 +510,18 @@ impl Handler<GetMessagesMsg> for DbHandler {
 				messages::status,
 				messages::time,
 				messages::timezone,
-
 				clients::name.nullable(),
 				servers_clients::icon.nullable(),
 				servers_clients::avatar.nullable(),
 			));
 		let result = if let Some((time, id)) = msg.0.start {
 			// messages::(time, id) < (time, id), i.e. previous messages
-			query.filter(messages::time.lt(&time).or(
-				messages::time.eq(&time).and(messages::id.lt(id))))
+			query
+				.filter(
+					messages::time
+						.lt(&time)
+						.or(messages::time.eq(&time).and(messages::id.lt(id))),
+				)
 				.load::<TextMessage>(&self.con)?
 		} else {
 			query.load::<TextMessage>(&self.con)?
@@ -563,14 +544,12 @@ impl Handler<WriteMessageMsg> for DbHandler {
 		let utc_time = Utc::now().naive_utc();
 		let dummy_offset = FixedOffset::east(0);
 		let local_zone = Local::from_offset(&dummy_offset);
-		let utc_to_local_offset = local_zone
-			.offset_from_utc_datetime(&utc_time)
-			.local_minus_utc();
+		let utc_to_local_offset =
+			local_zone.offset_from_utc_datetime(&utc_time).local_minus_utc();
 
 		let chat = self.get_or_create_chat(&message.chat)?;
-		self.last_message_id = self
-			.con
-			.transaction::<_, diesel::result::Error, _>(|| {
+		self.last_message_id =
+			self.con.transaction::<_, diesel::result::Error, _>(|| {
 				// Insert message
 				let message = models::MessageInsert {
 					chat,
