@@ -2,7 +2,7 @@
 Qint allows you to speak with other people over the internet.
 
 ## Screenshots
-TODO
+![main ui](https://share.splamy.de/20/02/firefox_2020-02-02_19-06-04.png)
 
 ## Dependencies
 - [Rust](https://rust-lang.org), preferred installation method is [rustup](https://rustup.rs)
