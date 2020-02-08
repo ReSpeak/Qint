@@ -321,7 +321,6 @@ impl EventHandler for super::DbHandler {
 								let cmp = messages::chat
 									.eq(chat)
 									.and(messages::invoker.eq(&invoker_uid))
-									.and(messages::invoker_name.eq(invoker_name))
 									.and(messages::content.eq(message))
 									.and(messages::status.eq(MessageStatus::Sending));
 								// Update status
