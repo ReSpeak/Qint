@@ -3,7 +3,7 @@
 use chrono::offset::{FixedOffset, TimeZone};
 use chrono::{Duration, Local, Utc};
 use diesel::prelude::*;
-use failure::Error;
+use failure::{bail, Error};
 use qint_shared::{ChatId, ChatType};
 use qint_shared::models::MessageStatus;
 use tsclientlib::events::{Event, PropertyId, PropertyValue};
@@ -233,6 +233,8 @@ impl EventHandler for super::DbHandler {
 						None
 					};
 
+					let own_message = invoker.id == con.lock().own_client;
+
 					// Make sure the chat exists
 					let chat;
 					// If it is possible that the message is inserted by
@@ -248,14 +250,32 @@ impl EventHandler for super::DbHandler {
 						MessageTarget::Channel => {
 							can_be_duplicate = true;
 							let con = con.lock();
-							let own_client = &con.clients[&con.own_client];
+							let client = con.clients.get(&con.own_client);
+							let own_client = if let Some(client) = client {
+								client
+							} else {
+								bail!("Failed to find own client");
+							};
 							chat = ChatType::Channel(own_client.channel.0);
 						}
 						MessageTarget::Client(id) => {
 							can_be_duplicate = false;
 							let con = con.lock();
-							let client = &con.clients[id];
-							chat = ChatType::Client(base64::decode(&client.uid.0).unwrap());
+							let client = con.clients.get(id);
+							let client_uid = if let Some(client) = client {
+								Some(&client.uid.0)
+							} else if !own_message {
+								invoker.uid.as_ref().map(|uid| &uid.0)
+							} else {
+								None
+							};
+
+							let client_uid = if let Some(uid) = client_uid {
+								uid
+							} else {
+								bail!("Failed to find client");
+							};
+							chat = ChatType::Client(base64::decode(client_uid).unwrap());
 						}
 						MessageTarget::Poke(id) => {
 							can_be_duplicate = false;
@@ -293,6 +313,28 @@ impl EventHandler for super::DbHandler {
 
 								if let Some(id) = id {
 									return Ok(id);
+								}
+							}
+
+							if own_message {
+								// Check if the message is already in the database
+								let cmp = messages::chat
+									.eq(chat)
+									.and(messages::invoker.eq(&invoker_uid))
+									.and(messages::invoker_name.eq(invoker_name))
+									.and(messages::content.eq(message))
+									.and(messages::status.eq(MessageStatus::Sending));
+								// Update status
+								let res = diesel::update(messages::table.filter(cmp))
+									.set(messages::status.eq(MessageStatus::Success))
+									.execute(&self.con)?;
+
+								if res != 0 {
+									// Successfully updated
+									return messages::table
+										.order(messages::id.desc())
+										.select(messages::id)
+										.first::<i64>(&self.con);
 								}
 							}
 

@@ -80,7 +80,6 @@ CREATE TABLE messages (
 	-- The name if the uid is not known
 	invoker_name TEXT,
 	content TEXT NOT NULL,
-	status TEXT CHECK(status IN ('sending', 'success', 'error')) NOT NULL DEFAULT 'success',
 	-- In UTC
 	time DATETIME NOT NULL,
 	-- Offset from UTC in seconds to the east

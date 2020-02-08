@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use chrono::NaiveDateTime;
 use failure::{format_err, Error};
 use qint_shared::{ChatId, ChatType, MESSAGES_LIMIT, MessagesRequest};
-use qint_shared::models::Message;
+use qint_shared::models::{Message, MessageStatus};
 use slog::error;
 use stdweb::{js, Value};
 use stdweb::web::event::IEvent;
@@ -469,7 +469,7 @@ impl Chat {
 						{ msg.get_date_time().format("%H:%M") }
 					</span>
 				</div>
-				<div class="message-content latex_proc">
+				<div class=cl!["message-content", "latex_proc", ("message-sending", msg.status == MessageStatus::Sending), ("message-error", msg.status == MessageStatus::Error)]>
 					{ &msg.content }
 				</div>
 			</>

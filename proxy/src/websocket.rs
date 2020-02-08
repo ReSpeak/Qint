@@ -435,9 +435,9 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 						if let Some(con) = &mut self.connection {
 							let sink = con.get_packet_sink();
 
-							let (send, recv) = oneshot::channel();
-							if packet.header().packet_type() == PacketType::Command && (packet.content().starts_with(b"sendtextmessage ") || packet.content().starts_with(b"clientpoke ")) {
-								let logger = self.state.logger.clone();
+							let logger = self.state.logger.clone();
+							let db = self.state.database.clone();
+							(|| if packet.header().packet_type() == PacketType::Command && (packet.content().starts_with(b"sendtextmessage ") || packet.content().starts_with(b"clientpoke ")) {
 								let command = InCommand::new(packet.content().to_vec(),
 									packet.header().packet_type(), packet.header().flags().contains(Flags::NEWPROTOCOL), Direction::C2S).unwrap();
 
@@ -506,7 +506,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 										chat_type,
 									},
 								};
-								tokio::spawn(self.state.database.send(msg).map(move |r| match r {
+								tokio::spawn(db.send(msg).map(move |r| match r {
 									Ok(Ok(())) => {}
 									Ok(Err(e)) => {
 										error!(logger, "Failed to handle event in database"; "error" => ?e);
@@ -515,8 +515,9 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 										error!(logger, "Failed to send event to database");
 									}
 								}));
-							}
+							})();
 
+							let (send, recv) = oneshot::channel();
 							thread::spawn(|| {
 								tokio_compat::runtime::run(
 									futures01::future::lazy(move || {

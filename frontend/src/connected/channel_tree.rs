@@ -13,28 +13,6 @@ use crate::controls::context_menu::{ContextMenu, Pos2D};
 use crate::connection_service::*;
 use crate::controls::icon::Icon;
 
-macro_rules! cl {
-	( $( $x:tt ),* ) => {
-		{
-			let mut temp_vec = String::new();
-			$(
-				if !temp_vec.is_empty() { temp_vec.push_str(" "); }
-				cl_intern!(temp_vec, $x);
-			)*
-			temp_vec
-		}
-	};
-}
-
-macro_rules! cl_intern {
-	($st:expr, ($x:expr, $y:expr)) => {
-		if $y {
-			$st.push_str($x);
-		}
-	};
-	($st:expr, $x:expr) => { $st.push_str($x) };
-}
-
 pub struct ChannelTree {
 	link: ComponentLink<Self>,
 	con: ConnectionId,
