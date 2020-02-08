@@ -202,6 +202,7 @@
   width: var(--channel-tree-width);
   background-color: #eeeeee;
   border-right: #b3b3b3 2px solid;
+  user-select: none;
 }
 .sidebar .level:not(:last-child) {
   margin-bottom: 0;
