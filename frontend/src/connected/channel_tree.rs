@@ -12,6 +12,7 @@ use crate::controls::context_menu::{ContextMenu, Pos2D};
 
 use crate::connection_service::*;
 use crate::controls::icon::Icon;
+use failure::Fail;
 
 pub struct ChannelTree {
 	link: ComponentLink<Self>,
@@ -268,6 +269,24 @@ impl ChannelTree {
 			}
 		} else { html!{} };
 
+		let mut formatted_channel_name = channel.name.as_str();
+		let mut channel_align_center = false;
+		let mut channel_align_right = false;
+
+		if channel.name.starts_with("[cspacer") {
+			let end = channel.name.find("]");
+			if let Some(idx) = end {
+				channel_align_center = true;
+				formatted_channel_name = &channel.name[(idx + 1)..];
+			}
+		} else if channel.name.starts_with("[rspacer") {
+			let end = channel.name.find("]");
+			if let Some(idx) = end {
+				channel_align_right = true;
+				formatted_channel_name = &channel.name[(idx + 1)..];
+			}
+		}
+
 		html! {
 			<li>
 				{ cm }
@@ -276,9 +295,9 @@ impl ChannelTree {
 						("own-client", ctx.own_channel == id),
 						("selected-channel", ctx.selected_channel == Some(id))]}>
 					<span class="collapse-button" onclick=toggle_collapse>{ Icon::mdi_icon(collapse_icon) }</span>
-					<a class="entry-expand" ondoubleclick=change_channel onclick=set_chat oncontextmenu=context_request>
-						{ icon }
-						<span class="entry-expand">{ &channel.name }</span>
+					{ icon }
+					<a class=cl!["entry-expand", ("text-align-center", channel_align_center), ("text-align-right", channel_align_right)] ondoubleclick=change_channel onclick=set_chat oncontextmenu=context_request>
+						<span class="entry-expand">{ formatted_channel_name }</span>
 					</a>
 				</div>
 				<ul class=cl!["menu-list", ("collapsed", collapsed)]>
