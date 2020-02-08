@@ -9,7 +9,7 @@ use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use failure::Error;
-use qint_shared::models::{Bookmark, Message as TextMessage};
+use qint_shared::models::{Bookmark, Message as TextMessage, MessageStatus};
 use qint_shared::{BOOKMARKS_LIMIT, ChatId, ChatType, MESSAGES_LIMIT, MessagesRequest};
 use slog::{debug, info, Logger};
 use tsclientlib::Identity;
@@ -26,7 +26,6 @@ mod schema;
 diesel_migrations::embed_migrations!();
 
 pub struct DbHandler {
-	logger: Logger,
 	secret: Secret,
 	con: SqliteConnection,
 	last_message_id: i64,
@@ -60,6 +59,12 @@ struct GetBookmarksMsg {
 }
 
 struct GetMessagesMsg(MessagesRequest);
+
+pub struct WriteMessageMsg {
+	pub message: String,
+	pub invoker_uid: Vec<u8>,
+	pub chat: ChatId,
+}
 
 #[get("/bookmarks")]
 pub(crate) async fn bookmarks(
@@ -101,6 +106,9 @@ impl Message for GetBookmarksMsg {
 impl Message for GetMessagesMsg {
 	type Result = Result<Vec<TextMessage>, Error>;
 }
+impl Message for WriteMessageMsg {
+	type Result = Result<(), Error>;
+}
 impl Message for ConnectedMsg {
 	type Result = Result<(), Error>;
 }
@@ -132,7 +140,7 @@ impl DbHandler {
 			info!(logger, "Run database migrations"; "output" => s);
 		}
 
-		Ok(Self { logger, secret, con, last_message_id: 0 })
+		Ok(Self { secret, con, last_message_id: 0 })
 	}
 
 	fn get_chat(
@@ -188,6 +196,139 @@ impl DbHandler {
 			.order(chats::id.desc())
 			.select(chats::id)
 			.first::<i64>(&self.con)
+	}
+
+	fn get_or_create_chat(&self, id: &ChatId) -> Result<i64, diesel::result::Error> {
+		use schema::{
+			channel_chats, client_chats, client_pokes,
+			server_chats,
+		};
+
+		match &id.chat_type {
+			ChatType::Server => {
+				self
+					.con
+					.transaction::<_, diesel::result::Error, _>(
+						|| {
+							if let Some(chat) = server_chats::table
+								.find(&id.server)
+								.select(server_chats::chat)
+								.first::<i64>(&self.con)
+								.optional()?
+							{
+								Ok(chat)
+							} else {
+								// Create new chat
+								let chat = self.create_chat()?;
+
+								diesel::insert_into(
+									server_chats::table,
+								)
+								.values(&(
+									server_chats::server.eq(&id.server),
+									server_chats::chat.eq(chat),
+								))
+								.execute(&self.con)?;
+								Ok(chat)
+							}
+						},
+					)
+			}
+			ChatType::Channel(channel) => {
+				self
+					.con
+					.transaction::<_, diesel::result::Error, _>(
+						|| {
+							if let Some(chat) = channel_chats::table
+								.find((&id.server, *channel as i64))
+								.select(channel_chats::chat)
+								.first::<i64>(&self.con)
+								.optional()?
+							{
+								Ok(chat)
+							} else {
+								// Create new chat
+								let chat = self.create_chat()?;
+
+								diesel::insert_into(
+									channel_chats::table,
+								)
+								.values(&(
+									channel_chats::server
+										.eq(&id.server),
+									channel_chats::channel
+										.eq(*channel as i64),
+									channel_chats::chat.eq(chat),
+								))
+								.execute(&self.con)?;
+								Ok(chat)
+							}
+						},
+					)
+			}
+			ChatType::Client(client) => {
+				self
+					.con
+					.transaction::<_, diesel::result::Error, _>(
+						|| {
+							if let Some(chat) = client_chats::table
+								.find((&id.server, &client))
+								.select(client_chats::chat)
+								.first::<i64>(&self.con)
+								.optional()?
+							{
+								Ok(chat)
+							} else {
+								// Create new chat
+								let chat = self.create_chat()?;
+
+								diesel::insert_into(
+									client_chats::table,
+								)
+								.values(&(
+									client_chats::server.eq(&id.server),
+									client_chats::client
+										.eq(&client),
+									client_chats::chat.eq(chat),
+								))
+								.execute(&self.con)?;
+								Ok(chat)
+							}
+						},
+					)
+			}
+			ChatType::Poke(client) => {
+				self
+					.con
+					.transaction::<_, diesel::result::Error, _>(
+						|| {
+							if let Some(chat) = client_pokes::table
+								.find((&id.server, &client))
+								.select(client_pokes::chat)
+								.first::<i64>(&self.con)
+								.optional()?
+							{
+								Ok(chat)
+							} else {
+								// Create new chat
+								let chat = self.create_chat()?;
+
+								diesel::insert_into(
+									client_pokes::table,
+								)
+								.values(&(
+									client_pokes::server.eq(&id.server),
+									client_pokes::client
+										.eq(&client),
+									client_pokes::chat.eq(chat),
+								))
+								.execute(&self.con)?;
+								Ok(chat)
+							}
+						},
+					)
+			}
+		}
 	}
 }
 
@@ -406,6 +547,50 @@ impl Handler<GetMessagesMsg> for DbHandler {
 		};
 
 		Ok(result)
+	}
+}
+
+impl Handler<WriteMessageMsg> for DbHandler {
+	type Result = Result<(), Error>;
+	fn handle(
+		&mut self,
+		message: WriteMessageMsg,
+		_: &mut Self::Context,
+	) -> Self::Result
+	{
+		use schema::messages;
+
+		let utc_time = Utc::now().naive_utc();
+		let dummy_offset = FixedOffset::east(0);
+		let local_zone = Local::from_offset(&dummy_offset);
+		let utc_to_local_offset = local_zone
+			.offset_from_utc_datetime(&utc_time)
+			.local_minus_utc();
+
+		let chat = self.get_or_create_chat(&message.chat)?;
+		self.last_message_id = self
+			.con
+			.transaction::<_, diesel::result::Error, _>(|| {
+				// Insert message
+				let message = models::MessageInsert {
+					chat,
+					invoker: Some(&message.invoker_uid),
+					invoker_name: None,
+					content: &message.message,
+					status: MessageStatus::Sending,
+					time: &utc_time,
+					timezone: utc_to_local_offset,
+				};
+				diesel::insert_into(messages::table)
+					.values(&message)
+					.execute(&self.con)?;
+				messages::table
+					.order(messages::id.desc())
+					.select(messages::id)
+					.first::<i64>(&self.con)
+			})?;
+
+		Ok(())
 	}
 }
 

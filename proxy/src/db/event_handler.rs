@@ -4,6 +4,7 @@ use chrono::offset::{FixedOffset, TimeZone};
 use chrono::{Duration, Local, Utc};
 use diesel::prelude::*;
 use failure::Error;
+use qint_shared::{ChatId, ChatType};
 use qint_shared::models::MessageStatus;
 use tsclientlib::events::{Event, PropertyId, PropertyValue};
 use tsclientlib::MessageTarget;
@@ -209,10 +210,7 @@ impl EventHandler for super::DbHandler {
 					}
 				}
 				Event::Message { from, invoker, message } => {
-					use schema::{
-						channel_chats, client_chats, client_pokes, messages,
-						server_chats,
-					};
+					use schema::messages;
 
 					let server = con.get_server_key()?;
 					let server = server.to_short();
@@ -245,150 +243,31 @@ impl EventHandler for super::DbHandler {
 					match from {
 						MessageTarget::Server => {
 							can_be_duplicate = true;
-							chat = self
-								.con
-								.transaction::<_, diesel::result::Error, _>(
-									|| {
-										if let Some(chat) = server_chats::table
-											.find(server)
-											.select(server_chats::chat)
-											.first::<i64>(&self.con)
-											.optional()?
-										{
-											Ok(chat)
-										} else {
-											// Create new chat
-											let chat = self.create_chat()?;
-
-											diesel::insert_into(
-												server_chats::table,
-											)
-											.values(&(
-												server_chats::server.eq(server),
-												server_chats::chat.eq(chat),
-											))
-											.execute(&self.con)?;
-											Ok(chat)
-										}
-									},
-								)?;
+							chat = ChatType::Server;
 						}
 						MessageTarget::Channel => {
 							can_be_duplicate = true;
-							let channel = {
-								let con = con.lock();
-								let own_client = &con.clients[&con.own_client];
-								own_client.channel.0 as i64
-							};
-
-							chat = self
-								.con
-								.transaction::<_, diesel::result::Error, _>(
-									|| {
-										if let Some(chat) = channel_chats::table
-											.find((server, channel))
-											.select(channel_chats::chat)
-											.first::<i64>(&self.con)
-											.optional()?
-										{
-											Ok(chat)
-										} else {
-											// Create new chat
-											let chat = self.create_chat()?;
-
-											diesel::insert_into(
-												channel_chats::table,
-											)
-											.values(&(
-												channel_chats::server
-													.eq(server),
-												channel_chats::channel
-													.eq(channel),
-												channel_chats::chat.eq(chat),
-											))
-											.execute(&self.con)?;
-											Ok(chat)
-										}
-									},
-								)?;
+							let con = con.lock();
+							let own_client = &con.clients[&con.own_client];
+							chat = ChatType::Channel(own_client.channel.0);
 						}
 						MessageTarget::Client(id) => {
 							can_be_duplicate = false;
-							let client = {
-								let con = con.lock();
-								let client = &con.clients[id];
-								base64::decode(&client.uid.0).unwrap()
-							};
-
-							chat = self
-								.con
-								.transaction::<_, diesel::result::Error, _>(
-									|| {
-										if let Some(chat) = client_chats::table
-											.find((server, &client))
-											.select(client_chats::chat)
-											.first::<i64>(&self.con)
-											.optional()?
-										{
-											Ok(chat)
-										} else {
-											// Create new chat
-											let chat = self.create_chat()?;
-
-											diesel::insert_into(
-												client_chats::table,
-											)
-											.values(&(
-												client_chats::server.eq(server),
-												client_chats::client
-													.eq(&client),
-												client_chats::chat.eq(chat),
-											))
-											.execute(&self.con)?;
-											Ok(chat)
-										}
-									},
-								)?;
+							let con = con.lock();
+							let client = &con.clients[id];
+							chat = ChatType::Client(base64::decode(&client.uid.0).unwrap());
 						}
 						MessageTarget::Poke(id) => {
 							can_be_duplicate = false;
-							let client = {
-								let con = con.lock();
-								let client = &con.clients[id];
-								base64::decode(&client.uid.0).unwrap()
-							};
-
-							chat = self
-								.con
-								.transaction::<_, diesel::result::Error, _>(
-									|| {
-										if let Some(chat) = client_pokes::table
-											.find((server, &client))
-											.select(client_pokes::chat)
-											.first::<i64>(&self.con)
-											.optional()?
-										{
-											Ok(chat)
-										} else {
-											// Create new chat
-											let chat = self.create_chat()?;
-
-											diesel::insert_into(
-												client_pokes::table,
-											)
-											.values(&(
-												client_pokes::server.eq(server),
-												client_pokes::client
-													.eq(&client),
-												client_pokes::chat.eq(chat),
-											))
-											.execute(&self.con)?;
-											Ok(chat)
-										}
-									},
-								)?;
+							let con = con.lock();
+							let client = &con.clients[id];
+							chat = ChatType::Client(base64::decode(&client.uid.0).unwrap());
 						}
 					}
+					let chat = self.get_or_create_chat(&ChatId {
+						server: server.to_vec(),
+						chat_type: chat,
+					})?;
 
 					self.last_message_id = self
 						.con
