@@ -1,4 +1,3 @@
 target/
 /proxy/db.sqlite
-/proxy/SDL2.dll
 /proxy/msvc/
