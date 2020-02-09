@@ -241,7 +241,7 @@ impl Component for Model {
 			let switchtalking = self.link.callback(move |_| Msg::SetTalking(!is_talking));
 			html! {
 				<>
-					<plugins::Plugins />
+					<plugins::Plugins connection=&self.con />
 					<Connected connection=self.con.as_ref().unwrap() />
 					<button style="position:absolute; right: 0" onclick=switchtalking>{ talking }</button>
 					<notifications::Notifications />
