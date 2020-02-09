@@ -12,7 +12,6 @@ use crate::controls::context_menu::{ContextMenu, Pos2D};
 
 use crate::connection_service::*;
 use crate::controls::icon::Icon;
-use failure::Fail;
 
 pub struct ChannelTree {
 	link: ComponentLink<Self>,

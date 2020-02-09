@@ -1,22 +1,29 @@
+use std::collections::HashMap;
+
 use failure::Error;
+use stdweb::{js, Value};
+use uuid::Uuid;
 use yew::format::{Json, Nothing};
 use yew::prelude::*;
 use yew::services::fetch::{FetchService, FetchTask, Request, Response};
 
+use crate::connection_service::{ConnectionId, ConnectionService, FrontendConnectionState};
+
 pub enum Msg {
 	Ignore,
 	GotPlugins(Vec<String>),
-	RegisterCallback(CallbackInfo),
+	AddEventListener(String, CallbackInfo),
 }
 
 pub struct CallbackInfo {
 	plugin: String,
+	callback: Value,
 }
 
 pub struct Plugins {
 	link: ComponentLink<Self>,
 	plugins: Vec<String>,
-	callbacks: Vec<CallbackInfo>,
+	event_listeners: HashMap<String, Vec<CallbackInfo>>,
 	task: Option<FetchTask>,
 }
 
@@ -35,18 +42,11 @@ impl Plugins {
 	}
 
 	fn view_script(&self, name: &str) -> Html {
-		let name2 = name.to_string();
-		let cb = self.link.callback(move |()| {
-			Msg::RegisterCallback(CallbackInfo {
-				plugin: name2.clone(),
-			})
-		});
-
 		html! {
 			<script type="module">
 				{ format!("import('/plugins/{}').then(module => {{
-					module.init();
-				}});", name) }
+					module.init(window.qintPluginApi.getApi('{0}'));
+				}});", name.replace('\\', "\\\\").replace('\'', "\\'")) }
 			</script>
 		}
 	}
@@ -60,11 +60,62 @@ impl Component for Plugins {
 		let mut res = Self {
 			link,
 			plugins: Default::default(),
-			callbacks: Default::default(),
+			event_listeners: Default::default(),
 			task: None,
 		};
+
+		let event_listener_cb = res.link.callback(|(plugin, event, callback)| {
+			Msg::AddEventListener(event, CallbackInfo {
+				plugin,
+				callback,
+			})
+		});
+		let add_event_listener = move |plugin: String, event: String, listener: Value| {
+			event_listener_cb.emit((plugin, event, listener));
+		};
+
+		// Returns the bookkeeping or null if the connection does not exist
+		let get_state = move |con: String| {
+			let con = ConnectionId(match Uuid::parse_str(&con) {
+				Ok(r) => r,
+				Err(_) => return Value::Null,
+			});
+
+			ConnectionService::with(&con, |c| {
+				if let FrontendConnectionState::Connected(_c) = &c.state {
+					Value::Null
+				} else {
+					Value::Null
+				}
+			}, || Value::Null)
+		};
+
+		// All these methods need to be droped again in `destroy`. Otherwise,
+		// they leak memory.
+		js!{ @(no_return)
+			window.qintPluginApi = {
+				addEventListener: @{add_event_listener},
+				getState: @{get_state},
+				getApi(plugin) {
+					return {
+						addEventListener(event, listener) {
+							window.qintPluginApi.addEventListener(plugin, event, listener);
+						}
+					};
+				}
+			};
+		};
+
 		res.load_list();
 		res
+	}
+
+	fn destroy(&mut self) {
+		js!{ @(no_return)
+			window.qintPluginApi.addEventListener.drop();
+			window.qintPluginApi.getState.drop();
+			window.qintPluginApi = undefined;
+		}
 	}
 
 	fn update(&mut self, msg: Self::Message) -> ShouldRender {
@@ -72,12 +123,14 @@ impl Component for Plugins {
 			Msg::Ignore => false,
 			Msg::GotPlugins(plugins) => {
 				self.task = None;
-				self.callbacks.clear();
+				self.event_listeners.clear();
 				self.plugins = plugins;
 				true
 			}
-			Msg::RegisterCallback(info) => {
-				self.callbacks.push(info);
+			Msg::AddEventListener(event, info) => {
+				let listeners = self.event_listeners.entry(event)
+					.or_insert_with(Default::default);
+				listeners.push(info);
 				false
 			}
 		}

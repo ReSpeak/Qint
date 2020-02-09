@@ -233,18 +233,18 @@ impl Component for Model {
 			let onconnect = self.link.callback(Msg::Connect);
 			html! {
 				<>
-					<Connect onconnect=onconnect />
 					<plugins::Plugins />
+					<Connect onconnect=onconnect />
 				</>
 			}
 		} else {
 			let switchtalking = self.link.callback(move |_| Msg::SetTalking(!is_talking));
 			html! {
 				<>
+					<plugins::Plugins />
 					<Connected connection=self.con.as_ref().unwrap() />
 					<button style="position:absolute; right: 0" onclick=switchtalking>{ talking }</button>
 					<notifications::Notifications />
-					<plugins::Plugins />
 				</>
 			}
 		}
