@@ -398,7 +398,7 @@ async fn main() -> Result<(), Error> {
 					.index_file("index.html")
 					.default_handler(Files::new(
 						"",
-						"../frontend/target/wasm32-unknown-unknown/debug/",
+						"../frontend/dist/",
 					)),
 			)
 	})

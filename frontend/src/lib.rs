@@ -1,8 +1,12 @@
 #![recursion_limit="512"]
 
+#[global_allocator]
+static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+
 use failure::Error;
 use qint_shared::*;
 use slog::{error, o, warn, Drain, Logger};
+use wasm_bindgen::prelude::*;
 use yew::{html, Component, ComponentLink, Html, ShouldRender};
 use yew::format::{Binary, MsgPack, Nothing, Text};
 use yew::services::fetch::{FetchService, FetchTask, Request, Response};
@@ -258,4 +262,11 @@ impl From<Text> for WsMsg {
 
 impl From<Binary> for WsMsg {
 	fn from(b: Binary) -> WsMsg { WsMsg::Binary(b) }
+}
+
+#[wasm_bindgen]
+pub fn main() {
+	std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+	console_log::init_with_level(log::Level::Debug).unwrap();
+	yew::start_app::<Model>();
 }

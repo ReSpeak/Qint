@@ -6,9 +6,10 @@ Qint allows you to speak with other people over the internet.
 
 ## Dependencies
 - [Rust](https://rust-lang.org), preferred installation method is [rustup](https://rustup.rs)
-- [cargo-web](https://github.com/koute/cargo-web), install with `cargo install cargo-web`
+- [npm](https://www.npmjs.com)
 - [SDL2](https://www.libsdl.org), Windows installation guide is [below](#download-sdl2-on-windows)
 - [OpenSSL](https://www.openssl.org) 1.1, on linux only
+- [libopus](https://opus-codec.org), on linux only
 
 ## Clone
 At the moment, tsclientlib is needed beside the Qint folder.
@@ -26,7 +27,7 @@ And copy `SDL2-2.x.x/lib/x64/*.dll` to `Qint/proxy/msvc/dll/x64/`.
 ### Build the frontend
 ```bash
 cd Qint/frontend
-cargo web build
+npm run build
 ```
 
 ### Build and start the backend
