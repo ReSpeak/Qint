@@ -62,7 +62,7 @@ struct ProxyCommandObserver {
 
 struct WsCommandMsg(InCommandMsg);
 struct WsMsg(Bytes);
-struct SendMessageMsg(MessageP2F);
+pub(crate) struct SendMessageMsg(pub MessageP2F);
 /// Add a websocket connection to a TeamSpeak connection.
 ///
 /// The `bool` is `true` for a weak connection.
@@ -683,13 +683,27 @@ impl Handler<RemoveWsMsg> for TsConnection {
 	}
 }
 
+impl Handler<SendMessageMsg> for TsConnection {
+	type Result = ();
+	fn handle(
+		&mut self,
+		SendMessageMsg(msg): SendMessageMsg,
+		_: &mut Self::Context,
+	) -> Self::Result
+	{
+		self.send_message(&msg);
+	}
+}
+
 impl Ws {
 	pub fn new(
 		logger: Logger,
 		connection: Addr<TsConnection>,
+		id: ConnectionId,
 		options: WsOptions,
 	) -> Self
 	{
+		let logger = logger.new(o!("id" => id.0.to_string()));
 		Self { logger, connection, options }
 	}
 }
@@ -706,6 +720,7 @@ impl Handler<SendMessageMsg> for Ws {
 		ctx.binary(rmp_serde::to_vec(&msg).unwrap());
 	}
 }
+
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 	fn handle(
 		&mut self,

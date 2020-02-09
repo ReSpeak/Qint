@@ -38,7 +38,7 @@ const DIR_PROJECT: &str = "Qint";
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct ConnectionId(pub Uuid);
 
-#[derive(StructOpt, Debug)]
+#[derive(Clone, Debug, StructOpt)]
 #[structopt(author, about)]
 struct Args {
 	/// The address where the server listens
@@ -164,12 +164,19 @@ async fn create_ws(
 	};
 
 	let weak = options.weak;
-	let ws_con = Ws::new(state.logger.clone(), ts_con.clone(), options.0);
+	let ws_con = Ws::new(state.logger.clone(), ts_con.clone(), id, options.0);
 
 	ws::start_with_addr(ws_con, &req, stream).map(move |(addr, resp)| {
 		tokio::spawn(ts_con.send(AddWsMsg(addr, weak)));
 		resp
 	})
+}
+
+#[get("/list")]
+async fn list_cons(state: web::Data<State>) -> impl Responder {
+	// Check that the id does not exist
+	let cons = state.connections.lock().unwrap();
+	web::Json(cons.keys().map(|id| id.0).collect::<Vec<_>>())
 }
 
 #[post("/audiosend/true")]
@@ -314,18 +321,14 @@ async fn main() -> Result<(), Error> {
 	// Open database
 	let database = db::DbHandler::new(logger.clone(), &settings, key)?.start();
 
+	let connections = Arc::new(Mutex::new(HashMap::new()));
+
 	// Start sound
-	let audio_data = audio::start(logger.clone())?;
+	let audio_data = audio::start(logger.clone(), connections.clone())?;
 
 	let addr = settings.listen_address.clone();
 
-	let state = State {
-		logger,
-		connections: Arc::new(Mutex::new(HashMap::new())),
-		audio_data,
-		settings,
-		database,
-	};
+	let state = State { logger, connections, audio_data, settings, database };
 
 	Ok(HttpServer::new(move || {
 		let state = state.clone();

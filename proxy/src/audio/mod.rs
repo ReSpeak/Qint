@@ -1,8 +1,14 @@
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+
 use actix::*;
 use failure::Error;
 use futures_threadpool::ThreadPool;
 use sdl2::log::{Category, Priority};
 use slog::Logger;
+
+use crate::websocket::TsConnection;
+use crate::ConnectionId;
 
 use audio_to_ts::AudioToTs;
 use ts_to_audio::TsToAudio;
@@ -34,7 +40,7 @@ const USUAL_SAMPLE_COUNT: usize = USUAL_FRAME_SIZE;
 const MAX_OPUS_FRAME_SIZE: usize = 1275;
 
 #[derive(Clone)]
-pub struct AudioData {
+pub(crate) struct AudioData {
 	pub pool: ThreadPool,
 	pub a2ts: Addr<AudioToTs>,
 	pub ts2a: Addr<TsToAudio>,
@@ -63,7 +69,11 @@ fn sdl_log(prio: Priority, cat: Category, msg: &str) {
 	})
 }
 
-pub(crate) fn start(logger: Logger) -> Result<AudioData, Error> {
+pub(crate) fn start(
+	logger: Logger,
+	connections: Arc<Mutex<HashMap<ConnectionId, Addr<TsConnection>>>>,
+) -> Result<AudioData, Error>
+{
 	let sdl_context = sdl2::init().unwrap();
 	sdl2::log::set_output_function(sdl_log);
 
@@ -78,7 +88,8 @@ pub(crate) fn start(logger: Logger) -> Result<AudioData, Error> {
 		.name_prefix("audio")
 		.create();
 
-	let ts2a = TsToAudio::new(logger.clone(), audio_subsystem.clone())?;
+	let ts2a =
+		TsToAudio::new(logger.clone(), audio_subsystem.clone(), connections)?;
 	let a2ts = AudioToTs::new(logger.clone(), audio_subsystem, pool.clone())?;
 
 	Ok(AudioData { pool, a2ts: a2ts.start(), ts2a: ts2a.start() })

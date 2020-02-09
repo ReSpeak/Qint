@@ -42,6 +42,8 @@ pub enum MessageP2F {
 	/// server.
 	ServerKey(Vec<u8>),
 	Packet(InCommandMsg),
+	/// The list of currently talking clients.
+	TalkersChanged(Vec<u16>),
 	Webrtc(WebrtcMsg),
 }
 

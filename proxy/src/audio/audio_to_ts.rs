@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use actix::*;
@@ -7,7 +7,6 @@ use failure::{format_err, Error};
 use futures01::{Future, Sink};
 use futures_spawn::SpawnHelper;
 use futures_threadpool::ThreadPool;
-use parking_lot::Mutex;
 use sdl2::audio::{
 	AudioCallback, AudioDevice, AudioSpec, AudioSpecDesired, AudioStatus,
 };
@@ -101,7 +100,7 @@ impl Handler<SetListenerMsg> for AudioToTs {
 		_: &mut Self::Context,
 	) -> Self::Result
 	{
-		let mut listener = self.listener.lock();
+		let mut listener = self.listener.lock().unwrap();
 		*listener = Some(msg.connection.get_tsproto_connection());
 	}
 }
@@ -114,7 +113,7 @@ impl Handler<RemoveListenerMsg> for AudioToTs {
 		_: &mut Self::Context,
 	) -> Self::Result
 	{
-		let mut ls = self.listener.lock();
+		let mut ls = self.listener.lock().unwrap();
 		let res = ls.is_some();
 		*ls = None;
 		drop(ls);
@@ -132,7 +131,7 @@ impl Handler<SetVolumeMsg> for AudioToTs {
 		_: &mut Self::Context,
 	) -> Self::Result
 	{
-		let mut vol = self.volume.lock();
+		let mut vol = self.volume.lock().unwrap();
 		*vol = msg.0;
 	}
 }
@@ -145,6 +144,7 @@ impl Handler<SetPlayingMsg> for AudioToTs {
 		_: &mut Self::Context,
 	) -> Self::Result
 	{
+		// TODO Change talkers
 		if msg.0 {
 			self.device.resume();
 		} else {
@@ -232,7 +232,7 @@ impl AudioCallback for SdlCallback {
 	type Channel = f32;
 	fn callback(&mut self, buffer: &mut [Self::Channel]) {
 		// Handle volume
-		let volume = *self.volume.lock();
+		let volume = *self.volume.lock().unwrap();
 		if volume != 1.0 {
 			for d in &mut *buffer {
 				*d *= volume;
@@ -257,7 +257,7 @@ impl AudioCallback for SdlCallback {
 				});
 
 				// Write into packet sink
-				let mut listener = self.listener.lock();
+				let mut listener = self.listener.lock().unwrap();
 				if let Some(con) = &mut *listener {
 					if con.upgrade().is_none() {
 						*listener = None;

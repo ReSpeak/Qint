@@ -9,9 +9,9 @@ description = "Qint is a TeamSpeak client"
 [dependencies]
 actix = "0.9"
 actix-files = "0.2"
-actix-rt = "1.0"
 actix-web = "2.0"
 actix-web-actors = "2.0"
+actix-rt = "1.0"
 async-timer = "0.2"
 audiopus = "0.1"
 base64 = "0.10"
@@ -30,7 +30,6 @@ futures-threadpool = "0.1"
 hex = "0.4"
 lazy_static = "1"
 libsqlite3-sys = { version = "0.9", features = ["bundled"] }
-parking_lot = "0.8"
 qint-shared = { path = "../shared", features = ["db"] }
 rmp-serde = "0.14"
 sdl2 = "0.32"

@@ -1,27 +1,32 @@
+use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd, Reverse};
 use std::collections::hash_map::Entry;
-use std::collections::HashMap;
-use std::collections::VecDeque;
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
+use std::thread;
 use std::time::{Duration, Instant};
 
 use actix::*;
 use audiopus::coder::{Decoder, GenericCtl};
 use failure::{format_err, Error};
-use parking_lot::Mutex;
+use futures::prelude::*;
+use futures01::future::Future;
+use qint_shared::MessageP2F;
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired, AudioStatus};
 use sdl2::AudioSubsystem;
-use slog::{debug, error, o, trace, Logger};
+use slog::{debug, error, o, trace, warn, Logger};
 use tsclientlib::ClientId;
 use tsproto_packets::packets::{AudioData, CodecType, InAudio};
 
 use super::*;
+use crate::websocket::{SendMessageMsg, TsConnection};
 use crate::ConnectionId;
 
 /// After this amount of seconds, a decoder will be removed.
 const VOICE_TIMEOUT_SECS: u64 = 1;
 
 pub struct PlayMsg(pub ConnectionId, pub InAudio);
+struct TalkersChangedMsg(ConnectionId);
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct Id {
@@ -29,28 +34,36 @@ struct Id {
 	client: ClientId,
 }
 
-pub struct TsToAudio {
+/// A decoded audio packet
+struct AudioPacket {
+	id: u16,
+	data: Vec<f32>,
+}
+
+pub(crate) struct TsToAudio {
 	logger: Logger,
 	audio_subsystem: AudioSubsystem,
-	device: AudioDevice<SdlCallback>,
+	device: Option<AudioDevice<SdlCallback>>,
 	/// For each client, store the opus decoder and the instant when it was last
 	/// used.
 	decoders: HashMap<Id, (Decoder, Instant)>,
-	/// The audio queue, new data is appended at the end and data is loaded
-	/// from the beginning.
-	data: Arc<Mutex<HashMap<Id, VecDeque<f32>>>>,
-
-	/// Decoded opus data
-	opus_output: Vec<f32>,
+	/// The audio queue, we always play the packet with the smallest id.
+	data: Arc<Mutex<HashMap<Id, BinaryHeap<Reverse<AudioPacket>>>>>,
+	connections: Arc<Mutex<HashMap<ConnectionId, Addr<TsConnection>>>>,
 }
 
 struct SdlCallback {
 	logger: Logger,
-	data: Arc<Mutex<HashMap<Id, VecDeque<f32>>>>,
+	data: Arc<Mutex<HashMap<Id, BinaryHeap<Reverse<AudioPacket>>>>>,
+	t2a: Addr<TsToAudio>,
 }
 
 impl Message for PlayMsg {
 	type Result = Result<(), Error>;
+}
+
+impl Message for TalkersChangedMsg {
+	type Result = ();
 }
 
 impl fmt::Display for Id {
@@ -59,11 +72,36 @@ impl fmt::Display for Id {
 	}
 }
 
+impl PartialEq for AudioPacket {
+	fn eq(&self, other: &Self) -> bool { self.id == other.id }
+}
+impl Eq for AudioPacket {}
+
+impl PartialOrd for AudioPacket {
+	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl Ord for AudioPacket {
+	fn cmp(&self, other: &Self) -> Ordering {
+		if self.id == other.id {
+			Ordering::Equal
+		} else if self.id.wrapping_sub(other.id) < std::u16::MAX / 2 {
+			Ordering::Greater
+		} else {
+			Ordering::Less
+		}
+	}
+}
+
 impl Actor for TsToAudio {
 	type Context = Context<Self>;
 
 	fn started(&mut self, ctx: &mut Self::Context) {
-		ctx.run_interval(Duration::from_secs(1), |t2a, _| {
+		self.open_playback(ctx.address());
+
+		ctx.run_interval(Duration::from_secs(1), |t2a, ctx| {
 			if !t2a.decoders.is_empty() {
 				// Check for inactive connections
 				let now = Instant::now();
@@ -79,29 +117,21 @@ impl Actor for TsToAudio {
 				});
 
 				if t2a.decoders.is_empty() {
-					debug!(logger, "Pausing playback");
-					t2a.device.pause();
+					if let Some(device) = &t2a.device {
+						debug!(logger, "Pausing playback");
+						device.pause();
+					}
 				}
 			}
 
-			if t2a.device.status() == AudioStatus::Stopped {
+			if t2a
+				.device
+				.as_ref()
+				.map(|d| d.status() == AudioStatus::Stopped)
+				.unwrap_or(true)
+			{
 				// Try to reconnect to audio
-				match Self::open_playback(
-					t2a.logger.clone(),
-					&t2a.audio_subsystem,
-					t2a.data.clone(),
-				) {
-					Ok(d) => {
-						t2a.device = d;
-						debug!(t2a.logger, "Reconnected to playback device");
-						if !t2a.decoders.is_empty() {
-							t2a.device.resume();
-						}
-					}
-					Err(e) => {
-						error!(t2a.logger, "Failed to open playback device"; "error" => ?e);
-					}
-				};
+				t2a.open_playback(ctx.address());
 			}
 		});
 	}
@@ -111,57 +141,89 @@ impl TsToAudio {
 	pub fn new(
 		logger: Logger,
 		audio_subsystem: AudioSubsystem,
+		connections: Arc<Mutex<HashMap<ConnectionId, Addr<TsConnection>>>>,
 	) -> Result<Self, Error>
 	{
 		let logger = logger.new(o!("pipeline" => "ts-to-audio"));
 		let data = Arc::new(Mutex::new(Default::default()));
 
-		let device = Self::open_playback(
-			logger.clone(),
-			&audio_subsystem,
-			data.clone(),
-		)?;
-
 		Ok(Self {
 			logger,
 			audio_subsystem,
-			device,
+			device: None,
 			decoders: Default::default(),
 			data,
-
-			opus_output: vec![0f32; USUAL_FRAME_SIZE],
+			connections,
 		})
 	}
 
-	fn open_playback(
-		logger: Logger,
-		audio_subsystem: &AudioSubsystem,
-		data: Arc<Mutex<HashMap<Id, VecDeque<f32>>>>,
-	) -> Result<AudioDevice<SdlCallback>, Error>
-	{
+	fn open_playback(&mut self, t2a: Addr<TsToAudio>) {
 		let desired_spec = AudioSpecDesired {
 			freq: Some(48000),
 			channels: Some(2),
 			samples: Some(USUAL_SAMPLE_COUNT as u16),
 		};
 
-		audio_subsystem.open_playback(None, &desired_spec, move |spec| {
+		let logger = self.logger.clone();
+		let data = self.data.clone();
+		match self.audio_subsystem.open_playback(None, &desired_spec, |spec| {
 			// This spec will always be the desired spec, the sdl wrapper passes
 			// zero as `allowed_changes`.
-			debug!(logger, "Got playback spec"; "spec" => ?spec, "driver" => audio_subsystem.current_audio_driver());
+			debug!(logger, "Got playback spec"; "spec" => ?spec, "driver" => self.audio_subsystem.current_audio_driver());
 			SdlCallback {
 				logger,
 				data,
+				t2a,
 			}
-		}).map_err(|e| format_err!("SDL error: {}", e))
+		}) {
+			Ok(device) => self.device = Some(device),
+			Err(e) => {
+				self.device = None;
+				error!(self.logger, "Failed to open playback device"; "error" => ?e);
+			}
+		}
+	}
+
+	fn talkers_changed(&self, con_id: ConnectionId) {
+		let con = {
+			let cons = self.connections.lock().unwrap();
+			if let Some(con) = cons.get(&con_id) {
+				con.clone()
+			} else {
+				warn!(self.logger, "Failed to get connection for changed talkers"; "connection" => ?con_id);
+				return;
+			}
+		};
+
+		let talkers = self
+			.data
+			.lock()
+			.unwrap()
+			.keys()
+			.filter(|id| id.con == con_id)
+			.map(|id| id.client.0)
+			.collect();
+		let logger = self.logger.clone();
+		tokio::spawn(con.send(SendMessageMsg(MessageP2F::TalkersChanged(talkers)))
+			.map(move |r| if let Err(e) = r {
+				error!(logger, "Failed to notify connection about changed talkers"; "error" => ?e);
+			}));
 	}
 }
 
 impl Handler<PlayMsg> for TsToAudio {
 	type Result = Result<(), Error>;
 	fn handle(&mut self, msg: PlayMsg, _: &mut Self::Context) -> Self::Result {
-		if let AudioData::S2C { id: _, from, codec, data }
-		| AudioData::S2CWhisper { id: _, from, codec, data } = msg.1.data()
+		if self.device.is_none() {
+			warn!(
+				self.logger,
+				"Unable to play audio packet, device is not initialized"
+			);
+			return Ok(());
+		}
+
+		if let AudioData::S2C { id: packet_id, from, codec, data }
+		| AudioData::S2CWhisper { id: packet_id, from, codec, data } = msg.1.data()
 		{
 			if *codec != CodecType::OpusVoice && *codec != CodecType::OpusMusic
 			{
@@ -171,7 +233,7 @@ impl Handler<PlayMsg> for TsToAudio {
 			}
 
 			let id = Id { con: msg.0, client: ClientId(*from) };
-			let channels = self.device.spec().channels;
+			let channels = self.device.as_ref().unwrap().spec().channels;
 			let was_empty = self.decoders.is_empty();
 
 			let mut tmp_entry;
@@ -206,26 +268,22 @@ impl Handler<PlayMsg> for TsToAudio {
 				return Ok(());
 			}
 
+			let mut opus_output = vec![0f32; USUAL_FRAME_SIZE];
 			let len = loop {
-				match decoder.decode_float(
-					*data,
-					&mut self.opus_output[..],
-					false,
-				) {
+				match decoder.decode_float(*data, &mut opus_output, false) {
 					Ok(len) => break len,
 					Err(audiopus::error::Error::Opus(
 						audiopus::error::ErrorCode::BufferTooSmall,
 					)) => {
 						// Enlarge the buffer
-						if self.opus_output.len() == MAX_FRAME_SIZE {
+						if opus_output.len() == MAX_FRAME_SIZE {
 							return Err(format_err!(
 								"Bad opus packet, maximum buffer size exceeded"
 							));
-						} else if self.opus_output.len() * 2 > MAX_FRAME_SIZE {
-							self.opus_output.resize(MAX_FRAME_SIZE, 0f32);
+						} else if opus_output.len() * 2 > MAX_FRAME_SIZE {
+							opus_output.resize(MAX_FRAME_SIZE, 0f32);
 						} else {
-							self.opus_output
-								.resize(self.opus_output.len() * 2, 0f32);
+							opus_output.resize(opus_output.len() * 2, 0f32);
 						}
 					}
 					Err(e) => return Err(e.into()),
@@ -234,28 +292,54 @@ impl Handler<PlayMsg> for TsToAudio {
 
 			// Shrink the buffer
 			let size = len * usize::from(channels);
-			if size <= self.opus_output.len() / 2 {
-				self.opus_output.truncate(len);
+			if size <= opus_output.len() / 2 {
+				opus_output.truncate(len);
 			}
 			trace!(self.logger, "Decoded opus packet"; "id" => %id, "len" => len);
 
 			// Put into queue
+			let changed;
 			{
-				let mut data = self.data.lock();
-				let queue = data.entry(id).or_insert_with(Default::default);
-				if queue.len() > size * 2 {
-					debug!(self.logger, "Removing samples from playback queue"; "id" => %id, "count" => queue.len() - size);
-					*queue = queue.split_off(queue.len() - size);
-					queue.clear();
+				let mut data = self.data.lock().unwrap();
+				let entry = data.entry(id);
+				// If new, fire change talkers event
+				changed =
+					if let Entry::Vacant(_) = &entry { true } else { false };
+
+				let queue = entry.or_insert_with(Default::default);
+				if queue.len() > 2 {
+					debug!(self.logger, "Removing packets from playback queue"; "id" => %id, "count" => queue.len() - 2);
+					while queue.len() > 2 {
+						queue.pop();
+					}
 				}
-				queue.extend(self.opus_output[..size].iter());
+				queue.push(Reverse(AudioPacket {
+					id: *packet_id,
+					data: opus_output,
+				}))
+			}
+
+			if changed {
+				self.talkers_changed(id.con);
 			}
 
 			if was_empty {
-				self.device.resume();
+				self.device.as_ref().unwrap().resume();
 			}
 		}
 		Ok(())
+	}
+}
+
+impl Handler<TalkersChangedMsg> for TsToAudio {
+	type Result = ();
+	fn handle(
+		&mut self,
+		msg: TalkersChangedMsg,
+		_: &mut Self::Context,
+	) -> Self::Result
+	{
+		self.talkers_changed(msg.0);
 	}
 }
 
@@ -269,29 +353,63 @@ impl AudioCallback for SdlCallback {
 		}
 
 		// Mix data
-		let mut data = self.data.lock();
-		data.retain(|id, queue| {
-
-			let len = std::cmp::min(buffer.len(), queue.len());
-			let (a, b) = queue.as_slices();
-			let alen = std::cmp::min(a.len(), len);
-			for i in 0..alen {
-				buffer[i] += a[i];
-			}
-			if alen < len {
-				for i in 0..len - alen {
-					buffer[alen + i] += b[i];
+		let mut changed = HashSet::new();
+		{
+			let mut data = self.data.lock().unwrap();
+			data.retain(|id, queue| {
+				if queue.is_empty() {
+					changed.insert(id.con);
+					trace!(self.logger, "Remove playback queue buffer"; "id" => %id);
+					return false;
 				}
-			}
 
-			if queue.len() == len {
-				trace!(self.logger, "Remove playback queue buffer"; "id" => %id);
-				false
-			} else {
-				*queue = queue.split_off(len);
-				trace!(self.logger, "Left playback queue buffer"; "id" => %id, "len" => queue.len());
+				let mut left = buffer.len();
+				while left > 0 {
+					let mut q_packet = if let Some(p) = queue.peek_mut() {
+						p
+					} else {
+						break;
+					};
+					let packet = &mut q_packet.0;
+
+					let len = std::cmp::min(packet.data.len(), left);
+					for i in 0..len {
+						buffer[i] += packet.data[i];
+					}
+
+					if packet.data.len() > len {
+						packet.data = packet.data.split_off(len);
+					} else {
+						drop(q_packet);
+						queue.pop();
+					}
+					left -= len;
+				}
+
+				trace!(self.logger, "Left playback queue buffer"; "id" => %id, "packets" => queue.len());
 				true
-			}
-		});
+			});
+		}
+
+		for con in changed {
+			let logger = self.logger.clone();
+			let t2a = self.t2a.clone();
+			thread::spawn(move || {
+				tokio_compat::runtime::current_thread::run(
+						tokio::task::spawn_local(
+							t2a.send(TalkersChangedMsg(con))
+								.map(move |r| {match r {
+									Ok(()) => {}
+									Err(e) => {
+										error!(logger, "Failed to notify TS2Audio pipeline about talker change"; "error" => ?e)
+									}
+								}
+								}),
+						)
+						.compat()
+						.map_err(|_| ())
+				)
+			});
+		}
 	}
 }

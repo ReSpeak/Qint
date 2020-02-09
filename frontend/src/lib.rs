@@ -211,6 +211,10 @@ impl Component for Model {
 						}
 						false
 					}
+					MessageP2F::TalkersChanged(_talkers) => {
+						// TODO Animate here
+						false
+					}
 				}
 			}
 			Msg::SetTalking(talk) => {
