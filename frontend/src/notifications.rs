@@ -6,12 +6,11 @@ pub struct Notification {
 }
 
 pub struct Notifications {
-	link: ComponentLink<Self>,
+	_link: ComponentLink<Self>,
 	notifications: Vec<Notification>,
 }
 
 pub enum Msg {
-	Ignore,
 }
 
 #[derive(Clone, PartialEq, Properties)]
@@ -24,14 +23,13 @@ impl Component for Notifications {
 
 	fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
 		Self {
-			link,
+			_link: link,
 			notifications: Vec::new(),
 		}
 	}
 
 	fn update(&mut self, msg: Self::Message) -> ShouldRender {
 		match msg {
-			Msg::Ignore => false,
 		}
 	}
 
@@ -45,7 +43,8 @@ impl Component for Notifications {
 }
 
 impl Notifications {
-	fn view_notification(&self, notification: &Notification) -> Html {
+	fn view_notification(&self, _notification: &Notification) -> Html {
+		// TODO
 		html! {}
 	}
 }

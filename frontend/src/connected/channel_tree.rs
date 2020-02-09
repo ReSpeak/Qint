@@ -352,7 +352,6 @@ impl ChannelTree {
 				.unwrap_or(ChannelId(0)),
 			selected_channel,
 			selected_client,
-			selected_server,
 		};
 
 		let set = self.set_chat.clone();
@@ -368,7 +367,7 @@ impl ChannelTree {
 			<div class="menu channel-list">
 				<p class="menu-label" onclick=set_chat>
 					{ icon }
-					<span class="entry-expand">{ &con.server.name }</span>
+					<span class=cl!["entry-expand", ("selected-server", selected_server)]>{ &con.server.name }</span>
 				</p>
 				<ul class="menu-list">
 					{ for iter::successors(ctx.channels.get(&ChannelId(0)).unwrap().first_child, |c| ctx.channels.get(c).and_then(|c| c.after))
@@ -393,7 +392,6 @@ struct ViewContext<'a> {
 	own_channel: ChannelId,
 	selected_channel: Option<ChannelId>,
 	selected_client: Option<ClientId>,
-	selected_server: bool,
 }
 
 pub struct ContextMenuData {

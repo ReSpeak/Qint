@@ -1,10 +1,9 @@
+use stdweb::js;
 use yew::html;
 use yew::prelude::*;
-use stdweb::js;
 
 pub struct ContextMenu {
    props: Props,
-   link: ComponentLink<Self>,
    pos: Pos2D,
 }
 
@@ -39,7 +38,7 @@ impl Component for ContextMenu {
    type Message = Msg;
    type Properties = Props;
 
-   fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
+   fn create(props: Self::Properties, _: ComponentLink<Self>) -> Self {
       let close_context = props.close_cb.clone();
       js!{
          closeDropdowns();
@@ -48,7 +47,6 @@ impl Component for ContextMenu {
       let pos = props.pos.clone();
       let res = Self {
          props,
-         link,
          pos,
       };
       res

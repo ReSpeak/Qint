@@ -6,15 +6,17 @@ use yew::services::fetch::{FetchService, FetchTask, Request, Response};
 pub enum Msg {
 	Ignore,
 	GotPlugins(Vec<String>),
-	//GotPlugin(String),
-	RegisterCallback {
-		plugin: String,
-	},
+	RegisterCallback(CallbackInfo),
+}
+
+pub struct CallbackInfo {
+	plugin: String,
 }
 
 pub struct Plugins {
 	link: ComponentLink<Self>,
 	plugins: Vec<String>,
+	callbacks: Vec<CallbackInfo>,
 	task: Option<FetchTask>,
 }
 
@@ -32,32 +34,12 @@ impl Plugins {
 			})));
 	}
 
-	/*fn load_plugin(&mut self) {
-		let name = if let Some(name) = self.plugins_to_load.pop() {
-			name
-		} else {
-			return;
-		};
-
-		let req = Request::get(&format!("/plugins/{}", name))
-			.body(Nothing).unwrap();
-
-		self.task = Some(FetchService::new().fetch(req,
-			self.link.callback(|res: Response<Result<String, Error>>| {
-				if let Ok(plugin) = res.into_body() {
-					Msg::GotPlugin(plugin)
-				} else {
-					Msg::Ignore
-				}
-			})));
-	}*/
-
 	fn view_script(&self, name: &str) -> Html {
 		let name2 = name.to_string();
-		let cb = self.link.callback(|| {
-			Msg::RegisterCallback {
-				plugin: name2,
-			}
+		let cb = self.link.callback(move |()| {
+			Msg::RegisterCallback(CallbackInfo {
+				plugin: name2.clone(),
+			})
 		});
 
 		html! {
@@ -78,6 +60,7 @@ impl Component for Plugins {
 		let mut res = Self {
 			link,
 			plugins: Default::default(),
+			callbacks: Default::default(),
 			task: None,
 		};
 		res.load_list();
@@ -86,19 +69,18 @@ impl Component for Plugins {
 
 	fn update(&mut self, msg: Self::Message) -> ShouldRender {
 		match msg {
-			Msg::Ignore => {}
+			Msg::Ignore => false,
 			Msg::GotPlugins(plugins) => {
 				self.task = None;
+				self.callbacks.clear();
 				self.plugins = plugins;
-				//self.load_plugin();
+				true
 			}
-			/*Msg::GotPlugin(code) => {
-				self.task = None;
-				self.plugins.push(Plugin { code });
-				self.load_plugin();
-			}*/
+			Msg::RegisterCallback(info) => {
+				self.callbacks.push(info);
+				false
+			}
 		}
-		true
 	}
 
 	fn view(&self) -> Html {

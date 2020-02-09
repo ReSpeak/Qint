@@ -18,7 +18,6 @@ mod connection_service;
 mod controls;
 mod notifications;
 mod plugins;
-mod webrtc;
 
 const SERVER_ICON: &str = "server";
 const CHANNEL_ICON: &str = "chat-outline";
@@ -27,8 +26,6 @@ const CLIENT_ICON: &str = "account-outline";
 pub struct Model {
 	link: ComponentLink<Model>,
 	logger: Logger,
-	rtc: Option<webrtc::Webrtc>,
-	rtc_queue: Vec<WebrtcMsg>,
 	/// The currently selected connection if there is one.
 	con: Option<ConnectionId>,
 	is_talking: bool,
@@ -41,16 +38,13 @@ pub enum Msg {
 	Connected,
 	Disconnected,
 	Message(MessageP2F),
-	WebrtcReady,
 	Send(MessageF2P),
 	SetTalking(bool),
 }
 
 impl Model {
 	fn get_http_domain() -> String {
-		stdweb::web::window()
-			.location()
-			.and_then(|l| l.origin().ok())
+		web_sys::window().and_then(|w| w.location().origin().ok())
 			.and_then(|l| if l.starts_with("http") {
 				Some(l)
 			} else {
@@ -59,9 +53,7 @@ impl Model {
 	}
 
 	fn get_ws_domain() -> String {
-		stdweb::web::window()
-			.location()
-			.and_then(|l| l.origin().ok())
+		web_sys::window().and_then(|w| w.location().origin().ok())
 			.and_then(|l| if l.starts_with("http") {
 				Some(format!("ws{}", &l[4..]))
 			} else {
@@ -111,21 +103,8 @@ impl Component for Model {
 	fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
 		let logger = slog::Logger::root(slog_stdlog::StdLog.fuse(), o!());
 
-		// TODO Create webrtc connection
-		// For some reason it does not work if we do it afterwards
-		/*let callback = link.callback(|data: Option<WebrtcMsg>| {
-			if let Some(data) = data {
-				Msg::Send(MessageF2P::Webrtc(data))
-			} else {
-				Msg::WebrtcReady
-			}
-		});
-		let rtc = Some(webrtc::Webrtc::new(callback));*/
-
 		Self {
 			link,
-			rtc: None,
-			rtc_queue: Default::default(),
 			logger,
 			con: None,
 			is_talking: false,
@@ -192,30 +171,12 @@ impl Component for Model {
 							}
 						}
 					}
-					MessageP2F::Webrtc(msg) => {
-						if self.rtc.is_none() {
-							// Create webrtc connection
-							let callback = self.link.callback(|data: Option<WebrtcMsg>| {
-								if let Some(data) = data {
-									Msg::Send(MessageF2P::Webrtc(data))
-								} else {
-									Msg::WebrtcReady
-								}
-							});
-							self.rtc = Some(webrtc::Webrtc::new(callback));
-							self.rtc_queue.push(msg);
-						} else if self.rtc_queue.is_empty() {
-							// Webrtc is ready
-							self.rtc.as_mut().unwrap().handle(msg);
-						} else {
-							self.rtc_queue.push(msg);
-						}
-						false
-					}
 					MessageP2F::TalkersChanged(_talkers) => {
 						// TODO Animate here
 						false
 					}
+					// TODO Remove
+					MessageP2F::Webrtc(_) => false,
 				}
 			}
 			Msg::SetTalking(talk) => {
@@ -237,16 +198,7 @@ impl Component for Model {
 				self._set_talking_fetch_task = Some(fetch_task);
 
 				self.is_talking = talk;
-				if let Some(rtc) = &mut self.rtc {
-					rtc.set_talking(talk);
-				}
 				true
-			}
-			Msg::WebrtcReady => {
-				for msg in std::mem::replace(&mut self.rtc_queue, Vec::new()) {
-					self.rtc.as_mut().unwrap().handle(msg);
-				}
-				false
 			}
 			Msg::Send(msg) => {
 				let logger = &self.logger;

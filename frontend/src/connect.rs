@@ -144,11 +144,3 @@ impl Component for Connect {
 		}
 	}
 }
-
-fn checkbox_value(e: &ChangeData) -> bool {
-	if let ChangeData::Value(v) = e {
-		v == "true"
-	} else {
-		false
-	}
-}

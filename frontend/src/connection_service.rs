@@ -194,12 +194,12 @@ impl ConnectionService {
 			} else { None }
 			.map(|opt_pack| {
 				let logger = con.logger.clone();
-				stdweb::spawn_local(con.send_message(opt_pack).map(move |r| {
+				wasm_bindgen_futures::spawn_local(con.send_message(opt_pack).map(move |r| {
 					if let Err(e) = r {
 						// TODO Display notification
 						error!(logger, "{}", error_msg; "error" => ?e);
 					}
-				}))
+				}));
 			})
 		}, "Should be in connected state")
 	}
