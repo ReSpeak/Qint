@@ -17,6 +17,7 @@ mod connected;
 mod connection_service;
 mod controls;
 mod notifications;
+mod plugins;
 mod webrtc;
 
 const SERVER_ICON: &str = "server";
@@ -276,18 +277,18 @@ impl Component for Model {
 			let onconnect = self.link.callback(Msg::Connect);
 			html! {
 				<>
-				<audio id="audio-playback" autoplay="autoplay" />
-				<Connect onconnect=onconnect />
+					<Connect onconnect=onconnect />
+					<plugins::Plugins />
 				</>
 			}
 		} else {
 			let switchtalking = self.link.callback(move |_| Msg::SetTalking(!is_talking));
 			html! {
 				<>
-					<audio id="audio-playback" autoplay="autoplay" />
 					<Connected connection=self.con.as_ref().unwrap() />
 					<button style="position:absolute; right: 0" onclick=switchtalking>{ talking }</button>
 					<notifications::Notifications />
+					<plugins::Plugins />
 				</>
 			}
 		}

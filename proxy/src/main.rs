@@ -60,6 +60,12 @@ struct Args {
 	/// system.
 	#[structopt(long)]
 	cache_path: Option<String>,
+	/// The path for plugins.
+	///
+	/// If no value is given, this is the path of the config file plus
+	/// `plugins/`.
+	#[structopt(long)]
+	plugin_path: Option<String>,
 	/// How much log output do you want?
 	///
 	/// 0. Print nothing
@@ -79,6 +85,8 @@ struct Settings {
 	config_path: PathBuf,
 	#[serde(default = "default_cache_path")]
 	cache_path: PathBuf,
+	#[serde(default)]
+	plugin_path: PathBuf,
 	#[serde(default)]
 	default_identity: u64,
 	/// How much log output do you want?
@@ -136,6 +144,7 @@ impl Default for Settings {
 			listen_address: default_listen_address(),
 			config_path: Default::default(),
 			cache_path: default_cache_path(),
+			plugin_path: Default::default(),
 			default_identity: Default::default(),
 			verbosity: Default::default(),
 		}
@@ -209,6 +218,40 @@ async fn audiosend_false(state: web::Data<State>) -> impl Responder {
 	} else {
 		HttpResponse::Ok()
 	}
+}
+
+#[get("/plugins")]
+async fn list_plugins(
+	state: web::Data<State>,
+) -> Result<impl Responder, Error> {
+	let path = &state.settings.plugin_path;
+	let mut res = Vec::new();
+	let dir = match path.read_dir() {
+		Ok(r) => r,
+		Err(e) => {
+			warn!(state.logger, "Failed to list plugins"; "dir" => ?path, "error" => ?e);
+			return Ok(web::Json(Vec::new()));
+		}
+	};
+	for p in dir {
+		if let Ok(p) = p?.file_name().into_string() {
+			res.push(p);
+		}
+	}
+	Ok(web::Json(res))
+}
+
+#[get("/plugins/{name}")]
+async fn get_plugin(
+	state: web::Data<State>,
+	data: web::Path<String>,
+) -> impl Responder
+{
+	let path = state.settings.plugin_path.join(&*data);
+	fs::read_to_string(path).with_header(
+		http::header::CONTENT_TYPE,
+		"application/javascript; charset=utf-8",
+	)
 }
 
 #[get("/con/{id}/file/{channel}/{path:.*}")]
@@ -308,6 +351,9 @@ async fn main() -> Result<(), Error> {
 	if let Some(a) = args.cache_path {
 		settings.cache_path = a.into();
 	}
+	if let Some(a) = args.plugin_path {
+		settings.plugin_path = a.into();
+	}
 	if let Some(a) = args.listen_address {
 		settings.listen_address = a;
 	}
@@ -316,6 +362,10 @@ async fn main() -> Result<(), Error> {
 	}
 	if args.verbosity > settings.verbosity {
 		settings.verbosity = args.verbosity;
+	}
+
+	if settings.plugin_path.to_str() == Some("") {
+		settings.plugin_path = settings.config_path.join("plugins");
 	}
 
 	// Open database
@@ -338,6 +388,8 @@ async fn main() -> Result<(), Error> {
 			.service(create_ws)
 			.service(audiosend_true)
 			.service(audiosend_false)
+			.service(list_plugins)
+			.service(get_plugin)
 			.service(download_file)
 			.service(db::bookmarks)
 			.service(db::messages)

@@ -10,6 +10,9 @@ opt-level = 3
 [profile.release]
 lto = true
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 base64 = "0.10"
 chrono = "0.4"
