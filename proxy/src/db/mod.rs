@@ -85,9 +85,9 @@ pub(crate) async fn messages(
 ) -> Result<HttpResponse, Error>
 {
 	let msg: MessagesRequest = rmp_serde::from_read_ref(&body)?;
-	debug!(state.logger, "Requesting messages"; "req" => ?msg);
+	trace!(state.logger, "Requesting messages"; "req" => ?msg);
 	let messages = state.database.send(GetMessagesMsg(msg)).await??;
-	debug!(state.logger, "Returning messages"; "messages" => ?messages);
+	trace!(state.logger, "Returning messages"; "messages" => ?messages);
 
 	Ok(HttpResponse::Ok().body(rmp_serde::to_vec(&messages)?))
 }

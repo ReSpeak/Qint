@@ -1,4 +1,6 @@
 #![recursion_limit="512"]
+#[macro_use]
+extern crate stdweb;
 
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;

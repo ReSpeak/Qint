@@ -1,13 +1,19 @@
 use std::collections::HashMap;
 
 use failure::Error;
-use stdweb::{js, Value};
+use serde::{Deserialize, Serialize};
+use stdweb::{js, js_serializable, Value};
 use uuid::Uuid;
 use yew::format::{Json, Nothing};
 use yew::prelude::*;
 use yew::services::fetch::{FetchService, FetchTask, Request, Response};
 
 use crate::connection_service::{ConnectionId, ConnectionService, FrontendConnectionState};
+
+#[derive(Deserialize, Serialize)]
+struct Connection(ts_bookkeeping::data::Connection);
+
+js_serializable!(Connection);
 
 pub enum Msg {
 	Ignore,
@@ -104,19 +110,31 @@ impl Component for Plugins {
 		};
 
 		// Returns the bookkeeping or null if the connection does not exist
-		let get_state = move |con: String| {
+		let get_state = move |_plugin: String, con: String| {
 			let con = ConnectionId(match Uuid::parse_str(&con) {
 				Ok(r) => r,
-				Err(_) => return Value::Null,
+				Err(_) => {
+					stdweb::console!(error, format!("Failed to parse connection id {:?}", con));
+					return Value::Undefined;
+				}
 			});
 
 			ConnectionService::with(&con, |c| {
-				if let FrontendConnectionState::Connected(_c) = &c.state {
-					Value::Null
+				if let FrontendConnectionState::Connected(c) = &c.state {
+					match stdweb::private::to_value(&c.con) {
+						Ok(r) => r,
+						Err(e) => {
+							stdweb::console!(error, format!("Failed to serialize: {:?}", e));
+							Value::Undefined
+						}
+					}
 				} else {
 					Value::Null
 				}
-			}, || Value::Null)
+			}, || {
+				stdweb::console!(error, format!("Connection {:?} not found", con));
+				Value::Undefined
+			})
 		};
 
 		// All these methods need to be droped again in `destroy`. Otherwise,
@@ -130,8 +148,8 @@ impl Component for Plugins {
 						addEventListener(event, listener) {
 							window.qintPluginApi.addEventListener(plugin, event, listener);
 						},
-						getState() {
-							return window.qintPluginApi.getState(plugin);
+						getState(con) {
+							return window.qintPluginApi.getState(plugin, con);
 						}
 					};
 				}
