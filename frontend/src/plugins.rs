@@ -69,12 +69,14 @@ impl Plugins {
 			ConnectionService::with_mut(con, |con| {
 				// TODO Use Vec<Event> instead of Vec<u16>
 				let callback = self.link.callback(|e| Msg::Events(e));
-				con.event_listeners.insert("plugins".into(), Box::new(move |_, events| {
+				con.event_listeners.insert("plugins".into(), Box::new(move |con, events| {
 					for _e in events {
 						/*if let Event::TalkersChanged(talkers) = e {
 							callback.emit(talkers.clone());
 						}*/
-						callback.emit(vec![1, 2, 3]);
+						if let FrontendConnectionState::Connected(con) = &con.state {
+							callback.emit(vec![con.con.own_client.0, 1, 2]);
+						}
 					}
 				}));
 			}, || panic!("Should be in connected state"));

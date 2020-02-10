@@ -13,7 +13,7 @@ use qint_shared::models::{Bookmark, Message as TextMessage, MessageStatus};
 use qint_shared::{
 	ChatId, ChatType, MessagesRequest, BOOKMARKS_LIMIT, MESSAGES_LIMIT,
 };
-use slog::{debug, info, Logger};
+use slog::{info, trace, Logger};
 use tsclientlib::Identity;
 use tsproto::crypto::EccKeyPubP256;
 
