@@ -127,6 +127,11 @@ impl Message for DownloadFile {
 
 impl TsConnection {
 	fn close(&mut self, ctx: &mut <Self as Actor>::Context) {
+		// Close all websockets
+		for s in self.sockets.iter().chain(self.weak_sockets.iter()) {
+			tokio::spawn(s.send(DisconnectMsg).map(|_| ()));
+		}
+
 		self.state.connections.lock().unwrap().remove(&self.id);
 		ctx.stop();
 
@@ -718,6 +723,18 @@ impl Handler<SendMessageMsg> for Ws {
 	{
 		// TODO Support json
 		ctx.binary(rmp_serde::to_vec(&msg).unwrap());
+	}
+}
+
+impl Handler<DisconnectMsg> for Ws {
+	type Result = ();
+	fn handle(
+		&mut self,
+		_: DisconnectMsg,
+		ctx: &mut Self::Context,
+	) -> Self::Result
+	{
+		ctx.stop();
 	}
 }
 
