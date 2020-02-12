@@ -244,7 +244,6 @@ impl AudioToTs {
 
 	fn update_talking(&self) {
 		if let Some(con) = &self.connection {
-			println!("Updating to {}", self.is_playing);
 			tokio::spawn(con.send(SetSelfTalkingMsg(self.is_playing)));
 		}
 	}

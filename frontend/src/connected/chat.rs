@@ -31,6 +31,7 @@ pub struct Chat {
 
 	send_chat: Callback<SubmitEvent>,
 	chat_change: Callback<InputData>,
+	chat_key_down: Callback<KeyDownEvent>,
 	send_command: Callback<SubmitEvent>,
 	command_change: Callback<InputData>,
 	scroll_down: Callback<()>,
@@ -46,6 +47,7 @@ pub enum Msg {
 	CommandChange(String),
 	/// Requested messages arrived arrived from the proxy
 	GotMessages(Vec<Message>),
+	ChatKeyDown(KeyDownEvent),
 	/// A new message arrived
 	NewMessage(MessageTarget),
 	/// Set the chat to our channel when connecting to a server.
@@ -88,6 +90,9 @@ impl Component for Chat {
 		let chat_change = link.callback(|e: InputData|
 			Msg::ChatChange(e.value)
 		);
+		let chat_key_down = link.callback(|e: KeyDownEvent|
+			Msg::ChatKeyDown(e)
+		);
 		let send_command = link.callback(|e: SubmitEvent| {
 			e.prevent_default();
 			Msg::SendCommand
@@ -107,6 +112,7 @@ impl Component for Chat {
 
 			send_chat,
 			chat_change,
+			chat_key_down,
 			send_command,
 			command_change,
 			scroll_down,
@@ -163,6 +169,14 @@ impl Component for Chat {
 				}
 				self.check_load_messages();
 				true
+			}
+			Msg::ChatKeyDown(e) => {
+				if e.key() == "Enter" && !e.shift_key() && !e.ctrl_key() {
+					// Send message on enter
+					self.update(Msg::Send)
+				} else {
+					false
+				}
 			}
 			Msg::NewMessage(from) => {
 				let target = match self.get_message_target() {
@@ -289,9 +303,11 @@ impl Component for Chat {
 				<div class="chat">
 					{ self.view_messages() }
 					<form class="chat-form" onsubmit=&self.send_chat>
-						<input class="input" name="message" type="text"
+						<textarea class="input" name="message"
 							value=msg
-							oninput=&self.chat_change />
+							oninput=&self.chat_change
+							onkeydown=&self.chat_key_down>
+						</textarea>
 						<button class="button" name="send" type="submit">
 							{ "Send" }
 						</button>
