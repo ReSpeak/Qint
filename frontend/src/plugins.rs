@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use failure::Error;
+use ts_bookkeeping::events::Event;
 use serde::{Deserialize, Serialize};
 use stdweb::{js, js_serializable, Value};
 use uuid::Uuid;
@@ -19,7 +20,7 @@ pub enum Msg {
 	Ignore,
 	GotPlugins(Vec<String>),
 	AddEventListener(String, CallbackInfo),
-	Events(Vec<u16>),
+	Events(Vec<Event>),
 }
 
 pub struct CallbackInfo {
@@ -33,11 +34,13 @@ pub struct Plugins {
 	event_listeners: HashMap<String, Vec<CallbackInfo>>,
 	task: Option<FetchTask>,
 	con: Option<ConnectionId>,
+	talkers: Vec<u16>,
 }
 
 #[derive(Clone, PartialEq, Properties)]
 pub struct Props {
 	pub connection: Option<ConnectionId>,
+	pub talkers: Vec<u16>,
 }
 
 impl Plugins {
@@ -67,19 +70,27 @@ impl Plugins {
 	fn add_listener(&self) {
 		if let Some(con) = &self.con {
 			ConnectionService::with_mut(con, |con| {
-				// TODO Use Vec<Event> instead of Vec<u16>
 				let callback = self.link.callback(|e| Msg::Events(e));
-				con.event_listeners.insert("plugins".into(), Box::new(move |con, events| {
-					for _e in events {
-						/*if let Event::TalkersChanged(talkers) = e {
-							callback.emit(talkers.clone());
-						}*/
-						if let FrontendConnectionState::Connected(con) = &con.state {
-							callback.emit(vec![con.con.own_client.0, 1, 2]);
-						}
-					}
+				con.event_listeners.insert("plugins".into(), Box::new(move |_, events| {
+					callback.emit(events.to_vec());
 				}));
 			}, || panic!("Should be in connected state"));
+		}
+	}
+
+	fn talkers_changed(&self) {
+		if let Some(listeners) = self.event_listeners.get("TalkersChanged") {
+			let con = self.con.as_ref().unwrap().0.to_string();
+			for l in listeners {
+				js!{ @(no_return)
+					try {
+						@{&l.callback}(@{&con}, @{&self.talkers});
+					} catch {
+						// TODO Print
+						console.error("Callback throws exception");
+					}
+				};
+			}
 		}
 	}
 }
@@ -95,6 +106,7 @@ impl Component for Plugins {
 			event_listeners: Default::default(),
 			task: None,
 			con: props.connection,
+			talkers: props.talkers,
 		};
 
 		if res.con.is_some() {
@@ -187,44 +199,35 @@ impl Component for Plugins {
 
 			self.con = props.connection;
 			self.add_listener();
-			true
-		} else {
-			false
 		}
+
+		if self.talkers != props.talkers {
+			self.talkers = props.talkers;
+			self.talkers_changed();
+		}
+
+		false
 	}
 
 	fn update(&mut self, msg: Self::Message) -> ShouldRender {
 		match msg {
-			Msg::Ignore => false,
+			Msg::Ignore => {}
 			Msg::GotPlugins(plugins) => {
 				self.task = None;
 				self.event_listeners.clear();
 				self.plugins = plugins;
-				true
+				return true;
 			}
 			Msg::AddEventListener(event, info) => {
 				let listeners = self.event_listeners.entry(event)
 					.or_insert_with(Default::default);
 				listeners.push(info);
-				false
 			}
-			Msg::Events(e) => {
-				if let Some(listeners) = self.event_listeners.get("TalkersChanged") {
-					let con = self.con.as_ref().unwrap().0.to_string();
-					for l in listeners {
-						js!{ @(no_return)
-							try {
-								@{&l.callback}(@{&con}, @{&e});
-							} catch {
-								// TODO Print
-								console.error("Callback throws exception");
-							}
-						};
-					}
-				}
-				false
+			Msg::Events(_e) => {
+				// TODO
 			}
 		}
+		false
 	}
 
 	fn view(&self) -> Html {

@@ -35,6 +35,7 @@ pub struct Model {
 	/// The currently selected connection if there is one.
 	con: Option<ConnectionId>,
 	is_talking: bool,
+	talkers: Vec<u16>,
 	_set_talking_fetch_task: Option<FetchTask>,
 }
 
@@ -114,6 +115,7 @@ impl Component for Model {
 			logger,
 			con: None,
 			is_talking: false,
+			talkers: Vec::new(),
 			_set_talking_fetch_task: None,
 		}
 	}
@@ -177,9 +179,9 @@ impl Component for Model {
 							}
 						}
 					}
-					MessageP2F::TalkersChanged(_talkers) => {
-						// TODO Animate here
-						false
+					MessageP2F::TalkersChanged(talkers) => {
+						self.talkers = talkers;
+						true
 					}
 					// TODO Remove
 					MessageP2F::Webrtc(_) => false,
@@ -235,7 +237,8 @@ impl Component for Model {
 			let onconnect = self.link.callback(Msg::Connect);
 			html! {
 				<>
-					<plugins::Plugins />
+					<notifications::Notifications />
+					<plugins::Plugins talkers=&self.talkers />
 					<Connect onconnect=onconnect />
 				</>
 			}
@@ -243,10 +246,10 @@ impl Component for Model {
 			let switchtalking = self.link.callback(move |_| Msg::SetTalking(!is_talking));
 			html! {
 				<>
-					<plugins::Plugins connection=&self.con />
+					<notifications::Notifications />
+					<plugins::Plugins connection=&self.con talkers=&self.talkers />
 					<Connected connection=self.con.as_ref().unwrap() />
 					<button style="position:absolute; right: 0" onclick=switchtalking>{ talking }</button>
-					<notifications::Notifications />
 				</>
 			}
 		}

@@ -10,7 +10,6 @@ use actix::*;
 use audiopus::coder::{Decoder, GenericCtl};
 use failure::{format_err, Error};
 use futures::prelude::*;
-use futures01::future::Future;
 use qint_shared::MessageP2F;
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired, AudioStatus};
 use sdl2::AudioSubsystem;
@@ -391,11 +390,18 @@ impl AudioCallback for SdlCallback {
 			});
 		}
 
-		for con in changed {
-			let logger = self.logger.clone();
-			let t2a = self.t2a.clone();
-			thread::spawn(move || {
-				tokio_compat::runtime::current_thread::run(
+		let logger = self.logger.clone();
+		let t2a = self.t2a.clone();
+		thread::spawn(move || {
+			let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+			rt.block_on(async {
+				let local = tokio::task::LocalSet::new();
+
+				// Run the local task set.
+				local.run_until(async move {
+					for con in changed {
+						let logger = logger.clone();
 						tokio::task::spawn_local(
 							t2a.send(TalkersChangedMsg(con))
 								.map(move |r| {match r {
@@ -405,11 +411,12 @@ impl AudioCallback for SdlCallback {
 									}
 								}
 								}),
-						)
-						.compat()
-						.map_err(|_| ())
-				)
+						).await.unwrap();
+					}
+				}).await;
+
+				local.await;
 			});
-		}
+		});
 	}
 }
