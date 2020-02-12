@@ -15,10 +15,12 @@ use slog::{debug, error, o, Logger};
 use tsproto::client::ClientConVal;
 use tsproto_packets::packets::{AudioData, CodecType, OutAudio};
 
+use crate::websocket::SetSelfTalkingMsg;
 use super::*;
 
-pub struct SetListenerMsg {
+pub(crate) struct SetListenerMsg {
 	pub connection: tsclientlib::Connection,
+	pub ts_connection: Addr<TsConnection>,
 }
 
 pub struct RemoveListenerMsg;
@@ -30,6 +32,7 @@ pub struct AudioToTs {
 	audio_subsystem: AudioSubsystem,
 	executor: ThreadPool,
 	listener: Arc<Mutex<Option<ClientConVal>>>,
+	connection: Option<Addr<TsConnection>>,
 	device: AudioDevice<SdlCallback>,
 
 	is_playing: bool,
@@ -100,8 +103,17 @@ impl Handler<SetListenerMsg> for AudioToTs {
 		_: &mut Self::Context,
 	) -> Self::Result
 	{
+		// Remove from previous connection
+		let is_playing = self.is_playing;
+		self.is_playing = false;
+		self.update_talking();
+		self.is_playing = is_playing;
+
+		self.connection = Some(msg.ts_connection);
 		let mut listener = self.listener.lock().unwrap();
 		*listener = Some(msg.connection.get_tsproto_connection());
+		drop(listener);
+		self.update_talking();
 	}
 }
 
@@ -113,12 +125,14 @@ impl Handler<RemoveListenerMsg> for AudioToTs {
 		_: &mut Self::Context,
 	) -> Self::Result
 	{
+		self.is_playing = false;
+		self.update_talking();
+		self.connection = None;
 		let mut ls = self.listener.lock().unwrap();
 		let res = ls.is_some();
 		*ls = None;
 		drop(ls);
 		self.device.pause();
-		self.is_playing = false;
 		res
 	}
 }
@@ -144,13 +158,13 @@ impl Handler<SetPlayingMsg> for AudioToTs {
 		_: &mut Self::Context,
 	) -> Self::Result
 	{
-		// TODO Change talkers
 		if msg.0 {
 			self.device.resume();
 		} else {
 			self.device.pause();
 		}
 		self.is_playing = msg.0;
+		self.update_talking();
 	}
 }
 
@@ -178,6 +192,7 @@ impl AudioToTs {
 			audio_subsystem,
 			executor,
 			listener,
+			connection: None,
 			device,
 
 			is_playing: false,
@@ -225,6 +240,13 @@ impl AudioToTs {
 				opus_output: [0; MAX_OPUS_FRAME_SIZE],
 			}
 		}).map_err(|e| format_err!("SDL error: {}", e))
+	}
+
+	fn update_talking(&self) {
+		if let Some(con) = &self.connection {
+			println!("Updating to {}", self.is_playing);
+			tokio::spawn(con.send(SetSelfTalkingMsg(self.is_playing)));
+		}
 	}
 }
 

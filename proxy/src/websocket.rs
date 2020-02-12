@@ -19,7 +19,7 @@ use tokio::net::TcpStream;
 use tokio::prelude::*;
 use tsclientlib::messages::c2s::{self, InMessageTrait};
 use tsclientlib::{
-	ChannelId, Connection, Identity, PHBox, PacketHandler,
+	ChannelId, ClientId, Connection, Identity, PHBox, PacketHandler,
 	TextMessageTargetMode,
 };
 use tsproto::handler_data::InCommandObserver;
@@ -35,6 +35,9 @@ pub(crate) struct TsConnection {
 	state: Arc<State>,
 	id: ConnectionId,
 	connection: Option<Connection>,
+	talkers: Vec<ClientId>,
+	self_talking: bool,
+
 	pk_recv: Option<oneshot::Receiver<()>>,
 	sockets: Vec<Addr<Ws>>,
 	weak_sockets: Vec<Addr<Ws>>,
@@ -63,6 +66,8 @@ struct ProxyCommandObserver {
 struct WsCommandMsg(InCommandMsg);
 struct WsMsg(Bytes);
 pub(crate) struct SendMessageMsg(pub MessageP2F);
+pub(crate) struct SetTalkersMsg(pub Vec<ClientId>);
+pub(crate) struct SetSelfTalkingMsg(pub bool);
 /// Add a websocket connection to a TeamSpeak connection.
 ///
 /// The `bool` is `true` for a weak connection.
@@ -105,6 +110,14 @@ impl Message for WsMsg {
 }
 
 impl Message for SendMessageMsg {
+	type Result = ();
+}
+
+impl Message for SetTalkersMsg {
+	type Result = ();
+}
+
+impl Message for SetSelfTalkingMsg {
 	type Result = ();
 }
 
@@ -153,6 +166,9 @@ impl TsConnection {
 			state,
 			id,
 			connection: None,
+			talkers: Vec::new(),
+			self_talking: false,
+
 			pk_recv: None,
 			sockets: Vec::new(),
 			weak_sockets: Vec::new(),
@@ -168,6 +184,16 @@ impl TsConnection {
 						"error" => ?e);
 				}
 			}));
+		}
+	}
+
+	fn update_talkers(&self) {
+		if let Some(con) = &self.connection {
+			let mut talkers = self.talkers.clone();
+			if self.self_talking {
+				talkers.push(con.lock().own_client);
+			}
+			self.send_message(&MessageP2F::TalkersChanged(talkers));
 		}
 	}
 
@@ -433,7 +459,7 @@ impl Handler<WsMsg> for TsConnection {
 						}
 						r
 					})
-					.map(move |con, actor: &mut Self, _| {
+					.map(move |con, actor: &mut Self, ctx| {
 						match con {
 							Ok(con) => {
 								let c = con.clone();
@@ -447,6 +473,7 @@ impl Handler<WsMsg> for TsConnection {
 									a2ts.send(
 										audio::audio_to_ts::SetListenerMsg {
 											connection: c,
+											ts_connection: ctx.address(),
 										},
 									)
 									.map(move |r| {
@@ -697,6 +724,32 @@ impl Handler<SendMessageMsg> for TsConnection {
 	) -> Self::Result
 	{
 		self.send_message(&msg);
+	}
+}
+
+impl Handler<SetTalkersMsg> for TsConnection {
+	type Result = ();
+	fn handle(
+		&mut self,
+		SetTalkersMsg(talkers): SetTalkersMsg,
+		_: &mut Self::Context,
+	) -> Self::Result
+	{
+		self.talkers = talkers;
+		self.update_talkers();
+	}
+}
+
+impl Handler<SetSelfTalkingMsg> for TsConnection {
+	type Result = ();
+	fn handle(
+		&mut self,
+		SetSelfTalkingMsg(talking): SetSelfTalkingMsg,
+		_: &mut Self::Context,
+	) -> Self::Result
+	{
+		self.self_talking = talking;
+		self.update_talkers();
 	}
 }
 

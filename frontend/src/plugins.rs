@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use failure::Error;
 use ts_bookkeeping::events::Event;
+use ts_bookkeeping::ClientId;
 use serde::{Deserialize, Serialize};
 use stdweb::{js, js_serializable, Value};
 use uuid::Uuid;
@@ -34,13 +35,13 @@ pub struct Plugins {
 	event_listeners: HashMap<String, Vec<CallbackInfo>>,
 	task: Option<FetchTask>,
 	con: Option<ConnectionId>,
-	talkers: Vec<u16>,
+	talkers: Vec<ClientId>,
 }
 
 #[derive(Clone, PartialEq, Properties)]
 pub struct Props {
 	pub connection: Option<ConnectionId>,
-	pub talkers: Vec<u16>,
+	pub talkers: Vec<ClientId>,
 }
 
 impl Plugins {
@@ -81,10 +82,11 @@ impl Plugins {
 	fn talkers_changed(&self) {
 		if let Some(listeners) = self.event_listeners.get("TalkersChanged") {
 			let con = self.con.as_ref().unwrap().0.to_string();
+			let talkers = self.talkers.iter().map(|t| t.0).collect::<Vec<_>>();
 			for l in listeners {
 				js!{ @(no_return)
 					try {
-						@{&l.callback}(@{&con}, @{&self.talkers});
+						@{&l.callback}(@{&con}, @{&talkers});
 					} catch {
 						// TODO Print
 						console.error("Callback throws exception");

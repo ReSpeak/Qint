@@ -7,6 +7,7 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 use failure::Error;
 use qint_shared::*;
+use ts_bookkeeping::ClientId;
 use slog::{error, o, warn, Drain, Logger};
 use wasm_bindgen::prelude::*;
 use yew::{html, Component, ComponentLink, Html, ShouldRender};
@@ -35,7 +36,7 @@ pub struct Model {
 	/// The currently selected connection if there is one.
 	con: Option<ConnectionId>,
 	is_talking: bool,
-	talkers: Vec<u16>,
+	talkers: Vec<ClientId>,
 	_set_talking_fetch_task: Option<FetchTask>,
 }
 

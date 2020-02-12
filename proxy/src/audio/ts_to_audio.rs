@@ -10,16 +10,15 @@ use actix::*;
 use audiopus::coder::{Decoder, GenericCtl};
 use failure::{format_err, Error};
 use futures::prelude::*;
-use qint_shared::MessageP2F;
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired, AudioStatus};
 use sdl2::AudioSubsystem;
 use slog::{debug, error, o, trace, warn, Logger};
 use tsclientlib::ClientId;
 use tsproto_packets::packets::{AudioData, CodecType, InAudio};
 
-use super::*;
-use crate::websocket::{SendMessageMsg, TsConnection};
+use crate::websocket::{SetTalkersMsg, TsConnection};
 use crate::ConnectionId;
+use super::*;
 
 /// After this amount of seconds, a decoder will be removed.
 const VOICE_TIMEOUT_SECS: u64 = 1;
@@ -200,10 +199,10 @@ impl TsToAudio {
 			.unwrap()
 			.keys()
 			.filter(|id| id.con == con_id)
-			.map(|id| id.client.0)
+			.map(|id| id.client)
 			.collect();
 		let logger = self.logger.clone();
-		tokio::spawn(con.send(SendMessageMsg(MessageP2F::TalkersChanged(talkers)))
+		tokio::spawn(con.send(SetTalkersMsg(talkers))
 			.map(move |r| if let Err(e) = r {
 				error!(logger, "Failed to notify connection about changed talkers"; "error" => ?e);
 			}));

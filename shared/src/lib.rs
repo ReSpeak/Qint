@@ -7,24 +7,13 @@ use std::fmt;
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use tsproto_packets::packets::{Direction, InCommand, OutPacket, PacketType};
-//use tsproto_types::versions::Version;
+use tsproto_types::ClientId;
+use tsproto_types::versions::Version;
 
 pub mod models;
 
 pub const BOOKMARKS_LIMIT: usize = 20;
 pub const MESSAGES_LIMIT: usize = 50;
-
-// TODO
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum Version {
-	Linux3_2_1,
-}
-impl fmt::Display for Version {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "Linux3_2_1")?;
-		Ok(())
-	}
-}
 
 /// A message sent over a websocket connection from the frontend to the proxy.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -43,7 +32,7 @@ pub enum MessageP2F {
 	ServerKey(Vec<u8>),
 	Packet(InCommandMsg),
 	/// The list of currently talking clients.
-	TalkersChanged(Vec<u16>),
+	TalkersChanged(Vec<ClientId>),
 	Webrtc(WebrtcMsg),
 }
 
@@ -140,7 +129,7 @@ impl ConnectOptions {
 		Self {
 			address,
 			name: String::from("TeamSpeakUser"),
-			version: Version::Linux3_2_1,
+			version: Version::Linux_3_X_X,
 			log_commands: false,
 			log_packets: false,
 			log_udp_packets: false,
