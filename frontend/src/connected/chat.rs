@@ -256,7 +256,7 @@ impl Component for Chat {
 				js! { @(no_return)
 					document.querySelectorAll(".chat-messages .latex_proc").forEach(elem => {
 						elem.classList.remove("latex_proc");
-						renderMathInElement(elem, {
+						window.renderMathInElement(elem, {
 							errorCallback: (err) => { console.log("Failed to LaTeX", err); }
 						});
 					});
