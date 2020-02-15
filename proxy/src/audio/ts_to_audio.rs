@@ -284,7 +284,7 @@ impl Handler<PlayMsg> for TsToAudio {
 							opus_output.resize(opus_output.len() * 2, 0f32);
 						}
 					}
-					Err(e) => return Err(e.into()),
+					Err(e) => return Err(format_err!("Error: {:?}, data: {:?}", e, data).into()),
 				}
 			};
 

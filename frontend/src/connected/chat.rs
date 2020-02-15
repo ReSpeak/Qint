@@ -366,8 +366,8 @@ impl Chat {
 								}
 							}
 						}
-						Event::Message { from, .. } => {
-							new_msg.emit(from.clone());
+						Event::Message { target, .. } => {
+							new_msg.emit(target.clone());
 						}
 						_ => {}
 					}

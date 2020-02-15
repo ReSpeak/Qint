@@ -209,7 +209,7 @@ impl EventHandler for super::DbHandler {
 						_ => {}
 					}
 				}
-				Event::Message { from, invoker, message } => {
+				Event::Message { target, invoker, message } => {
 					use schema::messages;
 
 					let server = con.get_server_key()?;
@@ -242,7 +242,7 @@ impl EventHandler for super::DbHandler {
 					// We have to make sure that only one instance of a message
 					// is inserted into the database.
 					let can_be_duplicate;
-					match from {
+					match target {
 						MessageTarget::Server => {
 							can_be_duplicate = true;
 							chat = ChatType::Server;
@@ -262,12 +262,10 @@ impl EventHandler for super::DbHandler {
 							can_be_duplicate = false;
 							let con = con.lock();
 							let client = con.clients.get(id);
-							let client_uid = if let Some(client) = client {
-								Some(&client.uid.0)
-							} else if !own_message {
-								invoker.uid.as_ref().map(|uid| &uid.0)
+							let client_uid = if own_message {
+								client.map(|c| &c.uid.0)
 							} else {
-								None
+								invoker.uid.as_ref().map(|uid| &uid.0)
 							};
 
 							let client_uid = if let Some(uid) = client_uid {
