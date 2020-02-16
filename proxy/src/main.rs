@@ -383,7 +383,7 @@ async fn main() -> Result<(), Error> {
 	Ok(HttpServer::new(move || {
 		let state = state.clone();
 		App::new()
-			.wrap(middleware::Logger::default())
+			//.wrap(middleware::Logger::default())
 			.data(state)
 			.service(create_ws)
 			.service(audiosend_true)

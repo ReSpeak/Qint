@@ -535,17 +535,6 @@ impl Handler<WsMsg> for TsConnection {
 								.starts_with(b"sendtextmessage ")
 								|| packet.content().starts_with(b"clientpoke "))
 						{
-							let command = InCommand::new(
-								packet.content().to_vec(),
-								packet.header().packet_type(),
-								packet
-									.header()
-									.flags()
-									.contains(Flags::NEWPROTOCOL),
-								Direction::C2S,
-							)
-							.unwrap();
-
 							let server = match con.get_server_key() {
 								Ok(key) => key,
 								Err(e) => {
@@ -562,6 +551,27 @@ impl Handler<WsMsg> for TsConnection {
 									base64::decode(&client.uid.0).unwrap()
 								} else {
 									error!(logger, "Failed to get own client");
+									return;
+								}
+							};
+
+							let command = match InCommand::new(
+								packet.content().to_vec(),
+								packet.header().packet_type(),
+								packet
+									.header()
+									.flags()
+									.contains(Flags::NEWPROTOCOL),
+								Direction::C2S,
+							) {
+								Ok(r) => r,
+								Err(e) => {
+									error!(
+										logger,
+										"Failed to parse command";
+										"command" => ?packet,
+										"error" => ?e,
+									);
 									return;
 								}
 							};

@@ -4,6 +4,7 @@
 	overflow: hidden;
 	background-color: white;
 	padding: 0;
+	user-select: none;
 
 	.menu-label:not(:last-child) {
 		padding: 1.5em 0.5em;
@@ -26,7 +27,7 @@
 	.entry-expand {
 		flex: 1;
 	}
-	
+
 	// Compress layout
 	.menu-list {
 		li ul {
@@ -34,7 +35,9 @@
 		}
 
 		a {
-			padding-left: 0 !important;
+			padding-left: 0;
+			padding-top: 0.3em;
+			padding-bottom: 0.3em;
 		}
 	}
 

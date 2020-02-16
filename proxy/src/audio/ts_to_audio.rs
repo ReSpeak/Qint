@@ -260,7 +260,7 @@ impl Handler<PlayMsg> for TsToAudio {
 				}
 			};
 
-			if data.is_empty() {
+			if data.len() <= 5 {
 				debug!(self.logger, "Resetting decoder"; "id" => %id);
 				decoder.reset_state()?;
 				return Ok(());

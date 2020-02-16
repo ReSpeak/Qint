@@ -47,7 +47,6 @@ pub enum Msg {
 	CommandChange(String),
 	/// Requested messages arrived arrived from the proxy
 	GotMessages(Vec<Message>),
-	ChatKeyDown(KeyDownEvent),
 	/// A new message arrived
 	NewMessage(MessageTarget),
 	/// Set the chat to our channel when connecting to a server.
@@ -91,7 +90,13 @@ impl Component for Chat {
 			Msg::ChatChange(e.value)
 		);
 		let chat_key_down = link.callback(|e: KeyDownEvent|
-			Msg::ChatKeyDown(e)
+			if e.key() == "Enter" && !e.shift_key() && !e.ctrl_key() {
+				// Send message on enter
+				e.prevent_default();
+				Msg::Send
+			} else {
+				Msg::Ignore
+			}
 		);
 		let send_command = link.callback(|e: SubmitEvent| {
 			e.prevent_default();
@@ -169,14 +174,6 @@ impl Component for Chat {
 				}
 				self.check_load_messages();
 				true
-			}
-			Msg::ChatKeyDown(e) => {
-				if e.key() == "Enter" && !e.shift_key() && !e.ctrl_key() {
-					// Send message on enter
-					self.update(Msg::Send)
-				} else {
-					false
-				}
 			}
 			Msg::NewMessage(from) => {
 				let target = match self.get_message_target() {
