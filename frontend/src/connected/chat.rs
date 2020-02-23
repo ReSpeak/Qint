@@ -5,7 +5,7 @@ use chrono::NaiveDateTime;
 use failure::{format_err, Error};
 use qint_shared::{ChatId, ChatType, MESSAGES_LIMIT, MessagesRequest};
 use qint_shared::models::{Message, MessageStatus};
-use slog::error;
+use slog::{error, info};
 use stdweb::{js, Value};
 use stdweb::web::event::IEvent;
 use ts_bookkeeping::{ChannelId, IconHash, MessageTarget, UidRef};
@@ -46,6 +46,7 @@ pub struct Chat {
 	toggle_raw: Callback<ClickEvent>,
 	toggle_view_orig: Callback<ClickEvent>,
 
+	/// Displayed messages, sorted ascending by time.
 	messages: Vec<UiChatMessage>,
 }
 
@@ -188,21 +189,34 @@ impl Component for Chat {
 					self.check_load_messages();
 					return true;
 				}
+				let logger = ConnectionService::with_unwrap(&self.con,
+					|con| Some(con.logger.clone()), "Failed to find connection");
 
-				if msgs[0] >= self.messages[0] {
-					// Prepend msgs
-					if let Ok(i) = msgs.binary_search(&self.messages[0]) {
-						msgs.truncate(i);
-						msgs.append(&mut self.messages);
-						self.messages = msgs;
+				info!(logger, "Received messages"; "new" => ?msgs, "current" => ?self.messages);
+				if msgs.last().unwrap() >= self.messages.last().unwrap() {
+					// Messages are more recent, append msgs
+					if let Ok(i) = self.messages.binary_search(&msgs[0]) {
+						info!(logger, "Appending, found"; "at" => i);
+						self.messages.truncate(i);
+						self.messages.append(&mut msgs);
 					} else {
+						info!(logger, "Gap, replacing");
 						// There may be a gap between msgs and self.messages,
 						// so we just replace them.
 						self.messages = msgs;
 					}
 				} else {
-					// Append msgs
-					self.messages.append(&mut msgs);
+					// Messages are older, prepend msgs
+					if let Ok(i) = msgs.binary_search(&self.messages[0]) {
+						info!(logger, "Prepending, found"; "at" => i);
+						msgs.truncate(i);
+						msgs.append(&mut self.messages);
+						self.messages = msgs;
+					} else {
+						info!(logger, "Prepending");
+						msgs.append(&mut self.messages);
+						self.messages = msgs;
+					}
 				}
 				self.new_messages = true;
 				self.check_load_messages();
@@ -488,7 +502,7 @@ impl Chat {
 			return element.scrollTop / element.clientHeight <= 0.1;
 		} {
 			// Need more messages
-			let start = if let Some(UiChatMessage{ data: msg, .. }) = self.messages.last() {
+			let start = if let Some(UiChatMessage{ data: msg, .. }) = self.messages.first() {
 				Some((msg.time, msg.id))
 			} else {
 				None
@@ -582,7 +596,7 @@ impl Chat {
 
 		// Group by same author messages following each other
 		let mut groups: Vec<Vec<&UiChatMessage>> = Vec::new();
-		for m in self.messages.iter().rev() {
+		for m in self.messages.iter() {
 			if groups.last().map(|l| {
 				let l = &l[0].data;
 				l.invoker == m.data.invoker && l.invoker_name == m.data.invoker_name

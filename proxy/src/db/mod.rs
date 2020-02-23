@@ -487,7 +487,7 @@ impl Handler<GetMessagesMsg> for DbHandler {
 			return Ok(Vec::new());
 		};
 
-		// Order by (bookmark, last_used)
+		// Order by (time, id) descending
 		// Select id, name, address, bookmark, last_used, timezone
 		// Join channel.name
 		// Join server.icon
@@ -500,7 +500,7 @@ impl Handler<GetMessagesMsg> for DbHandler {
 					.eq(messages::invoker)
 					.and(servers_clients::server.eq(&msg.0.chat.server))),
 			)
-			.order((messages::time.desc(), messages::id))
+			.order((messages::time.desc(), messages::id.desc()))
 			.limit(MESSAGES_LIMIT as i64)
 			.select((
 				messages::id,
@@ -514,7 +514,7 @@ impl Handler<GetMessagesMsg> for DbHandler {
 				servers_clients::icon.nullable(),
 				servers_clients::avatar.nullable(),
 			));
-		let result = if let Some((time, id)) = msg.0.start {
+		let mut result = if let Some((time, id)) = msg.0.start {
 			// messages::(time, id) < (time, id), i.e. previous messages
 			query
 				.filter(
@@ -526,6 +526,7 @@ impl Handler<GetMessagesMsg> for DbHandler {
 		} else {
 			query.load::<TextMessage>(&self.con)?
 		};
+		result.reverse();
 
 		Ok(result)
 	}
