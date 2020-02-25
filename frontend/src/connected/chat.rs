@@ -1,3 +1,4 @@
+use core::cmp::Ordering;
 use std::borrow::Cow;
 
 use chrono::NaiveDateTime;
@@ -14,10 +15,13 @@ use yew::format::MsgPack;
 use yew::html;
 use yew::prelude::*;
 use yew::services::fetch::{FetchService, FetchTask, Request, Response};
+use pulldown_cmark::{Parser, Options};
 
 use crate::CLIENT_ICON;
 use crate::connection_service::*;
 use crate::controls::icon::Icon;
+use crate::html_util::{html_from_string, data_hash_to_color};
+use crate::connected::yew_markdown::YewMd;
 
 pub struct Chat {
 	link: ComponentLink<Self>,
@@ -36,7 +40,12 @@ pub struct Chat {
 	command_change: Callback<InputData>,
 	scroll_down: Callback<()>,
 
-	messages: Vec<Message>,
+	messages: Vec<UiChatMessage>,
+}
+
+pub struct UiChatMessage {
+	data: Message,
+	rendered_markdown: Html,
 }
 
 pub enum Msg {
@@ -46,7 +55,7 @@ pub enum Msg {
 	/// The user changed the content of the command text input
 	CommandChange(String),
 	/// Requested messages arrived arrived from the proxy
-	GotMessages(Vec<Message>),
+	GotMessages(Vec<UiChatMessage>),
 	/// A new message arrived
 	NewMessage(MessageTarget),
 	/// Set the chat to our channel when connecting to a server.
@@ -251,12 +260,19 @@ impl Component for Chat {
 			}
 			Msg::ScrollDown => {
 				js! { @(no_return)
+					// katex
 					document.querySelectorAll(".chat-messages .latex_proc").forEach(elem => {
 						elem.classList.remove("latex_proc");
 						window.renderMathInElement(elem, {
 							errorCallback: (err) => { console.log("Failed to LaTeX", err); }
 						});
 					});
+					// highlight
+					document.querySelectorAll(".chat-messages .highlight_proc").forEach(elem => {
+						elem.classList.remove("highlight_proc");
+						window.highlightBlock(elem);
+					});
+					// move last chat into view
 					document.querySelector(".chat-end").scrollIntoView({behavior: "smooth"});
 				};
 				false
@@ -399,7 +415,7 @@ impl Chat {
 		self.fetch_task = Some(fetch.fetch_binary(request, self.link
 			.callback(|resp: Response<MsgPack<Result<Vec<Message>, Error>>>| {
 				match resp.into_body().0 {
-					Ok(r) => Msg::GotMessages(r),
+					Ok(r) => Msg::GotMessages(r.into_iter().map(|m| UiChatMessage::new(m)).collect()),
 					Err(e) => {
 						// TODO Display error message
 						log::error!("Failed to fetch messages: {:?}", e);
@@ -426,7 +442,7 @@ impl Chat {
 			return element.scrollTop / element.clientHeight <= 0.1;
 		} {
 			// Need more messages
-			let start = if let Some(msg) = self.messages.last() {
+			let start = if let Some(UiChatMessage{ data: msg, .. }) = self.messages.last() {
 				Some((msg.time, msg.id))
 			} else {
 				None
@@ -462,38 +478,29 @@ impl Chat {
 			Icon::mdi_icon(CLIENT_ICON)
 		};
 
+		let user_name = msg.client_name.as_ref().or(msg.invoker_name.as_ref()).unwrap();
+		let user_color = if let Some(ref uid) = msg.invoker {
+			data_hash_to_color(uid)
+		} else {
+			data_hash_to_color(user_name.as_bytes())
+		};
 		html! {
 			<>
 				<div class="invoker-icon">
 					{ icon }
 				</div>
-				<div class="invoker-name">
-					{ msg.client_name.as_ref().or(msg.invoker_name.as_ref()).unwrap() }
+				<div class="invoker-name has-text-weight-bold" style={ user_color }>
+					{ user_name }
 				</div>
 			</>
 		}
 	}
 
-	fn view_message(&self, msg: &Message) -> Html {
-		html! {
-			<>
-				<div class="message-time">
-					<span title={ format!("{}", msg.get_date_time().format("%Y-%m-%d %H:%M, UTC%:z")) }>
-						{ msg.get_date_time().format("%H:%M") }
-					</span>
-				</div>
-				<div class=cl!["message-content", "latex_proc", ("message-sending", msg.status == MessageStatus::Sending), ("message-error", msg.status == MessageStatus::Error)]>
-					{ &msg.content }
-				</div>
-			</>
-		}
-	}
-
-	fn view_message_group(&self, group: &[&Message]) -> Html {
+	fn view_message_group(&self, group: &[&UiChatMessage]) -> Html {
 		html! {
 			<li>
-				{ self.view_message_header(group[0]) }
-				{ for group.iter().map(|m| self.view_message(m)) }
+				{ self.view_message_header(&group[0].data) }
+				{ for group.iter().map(|m| m.rendered_markdown.clone()) }
 			</li>
 		}
 	}
@@ -524,11 +531,11 @@ impl Chat {
 		};
 
 		// Group by same author messages following each other
-		let mut groups: Vec<Vec<&Message>> = Vec::new();
+		let mut groups: Vec<Vec<&UiChatMessage>> = Vec::new();
 		for m in self.messages.iter().rev() {
 			if groups.last().map(|l| {
-				let l = l[0];
-				l.invoker == m.invoker && l.invoker_name == m.invoker_name
+				let l = &l[0].data;
+				l.invoker == m.data.invoker && l.invoker_name == m.data.invoker_name
 			}).unwrap_or_default() {
 				groups.last_mut().unwrap().push(m);
 			} else {
@@ -545,3 +552,54 @@ impl Chat {
 		}
 	}
 }
+
+impl UiChatMessage {
+	pub fn new(msg: Message) -> UiChatMessage {
+		let rendered_markdown = Self::view_message(&msg);
+		UiChatMessage {
+			data: msg,
+			rendered_markdown,
+		}
+	}
+
+	fn view_message(msg: &Message) -> Html {
+		let rendered_markdown = YewMd::render(&msg.content);
+
+		html! {
+			<>
+				<div class="message-time">
+					<span title={ format!("{}", msg.get_date_time().format("%Y-%m-%d %H:%M, UTC%:z")) }>
+						{ msg.get_date_time().format("%H:%M") }
+					</span>
+				</div>
+				<div class=cl![
+						"message-content",
+						("message-sending", msg.status == MessageStatus::Sending),
+						("message-error", msg.status == MessageStatus::Error)]>
+					<div class="content latex_proc">
+						{ rendered_markdown }
+					</div>
+				</div>
+			</>
+		}
+	}
+}
+
+impl Ord for UiChatMessage {
+	fn cmp(&self, other: &Self) -> Ordering {
+		self.data.cmp(&other.data)
+	}
+}
+
+impl PartialOrd for UiChatMessage {
+	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl PartialEq for UiChatMessage {
+	fn eq(&self, other: &Self) -> bool {
+		self.data == other.data
+	}
+}
+impl Eq for UiChatMessage {}

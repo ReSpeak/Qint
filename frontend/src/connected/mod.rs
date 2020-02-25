@@ -30,6 +30,7 @@ macro_rules! cl_intern {
 mod channel_tree;
 mod chat;
 mod sidebar;
+mod yew_markdown;
 
 pub struct Connected {
 	link: ComponentLink<Self>,

@@ -25,6 +25,7 @@ mod connection_service;
 mod controls;
 mod notifications;
 mod plugins;
+mod html_util;
 
 const SERVER_ICON: &str = "server";
 const CHANNEL_ICON: &str = "chat-outline";
