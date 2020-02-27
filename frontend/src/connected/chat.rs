@@ -152,6 +152,7 @@ impl Component for Chat {
 				ConnectionService::with_mut_ready_unwrap(&self.con, |con| {
 					con.composing.insert(self.chat.clone(), s);
 				});
+				self.update_chat_height(false);
 				true
 			}
 			Msg::CommandChange(s) => {
@@ -251,6 +252,7 @@ impl Component for Chat {
 					c.composing.remove(&self.chat);
 					Some(cmd)
 				}, "Failed to send message");
+				self.update_chat_height(true);
 				true
 			}
 			Msg::SendCommand => {
@@ -291,7 +293,7 @@ impl Component for Chat {
 						});
 					});
 					// highlight
-					document.querySelectorAll(".chat-messages .highlight_proc").forEach(elem => {
+					document.querySelectorAll(".chat-messages pre code:not(.hljs)").forEach(elem => {
 						elem.classList.remove("highlight_proc");
 						window.highlightBlock(elem);
 					});
@@ -342,7 +344,7 @@ impl Component for Chat {
 				<div class="chat">
 					{ self.view_messages() }
 					<form class="chat-form" onsubmit=&self.send_chat>
-						<textarea class="input" name="message"
+						<textarea class="input auto_height" name="message"
 							value=msg
 							oninput=&self.chat_change
 							onkeydown=&self.chat_key_down>
@@ -581,6 +583,41 @@ impl Chat {
 			</ul>
 		}
 	}
+
+	// The 'clear' parameter is yet another hack as there's no event after the chat
+	// has been cleard after sending a message
+	fn update_chat_height(&self, clear: bool) {
+		js! {
+			document.querySelectorAll(".auto_height").forEach(e => {
+				if (@{clear}) e.value = "";
+				e.style.height = "5px";
+				if (e.scrollHeight < 300) {
+					e.style.height = e.scrollHeight + "px";
+					e.style.overflowY = "hidden";
+				} else {
+					e.style.height = "300px";
+					e.style.overflowY = "auto";
+				}
+			});
+		}
+	}
+}
+
+macro_rules! icon {
+	(txt-$x:expr) => {
+		html! {
+			<span class="icon is-small">
+				{ $x }
+			</span>
+		}
+	};
+	($x:expr) => {
+		html! {
+			<span class="icon is-small">
+				<i class={concat!("mdi mdi-18px mdi-", $x)}></i>
+			</span>
+		}
+	};
 }
 
 impl UiChatMessage {
@@ -611,18 +648,22 @@ impl UiChatMessage {
 						"message-content",
 						("message-sending", msg.status == MessageStatus::Sending),
 						("message-error", msg.status == MessageStatus::Error)]>
-					<div class="msg_raw">
+					<div class="content message-rendered latex_proc">
+						{ rendered_markdown }
+					</div>
+					<div class="message-raw">
 						<pre>
 							{ &msg.content }
 						</pre>
 					</div>
-					<div class="content msg_rendered latex_proc">
-						{ rendered_markdown }
-					</div>
 					<div class="tool-buttons" >
 						<div class="tool-buttons-wrap buttons has-addons" >
-							<button class="button is-small"
-								onclick=toggle_raw> {"🥩"} </button>
+							<button class="button is-small is-rounded">
+								{ icon!("format-quote-close") }
+							</button>
+							<button class="button is-small is-rounded" onclick=toggle_raw>
+								{ icon!(txt-"🥩") }
+							</button>
 						</div>
 					</div>
 				</div>

@@ -3,6 +3,7 @@
 use pulldown_cmark::{Alignment, Event, Parser, Tag, Options, CodeBlockKind};
 use yew::virtual_dom::{VNode, VTag, VText};
 use yew::{html, Html};
+use regex::Regex;
 
 use nom::{
 	IResult, Err, error::ErrorKind,
@@ -54,16 +55,47 @@ impl<TStack> YewRender<TStack> {
 		}
 	}
 	
+	fn push_text(&mut self, text: &str) {
+		self.push_node(VText::new(text.to_string()).into())
+	}
 	fn push_vtag(&mut self, elem: VTag) {
 		self.push_node(elem.into())
 	}
 	fn push_node(&mut self, elem: VNode) {
-		if self.spine.is_empty() {
-			self.elems.push(elem);
+		if let Some((_, tag)) = self.spine.last_mut() {
+			tag.add_child(elem);
 		} else {
-			let l = self.spine.len();
-			self.spine[l - 1].1.add_child(elem);
+			self.elems.push(elem);
 		}
+	}
+
+	/// Should do stuff like
+	/// - Finding urls
+	/// - Processing special urls like client:// ts3file:// etc.
+	fn process_text(&mut self, text: &str) {
+		lazy_static! {
+			static ref MATCH_URL: Regex = Regex::new("(f|ht)tps?://([^/?#\\s]*)?([^?#\\s]*)(\\?([^#\\s]*))?(#(\\S*))?").unwrap();
+		}
+
+		let mut last_url = 0usize;
+
+		for m in MATCH_URL.find_iter(text) {
+			self.push_text(&text[last_url..m.start()]);
+			let mut a = Self::make_link();
+			let href = m.as_str();
+			a.add_attribute("href", &href);
+			a.add_child(VText::new(href.to_string()).into());
+			self.push_node(a.into());
+			last_url = m.end();
+		}
+
+		self.push_text(&text[last_url..]);
+	}
+
+	fn make_link() -> VTag {
+		let mut el = VTag::new("a");
+		el.add_attribute("target", &"_blank");
+		el
 	}
 }
 
@@ -71,12 +103,17 @@ impl<TStack> YewRender<TStack> {
 
 impl YewMd {
 	fn markdown(mut self, raw: &str) -> Html {
-		// TODO make static
-		let mut options = Options::empty();
-		options.insert(Options::ENABLE_STRIKETHROUGH);
-		options.insert(Options::ENABLE_TASKLISTS);
-		options.insert(Options::ENABLE_TABLES);
-		let parser = Parser::new_ext(raw, options);
+		lazy_static! {
+			static ref MD_OPTIONS: Options = {
+				let mut options = Options::empty();
+				options.insert(Options::ENABLE_STRIKETHROUGH);
+				options.insert(Options::ENABLE_TASKLISTS);
+				options.insert(Options::ENABLE_TABLES);
+				options
+			};
+		}
+
+		let parser = Parser::new_ext(raw, *MD_OPTIONS);
 	
 		let mut txt_build = String::new();
 		let mut was_txt = false;
@@ -108,7 +145,7 @@ impl YewMd {
 				},
 				Event::Html(_) => { /* haha yeah, nice try */ }
 				Event::FootnoteReference(_) => {},
-				Event::SoftBreak => self.push_node(VText::new("\n".to_string()).into()),
+				Event::SoftBreak => self.push_text("\n"),
 				Event::HardBreak => self.push_vtag(VTag::new("br")),
 				Event::Rule => self.push_vtag(VTag::new("hr")),
 				Event::TaskListMarker(checked) => { /* TODO seems funny */ },
@@ -123,7 +160,11 @@ impl YewMd {
 
 	fn markdown_start_tag(&mut self, t: Tag) -> VTag {
 		match t {
-			Tag::Paragraph => VTag::new("p"),
+			Tag::Paragraph => {
+				let mut el = VTag::new("div");
+				el.add_class("para");
+				el
+			}
 			Tag::Strikethrough => VTag::new("s"),
 			Tag::Heading(n) => {
 				assert!(n > 0); // TODO uuhm
@@ -196,9 +237,8 @@ impl YewMd {
 				el
 			}
 			Tag::Link(ref link_type, ref href, ref title) => {
-				let mut el = VTag::new("a");
+				let mut el = Self::make_link();
 				el.add_attribute("href", href);
-				el.add_attribute("target", &"_blank");
 				if title.as_ref() != "" {
 					el.add_attribute("title", title);
 				}
@@ -222,7 +262,6 @@ impl YewMd {
 		match t {
 			Tag::CodeBlock(_) => {
 				let mut pre = VTag::new("pre");
-				pre.add_class(&"highlight_proc");
 				pre.add_child(top.into());
 				top = pre;
 			}
@@ -264,6 +303,12 @@ enum BBSegment<'a> {
 	Close(BBTag),
 }
 
+impl<'a> BBSegment<'a> {
+	fn is_text(&self) -> bool {
+		if let BBSegment::Text(_) = self { true } else { false }
+	}
+}
+
 #[derive(Debug, Eq, PartialEq)]
 enum BBTag {
 	Bold,
@@ -275,25 +320,31 @@ enum BBTag {
 }
 
 fn bb(raw: &str) -> Html {
-	if !raw.contains('[') {
-		return VText::new(raw.to_string()).into();
-	}
 	YewBb::new().mini_bb(raw)
 }
 
 impl YewBb {
 	fn mini_bb(mut self, raw: &str) -> Html {
 		let seg_list = nom_bb_read(raw);
-		let mut auto_fill_url = false;
-		let mut fill_url_str = String::new();
+		
+		let mut txt_build = String::new();
+		let mut was_txt = false;
 
 		for seg in seg_list {
+			if was_txt && !seg.is_text() {
+				if self.spine.is_empty() {
+					self.process_text(&txt_build);
+				} else {
+					self.push_text(&txt_build);
+				}
+				txt_build.clear();
+				was_txt = false;
+			}
+
 			match seg {
 				BBSegment::Text(text) => {
-					self.push_node(VText::new(text.to_string()).into());
-					if auto_fill_url {
-						fill_url_str.push_str(&text);
-					}
+					txt_build.push_str(&text);
+					was_txt = true;
 				}
 				BBSegment::Open(tag, arg) => {
 					let vtag = match tag {
@@ -309,13 +360,9 @@ impl YewBb {
 							el
 						}
 						BBTag::Url => {
-							let mut el = VTag::new("a");
-							el.add_attribute("target", &"_blank");
+							let mut el = Self::make_link();
 							if let Some(href) = arg {
 								el.add_attribute("href", &href);
-								auto_fill_url = false;
-							} else {
-								auto_fill_url = true;
 							}
 							el
 						}
@@ -324,10 +371,17 @@ impl YewBb {
 				},
 				BBSegment::Close(tag) => {
 					while let Some((stack_tag, mut vtag)) = self.spine.pop() {
-						if auto_fill_url {
-							vtag.add_attribute("href", &fill_url_str);
-							fill_url_str.clear();
-							auto_fill_url = false;
+						if stack_tag == BBTag::Url && !vtag.attributes.contains_key("href") {
+							let mut href_opt = None;
+							for r in vtag.children.iter() {
+								if let VNode::VText(ref vtext) = r {
+									href_opt = Some(vtext.text.clone());
+									break;
+								}
+							}
+							if let Some(href) = href_opt {
+								vtag.add_attribute("href", &href);
+							}
 						}
 						self.push_vtag(vtag);
 						if stack_tag == tag {
@@ -335,6 +389,14 @@ impl YewBb {
 						}
 					}
 				}
+			}
+		}
+
+		if was_txt {
+			if self.spine.is_empty() {
+				self.process_text(&txt_build);
+			} else {
+				self.push_text(&txt_build);
 			}
 		}
 

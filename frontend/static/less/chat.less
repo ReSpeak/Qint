@@ -90,14 +90,25 @@
 		font-size: 0.8em;
 		* {
 			color: gray;
+			user-select: none;
 		}
 	}
 
 	.message-content {
 		grid-column: 2;
+		white-space: pre-wrap;
 
 		// for tool buttons
 		position: relative;
+
+		// Overwrite bulma default
+		pre {
+			padding: 0;
+			border-radius: 7px;
+
+			tab-size: 4;
+			-moz-tab-size: 4;
+		}
 	}
 
 	.tool-buttons {
@@ -108,27 +119,28 @@
 
 		.tool-buttons-wrap {
 			position: absolute;
-			right: 16px;
-			top: -16px;
+			right: 20px;
+			top: -10px;
+			flex-wrap: nowrap;
 		}
 	}
 
 	// View raw toggle
 
 	.message-content {
-		.msg_raw {
+		.message-raw {
 			display: none;
 		}
-		.msg_rendered {
+		.message-rendered {
 			display: unset;
 		}
 	}
 
 	.message-content.view_raw {
-		.msg_raw {
+		.message-raw {
 			display: unset;
 		}
-		.msg_rendered {
+		.message-rendered {
 			display: none;
 		}
 	}
