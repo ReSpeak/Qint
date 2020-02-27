@@ -47,13 +47,10 @@
 	padding: 0.5em;
 	overflow-y: auto;
 
-	> li {
-		display: grid;
-		grid-template-columns: max-content auto;
-		padding-bottom: 0.8em;
-	}
-
-	> li > * {
+	.invoker-icon,
+	.invoker-name,
+	.message-time,
+	.message-content {
 		padding: 0.1em 0.5em;
 	}
 
@@ -70,6 +67,24 @@
 		//font-size: 0.8em;
 	}
 
+	.message-group {
+		display: grid;
+		grid-template-columns: max-content auto;
+		padding-bottom: 0.8em;
+	}
+
+	.message-row {
+		display: contents;
+
+		&:hover > * {
+			background-color: #eee;
+	
+			.tool-buttons {
+				visibility: visible;
+			}
+		}
+	}
+
 	.message-time {
 		grid-column: 1;
 		font-size: 0.8em;
@@ -80,6 +95,42 @@
 
 	.message-content {
 		grid-column: 2;
+
+		// for tool buttons
+		position: relative;
+	}
+
+	.tool-buttons {
+		visibility: hidden;
+		position: absolute;
+		right: 0;
+		top: 0;
+
+		.tool-buttons-wrap {
+			position: absolute;
+			right: 16px;
+			top: -16px;
+		}
+	}
+
+	// View raw toggle
+
+	.message-content {
+		.msg_raw {
+			display: none;
+		}
+		.msg_rendered {
+			display: unset;
+		}
+	}
+
+	.message-content.view_raw {
+		.msg_raw {
+			display: unset;
+		}
+		.msg_rendered {
+			display: none;
+		}
 	}
 }
 

@@ -5,7 +5,7 @@ import "bulma";
 import 'katex/dist/katex.min.css'
 import renderMathInElement from "katex/dist/contrib/auto-render";
 // highlight.js
-import 'highlight.js/styles/github.css';
+import 'highlight.js/styles/vs2015.css';
 import hljs from 'highlight.js';
 
 // Note that a dynamic `import` statement here is required due to

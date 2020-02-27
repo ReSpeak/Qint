@@ -15,13 +15,12 @@ use yew::format::MsgPack;
 use yew::html;
 use yew::prelude::*;
 use yew::services::fetch::{FetchService, FetchTask, Request, Response};
-use pulldown_cmark::{Parser, Options};
 
 use crate::CLIENT_ICON;
 use crate::connection_service::*;
 use crate::controls::icon::Icon;
-use crate::html_util::{html_from_string, data_hash_to_color};
-use crate::connected::yew_markdown::YewMd;
+use crate::html_util::{data_hash_to_color};
+use crate::connected::yew_markdown::markdown;
 
 pub struct Chat {
 	link: ComponentLink<Self>,
@@ -30,6 +29,8 @@ pub struct Chat {
 	/// If `true`, all messages are loaded and there are no older messages available.
 	/// If `false`, we can still load older messages.
 	all_loaded: bool,
+	/// True when new messages are in view which need to be prostprocessed
+	new_messages: bool,
 	fetch_task: Option<FetchTask>,
 	set_chat: Callback<SelectedChat>,
 
@@ -38,7 +39,9 @@ pub struct Chat {
 	chat_key_down: Callback<KeyDownEvent>,
 	send_command: Callback<SubmitEvent>,
 	command_change: Callback<InputData>,
-	scroll_down: Callback<()>,
+	/// Called whenever new messages get added into the view list of the active chat.
+	/// Manages html postprocessing like highlight, katex or scrolling into view.
+	chat_postprocess: Callback<()>,
 
 	messages: Vec<UiChatMessage>,
 }
@@ -74,6 +77,8 @@ pub enum Msg {
 	SendCommand,
 	/// Scroll to the end of the chat
 	ScrollDown,
+	/// After new Messages have been added into the view
+	ChatPostprocess,
 }
 
 #[derive(Clone, PartialEq, Properties)]
@@ -114,13 +119,14 @@ impl Component for Chat {
 		let command_change = link.callback(|e: InputData|
 			Msg::CommandChange(e.value)
 		);
-		let scroll_down = link.callback(|()| Msg::ScrollDown);
+		let chat_postprocess = link.callback(|()| Msg::ChatPostprocess);
 
 		let mut res = Self {
 			link,
 			con: props.connection,
 			chat: props.chat.clone(),
 			all_loaded: false,
+			new_messages: false,
 			fetch_task: None,
 			set_chat: props.set_chat,
 
@@ -129,7 +135,7 @@ impl Component for Chat {
 			chat_key_down,
 			send_command,
 			command_change,
-			scroll_down,
+			chat_postprocess,
 
 			messages: Vec::new(),
 		};
@@ -155,6 +161,7 @@ impl Component for Chat {
 				true
 			}
 			Msg::GotMessages(mut msgs) => {
+				js! { console.log("ON GotMessages"); };
 				self.fetch_task = None;
 				self.all_loaded = msgs.len() < MESSAGES_LIMIT;
 				if msgs.is_empty() {
@@ -162,6 +169,7 @@ impl Component for Chat {
 				}
 				if self.messages.is_empty() {
 					self.messages = msgs;
+					self.new_messages = true;
 					self.check_load_messages();
 					return true;
 				}
@@ -181,6 +189,7 @@ impl Component for Chat {
 					// Append msgs
 					self.messages.append(&mut msgs);
 				}
+				self.new_messages = true;
 				self.check_load_messages();
 				true
 			}
@@ -260,9 +269,23 @@ impl Component for Chat {
 			}
 			Msg::ScrollDown => {
 				js! { @(no_return)
+					// move last chat into view
+					document.querySelector(".chat-end").scrollIntoView({behavior: "smooth"});
+				};
+				false
+			}
+			Msg::ChatPostprocess => {
+				if !self.new_messages {
+					js! { console.log("Already processed"); };
+					return false;
+				}
+				self.new_messages = false;
+				js! { @(no_return)
+					console.log("ON post proc");
 					// katex
 					document.querySelectorAll(".chat-messages .latex_proc").forEach(elem => {
 						elem.classList.remove("latex_proc");
+						console.log("Processed");
 						window.renderMathInElement(elem, {
 							errorCallback: (err) => { console.log("Failed to LaTeX", err); }
 						});
@@ -273,7 +296,7 @@ impl Component for Chat {
 						window.highlightBlock(elem);
 					});
 					// move last chat into view
-					document.querySelector(".chat-end").scrollIntoView({behavior: "smooth"});
+					document.querySelector(".chat-end").scrollIntoView(/*{behavior: "smooth"}*/);
 				};
 				false
 			}
@@ -304,6 +327,9 @@ impl Component for Chat {
 		if self.set_chat != props.set_chat {
 			self.set_chat = props.set_chat;
 		}
+
+		js! { console.log("ON change"); };
+		self.chat_postprocess.emit(());
 
 		changed
 	}
@@ -498,7 +524,7 @@ impl Chat {
 
 	fn view_message_group(&self, group: &[&UiChatMessage]) -> Html {
 		html! {
-			<li>
+			<li class="message-group">
 				{ self.view_message_header(&group[0].data) }
 				{ for group.iter().map(|m| m.rendered_markdown.clone()) }
 			</li>
@@ -509,17 +535,21 @@ impl Chat {
 		// Check if we are at bottom of chat window, if so, scroll to the bottom
 		// after adding new messages.
 		// https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollHeight
-		if let Value::Bool(true) = js! {
-			const elements = document.querySelectorAll(".chat-messages");
-			if (elements.length === 0) {
-				return false;
-			}
+		// if let Value::Bool(true) = js! {
+		// 	const elements = document.querySelectorAll(".chat-messages");
+		// 	if (elements.length === 0) {
+		// 		return false;
+		// 	}
 
-			const element = elements[0];
-			return element.scrollHeight - element.scrollTop === element.clientHeight;
-		} {
-			self.scroll_down.emit(());
-		}
+		// 	const element = elements[0];
+		// 	return element.scrollHeight - element.scrollTop === element.clientHeight;
+		// } {
+		// 	self.chat_postprocess.emit(());
+		// }
+
+		self.chat_postprocess.emit(());
+		//self.send_message(Msg::ChatPostprocess);
+		js! { console.log("ON render"); };
 
 		// Display loading spinner when there is an active fetch task
 		let spinner = if self.fetch_task.is_some() {
@@ -563,10 +593,15 @@ impl UiChatMessage {
 	}
 
 	fn view_message(msg: &Message) -> Html {
-		let rendered_markdown = YewMd::render(&msg.content);
+		let rendered_markdown = markdown(&msg.content);
+
+		// TODO move this to a static context somewhere
+		let toggle_raw = Callback::from(|e: ClickEvent| {
+			js! { parent(@{e.target()}, ".message-content").classList.toggle("view_raw"); }
+		});
 
 		html! {
-			<>
+			<div class="message-row">
 				<div class="message-time">
 					<span title={ format!("{}", msg.get_date_time().format("%Y-%m-%d %H:%M, UTC%:z")) }>
 						{ msg.get_date_time().format("%H:%M") }
@@ -576,11 +611,22 @@ impl UiChatMessage {
 						"message-content",
 						("message-sending", msg.status == MessageStatus::Sending),
 						("message-error", msg.status == MessageStatus::Error)]>
-					<div class="content latex_proc">
+					<div class="msg_raw">
+						<pre>
+							{ &msg.content }
+						</pre>
+					</div>
+					<div class="content msg_rendered latex_proc">
 						{ rendered_markdown }
 					</div>
+					<div class="tool-buttons" >
+						<div class="tool-buttons-wrap buttons has-addons" >
+							<button class="button is-small"
+								onclick=toggle_raw> {"🥩"} </button>
+						</div>
+					</div>
 				</div>
-			</>
+			</div>
 		}
 	}
 }
