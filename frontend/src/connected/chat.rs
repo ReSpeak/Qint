@@ -20,6 +20,7 @@ use crate::CLIENT_ICON;
 use crate::connection_service::*;
 use crate::controls::icon::Icon;
 use crate::html_util::{data_hash_to_color};
+use crate::bulma_icon;
 use crate::connected::yew_markdown::markdown;
 
 pub struct Chat {
@@ -42,6 +43,8 @@ pub struct Chat {
 	/// Called whenever new messages get added into the view list of the active chat.
 	/// Manages html postprocessing like highlight, katex or scrolling into view.
 	chat_postprocess: Callback<()>,
+	toggle_raw: Callback<ClickEvent>,
+	toggle_view_orig: Callback<ClickEvent>,
 
 	messages: Vec<UiChatMessage>,
 }
@@ -49,6 +52,8 @@ pub struct Chat {
 pub struct UiChatMessage {
 	data: Message,
 	rendered_markdown: Html,
+	is_edit: bool,
+	show_original: bool,
 }
 
 pub enum Msg {
@@ -79,6 +84,7 @@ pub enum Msg {
 	ScrollDown,
 	/// After new Messages have been added into the view
 	ChatPostprocess,
+	ToggleShowOriginal,
 }
 
 #[derive(Clone, PartialEq, Properties)]
@@ -120,6 +126,12 @@ impl Component for Chat {
 			Msg::CommandChange(e.value)
 		);
 		let chat_postprocess = link.callback(|()| Msg::ChatPostprocess);
+		let toggle_raw = Callback::from(|e: ClickEvent| {
+			js! { @(no_return) parent(@{e.target()}, ".message-content").classList.toggle("view_raw"); }
+		});
+		let toggle_view_orig = link.callback(|_: ClickEvent| {
+			Msg::ToggleShowOriginal
+		});
 
 		let mut res = Self {
 			link,
@@ -136,6 +148,8 @@ impl Component for Chat {
 			send_command,
 			command_change,
 			chat_postprocess,
+			toggle_raw,
+			toggle_view_orig,
 
 			messages: Vec::new(),
 		};
@@ -301,6 +315,10 @@ impl Component for Chat {
 					document.querySelector(".chat-end").scrollIntoView(/*{behavior: "smooth"}*/);
 				};
 				false
+			}
+			Msg::ToggleShowOriginal => {
+
+				true
 			}
 		}
 	}
@@ -528,7 +546,7 @@ impl Chat {
 		html! {
 			<li class="message-group">
 				{ self.view_message_header(&group[0].data) }
-				{ for group.iter().map(|m| m.rendered_markdown.clone()) }
+				{ for group.iter().map(|m| self.view_message(m)) }
 			</li>
 		}
 	}
@@ -569,7 +587,9 @@ impl Chat {
 				let l = &l[0].data;
 				l.invoker == m.data.invoker && l.invoker_name == m.data.invoker_name
 			}).unwrap_or_default() {
-				groups.last_mut().unwrap().push(m);
+				let last = groups.last_mut().unwrap();
+				if m.is_edit && !m.show_original { last.pop(); }
+				last.push(m);
 			} else {
 				groups.push(vec![m]);
 			}
@@ -581,6 +601,45 @@ impl Chat {
 				{ for groups.iter().map(|g| self.view_message_group(g)) }
 				<div class="chat-end"></div>
 			</ul>
+		}
+	}
+
+	fn view_message(&self, ui_msg: &UiChatMessage) -> Html {
+		let msg = &ui_msg.data;
+		html! {
+			<div class="message-row">
+				<div class="message-time">
+					<span title={ format!("{}", msg.get_date_time().format("%Y-%m-%d %H:%M, UTC%:z")) }>
+						{ msg.get_date_time().format("%H:%M") }
+					</span>
+				</div>
+				<div class=cl![
+						"message-content",
+						("message-sending", msg.status == MessageStatus::Sending),
+						("message-error", msg.status == MessageStatus::Error)]>
+					<div class="content message-rendered latex_proc">
+						{ ui_msg.rendered_markdown.clone() }
+					</div>
+					<div class="message-raw">
+						<pre>
+							{ &msg.content }
+						</pre>
+					</div>
+					<div class="tool-buttons" >
+						<div class="tool-buttons-wrap buttons has-addons" >
+							<button class="button is-small is-rounded">
+								{ bulma_icon!("pencil") }
+							</button>
+							<button class="button is-small is-rounded">
+								{ bulma_icon!("format-quote-close") }
+							</button>
+							<button class="button is-small is-rounded" onclick=&self.toggle_raw>
+								{ bulma_icon!(="🥩") }
+							</button>
+						</div>
+					</div>
+				</div>
+			</div>
 		}
 	}
 
@@ -603,71 +662,19 @@ impl Chat {
 	}
 }
 
-macro_rules! icon {
-	(txt-$x:expr) => {
-		html! {
-			<span class="icon is-small">
-				{ $x }
-			</span>
-		}
-	};
-	($x:expr) => {
-		html! {
-			<span class="icon is-small">
-				<i class={concat!("mdi mdi-18px mdi-", $x)}></i>
-			</span>
-		}
-	};
-}
-
 impl UiChatMessage {
+	const EDIT_PREFIX: &'static str = "*EDIT*";
+
 	pub fn new(msg: Message) -> UiChatMessage {
-		let rendered_markdown = Self::view_message(&msg);
+		let is_edit = false && msg.content.starts_with(Self::EDIT_PREFIX);
+		let content_text = if is_edit { &msg.content[Self::EDIT_PREFIX.len()..] } else { &msg.content };
+		let rendered_markdown = markdown(content_text);
+
 		UiChatMessage {
 			data: msg,
 			rendered_markdown,
-		}
-	}
-
-	fn view_message(msg: &Message) -> Html {
-		let rendered_markdown = markdown(&msg.content);
-
-		// TODO move this to a static context somewhere
-		let toggle_raw = Callback::from(|e: ClickEvent| {
-			js! { parent(@{e.target()}, ".message-content").classList.toggle("view_raw"); }
-		});
-
-		html! {
-			<div class="message-row">
-				<div class="message-time">
-					<span title={ format!("{}", msg.get_date_time().format("%Y-%m-%d %H:%M, UTC%:z")) }>
-						{ msg.get_date_time().format("%H:%M") }
-					</span>
-				</div>
-				<div class=cl![
-						"message-content",
-						("message-sending", msg.status == MessageStatus::Sending),
-						("message-error", msg.status == MessageStatus::Error)]>
-					<div class="content message-rendered latex_proc">
-						{ rendered_markdown }
-					</div>
-					<div class="message-raw">
-						<pre>
-							{ &msg.content }
-						</pre>
-					</div>
-					<div class="tool-buttons" >
-						<div class="tool-buttons-wrap buttons has-addons" >
-							<button class="button is-small is-rounded">
-								{ icon!("format-quote-close") }
-							</button>
-							<button class="button is-small is-rounded" onclick=toggle_raw>
-								{ icon!(txt-"🥩") }
-							</button>
-						</div>
-					</div>
-				</div>
-			</div>
+			is_edit,
+			show_original: false
 		}
 	}
 }

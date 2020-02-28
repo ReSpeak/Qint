@@ -1,9 +1,10 @@
 /// Original author of this code is [Nathan Ringo](https://github.com/remexre)
 /// Source: https://github.com/acmumn/mentoring/blob/master/web-client/src/view/markdown.rs
-use pulldown_cmark::{Alignment, Event, Parser, Tag, Options, CodeBlockKind};
+use pulldown_cmark::{Alignment, Event, Parser, Tag, Options, CodeBlockKind, LinkType};
 use yew::virtual_dom::{VNode, VTag, VText};
 use yew::{html, Html};
 use regex::Regex;
+use crate::bulma_icon;
 
 use nom::{
 	IResult, Err, error::ErrorKind,
@@ -119,7 +120,7 @@ impl YewMd {
 		let mut was_txt = false;
 
 		for ev in parser {
-			if was_txt && !is_text(&ev) {
+			if was_txt && !is_textlike(&ev) {
 				self.push_node(bb(&txt_build));
 				txt_build.clear();
 				was_txt = false;
@@ -143,12 +144,27 @@ impl YewMd {
 					code.add_child(VText::new(text.to_string()).into());
 					self.push_vtag(code);
 				},
-				Event::Html(_) => { /* haha yeah, nice try */ }
+				Event::Html(text) => {
+					// Treat html just like normal text
+					was_txt = true;
+					txt_build.push_str(&text);
+				}
 				Event::FootnoteReference(_) => {},
 				Event::SoftBreak => self.push_text("\n"),
 				Event::HardBreak => self.push_vtag(VTag::new("br")),
 				Event::Rule => self.push_vtag(VTag::new("hr")),
-				Event::TaskListMarker(checked) => { /* TODO seems funny */ },
+				Event::TaskListMarker(checked) => {
+					self.push_node(if checked {
+						bulma_icon!("check-circle-outline")
+					} else {
+						bulma_icon!("checkbox-blank-circle-outline")
+					});
+					if let Some((_, ref mut vtag)) = self.spine.last_mut() {
+						if vtag.tag().eq_ignore_ascii_case("LI") {
+							vtag.add_attribute("style", &"list-style: none outside;");
+						}
+					}
+				},
 			}
 		}
 		if was_txt {
@@ -189,8 +205,8 @@ impl YewMd {
 				el
 			}
 			Tag::List(None) => {
-				let mut elem = VTag::new("ul");
-				elem.add_attribute("style", &"list-style: disc inside;");
+				let elem = VTag::new("ul");
+				//elem.add_attribute("style", &"list-style: disc inside;");
 				elem
 			}
 			Tag::List(Some(1)) => {
@@ -238,13 +254,16 @@ impl YewMd {
 			}
 			Tag::Link(ref link_type, ref href, ref title) => {
 				let mut el = Self::make_link();
-				el.add_attribute("href", href);
+				match link_type {
+					LinkType::Email => el.add_attribute("href", &format!("mailto:{}", href)),
+					_ => el.add_attribute("href", href),
+				}
 				if title.as_ref() != "" {
 					el.add_attribute("title", title);
 				}
 				el
 			}
-			Tag::Image(ref link_type, ref src, ref title) => {
+			Tag::Image(_, ref src, ref title) => {
 				let mut el = VTag::new("img");
 				el.add_attribute("src", src);
 				if title.as_ref() != "" {
@@ -290,8 +309,14 @@ impl YewMd {
 	}
 }
 
+fn is_textlike(ev: &Event) -> bool {
+	is_text(ev) || is_html(ev)
+}
 fn is_text(ev: &Event) -> bool {
 	if let Event::Text(_) = ev { true } else { false }
+}
+fn is_html(ev: &Event) -> bool {
+	if let Event::Html(_) = ev { true } else { false }
 }
 
 // inline Mini-BB

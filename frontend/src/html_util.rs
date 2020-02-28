@@ -4,16 +4,6 @@ use yew::prelude::*;
 use yew::virtual_dom::VNode;
 
 pub fn html_from_string(html: &str) -> Result<Html, ()> {
-	// let mut options = Options::empty();
-	// options.insert(Options::ENABLE_STRIKETHROUGH);
-	// options.insert(Options::ENABLE_TASKLISTS);
-	// options.insert(Options::ENABLE_TABLES);
-	// let parser = Parser::new_ext(&msg.content, options);
-
-	// // Write to String buffer.
-	// let mut html_output = String::new();
-	// pulldown_cmark::html::push_html(&mut html_output, parser);
-
 	let div = js! {
 		var div = document.createElement("div");
 		div.innerHTML = @{html};
@@ -48,4 +38,24 @@ pub fn data_hash_to_color(data: &[u8]) -> String {
 	hash /= RANGE_S;
 	let var_l = (40i32 + ((hash % RANGE_L) as i32 - 10i32)) as u32; // = 40 ± 10 => [30-50]
 	format!("color:hsl({}, {}%, {}%);", var_h, var_s, var_l)
+}
+
+#[macro_export]
+macro_rules! bulma_icon {
+	(= $x:expr) => {
+		html! {
+			<span class="icon">
+				{ $x }
+			</span>
+		}
+	};
+	($x:expr) => { $crate::bulma_icon!($x, 18) };
+	($x:expr, $size: expr) => {
+		html! {
+			<span class="icon">
+				<i class={concat!("mdi mdi-", $size, "px mdi-", $x)}>
+				</i>
+			</span>
+		}
+	};
 }
