@@ -50,6 +50,7 @@ pub struct Chat {
 	messages: Vec<UiChatMessage>,
 }
 
+#[derive(Clone, Debug)]
 pub struct UiChatMessage {
 	data: Message,
 	rendered_markdown: Html,
@@ -167,8 +168,8 @@ impl Component for Chat {
 				ConnectionService::with_mut_ready_unwrap(&self.con, |con| {
 					con.composing.insert(self.chat.clone(), s);
 				});
-				self.update_chat_height(false);
-				true
+				self.update_chat_height();
+				false
 			}
 			Msg::CommandChange(s) => {
 				ConnectionService::with_mut_ready_unwrap(&self.con, |con| {
@@ -280,8 +281,9 @@ impl Component for Chat {
 					c.composing.remove(&self.chat);
 					Some(cmd)
 				}, "Failed to send message");
-				self.update_chat_height(true);
-				true
+				self.update_chat_content();
+				self.update_chat_height();
+				false
 			}
 			Msg::SendCommand => {
 				ConnectionService::with_mut_send_unwrap(&self.con, |c| {
@@ -370,14 +372,11 @@ impl Component for Chat {
 
 	fn view(&self) -> Html {
 		ConnectionService::with_ready_unwrap(&self.con, |c| {
-			let msg = c.composing.get(&self.chat).map(String::as_str)
-				.unwrap_or_default();
 			html! {
 				<div class="chat">
 					{ self.view_messages() }
 					<form class="chat-form" onsubmit=&self.send_chat>
 						<textarea class="input auto_height" name="message"
-							value=msg
 							oninput=&self.chat_change
 							onkeydown=&self.chat_key_down>
 						</textarea>
@@ -454,6 +453,7 @@ impl Chat {
 		self.chat = chat;
 		self.messages.clear();
 		self.request_messages(None);
+		self.update_chat_content();
 	}
 
 	fn request_messages(&mut self, start: Option<(NaiveDateTime, i64)>) {
@@ -657,12 +657,21 @@ impl Chat {
 		}
 	}
 
-	// The 'clear' parameter is yet another hack as there's no event after the chat
-	// has been cleard after sending a message
-	fn update_chat_height(&self, clear: bool) {
+	fn update_chat_content(&self) {
+		ConnectionService::with_ready_unwrap(&self.con, |c| {
+			let msg = c.composing.get(&self.chat).map(String::as_str)
+				.unwrap_or_default();
+			js! {
+				document.querySelectorAll(".auto_height").forEach(e => {
+					e.value = @{msg};
+				});
+			}
+		});
+	}
+
+	fn update_chat_height(&self) {
 		js! {
 			document.querySelectorAll(".auto_height").forEach(e => {
-				if (@{clear}) e.value = "";
 				e.style.height = "5px";
 				if (e.scrollHeight < 300) {
 					e.style.height = e.scrollHeight + "px";
