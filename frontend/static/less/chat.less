@@ -46,6 +46,18 @@
 .chat-messages {
 	padding: 0.5em;
 	overflow-y: auto;
+	display: grid;
+	grid-template-columns: max-content auto;
+	padding-bottom: 0.8em;
+
+	.chat-date {
+		grid-column-start: 1;
+		grid-column-end: 3;
+		border-top: 1px solid gray;
+		margin: 1em 1em 0em 1em;
+		text-align: center;
+		color: gray;
+	}
 
 	.invoker-icon,
 	.invoker-name,
@@ -56,21 +68,13 @@
 
 	.invoker-icon {
 		grid-column: 1;
-		grid-row: 1;
 	}
 
 	.invoker-name {
 		grid-column: 2;
-		grid-row: 1;
 		margin-top: auto;
 		margin-bottom: auto;
 		//font-size: 0.8em;
-	}
-
-	.message-group {
-		display: grid;
-		grid-template-columns: max-content auto;
-		padding-bottom: 0.8em;
 	}
 
 	.message-row {
@@ -78,7 +82,7 @@
 
 		&:hover > * {
 			background-color: #eee;
-	
+
 			.tool-buttons {
 				visibility: visible;
 			}
@@ -90,7 +94,6 @@
 		font-size: 0.8em;
 		* {
 			color: gray;
-			user-select: none;
 		}
 	}
 

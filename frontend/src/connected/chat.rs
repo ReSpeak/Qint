@@ -38,6 +38,8 @@ pub struct Chat {
 	send_chat: Callback<SubmitEvent>,
 	chat_change: Callback<InputData>,
 	chat_key_down: Callback<KeyDownEvent>,
+	chat_scroll: Callback<ScrollEvent>,
+	fire_chat_scroll: Callback<()>,
 	send_command: Callback<SubmitEvent>,
 	command_change: Callback<InputData>,
 	/// Called whenever new messages get added into the view list of the active chat.
@@ -82,6 +84,8 @@ pub enum Msg {
 	Send,
 	/// When the user clicked on 'Send Command'
 	SendCommand,
+	/// The view was scrolled
+	OnScroll,
 	/// Scroll to the end of the chat
 	ScrollDown,
 	/// After new Messages have been added into the view
@@ -120,6 +124,12 @@ impl Component for Chat {
 				Msg::Ignore
 			}
 		);
+		let chat_scroll = link.callback(|_: ScrollEvent|
+			Msg::OnScroll
+		);
+		let fire_chat_scroll = link.callback(|()|
+			Msg::OnScroll
+		);
 		let send_command = link.callback(|e: SubmitEvent| {
 			e.prevent_default();
 			Msg::SendCommand
@@ -147,6 +157,8 @@ impl Component for Chat {
 			send_chat,
 			chat_change,
 			chat_key_down,
+			chat_scroll,
+			fire_chat_scroll,
 			send_command,
 			command_change,
 			chat_postprocess,
@@ -187,7 +199,6 @@ impl Component for Chat {
 				if self.messages.is_empty() {
 					self.messages = msgs;
 					self.new_messages = true;
-					self.check_load_messages();
 					return true;
 				}
 				let logger = ConnectionService::with_unwrap(&self.con,
@@ -220,7 +231,6 @@ impl Component for Chat {
 					}
 				}
 				self.new_messages = true;
-				self.check_load_messages();
 				true
 			}
 			Msg::NewMessage(from) => {
@@ -299,6 +309,10 @@ impl Component for Chat {
 				}, "Failed to send command");
 				true
 			}
+			Msg::OnScroll => {
+				self.check_load_messages();
+				false
+			}
 			Msg::ScrollDown => {
 				js! { @(no_return)
 					// move last chat into view
@@ -371,6 +385,7 @@ impl Component for Chat {
 	}
 
 	fn view(&self) -> Html {
+		self.fire_chat_scroll.emit(());
 		ConnectionService::with_ready_unwrap(&self.con, |c| {
 			html! {
 				<div class="chat">
@@ -497,7 +512,7 @@ impl Chat {
 
 	/// Check if more messages should be loaded.
 	fn check_load_messages(&mut self) {
-		if self.all_loaded {
+		if self.all_loaded || self.fetch_task.is_some() {
 			return;
 		}
 
@@ -509,7 +524,8 @@ impl Chat {
 
 			const element = elements[0];
 			// Less than 10% of the screen height is left as a buffer
-			return element.scrollTop / element.clientHeight <= 0.1;
+			console.log("left scroll height: " + (element.scrollTop / element.scrollHeight));
+			return element.scrollTop / element.scrollHeight <= 0.1;
 		} {
 			// Need more messages
 			let start = if let Some(UiChatMessage{ data: msg, .. }) = self.messages.first() {
@@ -604,37 +620,66 @@ impl Chat {
 			html!{}
 		};
 
-		// Group by same author messages following each other
-		let mut groups: Vec<Vec<&UiChatMessage>> = Vec::new();
-		for m in self.messages.iter() {
-			if groups.last().map(|l| {
-				let l = &l[0].data;
-				l.invoker == m.data.invoker && l.invoker_name == m.data.invoker_name
-			}).unwrap_or_default() {
-				let last = groups.last_mut().unwrap();
-				if m.is_edit && !m.show_original { last.pop(); }
-				last.push(m);
-			} else {
-				groups.push(vec![m]);
-			}
-		}
-
+		let mut last = None;
 		html! {
-			<ul class="chat-messages">
+			<ul class="chat-messages" onscroll=&self.chat_scroll>
 				{ spinner }
-				{ for groups.iter().map(|g| self.view_message_group(g)) }
+				{ for self.messages.iter().map(|m| {
+					let res = self.view_message_with_header(last, m);
+					last = Some(m);
+					res
+				}) }
 				<div class="chat-end"></div>
 			</ul>
 		}
 	}
 
+	/// Renders a message.
+	///
+	/// `last_msg` is used to determine if a header should be rendered or not.
+	fn view_message_with_header(&self, last_msg: Option<&UiChatMessage>, ui_msg: &UiChatMessage) -> Html {
+		let mut client_header = true;
+		let mut date_header = true;
+		if let Some(last) = last_msg {
+			date_header = last.data.get_date_time().date() != ui_msg.data.get_date_time().date();
+			client_header = last.data.invoker != ui_msg.data.invoker
+				|| last.data.invoker_name != ui_msg.data.invoker_name;
+		}
+
+		let date_header = if date_header {
+			let date = ui_msg.data.get_date_time();
+			html!{
+				<div title={ format!("{}", date.format("%Y-%m-%d %H:%M, UTC%:z")) } class="chat-date">
+					{ date.format("%a, %b %d %Y") }
+				</div>
+			}
+		} else {
+			html!{}
+		};
+
+		let client_header = if client_header {
+			self.view_message_header(&ui_msg.data)
+		} else {
+			html!{}
+		};
+
+		html! {
+			<>
+				{ date_header }
+				{ client_header }
+				{ self.view_message(ui_msg) }
+			</>
+		}
+	}
+
 	fn view_message(&self, ui_msg: &UiChatMessage) -> Html {
 		let msg = &ui_msg.data;
+		let date = msg.get_date_time();
 		html! {
 			<div class="message-row">
 				<div class="message-time">
-					<span title={ format!("{}", msg.get_date_time().format("%Y-%m-%d %H:%M, UTC%:z")) }>
-						{ msg.get_date_time().format("%H:%M") }
+					<span title={ format!("{}", date.format("%Y-%m-%d %H:%M, UTC%:z")) }>
+						{ date.format("%H:%M") }
 					</span>
 				</div>
 				<div class=cl![
