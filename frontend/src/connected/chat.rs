@@ -193,6 +193,18 @@ impl Component for Chat {
 				js! { console.log("ON GotMessages"); };
 				self.fetch_task = None;
 				self.all_loaded = msgs.len() < MESSAGES_LIMIT;
+
+				let logger = ConnectionService::with_unwrap(&self.con,
+					|con| Some(con.logger.clone()), "Failed to find connection");
+				info!(logger, "Receiving messages";
+					"new_count" => ?msgs.len(),
+					"new_first" => ?msgs.first(),
+					"new_last" => ?msgs.last(),
+					"current_count" => ?self.messages.len(),
+					"current_first" => ?self.messages.first(),
+					"current_last" => ?self.messages.last(),
+				);
+
 				if msgs.is_empty() {
 					return true;
 				}
@@ -201,10 +213,7 @@ impl Component for Chat {
 					self.new_messages = true;
 					return true;
 				}
-				let logger = ConnectionService::with_unwrap(&self.con,
-					|con| Some(con.logger.clone()), "Failed to find connection");
 
-				info!(logger, "Received messages"; "new" => ?msgs, "current" => ?self.messages);
 				if msgs.last().unwrap() >= self.messages.last().unwrap() {
 					// Messages are more recent, append msgs
 					if let Ok(i) = self.messages.binary_search(&msgs[0]) {
@@ -230,6 +239,11 @@ impl Component for Chat {
 						self.messages = msgs;
 					}
 				}
+				info!(logger, "Received messages";
+					"current_count" => ?self.messages.len(),
+					"current_first" => ?self.messages.first(),
+					"current_last" => ?self.messages.last(),
+				);
 				self.new_messages = true;
 				true
 			}
@@ -247,6 +261,7 @@ impl Component for Chat {
 					}
 				};
 				if from == target {
+					// TODO Don't replace fetch_task if it is set
 					self.request_messages(None);
 					true
 				} else {
