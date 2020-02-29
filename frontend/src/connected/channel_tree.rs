@@ -8,10 +8,11 @@ use ts_bookkeeping::events::{Event, PropertyId};
 use yew::html;
 use yew::prelude::*;
 use stdweb::web::event::IEvent;
-use crate::controls::context_menu::{ContextMenu, Pos2D};
 
 use crate::connection_service::*;
+use crate::controls::context_menu::{ContextMenu, Pos2D};
 use crate::controls::icon::Icon;
+use crate::html_util::data_hash_to_color;
 
 pub struct ChannelTree {
 	link: ComponentLink<Self>,
@@ -197,6 +198,13 @@ impl ChannelTree {
 			}
 		} else { html!{} };
 
+		let uid;
+		let user_color = data_hash_to_color(if let Ok(u) = base64::decode(&client.uid.0) {
+			uid = u;
+			&uid
+		} else {
+			client.name.as_bytes()
+		});
 		html! {
 			<li>
 				{ cm }
@@ -207,7 +215,7 @@ impl ChannelTree {
 					{ Icon::mdi_icon("") }
 					<a class="entry-expand" onclick=set_chat oncontextmenu=context_request>
 						{ icon }
-						<span class="entry-expand">{ &client.name }</span>
+						<span class="entry-expand" style=user_color>{ &client.name }</span>
 					</a>
 				</div>
 			</li>
