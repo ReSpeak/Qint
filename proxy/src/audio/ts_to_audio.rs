@@ -231,6 +231,12 @@ impl Handler<PlayMsg> for TsToAudio {
 			}
 
 			let id = Id { con: msg.0, client: ClientId(*from) };
+			if data.len() <= 5 {
+				debug!(self.logger, "Got small audio packet"; "id" => %id);
+				//decoder.reset_state()?;
+				return Ok(());
+			}
+
 			let channels = self.device.as_ref().unwrap().spec().channels;
 			let was_empty = self.decoders.is_empty();
 
@@ -259,12 +265,6 @@ impl Handler<PlayMsg> for TsToAudio {
 					&mut v.insert((decoder, Instant::now())).0
 				}
 			};
-
-			if data.len() <= 5 {
-				debug!(self.logger, "Resetting decoder"; "id" => %id);
-				decoder.reset_state()?;
-				return Ok(());
-			}
 
 			let mut opus_output = vec![0f32; USUAL_FRAME_SIZE];
 			let len = loop {
@@ -305,9 +305,9 @@ impl Handler<PlayMsg> for TsToAudio {
 					if let Entry::Vacant(_) = &entry { true } else { false };
 
 				let queue = entry.or_insert_with(Default::default);
-				if queue.len() > 2 {
+				if queue.len() > 4 {
 					debug!(self.logger, "Removing packets from playback queue"; "id" => %id, "count" => queue.len() - 2);
-					while queue.len() > 2 {
+					while queue.len() > 4 {
 						queue.pop();
 					}
 				}
@@ -322,6 +322,7 @@ impl Handler<PlayMsg> for TsToAudio {
 			}
 
 			if was_empty {
+				debug!(self.logger, "Resuming playback");
 				self.device.as_ref().unwrap().resume();
 			}
 		}
@@ -350,19 +351,20 @@ impl AudioCallback for SdlCallback {
 			*d = 0.0;
 		}
 
-		// Mix data
+		// All connections where the talkers changed
 		let mut changed = HashSet::new();
+		// Mix data
 		{
 			let mut data = self.data.lock().unwrap();
 			data.retain(|id, queue| {
 				if queue.is_empty() {
 					changed.insert(id.con);
-					trace!(self.logger, "Remove playback queue buffer"; "id" => %id);
+					debug!(self.logger, "Remove playback queue buffer"; "id" => %id);
 					return false;
 				}
 
-				let mut left = buffer.len();
-				while left > 0 {
+				let mut i = 0;
+				while i < buffer.len() {
 					let mut q_packet = if let Some(p) = queue.peek_mut() {
 						p
 					} else {
@@ -370,10 +372,12 @@ impl AudioCallback for SdlCallback {
 					};
 					let packet = &mut q_packet.0;
 
-					let len = std::cmp::min(packet.data.len(), left);
-					for i in 0..len {
-						buffer[i] += packet.data[i];
+					let len = std::cmp::min(packet.data.len(), buffer.len() - i);
+					for j in 0..len {
+						buffer[i + j] += packet.data[j];
 					}
+					trace!(self.logger, "Add from buffer"; "id" => %id, "from" => i, "to" => i + len);
+					i += len;
 
 					if packet.data.len() > len {
 						packet.data = packet.data.split_off(len);
@@ -381,7 +385,6 @@ impl AudioCallback for SdlCallback {
 						drop(q_packet);
 						queue.pop();
 					}
-					left -= len;
 				}
 
 				trace!(self.logger, "Left playback queue buffer"; "id" => %id, "packets" => queue.len());
@@ -389,33 +392,35 @@ impl AudioCallback for SdlCallback {
 			});
 		}
 
-		let logger = self.logger.clone();
-		let t2a = self.t2a.clone();
-		thread::spawn(move || {
-			let mut rt = tokio::runtime::Runtime::new().unwrap();
+		if !changed.is_empty() {
+			let logger = self.logger.clone();
+			let t2a = self.t2a.clone();
+			thread::spawn(move || {
+				let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-			rt.block_on(async {
-				let local = tokio::task::LocalSet::new();
+				rt.block_on(async {
+					let local = tokio::task::LocalSet::new();
 
-				// Run the local task set.
-				local.run_until(async move {
-					for con in changed {
-						let logger = logger.clone();
-						tokio::task::spawn_local(
-							t2a.send(TalkersChangedMsg(con))
-								.map(move |r| {match r {
-									Ok(()) => {}
-									Err(e) => {
-										error!(logger, "Failed to notify TS2Audio pipeline about talker change"; "error" => ?e)
+					// Run the local task set.
+					local.run_until(async move {
+						for con in changed {
+							let logger = logger.clone();
+							tokio::task::spawn_local(
+								t2a.send(TalkersChangedMsg(con))
+									.map(move |r| {match r {
+										Ok(()) => {}
+										Err(e) => {
+											error!(logger, "Failed to notify TS2Audio pipeline about talker change"; "error" => ?e)
+										}
 									}
-								}
-								}),
-						).await.unwrap();
-					}
-				}).await;
+									}),
+							).await.unwrap();
+						}
+					}).await;
 
-				local.await;
+					local.await;
+				});
 			});
-		});
+		}
 	}
 }
