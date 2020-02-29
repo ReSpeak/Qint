@@ -408,7 +408,7 @@ impl Chat {
 	fn add_listener(&self) {
 		// Listen for new messages
 		ConnectionService::with_mut(&self.con, |con| {
-			let new_msg = self.link.callback(|from| Msg::NewMessage(from));
+			let new_msg = self.link.callback(|target| Msg::NewMessage(target));
 			let chat_to_channel = self.link.callback(|c| Msg::SetChatToChannel(c));
 			let channel_changed = self.link.callback(|(old, new)|
 				Msg::ChannelChanged { old, new });
@@ -438,8 +438,18 @@ impl Chat {
 								}
 							}
 						}
-						Event::Message { target, .. } => {
-							new_msg.emit(target.clone());
+						Event::Message { invoker, target, .. } => {
+							let mut target = target.clone();
+							if let MessageTarget::Client(id) = target {
+								if let FrontendConnectionState::Connected(con) = &con.state {
+									if id == con.con.own_client {
+										// Message is directed at us, replace target
+										// with invoker
+										target = MessageTarget::Client(invoker.id);
+									}
+								}
+							}
+							new_msg.emit(target);
 						}
 						_ => {}
 					}
