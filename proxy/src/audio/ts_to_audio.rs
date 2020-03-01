@@ -7,7 +7,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use actix::*;
-use audiopus::coder::{Decoder, GenericCtl};
+use audiopus::coder::Decoder;
 use failure::{format_err, Error};
 use futures::prelude::*;
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired, AudioStatus};
@@ -268,7 +268,7 @@ impl Handler<PlayMsg> for TsToAudio {
 
 			let mut opus_output = vec![0f32; USUAL_FRAME_SIZE];
 			let len = loop {
-				match decoder.decode_float(*data, &mut opus_output, false) {
+				match decoder.decode_float(Some(*data), &mut opus_output, false) {
 					Ok(len) => break len,
 					Err(audiopus::error::Error::Opus(
 						audiopus::error::ErrorCode::BufferTooSmall,

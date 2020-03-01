@@ -9,7 +9,7 @@ pub fn html_from_string(html: &str) -> Result<Html, ()> {
 		div.innerHTML = @{html};
 		return div;
 	};
-	let node = Node::try_from(div).map_err(|_| ())?; // TOD maybe a better error map
+	let node = Node::try_from(div).map_err(|_| ())?; // TODO maybe a better error map
 	Ok(VNode::VRef(node))
 }
 
