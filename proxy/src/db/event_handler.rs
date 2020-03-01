@@ -367,7 +367,7 @@ impl EventHandler for super::DbHandler {
 								.first::<i64>(&self.con)
 						})?;
 				}
-				Event::__NonExhaustive => unreachable!(),
+				_ => unreachable!("Unknown event type"),
 			}
 		}
 		Ok(())

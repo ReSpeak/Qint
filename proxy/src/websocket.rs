@@ -249,7 +249,7 @@ impl TsConnection {
 				}),
 			)
 			.prepare_client(Box::new(move |client| {
-				client.lock().add_in_command_observer(
+				client.lock().unwrap().add_in_command_observer(
 					"Qint".into(),
 					Box::new(ProxyCommandObserver {
 						logger: logger3.clone(),
