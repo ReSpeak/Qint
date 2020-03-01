@@ -548,7 +548,7 @@ impl Handler<WsMsg> for TsConnection {
 								if let Some(client) =
 									con.clients.get(&con.own_client)
 								{
-									base64::decode(&client.uid.0).unwrap()
+									client.uid.0.clone()
 								} else {
 									error!(logger, "Failed to get own client");
 									return;
@@ -609,10 +609,7 @@ impl Handler<WsMsg> for TsConnection {
 										};
 										let con = con.lock();
 										let client = &con.clients[&id];
-										ChatType::Client(
-											base64::decode(&client.uid.0)
-												.unwrap(),
-										)
+										ChatType::Client(client.uid.0.clone())
 									}
 									TextMessageTargetMode::Unknown => {
 										error!(
@@ -632,9 +629,7 @@ impl Handler<WsMsg> for TsConnection {
 								message = msg.message.into();
 								let con = con.lock();
 								let client = &con.clients[&msg.client_id];
-								chat_type = ChatType::Poke(
-									base64::decode(&client.uid.0).unwrap(),
-								);
+								chat_type = ChatType::Poke(client.uid.0.clone());
 							}
 
 							let msg = db::WriteMessageMsg {

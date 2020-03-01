@@ -1,3 +1,5 @@
+use qint_shared::models::Message;
+use ts_bookkeeping::data::Client;
 use stdweb::unstable::TryFrom;
 use stdweb::web::Node;
 use yew::prelude::*;
@@ -21,15 +23,46 @@ pub fn data_hash_to_color(data: &[u8]) -> String {
 	if data.len() < 4 {
 		return String::from("color:black;");
 	}
-
-	const RANGE_H: i32 = 360i32;
-	const RANGE_S: i32 = 20i32;
-	const RANGE_L: i32 = 20i32;
-
-	let var_h = (((data[0] as i32) << 8u32) | ((data[1] as i32) << 0u32)) / RANGE_H;
-	let var_s = 80i32 + (data[2] as i32) / RANGE_S; // = 90 ± 10 => [80-100]
-	let var_l = 30i32 + (data[3] as i32) / RANGE_L; // = 40 ± 10 => [30- 50]
+	let var_h = (((data[0] as i32) << 8u32) | ((data[1] as i32) << 0u32)) % 360i32;
+	let var_s = 60i32 + (data[2] as i32) % 40i32; // = 80 ± 20 => [60-100]
+	let var_l = 30i32 + (data[3] as i32) % 30i32; // = 45 ± 15 => [30- 60]
 	format!("color:hsl({}, {}%, {}%);", var_h, var_s, var_l)
+}
+
+pub trait MessageExtensions {
+	fn get_user_name(&self) -> &str;
+}
+
+impl MessageExtensions for Message {
+	fn get_user_name(&self) -> &str {
+		if let Some(name) = &self.client_name {
+			name
+		} else if let Some(name) = &self.invoker_name {
+			name
+		} else {
+			"Anonymous"
+		}
+	}
+}
+
+pub trait ToColor {
+	fn to_color(&self) -> String;
+}
+
+impl ToColor for Message {
+	fn to_color(&self) -> String {
+		if let Some(ref uid) = self.invoker {
+			data_hash_to_color(uid)
+		} else {
+			str_hash_to_color(self.get_user_name())
+		}
+	}
+}
+
+impl ToColor for Client {
+	fn to_color(&self) -> String {
+		data_hash_to_color(&self.uid.0)
+	}
 }
 
 #[macro_export]

@@ -12,7 +12,7 @@ use stdweb::web::event::IEvent;
 use crate::connection_service::*;
 use crate::controls::context_menu::{ContextMenu, Pos2D};
 use crate::controls::icon::Icon;
-use crate::html_util::data_hash_to_color;
+use crate::html_util::ToColor;
 
 pub struct ChannelTree {
 	link: ComponentLink<Self>,
@@ -172,7 +172,7 @@ impl ChannelTree {
 	fn view_client(&self, ctx: &ViewContext, client: &Client) -> Html {
 		let icon = Icon::client_icon(&self.con, client);
 		let set = self.set_chat.clone();
-		let uid = base64::decode(&client.uid.0).unwrap();
+		let uid = client.uid.0.clone();
 		let id = client.id;
 		let set_chat = self.link.callback(move |_| {
 			set.emit(SelectedChat {
@@ -198,13 +198,7 @@ impl ChannelTree {
 			}
 		} else { html!{} };
 
-		let uid;
-		let user_color = data_hash_to_color(if let Ok(u) = base64::decode(&client.uid.0) {
-			uid = u;
-			&uid
-		} else {
-			client.name.as_bytes()
-		});
+		let user_color = client.to_color();
 		html! {
 			<li>
 				{ cm }

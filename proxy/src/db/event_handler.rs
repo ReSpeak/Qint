@@ -38,9 +38,7 @@ impl EventHandler for super::DbHandler {
 							let server = server.to_short();
 							let con = con.lock();
 							let client = &con.clients[id];
-
-							let client_uid =
-								base64::decode(&client.uid.0).unwrap();
+							let client_uid = &client.uid.0;
 
 							// Check if we already know this client
 							if diesel::select(diesel::dsl::exists(
@@ -165,9 +163,7 @@ impl EventHandler for super::DbHandler {
 									 wasn't"
 								),
 							};
-
-							let client_uid =
-								base64::decode(&client.uid.0).unwrap();
+							let client_uid = &client.uid.0;
 
 							// Update last seen
 							let utc_time = Utc::now().naive_utc();
@@ -281,9 +277,7 @@ impl EventHandler for super::DbHandler {
 							can_be_duplicate = false;
 							let con = con.lock();
 							let client = &con.clients[id];
-							chat = ChatType::Client(
-								base64::decode(&client.uid.0).unwrap(),
-							);
+							chat = ChatType::Client(client.uid.0.clone());
 						}
 					}
 					let chat = self.get_or_create_chat(&ChatId {

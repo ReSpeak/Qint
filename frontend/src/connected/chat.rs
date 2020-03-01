@@ -19,7 +19,7 @@ use yew::services::fetch::{FetchService, FetchTask, Request, Response};
 use crate::CLIENT_ICON;
 use crate::connection_service::*;
 use crate::controls::icon::Icon;
-use crate::html_util::{data_hash_to_color, str_hash_to_color};
+use crate::html_util::{MessageExtensions, ToColor};
 use crate::bulma_icon;
 use crate::connected::yew_markdown::markdown;
 
@@ -580,15 +580,8 @@ impl Chat {
 			Icon::mdi_icon(CLIENT_ICON)
 		};
 
-		let user_name =
-			msg.client_name.as_ref().map(|x| x.as_str()).or(
-			msg.invoker_name.as_ref().map(|x| x.as_str())).unwrap_or(
-			"Anonymous");
-		let user_color = if let Some(ref uid) = msg.invoker {
-			data_hash_to_color(uid)
-		} else {
-			str_hash_to_color(&user_name)
-		};
+		let user_name = msg.get_user_name();
+		let user_color = msg.to_color();
 		html! {
 			<>
 				<div class="invoker-icon">
