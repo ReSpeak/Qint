@@ -343,19 +343,6 @@ impl Component for Chat {
 				self.new_messages = false;
 				js! { @(no_return)
 					console.log("ON post proc");
-					// katex
-					document.querySelectorAll(".chat-messages .latex_proc").forEach(elem => {
-						elem.classList.remove("latex_proc");
-						console.log("Processed");
-						window.renderMathInElement(elem, {
-							errorCallback: (err) => { console.log("Failed to LaTeX", err); }
-						});
-					});
-					// highlight
-					document.querySelectorAll(".chat-messages pre code:not(.hljs)").forEach(elem => {
-						elem.classList.remove("highlight_proc");
-						window.hljs.highlightBlock(elem);
-					});
 					// move last chat into view
 					document.querySelector(".chat-end").scrollIntoView(/*{behavior: "smooth"}*/);
 				};
@@ -539,7 +526,7 @@ impl Chat {
 
 			const element = elements[0];
 			// Less than 10% of the screen height is left as a buffer
-			console.log("left scroll height: " + (element.scrollTop / element.scrollHeight));
+			//console.log("left scroll height: " + (element.scrollTop / element.scrollHeight));
 			return element.scrollTop / element.scrollHeight <= 0.1;
 		} {
 			// Need more messages
@@ -749,6 +736,7 @@ impl UiChatMessage {
 	pub fn new(msg: Message) -> UiChatMessage {
 		let is_edit = false && msg.content.starts_with(Self::EDIT_PREFIX);
 		let content_text = if is_edit { &msg.content[Self::EDIT_PREFIX.len()..] } else { &msg.content };
+		console!(log, "Rendering md");
 		let rendered_markdown = markdown(content_text);
 
 		UiChatMessage {

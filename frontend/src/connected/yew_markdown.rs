@@ -2,7 +2,9 @@
 /// Source: https://github.com/acmumn/mentoring/blob/master/web-client/src/view/markdown.rs
 use pulldown_cmark::{Alignment, Event, Parser, Tag, Options, CodeBlockKind, LinkType};
 use regex::Regex;
-use stdweb::{js, Value};
+use stdweb::js;
+use stdweb::web::Node;
+use stdweb::unstable::TryFrom;
 use yew::virtual_dom::{VNode, VTag, VText};
 use yew::{html, Html};
 use crate::bulma_icon;
@@ -21,14 +23,36 @@ struct YewRender<TStack> {
 	spine: Vec<(TStack, VTag)>,
 
 	table_state: TableState,
+	text_builder: String,
+	text_state: TextKind,
 }
 
-type YewMd = YewRender<()>;
+type YewMd = YewRender<YewMdMeta>;
 type YewBb = YewRender<BBTag>;
 
 enum TableState {
 	Head,
 	Body,
+}
+
+enum YewMdMeta {
+	None,
+	Code(String) // language
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum TextKind {
+	None,
+	Normal,
+	Latex(bool), // display mode
+}
+
+impl TextKind {
+	fn is_none(&self) -> bool { *self == TextKind::None }
+	fn is_latex(&self) -> bool { if let TextKind::Latex(_) = self { true } else { false } }
+	fn when_none(&self, alt: TextKind) -> TextKind {
+		if self.is_none() { alt } else { *self }
+	}
 }
 
 pub fn markdown(raw: &str) -> Html {
@@ -43,6 +67,8 @@ impl<TStack> YewRender<TStack> {
 			elems: vec![],
 			spine: vec![],
 			table_state: TableState::Head,
+			text_builder: String::new(),
+			text_state: TextKind::None,
 		}
 	}
 
@@ -104,6 +130,19 @@ impl<TStack> YewRender<TStack> {
 // Markdown
 
 impl YewMd {
+	fn done_text(&mut self) {
+		match self.text_state {
+			TextKind::None => return,
+			TextKind::Normal => self.push_node(bb(&self.text_builder)),
+			TextKind::Latex(dm) => 
+				if let Some(node) = katex_render_code(&self.text_builder, dm) {
+					self.push_node(node);
+				},
+		}
+		self.text_builder.clear();
+		self.text_state = TextKind::None;
+	}
+
 	fn markdown(mut self, raw: &str) -> Html {
 		lazy_static! {
 			static ref MD_OPTIONS: Options = {
@@ -116,29 +155,24 @@ impl YewMd {
 		}
 
 		let parser = Parser::new_ext(raw, *MD_OPTIONS);
-	
-		let mut txt_build = String::new();
-		let mut was_txt = false;
 
 		for ev in parser {
-			if was_txt && !is_textlike(&ev) {
-				self.push_node(bb(&txt_build));
-				txt_build.clear();
-				was_txt = false;
+			if !is_textlike(&ev) {
+				self.done_text();
 			}
 
 			match ev {
 				Event::Start(tag) => {
-					let vtag = self.markdown_start_tag(tag);
-					self.spine.push(((), vtag));
+					let (meta, vtag) = self.markdown_start_tag(tag);
+					self.spine.push((meta, vtag));
 				}
 				Event::End(tag) => {
 					let vtag = self.markdown_end_tag(tag);
 					self.push_vtag(vtag);
 				}
 				Event::Text(text) => {
-					was_txt = true;
-					txt_build.push_str(&text);
+					self.text_state = self.text_state.when_none(TextKind::Normal);
+					self.text_builder.push_str(&text);
 				}
 				Event::Code(text) => {
 					let mut code = VTag::new("code");
@@ -146,9 +180,16 @@ impl YewMd {
 					self.push_vtag(code);
 				},
 				Event::Html(text) => {
-					// Treat html just like normal text
-					was_txt = true;
-					txt_build.push_str(&text);
+					if !self.text_state.is_latex() && text.eq_ignore_ascii_case("<LATEX>") {
+						self.done_text();
+						// Funkey hack: Big 'L' means display mode, small 'l' inline mode
+						self.text_state = TextKind::Latex(&text.as_ref()[1..2] == "L");
+					} else if self.text_state.is_latex() && text.eq_ignore_ascii_case("</LATEX>") {
+						self.done_text();
+					} else {
+						self.text_state = self.text_state.when_none(TextKind::Normal);
+						self.text_builder.push_str(&text);
+					}
 				}
 				Event::FootnoteReference(_) => {},
 				Event::SoftBreak => self.push_text("\n"),
@@ -168,72 +209,71 @@ impl YewMd {
 				},
 			}
 		}
-		if was_txt {
-			self.push_node(bb(&txt_build));
-		}
-	
+		self.done_text();
 		self.finalize_to_html()
 	}
 
-	fn markdown_start_tag(&mut self, t: Tag) -> VTag {
+	fn markdown_start_tag(&mut self, t: Tag) -> (YewMdMeta, VTag) {
 		match t {
 			Tag::Paragraph => {
 				let mut el = VTag::new("div");
 				el.add_class("para");
-				el
+				(YewMdMeta::None, el)
 			}
-			Tag::Strikethrough => VTag::new("s"),
+			Tag::Strikethrough => (YewMdMeta::None, VTag::new("s")),
 			Tag::Heading(n) => {
 				assert!(n > 0); // TODO uuhm
 				assert!(n < 7);
-				VTag::new(format!("h{}", n))
+				(YewMdMeta::None, VTag::new(format!("h{}", n)))
 			}
 			Tag::BlockQuote => {
 				let mut el = VTag::new("blockquote");
 				el.add_class("blockquote");
-				el
+				(YewMdMeta::None, el)
 			}
 			Tag::CodeBlock(info) => {
-				let mut el = VTag::new("code");
+				let el = VTag::new("code");
 				match info {
 					CodeBlockKind::Fenced(lang) => {
 						if !lang.as_ref().is_empty() {
-							el.add_class(format!("language-{}", lang.as_ref()).as_ref());
+							return (YewMdMeta::Code(lang.into_string()), el);
 						}
 					}
 					CodeBlockKind::Indented => {},
 				}
-				el
+				(YewMdMeta::None, el)
+				
 			}
 			Tag::List(None) => {
 				let elem = VTag::new("ul");
 				//elem.add_attribute("style", &"list-style: disc inside;");
-				elem
+				(YewMdMeta::None, elem)
 			}
 			Tag::List(Some(1)) => {
 				let mut elem = VTag::new("ol");
 				elem.add_attribute("style", &"list-style-position: inside;");
-				elem
+				(YewMdMeta::None, elem)
 			}
 			Tag::List(Some(ref start)) => {
 				let mut elem = VTag::new("ol");
 				elem.add_attribute("style", &"list-style-position: inside;");
 				elem.add_attribute("start", start);
-				elem
+				(YewMdMeta::None, elem)
 			}
-			Tag::Item => VTag::new("li"),
+			Tag::Item => (YewMdMeta::None, VTag::new("li")),
 			Tag::Table(_) => {
 				let mut el = VTag::new("table");
 				el.add_class("table");
-				el
+				(YewMdMeta::None, el)
 			}
 			Tag::TableHead => {
 				self.table_state = TableState::Head;
 				//let VTag::new("thead")
-				VTag::new("tr")
+				(YewMdMeta::None, VTag::new("tr"))
 			}
-			Tag::TableRow => VTag::new("tr"),
+			Tag::TableRow => (YewMdMeta::None, VTag::new("tr")),
 			Tag::TableCell => {
+				(YewMdMeta::None,
 				match self.table_state {
 					TableState::Head => {
 						VTag::new("th")
@@ -241,17 +281,17 @@ impl YewMd {
 					TableState::Body => {
 						VTag::new("td")
 					}
-				}
+				})
 			},
 			Tag::Emphasis => {
 				let mut el = VTag::new("span");
 				el.add_class("is-italic");
-				el
+				(YewMdMeta::None, el)
 			}
 			Tag::Strong => {
 				let mut el = VTag::new("span");
 				el.add_class("has-text-weight-bold");
-				el
+				(YewMdMeta::None, el)
 			}
 			Tag::Link(ref link_type, ref href, ref title) => {
 				let mut el = Self::make_link();
@@ -262,7 +302,7 @@ impl YewMd {
 				if title.as_ref() != "" {
 					el.add_attribute("title", title);
 				}
-				el
+				(YewMdMeta::None, el)
 			}
 			Tag::Image(_, ref src, ref title) => {
 				let mut el = VTag::new("img");
@@ -270,19 +310,29 @@ impl YewMd {
 				if title.as_ref() != "" {
 					el.add_attribute("title", title);
 				}
-				el
+				(YewMdMeta::None, el)
 			}
-			Tag::FootnoteDefinition(ref _footnote_id) => VTag::new("span"), // Footnotes are not rendered as anything special
+			// Footnotes are not rendered as anything special
+			Tag::FootnoteDefinition(ref _footnote_id) => (YewMdMeta::None, VTag::new("span")),
 		}
 	}
 	
 	fn markdown_end_tag(&mut self, t: Tag) -> VTag {
-		let mut top = self.spine.pop().expect("Stack was empty on pop").1;
+		let (meta, mut top) = self.spine.pop().expect("Stack was empty on pop");
 
 		match t {
 			Tag::CodeBlock(_) => {
+				let mut child = None;
+				for r in top.children.iter() {
+					if let VNode::VText(VText { text: code, .. }) = r {
+						let lang = if let YewMdMeta::Code(ref lang) = meta { lang } else { "" };
+						child = hljs_render_code(code, lang);
+						break;
+					}
+				}
+
 				let mut pre = VTag::new("pre");
-				pre.add_child(top.into());
+				pre.add_child(child.unwrap_or(top.into()));
 				top = pre;
 			}
 			Tag::Table(aligns) => {
@@ -350,27 +400,30 @@ fn bb(raw: &str) -> Html {
 }
 
 impl YewBb {
+	fn done_text(&mut self) {
+		if self.text_state == TextKind::None { return; }
+		let text = self.text_builder.clone(); // TODO remove clone somehow
+		if self.spine.is_empty() {
+			self.process_text(&text);
+		} else {
+			self.push_text(&text);
+		}
+		self.text_builder.clear();
+		self.text_state = TextKind::None;
+	}
+
 	fn mini_bb(mut self, raw: &str) -> Html {
 		let seg_list = nom_bb_read(raw);
 		
-		let mut txt_build = String::new();
-		let mut was_txt = false;
-
 		for seg in seg_list {
-			if was_txt && !seg.is_text() {
-				if self.spine.is_empty() {
-					self.process_text(&txt_build);
-				} else {
-					self.push_text(&txt_build);
-				}
-				txt_build.clear();
-				was_txt = false;
+			if !seg.is_text() {
+				self.done_text();
 			}
 
 			match seg {
 				BBSegment::Text(text) => {
-					txt_build.push_str(&text);
-					was_txt = true;
+					self.text_builder.push_str(&text);
+					self.text_state = TextKind::Normal;
 				}
 				BBSegment::Open(tag, arg) => {
 					let vtag = match tag {
@@ -418,13 +471,7 @@ impl YewBb {
 			}
 		}
 
-		if was_txt {
-			if self.spine.is_empty() {
-				self.process_text(&txt_build);
-			} else {
-				self.push_text(&txt_build);
-			}
-		}
+		self.done_text();
 
 		// cleanup since we cant trust the user to put together a correct bb text
 		while let Some((_, vtag)) = self.spine.pop() {
@@ -502,6 +549,46 @@ fn nom_bb_match_tag(s: &str) -> Option<BBTag> {
 
 // [JS] Highlight.js
 
-fn hjs_render_code(s: &str) -> VNode {
-	panic!();
+fn hljs_render_code(code: &str, lang: &str) -> Option<VNode> {
+	let elem = js! {
+		let lang = @{lang};
+		let code = @{code};
+		const elem = document.createElement("code");
+		elem.classList.add("hljs");
+		elem.classList.add("language-" + lang);
+		let res;
+		try {
+			if (lang)
+				res = window.hljs.highlight(lang, code);
+			else
+				res = window.hljs.highlightAuto(code);
+			elem.innerHTML = res.value;
+		} catch {
+			elem.innerText = code;
+		}
+		return elem;
+	};
+	Node::try_from(elem).ok().map(|n| VNode::VRef(n))
+}
+
+// [JS] KaTeX (LaTeX)
+
+fn katex_render_code(code: &str, display_mode: bool) -> Option<VNode> {
+	let elem = js! {
+		let code = @{code};
+		const elem = document.createElement("div");
+		let res;
+		try {
+			window.katex.render(code, elem, {
+				displayMode: @{display_mode},
+				throwOnError: false,
+			});
+		} catch {
+			elem.innerText = code;
+			console.log("Failed to render latex");
+		}
+		console.log(elem);
+		return elem;
+	};
+	Node::try_from(elem).ok().map(|n| VNode::VRef(n))
 }

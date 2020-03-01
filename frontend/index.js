@@ -3,7 +3,7 @@ import "@mdi/font/css/materialdesignicons.css";
 import "bulma";
 // katex
 import 'katex/dist/katex.min.css'
-import renderMathInElement from "katex/dist/contrib/auto-render";
+import katex from "katex";
 // highlight.js
 import 'highlight.js/styles/vs2015.css';
 import hljs from 'highlight.js';
@@ -17,5 +17,5 @@ rust
 	.then(m => m.main())
 	.catch(console.error);
 
-window.renderMathInElement = renderMathInElement;
+window.katex = katex;
 window.hljs = hljs;
