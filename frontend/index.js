@@ -18,4 +18,4 @@ rust
 	.catch(console.error);
 
 window.renderMathInElement = renderMathInElement;
-window.highlightBlock = hljs.highlightBlock;
+window.hljs = hljs;

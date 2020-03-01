@@ -1,9 +1,10 @@
 /// Original author of this code is [Nathan Ringo](https://github.com/remexre)
 /// Source: https://github.com/acmumn/mentoring/blob/master/web-client/src/view/markdown.rs
 use pulldown_cmark::{Alignment, Event, Parser, Tag, Options, CodeBlockKind, LinkType};
+use regex::Regex;
+use stdweb::{js, Value};
 use yew::virtual_dom::{VNode, VTag, VText};
 use yew::{html, Html};
-use regex::Regex;
 use crate::bulma_icon;
 
 use nom::{
@@ -497,4 +498,10 @@ fn nom_bb_match_tag(s: &str) -> Option<BBTag> {
 			else { None }
 		}
 	}
+}
+
+// [JS] Highlight.js
+
+fn hjs_render_code(s: &str) -> VNode {
+	panic!();
 }

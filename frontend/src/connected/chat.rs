@@ -19,7 +19,7 @@ use yew::services::fetch::{FetchService, FetchTask, Request, Response};
 use crate::CLIENT_ICON;
 use crate::connection_service::*;
 use crate::controls::icon::Icon;
-use crate::html_util::data_hash_to_color;
+use crate::html_util::{data_hash_to_color, str_hash_to_color};
 use crate::bulma_icon;
 use crate::connected::yew_markdown::markdown;
 
@@ -354,7 +354,7 @@ impl Component for Chat {
 					// highlight
 					document.querySelectorAll(".chat-messages pre code:not(.hljs)").forEach(elem => {
 						elem.classList.remove("highlight_proc");
-						window.highlightBlock(elem);
+						window.hljs.highlightBlock(elem);
 					});
 					// move last chat into view
 					document.querySelector(".chat-end").scrollIntoView(/*{behavior: "smooth"}*/);
@@ -570,8 +570,9 @@ impl Chat {
 	}
 
 	fn view_message_header(&self, msg: &Message) -> Html {
-		let icon = if msg.client_avatar.as_ref().map(|a| !a.is_empty()).unwrap_or_default() {
-			Icon::client_avatar(&self.con, UidRef(&base64::encode(msg.invoker.as_ref().unwrap())))
+		let icon = if msg.client_avatar.as_ref().map(|a| !a.is_empty()).unwrap_or_default()
+			&& msg.invoker.is_some() {
+				Icon::client_avatar(&self.con, UidRef(msg.invoker.as_ref().unwrap()))
 		} else if let Some(icon) = msg.client_icon {
 			Icon::icon_hash(&self.con, IconHash(icon as u32))
 				.unwrap_or_else(|| Icon::mdi_icon(CLIENT_ICON))
@@ -579,11 +580,14 @@ impl Chat {
 			Icon::mdi_icon(CLIENT_ICON)
 		};
 
-		let user_name = msg.client_name.as_ref().or(msg.invoker_name.as_ref()).unwrap();
+		let user_name =
+			msg.client_name.as_ref().map(|x| x.as_str()).or(
+			msg.invoker_name.as_ref().map(|x| x.as_str())).unwrap_or(
+			"Anonymous");
 		let user_color = if let Some(ref uid) = msg.invoker {
 			data_hash_to_color(uid)
 		} else {
-			data_hash_to_color(user_name.as_bytes())
+			str_hash_to_color(&user_name)
 		};
 		html! {
 			<>
@@ -594,15 +598,6 @@ impl Chat {
 					{ user_name }
 				</div>
 			</>
-		}
-	}
-
-	fn view_message_group(&self, group: &[&UiChatMessage]) -> Html {
-		html! {
-			<li class="message-group">
-				{ self.view_message_header(&group[0].data) }
-				{ for group.iter().map(|m| self.view_message(m)) }
-			</li>
 		}
 	}
 
