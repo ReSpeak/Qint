@@ -219,7 +219,7 @@ impl EventHandler for super::DbHandler {
 						.local_minus_utc();
 
 					let invoker_uid = if let Some(uid) = &invoker.uid {
-						Some(base64::decode(&uid.0).unwrap())
+						Some(uid.0.as_slice())
 					} else {
 						None
 					};
@@ -269,9 +269,7 @@ impl EventHandler for super::DbHandler {
 							} else {
 								bail!("Failed to find client");
 							};
-							chat = ChatType::Client(
-								base64::decode(client_uid).unwrap(),
-							);
+							chat = ChatType::Client(client_uid.clone());
 						}
 						MessageTarget::Poke(id) => {
 							can_be_duplicate = false;
@@ -294,7 +292,7 @@ impl EventHandler for super::DbHandler {
 									utc_time - Duration::seconds(1);
 								let cmp = messages::chat
 									.eq(chat)
-									.and(messages::invoker.eq(&invoker_uid))
+									.and(messages::invoker.eq(invoker_uid))
 									.and(
 										messages::invoker_name.eq(invoker_name),
 									)
@@ -316,7 +314,7 @@ impl EventHandler for super::DbHandler {
 								// Check if the message is already in the database
 								let cmp = messages::chat
 									.eq(chat)
-									.and(messages::invoker.eq(&invoker_uid))
+									.and(messages::invoker.eq(invoker_uid))
 									.and(messages::content.eq(message))
 									.and(
 										messages::status
@@ -343,9 +341,7 @@ impl EventHandler for super::DbHandler {
 							// Insert message
 							let message = models::MessageInsert {
 								chat,
-								invoker: invoker_uid
-									.as_ref()
-									.map(|v| v.as_slice()),
+								invoker: invoker_uid,
 								invoker_name,
 								content: message,
 								status: MessageStatus::Success,
