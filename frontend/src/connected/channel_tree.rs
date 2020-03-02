@@ -172,15 +172,24 @@ impl ChannelTree {
 	fn view_client(&self, ctx: &ViewContext, client: &Client) -> Html {
 		let icon = Icon::client_icon(&self.con, client);
 		let set = self.set_chat.clone();
-		let uid = client.uid.0.clone();
 		let id = client.id;
-		let set_chat = self.link.callback(move |_| {
-			set.emit(SelectedChat {
-				chat_type: ChatType::Client(uid.clone()),
-				client: Some(id),
-			});
-			Msg::Ignore
-		});
+		let set_chat = match &client.uid {
+			Some(uid) => {
+				let uid = uid.0.clone();
+				self.link.callback(move |_| {
+					set.emit(SelectedChat {
+						chat_type: ChatType::Client(uid.clone()),
+						client: Some(id),
+					});
+					Msg::Ignore
+				})
+			}
+			None => {
+				self.link.callback(move |_| {
+					Msg::Ignore
+				})
+			}
+		};
 
 		let context_request = self.link.callback(move |e: ContextMenuEvent| {
 			e.prevent_default();

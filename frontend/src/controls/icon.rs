@@ -22,10 +22,11 @@ impl Icon {
 	/// Choose avatar, client icon or generic icon.
 	pub fn client_icon(con: &ConnectionId, client: &Client) -> Html {
 		if !client.avatar_hash.is_empty() {
-			Self::client_avatar(con, client.uid.as_ref())
-		} else {
-			Self::icon_hash(con, client.icon_id).unwrap_or_else(|| Self::mdi_icon(CLIENT_ICON))
+			if let Some(uid) = &client.uid {
+				return Self::client_avatar(con, uid.as_ref());
+			}
 		}
+		Self::icon_hash(con, client.icon_id).unwrap_or_else(|| Self::mdi_icon(CLIENT_ICON))
 	}
 
 	pub fn client_avatar(con: &ConnectionId, client_uid: UidRef) -> Html {

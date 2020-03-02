@@ -61,7 +61,11 @@ impl ToColor for Message {
 
 impl ToColor for Client {
 	fn to_color(&self) -> String {
-		data_hash_to_color(&self.uid.0)
+		if let Some(uid) = &self.uid {
+			data_hash_to_color(&uid.0)
+		} else {
+			str_hash_to_color(&self.name)
+		}
 	}
 }
 

@@ -37,8 +37,14 @@ impl EventHandler for super::DbHandler {
 							let server = con.get_server_key()?;
 							let server = server.to_short();
 							let con = con.lock();
-							let client = &con.clients[id];
-							let client_uid = &client.uid.0;
+							let client = match con.clients.get(id) {
+								Some(c) => c,
+								None => bail!("Failed to find client"),
+							};
+							let client_uid = match &client.uid {
+								Some(client_uid) => &client_uid.0,
+								None => bail!("Client has no uid"),
+							};
 
 							// Check if we already know this client
 							if diesel::select(diesel::dsl::exists(
@@ -163,7 +169,10 @@ impl EventHandler for super::DbHandler {
 									 wasn't"
 								),
 							};
-							let client_uid = &client.uid.0;
+							let client_uid = match &client.uid {
+								Some(uid) => &uid.0,
+								None => bail!("Client has no uid"),
+							};
 
 							// Update last seen
 							let utc_time = Utc::now().naive_utc();
@@ -259,7 +268,7 @@ impl EventHandler for super::DbHandler {
 							let con = con.lock();
 							let client = con.clients.get(id);
 							let client_uid = if own_message {
-								client.map(|c| &c.uid.0)
+								client.and_then(|c| c.uid.as_ref()).map(|u| &u.0)
 							} else {
 								invoker.uid.as_ref().map(|uid| &uid.0)
 							};
@@ -274,8 +283,13 @@ impl EventHandler for super::DbHandler {
 						MessageTarget::Poke(id) => {
 							can_be_duplicate = false;
 							let con = con.lock();
-							let client = &con.clients[id];
-							chat = ChatType::Client(client.uid.0.clone());
+							let client = &con.clients.get(id);
+							let uid = client.and_then(|c| c.uid.as_ref());
+							if let Some(uid) = uid {
+								chat = ChatType::Poke(uid.0.clone());
+							} else {
+								bail!("Client has no uid");
+							}
 						}
 					}
 					let chat = self.get_or_create_chat(&ChatId {

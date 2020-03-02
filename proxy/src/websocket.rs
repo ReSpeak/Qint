@@ -545,10 +545,8 @@ impl Handler<WsMsg> for TsConnection {
 							let server = server.to_short().to_vec();
 							let invoker_uid = {
 								let con = con.lock();
-								if let Some(client) =
-									con.clients.get(&con.own_client)
-								{
-									client.uid.0.clone()
+								if let Some(uid) = con.clients.get(&con.own_client).and_then(|c| c.uid.as_ref()) {
+									uid.0.clone()
 								} else {
 									error!(logger, "Failed to get own client");
 									return;
@@ -608,8 +606,13 @@ impl Handler<WsMsg> for TsConnection {
 											return;
 										};
 										let con = con.lock();
-										let client = &con.clients[&id];
-										ChatType::Client(client.uid.0.clone())
+										let uid = &con.clients.get(&id).and_then(|c| c.uid.as_ref());
+										if let Some(uid) = uid {
+											ChatType::Client(uid.0.clone())
+										} else {
+											error!(logger, "Failed to get uid of client"; "client" => ?id);
+											return;
+										}
 									}
 									TextMessageTargetMode::Unknown => {
 										error!(
@@ -628,8 +631,13 @@ impl Handler<WsMsg> for TsConnection {
 								let msg = msg.iter().next().unwrap();
 								message = msg.message.into();
 								let con = con.lock();
-								let client = &con.clients[&msg.client_id];
-								chat_type = ChatType::Poke(client.uid.0.clone());
+								let uid = &con.clients.get(&msg.client_id).and_then(|c| c.uid.as_ref());
+								if let Some(uid) = uid {
+									chat_type = ChatType::Poke(uid.0.clone())
+								} else {
+									error!(logger, "Failed to get uid of client"; "client" => ?msg.client_id);
+									return;
+								}
 							}
 
 							let msg = db::WriteMessageMsg {
