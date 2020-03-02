@@ -67,7 +67,7 @@ pub enum Msg {
 	/// The user changed the content of the command text input
 	CommandChange(String),
 	/// Requested messages arrived arrived from the proxy
-	GotMessages(Vec<UiChatMessage>),
+	GotMessages(Vec<Message>),
 	/// A new message arrived
 	NewMessage(MessageTarget),
 	/// Set the chat to our channel when connecting to a server.
@@ -91,6 +91,13 @@ pub enum Msg {
 	/// After new Messages have been added into the view
 	ChatPostprocess,
 	ToggleShowOriginal,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum NewMessageAction {
+	Append,
+	Prepend,
+	Replace,
 }
 
 #[derive(Clone, PartialEq, Properties)]
@@ -189,7 +196,7 @@ impl Component for Chat {
 				});
 				true
 			}
-			Msg::GotMessages(mut msgs) => {
+			Msg::GotMessages(msgs) => {
 				js! { console.log("ON GotMessages"); };
 				self.fetch_task = None;
 				self.all_loaded = msgs.len() < MESSAGES_LIMIT;
@@ -205,40 +212,26 @@ impl Component for Chat {
 					"current_last" => ?self.messages.last(),
 				);
 
-				if msgs.is_empty() {
-					return true;
-				}
-				if self.messages.is_empty() {
-					self.messages = msgs;
-					self.new_messages = true;
+				let (msgs, action) = Self::handle_new_messages(&self.messages, msgs);
+				info!(logger, "Merging messages"; "action" => ?action, "len" => msgs.len());
+				if msgs.is_empty() && action != NewMessageAction::Replace {
 					return true;
 				}
 
-				if msgs.last().unwrap() >= self.messages.last().unwrap() {
-					// Messages are more recent, append msgs
-					if let Ok(i) = self.messages.binary_search(&msgs[0]) {
-						info!(logger, "Appending, found"; "at" => i);
-						self.messages.truncate(i);
-						self.messages.append(&mut msgs);
-					} else {
-						info!(logger, "Gap, replacing");
-						// There may be a gap between msgs and self.messages,
-						// so we just replace them.
-						self.messages = msgs;
+				match action {
+					NewMessageAction::Append => {
+						self.messages.extend(msgs.into_iter().map(UiChatMessage::new));
 					}
-				} else {
-					// Messages are older, prepend msgs
-					if let Ok(i) = msgs.binary_search(&self.messages[0]) {
-						info!(logger, "Prepending, found"; "at" => i);
-						msgs.truncate(i);
-						msgs.append(&mut self.messages);
-						self.messages = msgs;
-					} else {
-						info!(logger, "Prepending");
-						msgs.append(&mut self.messages);
-						self.messages = msgs;
+					NewMessageAction::Prepend => {
+						let mut new_msgs = msgs.into_iter().map(UiChatMessage::new).collect::<Vec<_>>();
+						new_msgs.append(&mut self.messages);
+						self.messages = new_msgs;
+					}
+					NewMessageAction::Replace => {
+						self.messages = msgs.into_iter().map(UiChatMessage::new).collect();
 					}
 				}
+
 				info!(logger, "Received messages";
 					"current_count" => ?self.messages.len(),
 					"current_first" => ?self.messages.first(),
@@ -422,6 +415,37 @@ impl Component for Chat {
 }
 
 impl Chat {
+	fn handle_new_messages(messages: &[UiChatMessage], mut new: Vec<Message>) -> (Vec<Message>, NewMessageAction) {
+		if new.is_empty() {
+			return (Vec::new(), NewMessageAction::Append);
+		}
+		if messages.is_empty() {
+			return (new, NewMessageAction::Replace);
+		}
+
+		if new.last().unwrap() >= &messages.last().unwrap().data {
+			// Messages are more recent, append new
+			if let Ok(i) = new.binary_search(&messages.last().unwrap().data) {
+				new = new.split_off(i + 1);
+				(new, NewMessageAction::Append)
+			} else {
+				// There may be a gap between new and messages, so we just
+				// replace them.
+				(new, NewMessageAction::Replace)
+			}
+		} else {
+			// Messages are older, prepend new
+			if let Ok(i) = new.binary_search(&messages[0].data) {
+				new.truncate(i);
+				(new, NewMessageAction::Prepend)
+			} else {
+				// There may be a gap between new and messages, so we just
+				// replace them.
+				(new, NewMessageAction::Replace)
+			}
+		}
+	}
+
 	fn add_listener(&self) {
 		// Listen for new messages
 		ConnectionService::with_mut(&self.con, |con| {
@@ -502,7 +526,7 @@ impl Chat {
 		self.fetch_task = Some(fetch.fetch_binary(request, self.link
 			.callback(|resp: Response<MsgPack<Result<Vec<Message>, Error>>>| {
 				match resp.into_body().0 {
-					Ok(r) => Msg::GotMessages(r.into_iter().map(|m| UiChatMessage::new(m)).collect()),
+					Ok(r) => Msg::GotMessages(r),
 					Err(e) => {
 						// TODO Display error message
 						log::error!("Failed to fetch messages: {:?}", e);

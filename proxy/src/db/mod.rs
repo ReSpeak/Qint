@@ -515,12 +515,12 @@ impl Handler<GetMessagesMsg> for DbHandler {
 				servers_clients::avatar.nullable(),
 			));
 		let mut result = if let Some((time, id)) = msg.0.start {
-			// messages::(time, id) < (time, id), i.e. previous messages
+			// messages::(time, id) <= (time, id), i.e. previous messages
 			query
 				.filter(
 					messages::time
 						.lt(&time)
-						.or(messages::time.eq(&time).and(messages::id.lt(id))),
+						.or(messages::time.eq(&time).and(messages::id.le(id))),
 				)
 				.load::<TextMessage>(&self.con)?
 		} else {
