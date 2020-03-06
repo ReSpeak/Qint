@@ -31,7 +31,7 @@ pub struct SetPlayingMsg(pub bool);
 struct PlayPacketMsg(Vec<f32>);
 
 /// Threshold for voice activation detection.
-const VAD_THRESHOLD: f32 = 0.1;
+const VAD_THRESHOLD: f32 = 0.02;
 
 pub struct AudioToTs {
 	logger: Logger,
