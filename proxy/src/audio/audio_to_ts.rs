@@ -1,19 +1,21 @@
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use actix::*;
 use audiopus::coder::Encoder;
 use failure::{format_err, Error};
+use futures::prelude::*;
 use futures01::{Future, Sink};
 use futures_spawn::SpawnHelper;
 use futures_threadpool::ThreadPool;
+use rnnoise_c::DenoiseState;
 use sdl2::audio::{
 	AudioCallback, AudioDevice, AudioSpec, AudioSpecDesired, AudioStatus,
 };
 use sdl2::AudioSubsystem;
-use slog::{debug, error, o, Logger};
+use slog::{debug, error, o, warn, Logger};
+use tokio::runtime::Handle;
 use tsproto::client::ClientConVal;
-use tsproto_packets::packets::{AudioData, CodecType, OutAudio};
+use tsproto_packets::packets::{AudioData, CodecType, OutAudio, OutPacket};
 
 use crate::websocket::SetSelfTalkingMsg;
 use super::*;
@@ -26,50 +28,60 @@ pub(crate) struct SetListenerMsg {
 pub struct RemoveListenerMsg;
 pub struct SetVolumeMsg(pub f32);
 pub struct SetPlayingMsg(pub bool);
+struct PlayPacketMsg(Vec<f32>);
+
+/// Threshold for voice activation detection.
+const VAD_THRESHOLD: f32 = 0.1;
 
 pub struct AudioToTs {
 	logger: Logger,
 	audio_subsystem: AudioSubsystem,
 	executor: ThreadPool,
-	listener: Arc<Mutex<Option<ClientConVal>>>,
+	handle: Handle,
+	listener: Option<ClientConVal>,
 	connection: Option<Addr<TsConnection>>,
-	device: AudioDevice<SdlCallback>,
+	encoder: Option<AudioEncoder>,
 
 	is_playing: bool,
-	volume: Arc<Mutex<f32>>,
+	is_talking: bool,
+	volume: f32,
+}
+
+struct AudioEncoder {
+	logger: Logger,
+	device: AudioDevice<SdlCallback>,
+	spec: AudioSpec,
+
+	encoder: Encoder,
+	denoise: DenoiseState,
+	opus_output: [u8; MAX_OPUS_FRAME_SIZE],
 }
 
 struct SdlCallback {
 	logger: Logger,
-	spec: AudioSpec,
-	encoder: Encoder,
-	executor: ThreadPool,
-	listener: Arc<Mutex<Option<ClientConVal>>>,
-	volume: Arc<Mutex<f32>>,
-
-	opus_output: [u8; MAX_OPUS_FRAME_SIZE],
+	handle: Handle,
+	a2t: Addr<AudioToTs>,
 }
 
 impl Actor for AudioToTs {
 	type Context = Context<Self>;
 
 	fn started(&mut self, ctx: &mut Self::Context) {
-		ctx.run_interval(Duration::from_secs(1), |a2t, _| {
-			if a2t.device.status() == AudioStatus::Stopped {
+		ctx.run_interval(Duration::from_secs(1), |a2t, ctx| {
+			if a2t.encoder.as_ref().map(|e| e.device.status() == AudioStatus::Stopped).unwrap_or(true) {
 				// Try to reconnect to audio
-				match Self::open_capture(
+				match AudioEncoder::new(
 					a2t.logger.clone(),
 					&a2t.audio_subsystem,
-					a2t.executor.clone(),
-					a2t.listener.clone(),
-					a2t.volume.clone(),
+					a2t.handle.clone(),
+					ctx.address(),
 				) {
-					Ok(d) => {
-						a2t.device = d;
+					Ok(e) => {
 						debug!(a2t.logger, "Reconnected to capture device");
 						if a2t.is_playing {
-							a2t.device.resume();
+							e.device.resume();
 						}
+						a2t.encoder = Some(e);
 					}
 					Err(e) => {
 						error!(a2t.logger, "Failed to open capture device"; "error" => ?e);
@@ -94,6 +106,9 @@ impl Message for SetVolumeMsg {
 impl Message for SetPlayingMsg {
 	type Result = ();
 }
+impl Message for PlayPacketMsg {
+	type Result = ();
+}
 
 impl Handler<SetListenerMsg> for AudioToTs {
 	type Result = ();
@@ -110,9 +125,7 @@ impl Handler<SetListenerMsg> for AudioToTs {
 		self.is_playing = is_playing;
 
 		self.connection = Some(msg.ts_connection);
-		let mut listener = self.listener.lock().unwrap();
-		*listener = Some(msg.connection.get_tsproto_connection());
-		drop(listener);
+		self.listener = Some(msg.connection.get_tsproto_connection());
 		self.update_talking();
 	}
 }
@@ -128,11 +141,11 @@ impl Handler<RemoveListenerMsg> for AudioToTs {
 		self.is_playing = false;
 		self.update_talking();
 		self.connection = None;
-		let mut ls = self.listener.lock().unwrap();
-		let res = ls.is_some();
-		*ls = None;
-		drop(ls);
-		self.device.pause();
+		let res = self.listener.is_some();
+		self.listener = None;
+		if let Some(e) = &self.encoder {
+			e.device.pause();
+		}
 		res
 	}
 }
@@ -145,8 +158,7 @@ impl Handler<SetVolumeMsg> for AudioToTs {
 		_: &mut Self::Context,
 	) -> Self::Result
 	{
-		let mut vol = self.volume.lock().unwrap();
-		*vol = msg.0;
+		self.volume = msg.0;
 	}
 }
 
@@ -158,13 +170,58 @@ impl Handler<SetPlayingMsg> for AudioToTs {
 		_: &mut Self::Context,
 	) -> Self::Result
 	{
-		if msg.0 {
-			self.device.resume();
-		} else {
-			self.device.pause();
+		if let Some(e) = &self.encoder {
+			if msg.0 {
+				e.device.resume();
+			} else {
+				e.device.pause();
+			}
 		}
 		self.is_playing = msg.0;
 		self.update_talking();
+	}
+}
+
+impl Handler<PlayPacketMsg> for AudioToTs {
+	type Result = ();
+	fn handle(
+		&mut self,
+		PlayPacketMsg(mut buffer): PlayPacketMsg,
+		_: &mut Self::Context,
+	) -> Self::Result
+	{
+		// Write into packet sink
+		if let Some(con) = &mut self.listener {
+			if con.upgrade().is_none() {
+				self.listener = None;
+				return;
+			}
+			drop(con);
+
+			let vol = self.volume;
+			if let Some(e) = &mut self.encoder {
+				let talking;
+				if let Some(packet) = e.handle_audio_buffer(&mut buffer, vol) {
+					talking = true;
+					let sink = self.listener.as_mut().unwrap().as_packet_sink();
+					let logger = self.logger.clone();
+					self.executor
+						.spawn(sink.send(packet).map(|_| ()).map_err(
+							move |e| {
+								error!(logger, "Failed to send packet"; "error" => ?e);
+							},
+						))
+						.detach();
+				} else {
+					talking = false;
+				}
+
+				if talking != self.is_talking {
+					self.is_talking = talking;
+					self.update_talking();
+				}
+			}
+		}
 	}
 }
 
@@ -173,41 +230,40 @@ impl AudioToTs {
 		logger: Logger,
 		audio_subsystem: AudioSubsystem,
 		executor: ThreadPool,
+		handle: Handle,
 	) -> Result<Self, Error>
 	{
 		let logger = logger.new(o!("pipeline" => "audio-to-ts"));
-		let listener = Arc::new(Mutex::new(Default::default()));
-		let volume = Arc::new(Mutex::new(1.0));
-
-		let device = Self::open_capture(
-			logger.clone(),
-			&audio_subsystem,
-			executor.clone(),
-			listener.clone(),
-			volume.clone(),
-		)?;
 
 		Ok(Self {
 			logger,
 			audio_subsystem,
 			executor,
-			listener,
+			handle,
+			listener: None,
 			connection: None,
-			device,
+			encoder: None,
 
 			is_playing: false,
-			volume,
+			is_talking: false,
+			volume: 1.0,
 		})
 	}
 
-	fn open_capture(
+	fn update_talking(&self) {
+		if let Some(con) = &self.connection {
+			tokio::spawn(con.send(SetSelfTalkingMsg(self.is_playing && self.is_talking)));
+		}
+	}
+}
+
+impl AudioEncoder {
+	fn new(
 		logger: Logger,
 		audio_subsystem: &AudioSubsystem,
-		executor: ThreadPool,
-		listener: Arc<Mutex<Option<ClientConVal>>>,
-		volume: Arc<Mutex<f32>>,
-	) -> Result<AudioDevice<SdlCallback>, Error>
-	{
+		handle: Handle,
+		a2t: Addr<AudioToTs>,
+	) -> Result<Self, Error> {
 		let desired_spec = AudioSpecDesired {
 			freq: Some(48000),
 			channels: Some(1),
@@ -215,45 +271,68 @@ impl AudioToTs {
 			samples: Some(48000 / 50),
 		};
 
-		audio_subsystem.open_capture(None, &desired_spec, |spec| {
+		let logger2 = logger.clone();
+		let mut audio_spec = None;
+		let mut opus_channels = None;
+		let device = audio_subsystem.open_capture(None, &desired_spec, |spec| {
 			// This spec will always be the desired spec, the sdl wrapper passes
 			// zero as `allowed_changes`.
-			debug!(logger, "Got capture spec"; "spec" => ?spec, "driver" => audio_subsystem.current_audio_driver());
-			let opus_channels = if spec.channels == 1 {
+			debug!(logger, "Got capture spec"; "spec" => ?spec,
+				"driver" => audio_subsystem.current_audio_driver());
+			opus_channels = Some(if spec.channels == 1 {
 				audiopus::Channels::Mono
 			} else {
 				audiopus::Channels::Stereo
-			};
+			});
 
-			let encoder = Encoder::new(audiopus::SampleRate::Hz48000,
-				opus_channels, audiopus::Application::Voip)
-				.expect("Could not create encoder");
-
+			audio_spec = Some(spec);
 			SdlCallback {
 				logger,
-				spec,
-				encoder,
-				executor,
-				listener,
-				volume,
-
-				opus_output: [0; MAX_OPUS_FRAME_SIZE],
+				handle,
+				a2t,
 			}
-		}).map_err(|e| format_err!("SDL error: {}", e))
+		}).map_err(|e| format_err!("SDL error: {}", e))?;
+
+		Ok(Self {
+			logger: logger2,
+			device,
+			spec: audio_spec.unwrap(),
+
+			encoder: Encoder::new(audiopus::SampleRate::Hz48000,
+				opus_channels.unwrap(), audiopus::Application::Voip)
+				.expect("Could not create opus encoder"),
+			denoise: DenoiseState::new(),
+			opus_output: [0; MAX_OPUS_FRAME_SIZE],
+		})
 	}
 
-	fn update_talking(&self) {
-		if let Some(con) = &self.connection {
-			tokio::spawn(con.send(SetSelfTalkingMsg(self.is_playing)));
+	fn handle_audio_buffer(&mut self, buffer: &mut [f32], volume: f32) -> Option<OutPacket> {
+		// Denoise
+		if buffer.len() % rnnoise_c::FRAME_SIZE != 0 {
+			warn!(self.logger, "Size not fitting for denoising");
+		} else {
+			// Scale to the expected range
+			for d in &mut *buffer {
+				*d *= u16::max_value() as f32;
+			}
+
+			let mut vad_probe = 0.0;
+			for i in buffer.chunks_mut(rnnoise_c::FRAME_SIZE) {
+				vad_probe += self.denoise.process_frame_in_place(i);
+			}
+			vad_probe /= (buffer.len() / rnnoise_c::FRAME_SIZE) as f32;
+
+			//debug!(self.logger, "Vad probe"; "value" => vad_probe);
+			if vad_probe < VAD_THRESHOLD {
+				return None;
+			}
+
+			for d in &mut *buffer {
+				*d /= u16::max_value() as f32;
+			}
 		}
-	}
-}
 
-impl AudioCallback for SdlCallback {
-	type Channel = f32;
-	fn callback(&mut self, buffer: &mut [Self::Channel]) {
 		// Handle volume
-		let volume = *self.volume.lock().unwrap();
 		if volume != 1.0 {
 			for d in &mut *buffer {
 				*d *= volume;
@@ -263,6 +342,7 @@ impl AudioCallback for SdlCallback {
 		match self.encoder.encode_float(buffer, &mut self.opus_output[..]) {
 			Err(e) => {
 				error!(self.logger, "Failed to encode opus"; "error" => ?e);
+				None
 			}
 			Ok(len) => {
 				// Create packet
@@ -271,31 +351,53 @@ impl AudioCallback for SdlCallback {
 				} else {
 					CodecType::OpusMusic
 				};
-				let packet = OutAudio::new(&AudioData::C2S {
+				Some(OutAudio::new(&AudioData::C2S {
 					id: 0,
 					codec,
 					data: &self.opus_output[..len],
-				});
-
-				// Write into packet sink
-				let mut listener = self.listener.lock().unwrap();
-				if let Some(con) = &mut *listener {
-					if con.upgrade().is_none() {
-						*listener = None;
-						return;
-					}
-
-					let sink = con.as_packet_sink();
-					let logger = self.logger.clone();
-					self.executor
-						.spawn(sink.send(packet).map(|_| ()).map_err(
-							move |e| {
-								error!(logger, "Failed to send packet"; "error" => ?e);
-							},
-						))
-						.detach();
-				}
+				}))
 			}
 		}
+	}
+}
+
+impl AudioCallback for SdlCallback {
+	type Channel = f32;
+	fn callback(&mut self, buffer: &mut [Self::Channel]) {
+		let logger = self.logger.clone();
+		let a2t = self.a2t.clone();
+		let buffer = buffer.to_vec();
+		/*self.handle.enter(move ||
+			tokio::spawn(a2t.send(PlayPacketMsg(buffer))
+				.map(move |r| {match r {
+					Ok(()) => {}
+					Err(e) => {
+						error!(logger, "Failed to send audio data to Audio2TS pipeline"; "error" => ?e)
+					}
+				}
+		})));*/
+		std::thread::spawn(move || {
+			let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+			rt.block_on(async {
+				let local = tokio::task::LocalSet::new();
+
+				// Run the local task set.
+				local.run_until(async move {
+					tokio::task::spawn_local(
+						a2t.send(PlayPacketMsg(buffer))
+							.map(move |r| {match r {
+								Ok(()) => {}
+								Err(e) => {
+									error!(logger, "Failed to send audio data to Audio2TS pipeline"; "error" => ?e)
+								}
+							}
+							}),
+					).await.unwrap();
+				}).await;
+
+				local.await;
+			});
+		});
 	}
 }

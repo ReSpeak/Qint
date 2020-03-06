@@ -7,3 +7,6 @@ exclude = ["frontend"]
 
 [profile.release]
 debug = true
+
+[patch.crates-io]
+rnnoise-c = { git = "https://github.com/Flakebi/rnnoise-c" }

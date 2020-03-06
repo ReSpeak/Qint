@@ -82,7 +82,7 @@ impl<TStack> YewRender<TStack> {
 			html! { <div>{ for self.elems.into_iter() }</div> }
 		}
 	}
-	
+
 	fn push_text(&mut self, text: &str) {
 		self.push_node(VText::new(text.to_string()).into())
 	}
@@ -134,7 +134,7 @@ impl YewMd {
 		match self.text_state {
 			TextKind::None => return,
 			TextKind::Normal => self.push_node(bb(&self.text_builder)),
-			TextKind::Latex(dm) => 
+			TextKind::Latex(dm) =>
 				if let Some(node) = katex_render_code(&self.text_builder, dm) {
 					self.push_node(node);
 				},
@@ -242,7 +242,7 @@ impl YewMd {
 					CodeBlockKind::Indented => {},
 				}
 				(YewMdMeta::None, el)
-				
+
 			}
 			Tag::List(None) => {
 				let elem = VTag::new("ul");
@@ -316,7 +316,7 @@ impl YewMd {
 			Tag::FootnoteDefinition(ref _footnote_id) => (YewMdMeta::None, VTag::new("span")),
 		}
 	}
-	
+
 	fn markdown_end_tag(&mut self, t: Tag) -> VTag {
 		let (meta, mut top) = self.spine.pop().expect("Stack was empty on pop");
 
@@ -414,7 +414,7 @@ impl YewBb {
 
 	fn mini_bb(mut self, raw: &str) -> Html {
 		let seg_list = nom_bb_read(raw);
-		
+
 		for seg in seg_list {
 			if !seg.is_text() {
 				self.done_text();
@@ -555,7 +555,8 @@ fn hljs_render_code(code: &str, lang: &str) -> Option<VNode> {
 		let code = @{code};
 		const elem = document.createElement("code");
 		elem.classList.add("hljs");
-		elem.classList.add("language-" + lang);
+		if (lang !== "")
+			elem.classList.add("language-" + lang);
 		let res;
 		try {
 			if (lang)

@@ -6,6 +6,7 @@ use failure::Error;
 use futures_threadpool::ThreadPool;
 use sdl2::log::{Category, Priority};
 use slog::Logger;
+use tokio::runtime::Handle;
 
 use crate::websocket::TsConnection;
 use crate::ConnectionId;
@@ -90,7 +91,7 @@ pub(crate) fn start(
 
 	let ts2a =
 		TsToAudio::new(logger.clone(), audio_subsystem.clone(), connections)?;
-	let a2ts = AudioToTs::new(logger.clone(), audio_subsystem, pool.clone())?;
+	let a2ts = AudioToTs::new(logger.clone(), audio_subsystem, pool.clone(), Handle::current())?;
 
 	Ok(AudioData { pool, a2ts: a2ts.start(), ts2a: ts2a.start() })
 }
