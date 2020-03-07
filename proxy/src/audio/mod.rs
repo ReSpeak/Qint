@@ -1,12 +1,15 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::thread;
 
 use actix::*;
 use failure::Error;
 use futures_threadpool::ThreadPool;
-use sdl2::log::{Category, Priority};
-use slog::Logger;
-use tokio::runtime::Handle;
+use futures::FutureExt;
+use slog::{error, Logger};
+use tokio::stream::StreamExt;
+use tokio::sync::mpsc;
+use tokio::task;
 
 use crate::websocket::TsConnection;
 use crate::ConnectionId;
@@ -47,27 +50,10 @@ pub(crate) struct AudioData {
 	pub ts2a: Addr<TsToAudio>,
 }
 
-fn sdl_log(prio: Priority, cat: Category, msg: &str) {
-	slog_scope::with_logger(|l| match prio {
-		Priority::Verbose => {
-			slog::trace!(l, "SDL"; "message" => msg, "category" => ?cat)
-		}
-		Priority::Debug => {
-			slog::debug!(l, "SDL"; "message" => msg, "category" => ?cat)
-		}
-		Priority::Info => {
-			slog::info!(l, "SDL"; "message" => msg, "category" => ?cat)
-		}
-		Priority::Warn => {
-			slog::warn!(l, "SDL"; "message" => msg, "category" => ?cat)
-		}
-		Priority::Error => {
-			slog::error!(l, "SDL"; "message" => msg, "category" => ?cat)
-		}
-		Priority::Critical => {
-			slog::crit!(l, "SDL"; "message" => msg, "category" => ?cat)
-		}
-	})
+#[derive(Clone, Debug)]
+pub(crate) enum SendAudioEvent {
+	TalkersChanged(ConnectionId),
+	PlayPacket(Vec<f32>),
 }
 
 pub(crate) fn start(
@@ -76,7 +62,6 @@ pub(crate) fn start(
 ) -> Result<AudioData, Error>
 {
 	let sdl_context = sdl2::init().unwrap();
-	sdl2::log::set_output_function(sdl_log);
 
 	let audio_subsystem = sdl_context.audio().unwrap();
 	// SDL automatically disables the screensaver, enable it again
@@ -89,9 +74,45 @@ pub(crate) fn start(
 		.name_prefix("audio")
 		.create();
 
-	let ts2a =
-		TsToAudio::new(logger.clone(), audio_subsystem.clone(), connections)?;
-	let a2ts = AudioToTs::new(logger.clone(), audio_subsystem, pool.clone(), Handle::current())?;
+	// Create thread local runtime for non-send tasks
+	let (spawn_send, mut spawn_recv) = mpsc::unbounded_channel();
+	let ts2a = TsToAudio::new(logger.clone(), audio_subsystem.clone(), connections, spawn_send.clone())?.start();
+	let a2ts = AudioToTs::new(logger.clone(), audio_subsystem, pool.clone(), spawn_send)?.start();
 
-	Ok(AudioData { pool, a2ts: a2ts.start(), ts2a: ts2a.start() })
+	let ts2a2 = ts2a.clone();
+	let a2ts2 = a2ts.clone();
+	thread::spawn(move || {
+		let mut rt = tokio::runtime::Runtime::new().unwrap();
+		let local = tokio::task::LocalSet::new();
+
+		// Run the local task set.
+		local.block_on(&mut rt, async move {
+			while let Some(e) = spawn_recv.next().await {
+				let logger = logger.clone();
+				match e {
+					SendAudioEvent::TalkersChanged(con) => task::spawn_local(
+						ts2a2.send(ts_to_audio::TalkersChangedMsg(con))
+							.map(move |r| {match r {
+								Ok(()) => {}
+								Err(e) => {
+									error!(logger, "Failed to notify TS2Audio pipeline about talker change"; "error" => ?e)
+								}
+							}
+							}),
+						),
+					SendAudioEvent::PlayPacket(buffer) => task::spawn_local(
+						a2ts2.send(audio_to_ts::PlayPacketMsg(buffer))
+							.map(move |r| {match r {
+								Ok(()) => {}
+								Err(e) => {
+									error!(logger, "Failed to send audio data to Audio2TS pipeline"; "error" => ?e)
+								}
+							}})
+					),
+				};
+			}
+		});
+	});
+
+	Ok(AudioData { pool, a2ts, ts2a })
 }

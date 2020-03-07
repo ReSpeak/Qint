@@ -3,7 +3,6 @@ use std::collections::hash_map::Entry;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
-use std::thread;
 use std::time::{Duration, Instant};
 
 use actix::*;
@@ -13,6 +12,7 @@ use futures::prelude::*;
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired, AudioStatus};
 use sdl2::AudioSubsystem;
 use slog::{debug, error, o, trace, warn, Logger};
+use tokio::sync::mpsc;
 use tsclientlib::ClientId;
 use tsproto_packets::packets::{AudioData, CodecType, InAudio};
 
@@ -24,7 +24,7 @@ use super::*;
 const VOICE_TIMEOUT_SECS: u64 = 1;
 
 pub struct PlayMsg(pub ConnectionId, pub InAudio);
-struct TalkersChangedMsg(ConnectionId);
+pub struct TalkersChangedMsg(pub ConnectionId);
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct Id {
@@ -41,6 +41,7 @@ struct AudioPacket {
 pub(crate) struct TsToAudio {
 	logger: Logger,
 	audio_subsystem: AudioSubsystem,
+	spawn_send: mpsc::UnboundedSender<SendAudioEvent>,
 	device: Option<AudioDevice<SdlCallback>>,
 	/// For each client, store the opus decoder and the instant when it was last
 	/// used.
@@ -53,7 +54,7 @@ pub(crate) struct TsToAudio {
 struct SdlCallback {
 	logger: Logger,
 	data: Arc<Mutex<HashMap<Id, BinaryHeap<Reverse<AudioPacket>>>>>,
-	t2a: Addr<TsToAudio>,
+	spawn_send: mpsc::UnboundedSender<SendAudioEvent>,
 }
 
 impl Message for PlayMsg {
@@ -97,9 +98,9 @@ impl Actor for TsToAudio {
 	type Context = Context<Self>;
 
 	fn started(&mut self, ctx: &mut Self::Context) {
-		self.open_playback(ctx.address());
+		self.open_playback();
 
-		ctx.run_interval(Duration::from_secs(1), |t2a, ctx| {
+		ctx.run_interval(Duration::from_secs(1), |t2a, _| {
 			if !t2a.decoders.is_empty() {
 				// Check for inactive connections
 				let now = Instant::now();
@@ -129,17 +130,18 @@ impl Actor for TsToAudio {
 				.unwrap_or(true)
 			{
 				// Try to reconnect to audio
-				t2a.open_playback(ctx.address());
+				t2a.open_playback();
 			}
 		});
 	}
 }
 
 impl TsToAudio {
-	pub fn new(
+	pub(crate) fn new(
 		logger: Logger,
 		audio_subsystem: AudioSubsystem,
 		connections: Arc<Mutex<HashMap<ConnectionId, Addr<TsConnection>>>>,
+		spawn_send: mpsc::UnboundedSender<SendAudioEvent>,
 	) -> Result<Self, Error>
 	{
 		let logger = logger.new(o!("pipeline" => "ts-to-audio"));
@@ -152,10 +154,11 @@ impl TsToAudio {
 			decoders: Default::default(),
 			data,
 			connections,
+			spawn_send,
 		})
 	}
 
-	fn open_playback(&mut self, t2a: Addr<TsToAudio>) {
+	fn open_playback(&mut self) {
 		let desired_spec = AudioSpecDesired {
 			freq: Some(48000),
 			channels: Some(2),
@@ -171,7 +174,7 @@ impl TsToAudio {
 			SdlCallback {
 				logger,
 				data,
-				t2a,
+				spawn_send: self.spawn_send.clone(),
 			}
 		}) {
 			Ok(device) => self.device = Some(device),
@@ -392,35 +395,8 @@ impl AudioCallback for SdlCallback {
 			});
 		}
 
-		if !changed.is_empty() {
-			let logger = self.logger.clone();
-			let t2a = self.t2a.clone();
-			thread::spawn(move || {
-				let mut rt = tokio::runtime::Runtime::new().unwrap();
-
-				rt.block_on(async {
-					let local = tokio::task::LocalSet::new();
-
-					// Run the local task set.
-					local.run_until(async move {
-						for con in changed {
-							let logger = logger.clone();
-							tokio::task::spawn_local(
-								t2a.send(TalkersChangedMsg(con))
-									.map(move |r| {match r {
-										Ok(()) => {}
-										Err(e) => {
-											error!(logger, "Failed to notify TS2Audio pipeline about talker change"; "error" => ?e)
-										}
-									}
-									}),
-							).await.unwrap();
-						}
-					}).await;
-
-					local.await;
-				});
-			});
+		for con in changed {
+			self.spawn_send.send(SendAudioEvent::TalkersChanged(con)).unwrap();
 		}
 	}
 }

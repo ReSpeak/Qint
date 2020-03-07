@@ -3,7 +3,6 @@ use std::time::Duration;
 use actix::*;
 use audiopus::coder::Encoder;
 use failure::{format_err, Error};
-use futures::prelude::*;
 use futures01::{Future, Sink};
 use futures_spawn::SpawnHelper;
 use futures_threadpool::ThreadPool;
@@ -13,7 +12,7 @@ use sdl2::audio::{
 };
 use sdl2::AudioSubsystem;
 use slog::{debug, error, o, warn, Logger};
-use tokio::runtime::Handle;
+use tokio::sync::mpsc;
 use tsproto::client::ClientConVal;
 use tsproto_packets::packets::{AudioData, CodecType, OutAudio, OutPacket};
 
@@ -28,22 +27,26 @@ pub(crate) struct SetListenerMsg {
 pub struct RemoveListenerMsg;
 pub struct SetVolumeMsg(pub f32);
 pub struct SetPlayingMsg(pub bool);
-struct PlayPacketMsg(Vec<f32>);
+pub struct PlayPacketMsg(pub Vec<f32>);
 
 /// Threshold for voice activation detection.
-const VAD_THRESHOLD: f32 = 0.02;
+const VAD_THRESHOLD: f32 = 0.2;
+
+/// How many packets should still be sent after the voice detection is under the
+/// threshold.
+const TALKING_TIME: u8 = 5;
 
 pub struct AudioToTs {
 	logger: Logger,
 	audio_subsystem: AudioSubsystem,
 	executor: ThreadPool,
-	handle: Handle,
+	spawn_send: mpsc::UnboundedSender<SendAudioEvent>,
 	listener: Option<ClientConVal>,
 	connection: Option<Addr<TsConnection>>,
 	encoder: Option<AudioEncoder>,
 
 	is_playing: bool,
-	is_talking: bool,
+	is_talking: u8,
 	volume: f32,
 }
 
@@ -58,23 +61,20 @@ struct AudioEncoder {
 }
 
 struct SdlCallback {
-	logger: Logger,
-	handle: Handle,
-	a2t: Addr<AudioToTs>,
+	spawn_send: mpsc::UnboundedSender<SendAudioEvent>,
 }
 
 impl Actor for AudioToTs {
 	type Context = Context<Self>;
 
 	fn started(&mut self, ctx: &mut Self::Context) {
-		ctx.run_interval(Duration::from_secs(1), |a2t, ctx| {
+		ctx.run_interval(Duration::from_secs(1), |a2t, _| {
 			if a2t.encoder.as_ref().map(|e| e.device.status() == AudioStatus::Stopped).unwrap_or(true) {
 				// Try to reconnect to audio
 				match AudioEncoder::new(
 					a2t.logger.clone(),
 					&a2t.audio_subsystem,
-					a2t.handle.clone(),
-					ctx.address(),
+					a2t.spawn_send.clone(),
 				) {
 					Ok(e) => {
 						debug!(a2t.logger, "Reconnected to capture device");
@@ -200,9 +200,8 @@ impl Handler<PlayPacketMsg> for AudioToTs {
 
 			let vol = self.volume;
 			if let Some(e) = &mut self.encoder {
-				let talking;
-				if let Some(packet) = e.handle_audio_buffer(&mut buffer, vol) {
-					talking = true;
+				let talking = self.is_talking != 0;
+				if let Some(packet) = e.handle_audio_buffer(&mut buffer, vol, &mut self.is_talking) {
 					let sink = self.listener.as_mut().unwrap().as_packet_sink();
 					let logger = self.logger.clone();
 					self.executor
@@ -212,12 +211,9 @@ impl Handler<PlayPacketMsg> for AudioToTs {
 							},
 						))
 						.detach();
-				} else {
-					talking = false;
 				}
 
-				if talking != self.is_talking {
-					self.is_talking = talking;
+				if talking != (self.is_talking != 0) {
 					self.update_talking();
 				}
 			}
@@ -226,11 +222,11 @@ impl Handler<PlayPacketMsg> for AudioToTs {
 }
 
 impl AudioToTs {
-	pub fn new(
+	pub(crate) fn new(
 		logger: Logger,
 		audio_subsystem: AudioSubsystem,
 		executor: ThreadPool,
-		handle: Handle,
+		spawn_send: mpsc::UnboundedSender<SendAudioEvent>,
 	) -> Result<Self, Error>
 	{
 		let logger = logger.new(o!("pipeline" => "audio-to-ts"));
@@ -239,20 +235,20 @@ impl AudioToTs {
 			logger,
 			audio_subsystem,
 			executor,
-			handle,
+			spawn_send,
 			listener: None,
 			connection: None,
 			encoder: None,
 
 			is_playing: false,
-			is_talking: false,
+			is_talking: 0,
 			volume: 1.0,
 		})
 	}
 
 	fn update_talking(&self) {
 		if let Some(con) = &self.connection {
-			tokio::spawn(con.send(SetSelfTalkingMsg(self.is_playing && self.is_talking)));
+			tokio::spawn(con.send(SetSelfTalkingMsg(self.is_playing && self.is_talking != 0)));
 		}
 	}
 }
@@ -261,8 +257,7 @@ impl AudioEncoder {
 	fn new(
 		logger: Logger,
 		audio_subsystem: &AudioSubsystem,
-		handle: Handle,
-		a2t: Addr<AudioToTs>,
+		spawn_send: mpsc::UnboundedSender<SendAudioEvent>,
 	) -> Result<Self, Error> {
 		let desired_spec = AudioSpecDesired {
 			freq: Some(48000),
@@ -287,9 +282,7 @@ impl AudioEncoder {
 
 			audio_spec = Some(spec);
 			SdlCallback {
-				logger,
-				handle,
-				a2t,
+				spawn_send,
 			}
 		}).map_err(|e| format_err!("SDL error: {}", e))?;
 
@@ -306,7 +299,7 @@ impl AudioEncoder {
 		})
 	}
 
-	fn handle_audio_buffer(&mut self, buffer: &mut [f32], volume: f32) -> Option<OutPacket> {
+	fn handle_audio_buffer(&mut self, buffer: &mut [f32], volume: f32, is_talking: &mut u8) -> Option<OutPacket> {
 		// Denoise
 		if buffer.len() % rnnoise_c::FRAME_SIZE != 0 {
 			warn!(self.logger, "Size not fitting for denoising");
@@ -324,6 +317,12 @@ impl AudioEncoder {
 
 			//debug!(self.logger, "Vad probe"; "value" => vad_probe);
 			if vad_probe < VAD_THRESHOLD {
+				*is_talking = is_talking.saturating_sub(1);
+			} else {
+				*is_talking = TALKING_TIME + 1;
+			}
+
+			if *is_talking == 0 {
 				return None;
 			}
 
@@ -364,40 +363,6 @@ impl AudioEncoder {
 impl AudioCallback for SdlCallback {
 	type Channel = f32;
 	fn callback(&mut self, buffer: &mut [Self::Channel]) {
-		let logger = self.logger.clone();
-		let a2t = self.a2t.clone();
-		let buffer = buffer.to_vec();
-		/*self.handle.enter(move ||
-			tokio::spawn(a2t.send(PlayPacketMsg(buffer))
-				.map(move |r| {match r {
-					Ok(()) => {}
-					Err(e) => {
-						error!(logger, "Failed to send audio data to Audio2TS pipeline"; "error" => ?e)
-					}
-				}
-		})));*/
-		std::thread::spawn(move || {
-			let mut rt = tokio::runtime::Runtime::new().unwrap();
-
-			rt.block_on(async {
-				let local = tokio::task::LocalSet::new();
-
-				// Run the local task set.
-				local.run_until(async move {
-					tokio::task::spawn_local(
-						a2t.send(PlayPacketMsg(buffer))
-							.map(move |r| {match r {
-								Ok(()) => {}
-								Err(e) => {
-									error!(logger, "Failed to send audio data to Audio2TS pipeline"; "error" => ?e)
-								}
-							}
-							}),
-					).await.unwrap();
-				}).await;
-
-				local.await;
-			});
-		});
+		self.spawn_send.send(SendAudioEvent::PlayPacket(buffer.to_vec())).unwrap();
 	}
 }
