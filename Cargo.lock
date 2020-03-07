@@ -2408,7 +2408,7 @@ dependencies = [
 [[package]]
 name = "rnnoise-c"
 version = "0.1.0"
-source = "git+https://github.com/Flakebi/rnnoise-c#8d764dd07a486c06400726aa80959b36c4364ff0"
+source = "git+https://github.com/Flakebi/rnnoise-c#22a930d89afcc859a5706b1e7f6fe746dd9d9af0"
 dependencies = [
  "rnnoise-sys 0.1.1 (git+https://github.com/Flakebi/rnnoise-c)",
 ]
@@ -2416,7 +2416,7 @@ dependencies = [
 [[package]]
 name = "rnnoise-sys"
 version = "0.1.1"
-source = "git+https://github.com/Flakebi/rnnoise-c#8d764dd07a486c06400726aa80959b36c4364ff0"
+source = "git+https://github.com/Flakebi/rnnoise-c#22a930d89afcc859a5706b1e7f6fe746dd9d9af0"
 dependencies = [
  "bindgen 0.52.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "cc 1.0.50 (registry+https://github.com/rust-lang/crates.io-index)",
