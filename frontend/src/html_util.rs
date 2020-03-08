@@ -88,3 +88,27 @@ macro_rules! bulma_icon {
 		}
 	};
 }
+
+#[macro_export]
+macro_rules! cl {
+	( $( $x:tt ),* ) => {
+		{
+			let mut temp_vec = String::new();
+			$(
+				if !temp_vec.is_empty() { temp_vec.push_str(" "); }
+				crate::cl_intern!(temp_vec, $x);
+			)*
+			temp_vec
+		}
+	};
+}
+
+#[macro_export]
+macro_rules! cl_intern {
+	($st:expr, ($x:expr, $y:expr)) => {
+		if $y {
+			$st.push_str($x);
+		}
+	};
+	($st:expr, $x:expr) => { $st.push_str($x) };
+}

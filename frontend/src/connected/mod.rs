@@ -2,34 +2,14 @@ use yew::html;
 use yew::prelude::*;
 
 use crate::connection_service::*;
+use sounds::{play_sound};
 use sidebar::SideBar;
 use chat::Chat;
-
-macro_rules! cl {
-	( $( $x:tt ),* ) => {
-		{
-			let mut temp_vec = String::new();
-			$(
-				if !temp_vec.is_empty() { temp_vec.push_str(" "); }
-				cl_intern!(temp_vec, $x);
-			)*
-			temp_vec
-		}
-	};
-}
-
-macro_rules! cl_intern {
-	($st:expr, ($x:expr, $y:expr)) => {
-		if $y {
-			$st.push_str($x);
-		}
-	};
-	($st:expr, $x:expr) => { $st.push_str($x) };
-}
 
 mod channel_tree;
 mod chat;
 mod sidebar;
+mod sounds;
 mod yew_markdown;
 
 pub struct Connected {
@@ -125,6 +105,15 @@ impl Connected {
 			con.packet_listeners.insert("connected".into(), Box::new(move |_, packet| {
 				if packet.name() == "channellistfinished" {
 					subscribe.emit(());
+				}
+			}));
+			
+			con.event_listeners.insert("sounds".into(), Box::new(move |c, events| {
+				if let FrontendConnection { state: FrontendConnectionState::Connected(
+						crate::connection_service::Connected { con: book, .. } ), .. } = c {
+					for e in events {
+						play_sound(&e, &book);
+					}
 				}
 			}));
 		}, || panic!("Should be in connected state"));

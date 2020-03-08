@@ -20,7 +20,7 @@ use crate::CLIENT_ICON;
 use crate::connection_service::*;
 use crate::controls::icon::Icon;
 use crate::html_util::{MessageExtensions, ToColor};
-use crate::bulma_icon;
+use crate::{cl, bulma_icon};
 use crate::connected::yew_markdown::markdown;
 
 pub struct Chat {
@@ -455,6 +455,7 @@ impl Chat {
 				Msg::ChannelChanged { old, new });
 			con.event_listeners.insert("chat".into(), Box::new(move |con, events| {
 				for e in events {
+					
 					match e {
 						Event::PropertyAdded { id, .. } => {
 							if let FrontendConnectionState::Connected(con) = &con.state {

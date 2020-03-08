@@ -8,6 +8,8 @@ import katex from "katex";
 import 'highlight.js/styles/vs2015.css';
 import hljs from 'highlight.js';
 
+import sounds from "./static/js/sounds";
+
 // Note that a dynamic `import` statement here is required due to
 // webpack/webpack#6615, but in theory `import { greet } from './pkg';`
 // will work here one day as well!
@@ -19,3 +21,4 @@ rust
 
 window.katex = katex;
 window.hljs = hljs;
+window.sounds = sounds;
