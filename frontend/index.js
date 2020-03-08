@@ -6,7 +6,7 @@ import 'katex/dist/katex.min.css'
 import katex from "katex";
 // highlight.js
 import 'highlight.js/styles/vs2015.css';
-import hljs from 'highlight.js';
+import hljs_highlight from "./static/js/hljs";
 
 import sounds from "./static/js/sounds";
 
@@ -20,5 +20,5 @@ rust
 	.catch(console.error);
 
 window.katex = katex;
-window.hljs = hljs;
+window.hljs_highlight = hljs_highlight;
 window.sounds = sounds;

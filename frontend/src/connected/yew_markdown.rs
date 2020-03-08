@@ -550,25 +550,7 @@ fn nom_bb_match_tag(s: &str) -> Option<BBTag> {
 // [JS] Highlight.js
 
 fn hljs_render_code(code: &str, lang: &str) -> Option<VNode> {
-	let elem = js! {
-		let lang = @{lang};
-		let code = @{code};
-		const elem = document.createElement("code");
-		elem.classList.add("hljs");
-		if (lang !== "")
-			elem.classList.add("language-" + lang);
-		let res;
-		try {
-			if (lang)
-				res = window.hljs.highlight(lang, code);
-			else
-				res = window.hljs.highlightAuto(code);
-			elem.innerHTML = res.value;
-		} catch {
-			elem.innerText = code;
-		}
-		return elem;
-	};
+	let elem = js! { return window.hljs_highlight(@{code}, @{lang}); };
 	Node::try_from(elem).ok().map(|n| VNode::VRef(n))
 }
 
