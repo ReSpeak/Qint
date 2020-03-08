@@ -17,7 +17,7 @@ export default function hljs_highlight(code, lang) {
 		} else {
 			res = hljs.highlightAuto(code);
 		}
-		elem.classList.add("language-" + res.language);
+		elem.setAttribute("rel", res.language);
 		elem.innerHTML = res.value;
 	} catch {
 		elem.innerText = code;

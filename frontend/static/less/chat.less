@@ -151,3 +151,15 @@
 .round {
 	border-radius: 100%;
 }
+
+code[rel]::before {
+	font-size: 0.8em;
+	content: attr(rel);
+	position: absolute;
+	bottom: 1em;
+	right: 2em;
+	color: orange;
+	font-weight: bold;
+	font-family: Sans-Serif;
+	text-transform: uppercase;
+}

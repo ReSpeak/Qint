@@ -1,5 +1,5 @@
 use stdweb::{js};
-use ts_bookkeeping::events::{Event, PropertyId};
+use ts_bookkeeping::events::{Event, PropertyId, PropertyValue};
 use ts_bookkeeping::{MessageTarget};
 use ts_bookkeeping::data::{Client, Channel, Server, Connection};
 
@@ -41,8 +41,8 @@ fn get_sound(ev: &Event, book: &Connection) -> (&'static str/*file*/, String /*t
 		},
 		Event::PropertyAdded{ id: PropertyId::Client(id), .. }
 			=> ("user_connected.mp3", format!("{} connected", book.clients[id].get_phonetic())),
-		Event::PropertyRemoved{ id: PropertyId::Client(id), .. }
-			=> ("user_disconnected.mp3", format!("{} disconnected", book.clients[id].get_phonetic())),
+		Event::PropertyRemoved{ old: PropertyValue::Client(client), .. }
+			=> ("user_disconnected.mp3", format!("{} disconnected", client.get_phonetic())),
 		Event::PropertyChanged{ id: PropertyId::ClientChannel(id), .. }
 			=> ("user_channel_changed.mp3", format!("{} switched channel", book.clients[id].get_phonetic())),
 		_ => ("", String::new())

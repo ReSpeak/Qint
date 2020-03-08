@@ -14,18 +14,9 @@
 		font-weight: bold;
 	}
 
-	.channel-line {
-		display: flex;
-		align-items: center;
-
-		a {
-			//border-radius: 50em 0 0 50em;
-			//background-image: linear-gradient(to right, rgba(124, 124, 194, 0.2), rgba(255,255,255,0));
-			//background-color: white;
-		}
-	}
-	.entry-expand {
-		flex: 1;
+	.afk-text {
+		font-style: italic;
+		color: darkgray;
 	}
 
 	// Compress layout
@@ -39,6 +30,10 @@
 			padding-top: 0.3em;
 			padding-bottom: 0.3em;
 		}
+	}
+
+	> .menu-list {
+		overflow-y: auto;
 	}
 
 	.own-client, .own-channel {
@@ -63,8 +58,4 @@
 	.collapsed {
 		display: none;
 	}
-}
-
-.channel-list > .menu-list {
-	overflow-y: auto;
 }

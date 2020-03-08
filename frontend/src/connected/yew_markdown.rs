@@ -201,7 +201,7 @@ impl YewMd {
 					} else {
 						bulma_icon!("checkbox-blank-circle-outline")
 					});
-					if let Some((_, ref mut vtag)) = self.spine.last_mut() {
+					if let Some((_, vtag)) = self.spine.last_mut() {
 						if vtag.tag().eq_ignore_ascii_case("LI") {
 							vtag.add_attribute("style", &"list-style: none outside;");
 						}
@@ -254,10 +254,10 @@ impl YewMd {
 				elem.add_attribute("style", &"list-style-position: inside;");
 				(YewMdMeta::None, elem)
 			}
-			Tag::List(Some(ref start)) => {
+			Tag::List(Some(start)) => {
 				let mut elem = VTag::new("ol");
 				elem.add_attribute("style", &"list-style-position: inside;");
-				elem.add_attribute("start", start);
+				elem.add_attribute("start", &start);
 				(YewMdMeta::None, elem)
 			}
 			Tag::Item => (YewMdMeta::None, VTag::new("li")),
@@ -293,27 +293,27 @@ impl YewMd {
 				el.add_class("has-text-weight-bold");
 				(YewMdMeta::None, el)
 			}
-			Tag::Link(ref link_type, ref href, ref title) => {
+			Tag::Link(link_type, href, title) => {
 				let mut el = Self::make_link();
 				match link_type {
 					LinkType::Email => el.add_attribute("href", &format!("mailto:{}", href)),
-					_ => el.add_attribute("href", href),
+					_ => el.add_attribute("href", &href),
 				}
 				if title.as_ref() != "" {
-					el.add_attribute("title", title);
+					el.add_attribute("title", &title);
 				}
 				(YewMdMeta::None, el)
 			}
-			Tag::Image(_, ref src, ref title) => {
+			Tag::Image(_, src, title) => {
 				let mut el = VTag::new("img");
-				el.add_attribute("src", src);
+				el.add_attribute("src", &src);
 				if title.as_ref() != "" {
-					el.add_attribute("title", title);
+					el.add_attribute("title", &title);
 				}
 				(YewMdMeta::None, el)
 			}
 			// Footnotes are not rendered as anything special
-			Tag::FootnoteDefinition(ref _footnote_id) => (YewMdMeta::None, VTag::new("span")),
+			Tag::FootnoteDefinition(_footnote_id) => (YewMdMeta::None, VTag::new("span")),
 		}
 	}
 
@@ -325,7 +325,7 @@ impl YewMd {
 				let mut child = None;
 				for r in top.children.iter() {
 					if let VNode::VText(VText { text: code, .. }) = r {
-						let lang = if let YewMdMeta::Code(ref lang) = meta { lang } else { "" };
+						let lang = if let YewMdMeta::Code(lang) = &meta { lang } else { "" };
 						child = hljs_render_code(code, lang);
 						break;
 					}
@@ -337,9 +337,9 @@ impl YewMd {
 			}
 			Tag::Table(aligns) => {
 				for r in top.children.iter_mut() {
-					if let &mut VNode::VTag(ref mut vtag) = r {
+					if let VNode::VTag(vtag) = r {
 						for (i, c) in vtag.children.iter_mut().enumerate() {
-							if let &mut VNode::VTag(ref mut vtag) = c {
+							if let VNode::VTag(vtag) = c {
 								match aligns[i] {
 									Alignment::None => {}
 									Alignment::Left => vtag.add_class("has-text-left"),
@@ -453,7 +453,7 @@ impl YewBb {
 						if stack_tag == BBTag::Url && !vtag.attributes.contains_key("href") {
 							let mut href_opt = None;
 							for r in vtag.children.iter() {
-								if let VNode::VText(ref vtext) = r {
+								if let VNode::VText(vtext) = r {
 									href_opt = Some(vtext.text.clone());
 									break;
 								}
@@ -570,7 +570,6 @@ fn katex_render_code(code: &str, display_mode: bool) -> Option<VNode> {
 			elem.innerText = code;
 			console.log("Failed to render latex");
 		}
-		console.log(elem);
 		return elem;
 	};
 	Node::try_from(elem).ok().map(|n| VNode::VRef(n))

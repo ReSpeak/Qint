@@ -51,7 +51,7 @@ pub trait ToColor {
 
 impl ToColor for Message {
 	fn to_color(&self) -> String {
-		if let Some(ref uid) = self.invoker {
+		if let Some(uid) = &self.invoker {
 			data_hash_to_color(uid)
 		} else {
 			str_hash_to_color(self.get_user_name())

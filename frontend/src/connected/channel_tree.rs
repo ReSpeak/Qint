@@ -213,17 +213,30 @@ impl ChannelTree {
 			<li>
 				{ cm }
 				<div class={ cl![
-						"channel-line",
+						"flex-line",
 						("own-client", ctx.own_client == id),
 						("selected-client", ctx.selected_client == Some(id))] } >
 					{ Icon::mdi_icon("") }
-					<a class="entry-expand" onclick=set_chat oncontextmenu=context_request>
+					<a class="flex-line expand"
+					   onclick=set_chat
+					   oncontextmenu=context_request>
 						{ icon }
-						<span class="entry-expand" style=user_color>{ &client.name }</span>
+						<span style=user_color class="text-collapse" title=&client.name>{ &client.name }</span>
+						{ Self::client_afk_text(&client.away_message) }
+						<div class="expand" />
+						{ Icon::client_muted(client.input_muted) }
+						{ Icon::client_deafen(client.output_muted) }
+						{ Icon::client_afk(client.away_message.is_some()) }
 					</a>
 				</div>
 			</li>
 		}
+	}
+
+	fn client_afk_text(afk: &Option<String>) -> Html {
+		if let Some(msg) = afk {
+			html!{ <span class="afk-text text-collapse" title=&msg>{ &msg }</span> }
+		} else { html!{} }
 	}
 
 	fn view_channel(&self, con: &Connection, ctx: &ViewContext, id: ChannelId) -> Html {
@@ -302,13 +315,13 @@ impl ChannelTree {
 			<li>
 				{ cm }
 				<div class={cl![
-						"channel-line",
+						"flex-line",
 						("own-client", ctx.own_channel == id),
 						("selected-channel", ctx.selected_channel == Some(id))]}>
 					<span class="collapse-button" onclick=toggle_collapse>{ Icon::mdi_icon(collapse_icon) }</span>
 					{ icon }
-					<a class=cl!["entry-expand", ("text-align-center", channel_align_center), ("text-align-right", channel_align_right)] ondoubleclick=change_channel onclick=set_chat oncontextmenu=context_request>
-						<span class="entry-expand">{ formatted_channel_name }</span>
+					<a class=cl!["expand", ("text-align-center", channel_align_center), ("text-align-right", channel_align_right)] ondoubleclick=change_channel onclick=set_chat oncontextmenu=context_request>
+						<span class="expand">{ formatted_channel_name }</span>
 					</a>
 				</div>
 				<ul class=cl!["menu-list", ("collapsed", collapsed)]>
@@ -378,7 +391,7 @@ impl ChannelTree {
 			<div class="menu channel-list">
 				<p class="menu-label" onclick=set_chat>
 					{ icon }
-					<span class=cl!["entry-expand", ("selected-server", selected_server)]>{ &con.server.name }</span>
+					<span class=cl!["expand", ("selected-server", selected_server)]>{ &con.server.name }</span>
 				</p>
 				<ul class="menu-list">
 					{ for iter::successors(ctx.channels.get(&ChannelId(0)).unwrap().first_child, |c| ctx.channels.get(c).and_then(|c| c.after))

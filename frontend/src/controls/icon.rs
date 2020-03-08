@@ -8,6 +8,26 @@ use crate::connection_service::ConnectionId;
 pub struct Icon;
 
 impl Icon {
+	fn icon_intern(name: &str, style: &str) -> Html {
+		let name = if name.is_empty() { "dummy" } else { name };
+		html! {
+			<span class="icon is-small" style=style>
+				<i class=format!("mdi mdi-{}", name)></i>
+			</span>
+		}
+	}
+	fn icon_intern_inner(name: &str, style: &str) -> Html {
+		html! {
+			<span class="icon is-small">
+				<i class=format!("mdi mdi-{}", name) style=style></i>
+			</span>
+		}
+	}
+
+	pub fn mdi_icon(name: &str) -> Html {
+		Self::icon_intern(name, "")
+	}
+
 	pub fn server_icon(con: &ConnectionId, server: &Server) -> Html {
 		Self::icon_hash(con, server.icon_id)
 			.unwrap_or_else(|| Self::mdi_icon(SERVER_ICON))
@@ -44,16 +64,16 @@ impl Icon {
 		}
 	}
 
-	pub fn mdi_icon(name: &str) -> Html {
-		Self::icon_intern(name, "")
+	pub fn client_muted(b: bool) -> Html {
+		if !b { return html!{} }
+		return Self::icon_intern_inner("microphone-off", "color:red;");
 	}
-
-	fn icon_intern(name: &str, style: &str) -> Html {
-		let name = if name.is_empty() { "dummy" } else { name };
-		html! {
-			<span class="icon is-small" style=style>
-				<i class=format!("mdi mdi-{}", name)></i>
-			</span>
-		}
+	pub fn client_deafen(b: bool) -> Html {
+		if !b { return html!{} }
+		return Self::icon_intern_inner("volume-off", "color:red;");
+	}
+	pub fn client_afk(b: bool) -> Html {
+		if !b { return html!{} }
+		return Self::icon_intern_inner("sleep", "color:blue;");
 	}
 }
