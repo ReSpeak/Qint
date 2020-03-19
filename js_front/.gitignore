@@ -1,0 +1,8 @@
+.DS_Store
+node_modules
+public/bundle.*
+public/bulma.css
+public/fonts
+package-lock.json
+yarn.lock
+.rpt2_cache

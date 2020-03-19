@@ -8,6 +8,12 @@
 		},
 		{
 			"path": "shared"
+		},
+		{
+			"path": "js_front"
 		}
-	]
+	],
+	"settings": {
+		"typescript.tsdk": "js_front\\node_modules\\typescript\\lib"
+	}
 }
