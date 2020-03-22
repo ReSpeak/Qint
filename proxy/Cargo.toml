@@ -12,25 +12,17 @@ actix-files = "0.2"
 actix-web = "2.0"
 actix-web-actors = "2.0"
 actix-rt = "1.0"
-async-timer = "0.2"
+anyhow = "1"
 audiopus = "0.2"
-base64 = "0.10"
-bytes = "0.5"
+base64 = "0.12"
 chrono = "0.4"
 diesel = { version = "1.4", features = ["chrono", "sqlite"] }
 diesel-derive-enum = { version = "0.4", features = ["sqlite"] }
 diesel_migrations = "1.4"
 directories = "2"
-failure = "0.1"
 flakebi-ring = "0.16.9"
-futures01 = { package = "futures", version = "0.1" }
-futures = { version = "0.3", features = ["compat"] }
-futures-spawn = "0.1"
-futures-threadpool = "0.1"
-hex = "0.4"
-lazy_static = "1"
+futures = "0.3"
 libsqlite3-sys = { version = "0.9", features = ["bundled"] }
-qint-shared = { path = "../shared", features = ["db"] }
 rmp-serde = "0.14"
 rnnoise-c = "0.1"
 sdl2 = "0.32"
@@ -43,9 +35,6 @@ slog-term = "2"
 structopt = { version = "0.3", default-features = false }
 toml = "0.4"
 tokio = "0.2"
-tokio01 = { package = "tokio", version = "0.1" }
-tokio-compat = "0.1"
-tokio-util = "0.2"
 tsclientlib = { path = "../../tsclientlib/tsclientlib", features = ["unstable"] }
 tsproto = { path = "../../tsclientlib/tsproto" }
 tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }

@@ -4,6 +4,7 @@ use yew::html;
 use yew::prelude::*;
 
 use crate::connection_service::*;
+use crate::controls::icon::Icon;
 
 use super::channel_tree::ChannelTree;
 
@@ -82,15 +83,25 @@ impl Component for SideBar {
 		});
 		let disconnect_click = self.link.callback(|_| Msg::Disconnect);
 
+		let menu_icon = ConnectionService::with(&self.con, |con| {
+			if let FrontendConnectionState::Connected(c) = &con.state {
+				if let Some(client) = c.con.clients.get(&c.con.own_client) {
+					Some(Icon::client_icon(&self.con, client))
+				} else {
+					None
+				}
+			} else {
+				None
+			}
+		}, || None).unwrap_or_else(|| Icon::mdi_icon(crate::CLIENT_ICON));
+
 		html! {
 			<aside class="sidebar">
 				<div class="level" style="padding: 0.5em;">
 					<div class="dropdown" onclick=dropdown_click>
 						<div class="dropdown-trigger">
 							<figure class="media-left" style="cursor: pointer;">
-								<p class="image is-32x32">
-									<img class="round" src="https://bulma.io/images/placeholders/128x128.png" />
-								</p>
+								{ menu_icon }
 							</figure>
 						</div>
 						<div class="dropdown-menu" id="dropdown-menu3" role="menu">

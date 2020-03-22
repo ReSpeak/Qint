@@ -306,7 +306,7 @@ impl AudioEncoder {
 		} else {
 			// Scale to the expected range
 			for d in &mut *buffer {
-				*d *= u16::max_value() as f32;
+				*d *= i16::max_value() as f32;
 			}
 
 			let mut vad_probe = 0.0;
@@ -327,7 +327,7 @@ impl AudioEncoder {
 			}
 
 			for d in &mut *buffer {
-				*d /= u16::max_value() as f32;
+				*d /= i16::max_value() as f32;
 			}
 		}
 

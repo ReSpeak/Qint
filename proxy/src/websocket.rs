@@ -87,6 +87,10 @@ impl Actor for TsConnection {
 
 impl Actor for Ws {
 	type Context = ws::WebsocketContext<Self>;
+
+	fn stopped(&mut self, ctx: &mut Self::Context) {
+		tokio::spawn(self.connection.send(RemoveWsMsg(ctx.address())));
+	}
 }
 
 impl Drop for TsConnection {
@@ -821,9 +825,6 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 			}
 			Ok(ws::Message::Binary(bin)) => {
 				tokio::spawn(self.connection.send(WsMsg(bin)));
-			}
-			Ok(ws::Message::Close(_)) => {
-				tokio::spawn(self.connection.send(RemoveWsMsg(ctx.address())));
 			}
 			_ => {}
 		}
