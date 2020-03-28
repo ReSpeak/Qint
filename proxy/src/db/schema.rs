@@ -74,7 +74,7 @@ table! {
 		channel1 -> BigInt,
 		channel2 -> BigInt,
 		client -> Nullable<Binary>,
-		typ -> qint_shared::models::EventTypeMapping,
+		typ -> crate::db::models::EventTypeMapping,
 		content -> Nullable<Binary>,
 		time -> Timestamp,
 		timezone -> Integer,
@@ -99,7 +99,7 @@ table! {
 		invoker -> Nullable<Binary>,
 		invoker_name -> Nullable<Text>,
 		content -> Text,
-		status -> qint_shared::models::MessageStatusMapping,
+		status -> crate::db::models::MessageStatusMapping,
 		time -> Timestamp,
 		timezone -> Integer,
 	}

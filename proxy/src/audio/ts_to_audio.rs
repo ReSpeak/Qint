@@ -5,25 +5,25 @@ use std::fmt;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use anyhow::{bail, Result};
 use actix::*;
 use audiopus::coder::Decoder;
-use failure::{format_err, Error};
 use futures::prelude::*;
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired, AudioStatus};
 use sdl2::AudioSubsystem;
 use slog::{debug, error, o, trace, warn, Logger};
 use tokio::sync::mpsc;
 use tsclientlib::ClientId;
-use tsproto_packets::packets::{AudioData, CodecType, InAudio};
+use tsproto_packets::packets::{AudioData, CodecType, InAudioBuf};
 
-use crate::websocket::{SetTalkersMsg, TsConnection};
+use crate::websocket::{SetTalkersMsg, Ws};
 use crate::ConnectionId;
 use super::*;
 
 /// After this amount of seconds, a decoder will be removed.
 const VOICE_TIMEOUT_SECS: u64 = 1;
 
-pub struct PlayMsg(pub ConnectionId, pub InAudio);
+pub struct PlayMsg(pub ConnectionId, pub InAudioBuf);
 pub struct TalkersChangedMsg(pub ConnectionId);
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -48,7 +48,7 @@ pub(crate) struct TsToAudio {
 	decoders: HashMap<Id, (Decoder, Instant)>,
 	/// The audio queue, we always play the packet with the smallest id.
 	data: Arc<Mutex<HashMap<Id, BinaryHeap<Reverse<AudioPacket>>>>>,
-	connections: Arc<Mutex<HashMap<ConnectionId, Addr<TsConnection>>>>,
+	connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
 }
 
 struct SdlCallback {
@@ -58,7 +58,7 @@ struct SdlCallback {
 }
 
 impl Message for PlayMsg {
-	type Result = Result<(), Error>;
+	type Result = Result<()>;
 }
 
 impl Message for TalkersChangedMsg {
@@ -140,9 +140,9 @@ impl TsToAudio {
 	pub(crate) fn new(
 		logger: Logger,
 		audio_subsystem: AudioSubsystem,
-		connections: Arc<Mutex<HashMap<ConnectionId, Addr<TsConnection>>>>,
+		connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
 		spawn_send: mpsc::UnboundedSender<SendAudioEvent>,
-	) -> Result<Self, Error>
+	) -> Result<Self>
 	{
 		let logger = logger.new(o!("pipeline" => "ts-to-audio"));
 		let data = Arc::new(Mutex::new(Default::default()));
@@ -213,7 +213,7 @@ impl TsToAudio {
 }
 
 impl Handler<PlayMsg> for TsToAudio {
-	type Result = Result<(), Error>;
+	type Result = Result<()>;
 	fn handle(&mut self, msg: PlayMsg, _: &mut Self::Context) -> Self::Result {
 		if self.device.is_none() {
 			warn!(
@@ -228,9 +228,7 @@ impl Handler<PlayMsg> for TsToAudio {
 		{
 			if *codec != CodecType::OpusVoice && *codec != CodecType::OpusMusic
 			{
-				return Err(format_err!(
-					"Got unsupported audio codec, only opus is supported"
-				));
+				bail!("Got unsupported audio codec, only opus is supported");
 			}
 
 			let id = Id { con: msg.0, client: ClientId(*from) };
@@ -278,16 +276,14 @@ impl Handler<PlayMsg> for TsToAudio {
 					)) => {
 						// Enlarge the buffer
 						if opus_output.len() == MAX_FRAME_SIZE {
-							return Err(format_err!(
-								"Bad opus packet, maximum buffer size exceeded"
-							));
+							bail!("Bad opus packet, maximum buffer size exceeded");
 						} else if opus_output.len() * 2 > MAX_FRAME_SIZE {
 							opus_output.resize(MAX_FRAME_SIZE, 0f32);
 						} else {
 							opus_output.resize(opus_output.len() * 2, 0f32);
 						}
 					}
-					Err(e) => return Err(format_err!("Error: {:?}, data: {:?}", e, data).into()),
+					Err(e) => bail!("Error: {:?}, data: {:?}", e, data),
 				}
 			};
 

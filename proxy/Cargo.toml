@@ -15,7 +15,7 @@ actix-rt = "1.0"
 anyhow = "1"
 audiopus = "0.2"
 base64 = "0.12"
-chrono = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
 diesel = { version = "1.4", features = ["chrono", "sqlite"] }
 diesel-derive-enum = { version = "0.4", features = ["sqlite"] }
 diesel_migrations = "1.4"
@@ -35,6 +35,7 @@ slog-term = "2"
 structopt = { version = "0.3", default-features = false }
 toml = "0.4"
 tokio = "0.2"
+tokio-util = { version = "0.3", features = ["codec"] }
 tsclientlib = { path = "../../tsclientlib/tsclientlib", features = ["unstable"] }
 tsproto = { path = "../../tsclientlib/tsproto" }
 tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }

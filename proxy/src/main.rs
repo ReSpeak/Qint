@@ -5,16 +5,14 @@ extern crate diesel_migrations;
 
 use std::collections::HashMap;
 use std::fs;
-use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+use anyhow::{bail, format_err, Result};
 use actix::*;
 use actix_files::Files;
 use actix_web::*;
 use actix_web_actors::ws;
-use bytes::BytesMut;
-use failure::{format_err, Error};
 use futures::prelude::*;
 use serde::Deserialize;
 use slog::{debug, error, info, o, warn, Drain, Logger};
@@ -26,11 +24,12 @@ use uuid::Uuid;
 
 mod audio;
 mod db;
+mod messages;
 mod secret;
 mod websocket;
 
 use secret::Secret;
-use websocket::{AddWsMsg, TsConnection, Ws};
+use websocket::Ws;
 
 const DIR_ORGANIZATION: &str = "ReSpeak";
 const DIR_PROJECT: &str = "Qint";
@@ -103,7 +102,7 @@ struct Settings {
 struct State {
 	logger: Logger,
 	/// The list of all currently existing connections
-	connections: Arc<Mutex<HashMap<ConnectionId, Addr<TsConnection>>>>,
+	connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
 	audio_data: audio::AudioData,
 	settings: Settings,
 	database: Addr<db::DbHandler>,
@@ -118,10 +117,6 @@ enum WsFormat {
 #[derive(Clone, Debug, Deserialize)]
 struct WsOptions {
 	format: WsFormat,
-	/// A TeamSpeak connection gets closed if no strong (= non-weak) connections
-	/// remain. This is analogous to `Rc`.
-	#[serde(default)]
-	weak: bool,
 }
 
 fn default_listen_address() -> String { "127.0.0.1:4422".into() }
@@ -164,21 +159,13 @@ async fn create_ws(
 
 	// Check that the id does not exist
 	let mut cons = state.connections.lock().unwrap();
-	let ts_con = if let Some(con) = cons.get(&id) {
-		con.clone()
-	} else {
-		let ts_con = TsConnection::new(state.deref().clone(), id).start();
-		cons.insert(id, ts_con.clone());
-		ts_con
-	};
+	if cons.contains_key(&id) {
+		return Either::A(HttpResponse::PreconditionFailed()
+			.body("Connection id is already occupied".to_string()));
+	}
 
-	let weak = options.weak;
-	let ws_con = Ws::new(state.logger.clone(), ts_con.clone(), id, options.0);
-
-	ws::start_with_addr(ws_con, &req, stream).map(move |(addr, resp)| {
-		tokio::spawn(ts_con.send(AddWsMsg(addr, weak)));
-		resp
-	})
+	let ws_con = Ws::new(state.logger.clone(), (*state).clone(), options.0, id);
+	Either::B(ws::start(ws_con, &req, stream))
 }
 
 #[get("/list")]
@@ -223,14 +210,14 @@ async fn audiosend_false(state: web::Data<State>) -> impl Responder {
 #[get("/plugins")]
 async fn list_plugins(
 	state: web::Data<State>,
-) -> Result<impl Responder, Error> {
+) -> impl Responder {
 	let path = &state.settings.plugin_path;
 	let mut res = Vec::new();
 	let dir = match path.read_dir() {
 		Ok(r) => r,
 		Err(e) => {
 			warn!(state.logger, "Failed to list plugins"; "dir" => ?path, "error" => ?e);
-			return Ok(web::Json(Vec::new()));
+			return std::io::Result::<_>::Ok(web::Json(Vec::new()));
 		}
 	};
 	for p in dir {
@@ -258,7 +245,7 @@ async fn get_plugin(
 async fn download_file(
 	state: web::Data<State>,
 	data: web::Path<(Uuid, u64, String)>,
-) -> Result<HttpResponse, Error>
+) -> Result<HttpResponse>
 {
 	let channel = ChannelId(data.1);
 	let cons = state.connections.lock().unwrap();
@@ -275,9 +262,8 @@ async fn download_file(
 		// Icons: There can be collisions as only CRC-32 is used, we may update
 		// them at some time when the modification time on the server is newer
 		// than on the cached file.
-
 		let stream = FramedRead::new(file_stream, BytesCodec::new())
-			.map(|r| r.map(BytesMut::freeze));
+			.map(|r| r.map(web::BytesMut::freeze));
 		Ok(HttpResponse::Ok().content_length(len).streaming(stream))
 	} else {
 		Ok(HttpResponse::Gone().finish())
@@ -285,7 +271,7 @@ async fn download_file(
 }
 
 #[actix_rt::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<()> {
 	let logger = {
 		let decorator = slog_term::TermDecorator::new().build();
 		let drain = slog_term::CompactFormat::new(decorator).build().fuse();
@@ -308,9 +294,7 @@ async fn main() -> Result<(), Error> {
 			DIR_PROJECT,
 		) {
 			Some(r) => r,
-			None => {
-				return Err(format_err!("Failed to get project directory"));
-			}
+			None => bail!("Failed to get project directory"),
 		};
 		proj_dirs.config_dir().into()
 	};
@@ -391,8 +375,6 @@ async fn main() -> Result<(), Error> {
 			.service(list_plugins)
 			.service(get_plugin)
 			.service(download_file)
-			.service(db::bookmarks)
-			.service(db::messages)
 			.service(
 				Files::new("", "../frontend/static/")
 					.index_file("index.html")

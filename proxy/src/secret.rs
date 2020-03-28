@@ -1,4 +1,4 @@
-use failure::{format_err, Error};
+use anyhow::{format_err, Result};
 use ring::aead::CHACHA20_POLY1305 as ALG;
 use ring::aead::*;
 use ring::error::Unspecified;
@@ -9,13 +9,13 @@ pub struct Secret(pub Vec<u8>);
 struct SingleNonce(Option<Nonce>);
 
 impl NonceSequence for SingleNonce {
-	fn advance(&mut self) -> Result<Nonce, Unspecified> {
+	fn advance(&mut self) -> std::result::Result<Nonce, Unspecified> {
 		self.0.take().map(Ok).unwrap_or(Err(Unspecified))
 	}
 }
 
 impl Secret {
-	pub fn new() -> Result<Self, Error> {
+	pub fn new() -> Result<Self> {
 		let rand = SystemRandom::new();
 		let mut key = vec![0; ALG.key_len()];
 		rand.fill(&mut key)
@@ -24,7 +24,7 @@ impl Secret {
 	}
 
 	/// Encrypt and mac
-	pub fn seal(&self, mut data: Vec<u8>) -> Result<Vec<u8>, Error> {
+	pub fn seal(&self, mut data: Vec<u8>) -> Result<Vec<u8>> {
 		let rand = SystemRandom::new();
 		let mut nonce_data = [0; 12];
 		rand.fill(&mut nonce_data[..])
@@ -46,7 +46,7 @@ impl Secret {
 	}
 
 	/// Mac and decrypt
-	pub fn open(&self, mut data: Vec<u8>) -> Result<Vec<u8>, Error> {
+	pub fn open(&self, mut data: Vec<u8>) -> Result<Vec<u8>> {
 		let mut nonce_data = [0; 12];
 		let nonce_len = nonce_data.len();
 		if data.len() < nonce_data.len() {

@@ -1,6 +1,9 @@
-use chrono::{DateTime, NaiveDateTime, Utc};
-use failure::Error;
-use qint_shared::models::{EventType, MessageStatus};
+use std::cmp::{Ord, Ordering};
+
+use anyhow::Result;
+use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Utc};
+use diesel_derive_enum::DbEnum;
+use serde::{Deserialize, Serialize};
 
 use super::schema::*;
 use crate::secret::Secret;
@@ -92,14 +95,14 @@ pub struct BookmarkInsert<'a> {
 }
 
 #[derive(Queryable)]
-pub struct Chat {
+pub struct ChatModel {
 	pub id: i64,
 	pub last_read: NaiveDateTime,
 	pub timezone: i32,
 }
 
 #[derive(Queryable)]
-pub struct Message {
+pub struct MessageModel {
 	pub id: i64,
 	/// Client uid of sender, `None` if we got the message from the server.
 	pub invoker: Option<Vec<u8>>,
@@ -158,11 +161,75 @@ pub struct ServersClientsInsert<'a> {
 	pub timezone: i32,
 }
 
+#[derive(Clone, Copy, DbEnum, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub enum EventType {
+	ChannelSwitched,
+	NameChanged,
+}
+
+#[derive(Clone, Copy, DbEnum, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub enum MessageStatus {
+	Sending,
+	Success,
+	Error,
+}
+
+#[derive(Clone, Debug, Deserialize, Queryable, Serialize)]
+pub struct Bookmark {
+	pub id: i64,
+	pub name: Option<String>,
+	pub username: String,
+	pub address: String,
+	pub bookmark: bool,
+	pub last_used: Option<NaiveDateTime>,
+	pub timezone: i32,
+	pub channel_name: Option<String>,
+	pub server_icon: Option<i32>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Queryable, Serialize)]
+pub struct Message {
+	pub id: i64,
+	pub invoker: Option<Vec<u8>>,
+	pub invoker_name: Option<String>,
+	pub content: String,
+	pub status: MessageStatus,
+	pub time: NaiveDateTime,
+	pub timezone: i32,
+
+	pub client_name: Option<String>,
+	pub client_icon: Option<i32>,
+	pub client_avatar: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Queryable, Serialize)]
+pub struct Chat {
+	pub last_read: NaiveDateTime,
+	pub timezone: i32,
+}
+
+impl Message {
+	pub fn get_date_time(&self) -> DateTime<FixedOffset> {
+		FixedOffset::east(self.timezone).from_utc_datetime(&self.time)
+	}
+}
+
+impl Ord for Message {
+	fn cmp(&self, other: &Self) -> Ordering {
+		self.time.cmp(&other.time).then_with(|| self.id.cmp(&other.id))
+	}
+}
+
+impl PartialOrd for Message {
+	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+		Some(self.cmp(other))
+	}
+}
 impl Identity {
 	pub fn into_identity(
 		self,
 		secret: &Secret,
-	) -> Result<tsclientlib::Identity, Error>
+	) -> Result<tsclientlib::Identity>
 	{
 		let key = secret.open(self.private_key)?;
 		Ok(tsclientlib::Identity::new_with_max_counter(
@@ -178,7 +245,7 @@ impl<'a> NewIdentity<'a> {
 		id: &tsclientlib::Identity,
 		client_uid: &'a [u8],
 		secret: &Secret,
-	) -> Result<Self, Error>
+	) -> Result<Self>
 	{
 		let private_key = secret.seal(id.key().to_short().to_vec())?;
 		Ok(Self {

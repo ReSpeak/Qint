@@ -1,27 +1,23 @@
 use std::time::Duration;
 
+use anyhow::{format_err, Result};
 use actix::*;
 use audiopus::coder::Encoder;
-use failure::{format_err, Error};
-use futures01::{Future, Sink};
-use futures_spawn::SpawnHelper;
-use futures_threadpool::ThreadPool;
 use rnnoise_c::DenoiseState;
 use sdl2::audio::{
 	AudioCallback, AudioDevice, AudioSpec, AudioSpecDesired, AudioStatus,
 };
 use sdl2::AudioSubsystem;
 use slog::{debug, error, o, warn, Logger};
+use tokio::runtime::Handle;
 use tokio::sync::mpsc;
-use tsproto::client::ClientConVal;
 use tsproto_packets::packets::{AudioData, CodecType, OutAudio, OutPacket};
 
-use crate::websocket::SetSelfTalkingMsg;
+use crate::websocket::{SetSelfTalkingMsg, Ws};
 use super::*;
 
 pub(crate) struct SetListenerMsg {
-	pub connection: tsclientlib::Connection,
-	pub ts_connection: Addr<TsConnection>,
+	pub connection: Addr<Ws>,
 }
 
 pub struct RemoveListenerMsg;
@@ -39,10 +35,9 @@ const TALKING_TIME: u8 = 5;
 pub struct AudioToTs {
 	logger: Logger,
 	audio_subsystem: AudioSubsystem,
-	executor: ThreadPool,
+	executor: Handle,
 	spawn_send: mpsc::UnboundedSender<SendAudioEvent>,
-	listener: Option<ClientConVal>,
-	connection: Option<Addr<TsConnection>>,
+	connection: Option<Addr<Ws>>,
 	encoder: Option<AudioEncoder>,
 
 	is_playing: bool,
@@ -124,8 +119,7 @@ impl Handler<SetListenerMsg> for AudioToTs {
 		self.update_talking();
 		self.is_playing = is_playing;
 
-		self.connection = Some(msg.ts_connection);
-		self.listener = Some(msg.connection.get_tsproto_connection());
+		self.connection = Some(msg.connection);
 		self.update_talking();
 	}
 }
@@ -141,8 +135,8 @@ impl Handler<RemoveListenerMsg> for AudioToTs {
 		self.is_playing = false;
 		self.update_talking();
 		self.connection = None;
-		let res = self.listener.is_some();
-		self.listener = None;
+		let res = self.connection.is_some();
+		self.connection = None;
 		if let Some(e) = &self.encoder {
 			e.device.pause();
 		}
@@ -191,21 +185,14 @@ impl Handler<PlayPacketMsg> for AudioToTs {
 	) -> Self::Result
 	{
 		// Write into packet sink
-		if let Some(con) = &mut self.listener {
-			if con.upgrade().is_none() {
-				self.listener = None;
-				return;
-			}
-			drop(con);
-
+		if let Some(con) = &mut self.connection {
 			let vol = self.volume;
 			if let Some(e) = &mut self.encoder {
 				let talking = self.is_talking != 0;
 				if let Some(packet) = e.handle_audio_buffer(&mut buffer, vol, &mut self.is_talking) {
-					let sink = self.listener.as_mut().unwrap().as_packet_sink();
 					let logger = self.logger.clone();
 					self.executor
-						.spawn(sink.send(packet).map(|_| ()).map_err(
+						.spawn(con.send(packet).map(|_| ()).map_err(
 							move |e| {
 								error!(logger, "Failed to send packet"; "error" => ?e);
 							},
@@ -225,9 +212,9 @@ impl AudioToTs {
 	pub(crate) fn new(
 		logger: Logger,
 		audio_subsystem: AudioSubsystem,
-		executor: ThreadPool,
+		executor: Handle,
 		spawn_send: mpsc::UnboundedSender<SendAudioEvent>,
-	) -> Result<Self, Error>
+	) -> Result<Self>
 	{
 		let logger = logger.new(o!("pipeline" => "audio-to-ts"));
 
@@ -236,7 +223,6 @@ impl AudioToTs {
 			audio_subsystem,
 			executor,
 			spawn_send,
-			listener: None,
 			connection: None,
 			encoder: None,
 
@@ -258,7 +244,7 @@ impl AudioEncoder {
 		logger: Logger,
 		audio_subsystem: &AudioSubsystem,
 		spawn_send: mpsc::UnboundedSender<SendAudioEvent>,
-	) -> Result<Self, Error> {
+	) -> Result<Self> {
 		let desired_spec = AudioSpecDesired {
 			freq: Some(48000),
 			channels: Some(1),
