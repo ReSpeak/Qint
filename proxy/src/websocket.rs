@@ -116,9 +116,10 @@ impl Ws {
 				talkers.push(con.own_client);
 			}
 			self.send_message(&MessageP2F::TalkersChanged(talkers), ctx);
+		} else {
+			self.talkers.clear();
+			self.send_message(&MessageP2F::TalkersChanged(Vec::new()), ctx);
 		}
-		self.talkers.clear();
-		self.send_message(&MessageP2F::TalkersChanged(Vec::new()), ctx);
 	}
 
 	fn handle_event(&mut self, event: TsStreamItem, ctx: &mut <Self as Actor>::Context) {
@@ -245,9 +246,10 @@ impl Ws {
 							.map(|r| r.map_err(|e| e.into()).and_then(|r| r)),
 					)
 					.map(move |identity, actor: &mut Self, ctx| identity.and_then(|id| {
-						let options = tsclientlib::ConnectOptions::new(o.address)
-							.name(o.name)
+						let options = tsclientlib::ConnectOptions::new(o.address.clone())
+							.name(o.name.clone())
 							.identity(id)
+							.version(o.version.clone())
 							.logger(actor.logger.clone())
 							.log_commands(o.log_commands || actor.state.settings.verbosity > 0)
 							.log_packets(o.log_packets || actor.state.settings.verbosity > 1)
@@ -255,6 +257,7 @@ impl Ws {
 								o.log_udp_packets || actor.state.settings.verbosity > 2,
 							);
 
+						actor.connect_options = Some(o);
 						actor.connection = Some(Connection::new(options)?);
 						ctx.spawn(ConnectionPoller);
 						Ok(())
@@ -420,8 +423,10 @@ impl Handler<SetTalkersMsg> for Ws {
 		ctx: &mut Self::Context,
 	) -> Self::Result
 	{
-		self.talkers = talkers;
-		self.update_talkers(ctx);
+		if self.talkers != talkers {
+			self.talkers = talkers;
+			self.update_talkers(ctx);
+		}
 	}
 }
 
@@ -433,8 +438,10 @@ impl Handler<SetSelfTalkingMsg> for Ws {
 		ctx: &mut Self::Context,
 	) -> Self::Result
 	{
-		self.self_talking = talking;
-		self.update_talkers(ctx);
+		if self.self_talking != talking {
+			self.self_talking = talking;
+			self.update_talkers(ctx);
+		}
 	}
 }
 
@@ -498,29 +505,30 @@ impl ActorFuture for ConnectionPoller {
 		ctx: &mut <Self::Actor as Actor>::Context,
 		task: &mut task::Context,
 	) -> Poll<Self::Output> {
-		let res = if let Some(con) = &mut actor.connection {
-			con.events().poll_next_unpin(task)
-		} else {
-			return Poll::Ready(());
-		};
+		loop {
+			let res = if let Some(con) = &mut actor.connection {
+				con.events().poll_next_unpin(task)
+			} else {
+				break Poll::Ready(());
+			};
 
-		match res {
-			Poll::Pending => Poll::Pending,
-			Poll::Ready(None) => {
-				actor.connection = None;
-				actor.disconnect(ctx);
-				Poll::Ready(())
-			}
-			Poll::Ready(Some(Err(e))) => {
-				error!(actor.state.logger, "Connection failed"; "error" => ?e);
-				actor.connection = None;
-				actor.send_message(&MessageP2F::Error(
-					"Connection failed".to_string()), ctx);
-				Poll::Ready(())
-			}
-			Poll::Ready(Some(Ok(item))) => {
-				actor.handle_event(item, ctx);
-				Poll::Pending
+			match res {
+				Poll::Pending => break Poll::Pending,
+				Poll::Ready(None) => {
+					actor.connection = None;
+					actor.disconnect(ctx);
+					break Poll::Ready(());
+				}
+				Poll::Ready(Some(Err(e))) => {
+					error!(actor.state.logger, "Connection failed"; "error" => ?e);
+					actor.connection = None;
+					actor.send_message(&MessageP2F::Error(
+						"Connection failed".to_string()), ctx);
+					break Poll::Ready(());
+				}
+				Poll::Ready(Some(Ok(item))) => {
+					actor.handle_event(item, ctx);
+				}
 			}
 		}
 	}

@@ -168,13 +168,6 @@ async fn create_ws(
 	Either::B(ws::start(ws_con, &req, stream))
 }
 
-#[get("/list")]
-async fn list_cons(state: web::Data<State>) -> impl Responder {
-	// Check that the id does not exist
-	let cons = state.connections.lock().unwrap();
-	web::Json(cons.keys().map(|id| id.0).collect::<Vec<_>>())
-}
-
 #[post("/audiosend/true")]
 async fn audiosend_true(state: web::Data<State>) -> impl Responder {
 	if state
