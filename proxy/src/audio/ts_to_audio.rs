@@ -224,7 +224,7 @@ impl Handler<PlayMsg> for TsToAudio {
 		}
 
 		if let AudioData::S2C { id: packet_id, from, codec, data }
-		| AudioData::S2CWhisper { id: packet_id, from, codec, data } = msg.1.data()
+		| AudioData::S2CWhisper { id: packet_id, from, codec, data } = msg.1.data().data()
 		{
 			if *codec != CodecType::OpusVoice && *codec != CodecType::OpusMusic
 			{

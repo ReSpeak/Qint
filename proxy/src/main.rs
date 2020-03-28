@@ -8,7 +8,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use anyhow::{bail, format_err, Result};
+use anyhow::{bail, Result};
 use actix::*;
 use actix_files::Files;
 use actix_web::*;
@@ -158,7 +158,7 @@ async fn create_ws(
 	let id = ConnectionId(*uuid);
 
 	// Check that the id does not exist
-	let mut cons = state.connections.lock().unwrap();
+	let cons = state.connections.lock().unwrap();
 	if cons.contains_key(&id) {
 		return Either::A(HttpResponse::PreconditionFailed()
 			.body("Connection id is already occupied".to_string()));
@@ -245,16 +245,25 @@ async fn get_plugin(
 async fn download_file(
 	state: web::Data<State>,
 	data: web::Path<(Uuid, u64, String)>,
-) -> Result<HttpResponse>
+) -> impl Responder
 {
 	let channel = ChannelId(data.1);
 	let cons = state.connections.lock().unwrap();
 	if let Some(con) = cons.get(&ConnectionId(data.0)).cloned() {
 		drop(cons);
 		debug!(state.logger, "Downloading file"; "channel" => data.1, "path" => &data.2);
-		let (len, file_stream): (u64, TcpStream) = con
+		let (len, file_stream): (u64, TcpStream) = match con
 			.send(websocket::DownloadFile { channel, path: data.2.clone() })
-			.await??;
+			.await {
+			Err(_) => {
+				return HttpResponse::Gone().finish();
+			}
+			Ok(Err(e)) => {
+				error!(state.logger, "File download failed"; "error" => ?e);
+				return HttpResponse::InternalServerError().body("Failed to download file");
+			}
+			Ok(Ok(r)) => r,
+		};
 
 		// TODO Cache icons and avatars for offline usage
 		// Use a general file cache (e.g. also for sent images) by TS-Server
@@ -264,9 +273,9 @@ async fn download_file(
 		// than on the cached file.
 		let stream = FramedRead::new(file_stream, BytesCodec::new())
 			.map(|r| r.map(web::BytesMut::freeze));
-		Ok(HttpResponse::Ok().content_length(len).streaming(stream))
+		HttpResponse::Ok().content_length(len).streaming(stream)
 	} else {
-		Ok(HttpResponse::Gone().finish())
+		HttpResponse::Gone().finish()
 	}
 }
 

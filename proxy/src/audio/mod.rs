@@ -69,7 +69,7 @@ pub(crate) fn start(
 		video_subsystem.enable_screen_saver();
 	}
 
-	let runtime = Runtime::new().unwrap();
+	let mut runtime = Runtime::new().unwrap();
 	let pool = runtime.handle().clone();
 
 	// Create thread local runtime for non-send tasks

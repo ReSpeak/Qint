@@ -1,7 +1,7 @@
 use std::cmp::{Ord, Ordering};
 
 use anyhow::Result;
-use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use diesel_derive_enum::DbEnum;
 use serde::{Deserialize, Serialize};
 
@@ -206,12 +206,6 @@ pub struct Message {
 pub struct Chat {
 	pub last_read: NaiveDateTime,
 	pub timezone: i32,
-}
-
-impl Message {
-	pub fn get_date_time(&self) -> DateTime<FixedOffset> {
-		FixedOffset::east(self.timezone).from_utc_datetime(&self.time)
-	}
 }
 
 impl Ord for Message {

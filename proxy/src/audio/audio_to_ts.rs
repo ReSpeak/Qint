@@ -3,6 +3,7 @@ use std::time::Duration;
 use anyhow::{format_err, Result};
 use actix::*;
 use audiopus::coder::Encoder;
+use futures::prelude::*;
 use rnnoise_c::DenoiseState;
 use sdl2::audio::{
 	AudioCallback, AudioDevice, AudioSpec, AudioSpecDesired, AudioStatus,
@@ -13,7 +14,7 @@ use tokio::runtime::Handle;
 use tokio::sync::mpsc;
 use tsproto_packets::packets::{AudioData, CodecType, OutAudio, OutPacket};
 
-use crate::websocket::{SetSelfTalkingMsg, Ws};
+use crate::websocket::{SendPacketMsg, SetSelfTalkingMsg, Ws};
 use super::*;
 
 pub(crate) struct SetListenerMsg {
@@ -192,12 +193,9 @@ impl Handler<PlayPacketMsg> for AudioToTs {
 				if let Some(packet) = e.handle_audio_buffer(&mut buffer, vol, &mut self.is_talking) {
 					let logger = self.logger.clone();
 					self.executor
-						.spawn(con.send(packet).map(|_| ()).map_err(
-							move |e| {
-								error!(logger, "Failed to send packet"; "error" => ?e);
-							},
-						))
-						.detach();
+						.spawn(con.send(SendPacketMsg(packet)).map(move |r| if let Err(e) = r {
+							error!(logger, "Failed to send audio packet"; "error" => ?e);
+						}));
 				}
 
 				if talking != (self.is_talking != 0) {

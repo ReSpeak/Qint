@@ -2,14 +2,13 @@ use std::fs;
 
 use anyhow::{bail, Result};
 use actix::*;
-use actix_web::*;
 use chrono::offset::{FixedOffset, TimeZone};
-use chrono::{DateTime, Duration, Local, Utc};
+use chrono::{Duration, Local, Utc};
 use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use futures::prelude::*;
-use slog::{error, info, trace, Logger};
+use slog::{error, info, Logger};
 use tsclientlib::{ChannelId, ClientId, Identity, Invoker, MessageTarget};
 use tsclientlib::Connection as TsConnection;
 use tsclientlib::data::Connection as TsData;
@@ -17,7 +16,7 @@ use tsclientlib::events::{Event, PropertyId, PropertyValue};
 use tsproto::crypto::EccKeyPubP256;
 
 use crate::secret::Secret;
-use crate::{Settings, State};
+use crate::Settings;
 use models::{Bookmark, Message as TextMessage, MessageStatus};
 
 mod models;
@@ -71,7 +70,7 @@ pub enum ChatType {
 	Poke(Vec<u8>),
 }
 
-type RunFn = Box<FnOnce(&mut DbHandler, &mut <DbHandler as Actor>::Context) -> Result<()> + Send>;
+type RunFn = Box<dyn FnOnce(&mut DbHandler, &mut <DbHandler as Actor>::Context) -> Result<()> + Send>;
 
 pub struct RunMsg(RunFn);
 
@@ -123,37 +122,6 @@ impl DbHandler {
 		}
 
 		Ok(Self { secret, con, last_message_id: 0 })
-	}
-
-	fn get_chat(
-		&self,
-		id: &ChatId,
-	) -> DieselResult<Option<i64>>
-	{
-		use schema::{channel_chats, client_chats, client_pokes, server_chats};
-
-		match &id.chat_type {
-			ChatType::Server => server_chats::table
-				.find(&id.server)
-				.select(server_chats::chat)
-				.first(&self.con)
-				.optional(),
-			ChatType::Channel(cid) => channel_chats::table
-				.find((&id.server, *cid as i64))
-				.select(channel_chats::chat)
-				.first(&self.con)
-				.optional(),
-			ChatType::Client(cid) => client_chats::table
-				.find((&id.server, cid))
-				.select(client_chats::chat)
-				.first(&self.con)
-				.optional(),
-			ChatType::Poke(cid) => client_pokes::table
-				.find((&id.server, cid))
-				.select(client_pokes::chat)
-				.first(&self.con)
-				.optional(),
-		}
 	}
 
 	/// Create a new chat entry in the database and returns the id.
@@ -404,7 +372,7 @@ impl Handler<ConnectedMsg> for DbHandler {
 	{
 		use diesel::dsl::not;
 		use schema::{bookmarks, identities};
-		let server = msg.server_key.to_short();
+		let server = msg.server_key.to_short().to_vec();
 
 		// Find identity
 		// TODO Put into own function
@@ -569,7 +537,7 @@ impl DbHandler {
 
 	fn handle_connected(db: &Addr<Self>, logger: &Logger, con: &TsConnection, data: &TsData) -> Result<()> {
 		let key = con.get_server_key()?;
-		let key = key.to_short();
+		let key = key.to_short().to_vec();
 		let icon_id = if data.server.icon_id.0 != 0 {
 			Some(data.server.icon_id.0 as i32)
 		} else {
@@ -578,7 +546,7 @@ impl DbHandler {
 		let server_name = data.server.name.clone();
 		let addr = con.get_options().get_address().to_string();
 
-		Self::run(db, logger, move |db, ctx| {
+		Self::run(db, logger, move |db, _| {
 			use schema::servers::dsl::*;
 
 			// Check if we already know that address
@@ -609,7 +577,7 @@ impl DbHandler {
 
 	fn handle_add_client(db: &Addr<Self>, logger: &Logger, con: &TsConnection, data: &TsData, id: ClientId) -> Result<()> {
 		let server = con.get_server_key()?;
-		let server = server.to_short();
+		let server = server.to_short().to_vec();
 		let client = match data.clients.get(&id) {
 			Some(c) => c,
 			None => bail!("Failed to find client"),
@@ -632,7 +600,7 @@ impl DbHandler {
 		};
 		let client_name = client.name.clone();
 
-		Self::run(db, logger, move |db, ctx| {
+		Self::run(db, logger, move |db, _| {
 			use schema::clients::dsl::*;
 			use schema::servers_clients;
 
@@ -685,7 +653,7 @@ impl DbHandler {
 
 	fn handle_add_channel(db: &Addr<Self>, logger: &Logger, con: &TsConnection, data: &TsData, ch_id: ChannelId) -> Result<()> {
 		let ch_server = con.get_server_key()?;
-		let ch_server = ch_server.to_short();
+		let ch_server = ch_server.to_short().to_vec();
 		let channel = match data.channels.get(&ch_id) {
 			Some(c) => c,
 			None => bail!("Failed to find channel"),
@@ -700,7 +668,7 @@ impl DbHandler {
 		});
 		let ch_name = channel.name.clone();
 
-		Self::run(db, logger, move |db, ctx| {
+		Self::run(db, logger, move |db, _| {
 			use schema::channels::dsl::*;
 
 			// Check if we already know this channel
@@ -741,11 +709,11 @@ impl DbHandler {
 		Ok(())
 	}
 
-	fn handle_remove_client(db: &Addr<Self>, logger: &Logger, con: &TsConnection, data: &TsData, old: &PropertyValue) -> Result<()> {
+	fn handle_remove_client(db: &Addr<Self>, logger: &Logger, con: &TsConnection, _: &TsData, old: &PropertyValue) -> Result<()> {
 		// TODO, if own client removed, handle for all other clients
 
 		let server = con.get_server_key()?;
-		let server = server.to_short();
+		let server = server.to_short().to_vec();
 		let client = match old {
 			PropertyValue::Client(client) => client,
 			_ => panic!(
@@ -758,7 +726,7 @@ impl DbHandler {
 			None => bail!("Client has no uid"),
 		};
 
-		Self::run(db, logger, move |db, ctx| {
+		Self::run(db, logger, move |db, _| {
 			use schema::servers_clients;
 
 			// TODO Move that into a single method
@@ -786,11 +754,11 @@ impl DbHandler {
 		Ok(())
 	}
 
-	fn handle_remove_channel(db: &Addr<Self>, logger: &Logger, con: &TsConnection, data: &TsData, ch_id: ChannelId) -> Result<()> {
+	fn handle_remove_channel(db: &Addr<Self>, logger: &Logger, con: &TsConnection, _: &TsData, ch_id: ChannelId) -> Result<()> {
 		let ch_server = con.get_server_key()?;
-		let ch_server = ch_server.to_short();
+		let ch_server = ch_server.to_short().to_vec();
 
-		Self::run(db, logger, move |db, ctx| {
+		Self::run(db, logger, move |db, _| {
 			use schema::channels::dsl::*;
 
 			// Mark channel as deleted
@@ -809,10 +777,8 @@ impl DbHandler {
 	}
 
 	fn handle_message(db: &Addr<Self>, logger: &Logger, con: &TsConnection, data: &TsData, target: MessageTarget, invoker: &Invoker, message: &str) -> Result<()> {
-		use schema::messages;
-
 		let server = con.get_server_key()?;
-		let server = server.to_short();
+		let server = server.to_short().to_vec();
 
 		let utc_time = Utc::now().naive_utc();
 		let dummy_offset = FixedOffset::east(0);
@@ -822,12 +788,12 @@ impl DbHandler {
 			.local_minus_utc();
 
 		let invoker_uid = if let Some(uid) = &invoker.uid {
-			Some(uid.0.as_slice())
+			Some(uid.0.clone())
 		} else {
 			None
 		};
 		let invoker_name = if invoker_uid.is_none() {
-			Some(invoker.name.as_str())
+			Some(invoker.name.clone())
 		} else {
 			None
 		};
@@ -884,9 +850,12 @@ impl DbHandler {
 			}
 		}
 
-		Self::run(db, logger, move |db, ctx| {
+		let message = message.to_string();
+		Self::run(db, logger, move |db, _| {
+			use schema::messages;
+
 			let chat = db.get_or_create_chat(&ChatId {
-				server: server.to_vec(),
+				server,
 				chat_type: chat,
 			})?;
 
@@ -899,11 +868,11 @@ impl DbHandler {
 							utc_time - Duration::seconds(1);
 						let cmp = messages::chat
 							.eq(chat)
-							.and(messages::invoker.eq(invoker_uid))
+							.and(messages::invoker.eq(&invoker_uid))
 							.and(
-								messages::invoker_name.eq(invoker_name),
+								messages::invoker_name.eq(&invoker_name),
 							)
-							.and(messages::content.eq(message))
+							.and(messages::content.eq(&message))
 							.and(messages::time.gt(&start_check_time))
 							.and(messages::id.gt(db.last_message_id));
 						let id = messages::table
@@ -917,12 +886,13 @@ impl DbHandler {
 						}
 					}
 
+					let invoker_uid = invoker_uid.as_ref().map(|s| s.as_slice());
 					if own_message {
 						// Check if the message is already in the database
 						let cmp = messages::chat
 							.eq(chat)
 							.and(messages::invoker.eq(invoker_uid))
-							.and(messages::content.eq(message))
+							.and(messages::content.eq(&message))
 							.and(
 								messages::status
 									.eq(MessageStatus::Sending),
@@ -949,8 +919,8 @@ impl DbHandler {
 					let message = models::MessageInsert {
 						chat,
 						invoker: invoker_uid,
-						invoker_name,
-						content: message,
+						invoker_name: invoker_name.as_ref().map(|s| s.as_str()),
+						content: &message,
 						status: MessageStatus::Success,
 						time: &utc_time,
 						timezone: utc_to_local_offset,
