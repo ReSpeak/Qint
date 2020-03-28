@@ -161,13 +161,17 @@ pub struct ServersClientsInsert<'a> {
 	pub timezone: i32,
 }
 
-#[derive(Clone, Copy, DbEnum, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(
+	Clone, Copy, DbEnum, Debug, Deserialize, Eq, Hash, PartialEq, Serialize,
+)]
 pub enum EventType {
 	ChannelSwitched,
 	NameChanged,
 }
 
-#[derive(Clone, Copy, DbEnum, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(
+	Clone, Copy, DbEnum, Debug, Deserialize, Eq, Hash, PartialEq, Serialize,
+)]
 pub enum MessageStatus {
 	Sending,
 	Success,
@@ -187,7 +191,9 @@ pub struct Bookmark {
 	pub server_icon: Option<i32>,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Queryable, Serialize)]
+#[derive(
+	Clone, Debug, Deserialize, Eq, Hash, PartialEq, Queryable, Serialize,
+)]
 pub struct Message {
 	pub id: i64,
 	pub invoker: Option<Vec<u8>>,
@@ -221,10 +227,8 @@ impl PartialOrd for Message {
 }
 impl Identity {
 	pub fn into_identity(
-		self,
-		secret: &Secret,
-	) -> Result<tsclientlib::Identity>
-	{
+		self, secret: &Secret,
+	) -> Result<tsclientlib::Identity> {
 		let key = secret.open(self.private_key)?;
 		Ok(tsclientlib::Identity::new_with_max_counter(
 			tsproto::crypto::EccKeyPrivP256::import(&key)?,
@@ -236,11 +240,8 @@ impl Identity {
 
 impl<'a> NewIdentity<'a> {
 	pub fn new(
-		id: &tsclientlib::Identity,
-		client_uid: &'a [u8],
-		secret: &Secret,
-	) -> Result<Self>
-	{
+		id: &tsclientlib::Identity, client_uid: &'a [u8], secret: &Secret,
+	) -> Result<Self> {
 		let private_key = secret.seal(id.key().to_short().to_vec())?;
 		Ok(Self {
 			private_key,

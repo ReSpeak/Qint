@@ -1,7 +1,7 @@
 use std::time::Duration;
 
-use anyhow::{format_err, Result};
 use actix::*;
+use anyhow::{format_err, Result};
 use audiopus::coder::Encoder;
 use futures::prelude::*;
 use rnnoise_c::DenoiseState;
@@ -14,8 +14,8 @@ use tokio::runtime::Handle;
 use tokio::sync::mpsc;
 use tsproto_packets::packets::{AudioData, CodecType, OutAudio, OutPacket};
 
-use crate::websocket::{SendPacketMsg, SetSelfTalkingMsg, Ws};
 use super::*;
+use crate::websocket::{SendPacketMsg, SetSelfTalkingMsg, Ws};
 
 pub(crate) struct SetListenerMsg {
 	pub connection: Addr<Ws>,
@@ -65,7 +65,12 @@ impl Actor for AudioToTs {
 
 	fn started(&mut self, ctx: &mut Self::Context) {
 		ctx.run_interval(Duration::from_secs(1), |a2t, _| {
-			if a2t.encoder.as_ref().map(|e| e.device.status() == AudioStatus::Stopped).unwrap_or(true) {
+			if a2t
+				.encoder
+				.as_ref()
+				.map(|e| e.device.status() == AudioStatus::Stopped)
+				.unwrap_or(true)
+			{
 				// Try to reconnect to audio
 				match AudioEncoder::new(
 					a2t.logger.clone(),
@@ -109,11 +114,8 @@ impl Message for PlayPacketMsg {
 impl Handler<SetListenerMsg> for AudioToTs {
 	type Result = ();
 	fn handle(
-		&mut self,
-		msg: SetListenerMsg,
-		_: &mut Self::Context,
-	) -> Self::Result
-	{
+		&mut self, msg: SetListenerMsg, _: &mut Self::Context,
+	) -> Self::Result {
 		// Remove from previous connection
 		let is_playing = self.is_playing;
 		self.is_playing = false;
@@ -128,11 +130,8 @@ impl Handler<SetListenerMsg> for AudioToTs {
 impl Handler<RemoveListenerMsg> for AudioToTs {
 	type Result = bool;
 	fn handle(
-		&mut self,
-		_: RemoveListenerMsg,
-		_: &mut Self::Context,
-	) -> Self::Result
-	{
+		&mut self, _: RemoveListenerMsg, _: &mut Self::Context,
+	) -> Self::Result {
 		self.is_playing = false;
 		self.update_talking();
 		self.connection = None;
@@ -148,11 +147,8 @@ impl Handler<RemoveListenerMsg> for AudioToTs {
 impl Handler<SetVolumeMsg> for AudioToTs {
 	type Result = ();
 	fn handle(
-		&mut self,
-		msg: SetVolumeMsg,
-		_: &mut Self::Context,
-	) -> Self::Result
-	{
+		&mut self, msg: SetVolumeMsg, _: &mut Self::Context,
+	) -> Self::Result {
 		self.volume = msg.0;
 	}
 }
@@ -160,11 +156,8 @@ impl Handler<SetVolumeMsg> for AudioToTs {
 impl Handler<SetPlayingMsg> for AudioToTs {
 	type Result = ();
 	fn handle(
-		&mut self,
-		msg: SetPlayingMsg,
-		_: &mut Self::Context,
-	) -> Self::Result
-	{
+		&mut self, msg: SetPlayingMsg, _: &mut Self::Context,
+	) -> Self::Result {
 		if let Some(e) = &self.encoder {
 			if msg.0 {
 				e.device.resume();
@@ -180,8 +173,7 @@ impl Handler<SetPlayingMsg> for AudioToTs {
 impl Handler<PlayPacketMsg> for AudioToTs {
 	type Result = ();
 	fn handle(
-		&mut self,
-		PlayPacketMsg(mut buffer): PlayPacketMsg,
+		&mut self, PlayPacketMsg(mut buffer): PlayPacketMsg,
 		_: &mut Self::Context,
 	) -> Self::Result
 	{
@@ -190,12 +182,19 @@ impl Handler<PlayPacketMsg> for AudioToTs {
 			let vol = self.volume;
 			if let Some(e) = &mut self.encoder {
 				let talking = self.is_talking != 0;
-				if let Some(packet) = e.handle_audio_buffer(&mut buffer, vol, &mut self.is_talking) {
+				if let Some(packet) = e.handle_audio_buffer(
+					&mut buffer,
+					vol,
+					&mut self.is_talking,
+				) {
 					let logger = self.logger.clone();
-					self.executor
-						.spawn(con.send(SendPacketMsg(packet)).map(move |r| if let Err(e) = r {
-							error!(logger, "Failed to send audio packet"; "error" => ?e);
-						}));
+					self.executor.spawn(con.send(SendPacketMsg(packet)).map(
+						move |r| {
+							if let Err(e) = r {
+								error!(logger, "Failed to send audio packet"; "error" => ?e);
+							}
+						},
+					));
 				}
 
 				if talking != (self.is_talking != 0) {
@@ -208,9 +207,7 @@ impl Handler<PlayPacketMsg> for AudioToTs {
 
 impl AudioToTs {
 	pub(crate) fn new(
-		logger: Logger,
-		audio_subsystem: AudioSubsystem,
-		executor: Handle,
+		logger: Logger, audio_subsystem: AudioSubsystem, executor: Handle,
 		spawn_send: mpsc::UnboundedSender<SendAudioEvent>,
 	) -> Result<Self>
 	{
@@ -232,17 +229,19 @@ impl AudioToTs {
 
 	fn update_talking(&self) {
 		if let Some(con) = &self.connection {
-			tokio::spawn(con.send(SetSelfTalkingMsg(self.is_playing && self.is_talking != 0)));
+			tokio::spawn(con.send(SetSelfTalkingMsg(
+				self.is_playing && self.is_talking != 0,
+			)));
 		}
 	}
 }
 
 impl AudioEncoder {
 	fn new(
-		logger: Logger,
-		audio_subsystem: &AudioSubsystem,
+		logger: Logger, audio_subsystem: &AudioSubsystem,
 		spawn_send: mpsc::UnboundedSender<SendAudioEvent>,
-	) -> Result<Self> {
+	) -> Result<Self>
+	{
 		let desired_spec = AudioSpecDesired {
 			freq: Some(48000),
 			channels: Some(1),
@@ -253,37 +252,42 @@ impl AudioEncoder {
 		let logger2 = logger.clone();
 		let mut audio_spec = None;
 		let mut opus_channels = None;
-		let device = audio_subsystem.open_capture(None, &desired_spec, |spec| {
-			// This spec will always be the desired spec, the sdl wrapper passes
-			// zero as `allowed_changes`.
-			debug!(logger, "Got capture spec"; "spec" => ?spec,
+		let device = audio_subsystem
+			.open_capture(None, &desired_spec, |spec| {
+				// This spec will always be the desired spec, the sdl wrapper passes
+				// zero as `allowed_changes`.
+				debug!(logger, "Got capture spec"; "spec" => ?spec,
 				"driver" => audio_subsystem.current_audio_driver());
-			opus_channels = Some(if spec.channels == 1 {
-				audiopus::Channels::Mono
-			} else {
-				audiopus::Channels::Stereo
-			});
+				opus_channels = Some(if spec.channels == 1 {
+					audiopus::Channels::Mono
+				} else {
+					audiopus::Channels::Stereo
+				});
 
-			audio_spec = Some(spec);
-			SdlCallback {
-				spawn_send,
-			}
-		}).map_err(|e| format_err!("SDL error: {}", e))?;
+				audio_spec = Some(spec);
+				SdlCallback { spawn_send }
+			})
+			.map_err(|e| format_err!("SDL error: {}", e))?;
 
 		Ok(Self {
 			logger: logger2,
 			device,
 			spec: audio_spec.unwrap(),
 
-			encoder: Encoder::new(audiopus::SampleRate::Hz48000,
-				opus_channels.unwrap(), audiopus::Application::Voip)
-				.expect("Could not create opus encoder"),
+			encoder: Encoder::new(
+				audiopus::SampleRate::Hz48000,
+				opus_channels.unwrap(),
+				audiopus::Application::Voip,
+			)
+			.expect("Could not create opus encoder"),
 			denoise: DenoiseState::new(),
 			opus_output: [0; MAX_OPUS_FRAME_SIZE],
 		})
 	}
 
-	fn handle_audio_buffer(&mut self, buffer: &mut [f32], volume: f32, is_talking: &mut u8) -> Option<OutPacket> {
+	fn handle_audio_buffer(
+		&mut self, buffer: &mut [f32], volume: f32, is_talking: &mut u8,
+	) -> Option<OutPacket> {
 		// Denoise
 		if buffer.len() % rnnoise_c::FRAME_SIZE != 0 {
 			warn!(self.logger, "Size not fitting for denoising");
@@ -347,6 +351,8 @@ impl AudioEncoder {
 impl AudioCallback for SdlCallback {
 	type Channel = f32;
 	fn callback(&mut self, buffer: &mut [Self::Channel]) {
-		self.spawn_send.send(SendAudioEvent::PlayPacket(buffer.to_vec())).unwrap();
+		self.spawn_send
+			.send(SendAudioEvent::PlayPacket(buffer.to_vec()))
+			.unwrap();
 	}
 }

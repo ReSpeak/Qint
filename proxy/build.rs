@@ -38,7 +38,10 @@ fn main() {
 					new_file_path.push(file_name);
 					std::fs::copy(&entry_path, new_file_path.as_path())
 						.expect("Can't copy SDL from DLL dir");
-					println!("cargo:rerun-if-changed={}", new_file_path.display());
+					println!(
+						"cargo:rerun-if-changed={}",
+						new_file_path.display()
+					);
 				}
 			}
 		}

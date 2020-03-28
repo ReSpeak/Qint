@@ -5,10 +5,7 @@ use tsclientlib::{ClientId, MessageTarget, Version};
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum MessageF2P {
 	Connect(ConnectOptions),
-	SendMessage {
-		target: MessageTarget,
-		message: String,
-	}
+	SendMessage { target: MessageTarget, message: String },
 }
 
 /// A message sent over a websocket connection from the proxy to the frontend.

@@ -1,7 +1,7 @@
 use std::fs;
 
-use anyhow::{bail, Result};
 use actix::*;
+use anyhow::{bail, Result};
 use chrono::offset::{FixedOffset, TimeZone};
 use chrono::{Duration, Local, Utc};
 use diesel::connection::SimpleConnection;
@@ -9,10 +9,10 @@ use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use futures::prelude::*;
 use slog::{error, info, Logger};
-use tsclientlib::{ChannelId, ClientId, Identity, Invoker, MessageTarget};
-use tsclientlib::Connection as TsConnection;
 use tsclientlib::data::Connection as TsData;
 use tsclientlib::events::{Event, PropertyId, PropertyValue};
+use tsclientlib::Connection as TsConnection;
+use tsclientlib::{ChannelId, ClientId, Identity, Invoker, MessageTarget};
 use tsproto::crypto::EccKeyPubP256;
 
 use crate::secret::Secret;
@@ -70,7 +70,10 @@ pub enum ChatType {
 	Poke(Vec<u8>),
 }
 
-type RunFn = Box<dyn FnOnce(&mut DbHandler, &mut <DbHandler as Actor>::Context) -> Result<()> + Send>;
+type RunFn = Box<
+	dyn FnOnce(&mut DbHandler, &mut <DbHandler as Actor>::Context) -> Result<()>
+		+ Send,
+>;
 
 pub struct RunMsg(RunFn);
 
@@ -96,11 +99,8 @@ impl Message for RunMsg {
 
 impl DbHandler {
 	pub(crate) fn new(
-		logger: Logger,
-		settings: &Settings,
-		secret: Secret,
-	) -> Result<Self>
-	{
+		logger: Logger, settings: &Settings, secret: Secret,
+	) -> Result<Self> {
 		let database_url = settings.config_path.join("storage.sqlite");
 		let con = SqliteConnection::establish(database_url.to_str().unwrap())?;
 
@@ -148,11 +148,7 @@ impl DbHandler {
 			.first::<i64>(&self.con)
 	}
 
-	fn get_or_create_chat(
-		&self,
-		id: &ChatId,
-	) -> DieselResult<i64>
-	{
+	fn get_or_create_chat(&self, id: &ChatId) -> DieselResult<i64> {
 		use schema::{channel_chats, client_chats, client_pokes, server_chats};
 
 		match &id.chat_type {
@@ -258,11 +254,8 @@ impl DbHandler {
 impl Handler<GetIdentityMsg> for DbHandler {
 	type Result = Result<Identity>;
 	fn handle(
-		&mut self,
-		msg: GetIdentityMsg,
-		_: &mut Self::Context,
-	) -> Self::Result
-	{
+		&mut self, msg: GetIdentityMsg, _: &mut Self::Context,
+	) -> Self::Result {
 		use schema::identities::dsl::*;
 
 		match identities.find(msg.0 as i64).first::<models::Identity>(&self.con)
@@ -305,7 +298,11 @@ impl Handler<GetIdentityMsg> for DbHandler {
 
 impl Handler<UpdateIdentityMsg> for DbHandler {
 	type Result = Result<()>;
-	fn handle(&mut self, UpdateIdentityMsg(identity): UpdateIdentityMsg, _: &mut Self::Context) -> Self::Result {
+	fn handle(
+		&mut self, UpdateIdentityMsg(identity): UpdateIdentityMsg,
+		_: &mut Self::Context,
+	) -> Self::Result
+	{
 		use schema::identities::dsl::*;
 
 		let pub_key = identity.key().to_pub();
@@ -323,11 +320,8 @@ impl Handler<UpdateIdentityMsg> for DbHandler {
 impl Handler<WriteMessageMsg> for DbHandler {
 	type Result = Result<()>;
 	fn handle(
-		&mut self,
-		message: WriteMessageMsg,
-		_: &mut Self::Context,
-	) -> Self::Result
-	{
+		&mut self, message: WriteMessageMsg, _: &mut Self::Context,
+	) -> Self::Result {
 		use schema::messages;
 
 		let utc_time = Utc::now().naive_utc();
@@ -365,11 +359,8 @@ impl Handler<WriteMessageMsg> for DbHandler {
 impl Handler<ConnectedMsg> for DbHandler {
 	type Result = Result<()>;
 	fn handle(
-		&mut self,
-		msg: ConnectedMsg,
-		_: &mut Self::Context,
-	) -> Self::Result
-	{
+		&mut self, msg: ConnectedMsg, _: &mut Self::Context,
+	) -> Self::Result {
 		use diesel::dsl::not;
 		use schema::{bookmarks, identities};
 		let server = msg.server_key.to_short().to_vec();
@@ -458,17 +449,16 @@ impl Handler<ConnectedMsg> for DbHandler {
 
 impl Handler<RunMsg> for DbHandler {
 	type Result = Result<()>;
-	fn handle(&mut self, RunMsg(f): RunMsg, ctx: &mut Self::Context) -> Self::Result {
+	fn handle(
+		&mut self, RunMsg(f): RunMsg, ctx: &mut Self::Context,
+	) -> Self::Result {
 		f(self, ctx)
 	}
 }
 
 impl DbHandler {
 	pub fn handle_events(
-		db: &Addr<Self>,
-		logger: &Logger,
-		con: &TsConnection,
-		data: &TsData,
+		db: &Addr<Self>, logger: &Logger, con: &TsConnection, data: &TsData,
 		events: &[Event],
 	) -> Result<()>
 	{
@@ -494,19 +484,19 @@ impl DbHandler {
 					}
 				}
 				Event::PropertyChanged { .. } => Ok(()),
-				Event::PropertyRemoved { id, old, .. } => {
-					match id {
-						PropertyId::Client(_) => {
-							Self::handle_remove_client(db, logger, con, data, old)
-						}
-						PropertyId::Channel(id) => {
-							Self::handle_remove_channel(db, logger, con, data, *id)
-						}
-						_ => Ok(()),
+				Event::PropertyRemoved { id, old, .. } => match id {
+					PropertyId::Client(_) => {
+						Self::handle_remove_client(db, logger, con, data, old)
 					}
-				}
+					PropertyId::Channel(id) => {
+						Self::handle_remove_channel(db, logger, con, data, *id)
+					}
+					_ => Ok(()),
+				},
 				Event::Message { target, invoker, message } => {
-					Self::handle_message(db, logger, con, data, *target, invoker, message)
+					Self::handle_message(
+						db, logger, con, data, *target, invoker, message,
+					)
 				}
 				Event::ChannelListFinished => {
 					// TODO On channellistfinished: Mark channels as removed which
@@ -522,7 +512,16 @@ impl DbHandler {
 		Ok(())
 	}
 
-	fn run<F: FnOnce(&mut DbHandler, &mut <DbHandler as Actor>::Context) -> Result<()> + Send + 'static>(db: &Addr<Self>, logger: &Logger, f: F) {
+	fn run<
+		F: FnOnce(
+				&mut DbHandler,
+				&mut <DbHandler as Actor>::Context,
+			) -> Result<()>
+			+ Send
+			+ 'static,
+	>(
+		db: &Addr<Self>, logger: &Logger, f: F,
+	) {
 		let logger = logger.clone();
 		actix::spawn(db.send(RunMsg(Box::new(f))).map(move |r| match r {
 			Err(e) => {
@@ -535,7 +534,9 @@ impl DbHandler {
 		}))
 	}
 
-	fn handle_connected(db: &Addr<Self>, logger: &Logger, con: &TsConnection, data: &TsData) -> Result<()> {
+	fn handle_connected(
+		db: &Addr<Self>, logger: &Logger, con: &TsConnection, data: &TsData,
+	) -> Result<()> {
 		let key = con.get_server_key()?;
 		let key = key.to_short().to_vec();
 		let icon_id = if data.server.icon_id.0 != 0 {
@@ -575,7 +576,11 @@ impl DbHandler {
 		Ok(())
 	}
 
-	fn handle_add_client(db: &Addr<Self>, logger: &Logger, con: &TsConnection, data: &TsData, id: ClientId) -> Result<()> {
+	fn handle_add_client(
+		db: &Addr<Self>, logger: &Logger, con: &TsConnection, data: &TsData,
+		id: ClientId,
+	) -> Result<()>
+	{
 		let server = con.get_server_key()?;
 		let server = server.to_short().to_vec();
 		let client = match data.clients.get(&id) {
@@ -611,11 +616,9 @@ impl DbHandler {
 			.get_result(&db.con)?
 			{
 				// Update
-				diesel::update(
-					clients.filter(uid.eq(&client_uid)),
-				)
-				.set(name.eq(&client_name))
-				.execute(&db.con)?;
+				diesel::update(clients.filter(uid.eq(&client_uid)))
+					.set(name.eq(&client_name))
+					.execute(&db.con)?;
 			} else {
 				let client = models::ClientInsert {
 					uid: &client_uid,
@@ -651,7 +654,11 @@ impl DbHandler {
 		Ok(())
 	}
 
-	fn handle_add_channel(db: &Addr<Self>, logger: &Logger, con: &TsConnection, data: &TsData, ch_id: ChannelId) -> Result<()> {
+	fn handle_add_channel(
+		db: &Addr<Self>, logger: &Logger, con: &TsConnection, data: &TsData,
+		ch_id: ChannelId,
+	) -> Result<()>
+	{
 		let ch_server = con.get_server_key()?;
 		let ch_server = ch_server.to_short().to_vec();
 		let channel = match data.channels.get(&ch_id) {
@@ -663,9 +670,9 @@ impl DbHandler {
 		} else {
 			Some(channel.parent.0 as i64)
 		};
-		let icon_id = channel.icon_id.and_then(|i| {
-			if i.0 == 0 { None } else { Some(i.0 as i32) }
-		});
+		let icon_id = channel
+			.icon_id
+			.and_then(|i| if i.0 == 0 { None } else { Some(i.0 as i32) });
 		let ch_name = channel.name.clone();
 
 		Self::run(db, logger, move |db, _| {
@@ -709,17 +716,18 @@ impl DbHandler {
 		Ok(())
 	}
 
-	fn handle_remove_client(db: &Addr<Self>, logger: &Logger, con: &TsConnection, _: &TsData, old: &PropertyValue) -> Result<()> {
+	fn handle_remove_client(
+		db: &Addr<Self>, logger: &Logger, con: &TsConnection, _: &TsData,
+		old: &PropertyValue,
+	) -> Result<()>
+	{
 		// TODO, if own client removed, handle for all other clients
 
 		let server = con.get_server_key()?;
 		let server = server.to_short().to_vec();
 		let client = match old {
 			PropertyValue::Client(client) => client,
-			_ => panic!(
-				"Property value should be a client but \
-				 wasn't"
-			),
+			_ => panic!("Property value should be a client but wasn't"),
 		};
 		let client_uid = match &client.uid {
 			Some(uid) => uid.0.clone(),
@@ -738,15 +746,16 @@ impl DbHandler {
 				.offset_from_utc_datetime(&utc_time)
 				.local_minus_utc();
 
-			diesel::update(servers_clients::table.filter(
-				servers_clients::server.eq(server).and(
-					servers_clients::client.eq(&client_uid),
+			diesel::update(
+				servers_clients::table.filter(
+					servers_clients::server
+						.eq(server)
+						.and(servers_clients::client.eq(&client_uid)),
 				),
-			))
+			)
 			.set((
 				servers_clients::last_seen.eq(utc_time),
-				servers_clients::timezone
-					.eq(utc_to_local_offset),
+				servers_clients::timezone.eq(utc_to_local_offset),
 			))
 			.execute(&db.con)?;
 			Ok(())
@@ -754,7 +763,11 @@ impl DbHandler {
 		Ok(())
 	}
 
-	fn handle_remove_channel(db: &Addr<Self>, logger: &Logger, con: &TsConnection, _: &TsData, ch_id: ChannelId) -> Result<()> {
+	fn handle_remove_channel(
+		db: &Addr<Self>, logger: &Logger, con: &TsConnection, _: &TsData,
+		ch_id: ChannelId,
+	) -> Result<()>
+	{
 		let ch_server = con.get_server_key()?;
 		let ch_server = ch_server.to_short().to_vec();
 
@@ -763,11 +776,8 @@ impl DbHandler {
 
 			// Mark channel as deleted
 			diesel::update(
-				channels.filter(
-					server
-						.eq(&ch_server)
-						.and(id.eq(ch_id.0 as i64)),
-				),
+				channels
+					.filter(server.eq(&ch_server).and(id.eq(ch_id.0 as i64))),
 			)
 			.set(deleted.eq(true))
 			.execute(&db.con)?;
@@ -776,16 +786,19 @@ impl DbHandler {
 		Ok(())
 	}
 
-	fn handle_message(db: &Addr<Self>, logger: &Logger, con: &TsConnection, data: &TsData, target: MessageTarget, invoker: &Invoker, message: &str) -> Result<()> {
+	fn handle_message(
+		db: &Addr<Self>, logger: &Logger, con: &TsConnection, data: &TsData,
+		target: MessageTarget, invoker: &Invoker, message: &str,
+	) -> Result<()>
+	{
 		let server = con.get_server_key()?;
 		let server = server.to_short().to_vec();
 
 		let utc_time = Utc::now().naive_utc();
 		let dummy_offset = FixedOffset::east(0);
 		let local_zone = Local::from_offset(&dummy_offset);
-		let utc_to_local_offset = local_zone
-			.offset_from_utc_datetime(&utc_time)
-			.local_minus_utc();
+		let utc_to_local_offset =
+			local_zone.offset_from_utc_datetime(&utc_time).local_minus_utc();
 
 		let invoker_uid = if let Some(uid) = &invoker.uid {
 			Some(uid.0.clone())
@@ -854,24 +867,18 @@ impl DbHandler {
 		Self::run(db, logger, move |db, _| {
 			use schema::messages;
 
-			let chat = db.get_or_create_chat(&ChatId {
-				server,
-				chat_type: chat,
-			})?;
+			let chat =
+				db.get_or_create_chat(&ChatId { server, chat_type: chat })?;
 
-			db.last_message_id = db
-				.con
-				.transaction::<_, diesel::result::Error, _>(|| {
+			db.last_message_id =
+				db.con.transaction::<_, diesel::result::Error, _>(|| {
 					if can_be_duplicate {
 						// Check if the message is already in the database
-						let start_check_time =
-							utc_time - Duration::seconds(1);
+						let start_check_time = utc_time - Duration::seconds(1);
 						let cmp = messages::chat
 							.eq(chat)
 							.and(messages::invoker.eq(&invoker_uid))
-							.and(
-								messages::invoker_name.eq(&invoker_name),
-							)
+							.and(messages::invoker_name.eq(&invoker_name))
 							.and(messages::content.eq(&message))
 							.and(messages::time.gt(&start_check_time))
 							.and(messages::id.gt(db.last_message_id));
@@ -886,25 +893,19 @@ impl DbHandler {
 						}
 					}
 
-					let invoker_uid = invoker_uid.as_ref().map(|s| s.as_slice());
+					let invoker_uid =
+						invoker_uid.as_ref().map(|s| s.as_slice());
 					if own_message {
 						// Check if the message is already in the database
 						let cmp = messages::chat
 							.eq(chat)
 							.and(messages::invoker.eq(invoker_uid))
 							.and(messages::content.eq(&message))
-							.and(
-								messages::status
-									.eq(MessageStatus::Sending),
-							);
+							.and(messages::status.eq(MessageStatus::Sending));
 						// Update status
-						let res =
-							diesel::update(messages::table.filter(cmp))
-								.set(
-									messages::status
-										.eq(MessageStatus::Success),
-								)
-								.execute(&db.con)?;
+						let res = diesel::update(messages::table.filter(cmp))
+							.set(messages::status.eq(MessageStatus::Success))
+							.execute(&db.con)?;
 
 						if res != 0 {
 							// Successfully updated

@@ -5,8 +5,8 @@ use std::fmt;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use anyhow::{bail, Result};
 use actix::*;
+use anyhow::{bail, Result};
 use audiopus::coder::Decoder;
 use futures::prelude::*;
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired, AudioStatus};
@@ -16,9 +16,9 @@ use tokio::sync::mpsc;
 use tsclientlib::ClientId;
 use tsproto_packets::packets::{AudioData, CodecType, InAudioBuf};
 
+use super::*;
 use crate::websocket::{SetTalkersMsg, Ws};
 use crate::ConnectionId;
-use super::*;
 
 /// After this amount of seconds, a decoder will be removed.
 const VOICE_TIMEOUT_SECS: u64 = 1;
@@ -138,8 +138,7 @@ impl Actor for TsToAudio {
 
 impl TsToAudio {
 	pub(crate) fn new(
-		logger: Logger,
-		audio_subsystem: AudioSubsystem,
+		logger: Logger, audio_subsystem: AudioSubsystem,
 		connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
 		spawn_send: mpsc::UnboundedSender<SendAudioEvent>,
 	) -> Result<Self>
@@ -224,7 +223,8 @@ impl Handler<PlayMsg> for TsToAudio {
 		}
 
 		if let AudioData::S2C { id: packet_id, from, codec, data }
-		| AudioData::S2CWhisper { id: packet_id, from, codec, data } = msg.1.data().data()
+		| AudioData::S2CWhisper { id: packet_id, from, codec, data } =
+			msg.1.data().data()
 		{
 			if *codec != CodecType::OpusVoice && *codec != CodecType::OpusMusic
 			{
@@ -269,14 +269,17 @@ impl Handler<PlayMsg> for TsToAudio {
 
 			let mut opus_output = vec![0f32; USUAL_FRAME_SIZE];
 			let len = loop {
-				match decoder.decode_float(Some(*data), &mut opus_output, false) {
+				match decoder.decode_float(Some(*data), &mut opus_output, false)
+				{
 					Ok(len) => break len,
 					Err(audiopus::error::Error::Opus(
 						audiopus::error::ErrorCode::BufferTooSmall,
 					)) => {
 						// Enlarge the buffer
 						if opus_output.len() == MAX_FRAME_SIZE {
-							bail!("Bad opus packet, maximum buffer size exceeded");
+							bail!(
+								"Bad opus packet, maximum buffer size exceeded"
+							);
 						} else if opus_output.len() * 2 > MAX_FRAME_SIZE {
 							opus_output.resize(MAX_FRAME_SIZE, 0f32);
 						} else {
@@ -332,11 +335,8 @@ impl Handler<PlayMsg> for TsToAudio {
 impl Handler<TalkersChangedMsg> for TsToAudio {
 	type Result = ();
 	fn handle(
-		&mut self,
-		msg: TalkersChangedMsg,
-		_: &mut Self::Context,
-	) -> Self::Result
-	{
+		&mut self, msg: TalkersChangedMsg, _: &mut Self::Context,
+	) -> Self::Result {
 		self.talkers_changed(msg.0);
 	}
 }

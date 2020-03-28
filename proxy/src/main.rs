@@ -8,11 +8,11 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use anyhow::{bail, Result};
 use actix::*;
 use actix_files::Files;
 use actix_web::*;
 use actix_web_actors::ws;
+use anyhow::{bail, Result};
 use futures::prelude::*;
 use serde::Deserialize;
 use slog::{debug, error, info, o, warn, Drain, Logger};
@@ -148,11 +148,8 @@ impl Default for Settings {
 
 #[get("/con/{id}/ws")]
 async fn create_ws(
-	state: web::Data<State>,
-	uuid: web::Path<Uuid>,
-	options: web::Query<WsOptions>,
-	req: HttpRequest,
-	stream: web::Payload,
+	state: web::Data<State>, uuid: web::Path<Uuid>,
+	options: web::Query<WsOptions>, req: HttpRequest, stream: web::Payload,
 ) -> impl Responder
 {
 	let id = ConnectionId(*uuid);
@@ -160,8 +157,10 @@ async fn create_ws(
 	// Check that the id does not exist
 	let cons = state.connections.lock().unwrap();
 	if cons.contains_key(&id) {
-		return Either::A(HttpResponse::PreconditionFailed()
-			.body("Connection id is already occupied".to_string()));
+		return Either::A(
+			HttpResponse::PreconditionFailed()
+				.body("Connection id is already occupied".to_string()),
+		);
 	}
 
 	let ws_con = Ws::new(state.logger.clone(), (*state).clone(), options.0, id);
@@ -201,9 +200,7 @@ async fn audiosend_false(state: web::Data<State>) -> impl Responder {
 }
 
 #[get("/plugins")]
-async fn list_plugins(
-	state: web::Data<State>,
-) -> impl Responder {
+async fn list_plugins(state: web::Data<State>) -> impl Responder {
 	let path = &state.settings.plugin_path;
 	let mut res = Vec::new();
 	let dir = match path.read_dir() {
@@ -223,10 +220,8 @@ async fn list_plugins(
 
 #[get("/plugins/{name}")]
 async fn get_plugin(
-	state: web::Data<State>,
-	data: web::Path<String>,
-) -> impl Responder
-{
+	state: web::Data<State>, data: web::Path<String>,
+) -> impl Responder {
 	let path = state.settings.plugin_path.join(&*data);
 	fs::read_to_string(path).with_header(
 		http::header::CONTENT_TYPE,
@@ -236,10 +231,8 @@ async fn get_plugin(
 
 #[get("/con/{id}/file/{channel}/{path:.*}")]
 async fn download_file(
-	state: web::Data<State>,
-	data: web::Path<(Uuid, u64, String)>,
-) -> impl Responder
-{
+	state: web::Data<State>, data: web::Path<(Uuid, u64, String)>,
+) -> impl Responder {
 	let channel = ChannelId(data.1);
 	let cons = state.connections.lock().unwrap();
 	if let Some(con) = cons.get(&ConnectionId(data.0)).cloned() {
@@ -247,13 +240,15 @@ async fn download_file(
 		debug!(state.logger, "Downloading file"; "channel" => data.1, "path" => &data.2);
 		let (len, file_stream): (u64, TcpStream) = match con
 			.send(websocket::DownloadFile { channel, path: data.2.clone() })
-			.await {
+			.await
+		{
 			Err(_) => {
 				return HttpResponse::Gone().finish();
 			}
 			Ok(Err(e)) => {
 				error!(state.logger, "File download failed"; "error" => ?e);
-				return HttpResponse::InternalServerError().body("Failed to download file");
+				return HttpResponse::InternalServerError()
+					.body("Failed to download file");
 			}
 			Ok(Ok(r)) => r,
 		};

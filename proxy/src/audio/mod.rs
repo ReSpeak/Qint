@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use anyhow::Result;
 use actix::*;
+use anyhow::Result;
 use futures::FutureExt;
 use slog::{error, Logger};
 use tokio::runtime::{Handle, Runtime};
@@ -57,10 +57,8 @@ pub(crate) enum SendAudioEvent {
 }
 
 pub(crate) fn start(
-	logger: Logger,
-	connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
-) -> Result<AudioData>
-{
+	logger: Logger, connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
+) -> Result<AudioData> {
 	let sdl_context = sdl2::init().unwrap();
 
 	let audio_subsystem = sdl_context.audio().unwrap();
@@ -74,8 +72,20 @@ pub(crate) fn start(
 
 	// Create thread local runtime for non-send tasks
 	let (spawn_send, mut spawn_recv) = mpsc::unbounded_channel();
-	let ts2a = TsToAudio::new(logger.clone(), audio_subsystem.clone(), connections, spawn_send.clone())?.start();
-	let a2ts = AudioToTs::new(logger.clone(), audio_subsystem, runtime.handle().clone(), spawn_send)?.start();
+	let ts2a = TsToAudio::new(
+		logger.clone(),
+		audio_subsystem.clone(),
+		connections,
+		spawn_send.clone(),
+	)?
+	.start();
+	let a2ts = AudioToTs::new(
+		logger.clone(),
+		audio_subsystem,
+		runtime.handle().clone(),
+		spawn_send,
+	)?
+	.start();
 
 	let ts2a2 = ts2a.clone();
 	let a2ts2 = a2ts.clone();
