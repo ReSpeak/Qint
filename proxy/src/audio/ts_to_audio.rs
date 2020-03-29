@@ -4,14 +4,11 @@ use std::time::Duration;
 
 use actix::*;
 use anyhow::Result;
-use sdl2::audio::{AudioQueue, AudioSpecDesired, AudioStatus};
+use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired, AudioStatus};
 use sdl2::AudioSubsystem;
 use slog::{debug, error, o, trace, warn, Logger};
 
 use super::*;
-
-/// Buffer for 10 ms at 48 kHz (stereo).
-const BUFFER_SIZE: usize = 48_000 / 100 * 2;
 
 pub struct StartPlayingMsg;
 
@@ -19,6 +16,8 @@ pub struct StartPlayingMsg;
 pub(crate) enum T2AStatus {
 	/// Playing but no data have been added.
 	PlayingNothing,
+	/// Playing and should pause because there were no data the last time.
+	PlayingShouldPause,
 	/// Playing and has data.
 	Playing,
 	/// Needs to be started.
@@ -40,9 +39,13 @@ pub(crate) struct TsToAudioData {
 pub(crate) struct TsToAudio {
 	logger: Logger,
 	audio_subsystem: AudioSubsystem,
-	device: Option<AudioQueue<f32>>,
+	device: Option<AudioDevice<SdlCallback>>,
 	data: Arc<Mutex<TsToAudioData>>,
-	queue_buffer_timer: Option<SpawnHandle>,
+}
+
+struct SdlCallback {
+	logger: Logger,
+	data: Arc<Mutex<TsToAudioData>>,
 }
 
 impl Message for StartPlayingMsg {
@@ -55,7 +58,8 @@ impl TsToAudioData {
 	pub fn add_waker(&mut self, waker: Waker) -> bool {
 		self.wakers.push(waker);
 		match self.state {
-			| T2AStatus::PlayingNothing => {
+			T2AStatus::PlayingNothing
+			| T2AStatus::PlayingShouldPause => {
 				self.state = T2AStatus::Playing;
 			}
 			T2AStatus::Paused => {
@@ -75,6 +79,19 @@ impl Actor for TsToAudio {
 		self.open_playback();
 
 		ctx.run_interval(Duration::from_secs(1), |t2a, _| {
+			{
+				let mut data = t2a.data.lock().unwrap();
+				if data.state == T2AStatus::PlayingShouldPause {
+					if let Some(device) = &t2a.device {
+						if device.status() == AudioStatus::Playing {
+							debug!(t2a.logger, "Pausing playback");
+							device.pause();
+							data.state = T2AStatus::Paused;
+						}
+					}
+				}
+			}
+
 			// Restart on errors
 			if t2a
 				.device
@@ -97,7 +114,7 @@ impl TsToAudio {
 		let logger = logger.new(o!("pipeline" => "ts-to-audio"));
 		let data = Arc::new(Mutex::new(TsToAudioData {
 			state: T2AStatus::Paused,
-			data: vec![0.0; BUFFER_SIZE],
+			data: Default::default(),
 			wakers: Default::default(),
 			gen: 0,
 		}));
@@ -107,7 +124,6 @@ impl TsToAudio {
 			audio_subsystem,
 			device: None,
 			data: data.clone(),
-			queue_buffer_timer: None,
 		}, data))
 	}
 
@@ -119,17 +135,20 @@ impl TsToAudio {
 		};
 
 		let logger = self.logger.clone();
-		// This spec will always be the desired spec, the sdl wrapper passes
-		// zero as `allowed_changes`.
-		match self.audio_subsystem.open_queue(None, &desired_spec) {
-			Ok(queue) => {
-				debug!(logger, "Got playback spec"; "spec" => ?queue.spec(),
-					"driver" => self.audio_subsystem.current_audio_driver());
-				self.device = Some(queue)
+		let data = self.data.clone();
+		match self.audio_subsystem.open_playback(None, &desired_spec, |spec| {
+			// This spec will always be the desired spec, the sdl wrapper passes
+			// zero as `allowed_changes`.
+			debug!(logger, "Got playback spec"; "spec" => ?spec, "driver" => self.audio_subsystem.current_audio_driver());
+			SdlCallback {
+				logger,
+				data,
 			}
+		}) {
+			Ok(device) => self.device = Some(device),
 			Err(e) => {
 				self.device = None;
-				error!(self.logger, "Failed to open playback device"; "error" => e);
+				error!(self.logger, "Failed to open playback device"; "error" => ?e);
 			}
 		}
 	}
@@ -137,47 +156,12 @@ impl TsToAudio {
 
 impl Handler<StartPlayingMsg> for TsToAudio {
 	type Result = ();
-	fn handle(&mut self, _: StartPlayingMsg, ctx: &mut Self::Context) -> Self::Result {
+	fn handle(&mut self, _: StartPlayingMsg, _: &mut Self::Context) -> Self::Result {
 		if let Some(device) = &self.device {
 			if device.status() == AudioStatus::Paused {
 				debug!(self.logger, "Resuming playback");
 				self.data.lock().unwrap().state = T2AStatus::Playing;
 				self.device.as_ref().unwrap().resume();
-
-				self.queue_buffer_timer = Some(ctx.run_interval(Duration::from_millis(10), |t2a, ctx| {
-					trace!(t2a.logger, "Filling audio playback buffer");
-
-					let mut data = t2a.data.lock().unwrap();
-					if let Some(queue) = &t2a.device {
-						queue.queue(&data.data);
-					} else {
-						debug!(t2a.logger, "Stopping playback because device is lost");
-						ctx.cancel_future(t2a.queue_buffer_timer.take().unwrap());
-						data.state = T2AStatus::Paused;
-						return;
-					}
-
-					// Clear buffer
-					for d in &mut data.data {
-						*d = 0.0;
-					}
-
-					data.gen = data.gen.wrapping_add(1);
-					let new_state = match data.state {
-						T2AStatus::Paused
-						| T2AStatus::PlayingNothing => {
-							debug!(t2a.logger, "Pausing playback");
-							t2a.device.as_ref().unwrap().pause();
-							ctx.cancel_future(t2a.queue_buffer_timer.take().unwrap());
-							T2AStatus::Paused
-						}
-						T2AStatus::Playing => {
-							T2AStatus::PlayingNothing
-						}
-					};
-					data.state = new_state;
-					data.wakers.drain(..).for_each(|w| w.wake());
-				}));
 			}
 		} else {
 			warn!(
@@ -185,5 +169,35 @@ impl Handler<StartPlayingMsg> for TsToAudio {
 				"Unable to play audio packet, device is not initialized"
 			);
 		}
+	}
+}
+
+impl AudioCallback for SdlCallback {
+	type Channel = f32;
+	fn callback(&mut self, buffer: &mut [Self::Channel]) {
+		trace!(self.logger, "Filling audio playback buffer"; "len" => buffer.len());
+
+		let mut data = self.data.lock().unwrap();
+		if data.data.len() != buffer.len() {
+			warn!(self.logger, "Audio buffer has wrong length";
+				"has" => data.data.len(), "need" => buffer.len());
+			data.data.resize(buffer.len(), 0.0);
+		}
+		buffer.copy_from_slice(&data.data);
+
+		// Clear buffer
+		for d in &mut data.data {
+			*d = 0.0;
+		}
+
+		data.gen = data.gen.wrapping_add(1);
+		let new_state = match data.state {
+			T2AStatus::PlayingNothing
+			| T2AStatus::PlayingShouldPause => T2AStatus::PlayingShouldPause,
+			T2AStatus::Playing => T2AStatus::PlayingNothing,
+			T2AStatus::Paused => T2AStatus::Paused,
+		};
+		data.state = new_state;
+		data.wakers.drain(..).for_each(|w| w.wake());
 	}
 }
