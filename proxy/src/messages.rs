@@ -3,6 +3,7 @@ use tsclientlib::{ClientId, MessageTarget, Version};
 
 /// A message sent over a websocket connection from the frontend to the proxy.
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub enum MessageF2P {
 	Connect(ConnectOptions),
 	SendMessage { target: MessageTarget, message: String },
@@ -10,17 +11,19 @@ pub enum MessageF2P {
 
 /// A message sent over a websocket connection from the proxy to the frontend.
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub enum MessageP2F {
 	/// The connection failed. The websocket connection should be closed
 	/// afterwards.
 	Error(String),
-	/// The list of currently talking clients.
-	TalkersChanged(Vec<ClientId>),
+	/// The list of currently talking clients and `true` if they are whispering.
+	TalkersChanged(Vec<(ClientId, bool)>),
 	/// The connection received events.
 	Events(), // TODO
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ConnectOptions {
 	pub address: String,
 	pub name: String,

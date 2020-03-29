@@ -7,11 +7,11 @@ use actix::*;
 use actix_web_actors::ws;
 use anyhow::{bail, format_err, Result};
 use futures::prelude::*;
-use slog::{error, o, warn, Logger};
+use slog::{debug, error, o, warn, Logger};
 use tokio::net::TcpStream;
 use tsclientlib::events::Event as TsEvent;
 use tsclientlib::StreamItem as TsStreamItem;
-use tsclientlib::{events, ChannelId, ClientId, Connection, MessageTarget};
+use tsclientlib::{events, ChannelId, Connection, DisconnectOptions, MessageTarget};
 use tsproto::resend::PacketId;
 use tsproto_packets::packets::OutPacket;
 
@@ -28,15 +28,23 @@ pub(crate) struct Ws {
 	connection: Option<Connection>,
 	connect_options: Option<messages::ConnectOptions>,
 
-	talkers: Vec<ClientId>,
+	websocket_closed: bool,
+	audio_manager_running: bool,
 	self_talking: bool,
 }
 
 /// Polls the connection for events.
 struct ConnectionPoller;
 
+/// Get audio from the connection and hand it to the `TsToAudio` actor.
+struct AudioManager {
+	/// A temporary audio buffer.
+	audio_buffer: Vec<f32>,
+	/// The last generation where we used audio.
+	last_gen: usize,
+}
+
 pub(crate) struct SendMessageMsg(pub MessageP2F);
-pub(crate) struct SetTalkersMsg(pub Vec<ClientId>);
 pub(crate) struct SetSelfTalkingMsg(pub bool);
 pub(crate) struct SendPacketMsg(pub OutPacket);
 
@@ -53,34 +61,31 @@ pub(crate) struct UploadFile {
 impl Actor for Ws {
 	type Context = ws::WebsocketContext<Self>;
 
-	fn stopping(&mut self, _: &mut Self::Context) -> Running {
-		// TODO Wait until disconnected if still connected
-		//Running::Continue
-		Running::Stop
+	fn stopping(&mut self, ctx: &mut Self::Context) -> Running {
+		// Wait until disconnected if still connected
+		if self.connection.is_some() {
+			self.disconnect(ctx);
+			Running::Continue
+		} else {
+			debug!(self.logger, "Stopping connection");
+			Running::Stop
+		}
 	}
 }
 
 impl Message for SendMessageMsg {
 	type Result = ();
 }
-
-impl Message for SetTalkersMsg {
-	type Result = ();
-}
-
 impl Message for SetSelfTalkingMsg {
 	type Result = ();
 }
-
 impl Message for SendPacketMsg {
 	type Result = Result<PacketId>;
 }
-
 impl Message for DownloadFile {
 	/// The size of the file and the stream
 	type Result = Result<(u64, TcpStream)>;
 }
-
 impl Message for UploadFile {
 	type Result = Result<TcpStream>;
 }
@@ -98,30 +103,31 @@ impl Ws {
 			connection: None,
 			connect_options: None,
 
-			talkers: Default::default(),
+			websocket_closed: false,
+			audio_manager_running: false,
 			self_talking: false,
 		}
 	}
 
 	fn update_talkers(&mut self, ctx: &mut <Self as Actor>::Context) {
-		if let Some(con) =
-			&self.connection.as_ref().and_then(|c| c.get_state().ok())
-		{
-			let mut talkers = self.talkers.clone();
-			if self.self_talking {
-				talkers.push(con.own_client);
+		if let Some(con) = &self.connection {
+			if let Ok(state) = con.get_state() {
+				let mut talkers = con.get_audio().get_queues().iter()
+					.map(|(i, q)| (*i, q.is_whispering())).collect::<Vec<_>>();
+				if self.self_talking {
+					talkers.push((state.own_client, false));
+				}
+				self.send_message(&MessageP2F::TalkersChanged(talkers), ctx);
+				return;
 			}
-			self.send_message(&MessageP2F::TalkersChanged(talkers), ctx);
-		} else {
-			self.talkers.clear();
-			self.send_message(&MessageP2F::TalkersChanged(Vec::new()), ctx);
 		}
+		self.send_message(&MessageP2F::TalkersChanged(Vec::new()), ctx);
 	}
 
 	fn handle_event(
 		&mut self, event: TsStreamItem, ctx: &mut <Self as Actor>::Context,
 	) {
-		let event = match event {
+		match event {
 			TsStreamItem::ConEvents(events) => {
 				for e in &events {
 					if let TsEvent::PropertyAdded {
@@ -198,52 +204,49 @@ impl Ws {
 						}
 					}
 				}
-				return;
+			}
+			TsStreamItem::TalkersChanged => {
+				self.update_talkers(ctx);
+				if let Some(con) = &self.connection {
+					if !con.get_audio().get_queues().is_empty() && !self.audio_manager_running {
+						ctx.spawn(AudioManager::new(self));
+					}
+				}
 			}
 			TsStreamItem::IdentityLevelIncreased => {
 				if let Some(con) = &self.connection {
-					db::UpdateIdentityMsg(
+					let event = db::UpdateIdentityMsg(
 						con.get_options().get_identity().unwrap().clone(),
-					)
-				} else {
-					return;
+					);
+					let logger = self.logger.clone();
+					actix::spawn(self.state.database.send(event).map(move |r| match r {
+						Ok(Ok(())) => {}
+						Ok(Err(e)) => {
+							error!(logger, "Failed to handle event in database"; "error" => ?e);
+						}
+						Err(_) => {
+							error!(logger, "Failed to send event to database");
+						}
+					}));
 				}
 			}
-			_ => return,
-		};
-		let logger = self.logger.clone();
-		actix::spawn(self.state.database.send(event).map(move |r| match r {
-			Ok(Ok(())) => {}
-			Ok(Err(e)) => {
-				error!(logger, "Failed to handle event in database"; "error" => ?e);
-			}
-			Err(_) => {
-				error!(logger, "Failed to send event to database");
-			}
-		}));
+			_ => {}
+		}
 	}
 
-	fn handle_audio(&mut self) {
-		// TODO
-		/*let logger = self.logger.clone();
-		self.audio.send(audio::ts_to_audio::PlayMsg(self.id, packet))
-			.map(move |r| match r {
-				Ok(Ok(())) => {}
-				Ok(Err(e)) => {
-					error!(logger, "Failed to play audio packet"; "error" => ?e)
-				}
-				Err(e) => {
-					error!(logger, "Failed to play audio packet"; "error" => ?e)
-				}
-			});*/
-	}
-
-	fn disconnect(&mut self, _: &mut <Self as Actor>::Context) {
-		if let Some(_con) = &mut self.connection {
-			// TODO Send disconnect packet
-		} else { // if websocket connected
-			// TODO Disconnect websocket
-		} // Else stop()
+	fn disconnect(&mut self, ctx: &mut <Self as Actor>::Context) {
+		if let Some(con) = &mut self.connection {
+			if let Err(e) = con.disconnect(DisconnectOptions::new()) {
+				warn!(self.logger, "Failed to disconnect properly";
+					"error" => %e);
+				self.connection = None;
+				self.disconnect(ctx);
+			}
+		} else if !self.websocket_closed {
+			ctx.close(None);
+		} else {
+			ctx.stop();
+		}
 	}
 
 	fn handle_ws_message(
@@ -445,20 +448,6 @@ impl Handler<UploadFile> for Ws {
 	}
 }
 
-impl Handler<SetTalkersMsg> for Ws {
-	type Result = ();
-	fn handle(
-		&mut self, SetTalkersMsg(talkers): SetTalkersMsg,
-		ctx: &mut Self::Context,
-	) -> Self::Result
-	{
-		if self.talkers != talkers {
-			self.talkers = talkers;
-			self.update_talkers(ctx);
-		}
-	}
-}
-
 impl Handler<SetSelfTalkingMsg> for Ws {
 	type Result = ();
 	fn handle(
@@ -515,7 +504,10 @@ impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for Ws {
 					};
 				self.handle_ws_message(msg, ctx);
 			}
-			Ok(ws::Message::Close(_)) => self.disconnect(ctx),
+			Ok(ws::Message::Close(_)) => {
+				self.websocket_closed = true;
+				self.disconnect(ctx);
+			}
 			_ => {}
 		}
 	}
@@ -557,5 +549,68 @@ impl ActorFuture for ConnectionPoller {
 				}
 			}
 		}
+	}
+}
+
+impl AudioManager {
+	fn new(actor: &mut Ws) -> Self {
+		let data = actor.state.audio_data.ts2a_data.lock().unwrap();
+		let last_gen = data.gen.wrapping_sub(1);
+		actor.audio_manager_running = true;
+
+		Self {
+			audio_buffer: Default::default(),
+			last_gen,
+		}
+	}
+}
+
+impl ActorFuture for AudioManager {
+	type Output = ();
+	type Actor = Ws;
+	fn poll(
+		mut self: Pin<&mut Self>, actor: &mut Self::Actor,
+		_: &mut <Self::Actor as Actor>::Context, task: &mut task::Context,
+	) -> Poll<Self::Output>
+	{
+		if let Some(con) = &mut actor.connection {
+			if con.get_audio().get_queues().is_empty() {
+				debug!(actor.logger, "Shutdown audio manager");
+				actor.audio_manager_running = false;
+				return Poll::Ready(());
+			}
+
+			{
+				let data = actor.state.audio_data.ts2a_data.lock().unwrap();
+				if data.gen == self.last_gen {
+					return Poll::Pending;
+				}
+				self.audio_buffer.resize(data.data.len(), 0.0);
+			}
+
+			for d in &mut self.audio_buffer {
+				*d = 0.0;
+			}
+
+			con.get_mut_audio().fill_buffer(&mut self.audio_buffer);
+		} else {
+			debug!(actor.logger, "Shutdown audio manager, connection is gone");
+			return Poll::Ready(());
+		}
+
+		let mut data = actor.state.audio_data.ts2a_data.lock().unwrap();
+		self.last_gen = data.gen;
+		for (a, b) in data.data.iter_mut().zip(self.audio_buffer.iter()) {
+			*a += b;
+		}
+		if data.add_waker(task.waker().clone()) {
+			let logger = actor.logger.clone();
+			actix::spawn(actor.state.audio_data.ts2a.send(audio::ts_to_audio::StartPlayingMsg)
+				.map(move |r| if let Err(e) = r {
+					error!(logger, "Failed to start playback"; "error" => ?e);
+				}));
+		}
+
+		Poll::Pending
 	}
 }

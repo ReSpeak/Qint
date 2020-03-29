@@ -271,7 +271,8 @@ async fn download_file(
 async fn main() -> Result<()> {
 	let logger = {
 		let decorator = slog_term::TermDecorator::new().build();
-		let drain = slog_term::CompactFormat::new(decorator).build().fuse();
+		let drain = slog_term::CompactFormat::new(decorator).build();
+		let drain = slog_envlogger::new(drain).fuse();
 		let drain = slog_async::Async::new(drain).build().fuse();
 
 		slog::Logger::root(drain, o!())
@@ -355,7 +356,7 @@ async fn main() -> Result<()> {
 	let connections = Arc::new(Mutex::new(HashMap::new()));
 
 	// Start sound
-	let audio_data = audio::start(logger.clone(), connections.clone())?;
+	let audio_data = audio::start(logger.clone())?;
 
 	let addr = settings.listen_address.clone();
 

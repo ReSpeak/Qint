@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -11,21 +10,11 @@ use tokio::stream::StreamExt;
 use tokio::sync::mpsc;
 use tokio::task;
 
-use crate::websocket::Ws;
-use crate::ConnectionId;
-
 use audio_to_ts::AudioToTs;
 use ts_to_audio::TsToAudio;
 
 pub mod audio_to_ts;
 pub mod ts_to_audio;
-
-/// The maximum supported size of a decoded audio packet.
-///
-/// Use 48 kHz, maximum of 120 ms frames (3 times 40 ms frames of which there
-/// are 25 per second) and stereo data (2 channels).
-/// This is a maximum of 11520 samples and 45 kiB.
-const MAX_FRAME_SIZE: usize = 48000 / 25 * 3 * 2;
 
 /// The usual frame size.
 ///
@@ -48,17 +37,15 @@ pub(crate) struct AudioData {
 	pub pool: Handle,
 	pub a2ts: Addr<AudioToTs>,
 	pub ts2a: Addr<TsToAudio>,
+	pub ts2a_data: Arc<Mutex<ts_to_audio::TsToAudioData>>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) enum SendAudioEvent {
-	TalkersChanged(ConnectionId),
 	PlayPacket(Vec<f32>),
 }
 
-pub(crate) fn start(
-	logger: Logger, connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
-) -> Result<AudioData> {
+pub(crate) fn start(logger: Logger) -> Result<AudioData> {
 	let sdl_context = sdl2::init().unwrap();
 
 	let audio_subsystem = sdl_context.audio().unwrap();
@@ -72,13 +59,11 @@ pub(crate) fn start(
 
 	// Create thread local runtime for non-send tasks
 	let (spawn_send, mut spawn_recv) = mpsc::unbounded_channel();
-	let ts2a = TsToAudio::new(
+	let (ts2a, ts2a_data) = TsToAudio::new(
 		logger.clone(),
 		audio_subsystem.clone(),
-		connections,
-		spawn_send.clone(),
-	)?
-	.start();
+	)?;
+	let ts2a = ts2a.start();
 	let a2ts = AudioToTs::new(
 		logger.clone(),
 		audio_subsystem,
@@ -87,7 +72,6 @@ pub(crate) fn start(
 	)?
 	.start();
 
-	let ts2a2 = ts2a.clone();
 	let a2ts2 = a2ts.clone();
 	thread::spawn(move || {
 		let local = tokio::task::LocalSet::new();
@@ -97,16 +81,6 @@ pub(crate) fn start(
 			while let Some(e) = spawn_recv.next().await {
 				let logger = logger.clone();
 				match e {
-					SendAudioEvent::TalkersChanged(con) => task::spawn_local(
-						ts2a2.send(ts_to_audio::TalkersChangedMsg(con))
-							.map(move |r| {match r {
-								Ok(()) => {}
-								Err(e) => {
-									error!(logger, "Failed to notify TS2Audio pipeline about talker change"; "error" => ?e)
-								}
-							}
-							}),
-						),
 					SendAudioEvent::PlayPacket(buffer) => task::spawn_local(
 						a2ts2.send(audio_to_ts::PlayPacketMsg(buffer))
 							.map(move |r| {match r {
@@ -121,5 +95,5 @@ pub(crate) fn start(
 		});
 	});
 
-	Ok(AudioData { pool, a2ts, ts2a })
+	Ok(AudioData { pool, a2ts, ts2a, ts2a_data })
 }
