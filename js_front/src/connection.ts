@@ -1,17 +1,18 @@
 import { Chat, Message } from "./chat/chat";
-import { OutMsg, InMsg } from "./msg/ws";
-import { writable } from "svelte/store";
+import { OutMsg, InMsg } from "./structs/ws";
+import { writable, Writable } from "svelte/store";
+import { Book, Channel, Server } from "./tree/book";
 
 export class Connection {
-	public state = writable(ConnectionState.Disconnected);
-	public server?: Server;
-	public clients: Map<number, Client> = new Map();
-	public channels: Map<number, Channel> = new Map();
-	public chat: Chat;
+	public readonly state = writable(ConnectionState.Disconnected);
+
+	public readonly book: Book;
+	public readonly chat: Chat;
 	private socket: WebSocket;
 	private guid: string;
 
 	constructor() {
+		this.book = new Book();
 		this.chat = new Chat();
 		this.guid = "36c07459-a731-4868-9f10-a9b7564a4461"; // TODO random
 		// this.socket = new WebSocket(`ws://con/${this.guid}/ws`);
@@ -31,13 +32,16 @@ export class Connection {
 
 	private fillDummyData() {
 		this.state.set(ConnectionState.Connected);
-		this.channels.set(3, new Channel(3, 0, 0));
+		this.book.addChannel(new Channel(1, 0, 0).set_name("A"));
+		this.book.addChannel(new Channel(2, 1, 0).set_name("B"));
+		this.book.addChannel(new Channel(3, 1, 2).set_name("C"));
+		this.book.server.update(s => { s.name = "Server der Verplanten"; return s; });
 		this.chat.messages.update(m => [...m,
-			new Message("asd", "asdfg"),
-			new Message("asd", "asdfg"),
-			new Message("foor", "asdfg"),
-			new Message("asd", "asdfg"),
-			new Message("asd", "asdfg"),
+		new Message("asd", "asdfg"),
+		new Message("asd", "asdfg"),
+		new Message("foor", "asdfg"),
+		new Message("as<>d", "a<div>sdfg"),
+		new Message("asd", "asdfg"),
 		]);
 	}
 
@@ -78,27 +82,4 @@ export enum ConnectionState {
 interface IConnectOptions {
 	address: string;
 	// ...
-}
-
-type ChannelId = number;
-
-class Client {
-	public name?: string;
-}
-
-class Channel {
-	public id: ChannelId;
-	public name?: string;
-	public parent: ChannelId;
-	public order: ChannelId;
-
-	constructor(id: ChannelId, parent: ChannelId, order: ChannelId) {
-		this.id = id;
-		this.parent = parent;
-		this.order = order;
-	}
-}
-
-class Server {
-	public name?: string;
 }

@@ -15,6 +15,6 @@
 		"variable-name": false,
 		"no-empty": false,
 		"no-console": false,
-		"member-ordering": false,
+		"member-ordering": false
 	}
 }

@@ -1,4 +1,6 @@
 <script>
+	import Server from "../tree/Server.svelte";
+
 	export let connection;
 </script>
 
@@ -40,11 +42,7 @@
 		</div>
 	</div>
 
-	<!-- <ChannelTree
-		connection="&self.con"
-		chat="&self.chat"
-		set_chat="&self.set_chat"
-	/> -->
+	<Server {connection} />
 
 	<div class="menu">
 		<ul class="menu-list">
@@ -52,7 +50,7 @@
 				<div class="channel-line">
 					<a href="#" class="entry-expand">
 						<span class="entry-expand" style="display:flex;">
-							{'Splamy (maybe)'}
+							Splamy (maybe)
 						</span>
 					</a>
 				</div>

@@ -11,7 +11,7 @@
 	{#if raw}
 		{raw}
 	{:else}
-		<i class="mdi mdi-{name} mdi-{size}-px"></i>
+		<i class="mdi mdi-{name} mdi-{size}px"></i>
 	{/if}
 </span>
 

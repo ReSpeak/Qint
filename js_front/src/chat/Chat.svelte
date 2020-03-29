@@ -1,13 +1,14 @@
 <script>
 	import Message from "./Message.svelte";
 	import Icon from "../ui/Icon.svelte";
+	import { DateSeparator } from "./chat";
 	// import { sleep } from "../util";
 
 	// let load_morrr;
 
 	export let connection;
-	$: chat = connection.chat;
-	$: messages = chat.grouped_messages;
+	let chat = connection.chat;
+	let messages = chat.grouped_messages;
 
 	let load_msg_task = Promise.resolve();
 	// console.log(connection);
@@ -47,19 +48,25 @@
 			</div>
 		{:then}
 			{#each $messages as group}
-				<div class="invoker-icon">
-					<Icon name="account" />
-				</div>
-				<div
-					class="invoker-name has-text-weight-bold"
-					style="user_color"
-				>
-					{group.user}
-				</div>
+				{#if group instanceof DateSeparator}
+					<div title="{group.date.format('YY')}" class="chat-date">
+						{group.date.format('YY')}
+					</div>
+				{:else}
+					<div class="invoker-icon">
+						<Icon name="account" />
+					</div>
+					<div
+						class="invoker-name has-text-weight-bold"
+						style="user_color"
+					>
+						{group.user}
+					</div>
 
-				{#each group.messages as message}
-					<Message {message} />
-				{/each}
+					{#each group.messages as message}
+						<Message {message} />
+					{/each}
+				{/if}
 			{/each}
 			<div class="chat-end"></div>
 		{:catch}
@@ -88,6 +95,15 @@
 		bottom: 0;
 		left: var(--channel-tree-width);
 		right: 0;
+	}
+
+	.chat-date {
+		grid-column-start: 1;
+		grid-column-end: 3;
+		border-top: 1px solid gray;
+		margin: 1em 1em 0em 1em;
+		text-align: center;
+		color: gray;
 	}
 
 	.chat-form {
@@ -131,15 +147,6 @@
 		grid-template-columns: min-content minmax(0, 1fr);
 	}
 
-	.chat-date {
-		grid-column-start: 1;
-		grid-column-end: 3;
-		border-top: 1px solid gray;
-		margin: 1em 1em 0em 1em;
-		text-align: center;
-		color: gray;
-	}
-
 	.invoker-icon,
 	.invoker-name,
 	.message-time,
@@ -156,92 +163,5 @@
 		margin-top: auto;
 		margin-bottom: auto;
 		//font-size: 0.8em;
-	}
-
-	.message-row {
-		display: contents;
-
-		&:hover > * {
-			background-color: #eee;
-
-			.tool-buttons {
-				visibility: visible;
-			}
-		}
-	}
-
-	.message-time {
-		grid-column: 1;
-		font-size: 0.8em;
-		* {
-			color: gray;
-		}
-	}
-
-	.message-content {
-		grid-column: 2;
-		white-space: pre-wrap;
-
-		// for tool buttons
-		position: relative;
-
-		// Overwrite bulma default
-		pre {
-			padding: 0;
-			border-radius: 7px;
-
-			tab-size: 4;
-			-moz-tab-size: 4;
-		}
-	}
-
-	.tool-buttons {
-		visibility: hidden;
-		position: absolute;
-		right: 0;
-		top: 0;
-
-		.tool-buttons-wrap {
-			position: absolute;
-			right: 20px;
-			top: -10px;
-			flex-wrap: nowrap;
-		}
-	}
-
-	// View raw toggle
-
-	.message-content {
-		.message-raw {
-			display: none;
-		}
-		.message-rendered {
-			display: unset;
-		}
-	}
-
-	.message-content.view_raw {
-		.message-raw {
-			display: unset;
-		}
-		.message-rendered {
-			display: none;
-		}
-	}
-
-	.round {
-		border-radius: 100%;
-	}
-
-	code[rel]::before {
-		font-size: 0.8em;
-		content: attr(rel);
-		position: absolute;
-		bottom: 1em;
-		right: 2em;
-		color: orange;
-		font-weight: bold;
-		font-family: Sans-Serif;
-		text-transform: uppercase;
 	}
 </style>
