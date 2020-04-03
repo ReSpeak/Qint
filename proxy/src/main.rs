@@ -155,7 +155,7 @@ async fn create_ws(
 	let id = ConnectionId(*uuid);
 
 	// Check that the id does not exist
-	let cons = state.connections.lock().unwrap();
+	let mut cons = state.connections.lock().unwrap();
 	if cons.contains_key(&id) {
 		return Either::A(
 			HttpResponse::PreconditionFailed()
@@ -164,7 +164,19 @@ async fn create_ws(
 	}
 
 	let ws_con = Ws::new(state.logger.clone(), (*state).clone(), options.0, id);
-	Either::B(ws::start(ws_con, &req, stream))
+	match ws::start_with_addr(ws_con, &req, stream) {
+		Err(e) => {
+			error!(state.logger, "Failed to create websocket actor"; "error" => ?e);
+			Either::A(
+				HttpResponse::InternalServerError()
+					.body("Failed to start connection"),
+			)
+		}
+		Ok((addr, ws)) => {
+			cons.insert(id, addr);
+			Either::B(ws)
+		}
+	}
 }
 
 #[post("/audiosend/true")]
@@ -356,7 +368,7 @@ async fn main() -> Result<()> {
 	let connections = Arc::new(Mutex::new(HashMap::new()));
 
 	// Start sound
-	let audio_data = audio::start(logger.clone())?;
+	let audio_data = audio::start(logger.clone(), connections.clone())?;
 
 	let addr = settings.listen_address.clone();
 

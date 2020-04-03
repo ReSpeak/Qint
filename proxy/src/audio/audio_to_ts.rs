@@ -24,6 +24,7 @@ pub(crate) struct SetListenerMsg {
 pub struct RemoveListenerMsg;
 pub struct SetVolumeMsg(pub f32);
 pub struct SetPlayingMsg(pub bool);
+#[derive(Debug)]
 pub struct PlayPacketMsg(pub Vec<f32>);
 
 /// Threshold for voice activation detection.
@@ -37,7 +38,7 @@ pub struct AudioToTs {
 	logger: Logger,
 	audio_subsystem: AudioSubsystem,
 	executor: Handle,
-	spawn_send: mpsc::UnboundedSender<SendAudioEvent>,
+	spawn_send: mpsc::UnboundedSender<PlayPacketMsg>,
 	connection: Option<Addr<Ws>>,
 	encoder: Option<AudioEncoder>,
 
@@ -57,7 +58,7 @@ struct AudioEncoder {
 }
 
 struct SdlCallback {
-	spawn_send: mpsc::UnboundedSender<SendAudioEvent>,
+	spawn_send: mpsc::UnboundedSender<PlayPacketMsg>,
 }
 
 impl Actor for AudioToTs {
@@ -179,6 +180,13 @@ impl Handler<PlayPacketMsg> for AudioToTs {
 	{
 		// Write into packet sink
 		if let Some(con) = &mut self.connection {
+			if !con.connected() {
+				self.connection = None;
+				if let Some(e) = &self.encoder {
+					e.device.pause();
+				}
+				return;
+			}
 			let vol = self.volume;
 			if let Some(e) = &mut self.encoder {
 				let talking = self.is_talking != 0;
@@ -208,7 +216,7 @@ impl Handler<PlayPacketMsg> for AudioToTs {
 impl AudioToTs {
 	pub(crate) fn new(
 		logger: Logger, audio_subsystem: AudioSubsystem, executor: Handle,
-		spawn_send: mpsc::UnboundedSender<SendAudioEvent>,
+		spawn_send: mpsc::UnboundedSender<PlayPacketMsg>,
 	) -> Result<Self>
 	{
 		let logger = logger.new(o!("pipeline" => "audio-to-ts"));
@@ -239,7 +247,7 @@ impl AudioToTs {
 impl AudioEncoder {
 	fn new(
 		logger: Logger, audio_subsystem: &AudioSubsystem,
-		spawn_send: mpsc::UnboundedSender<SendAudioEvent>,
+		spawn_send: mpsc::UnboundedSender<PlayPacketMsg>,
 	) -> Result<Self>
 	{
 		let desired_spec = AudioSpecDesired {
@@ -351,8 +359,6 @@ impl AudioEncoder {
 impl AudioCallback for SdlCallback {
 	type Channel = f32;
 	fn callback(&mut self, buffer: &mut [Self::Channel]) {
-		self.spawn_send
-			.send(SendAudioEvent::PlayPacket(buffer.to_vec()))
-			.unwrap();
+		self.spawn_send.send(PlayPacketMsg(buffer.to_vec())).unwrap();
 	}
 }

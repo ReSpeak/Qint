@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -10,6 +11,8 @@ use tokio::stream::StreamExt;
 use tokio::sync::mpsc;
 use tokio::task;
 
+use crate::websocket::Ws;
+use crate::ConnectionId;
 use audio_to_ts::AudioToTs;
 use ts_to_audio::TsToAudio;
 
@@ -37,15 +40,11 @@ pub(crate) struct AudioData {
 	pub pool: Handle,
 	pub a2ts: Addr<AudioToTs>,
 	pub ts2a: Addr<TsToAudio>,
-	pub ts2a_data: Arc<Mutex<ts_to_audio::TsToAudioData>>,
 }
 
-#[derive(Clone, Debug)]
-pub(crate) enum SendAudioEvent {
-	PlayPacket(Vec<f32>),
-}
-
-pub(crate) fn start(logger: Logger) -> Result<AudioData> {
+pub(crate) fn start(
+	logger: Logger, connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
+) -> Result<AudioData> {
 	let sdl_context = sdl2::init().unwrap();
 
 	let audio_subsystem = sdl_context.audio().unwrap();
@@ -59,11 +58,9 @@ pub(crate) fn start(logger: Logger) -> Result<AudioData> {
 
 	// Create thread local runtime for non-send tasks
 	let (spawn_send, mut spawn_recv) = mpsc::unbounded_channel();
-	let (ts2a, ts2a_data) = TsToAudio::new(
-		logger.clone(),
-		audio_subsystem.clone(),
-	)?;
-	let ts2a = ts2a.start();
+	let ts2a =
+		TsToAudio::new(logger.clone(), audio_subsystem.clone(), connections)?
+			.start();
 	let a2ts = AudioToTs::new(
 		logger.clone(),
 		audio_subsystem,
@@ -78,22 +75,17 @@ pub(crate) fn start(logger: Logger) -> Result<AudioData> {
 
 		// Run the local task set.
 		local.block_on(&mut runtime, async move {
-			while let Some(e) = spawn_recv.next().await {
+			while let Some(msg) = spawn_recv.next().await {
 				let logger = logger.clone();
-				match e {
-					SendAudioEvent::PlayPacket(buffer) => task::spawn_local(
-						a2ts2.send(audio_to_ts::PlayPacketMsg(buffer))
-							.map(move |r| {match r {
-								Ok(()) => {}
-								Err(e) => {
-									error!(logger, "Failed to send audio data to Audio2TS pipeline"; "error" => ?e)
-								}
-							}})
-					),
-				};
+				task::spawn_local(a2ts2.send(msg).map(move |r| match r {
+					Ok(()) => {}
+					Err(e) => {
+						error!(logger, "Failed to send audio data to Audio2TS pipeline"; "error" => ?e)
+					}
+				}));
 			}
 		});
 	});
 
-	Ok(AudioData { pool, a2ts, ts2a, ts2a_data })
+	Ok(AudioData { pool, a2ts, ts2a })
 }

@@ -11,9 +11,11 @@ use slog::{debug, error, o, warn, Logger};
 use tokio::net::TcpStream;
 use tsclientlib::events::Event as TsEvent;
 use tsclientlib::StreamItem as TsStreamItem;
-use tsclientlib::{events, ChannelId, Connection, DisconnectOptions, MessageTarget};
+use tsclientlib::{
+	events, ChannelId, ClientId, Connection, DisconnectOptions, MessageTarget,
+};
 use tsproto::resend::PacketId;
-use tsproto_packets::packets::OutPacket;
+use tsproto_packets::packets::{AudioData, OutPacket};
 
 use crate::db::{ChatId, ChatType};
 use crate::messages::{self, MessageF2P, MessageP2F};
@@ -29,23 +31,16 @@ pub(crate) struct Ws {
 	connect_options: Option<messages::ConnectOptions>,
 
 	websocket_closed: bool,
-	audio_manager_running: bool,
 	self_talking: bool,
+	talkers: Vec<(ClientId, bool)>,
 }
 
 /// Polls the connection for events.
 struct ConnectionPoller;
 
-/// Get audio from the connection and hand it to the `TsToAudio` actor.
-struct AudioManager {
-	/// A temporary audio buffer.
-	audio_buffer: Vec<f32>,
-	/// The last generation where we used audio.
-	last_gen: usize,
-}
-
 pub(crate) struct SendMessageMsg(pub MessageP2F);
 pub(crate) struct SetSelfTalkingMsg(pub bool);
+pub(crate) struct TalkersChangedMsg(pub Vec<(ClientId, bool)>);
 pub(crate) struct SendPacketMsg(pub OutPacket);
 
 pub(crate) struct DownloadFile {
@@ -79,6 +74,9 @@ impl Message for SendMessageMsg {
 impl Message for SetSelfTalkingMsg {
 	type Result = ();
 }
+impl Message for TalkersChangedMsg {
+	type Result = ();
+}
 impl Message for SendPacketMsg {
 	type Result = Result<PacketId>;
 }
@@ -104,16 +102,15 @@ impl Ws {
 			connect_options: None,
 
 			websocket_closed: false,
-			audio_manager_running: false,
 			self_talking: false,
+			talkers: Default::default(),
 		}
 	}
 
 	fn update_talkers(&mut self, ctx: &mut <Self as Actor>::Context) {
 		if let Some(con) = &self.connection {
 			if let Ok(state) = con.get_state() {
-				let mut talkers = con.get_audio().get_queues().iter()
-					.map(|(i, q)| (*i, q.is_whispering())).collect::<Vec<_>>();
+				let mut talkers = self.talkers.clone();
 				if self.self_talking {
 					talkers.push((state.own_client, false));
 				}
@@ -205,13 +202,34 @@ impl Ws {
 					}
 				}
 			}
-			TsStreamItem::TalkersChanged => {
-				self.update_talkers(ctx);
-				if let Some(con) = &self.connection {
-					if !con.get_audio().get_queues().is_empty() && !self.audio_manager_running {
-						ctx.spawn(AudioManager::new(self));
-					}
-				}
+			TsStreamItem::Audio(audio) => {
+				let from = ClientId(match audio.data().data() {
+					AudioData::S2C { from, .. } => *from,
+					AudioData::S2CWhisper { from, .. } => *from,
+					_ => panic!(
+						"Can only handle S2C packets but got a C2S packet"
+					),
+				});
+				let id = (self.id, from);
+				let logger = self.logger.clone();
+				actix::spawn(
+					self.state
+						.audio_data
+						.ts2a
+						.send(audio::ts_to_audio::PlayMsg(id, audio))
+						.map(move |r| match r {
+							Ok(Ok(())) => {}
+							Ok(Err(e)) => {
+								debug!(logger, "Audio error"; "error" => %e);
+							}
+							Err(_) => {
+								warn!(
+									logger,
+									"Failed to send audio to handler"
+								);
+							}
+						}),
+				);
 			}
 			TsStreamItem::IdentityLevelIncreased => {
 				if let Some(con) = &self.connection {
@@ -219,15 +237,20 @@ impl Ws {
 						con.get_options().get_identity().unwrap().clone(),
 					);
 					let logger = self.logger.clone();
-					actix::spawn(self.state.database.send(event).map(move |r| match r {
-						Ok(Ok(())) => {}
-						Ok(Err(e)) => {
-							error!(logger, "Failed to handle event in database"; "error" => ?e);
-						}
-						Err(_) => {
-							error!(logger, "Failed to send event to database");
-						}
-					}));
+					actix::spawn(self.state.database.send(event).map(
+						move |r| match r {
+							Ok(Ok(())) => {}
+							Ok(Err(e)) => {
+								error!(logger, "Failed to handle event in database"; "error" => ?e);
+							}
+							Err(_) => {
+								error!(
+									logger,
+									"Failed to send event to database"
+								);
+							}
+						},
+					));
 				}
 			}
 			_ => {}
@@ -462,6 +485,20 @@ impl Handler<SetSelfTalkingMsg> for Ws {
 	}
 }
 
+impl Handler<TalkersChangedMsg> for Ws {
+	type Result = ();
+	fn handle(
+		&mut self, TalkersChangedMsg(talkers): TalkersChangedMsg,
+		ctx: &mut Self::Context,
+	) -> Self::Result
+	{
+		if self.talkers != talkers {
+			self.talkers = talkers;
+			self.update_talkers(ctx);
+		}
+	}
+}
+
 impl Handler<SendPacketMsg> for Ws {
 	type Result = Result<PacketId>;
 	fn handle(
@@ -549,68 +586,5 @@ impl ActorFuture for ConnectionPoller {
 				}
 			}
 		}
-	}
-}
-
-impl AudioManager {
-	fn new(actor: &mut Ws) -> Self {
-		let data = actor.state.audio_data.ts2a_data.lock().unwrap();
-		let last_gen = data.gen.wrapping_sub(1);
-		actor.audio_manager_running = true;
-
-		Self {
-			audio_buffer: Default::default(),
-			last_gen,
-		}
-	}
-}
-
-impl ActorFuture for AudioManager {
-	type Output = ();
-	type Actor = Ws;
-	fn poll(
-		mut self: Pin<&mut Self>, actor: &mut Self::Actor,
-		_: &mut <Self::Actor as Actor>::Context, task: &mut task::Context,
-	) -> Poll<Self::Output>
-	{
-		if let Some(con) = &mut actor.connection {
-			if con.get_audio().get_queues().is_empty() {
-				debug!(actor.logger, "Shutdown audio manager");
-				actor.audio_manager_running = false;
-				return Poll::Ready(());
-			}
-
-			{
-				let data = actor.state.audio_data.ts2a_data.lock().unwrap();
-				if data.gen == self.last_gen {
-					return Poll::Pending;
-				}
-				self.audio_buffer.resize(data.data.len(), 0.0);
-			}
-
-			for d in &mut self.audio_buffer {
-				*d = 0.0;
-			}
-
-			con.get_mut_audio().fill_buffer(&mut self.audio_buffer);
-		} else {
-			debug!(actor.logger, "Shutdown audio manager, connection is gone");
-			return Poll::Ready(());
-		}
-
-		let mut data = actor.state.audio_data.ts2a_data.lock().unwrap();
-		self.last_gen = data.gen;
-		for (a, b) in data.data.iter_mut().zip(self.audio_buffer.iter()) {
-			*a += b;
-		}
-		if data.add_waker(task.waker().clone()) {
-			let logger = actor.logger.clone();
-			actix::spawn(actor.state.audio_data.ts2a.send(audio::ts_to_audio::StartPlayingMsg)
-				.map(move |r| if let Err(e) = r {
-					error!(logger, "Failed to start playback"; "error" => ?e);
-				}));
-		}
-
-		Poll::Pending
 	}
 }
