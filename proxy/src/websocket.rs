@@ -210,6 +210,8 @@ impl Ws {
 						}
 					}
 				}
+
+				self.send_message(&MessageP2F::Events(events), ctx);
 			}
 			TsStreamItem::Audio(audio) => {
 				let from = ClientId(match audio.data().data() {

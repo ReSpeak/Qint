@@ -1,28 +1,43 @@
-interface IMsg<T extends string> {
-	_cmd: T;
+// Out Messages
+export type OutMsg = { Connect: OMsgConnect }
+	| { SendMessage: OMsgSendMessage };
+
+interface OMsgConnect {
+	address: string;
+	name: string;
+	log_commands: boolean;
+	log_packets: boolean;
+	log_udp_packets: boolean;
+	version: string;
 }
 
-// Out Messages
-export type OutMsg = IMsgConnect;
-
-interface IMsgConnect extends IMsg<"connect"> {
-	address: string;
+interface OMsgSendMessage {
+	target: string; // TODO
+	message: string;
 }
 
 // In Messages
-export type InMsg = IMsgBookAdd | IMsgBookChange | IMsgBookRemove | IMsgConnected;
+export type InMsg = { Error: string }
+	| { TalkersChanged: [number, boolean][] }
+	| { Events: InBookMsg[] };
 
-interface IMsgBookAdd extends IMsg<"b_add"> {
+interface IInMsg<T extends string> {
+	_cmd: T;
+}
+
+type InBookMsg = IMsgBookAdd | IMsgBookChange | IMsgBookRemove | IMsgConnected;
+
+interface IMsgBookAdd extends IInMsg<"b_add"> {
 	obj: any;
 }
 
-interface IMsgBookChange extends IMsg<"b_change"> {
+interface IMsgBookChange extends IInMsg<"b_change"> {
 	obj: any;
 }
 
-interface IMsgBookRemove extends IMsg<"b_remove"> {
+interface IMsgBookRemove extends IInMsg<"b_remove"> {
 	obj: any;
 }
 
 // tslint:disable-next-line: no-empty-interface
-interface IMsgConnected extends IMsg<"connected"> {}
+interface IMsgConnected extends IInMsg<"connected"> {}

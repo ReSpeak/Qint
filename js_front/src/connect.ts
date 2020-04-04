@@ -10,7 +10,8 @@ export default class Self {
 
 	public connect() {
 		this.connection.connect({
-			address: this.address
+			address: this.address,
+			name: this.username
 		});
 	}
 }

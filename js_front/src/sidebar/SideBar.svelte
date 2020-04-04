@@ -12,7 +12,7 @@
 					<p class="image is-32x32">
 						<img
 							class="round"
-							src="https://bulma.io/images/placeholders/128x128.png"
+							src="/128x128.png"
 							alt="Home icon"
 						/>
 					</p>

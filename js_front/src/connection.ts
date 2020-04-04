@@ -15,8 +15,8 @@ export class Connection {
 		this.book = new Book();
 		this.chat = new Chat();
 		this.guid = "36c07459-a731-4868-9f10-a9b7564a4461"; // TODO random
-		// this.socket = new WebSocket(`ws://con/${this.guid}/ws`);
-		this.socket = new WebSocket("ws://localhost:2319");
+		this.socket = new WebSocket(`ws://localhost:4422/con/${this.guid}/ws?format=Json`);
+		//this.socket = new WebSocket("ws://localhost:2319");
 		this.socket.onmessage = (evt) => this.messageHandler(evt);
 
 		this.fillDummyData();
@@ -24,14 +24,20 @@ export class Connection {
 
 	public connect(opt: IConnectOptions) {
 		this.sendMessage({
-			_cmd: "connect",
-			address: opt.address
+			Connect: {
+				address: opt.address,
+				name: opt.name,
+				log_commands: false,
+				log_packets: false,
+				log_udp_packets: false,
+				version: "Linux_5_0_0_test_87"
+			}
 		});
 		this.state.set(ConnectionState.Connecting);
 	}
 
 	private fillDummyData() {
-		this.state.set(ConnectionState.Connected);
+		//this.state.set(ConnectionState.Connected);
 		this.book.addChannel(new Channel(1, 0, 0).set_name("A"));
 		this.book.addChannel(new Channel(2, 1, 0).set_name("B"));
 		this.book.addChannel(new Channel(3, 1, 2).set_name("C"));
@@ -51,7 +57,8 @@ export class Connection {
 
 	private messageHandler(evt: MessageEvent) {
 		const msg = JSON.parse(evt.data) as InMsg;
-		switch (msg._cmd) {
+		this.state.set(ConnectionState.Connected);
+		/*switch (msg._cmd) {
 			case "b_add":
 				// TODO
 				break;
@@ -66,7 +73,7 @@ export class Connection {
 			default:
 				console.warn("unknown packet", msg);
 				break;
-		}
+		}*/
 	}
 
 	// structure:
@@ -81,5 +88,6 @@ export enum ConnectionState {
 
 interface IConnectOptions {
 	address: string;
+	name: string;
 	// ...
 }

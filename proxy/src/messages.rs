@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use tsclientlib::{ClientId, MessageTarget, Version};
+use tsclientlib::events::Event;
 
 /// A message sent over a websocket connection from the frontend to the proxy.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -19,7 +20,7 @@ pub enum MessageP2F {
 	/// The list of currently talking clients and `true` if they are whispering.
 	TalkersChanged(Vec<(ClientId, bool)>),
 	/// The connection received events.
-	Events(), // TODO
+	Events(Vec<Event>),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
