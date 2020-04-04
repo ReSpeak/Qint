@@ -40,8 +40,10 @@ To check if it builds, you can also run `wasm-pack build --dev --target web`.
 ### Build and start the backend
 ```bash
 cd Qint/proxy
-cargo run
+env RUST_LOG=debug cargo run
 ```
+
+To activate logging for audio, use e.g. `RUST_LOG=debug,qint_proxy::audio::audio_to_ts=trace`.
 
 Now, you can use the client at http://localhost:4422.
 

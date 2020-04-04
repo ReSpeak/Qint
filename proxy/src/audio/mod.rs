@@ -57,17 +57,12 @@ pub(crate) fn start(
 	let pool = runtime.handle().clone();
 
 	// Create thread local runtime for non-send tasks
-	let (spawn_send, mut spawn_recv) = mpsc::unbounded_channel();
+	let (spawn_send, mut spawn_recv) = mpsc::channel(1);
 	let ts2a =
 		TsToAudio::new(logger.clone(), audio_subsystem.clone(), connections)?
 			.start();
-	let a2ts = AudioToTs::new(
-		logger.clone(),
-		audio_subsystem,
-		runtime.handle().clone(),
-		spawn_send,
-	)?
-	.start();
+	let a2ts =
+		AudioToTs::new(logger.clone(), audio_subsystem, spawn_send)?.start();
 
 	let a2ts2 = a2ts.clone();
 	thread::spawn(move || {
@@ -80,7 +75,8 @@ pub(crate) fn start(
 				task::spawn_local(a2ts2.send(msg).map(move |r| match r {
 					Ok(()) => {}
 					Err(e) => {
-						error!(logger, "Failed to send audio data to Audio2TS pipeline"; "error" => ?e)
+						error!(logger, "Failed to send audio data to Audio2TS \
+							pipeline"; "error" => ?e)
 					}
 				}));
 			}

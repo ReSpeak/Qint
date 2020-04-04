@@ -42,6 +42,7 @@ pub(crate) struct SendMessageMsg(pub MessageP2F);
 pub(crate) struct SetSelfTalkingMsg(pub bool);
 pub(crate) struct TalkersChangedMsg(pub Vec<(ClientId, bool)>);
 pub(crate) struct SendPacketMsg(pub OutPacket);
+pub(crate) struct DisconnectMsg;
 
 pub(crate) struct DownloadFile {
 	pub channel: ChannelId,
@@ -66,6 +67,11 @@ impl Actor for Ws {
 			Running::Stop
 		}
 	}
+
+	fn stopped(&mut self, _: &mut Self::Context) {
+		let mut cons = self.state.connections.lock().unwrap();
+		cons.remove(&self.id);
+	}
 }
 
 impl Message for SendMessageMsg {
@@ -79,6 +85,9 @@ impl Message for TalkersChangedMsg {
 }
 impl Message for SendPacketMsg {
 	type Result = Result<PacketId>;
+}
+impl Message for DisconnectMsg {
+	type Result = ();
 }
 impl Message for DownloadFile {
 	/// The size of the file and the stream
@@ -266,6 +275,7 @@ impl Ws {
 				self.disconnect(ctx);
 			}
 		} else if !self.websocket_closed {
+			debug!(self.logger, "Closing websocket");
 			ctx.close(None);
 		} else {
 			ctx.stop();
@@ -512,6 +522,15 @@ impl Handler<SendPacketMsg> for Ws {
 	}
 }
 
+impl Handler<DisconnectMsg> for Ws {
+	type Result = ();
+	fn handle(
+		&mut self, _: DisconnectMsg, ctx: &mut Self::Context,
+	) -> Self::Result {
+		self.disconnect(ctx);
+	}
+}
+
 impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for Ws {
 	fn handle(
 		&mut self, msg: std::result::Result<ws::Message, ws::ProtocolError>,
@@ -542,6 +561,7 @@ impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for Ws {
 				self.handle_ws_message(msg, ctx);
 			}
 			Ok(ws::Message::Close(_)) => {
+				debug!(self.logger, "Websocket closed");
 				self.websocket_closed = true;
 				self.disconnect(ctx);
 			}

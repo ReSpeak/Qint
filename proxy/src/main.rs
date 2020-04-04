@@ -18,6 +18,7 @@ use serde::Deserialize;
 use slog::{debug, error, info, o, warn, Drain, Logger};
 use structopt::StructOpt;
 use tokio::net::TcpStream;
+use tokio::time::{self, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
 use tsclientlib::ChannelId;
 use uuid::Uuid;
@@ -374,8 +375,9 @@ async fn main() -> Result<()> {
 
 	let state = State { logger, connections, audio_data, settings, database };
 
-	Ok(HttpServer::new(move || {
-		let state = state.clone();
+	let state2 = state.clone();
+	HttpServer::new(move || {
+		let state = state2.clone();
 		App::new()
 			//.wrap(middleware::Logger::default())
 			.data(state)
@@ -396,5 +398,25 @@ async fn main() -> Result<()> {
 	})
 	.bind(addr)?
 	.run()
-	.await?)
+	.await?;
+
+	// Quit all connections
+	info!(state.logger, "Closing remaining connections");
+	{
+		let cons = state.connections.lock().unwrap();
+		for con in cons.values() {
+			actix::spawn(con.send(websocket::DisconnectMsg).map(|_| ()));
+		}
+	}
+
+	// Wait at max a second and poll
+	for _ in 0u8..10 {
+		let cons = state.connections.lock().unwrap();
+		if cons.is_empty() {
+			break;
+		}
+		time::delay_for(Duration::from_millis(10)).await;
+	}
+
+	Ok(())
 }
