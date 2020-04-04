@@ -22,6 +22,8 @@ diesel_migrations = "1.4"
 directories = "2"
 flakebi-ring = "0.16.9"
 futures = "0.3"
+juniper = { git = "https://github.com/graphql-rust/juniper" }
+#juniper = { path = "../../juniper/juniper" }
 libsqlite3-sys = { version = "0.9", features = ["bundled"] }
 rmp-serde = "0.14"
 rnnoise-c = "0.1"

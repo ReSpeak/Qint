@@ -3,6 +3,7 @@ use std::cmp::{Ord, Ordering};
 use anyhow::Result;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use diesel_derive_enum::DbEnum;
+use juniper::{GraphQLEnum, GraphQLObject};
 use serde::{Deserialize, Serialize};
 
 use super::schema::*;
@@ -170,7 +171,7 @@ pub enum EventType {
 }
 
 #[derive(
-	Clone, Copy, DbEnum, Debug, Deserialize, Eq, Hash, PartialEq, Serialize,
+	Clone, Copy, DbEnum, Debug, Deserialize, Eq, GraphQLEnum, Hash, PartialEq, Serialize,
 )]
 pub enum MessageStatus {
 	Sending,

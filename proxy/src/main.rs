@@ -100,13 +100,14 @@ struct Settings {
 }
 
 #[derive(Clone)]
-struct State {
+pub struct State {
 	logger: Logger,
 	/// The list of all currently existing connections
 	connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
 	audio_data: audio::AudioData,
 	settings: Settings,
 	database: Addr<db::DbHandler>,
+	graphql_schema: Arc<db::graphql::Schema>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]
@@ -373,7 +374,8 @@ async fn main() -> Result<()> {
 
 	let addr = settings.listen_address.clone();
 
-	let state = State { logger, connections, audio_data, settings, database };
+	let graphql_schema = db::graphql::create_schema();
+	let state = State { logger, connections, audio_data, settings, database, graphql_schema };
 
 	let state2 = state.clone();
 	HttpServer::new(move || {
@@ -387,6 +389,8 @@ async fn main() -> Result<()> {
 			.service(list_plugins)
 			.service(get_plugin)
 			.service(download_file)
+			.service(db::graphql::db_graphql)
+			.service(db::graphql::graphiql)
 			.service(
 				Files::new("", "../frontend/static/")
 					.index_file("index.html")

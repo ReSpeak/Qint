@@ -1,4 +1,5 @@
 use std::fs;
+use std::result;
 
 use actix::*;
 use anyhow::{bail, Result};
@@ -19,6 +20,7 @@ use crate::secret::Secret;
 use crate::Settings;
 use models::{Bookmark, Message as TextMessage, MessageStatus};
 
+pub(crate) mod graphql;
 mod models;
 mod schema;
 
@@ -35,8 +37,8 @@ pub struct DbHandler {
 /// Identity id, `true` will create a new identity if this id does not exist.
 #[derive(Clone, Debug)]
 pub struct GetIdentityMsg(pub u64, pub bool);
-
 pub struct UpdateIdentityMsg(pub Identity);
+struct RunOnDbMsg<I: 'static, E: 'static, F: FnOnce(&mut DbHandler) -> result::Result<I, E>>(F);
 
 pub struct ConnectedMsg {
 	pub bookmark: Option<i64>,
@@ -83,6 +85,9 @@ impl Actor for DbHandler {
 
 impl Message for GetIdentityMsg {
 	type Result = Result<Identity>;
+}
+impl<I: 'static, E: 'static, F: FnOnce(&mut DbHandler) -> result::Result<I, E>> Message for RunOnDbMsg<I, E, F> {
+	type Result = result::Result<I, E>;
 }
 impl Message for UpdateIdentityMsg {
 	type Result = Result<()>;
@@ -293,6 +298,15 @@ impl Handler<GetIdentityMsg> for DbHandler {
 				Ok(identity)
 			}
 		}
+	}
+}
+
+impl<I: 'static, E: 'static, F: FnOnce(&mut DbHandler) -> result::Result<I, E>> Handler<RunOnDbMsg<I, E, F>> for DbHandler {
+	type Result = result::Result<I, E>;
+	fn handle(
+		&mut self, msg: RunOnDbMsg<I, E, F>, _: &mut Self::Context,
+	) -> Self::Result {
+		msg.0(self)
 	}
 }
 
