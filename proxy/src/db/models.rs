@@ -3,7 +3,7 @@ use std::cmp::{Ord, Ordering};
 use anyhow::Result;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use diesel_derive_enum::DbEnum;
-use juniper::{GraphQLEnum, GraphQLObject};
+use juniper::GraphQLEnum;
 use serde::{Deserialize, Serialize};
 
 use super::schema::*;

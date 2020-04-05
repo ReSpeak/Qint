@@ -18,7 +18,7 @@ use tsproto::crypto::EccKeyPubP256;
 
 use crate::secret::Secret;
 use crate::Settings;
-use models::{Bookmark, Message as TextMessage, MessageStatus};
+use models::MessageStatus;
 
 pub(crate) mod graphql;
 mod models;
