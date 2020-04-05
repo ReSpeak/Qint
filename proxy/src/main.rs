@@ -109,6 +109,7 @@ pub struct State {
 	settings: Settings,
 	database: Addr<db::DbHandler>,
 	graphql_schema: Arc<db::graphql::Schema>,
+	secret: Secret,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]
@@ -148,6 +149,8 @@ impl Default for Settings {
 		}
 	}
 }
+
+impl juniper::Context for State {}
 
 #[get("/con/{id}/ws")]
 async fn create_ws(
@@ -329,7 +332,7 @@ async fn main() -> Result<()> {
 
 	// Load secret key
 	let key_path = config_path.join("secret.key");
-	let key = match fs::read(&key_path) {
+	let secret = match fs::read(&key_path) {
 		Ok(r) => Secret(r),
 		Err(e) => {
 			warn!(logger, "Failed to read secret key, all your current \
@@ -366,7 +369,7 @@ async fn main() -> Result<()> {
 	}
 
 	// Open database
-	let database = db::DbHandler::new(logger.clone(), &settings, key)?.start();
+	let database = db::DbHandler::new(logger.clone(), &settings, secret.clone())?.start();
 
 	let connections = Arc::new(Mutex::new(HashMap::new()));
 
@@ -383,6 +386,7 @@ async fn main() -> Result<()> {
 		settings,
 		database,
 		graphql_schema,
+		secret,
 	};
 
 	let state2 = state.clone();

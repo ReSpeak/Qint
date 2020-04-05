@@ -26,7 +26,7 @@ pub struct ClientInsert<'a> {
 	pub custom_name: Option<&'a str>,
 }
 
-#[derive(Identifiable, Queryable)]
+#[derive(Clone, Identifiable, Queryable)]
 #[table_name = "identities"]
 pub struct Identity {
 	pub id: i64,
@@ -47,6 +47,7 @@ pub struct Server {
 	pub name: String,
 	/// Last used address
 	pub address: String,
+	pub icon: Option<i32>,
 }
 
 #[derive(Insertable)]
@@ -63,8 +64,9 @@ pub struct Channel {
 	pub server: Vec<u8>,
 	pub id: i64,
 	pub parent: Option<i64>,
+	pub order_id: Option<i64>,
 	pub name: String,
-	pub icon: Option<u32>,
+	pub icon: Option<i32>,
 	pub deleted: bool,
 }
 
@@ -96,20 +98,23 @@ pub struct BookmarkInsert<'a> {
 }
 
 #[derive(Queryable)]
-pub struct ChatModel {
+pub struct Chat {
 	pub id: i64,
 	pub last_read: NaiveDateTime,
 	pub timezone: i32,
 }
 
 #[derive(Queryable)]
-pub struct MessageModel {
+pub struct Message {
 	pub id: i64,
+	pub chat: i64,
 	/// Client uid of sender, `None` if we got the message from the server.
 	pub invoker: Option<Vec<u8>>,
+	pub invoker_name: Option<String>,
 	pub content: String,
 	pub status: MessageStatus,
-	pub time: DateTime<Utc>,
+	pub time: NaiveDateTime,
+	pub timezone: i32,
 }
 
 #[derive(Debug, Insertable)]
@@ -149,6 +154,16 @@ pub struct NewIdentity<'a> {
 	pub max_counter: i64,
 	/// Client uid
 	pub client: &'a [u8],
+}
+
+#[derive(Debug, Queryable)]
+pub struct ServersClients {
+	pub server: Vec<u8>,
+	pub client: Vec<u8>,
+	pub icon: Option<i32>,
+	pub avatar: Option<String>,
+	pub last_seen: NaiveDateTime,
+	pub timezone: i32,
 }
 
 #[derive(Debug, Insertable)]
@@ -194,17 +209,18 @@ pub struct Bookmark {
 	pub name: Option<String>,
 	pub username: String,
 	pub address: String,
+	pub channel: Option<i64>,
+	pub identity: i64,
 	pub bookmark: bool,
 	pub last_used: Option<NaiveDateTime>,
 	pub timezone: i32,
-	pub channel_name: Option<String>,
-	pub server_icon: Option<i32>,
+	pub server: Option<Vec<u8>>,
 }
 
 #[derive(
 	Clone, Debug, Deserialize, Eq, Hash, PartialEq, Queryable, Serialize,
 )]
-pub struct Message {
+pub struct OldMessage {
 	pub id: i64,
 	pub invoker: Option<Vec<u8>>,
 	pub invoker_name: Option<String>,
@@ -219,18 +235,18 @@ pub struct Message {
 }
 
 #[derive(Clone, Debug, Deserialize, Queryable, Serialize)]
-pub struct Chat {
+pub struct OldChat {
 	pub last_read: NaiveDateTime,
 	pub timezone: i32,
 }
 
-impl Ord for Message {
+impl Ord for OldMessage {
 	fn cmp(&self, other: &Self) -> Ordering {
 		self.time.cmp(&other.time).then_with(|| self.id.cmp(&other.id))
 	}
 }
 
-impl PartialOrd for Message {
+impl PartialOrd for OldMessage {
 	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
 		Some(self.cmp(other))
 	}

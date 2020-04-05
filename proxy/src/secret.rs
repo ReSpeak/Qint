@@ -4,6 +4,7 @@ use ring::aead::*;
 use ring::error::Unspecified;
 use ring::rand::{SecureRandom, SystemRandom};
 
+#[derive(Clone)]
 pub struct Secret(pub Vec<u8>);
 
 struct SingleNonce(Option<Nonce>);

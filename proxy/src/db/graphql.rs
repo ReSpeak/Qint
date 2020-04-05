@@ -7,10 +7,12 @@ use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
 use juniper::{EmptyMutation, EmptySubscription, FieldError, RootNode, ID};
 
-use super::{models, schema, RunOnDbMsg};
 use crate::State;
+use super::{models, schema, RunOnDbMsg};
+use super::models::MessageStatus;
 
 const BOOKMARKS_LIMIT: i64 = 20;
+const MESSAGES_LIMIT: i64 = 50;
 
 #[derive(Clone)]
 pub struct Context;
@@ -18,6 +20,13 @@ pub struct Context;
 pub struct Query;
 
 struct Bookmark(models::Bookmark);
+struct Channel(models::Channel);
+struct Chat(models::Chat);
+struct Client(models::Client);
+struct Identity(models::Identity);
+struct Message(models::Message);
+struct Server(models::Server);
+struct ServerClient(models::ServersClients);
 
 pub(crate) type Schema =
 	RootNode<'static, Query, EmptyMutation<State>, EmptySubscription<State>>;
@@ -39,10 +48,10 @@ pub(crate) async fn db_graphql(
 	Ok(HttpResponse::Ok().content_type("application/json").body(res))
 }
 
-#[juniper::graphql_object]
+#[juniper::graphql_object(Context = State)]
 /// A previously visited server.
 impl Bookmark {
-	/// The internal id of the bookmark.
+	/// The internal id.
 	fn id(&self) -> ID { ID::new(self.0.id.to_string()) }
 	/// The name of the bookmark if it has a custom name.
 	fn name(&self) -> Option<&str> { self.0.name.as_ref().map(|s| s.as_str()) }
@@ -50,8 +59,389 @@ impl Bookmark {
 	fn username(&self) -> &str { &self.0.username }
 	/// The server address.
 	fn address(&self) -> &str { &self.0.address }
+
+	async fn channel(&self, state: &State) -> GResult<Option<Channel>> {
+		if let Some(server) = self.0.server.clone() {
+			if let Some(id) = self.0.channel {
+				let res = state
+					.database
+					.send(RunOnDbMsg(move |db| {
+						use schema::channels;
+
+						let query = channels::table.filter(
+							channels::server.eq(server)
+							.and(channels::id.eq(id)));
+						GResult::Ok(Channel(query.first::<models::Channel>(&db.con)?))
+					}))
+					.await??;
+				Ok(Some(res))
+			} else {
+				Ok(None)
+			}
+		} else {
+			Ok(None)
+		}
+	}
+
+	/// The identity that is used with this bookmark.
+	async fn identity(&self, state: &State) -> GResult<Identity> {
+		let id = self.0.identity;
+		let res = state
+			.database
+			.send(RunOnDbMsg(move |db| {
+				use schema::identities;
+
+				let query = identities::table.filter(identities::id.eq(id));
+				GResult::Ok(Identity(query.first::<models::Identity>(&db.con)?))
+			}))
+			.await??;
+		Ok(res)
+	}
+
+	/// `true` if it this object is saved as a bookmark or `false`, if it is a
+	/// server that we recently connected to.
+	fn bookmark(&self) -> bool { self.0.bookmark }
 	/// The time when this bookmark was last used
 	fn last_used(&self) -> Option<&NaiveDateTime> { self.0.last_used.as_ref() }
+	fn timezone(&self) -> i32 { self.0.timezone }
+
+	async fn server(&self, state: &State) -> GResult<Option<Server>> {
+		if let Some(id) = self.0.server.clone() {
+			let res = state
+				.database
+				.send(RunOnDbMsg(|db| {
+					use schema::servers;
+
+					let query = servers::table
+						.filter(servers::public_key.eq(id));
+					GResult::Ok(Server(query.first::<models::Server>(&db.con)?))
+				}))
+				.await??;
+			Ok(Some(res))
+		} else {
+			Ok(None)
+		}
+	}
+}
+
+#[juniper::graphql_object(Context = State)]
+impl Channel {
+	fn id(&self) -> ID { ID::new(self.0.id.to_string()) }
+
+	async fn server(&self, state: &State) -> GResult<Option<Server>> {
+		let id = self.0.server.clone();
+		let res = state
+			.database
+			.send(RunOnDbMsg(|db| {
+				use schema::servers;
+
+				let query = servers::table
+					.filter(servers::public_key.eq(id));
+				GResult::Ok(Server(query.first::<models::Server>(&db.con)?))
+			}))
+			.await??;
+		Ok(Some(res))
+	}
+	fn parent(&self) -> Option<ID> { self.0.parent.map(|i| ID::new(i.to_string())) }
+	/// References the channel above this one (zero if this is the first
+	/// channel).
+	fn order_id(&self) -> Option<ID> { self.0.order_id.map(|i| ID::new(i.to_string())) }
+	fn name(&self) -> &str { &self.0.name }
+	fn icon(&self) -> Option<ID> {
+		self.0.icon.map(|i| ID::new((i as u32).to_string()))
+	}
+	fn deleted(&self) -> bool { self.0.deleted }
+
+	/// The channel chat.
+	async fn chat(&self, state: &State) -> GResult<Option<Chat>> {
+		let server = self.0.server.clone();
+		let id = self.0.id;
+		let res = state
+			.database
+			.send(RunOnDbMsg(move |db| {
+				use schema::{channel_chats, chats};
+
+				let query = channel_chats::table
+					.filter(channel_chats::server.eq(server)
+						.and(channel_chats::channel.eq(id)))
+					.inner_join(chats::table)
+					.select(chats::all_columns);
+				GResult::Ok(query.first::<models::Chat>(&db.con).optional()?
+					.map(Chat))
+			}))
+			.await??;
+		Ok(res)
+	}
+}
+
+#[juniper::graphql_object(Context = State)]
+impl Chat {
+	/// The internal id.
+	fn id(&self) -> ID { ID::new(self.0.id.to_string()) }
+	fn last_read(&self) -> &NaiveDateTime { &self.0.last_read }
+	fn timezone(&self) -> i32 { self.0.timezone }
+
+	// TODO Pagination
+	async fn messages(&self, state: &State) -> GResult<Vec<Message>> {
+		let id = self.0.id;
+		let res = state
+			.database
+			.send(RunOnDbMsg(move |db| {
+				use schema::messages;
+
+				let query = messages::table
+					.filter(messages::chat.eq(id))
+					.order((messages::time.desc(), messages::id.desc()))
+					.limit(MESSAGES_LIMIT);
+				GResult::Ok(query.load::<models::Message>(&db.con)?
+					.into_iter().map(Message).collect())
+			}))
+			.await??;
+		Ok(res)
+	}
+}
+
+#[juniper::graphql_object(Context = State)]
+impl Client {
+	/// The uid of the client.
+	fn uid(&self) -> ID { ID::new(base64::encode(&self.0.uid)) }
+	fn name(&self) -> &str { &self.0.name }
+	/// The base64 encoded public key of the client if we have it.
+	fn public_key(&self) -> Option<String> { self.0.public_key.as_ref().map(|p| base64::encode(&p)) }
+	/// The custom name of the client if we assigned one.
+	fn custom_name(&self) -> Option<&str> { self.0.custom_name.as_ref().map(|s| s.as_str()) }
+
+	/// The chat with this client on the specified server.
+	async fn chat(&self, state: &State, server: ID) -> GResult<Option<Chat>> {
+		let server = base64::decode(server.as_bytes())?;
+		let id = self.0.uid.clone();
+		let res = state
+			.database
+			.send(RunOnDbMsg(move |db| {
+				use schema::{chats, client_chats};
+
+				let query = client_chats::table
+					.filter(client_chats::server.eq(server)
+						.and(client_chats::client.eq(id)))
+					.inner_join(chats::table)
+					.select(chats::all_columns);
+				GResult::Ok(query.first::<models::Chat>(&db.con).optional()?
+					.map(Chat))
+			}))
+			.await??;
+		Ok(res)
+	}
+
+	/// The chat with this client on the specified server.
+	async fn pokes(&self, state: &State, server: ID) -> GResult<Option<Chat>> {
+		let server = base64::decode(server.as_bytes())?;
+		let id = self.0.uid.clone();
+		let res = state
+			.database
+			.send(RunOnDbMsg(move |db| {
+				use schema::{chats, client_pokes};
+
+				let query = client_pokes::table
+					.filter(client_pokes::server.eq(server)
+						.and(client_pokes::client.eq(id)))
+					.inner_join(chats::table)
+					.select(chats::all_columns);
+				GResult::Ok(query.first::<models::Chat>(&db.con).optional()?
+					.map(Chat))
+			}))
+			.await??;
+		Ok(res)
+	}
+}
+
+#[juniper::graphql_object(Context = State)]
+impl Identity {
+	/// The internal id.
+	fn id(&self) -> ID { ID::new(self.0.id.to_string()) }
+	fn name(&self) -> &str { &self.0.name }
+
+	fn level(&self, state: &State) -> GResult<i32> {
+		Ok(i32::from(self.0.clone().into_identity(&state.secret)?.level()?))
+	}
+
+	/// The publicly visible client associated with this identity.
+	async fn client(&self, state: &State) -> GResult<Client> {
+		let id = self.0.client.clone();
+		let res = state
+			.database
+			.send(RunOnDbMsg(move |db| {
+				use schema::clients;
+
+				let query = clients::table.filter(clients::uid.eq(id));
+				GResult::Ok(Client(query.first::<models::Client>(&db.con)?))
+			}))
+			.await??;
+		Ok(res)
+	}
+}
+
+#[juniper::graphql_object(Context = State)]
+impl Message {
+	/// The internal id.
+	fn id(&self) -> ID { ID::new(self.0.id.to_string()) }
+
+	async fn chat(&self, state: &State) -> GResult<Chat> {
+		let id = self.0.chat;
+		let res = state
+			.database
+			.send(RunOnDbMsg(move |db| {
+				use schema::chats;
+
+				let query = chats::table.filter(chats::id.eq(id));
+				GResult::Ok(Chat(query.first::<models::Chat>(&db.con)?))
+			}))
+			.await??;
+		Ok(res)
+	}
+
+	/// The send of the message or `None` if we got the message from the server.
+	async fn invoker(&self, state: &State) -> GResult<Option<Client>> {
+		if let Some(id) = self.0.invoker.clone() {
+			let res = state
+				.database
+				.send(RunOnDbMsg(|db| {
+					use schema::clients;
+
+					let query = clients::table.filter(clients::uid.eq(id));
+					GResult::Ok(Client(query.first::<models::Client>(&db.con)?))
+				}))
+				.await??;
+			Ok(Some(res))
+		} else {
+			Ok(None)
+		}
+	}
+
+	/// Name of the invoker if we don't have their uid.
+	fn invoker_name(&self) -> Option<&str> {
+		self.0.invoker_name.as_ref().map(|s| s.as_str())
+	}
+	fn content(&self) -> &str { &self.0.content }
+	fn status(&self) -> MessageStatus { self.0.status }
+	fn time(&self) -> &NaiveDateTime { &self.0.time }
+	fn timezone(&self) -> i32 { self.0.timezone }
+}
+
+#[juniper::graphql_object(Context = State)]
+impl Server {
+	/// The public key of the server, base64 encoded.
+	fn public_key(&self) -> ID { ID::new(base64::encode(&self.0.public_key)) }
+	fn name(&self) -> &str { &self.0.name }
+	/// The last used address to connect to this server.
+	fn address(&self) -> &str { &self.0.address }
+	fn icon(&self) -> Option<ID> {
+		self.0.icon.map(|i| ID::new((i as u32).to_string()))
+	}
+
+	/// The server chat.
+	async fn chat(&self, state: &State) -> GResult<Option<Chat>> {
+		let id = self.0.public_key.clone();
+		let res = state
+			.database
+			.send(RunOnDbMsg(move |db| {
+				use schema::{chats, server_chats};
+
+				let query = server_chats::table
+					.filter(server_chats::server.eq(id))
+					.inner_join(chats::table)
+					.select(chats::all_columns);
+				GResult::Ok(query.first::<models::Chat>(&db.con).optional()?
+					.map(Chat))
+			}))
+			.await??;
+		Ok(res)
+	}
+
+	/// The channels on this server.
+	// TODO Pagination
+	async fn channels(&self, state: &State, include_deleted: bool) -> GResult<Vec<Channel>> {
+		let id = self.0.public_key.clone();
+		let res = state
+			.database
+			.send(RunOnDbMsg(move |db| {
+				use schema::channels;
+
+				let query = channels::table
+					.filter(channels::server.eq(id));
+				let res = if include_deleted {
+					query.load::<models::Channel>(&db.con)
+				} else {
+					query.filter(channels::deleted.eq(false))
+						.load::<models::Channel>(&db.con)
+				};
+				GResult::Ok(res?.into_iter().map(Channel).collect())
+			}))
+			.await??;
+		Ok(res)
+	}
+
+	/// The clients that we saw on this server.
+	// TODO Pagination
+	async fn clients(&self, state: &State) -> GResult<Vec<ServerClient>> {
+		let id = self.0.public_key.clone();
+		let res = state
+			.database
+			.send(RunOnDbMsg(move |db| {
+				use schema::servers_clients;
+
+				let query = servers_clients::table
+					.filter(servers_clients::server.eq(id));
+				GResult::Ok(query.load::<models::ServersClients>(&db.con)?
+					.into_iter().map(ServerClient).collect())
+			}))
+			.await??;
+		Ok(res)
+	}
+}
+
+#[juniper::graphql_object(Context = State)]
+impl ServerClient {
+	async fn server(&self, state: &State) -> GResult<Server> {
+		let id = self.0.server.clone();
+		let res = state
+			.database
+			.send(RunOnDbMsg(move |db| {
+				use schema::servers;
+
+				let query = servers::table
+					.filter(servers::public_key.eq(id));
+				GResult::Ok(Server(query.first::<models::Server>(&db.con)?))
+			}))
+			.await??;
+		Ok(res)
+	}
+
+	async fn client(&self, state: &State) -> GResult<Client> {
+		let id = self.0.client.clone();
+		let res = state
+			.database
+			.send(RunOnDbMsg(move |db| {
+				use schema::clients;
+
+				let query = clients::table
+					.filter(clients::uid.eq(id));
+				GResult::Ok(Client(query.first::<models::Client>(&db.con)?))
+			}))
+			.await??;
+		Ok(res)
+	}
+
+	/// The icon of this client on this server.
+	fn icon(&self) -> Option<ID> {
+		self.0.icon.map(|i| ID::new((i as u32).to_string()))
+	}
+	/// The avatar of this client on this server.
+	fn avatar(&self) -> Option<&str> {
+		self.0.avatar.as_ref().map(|s| s.as_str())
+	}
+	/// When we saw this client last on this server
+	fn last_seen(&self) -> &NaiveDateTime { &self.0.last_seen }
+	fn timezone(&self) -> i32 { self.0.timezone }
 }
 
 #[juniper::graphql_object(Context = State)]
@@ -61,34 +451,11 @@ impl Query {
 		let res = state
 			.database
 			.send(RunOnDbMsg(|db| {
-				use diesel::dsl::not;
-				use schema::{bookmarks, channels, servers};
-
-				// Order by (bookmark, last_used)
-				// Select id, name, address, bookmark, last_used, timezone
-				// Join channel.name
-				// Join server.icon
+				use schema::bookmarks;
 
 				let query = bookmarks::table
-					.left_outer_join(servers::table)
-					.left_outer_join(channels::table.on(
-						bookmarks::server.eq(channels::server.nullable()).and(
-							bookmarks::channel.eq(channels::id.nullable()),
-						),
-					))
 					.order((bookmarks::bookmark, bookmarks::last_used))
-					.limit(BOOKMARKS_LIMIT)
-					.select((
-						bookmarks::id,
-						bookmarks::name,
-						bookmarks::username,
-						bookmarks::address,
-						bookmarks::bookmark,
-						bookmarks::last_used,
-						bookmarks::timezone,
-						channels::name.nullable(),
-						servers::icon.nullable(),
-					));
+					.limit(BOOKMARKS_LIMIT);
 				let result = /*if let Some((book, last)) = msg.start {
 				// (bookmark == book AND last_used > last) OR (!bookmark AND book)
 				query
@@ -99,9 +466,9 @@ impl Query {
 					)
 					.or_filter(not(bookmarks::bookmark).and(book))
 					.load::<Bookmark>(&db.con)
-			} else*/ {
-				query.load::<models::Bookmark>(&db.con)
-			}?.into_iter().map(Bookmark).collect();
+				} else*/ {
+					query.load::<models::Bookmark>(&db.con)
+				}?.into_iter().map(Bookmark).collect();
 
 				GResult::Ok(result)
 			}))
