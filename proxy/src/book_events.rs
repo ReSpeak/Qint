@@ -3,7 +3,6 @@ use std::net::{IpAddr, SocketAddr};
 
 use serde::{Deserialize, Serialize};
 use time::{Duration, OffsetDateTime};
-use tsclientlib::data::*;
 use tsclientlib::data::Connection;
 use tsclientlib::events::{Event, PropertyId, PropertyValueRef};
 use tsclientlib::*;

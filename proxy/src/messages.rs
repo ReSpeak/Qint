@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use tsclientlib::events::Event;
 use tsclientlib::{ClientId, MessageTarget, Version};
 
 use crate::book_events::JsEvent;

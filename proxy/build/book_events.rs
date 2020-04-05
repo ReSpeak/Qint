@@ -29,18 +29,6 @@ fn get_rust_type(p: &Property) -> String {
 	if p.opt { format!("Option<{}>", res) } else { res }
 }
 
-fn get_ids(structs: &[Struct], struc: &Struct) -> String {
-	let mut res = String::new();
-	for id in &struc.id {
-		let p = id.find_property(structs);
-		if !res.is_empty() {
-			res.push_str(", ");
-		}
-		res.push_str(&p.get_rust_type(false));
-	}
-	res
-}
-
 fn get_properties<'a>(
 	structs: &'a [Struct], s: &'a Struct,
 ) -> Vec<&'a Property> {
@@ -58,7 +46,7 @@ fn get_all_properties<'a>(
 		if !parts.contains(&struc.name.as_str()) {
 			continue;
 		}
-		for p in &struc.properties {
+		for p in get_properties(structs, struc) {
 			props.push(p);
 		}
 	}
@@ -72,7 +60,7 @@ fn get_to_owned(p: &Property) -> String {
 	} else if p.type_s == "Uid" {
 		"Uid(val.0.to_vec())"
 	} else if p.type_s == "TalkPowerRequest" {
-		"val.clone()"
+		"(*val).clone()"
 	} else {
 		""
 	};
@@ -80,7 +68,7 @@ fn get_to_owned(p: &Property) -> String {
 		"val".into()
 	} else {
 		if p.opt {
-			format!("val.map(|val| {})", to_owned)
+			format!("val.as_ref().map(|val| {})", to_owned)
 		} else {
 			to_owned.into()
 		}

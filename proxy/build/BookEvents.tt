@@ -30,11 +30,19 @@ fn convert_value(_fmt: &mut fmt::Formatter, name: &str, ids: &str, structs: &[St
 		if !parts.contains(&struc.name.as_str()) {
 			continue;
 		} #>
-		PropertyId::<#= struc.name #><#= ids #> => if let PropertyValueRef::<#= name #>(val) = p {
+		PropertyId::<#= struc.name #><#= ids #> => if let PropertyValueRef::<#= struc.name #>(val) = p {
 			Some(JsProperty::<#= name #> {
 		<# for p in get_all_properties(structs, parts) {
-			if false { #> // TODO
-			<#= p.name.to_snake_case() #>: Some(<#= get_to_owned(p) #>),
+			if p.modifier.is_none() && struc.properties.iter().any(|prop| prop.name == p.name) { #>
+			<#= p.name.to_snake_case() #>: Some({
+				<# let owned = get_to_owned(p);
+				if owned == "val" { #>
+				val.<#= p.name.to_snake_case() #>
+				<# } else { #>
+				let val = &val.<#= p.name.to_snake_case() #>;
+				<#= owned #>
+				<# } #>
+			}),
 			<# } else { #>
 			<#= p.name.to_snake_case() #>: None,
 			<# }
