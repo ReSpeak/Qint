@@ -18,6 +18,7 @@ export class Connection {
 		this.socket = new WebSocket(`ws://localhost:4422/con/${this.guid}/ws?format=Json`);
 		//this.socket = new WebSocket("ws://localhost:2319");
 		this.socket.onmessage = (evt) => this.messageHandler(evt);
+		//this.socket.send("{\"test\":\"sdf\"}");
 
 		this.fillDummyData();
 	}
@@ -38,9 +39,9 @@ export class Connection {
 
 	private fillDummyData() {
 		//this.state.set(ConnectionState.Connected);
-		this.book.addChannel(new Channel(1, 0, 0).set_name("A"));
-		this.book.addChannel(new Channel(2, 1, 0).set_name("B"));
-		this.book.addChannel(new Channel(3, 1, 2).set_name("C"));
+		this.book.addChannel(Channel.fromDebug(1, 0, 0).set_name("A"));
+		this.book.addChannel(Channel.fromDebug(2, 1, 0).set_name("B"));
+		this.book.addChannel(Channel.fromDebug(3, 1, 2).set_name("C"));
 		this.book.server.update(s => { s.name = "Server der Verplanten"; return s; });
 		this.chat.messages.update(m => [...m,
 		new Message("asd", "asdfg"),
@@ -57,27 +58,22 @@ export class Connection {
 
 	private messageHandler(evt: MessageEvent) {
 		const msg = JSON.parse(evt.data) as InMsg;
+		if ("Events" in msg) {
+			for (const tsevt of msg.Events) {
+				console.log(tsevt);
+			}
+		} else if ("TalkersChanged" in msg) {
+			// TODO
+		} else if ("Error" in msg) {
+			console.warn("Con Error:", msg.Error);
+		} else {
+			console.error("Unknown message", msg);
+		}
 		this.state.set(ConnectionState.Connected);
-		/*switch (msg._cmd) {
-			case "b_add":
-				// TODO
-				break;
-			case "b_change":
-				break;
-			case "b_remove":
-				break;
-			case "connected":
-				this.state.set(ConnectionState.Connected);
-				console.log("connected");
-				break;
-			default:
-				console.warn("unknown packet", msg);
-				break;
-		}*/
+
 	}
 
-	// structure:
-	// { _cmd:"b_add", to:"client", id:"42", obj: { name: "lullinger" } }
+	private takenumber(a: number) {}
 }
 
 export enum ConnectionState {

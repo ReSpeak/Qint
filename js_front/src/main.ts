@@ -5,6 +5,7 @@ import "highlight.js/styles/vs2015.css";
 import "./style.scss";
 
 import App from "./App.svelte";
+import "./extensions";
 import { Connection } from "./connection";
 
 const connection = new Connection();

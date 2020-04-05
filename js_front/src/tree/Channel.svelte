@@ -1,6 +1,8 @@
 <script>
+	import { afterUpdate } from "svelte";
 	import Channel from "./Channel.svelte";
 	import Icon from "../ui/Icon.svelte";
+	import { flash } from "../util";
 
 	export let channel;
 	let children = channel.children;
@@ -12,10 +14,16 @@
 	let alignCenter = false;
 	let alignRight = false;
 	let icon = ""; // TODO
+
+	let div;
+	afterUpdate(() => {
+		flash(div);
+	});
 </script>
 
 <li>
 	<div
+		bind:this={div}
 		class="flex-line"
 		class:own-client="{ownClient}"
 		class:selected-channel="{selectedChannel}"
