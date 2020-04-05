@@ -2098,6 +2098,7 @@ dependencies = [
  "directories",
  "flakebi-ring",
  "futures",
+ "heck",
  "juniper",
  "libsqlite3-sys",
  "log 0.4.8",
@@ -2113,12 +2114,15 @@ dependencies = [
  "slog-stdlog 3.0.5",
  "slog-term",
  "structopt",
+ "t4rust-derive",
+ "time 0.2.9",
  "tokio",
  "tokio-util 0.3.1",
  "toml 0.4.10",
  "tsclientlib",
  "tsproto",
  "tsproto-packets",
+ "tsproto-structs",
  "uuid",
 ]
 

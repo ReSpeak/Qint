@@ -171,7 +171,16 @@ pub enum EventType {
 }
 
 #[derive(
-	Clone, Copy, DbEnum, Debug, Deserialize, Eq, GraphQLEnum, Hash, PartialEq, Serialize,
+	Clone,
+	Copy,
+	DbEnum,
+	Debug,
+	Deserialize,
+	Eq,
+	GraphQLEnum,
+	Hash,
+	PartialEq,
+	Serialize,
 )]
 pub enum MessageStatus {
 	Sending,

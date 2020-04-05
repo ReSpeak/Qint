@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-use tsclientlib::{ClientId, MessageTarget, Version};
 use tsclientlib::events::Event;
+use tsclientlib::{ClientId, MessageTarget, Version};
 
 /// A message sent over a websocket connection from the frontend to the proxy.
 #[derive(Clone, Debug, Deserialize, Serialize)]

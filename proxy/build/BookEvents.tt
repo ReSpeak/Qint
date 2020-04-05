@@ -1,0 +1,93 @@
+<#@ template cleanws="true" #>
+<#
+use std::fmt;
+
+use tsproto_structs::convert_type;
+
+fn get_props(_fmt: &mut fmt::Formatter, structs: &[Struct], parts: &[&str]) -> fmt::Result {
+	for struc in structs {
+		if !parts.contains(&struc.name.as_str()) {
+			continue;
+		}
+		for p in &struc.properties { #>
+		<#= p.name.to_snake_case() #>: Option<<#= convert_type(&p.type_s, false) #>>,
+		<# }
+	}
+	Ok(())
+}
+
+fn convert_ids(_fmt: &mut fmt::Formatter, name: &str, ids: &str, structs: &[Struct], parts: &[&str]) -> fmt::Result {
+	for struc in structs {
+		if !parts.contains(&struc.name.as_str()) {
+			continue;
+		} #>
+			PropertyId::<#= struc.name #><#= ids #> => Ok(JsPropertyId::<#= name #><#= ids #>),
+		<# for p in get_properties(structs, struc) {
+			if p.modifier.is_none() { #>
+			PropertyId::<#= struc.name #><#= get_property_name(p) #><#= ids #> => Ok(JsPropertyId::<#= name #><#= ids #>),
+			<# }
+		}
+	}
+	Ok(())
+}
+
+#>
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub enum JsProperty {
+	Channel {
+<# get_props(_fmt, &self.structs, &["Channel", "OptionalChannelData"])?; #>
+	},
+	Client {
+<# get_props(_fmt, &self.structs, &["Client", "OptionalClientData", "ConnectionClientData"])?; #>
+	},
+	Server {
+<# get_props(_fmt, &self.structs, &["Server", "OptionalServerData", "ConnectionServerData"])?; #>
+	},
+}
+
+fn convert_event(con: &Connection, e: &Event) -> Option<JsEvent> {
+	match e {
+		Event::PropertyAdded { id, invoker } => {
+			Some(JsEvent::PropertyAdded {
+				id: id.clone().try_into().ok()?,
+				prop: property_to_js(id, con.get_property(id).ok()?)?,
+				invoker: invoker.clone(),
+			})
+		}
+		Event::PropertyChanged { id, invoker, .. } => {
+			Some(JsEvent::PropertyChanged {
+				id: id.clone().try_into().ok()?,
+				prop: property_to_js(id, con.get_property(id).ok()?)?,
+				invoker: invoker.clone(),
+			})
+		}
+		Event::PropertyRemoved { id, invoker, .. } => {
+			Some(JsEvent::PropertyRemoved {
+				id: id.clone().try_into().ok()?,
+				invoker: invoker.clone(),
+			})
+		}
+		Event::ChannelListFinished => Some(JsEvent::ChannelListFinished),
+		Event::Message { target, invoker, message } => Some(JsEvent::Message {
+			target: *target, invoker: invoker.clone(), message: message.clone(),
+		}),
+		_ => None,
+	}
+}
+
+fn property_to_js(id: &PropertyId, p: PropertyValueRef) -> Option<JsProperty> {
+	// TODO
+	None
+}
+
+impl TryFrom<PropertyId> for JsPropertyId {
+	type Error = ();
+	fn try_from(id: PropertyId) -> Result<Self, ()> {
+		match id {
+<# convert_ids(_fmt, "Channel", "(id)", &self.structs, &["Channel", "OptionalChannelData"])?; #>
+<# convert_ids(_fmt, "Client", "(id)", &self.structs, &["Client", "OptionalClientData", "ConnectionClientData"])?; #>
+<# convert_ids(_fmt, "Server", "", &self.structs, &["Server", "OptionalServerData", "ConnectionServerData"])?; #>
+			_ => Err(()),
+		}
+	}
+}

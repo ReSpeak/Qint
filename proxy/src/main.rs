@@ -24,6 +24,7 @@ use tsclientlib::ChannelId;
 use uuid::Uuid;
 
 mod audio;
+mod book_events;
 mod db;
 mod messages;
 mod secret;
@@ -375,7 +376,14 @@ async fn main() -> Result<()> {
 	let addr = settings.listen_address.clone();
 
 	let graphql_schema = db::graphql::create_schema();
-	let state = State { logger, connections, audio_data, settings, database, graphql_schema };
+	let state = State {
+		logger,
+		connections,
+		audio_data,
+		settings,
+		database,
+		graphql_schema,
+	};
 
 	let state2 = state.clone();
 	HttpServer::new(move || {

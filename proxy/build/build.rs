@@ -1,5 +1,11 @@
 use std::env;
-use std::path::PathBuf;
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::{Path, PathBuf};
+
+mod book_events;
+
+use crate::book_events::BookEvents;
 
 fn main() {
 	let target = env::var("TARGET").unwrap();
@@ -46,4 +52,11 @@ fn main() {
 			}
 		}
 	}
+
+	let out_dir = env::var("OUT_DIR").unwrap();
+	let path = Path::new(&out_dir);
+
+	// Bookkeeping events
+	let mut structs = File::create(&path.join("book_events.rs")).unwrap();
+	write!(&mut structs, "{}", BookEvents::default()).unwrap();
 }

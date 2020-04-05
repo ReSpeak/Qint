@@ -38,7 +38,11 @@ pub struct DbHandler {
 #[derive(Clone, Debug)]
 pub struct GetIdentityMsg(pub u64, pub bool);
 pub struct UpdateIdentityMsg(pub Identity);
-struct RunOnDbMsg<I: 'static, E: 'static, F: FnOnce(&mut DbHandler) -> result::Result<I, E>>(F);
+struct RunOnDbMsg<
+	I: 'static,
+	E: 'static,
+	F: FnOnce(&mut DbHandler) -> result::Result<I, E>,
+>(F);
 
 pub struct ConnectedMsg {
 	pub bookmark: Option<i64>,
@@ -86,7 +90,9 @@ impl Actor for DbHandler {
 impl Message for GetIdentityMsg {
 	type Result = Result<Identity>;
 }
-impl<I: 'static, E: 'static, F: FnOnce(&mut DbHandler) -> result::Result<I, E>> Message for RunOnDbMsg<I, E, F> {
+impl<I: 'static, E: 'static, F: FnOnce(&mut DbHandler) -> result::Result<I, E>>
+	Message for RunOnDbMsg<I, E, F>
+{
 	type Result = result::Result<I, E>;
 }
 impl Message for UpdateIdentityMsg {
@@ -301,7 +307,9 @@ impl Handler<GetIdentityMsg> for DbHandler {
 	}
 }
 
-impl<I: 'static, E: 'static, F: FnOnce(&mut DbHandler) -> result::Result<I, E>> Handler<RunOnDbMsg<I, E, F>> for DbHandler {
+impl<I: 'static, E: 'static, F: FnOnce(&mut DbHandler) -> result::Result<I, E>>
+	Handler<RunOnDbMsg<I, E, F>> for DbHandler
+{
 	type Result = result::Result<I, E>;
 	fn handle(
 		&mut self, msg: RunOnDbMsg<I, E, F>, _: &mut Self::Context,

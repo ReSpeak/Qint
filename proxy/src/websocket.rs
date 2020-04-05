@@ -19,7 +19,7 @@ use tsproto_packets::packets::{AudioData, OutPacket};
 
 use crate::db::{ChatId, ChatType};
 use crate::messages::{self, MessageF2P, MessageP2F};
-use crate::{audio, db, ConnectionId, State, WsFormat, WsOptions};
+use crate::{audio, book_events, db, ConnectionId, State, WsFormat, WsOptions};
 
 /// A websocket connection
 pub(crate) struct Ws {
@@ -211,6 +211,8 @@ impl Ws {
 					}
 				}
 
+				// TODO
+				//book_events
 				self.send_message(&MessageP2F::Events(events), ctx);
 			}
 			TsStreamItem::Audio(audio) => {

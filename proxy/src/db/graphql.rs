@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
 use actix_web::*;
+use chrono::NaiveDateTime;
 use diesel::prelude::*;
-use juniper::{EmptyMutation, EmptySubscription, FieldError, ID, RootNode};
 use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
+use juniper::{EmptyMutation, EmptySubscription, FieldError, RootNode, ID};
 
-use crate::State;
 use super::{models, schema, RunOnDbMsg};
+use crate::State;
 
 const BOOKMARKS_LIMIT: i64 = 20;
 
@@ -18,7 +19,8 @@ pub struct Query;
 
 struct Bookmark(models::Bookmark);
 
-pub(crate) type Schema = RootNode<'static, Query, EmptyMutation<State>, EmptySubscription<State>>;
+pub(crate) type Schema =
+	RootNode<'static, Query, EmptyMutation<State>, EmptySubscription<State>>;
 type GResult<T> = std::result::Result<T, FieldError>;
 
 #[get("/graphiql")]
@@ -29,12 +31,12 @@ pub async fn graphiql() -> impl Responder {
 }
 
 #[post("/db")]
-pub(crate) async fn db_graphql(state: web::Data<State>, data: web::Json<GraphQLRequest>) -> Result<impl Responder> {
+pub(crate) async fn db_graphql(
+	state: web::Data<State>, data: web::Json<GraphQLRequest>,
+) -> Result<impl Responder> {
 	let res = data.execute(&state.graphql_schema, &*state).await;
 	let res = serde_json::to_string(&res)?;
-	Ok(HttpResponse::Ok()
-		.content_type("application/json")
-		.body(res))
+	Ok(HttpResponse::Ok().content_type("application/json").body(res))
 }
 
 #[juniper::graphql_object]
@@ -48,42 +50,46 @@ impl Bookmark {
 	fn username(&self) -> &str { &self.0.username }
 	/// The server address.
 	fn address(&self) -> &str { &self.0.address }
+	/// The time when this bookmark was last used
+	fn last_used(&self) -> Option<&NaiveDateTime> { self.0.last_used.as_ref() }
 }
 
 #[juniper::graphql_object(Context = State)]
 impl Query {
 	// TODO Support pagination: https://relay.dev/graphql/connections.htm
 	async fn bookmarks(state: &State) -> GResult<Vec<Bookmark>> {
-		let res = state.database.send(RunOnDbMsg(|db| {
-			use diesel::dsl::not;
-			use schema::{bookmarks, channels, servers};
+		let res = state
+			.database
+			.send(RunOnDbMsg(|db| {
+				use diesel::dsl::not;
+				use schema::{bookmarks, channels, servers};
 
-			// Order by (bookmark, last_used)
-			// Select id, name, address, bookmark, last_used, timezone
-			// Join channel.name
-			// Join server.icon
+				// Order by (bookmark, last_used)
+				// Select id, name, address, bookmark, last_used, timezone
+				// Join channel.name
+				// Join server.icon
 
-			let query = bookmarks::table
-				.left_outer_join(servers::table)
-				.left_outer_join(
-					channels::table.on(bookmarks::server
-						.eq(channels::server.nullable())
-						.and(bookmarks::channel.eq(channels::id.nullable()))),
-				)
-				.order((bookmarks::bookmark, bookmarks::last_used))
-				.limit(BOOKMARKS_LIMIT)
-				.select((
-					bookmarks::id,
-					bookmarks::name,
-					bookmarks::username,
-					bookmarks::address,
-					bookmarks::bookmark,
-					bookmarks::last_used,
-					bookmarks::timezone,
-					channels::name.nullable(),
-					servers::icon.nullable(),
-				));
-			let result = /*if let Some((book, last)) = msg.start {
+				let query = bookmarks::table
+					.left_outer_join(servers::table)
+					.left_outer_join(channels::table.on(
+						bookmarks::server.eq(channels::server.nullable()).and(
+							bookmarks::channel.eq(channels::id.nullable()),
+						),
+					))
+					.order((bookmarks::bookmark, bookmarks::last_used))
+					.limit(BOOKMARKS_LIMIT)
+					.select((
+						bookmarks::id,
+						bookmarks::name,
+						bookmarks::username,
+						bookmarks::address,
+						bookmarks::bookmark,
+						bookmarks::last_used,
+						bookmarks::timezone,
+						channels::name.nullable(),
+						servers::icon.nullable(),
+					));
+				let result = /*if let Some((book, last)) = msg.start {
 				// (bookmark == book AND last_used > last) OR (!bookmark AND book)
 				query
 					.filter(
@@ -97,12 +103,17 @@ impl Query {
 				query.load::<models::Bookmark>(&db.con)
 			}?.into_iter().map(Bookmark).collect();
 
-			GResult::Ok(result)
-		})).await??;
+				GResult::Ok(result)
+			}))
+			.await??;
 		Ok(res)
 	}
 }
 
 pub(crate) fn create_schema() -> Arc<Schema> {
-	Arc::new(Schema::new(Query, EmptyMutation::<State>::new(), EmptySubscription::<State>::new()))
+	Arc::new(Schema::new(
+		Query,
+		EmptyMutation::<State>::new(),
+		EmptySubscription::<State>::new(),
+	))
 }
