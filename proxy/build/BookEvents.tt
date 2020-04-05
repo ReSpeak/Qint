@@ -2,17 +2,11 @@
 <#
 use std::fmt;
 
-use tsproto_structs::convert_type;
-
 fn get_props(_fmt: &mut fmt::Formatter, structs: &[Struct], parts: &[&str]) -> fmt::Result {
-	for struc in structs {
-		if !parts.contains(&struc.name.as_str()) {
-			continue;
-		}
-		for p in &struc.properties { #>
-		<#= p.name.to_snake_case() #>: Option<<#= convert_type(&p.type_s, false) #>>,
-		<# }
-	}
+	for p in get_all_properties(structs, parts) { #>
+		#[serde(skip_serializing_if = "Option::is_none")]
+		<#= p.name.to_snake_case() #>: Option<<#= get_rust_type(p) #>>,
+	<# }
 	Ok(())
 }
 
@@ -24,8 +18,49 @@ fn convert_ids(_fmt: &mut fmt::Formatter, name: &str, ids: &str, structs: &[Stru
 			PropertyId::<#= struc.name #><#= ids #> => Ok(JsPropertyId::<#= name #><#= ids #>),
 		<# for p in get_properties(structs, struc) {
 			if p.modifier.is_none() { #>
-			PropertyId::<#= struc.name #><#= get_property_name(p) #><#= ids #> => Ok(JsPropertyId::<#= name #><#= ids #>),
+			PropertyId::<#= struc.name #><#= p.get_name() #><#= ids #> => Ok(JsPropertyId::<#= name #><#= ids #>),
+		<# }
+		}
+	}
+	Ok(())
+}
+
+fn convert_value(_fmt: &mut fmt::Formatter, name: &str, ids: &str, structs: &[Struct], parts: &[&str]) -> fmt::Result {
+	for struc in structs {
+		if !parts.contains(&struc.name.as_str()) {
+			continue;
+		} #>
+		PropertyId::<#= struc.name #><#= ids #> => if let PropertyValueRef::<#= name #>(val) = p {
+			Some(JsProperty::<#= name #> {
+		<# for p in get_all_properties(structs, parts) {
+			if false { #> // TODO
+			<#= p.name.to_snake_case() #>: Some(<#= get_to_owned(p) #>),
+			<# } else { #>
+			<#= p.name.to_snake_case() #>: None,
 			<# }
+			} #>
+			})
+		} else {
+			panic!("Got wrong PropertyValue type, expected <#= name #>");
+		},
+		<# for prop in get_properties(structs, struc) {
+			if prop.modifier.is_none() {
+				let type_s = get_rust_type(prop).replace('<', "_").replace('>', "").to_camel_case();
+				#>
+		PropertyId::<#= struc.name #><#= prop.get_name() #><#= ids #> => if let PropertyValueRef::<#= type_s #>(val) = p {
+			Some(JsProperty::<#= name #> {
+		<# for p in get_all_properties(structs, parts) {
+			if prop.name == p.name { #>
+			<#= p.name.to_snake_case() #>: Some(<#= get_to_owned(p) #>),
+			<# } else { #>
+			<#= p.name.to_snake_case() #>: None,
+			<# }
+			} #>
+			})
+		} else {
+			panic!("Got wrong PropertyValue type, expected <#= type_s #>");
+		},
+		<# }
 		}
 	}
 	Ok(())
@@ -45,7 +80,7 @@ pub enum JsProperty {
 	},
 }
 
-fn convert_event(con: &Connection, e: &Event) -> Option<JsEvent> {
+pub fn convert_event(con: &Connection, e: &Event) -> Option<JsEvent> {
 	match e {
 		Event::PropertyAdded { id, invoker } => {
 			Some(JsEvent::PropertyAdded {
@@ -76,8 +111,12 @@ fn convert_event(con: &Connection, e: &Event) -> Option<JsEvent> {
 }
 
 fn property_to_js(id: &PropertyId, p: PropertyValueRef) -> Option<JsProperty> {
-	// TODO
-	None
+	match id {
+<# convert_value(_fmt, "Channel", "(_)", &self.structs, &["Channel", "OptionalChannelData"])?; #>
+<# convert_value(_fmt, "Client", "(_)", &self.structs, &["Client", "OptionalClientData", "ConnectionClientData"])?; #>
+<# convert_value(_fmt, "Server", "", &self.structs, &["Server", "OptionalServerData", "ConnectionServerData"])?; #>
+		_ => None,
+	}
 }
 
 impl TryFrom<PropertyId> for JsPropertyId {

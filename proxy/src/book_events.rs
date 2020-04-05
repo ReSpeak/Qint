@@ -2,7 +2,6 @@ use std::convert::{TryFrom, TryInto};
 use std::net::{IpAddr, SocketAddr};
 
 use serde::{Deserialize, Serialize};
-use slog::Logger;
 use time::{Duration, OffsetDateTime};
 use tsclientlib::data::*;
 use tsclientlib::data::Connection;
