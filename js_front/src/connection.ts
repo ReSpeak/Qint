@@ -13,7 +13,7 @@ export class Connection {
 
 	constructor() {
 		this.book = new Book();
-		this.chat = new Chat();
+		this.chat = new Chat(this);
 		this.guid = "36c07459-a731-4868-9f10-a9b7564a4461"; // TODO random
 		this.socket = new WebSocket(`ws://localhost:4422/con/${this.guid}/ws?format=Json`);
 		//this.socket = new WebSocket("ws://localhost:2319");
@@ -52,8 +52,12 @@ export class Connection {
 		]);
 	}
 
-	private sendMessage(data: OutMsg): void {
+	public sendMessage(data: OutMsg): void {
 		this.socket.send(JSON.stringify(data));
+	}
+
+	public sendRawMessage(data: string): void {
+		this.socket.send(data);
 	}
 
 	private messageHandler(evt: MessageEvent) {

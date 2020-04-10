@@ -1,4 +1,5 @@
 import { Client, Channel, Server } from "../tree/book";
+import { MessageTarget } from "./ts";
 // tslint:disable: interface-name
 
 // Out Messages
@@ -16,7 +17,7 @@ interface OMsgConnect {
 }
 
 interface OMsgSendMessage {
-	target: string; // TODO
+	target: MessageTarget;
 	message: string;
 }
 

@@ -6,7 +6,7 @@ export class Bookmark {
 	public readonly address: Writable<string> = writable("");
 }
 
-export function get_recent(): Promise<any> {
+export function getRecent(): Promise<any> {
     return graphql(`{
         mostRecentBookmark {
           username

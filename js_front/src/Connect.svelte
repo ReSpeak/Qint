@@ -1,6 +1,6 @@
 <script>
 	import { onMount } from 'svelte';
-	import { get_recent } from "./bookmark";
+	import { getRecent } from "./bookmark";
 	import self from "./connect";
 	import Icon from "./ui/Icon.svelte";
 	import { SERVER_ICON, CLIENT_ICON } from "./ui/const";
@@ -8,13 +8,13 @@
 	export let connection;
 	let data = new self(connection);
 
-	function connect_submit(e) {
+	function connectSubmit(e) {
 		e.preventDefault();
 		data.connect();
 	}
 
 	onMount(async () => {
-		let recent = await get_recent();
+		let recent = await getRecent();
 		if (data.username === "")
 			data.username = recent.data.mostRecentBookmark.username;
 		if (data.address === "")
@@ -25,7 +25,7 @@
 <div class="connect-container">
 	<div class="inner-connect-container">
 		<div class="connect-blur"></div>
-		<form class="connect-form" on:submit="{connect_submit}">
+		<form class="connect-form" on:submit="{connectSubmit}">
 			<div>
 				<p class="control has-icons-left">
 					<input

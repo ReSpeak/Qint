@@ -1,34 +1,20 @@
-export type ChatTarget = IChatTypeServer | IChatTypeChannel | IChatTypeClient;
+export type MessageTarget =
+	{ Server: null}
+	| { Channel: number }
+	| { Client: number }
+	| { Poke: number };
 
-export enum ChatType {
-	Server,
-	Channel,
-	Client,
-}
-
-const server: IChatTypeServer = { type: ChatType.Server };
-export const ChatTarget = {
-	ToServer(): IChatTypeServer {
-		return server;
+export const MessageTarget = {
+	ToServer(): MessageTarget {
+		return { Server: null };
 	},
-	ToChannel(id: number): IChatTypeChannel {
-		return { type: ChatType.Channel, id };
+	ToChannel(id: number): MessageTarget {
+		return { Channel: id };
 	},
-	ToClient(id: number): IChatTypeClient {
-		return { type: ChatType.Client, id };
+	ToClient(id: number): MessageTarget {
+		return { Client: id };
+	},
+	ToClientPoke(id: number): MessageTarget {
+		return { Poke: id };
 	},
 };
-
-interface IChatTypeServer {
-	readonly type: ChatType.Server;
-}
-
-interface IChatTypeChannel {
-	readonly type: ChatType.Channel;
-	id: number;
-}
-
-interface IChatTypeClient {
-	readonly type: ChatType.Client;
-	id: number;
-}

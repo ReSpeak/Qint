@@ -1,32 +1,48 @@
-import { writable, Writable, derived, Readable } from "svelte/store";
+import { get, writable, Writable, derived, Readable } from "svelte/store";
 import moment from "moment";
 import { Moment } from "moment";
-import { ChatTarget } from "../structs/ts";
+import { Connection } from "../connection";
+import { MessageTarget } from "../structs/ts";
 
 export class Chat {
-	public readonly selected_chat: Writable<ChatTarget> = writable(ChatTarget.ToServer());
+	public readonly selectedChat: Writable<MessageTarget> = writable(MessageTarget.ToServer());
 
 	public readonly messages: Writable<Message[]> = writable([]);
 
-	public readonly grouped_messages: Readable<ChatEntries[]>
+	public composing: string = "";
+
+	public readonly groupedMessages: Readable<ChatEntries[]>
 		= derived(this.messages, Chat.group_messages);
+
+	constructor(
+		private connection: Connection
+	) { }
 
 	private static group_messages(messages: Message[]): ChatEntries[] {
 		const groups = [];
-		let current_group: GroupedMessages | undefined;
-		let current_date: Moment | undefined;
+		let currentGroup: GroupedMessages | undefined;
+		let currentDate: Moment | undefined;
 		for (const message of messages) {
-			if (!current_group || message.user !== current_group.user) {
-				if (!current_date || !current_date.isSame(message.date, "day") ) {
-					current_date = message.date;
+			if (!currentGroup || message.user !== currentGroup.user) {
+				if (!currentDate || !currentDate.isSame(message.date, "day") ) {
+					currentDate = message.date;
 					groups.push(new DateSeparator(message.date));
 				}
-				current_group = new GroupedMessages(message.user);
-				groups.push(current_group);
+				currentGroup = new GroupedMessages(message.user);
+				groups.push(currentGroup);
 			}
-			current_group.messages.push(message);
+			currentGroup.messages.push(message);
 		}
 		return groups;
+	}
+
+	public sendMessage() {
+		this.connection.sendMessage({
+			SendMessage: {
+				target: get(this.selectedChat),
+				message: this.composing
+			}
+		});
 	}
 }
 

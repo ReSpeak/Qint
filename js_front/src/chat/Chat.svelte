@@ -8,9 +8,10 @@
 
 	export let connection;
 	let chat = connection.chat;
-	let messages = chat.grouped_messages;
+	let messages = chat.groupedMessages;
+	let composingCommand = "";
 
-	let load_msg_task = Promise.resolve();
+	let loadMsgTask = Promise.resolve();
 	// console.log(connection);
 	// let msgs = connection.messages;
 	// let selected_chat = connection.selected_chat;
@@ -35,11 +36,23 @@
 	// function changeChat() {
 	// 	selected_chat.update(s => "user" + Math.random());
 	// }
+
+	function sendMessage(e) {
+		e.preventDefault();
+		chat.sendMessage();
+		chat.composing = "";
+	}
+
+	function sendCommand(e) {
+		e.preventDefault();
+		connection.sendRawMessage(composingCommand);
+		composingCommand = "";
+	}
 </script>
 
 <div class="chat">
 	<ul class="chat-messages">
-		{#await load_msg_task}
+		{#await loadMsgTask}
 			<div
 				class="is-loading"
 				style="color: gray; font-style: italic; text-align: center;"
@@ -75,12 +88,12 @@
 			</div>
 		{/await}
 	</ul>
-	<form class="chat-form">
-		<textarea class="input auto_height" name="message"></textarea>
+	<form class="chat-form" on:submit="{sendMessage}">
+		<textarea bind:value="{chat.composing}" class="input auto_height" name="message"></textarea>
 		<button class="button" name="send" type="submit">Send</button>
 	</form>
-	<form class="chat-form">
-		<input class="input" name="message" type="text" />
+	<form class="chat-form" on:submit="{sendCommand}">
+		<textarea bind:value="{composingCommand}" class="input auto_height" name="message" type="text"></textarea>
 		<button class="button" name="send" type="submit">Send Command</button>
 	</form>
 </div>
