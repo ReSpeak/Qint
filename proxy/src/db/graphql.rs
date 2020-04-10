@@ -476,7 +476,7 @@ impl Query {
 		Ok(res)
 	}
 
-	/// The connection that was used last recently
+	/// The most recently used connection
 	async fn most_recent_bookmark(state: &State) -> GResult<Option<Bookmark>> {
 		let res = state
 			.database

@@ -21,7 +21,10 @@
 	}
 	:global(*) {
 		margin: 0;
-		
+
+	}
+	:global(html) {
+		overflow: hidden;
 	}
 	:global(body) {
 		background: white;

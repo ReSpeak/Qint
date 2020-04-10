@@ -49,8 +49,8 @@
 		{:then}
 			{#each $messages as group}
 				{#if group instanceof DateSeparator}
-					<div title="{group.date.format('YY')}" class="chat-date">
-						{group.date.format('YY')}
+					<div title="{group.date.format('L')}" class="chat-date">
+						{group.date.format('LL')}
 					</div>
 				{:else}
 					<div class="invoker-icon">

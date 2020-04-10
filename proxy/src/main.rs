@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use actix::*;
+use actix_cors::Cors;
 use actix_files::Files;
 use actix_web::*;
 use actix_web_actors::ws;
@@ -394,6 +395,7 @@ async fn main() -> Result<()> {
 		let state = state2.clone();
 		App::new()
 			//.wrap(middleware::Logger::default())
+			.wrap(Cors::new().max_age(3600).finish())
 			.data(state)
 			.service(create_ws)
 			.service(audiosend_true)
