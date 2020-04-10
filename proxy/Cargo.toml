@@ -43,6 +43,7 @@ tokio-util = { version = "0.3", features = ["codec"] }
 tsclientlib = { path = "../../tsclientlib/tsclientlib", features = ["unstable"] }
 tsproto = { path = "../../tsclientlib/tsproto" }
 tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }
+tsproto-types = { path = "../../tsclientlib/utils/tsproto-types" }
 uuid = { version = "0.8", features = ["serde"] }
 
 [dependencies.log]

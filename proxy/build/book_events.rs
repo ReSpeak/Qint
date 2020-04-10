@@ -59,7 +59,7 @@ fn get_to_owned(p: &Property) -> String {
 		"val.to_string()"
 	} else if p.type_s == "Uid" {
 		"Uid(val.0.to_vec())"
-	} else if p.type_s == "TalkPowerRequest" {
+	} else if p.type_s == "TalkPowerRequest" || p.type_s == "EccKeyPubP256" {
 		"(*val).clone()"
 	} else {
 		""

@@ -6,6 +6,7 @@ use time::{Duration, OffsetDateTime};
 use tsclientlib::data::Connection;
 use tsclientlib::events::{Event, PropertyId, PropertyValueRef};
 use tsclientlib::*;
+use tsproto_types::crypto::EccKeyPubP256;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum JsEvent {

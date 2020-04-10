@@ -14,7 +14,7 @@ use tsclientlib::data::Connection as TsData;
 use tsclientlib::events::{Event, PropertyId, PropertyValue};
 use tsclientlib::Connection as TsConnection;
 use tsclientlib::{ChannelId, ClientId, Identity, Invoker, MessageTarget};
-use tsproto::crypto::EccKeyPubP256;
+use tsproto_types::crypto::EccKeyPubP256;
 
 use crate::secret::Secret;
 use crate::Settings;

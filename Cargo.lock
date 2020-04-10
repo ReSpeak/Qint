@@ -2123,6 +2123,7 @@ dependencies = [
  "tsproto",
  "tsproto-packets",
  "tsproto-structs",
+ "tsproto-types",
  "uuid",
 ]
 
@@ -3343,6 +3344,7 @@ dependencies = [
  "tsproto",
  "tsproto-packets",
  "tsproto-structs",
+ "tsproto-types",
 ]
 
 [[package]]
@@ -3351,7 +3353,6 @@ version = "0.1.0"
 dependencies = [
  "aes",
  "anyhow",
- "arrayref",
  "base64 0.11.0",
  "bitflags",
  "curve25519-dalek",
@@ -3366,7 +3367,6 @@ dependencies = [
  "quicklz",
  "rand 0.7.3",
  "serde",
- "simple_asn1",
  "slog",
  "slog-async",
  "slog-perf",
@@ -3376,6 +3376,7 @@ dependencies = [
  "time 0.2.9",
  "tokio",
  "tsproto-packets",
+ "tsproto-types",
  "untrusted",
 ]
 
@@ -3411,16 +3412,24 @@ dependencies = [
 name = "tsproto-types"
 version = "0.1.0"
 dependencies = [
+ "arrayref",
  "base64 0.11.0",
  "bitflags",
+ "curve25519-dalek",
+ "flakebi-ring",
  "heck",
  "itertools 0.8.2",
+ "num-bigint",
  "num-derive",
  "num-traits",
+ "rand 0.7.3",
  "serde",
+ "simple_asn1",
  "t4rust-derive",
+ "thiserror",
  "time 0.2.9",
  "tsproto-structs",
+ "untrusted",
 ]
 
 [[package]]

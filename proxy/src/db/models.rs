@@ -5,6 +5,7 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use diesel_derive_enum::DbEnum;
 use juniper::GraphQLEnum;
 use serde::{Deserialize, Serialize};
+use tsproto_types::crypto::EccKeyPrivP256;
 
 use super::schema::*;
 use crate::secret::Secret;
@@ -257,7 +258,7 @@ impl Identity {
 	) -> Result<tsclientlib::Identity> {
 		let key = secret.open(self.private_key)?;
 		Ok(tsclientlib::Identity::new_with_max_counter(
-			tsproto::crypto::EccKeyPrivP256::import(&key)?,
+			EccKeyPrivP256::import(&key)?,
 			self.counter as u64,
 			self.max_counter as u64,
 		))

@@ -475,6 +475,23 @@ impl Query {
 			.await??;
 		Ok(res)
 	}
+
+	/// The connection that was used last recently
+	async fn most_recent_bookmark(state: &State) -> GResult<Option<Bookmark>> {
+		let res = state
+			.database
+			.send(RunOnDbMsg(|db| {
+				use schema::bookmarks;
+
+				let query = bookmarks::table.order(bookmarks::last_used);
+				let result = query.first::<models::Bookmark>(&db.con)
+					.optional()?.map(Bookmark);
+
+				GResult::Ok(result)
+			}))
+			.await??;
+		Ok(res)
+	}
 }
 
 pub(crate) fn create_schema() -> Arc<Schema> {
