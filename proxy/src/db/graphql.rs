@@ -454,7 +454,7 @@ impl Query {
 				use schema::bookmarks;
 
 				let query = bookmarks::table
-					.order((bookmarks::bookmark, bookmarks::last_used))
+					.order((bookmarks::bookmark, bookmarks::last_used.desc()))
 					.limit(BOOKMARKS_LIMIT);
 				let result = /*if let Some((book, last)) = msg.start {
 				// (bookmark == book AND last_used > last) OR (!bookmark AND book)

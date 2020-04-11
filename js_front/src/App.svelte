@@ -24,7 +24,7 @@
 
 	}
 	:global(html) {
-		overflow: hidden;
+		overflow: auto;
 	}
 	:global(body) {
 		background: white;
