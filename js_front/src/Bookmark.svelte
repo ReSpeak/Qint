@@ -6,6 +6,7 @@
 	export let username;
 	export let address;
 	export let bookmark;
+	let error = undefined;
 
 	function doConnect() {
 		connect.username = bookmark.username;
@@ -14,8 +15,12 @@
 	}
 
 	function toggle() {
+		error = undefined;
 		bookmark.bookmark = !bookmark.bookmark;
-		bookmark.update()
+		bookmark.update().catch((err) => {
+			console.log("Failed to update bookmark", err);
+			error = "Failed to update bookmark";
+		});
 	}
 
 	function hover() {
@@ -39,6 +44,9 @@
 		<i class="mdi mdi-{BOOKMARK_ON} mdi-24px bookmarkOn"></i>
 		<i class="mdi mdi-{BOOKMARK_OFF} mdi-24px bookmarkOff"></i>
 	</button>
+	{#if error}
+		<span class="bookmarkError tag is-danger">{error}</span>
+	{/if}
 </div>
 
 <style lang="scss">
@@ -136,5 +144,12 @@
 	.bookmarkItem:hover.bookmark .bookmarkStar .bookmarkOff,
 	.bookmark .bookmarkStar .bookmarkOff {
 		display: none;
+	}
+
+	.bookmarkError {
+		grid-row: 2;
+		grid-column: 1 / 3;
+		justify-self: center;
+		margin: 0.2em;
 	}
 </style>

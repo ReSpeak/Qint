@@ -18,19 +18,20 @@ use futures::prelude::*;
 use serde::Deserialize;
 use slog::{debug, error, info, o, warn, Drain, Logger};
 use structopt::StructOpt;
-use tokio::net::TcpStream;
 use tokio::time::{self, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
-use tsclientlib::ChannelId;
+use tsclientlib::{ChannelId, Uid};
 use uuid::Uuid;
 
 mod audio;
 mod book_events;
 mod db;
+mod filecache;
 mod messages;
 mod secret;
 mod websocket;
 
+use filecache::FileCache;
 use secret::Secret;
 use websocket::Ws;
 
@@ -257,7 +258,7 @@ async fn download_file(
 	if let Some(con) = cons.get(&ConnectionId(data.0)).cloned() {
 		drop(cons);
 		debug!(state.logger, "Downloading file"; "channel" => data.1, "path" => &data.2);
-		let (len, file_stream): (u64, TcpStream) = match con
+		let (len, file_stream, server) = match con
 			.send(websocket::DownloadFile { channel, path: data.2.clone() })
 			.await
 		{
@@ -265,24 +266,45 @@ async fn download_file(
 				return HttpResponse::Gone().finish();
 			}
 			Ok(Err(e)) => {
-				error!(state.logger, "File download failed"; "error" => ?e);
+				error!(state.logger, "File download failed"; "error" => %e);
 				return HttpResponse::InternalServerError()
-					.body("Failed to download file");
+					.body(format!("Failed to download file: {}", e));
 			}
 			Ok(Ok(r)) => r,
 		};
 
-		// TODO Cache icons and avatars for offline usage
-		// Use a general file cache (e.g. also for sent images) by TS-Server
-
-		// Icons: There can be collisions as only CRC-32 is used, we may update
-		// them at some time when the modification time on the server is newer
-		// than on the cached file.
 		let stream = FramedRead::new(file_stream, BytesCodec::new())
 			.map(|r| r.map(web::BytesMut::freeze));
-		HttpResponse::Ok().content_length(len).streaming(stream)
+		// Cache icons and avatars for offline usage
+		if channel.0 == 0 && (data.2.starts_with("icon_")
+			|| data.2.starts_with("avatar_")) {
+			let stream = FileCache::cache_file(&*state, server, channel,
+				&data.2, stream).await;
+			HttpResponse::Ok().content_length(len).streaming(stream)
+		} else {
+			HttpResponse::Ok().content_length(len).streaming(stream)
+		}
 	} else {
 		HttpResponse::Gone().finish()
+	}
+}
+
+/// Get a cached file by server id, channel and path.
+#[get("/filecache/{id}/{channel}/{path:.*}")]
+async fn download_cache_file(
+	state: web::Data<State>, data: web::Path<(String, u64, String)>,
+) -> impl Responder {
+	let server = match base64::decode(&data.0) {
+		Err(e) => return HttpResponse::BadRequest()
+			.body(format!("Not a valid server uid: {}", e)),
+		Ok(uid) => Uid(uid),
+	};
+	let channel = ChannelId(data.1);
+	if let Some((len, stream)) = FileCache::get_cached_file(
+		&*state, server, channel, &data.2).await {
+		HttpResponse::Ok().content_length(len).streaming(stream)
+	} else {
+		HttpResponse::NotFound().finish()
 	}
 }
 
@@ -404,6 +426,7 @@ async fn main() -> Result<()> {
 			.service(list_plugins)
 			.service(get_plugin)
 			.service(download_file)
+			.service(download_cache_file)
 			.service(db::graphql::db_graphql)
 			.service(db::graphql::graphiql)
 			.service(

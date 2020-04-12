@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{self, Poll};
@@ -9,10 +10,12 @@ use anyhow::{bail, format_err, Result};
 use futures::prelude::*;
 use slog::{debug, error, o, warn, Logger};
 use tokio::net::TcpStream;
+use tokio::sync::oneshot;
 use tsclientlib::events::Event as TsEvent;
 use tsclientlib::StreamItem as TsStreamItem;
 use tsclientlib::{
-	events, ChannelId, ClientId, Connection, DisconnectOptions, MessageTarget,
+	events, ChannelId, ClientId, Connection, DisconnectOptions,
+	FileDownloadResult, FileTransferHandle, MessageTarget, Uid,
 };
 use tsproto::resend::PacketId;
 use tsproto_packets::packets::{AudioData, OutPacket};
@@ -29,6 +32,7 @@ pub(crate) struct Ws {
 	id: ConnectionId,
 	connection: Option<Connection>,
 	connect_options: Option<messages::ConnectOptions>,
+	file_downloads: HashMap<FileTransferHandle, oneshot::Sender<Result<FileDownloadResult>>>,
 
 	websocket_closed: bool,
 	self_talking: bool,
@@ -38,7 +42,6 @@ pub(crate) struct Ws {
 /// Polls the connection for events.
 struct ConnectionPoller;
 
-pub(crate) struct SendMessageMsg(pub MessageP2F);
 pub(crate) struct SetSelfTalkingMsg(pub bool);
 pub(crate) struct TalkersChangedMsg(pub Vec<(ClientId, bool)>);
 pub(crate) struct SendPacketMsg(pub OutPacket);
@@ -74,9 +77,6 @@ impl Actor for Ws {
 	}
 }
 
-impl Message for SendMessageMsg {
-	type Result = ();
-}
 impl Message for SetSelfTalkingMsg {
 	type Result = ();
 }
@@ -91,7 +91,7 @@ impl Message for DisconnectMsg {
 }
 impl Message for DownloadFile {
 	/// The size of the file and the stream
-	type Result = Result<(u64, TcpStream)>;
+	type Result = Result<(u64, TcpStream, Uid)>;
 }
 impl Message for UploadFile {
 	type Result = Result<TcpStream>;
@@ -109,6 +109,7 @@ impl Ws {
 			id,
 			connection: None,
 			connect_options: None,
+			file_downloads: Default::default(),
 
 			websocket_closed: false,
 			self_talking: false,
@@ -166,7 +167,6 @@ impl Ws {
 								let logger = self.logger.clone();
 								let opts =
 									self.connect_options.as_ref().unwrap();
-								// TODO What if this one doesn't exist?
 								let id = self.state.settings.default_identity;
 								actix::spawn(
 									self.state
@@ -272,6 +272,16 @@ impl Ws {
 							}
 						},
 					));
+				}
+			}
+			TsStreamItem::FileDownload(handle, file) => {
+				if let Some(transfer) = self.file_downloads.remove(&handle) {
+					let _ = transfer.send(Ok(file));
+				}
+			}
+			TsStreamItem::FileTransferFailed(handle, e) => {
+				if let Some(transfer) = self.file_downloads.remove(&handle) {
+					let _ = transfer.send(Err(e));
 				}
 			}
 			_ => {}
@@ -458,18 +468,37 @@ impl Ws {
 }
 
 impl Handler<DownloadFile> for Ws {
-	type Result = ResponseFuture<Result<(u64, TcpStream)>>;
+	type Result = ResponseFuture<Result<(u64, TcpStream, Uid)>>;
 	fn handle(
 		&mut self, msg: DownloadFile, _: &mut Self::Context,
 	) -> Self::Result {
 		if let Some(con) = &mut self.connection {
-			let handle = con.download_file(
+			let uid = match con.get_server_key()
+				.and_then(|k| k.get_uid_no_base64().map_err(|e| e.into())) {
+				Ok(k) => Uid(k),
+				Err(e) => return Box::pin(futures::future::err(
+					format_err!("Failed to get uid: {}", e))),
+			};
+
+			let handle = match con.download_file(
 				msg.channel,
 				&format!("/{}", msg.path),
 				None,
 				None,
-			);
-			Box::pin(futures::future::err(format_err!("TODO")))
+			) {
+				Ok(r) => r,
+				Err(e) => return Box::pin(futures::future::err(
+					format_err!("Failed to download file: {}", e))),
+			};
+			let (send, recv) = oneshot::channel();
+			self.file_downloads.insert(handle, send);
+			Box::pin(recv.map(|r| match r {
+				Ok(Ok(r)) => {
+					Ok((r.size, r.stream, uid))
+				}
+				Ok(Err(e)) => Err(e),
+				Err(e) => Err(e.into()),
+			}))
 		} else {
 			Box::pin(futures::future::err(format_err!(
 				"Connection does not exist"

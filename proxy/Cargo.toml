@@ -15,6 +15,7 @@ actix-web-actors = "2.0"
 actix-rt = "1.0"
 anyhow = "1"
 audiopus = "0.2"
+base32 = "0.4"
 base64 = "0.12"
 chrono = { version = "0.4", features = ["serde"] }
 diesel = { version = "1.4", features = ["chrono", "sqlite"] }
@@ -39,7 +40,7 @@ slog-term = "2"
 structopt = { version = "0.3", default-features = false }
 time = "0.2"
 toml = "0.4"
-tokio = "0.2"
+tokio = { version = "0.2", features = ["fs"] }
 tokio-util = { version = "0.3", features = ["codec"] }
 tsclientlib = { path = "../../tsclientlib/tsclientlib", features = ["unstable"] }
 tsproto = { path = "../../tsclientlib/tsproto" }
