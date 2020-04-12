@@ -27,7 +27,7 @@
 <button class="button bookmark" on:click={doConnect} on:mouseover={hover} on:mouseout={leave}>
 	<div class="bookmark-icon"><i class="mdi mdi-{SERVER_ICON} mdi-24px"></i></div>
 	<div class="bookmark-name">{bookmark.name || bookmark.server.name}</div>
-	<div class="bookmark-info">Last connected on April 1, 2020</div>
+	<div class="bookmark-info" title="{bookmark.lastUsed.format()}">Last connected on {bookmark.lastUsed.format("lll")}</div>
 	<div class="bookmark-star"><i class="mdi mdi-{BOOKMARK_ON} mdi-24px"></i></div>
 </button>
 

@@ -77,6 +77,7 @@ pub struct ChannelInsert<'a> {
 	pub server: &'a [u8],
 	pub id: i64,
 	pub parent: Option<i64>,
+	pub order_id: Option<i64>,
 	pub name: &'a str,
 	pub icon: Option<i32>,
 	pub deleted: bool,

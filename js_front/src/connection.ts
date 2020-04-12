@@ -1,6 +1,6 @@
 import { Chat, Message } from "./chat/chat";
 import { OutMsg, InMsg } from "./structs/ws";
-import { writable, Writable } from "svelte/store";
+import { writable } from "svelte/store";
 import { Book, Channel, Server } from "./tree/book";
 
 export class Connection {
@@ -8,33 +8,33 @@ export class Connection {
 
 	public readonly book: Book;
 	public readonly chat: Chat;
-	private socket: WebSocket;
-	private guid: string;
+	private socket: WebSocket | null = null;
+	private guid: string | null = null;
 
 	constructor() {
 		this.book = new Book();
 		this.chat = new Chat(this);
-		this.guid = "36c07459-a731-4868-9f10-a9b7564a4461"; // TODO random
-		this.socket = new WebSocket(`ws://localhost:4422/con/${this.guid}/ws?format=Json`);
-		//this.socket = new WebSocket("ws://localhost:2319");
-		this.socket.onmessage = (evt) => this.messageHandler(evt);
-		//this.socket.send("{\"test\":\"sdf\"}");
 
 		this.fillDummyData();
 	}
 
 	public connect(opt: IConnectOptions) {
-		this.sendMessage({
-			Connect: {
-				address: opt.address,
-				name: opt.name,
-				log_commands: false,
-				log_packets: false,
-				log_udp_packets: false,
-				version: "Linux_5_0_0_test_87"
-			}
-		});
-		this.state.set(ConnectionState.Connecting);
+		this.guid = "36c07459-a731-4868-9f10-a9b7564a4461"; // TODO random
+		this.socket = new WebSocket(`ws://localhost:4422/con/${this.guid}/ws?format=Json`);
+		this.socket.onopen = () => {
+			this.sendMessage({
+				Connect: {
+					address: opt.address,
+					name: opt.name,
+					log_commands: false,
+					log_packets: false,
+					log_udp_packets: false,
+					version: "Linux_5_0_0_test_87"
+				}
+			});
+			this.state.set(ConnectionState.Connecting);
+		};
+		this.socket.onmessage = (evt) => this.messageHandler(evt);
 	}
 
 	private fillDummyData() {
@@ -53,11 +53,11 @@ export class Connection {
 	}
 
 	public sendMessage(data: OutMsg): void {
-		this.socket.send(JSON.stringify(data));
+		this.socket?.send(JSON.stringify(data));
 	}
 
 	public sendRawMessage(data: string): void {
-		this.socket.send(data);
+		this.socket?.send(data);
 	}
 
 	private messageHandler(evt: MessageEvent) {

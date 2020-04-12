@@ -20,7 +20,7 @@
 <svelte:options immutable />
 <div bind:this={div} class="message-row">
 	<div class="message-time">
-		<span title="{message.date.format('dddd, MMMM Do YYYY, h:mm:ss a')}">
+		<span title="{message.date.format('dddd, MMMM Do YYYY, HH:mm:ss')}">
 			{message.date.format('HH:mm')}
 		</span>
 	</div>

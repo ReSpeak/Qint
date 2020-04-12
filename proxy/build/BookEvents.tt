@@ -114,7 +114,6 @@ pub fn convert_event(con: &Connection, e: &Event) -> Option<JsEvent> {
 		Event::Message { target, invoker, message } => Some(JsEvent::Message {
 			target: *target, invoker: invoker.clone(), message: message.clone(),
 		}),
-		_ => None,
 	}
 }
 

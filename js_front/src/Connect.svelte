@@ -78,7 +78,16 @@
 			</li>
 			{/each}
 			{:catch error}
-			<li>Failed to fetch bookmarks, is Qint running?</li>
+			<li>
+				<article class="message is-danger">
+					<div class="message-header">
+						<p>Error</p>
+					</div>
+					<div class="message-body">
+						Failed to fetch bookmarks, is Qint running?
+					</div>
+				</article>
+			</li>
 			{/await}
 		</ul>
 	</div>
@@ -205,54 +214,5 @@
 		.bookmark-list {
 			padding: 1em 8em 4em 8em;
 		}
-	}
-
-	.bookmark {
-		background-color: #eeea;
-		border-radius: 0.4em;
-		padding: 0.2em;
-		margin: 0.5em;
-		display: grid;
-		justify-content: stretch;
-		width: 100%;
-		height: 100%;
-	}
-
-	.bookmark:hover {
-		background-color: #fffa;
-	}
-
-	.bookmark:hover .bookmark-icon {
-		color: #4a4a4a;
-	}
-
-	.bookmark-icon {
-		grid-column: 1;
-		grid-row: 1 / 3;
-		text-align: center;
-		color: #666;
-	}
-
-	.bookmark-name, .bookmark-info {
-		justify-self: start;
-	}
-
-	.bookmark-name {
-		grid-column: 2;
-		grid-row: 1;
-	}
-
-	.bookmark-info {
-		grid-column: 2;
-		grid-row: 2;
-		color: #666;
-		font-size: 0.85em;
-	}
-
-	.bookmark-star {
-		grid-column: 3;
-		grid-row: 1 / 3;
-		text-align: center;
-		color: #e8c507;
 	}
 </style>
