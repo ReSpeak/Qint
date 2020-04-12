@@ -1,23 +1,34 @@
 use std::sync::Arc;
 
 use actix_web::*;
+use anyhow::format_err;
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
-use juniper::{EmptyMutation, EmptySubscription, FieldError, RootNode, ID};
+use juniper::{EmptySubscription, FieldError, RootNode, ID};
 
 use crate::State;
 use super::{models, schema, RunOnDbMsg};
 use super::models::MessageStatus;
+use super::schema::bookmarks;
 
 const BOOKMARKS_LIMIT: i64 = 20;
 const MESSAGES_LIMIT: i64 = 50;
 
 #[derive(Clone)]
-pub struct Context;
-#[derive(Clone)]
 pub struct Query;
+#[derive(Clone)]
+pub struct Mutation;
+
+#[derive(juniper::GraphQLObject)]
+struct Void {
+	void: bool,
+}
+
+pub(crate) type Schema =
+	RootNode<'static, Query, Mutation, EmptySubscription<State>>;
+type GResult<T> = std::result::Result<T, FieldError>;
 
 struct Bookmark(models::Bookmark);
 struct Channel(models::Channel);
@@ -28,9 +39,23 @@ struct Message(models::Message);
 struct Server(models::Server);
 struct ServerClient(models::ServersClients);
 
-pub(crate) type Schema =
-	RootNode<'static, Query, EmptyMutation<State>, EmptySubscription<State>>;
-type GResult<T> = std::result::Result<T, FieldError>;
+#[derive(Debug, juniper::GraphQLInputObject)]
+struct UpdateBookmark {
+	id: ID,
+	name: Option<String>,
+	username: Option<String>,
+	channel: Option<ID>,
+	bookmark: Option<bool>,
+}
+
+#[derive(Debug, AsChangeset)]
+#[table_name="bookmarks"]
+struct UpdateBookmarkDb {
+	name: Option<String>,
+	username: Option<String>,
+	channel: Option<i64>,
+	bookmark: Option<bool>,
+}
 
 #[get("/graphiql")]
 pub async fn graphiql() -> impl Responder {
@@ -44,8 +69,17 @@ pub(crate) async fn db_graphql(
 	state: web::Data<State>, data: web::Json<GraphQLRequest>,
 ) -> Result<impl Responder> {
 	let res = data.execute(&state.graphql_schema, &*state).await;
-	let res = serde_json::to_string(&res)?;
-	Ok(HttpResponse::Ok().content_type("application/json").body(res))
+	let json_res = serde_json::to_string(&res)?;
+	let mut resp = if res.is_ok() {
+		HttpResponse::Ok()
+	} else {
+		HttpResponse::BadRequest()
+	};
+	Ok(resp.content_type("application/json").body(json_res))
+}
+
+impl Void {
+	fn new() -> Self { Self { void: true } }
 }
 
 #[juniper::graphql_object(Context = State)]
@@ -451,10 +485,8 @@ impl Query {
 		let res = state
 			.database
 			.send(RunOnDbMsg(|db| {
-				use schema::bookmarks;
-
 				let query = bookmarks::table
-					.order((bookmarks::bookmark, bookmarks::last_used.desc()))
+					.order((bookmarks::bookmark.desc(), bookmarks::last_used.desc()))
 					.limit(BOOKMARKS_LIMIT);
 				let result = /*if let Some((book, last)) = msg.start {
 				// (bookmark == book AND last_used > last) OR (!bookmark AND book)
@@ -481,8 +513,6 @@ impl Query {
 		let res = state
 			.database
 			.send(RunOnDbMsg(|db| {
-				use schema::bookmarks;
-
 				let query = bookmarks::table.order(bookmarks::last_used);
 				let result = query.first::<models::Bookmark>(&db.con)
 					.optional()?.map(Bookmark);
@@ -494,10 +524,67 @@ impl Query {
 	}
 }
 
+#[juniper::graphql_object(Context = State)]
+impl Mutation {
+	async fn update_bookmark(state: &State, update: UpdateBookmark) -> GResult<Void> {
+		let res = state.database.send(RunOnDbMsg(|db| {
+			let id: i64 = update.id.parse::<u64>()? as i64;
+
+			let ch = if let Some(c) = update.channel {
+				// Search server
+				let server = bookmarks::table.filter(bookmarks::id.eq(id))
+					.select(bookmarks::server)
+					.first::<Option<Vec<u8>>>(&db.con)?;
+
+				let server = if let Some(s) = server {
+					s
+				} else {
+					Err(format_err!("Cannot set channel: Bookmark needs a server"))?
+				};
+
+				// Search channel
+				use schema::channels;
+				let ch_id: i64 = c.parse::<u64>()? as i64;
+				let res = channels::table.filter(channels::id.eq(ch_id)
+					.and(channels::server.eq(server)))
+					.select(diesel::dsl::count_star())
+					.execute(&db.con)?;
+				if res == 0 {
+					Err(format_err!("Cannot set channel: Does not exist"))?;
+				}
+
+				Some(ch_id)
+			} else {
+				None
+			};
+
+			let db_update = UpdateBookmarkDb {
+				name: update.name,
+				username: update.username,
+				channel: ch,
+				bookmark: update.bookmark,
+			};
+
+			let res = diesel::update(bookmarks::table
+				.filter(bookmarks::id.eq(id)))
+				.set(db_update)
+				.execute(&db.con)?;
+
+			GResult::Ok(res)
+		})).await??;
+
+		if res == 0 {
+			Err(format_err!("Bookmark not found"))?;
+		}
+
+		Ok(Void::new())
+	}
+}
+
 pub(crate) fn create_schema() -> Arc<Schema> {
 	Arc::new(Schema::new(
 		Query,
-		EmptyMutation::<State>::new(),
+		Mutation,
 		EmptySubscription::<State>::new(),
 	))
 }

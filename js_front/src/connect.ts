@@ -14,4 +14,8 @@ export default class Self {
 			name: this.username
 		});
 	}
+
+	public reset() {
+		this.connection.reset();
+	}
 }

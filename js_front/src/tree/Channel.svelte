@@ -1,6 +1,5 @@
 <script>
 	import { afterUpdate } from "svelte";
-	import Channel from "./Channel.svelte";
 	import Icon from "../ui/Icon.svelte";
 	import { flash } from "../util";
 
@@ -44,7 +43,7 @@
 		<!-- Clients -->
 		<!-- Channel -->
 		{#each $children as channel}
-			<Channel {channel} />
+			<svelte:self {channel} />
 		{/each}
 	</ul>
 </li>

@@ -13,6 +13,11 @@
 		connect.connect();
 	}
 
+	function toggle() {
+		bookmark.bookmark = !bookmark.bookmark;
+		bookmark.update()
+	}
+
 	function hover() {
 		username.set(bookmark.username);
 		address.set(bookmark.address);
@@ -24,61 +29,112 @@
 	}
 </script>
 
-<button class="button bookmark" on:click={doConnect} on:mouseover={hover} on:mouseout={leave}>
-	<div class="bookmark-icon"><i class="mdi mdi-{SERVER_ICON} mdi-24px"></i></div>
-	<div class="bookmark-name">{bookmark.name || bookmark.server.name}</div>
-	<div class="bookmark-info" title="{bookmark.lastUsed.format()}">Last connected on {bookmark.lastUsed.format("lll")}</div>
-	<div class="bookmark-star"><i class="mdi mdi-{BOOKMARK_ON} mdi-24px"></i></div>
-</button>
+<div class="bookmarkItem" class:bookmark={bookmark.bookmark} on:mouseover={hover} on:mouseout={leave}>
+	<button class="button innerBookmarkItem" on:click={doConnect}>
+		<div class="bookmarkIcon"><i class="mdi mdi-{SERVER_ICON} mdi-24px"></i></div>
+		<div class="bookmarkName">{bookmark.name || bookmark.server.name}</div>
+		<div class="bookmarkInfo" title={bookmark.lastUsed.format()}>Last connected on {bookmark.lastUsed.format("lll")}</div>
+	</button>
+	<button class="button bookmarkStar" on:click={toggle}>
+		<i class="mdi mdi-{BOOKMARK_ON} mdi-24px bookmarkOn"></i>
+		<i class="mdi mdi-{BOOKMARK_OFF} mdi-24px bookmarkOff"></i>
+	</button>
+</div>
 
 <style lang="scss">
-	.bookmark {
+	.bookmarkItem {
 		background-color: #eeea;
 		border-radius: 0.4em;
-		padding: 0.2em;
 		margin: 0.5em;
 		display: grid;
 		justify-content: stretch;
-		grid-template-columns: 2.5em auto 2.5em;
+		grid-template-columns: auto 2.5em;
 		width: 100%;
 		height: 100%;
 	}
 
-	.bookmark:hover {
+	.innerBookmarkItem {
+		padding: 0.2em;
+		border: none;
+		background: none;
+		box-shadow: none;
+		display: grid;
+		justify-content: stretch;
+		grid-template-columns: 2.5em auto;
+		width: 100%;
+		height: 100%;
+	}
+
+	.bookmarkItem:hover {
 		background-color: #fffa;
 	}
 
-	.bookmark:hover .bookmark-icon {
+	.bookmarkItem:hover .bookmarkIcon {
 		color: #4a4a4a;
 	}
 
-	.bookmark-icon {
+	.bookmarkIcon {
 		grid-column: 1;
 		grid-row: 1 / 3;
 		text-align: center;
 		color: #777;
 	}
 
-	.bookmark-name, .bookmark-info {
+	.bookmarkName, .bookmarkInfo {
 		justify-self: start;
 	}
 
-	.bookmark-name {
+	.bookmarkName {
 		grid-column: 2;
 		grid-row: 1;
 	}
 
-	.bookmark-info {
+	.bookmarkInfo {
 		grid-column: 2;
 		grid-row: 2;
 		color: #666;
 		font-size: 0.85em;
 	}
 
-	.bookmark-star {
-		grid-column: 3;
-		grid-row: 1 / 3;
+	.bookmarkStar {
+		grid-column: 2;
+		height: 100%;
 		text-align: center;
+		color: #d8b507;
+		background: none;
+		border: none;
+		box-shadow: none;
+	}
+
+	.bookmarkStar:hover {
 		color: #e8c507;
+	}
+
+	.bookmarkStar .bookmarkOn {
+		display: none;
+	}
+
+	.bookmark .bookmarkStar .bookmarkOn {
+		display: inherit;
+	}
+
+	.bookmarkOff {
+		display: none;
+	}
+
+	// Display always on touch screens
+	@media (pointer:coarse) {
+		.bookmarkOff {
+			display: inherit;
+		}
+	}
+
+	.bookmarkItem:hover .bookmarkStar .bookmarkOff {
+		display: inherit;
+	}
+
+	.bookmarkItem:hover.bookmark .bookmarkStar .bookmarkOff,
+	.bookmark .bookmarkStar .bookmarkOff {
+		display: none;
 	}
 </style>

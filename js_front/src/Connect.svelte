@@ -1,20 +1,30 @@
 <script>
 	import { onMount } from 'svelte';
 	import { get, writable } from "svelte/store";
-	import { getRecent, Bookmark } from "./bookmark";
+	import { Bookmark } from "./bookmark";
 	import self from "./connect";
+	import { ConnectionState } from "./connection";
 	import Icon from "./ui/Icon.svelte";
 	import BookmarkComp from "./Bookmark.svelte";
-	import { BOOKMARK_OFF, BOOKMARK_ON, SERVER_ICON, CLIENT_ICON } from "./ui/const";
+	import { SERVER_ICON, CLIENT_ICON } from "./ui/const";
 
 	export let connection;
+	let state = connection.state;
+	let error = connection.error;
 	let data = new self(connection);
 	let username = writable(data.username);
 	let address = writable(data.address);
 	let bookmarks = Bookmark.get();
 
+	function onConnect() {
+		if (get(state) === ConnectionState.Disconnected)
+			data.connect();
+		else
+			data.reset();
+	}
+
 	onMount(async () => {
-		let recent = await getRecent();
+		let recent = await Bookmark.getRecent();
 		if (recent.data.mostRecentBookmark) {
 			if (data.username === "") {
 				data.username = recent.data.mostRecentBookmark.username;
@@ -29,9 +39,20 @@
 </script>
 
 <div class="connect-container">
+	{#if $error}
+		<article class="connect-error message is-danger">
+			<div class="message-header">
+				<p>Error</p>
+				<button class="delete" aria-label="delete" on:click="{() => error.set(undefined)}"></button>
+			</div>
+			<div class="message-body">
+				{$error}
+			</div>
+		</article>
+	{/if}
 	<div class="inner-connect-container">
 		<div class="connect-blur"></div>
-		<form class="connect-form" on:submit|preventDefault="{() => data.connect()}">
+		<form class="connect-form" on:submit|preventDefault="{onConnect}">
 			<div>
 				<p class="control has-icons-left">
 					<input
@@ -41,6 +62,7 @@
 						class="input"
 						type="text"
 						placeholder="Username"
+						disabled="{$state !== ConnectionState.Disconnected}"
 					/>
 					<Icon name="{CLIENT_ICON}" is_left />
 				</p>
@@ -54,13 +76,19 @@
 						class="input"
 						type="text"
 						placeholder="Server"
+						disabled="{$state !== ConnectionState.Disconnected}"
 					/>
 					<Icon name="{SERVER_ICON}" is_left />
 				</p>
 			</div>
 			<div>
 				<button class="button is-primary" name="connect" type="submit">
+				{#if $state === ConnectionState.Disconnected}
 					Connect
+				{:else}
+					<div class="loader"></div>
+					Cancel
+				{/if}
 				</button>
 			</div>
 		</form>
@@ -161,6 +189,19 @@
 	.connect-form > div button {
 		box-sizing: border-box;
 		width: 100%;
+	}
+
+	.connect-form > div button .loader {
+		margin-right: 1.5em;
+	}
+
+	.connect-error {
+		max-width: 100%;
+		width: 40em;
+
+		position: relative;
+		top: 5%;
+		margin: auto auto;
 	}
 
 
