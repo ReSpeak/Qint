@@ -209,8 +209,17 @@ impl Ws {
 							error!(self.logger, "Database failed to handle events"; "error" => ?e);
 						}
 
-						self.send_message(&MessageP2F::Events(events.into_iter()
-							.filter_map(|e| book_events::convert_event(data, &e)).collect()), ctx);
+						self.send_message(
+							&MessageP2F::Events(
+								events
+									.into_iter()
+									.filter_map(|e| {
+										book_events::convert_event(data, &e)
+									})
+									.collect(),
+							),
+							ctx,
+						);
 					}
 				}
 			}

@@ -10,8 +10,8 @@ use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use futures::prelude::*;
 use slog::{error, info, Logger};
-use tsclientlib::data::Connection as TsData;
 use tsclientlib::data::Client;
+use tsclientlib::data::Connection as TsData;
 use tsclientlib::events::{Event, PropertyId, PropertyValue};
 use tsclientlib::Connection as TsConnection;
 use tsclientlib::{ChannelId, ClientId, Identity, Invoker, MessageTarget};
@@ -494,9 +494,7 @@ impl DbHandler {
 			let r = match e {
 				Event::PropertyAdded { id, .. } => {
 					match id {
-						PropertyId::Server => {
-							handler.handle_connected()
-						}
+						PropertyId::Server => handler.handle_connected(),
 						PropertyId::Client(id) => {
 							if let Some(client) = data.clients.get(id) {
 								changed_client = Some(client);
@@ -514,9 +512,7 @@ impl DbHandler {
 				}
 				Event::PropertyChanged { id, .. } => {
 					match id {
-						PropertyId::ServerName => {
-							handler.handle_server_name()
-						}
+						PropertyId::ServerName => handler.handle_server_name(),
 						PropertyId::ServerIconId => {
 							handler.handle_server_icon()
 						}
@@ -557,7 +553,9 @@ impl DbHandler {
 					PropertyId::Client(_) => {
 						let client = match old {
 							PropertyValue::Client(client) => client,
-							_ => panic!("Property value should be a client but wasn't"),
+							_ => panic!(
+								"Property value should be a client but wasn't"
+							),
 						};
 						changed_client = Some(client);
 						handler.handle_remove_client(client)
@@ -574,9 +572,7 @@ impl DbHandler {
 							changed_client = data.clients.get(id);
 						}
 					}
-					handler.handle_message(
-						*target, invoker, message,
-					)
+					handler.handle_message(*target, invoker, message)
 				}
 				Event::ChannelListFinished => {
 					handler.handle_channellistfinished()
@@ -679,8 +675,11 @@ impl<'a> EventHandler<'a> {
 			{
 				// Update
 				diesel::update(servers.filter(public_key.eq(&key)))
-					.set((name.eq(&server_name), address.eq(&addr),
-						icon.eq(&icon_id)))
+					.set((
+						name.eq(&server_name),
+						address.eq(&addr),
+						icon.eq(&icon_id),
+					))
 					.execute(&db.con)?;
 			} else {
 				let server = models::ServerInsert {
@@ -733,8 +732,13 @@ impl<'a> EventHandler<'a> {
 			Some(client) => self.handle_add_client(client, true),
 			None => {
 				if let Some(uid) = &invoker.uid {
-					self.handle_add_client_internal(true, invoker.name.clone(),
-						uid.0.clone(), None, None)
+					self.handle_add_client_internal(
+						true,
+						invoker.name.clone(),
+						uid.0.clone(),
+						None,
+						None,
+					)
 				} else {
 					Ok(())
 				}
@@ -759,7 +763,13 @@ impl<'a> EventHandler<'a> {
 			Some(client.avatar_hash.clone())
 		};
 		let client_name = client.name.clone();
-		self.handle_add_client_internal(create, client_name, client_uid, icon, avatar)
+		self.handle_add_client_internal(
+			create,
+			client_name,
+			client_uid,
+			icon,
+			avatar,
+		)
 	}
 
 	fn handle_add_client_internal(
@@ -853,7 +863,10 @@ impl<'a> EventHandler<'a> {
 	/// Update last seen for all clients.
 	fn handle_disconnect(&self) -> Result<()> {
 		let server = self.get_server_key()?;
-		let uids = self.data.clients.values()
+		let uids = self
+			.data
+			.clients
+			.values()
 			.filter_map(|c| c.uid.as_ref().map(|u| u.0.clone()))
 			.collect::<Vec<_>>();
 
@@ -865,7 +878,8 @@ impl<'a> EventHandler<'a> {
 
 			diesel::update(
 				servers_clients::table.filter(
-					servers_clients::server.eq(server)
+					servers_clients::server
+						.eq(server)
 						.and(servers_clients::client.eq_any(&uids)),
 				),
 			)
@@ -899,10 +913,12 @@ impl<'a> EventHandler<'a> {
 		self.run(move |db, _| {
 			use schema::servers_clients::dsl::*;
 			// Update, ignored if not exists
-			diesel::update(servers_clients.filter(server.eq(&server_id)
-					.and(client.eq(&client_uid))))
-				.set(avatar.eq(&client_avatar))
-				.execute(&db.con)?;
+			diesel::update(
+				servers_clients
+					.filter(server.eq(&server_id).and(client.eq(&client_uid))),
+			)
+			.set(avatar.eq(&client_avatar))
+			.execute(&db.con)?;
 			Ok(())
 		});
 		Ok(())
@@ -928,10 +944,12 @@ impl<'a> EventHandler<'a> {
 		self.run(move |db, _| {
 			use schema::servers_clients::dsl::*;
 			// Update, ignored if not exists
-			diesel::update(servers_clients.filter(server.eq(&server_id)
-					.and(client.eq(&client_uid))))
-				.set(icon.eq(&client_icon))
-				.execute(&db.con)?;
+			diesel::update(
+				servers_clients
+					.filter(server.eq(&server_id).and(client.eq(&client_uid))),
+			)
+			.set(icon.eq(&client_icon))
+			.execute(&db.con)?;
 			Ok(())
 		});
 		Ok(())
@@ -1055,10 +1073,12 @@ impl<'a> EventHandler<'a> {
 		self.run(move |db, _| {
 			use schema::channels::dsl::*;
 			// Update, ignored if not exists
-			diesel::update(channels.filter(server.eq(&server_id)
-					.and(id.eq(ch_id.0 as i64))))
-				.set(parent.eq(ch_parent.0 as i64))
-				.execute(&db.con)?;
+			diesel::update(
+				channels
+					.filter(server.eq(&server_id).and(id.eq(ch_id.0 as i64))),
+			)
+			.set(parent.eq(ch_parent.0 as i64))
+			.execute(&db.con)?;
 			Ok(())
 		});
 		Ok(())
@@ -1075,10 +1095,12 @@ impl<'a> EventHandler<'a> {
 		self.run(move |db, _| {
 			use schema::channels::dsl::*;
 			// Update, ignored if not exists
-			diesel::update(channels.filter(server.eq(&server_id)
-					.and(id.eq(ch_id.0 as i64))))
-				.set(order_id.eq(ch_order.0 as i64))
-				.execute(&db.con)?;
+			diesel::update(
+				channels
+					.filter(server.eq(&server_id).and(id.eq(ch_id.0 as i64))),
+			)
+			.set(order_id.eq(ch_order.0 as i64))
+			.execute(&db.con)?;
 			Ok(())
 		});
 		Ok(())
@@ -1095,10 +1117,12 @@ impl<'a> EventHandler<'a> {
 		self.run(move |db, _| {
 			use schema::channels::dsl::*;
 			// Update, ignored if not exists
-			diesel::update(channels.filter(server.eq(&server_id)
-					.and(id.eq(ch_id.0 as i64))))
-				.set(name.eq(&ch_name))
-				.execute(&db.con)?;
+			diesel::update(
+				channels
+					.filter(server.eq(&server_id).and(id.eq(ch_id.0 as i64))),
+			)
+			.set(name.eq(&ch_name))
+			.execute(&db.con)?;
 			Ok(())
 		});
 		Ok(())
@@ -1111,18 +1135,18 @@ impl<'a> EventHandler<'a> {
 		} else {
 			bail!("Channel not found");
 		};
-		let ch_icon = channel.icon_id.and_then(|i| if i.0 == 0 {
-			None
-		} else {
-			Some(i.0 as i32)
-		});
+		let ch_icon = channel
+			.icon_id
+			.and_then(|i| if i.0 == 0 { None } else { Some(i.0 as i32) });
 		self.run(move |db, _| {
 			use schema::channels::dsl::*;
 			// Update, ignored if not exists
-			diesel::update(channels.filter(server.eq(&server_id)
-					.and(id.eq(ch_id.0 as i64))))
-				.set(icon.eq(&ch_icon))
-				.execute(&db.con)?;
+			diesel::update(
+				channels
+					.filter(server.eq(&server_id).and(id.eq(ch_id.0 as i64))),
+			)
+			.set(icon.eq(&ch_icon))
+			.execute(&db.con)?;
 			Ok(())
 		});
 		Ok(())
@@ -1130,8 +1154,7 @@ impl<'a> EventHandler<'a> {
 
 	fn handle_message(
 		&self, target: MessageTarget, invoker: &Invoker, message: &str,
-	) -> Result<()>
-	{
+	) -> Result<()> {
 		let server = self.get_server_key()?;
 
 		let invoker_uid = if let Some(uid) = &invoker.uid {
@@ -1278,16 +1301,21 @@ impl<'a> EventHandler<'a> {
 	/// there.
 	fn handle_channellistfinished(&self) -> Result<()> {
 		let server = self.get_server_key()?;
-		let channels = self.data.channels.keys().map(|id| id.0 as i64)
-			.collect::<Vec<_>>();
+		let channels =
+			self.data.channels.keys().map(|id| id.0 as i64).collect::<Vec<_>>();
 
 		self.run(move |db, _| {
 			use schema::channels;
 
-			diesel::update(channels::table.filter(channels::server.eq(&server)
-					.and(channels::id.ne_all(&channels))))
-				.set(channels::deleted.eq(true))
-				.execute(&db.con)?;
+			diesel::update(
+				channels::table.filter(
+					channels::server
+						.eq(&server)
+						.and(channels::id.ne_all(&channels)),
+				),
+			)
+			.set(channels::deleted.eq(true))
+			.execute(&db.con)?;
 			Ok(())
 		});
 

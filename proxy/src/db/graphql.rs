@@ -8,10 +8,10 @@ use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
 use juniper::{EmptySubscription, FieldError, RootNode, ID};
 
-use crate::State;
-use super::{models, schema, RunOnDbMsg};
 use super::models::MessageStatus;
 use super::schema::bookmarks;
+use super::{models, schema, RunOnDbMsg};
+use crate::State;
 
 const BOOKMARKS_LIMIT: i64 = 20;
 const MESSAGES_LIMIT: i64 = 50;
@@ -49,7 +49,7 @@ struct UpdateBookmark {
 }
 
 #[derive(Debug, AsChangeset)]
-#[table_name="bookmarks"]
+#[table_name = "bookmarks"]
 struct UpdateBookmarkDb {
 	name: Option<String>,
 	username: Option<String>,
@@ -103,9 +103,13 @@ impl Bookmark {
 						use schema::channels;
 
 						let query = channels::table.filter(
-							channels::server.eq(server)
-							.and(channels::id.eq(id)));
-						GResult::Ok(Channel(query.first::<models::Channel>(&db.con)?))
+							channels::server
+								.eq(server)
+								.and(channels::id.eq(id)),
+						);
+						GResult::Ok(Channel(
+							query.first::<models::Channel>(&db.con)?,
+						))
 					}))
 					.await??;
 				Ok(Some(res))
@@ -146,8 +150,8 @@ impl Bookmark {
 				.send(RunOnDbMsg(|db| {
 					use schema::servers;
 
-					let query = servers::table
-						.filter(servers::public_key.eq(id));
+					let query =
+						servers::table.filter(servers::public_key.eq(id));
 					GResult::Ok(Server(query.first::<models::Server>(&db.con)?))
 				}))
 				.await??;
@@ -169,17 +173,20 @@ impl Channel {
 			.send(RunOnDbMsg(|db| {
 				use schema::servers;
 
-				let query = servers::table
-					.filter(servers::public_key.eq(id));
+				let query = servers::table.filter(servers::public_key.eq(id));
 				GResult::Ok(Server(query.first::<models::Server>(&db.con)?))
 			}))
 			.await??;
 		Ok(Some(res))
 	}
-	fn parent(&self) -> Option<ID> { self.0.parent.map(|i| ID::new(i.to_string())) }
+	fn parent(&self) -> Option<ID> {
+		self.0.parent.map(|i| ID::new(i.to_string()))
+	}
 	/// References the channel above this one (zero if this is the first
 	/// channel).
-	fn order_id(&self) -> Option<ID> { self.0.order_id.map(|i| ID::new(i.to_string())) }
+	fn order_id(&self) -> Option<ID> {
+		self.0.order_id.map(|i| ID::new(i.to_string()))
+	}
 	fn name(&self) -> &str { &self.0.name }
 	fn icon(&self) -> Option<ID> {
 		self.0.icon.map(|i| ID::new((i as u32).to_string()))
@@ -196,12 +203,16 @@ impl Channel {
 				use schema::{channel_chats, chats};
 
 				let query = channel_chats::table
-					.filter(channel_chats::server.eq(server)
-						.and(channel_chats::channel.eq(id)))
+					.filter(
+						channel_chats::server
+							.eq(server)
+							.and(channel_chats::channel.eq(id)),
+					)
 					.inner_join(chats::table)
 					.select(chats::all_columns);
-				GResult::Ok(query.first::<models::Chat>(&db.con).optional()?
-					.map(Chat))
+				GResult::Ok(
+					query.first::<models::Chat>(&db.con).optional()?.map(Chat),
+				)
 			}))
 			.await??;
 		Ok(res)
@@ -227,8 +238,13 @@ impl Chat {
 					.filter(messages::chat.eq(id))
 					.order((messages::time.desc(), messages::id.desc()))
 					.limit(MESSAGES_LIMIT);
-				GResult::Ok(query.load::<models::Message>(&db.con)?
-					.into_iter().map(Message).collect())
+				GResult::Ok(
+					query
+						.load::<models::Message>(&db.con)?
+						.into_iter()
+						.map(Message)
+						.collect(),
+				)
 			}))
 			.await??;
 		Ok(res)
@@ -241,9 +257,13 @@ impl Client {
 	fn uid(&self) -> ID { ID::new(base64::encode(&self.0.uid)) }
 	fn name(&self) -> &str { &self.0.name }
 	/// The base64 encoded public key of the client if we have it.
-	fn public_key(&self) -> Option<String> { self.0.public_key.as_ref().map(|p| base64::encode(&p)) }
+	fn public_key(&self) -> Option<String> {
+		self.0.public_key.as_ref().map(|p| base64::encode(&p))
+	}
 	/// The custom name of the client if we assigned one.
-	fn custom_name(&self) -> Option<&str> { self.0.custom_name.as_ref().map(|s| s.as_str()) }
+	fn custom_name(&self) -> Option<&str> {
+		self.0.custom_name.as_ref().map(|s| s.as_str())
+	}
 
 	/// The chat with this client on the specified server.
 	async fn chat(&self, state: &State, server: ID) -> GResult<Option<Chat>> {
@@ -255,12 +275,16 @@ impl Client {
 				use schema::{chats, client_chats};
 
 				let query = client_chats::table
-					.filter(client_chats::server.eq(server)
-						.and(client_chats::client.eq(id)))
+					.filter(
+						client_chats::server
+							.eq(server)
+							.and(client_chats::client.eq(id)),
+					)
 					.inner_join(chats::table)
 					.select(chats::all_columns);
-				GResult::Ok(query.first::<models::Chat>(&db.con).optional()?
-					.map(Chat))
+				GResult::Ok(
+					query.first::<models::Chat>(&db.con).optional()?.map(Chat),
+				)
 			}))
 			.await??;
 		Ok(res)
@@ -276,12 +300,16 @@ impl Client {
 				use schema::{chats, client_pokes};
 
 				let query = client_pokes::table
-					.filter(client_pokes::server.eq(server)
-						.and(client_pokes::client.eq(id)))
+					.filter(
+						client_pokes::server
+							.eq(server)
+							.and(client_pokes::client.eq(id)),
+					)
 					.inner_join(chats::table)
 					.select(chats::all_columns);
-				GResult::Ok(query.first::<models::Chat>(&db.con).optional()?
-					.map(Chat))
+				GResult::Ok(
+					query.first::<models::Chat>(&db.con).optional()?.map(Chat),
+				)
 			}))
 			.await??;
 		Ok(res)
@@ -384,8 +412,9 @@ impl Server {
 					.filter(server_chats::server.eq(id))
 					.inner_join(chats::table)
 					.select(chats::all_columns);
-				GResult::Ok(query.first::<models::Chat>(&db.con).optional()?
-					.map(Chat))
+				GResult::Ok(
+					query.first::<models::Chat>(&db.con).optional()?.map(Chat),
+				)
 			}))
 			.await??;
 		Ok(res)
@@ -393,19 +422,21 @@ impl Server {
 
 	/// The channels on this server.
 	// TODO Pagination
-	async fn channels(&self, state: &State, include_deleted: bool) -> GResult<Vec<Channel>> {
+	async fn channels(
+		&self, state: &State, include_deleted: bool,
+	) -> GResult<Vec<Channel>> {
 		let id = self.0.public_key.clone();
 		let res = state
 			.database
 			.send(RunOnDbMsg(move |db| {
 				use schema::channels;
 
-				let query = channels::table
-					.filter(channels::server.eq(id));
+				let query = channels::table.filter(channels::server.eq(id));
 				let res = if include_deleted {
 					query.load::<models::Channel>(&db.con)
 				} else {
-					query.filter(channels::deleted.eq(false))
+					query
+						.filter(channels::deleted.eq(false))
 						.load::<models::Channel>(&db.con)
 				};
 				GResult::Ok(res?.into_iter().map(Channel).collect())
@@ -425,8 +456,13 @@ impl Server {
 
 				let query = servers_clients::table
 					.filter(servers_clients::server.eq(id));
-				GResult::Ok(query.load::<models::ServersClients>(&db.con)?
-					.into_iter().map(ServerClient).collect())
+				GResult::Ok(
+					query
+						.load::<models::ServersClients>(&db.con)?
+						.into_iter()
+						.map(ServerClient)
+						.collect(),
+				)
 			}))
 			.await??;
 		Ok(res)
@@ -442,8 +478,7 @@ impl ServerClient {
 			.send(RunOnDbMsg(move |db| {
 				use schema::servers;
 
-				let query = servers::table
-					.filter(servers::public_key.eq(id));
+				let query = servers::table.filter(servers::public_key.eq(id));
 				GResult::Ok(Server(query.first::<models::Server>(&db.con)?))
 			}))
 			.await??;
@@ -457,8 +492,7 @@ impl ServerClient {
 			.send(RunOnDbMsg(move |db| {
 				use schema::clients;
 
-				let query = clients::table
-					.filter(clients::uid.eq(id));
+				let query = clients::table.filter(clients::uid.eq(id));
 				GResult::Ok(Client(query.first::<models::Client>(&db.con)?))
 			}))
 			.await??;
@@ -486,7 +520,10 @@ impl Query {
 			.database
 			.send(RunOnDbMsg(|db| {
 				let query = bookmarks::table
-					.order((bookmarks::bookmark.desc(), bookmarks::last_used.desc()))
+					.order((
+						bookmarks::bookmark.desc(),
+						bookmarks::last_used.desc(),
+					))
 					.limit(BOOKMARKS_LIMIT);
 				let result = /*if let Some((book, last)) = msg.start {
 				// (bookmark == book AND last_used > last) OR (!bookmark AND book)
@@ -514,8 +551,10 @@ impl Query {
 			.database
 			.send(RunOnDbMsg(|db| {
 				let query = bookmarks::table.order(bookmarks::last_used);
-				let result = query.first::<models::Bookmark>(&db.con)
-					.optional()?.map(Bookmark);
+				let result = query
+					.first::<models::Bookmark>(&db.con)
+					.optional()?
+					.map(Bookmark);
 
 				GResult::Ok(result)
 			}))
@@ -526,52 +565,65 @@ impl Query {
 
 #[juniper::graphql_object(Context = State)]
 impl Mutation {
-	async fn update_bookmark(state: &State, update: UpdateBookmark) -> GResult<Void> {
-		let res = state.database.send(RunOnDbMsg(|db| {
-			let id: i64 = update.id.parse::<u64>()? as i64;
+	async fn update_bookmark(
+		state: &State, update: UpdateBookmark,
+	) -> GResult<Void> {
+		let res = state
+			.database
+			.send(RunOnDbMsg(|db| {
+				let id: i64 = update.id.parse::<u64>()? as i64;
 
-			let ch = if let Some(c) = update.channel {
-				// Search server
-				let server = bookmarks::table.filter(bookmarks::id.eq(id))
-					.select(bookmarks::server)
-					.first::<Option<Vec<u8>>>(&db.con)?;
+				let ch = if let Some(c) = update.channel {
+					// Search server
+					let server = bookmarks::table
+						.filter(bookmarks::id.eq(id))
+						.select(bookmarks::server)
+						.first::<Option<Vec<u8>>>(&db.con)?;
 
-				let server = if let Some(s) = server {
-					s
+					let server = if let Some(s) = server {
+						s
+					} else {
+						Err(format_err!(
+							"Cannot set channel: Bookmark needs a server"
+						))?
+					};
+
+					// Search channel
+					use schema::channels;
+					let ch_id: i64 = c.parse::<u64>()? as i64;
+					let res = channels::table
+						.filter(
+							channels::id
+								.eq(ch_id)
+								.and(channels::server.eq(server)),
+						)
+						.select(diesel::dsl::count_star())
+						.execute(&db.con)?;
+					if res == 0 {
+						Err(format_err!("Cannot set channel: Does not exist"))?;
+					}
+
+					Some(ch_id)
 				} else {
-					Err(format_err!("Cannot set channel: Bookmark needs a server"))?
+					None
 				};
 
-				// Search channel
-				use schema::channels;
-				let ch_id: i64 = c.parse::<u64>()? as i64;
-				let res = channels::table.filter(channels::id.eq(ch_id)
-					.and(channels::server.eq(server)))
-					.select(diesel::dsl::count_star())
-					.execute(&db.con)?;
-				if res == 0 {
-					Err(format_err!("Cannot set channel: Does not exist"))?;
-				}
+				let db_update = UpdateBookmarkDb {
+					name: update.name,
+					username: update.username,
+					channel: ch,
+					bookmark: update.bookmark,
+				};
 
-				Some(ch_id)
-			} else {
-				None
-			};
-
-			let db_update = UpdateBookmarkDb {
-				name: update.name,
-				username: update.username,
-				channel: ch,
-				bookmark: update.bookmark,
-			};
-
-			let res = diesel::update(bookmarks::table
-				.filter(bookmarks::id.eq(id)))
+				let res = diesel::update(
+					bookmarks::table.filter(bookmarks::id.eq(id)),
+				)
 				.set(db_update)
 				.execute(&db.con)?;
 
-			GResult::Ok(res)
-		})).await??;
+				GResult::Ok(res)
+			}))
+			.await??;
 
 		if res == 0 {
 			Err(format_err!("Bookmark not found"))?;
@@ -582,9 +634,5 @@ impl Mutation {
 }
 
 pub(crate) fn create_schema() -> Arc<Schema> {
-	Arc::new(Schema::new(
-		Query,
-		Mutation,
-		EmptySubscription::<State>::new(),
-	))
+	Arc::new(Schema::new(Query, Mutation, EmptySubscription::<State>::new()))
 }

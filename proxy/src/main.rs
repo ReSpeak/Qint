@@ -370,7 +370,8 @@ async fn main() -> Result<()> {
 	}
 
 	// Open database
-	let database = db::DbHandler::new(logger.clone(), &settings, secret.clone())?.start();
+	let database =
+		db::DbHandler::new(logger.clone(), &settings, secret.clone())?.start();
 
 	let connections = Arc::new(Mutex::new(HashMap::new()));
 
