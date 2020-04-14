@@ -35,29 +35,6 @@
 				bookmarkError = err;
 			}
 		}
-		/*if (fromStart) {
-			let end = 0;
-			if (bookmarks.length > 0) {
-				end = bookmarks[0].name;
-			}
-			let res = [];
-			for (let i = Math.max(end - 5, 0); i < end; i++) {
-				res.push({ name: i });
-			}
-			if (res.length != 0)
-				return res;
-		} else {
-			let start = 0;
-			if (bookmarks.length > 0) {
-				start = bookmarks[bookmarks.length - 1].name;
-			}
-			let res = [];
-			for (let i = start + 1; i < start + 5; i++) {
-				res.push({ name: i });
-			}
-			if (res.length != 0)
-				return res;
-		}*/
 	}
 
 	onMount(async () => {
