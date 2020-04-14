@@ -28,6 +28,8 @@
 	// The promise for loading items
 	let loadingStart;
 	let loadingEnd;
+	let arrowHidden = true;
+	let lastScrollTop = 0;
 
 	let top = 0;
 	let bottom = 0;
@@ -100,9 +102,22 @@
 		}
 	}
 
-	async function handle_scroll() {
+	async function handle_scroll(event) {
+		const { clientHeight, scrollHeight, scrollTop } = viewport;
+		// Show or hide return button
+		if ((scrollTop < lastScrollTop) == startIsTop
+			&& scrollTop != 0 && scrollHeight - scrollTop != clientHeight) {
+			arrowHidden = false;
+		} else {
+			arrowHidden = true;
+		}
+		lastScrollTop = scrollTop;
+
+		// Already loading, update nothing
+		if (loadingStart || loadingEnd)
+			return;
+
 		await loadData();
-		const { scrollTop } = viewport;
 
 		// Remove excessive items
 		let i = 0;
@@ -153,6 +168,13 @@
 		items = items.slice(start, end);
 	}
 
+	function scrollReturn() {
+		if (startIsTop)
+			viewport.scrollTo(0, 0);
+		else
+			viewport.scrollTo(0, viewport.scrollHeight);
+	}
+
 	// trigger initial refresh
 	onMount(() => {
 		rows = contents.getElementsByTagName('svelte-virtual-list-row');
@@ -160,40 +182,93 @@
 	});
 </script>
 
+<svelte-virtual-list>
+{#if !startIsTop}
+	<slot name="returnArrow"><button class="arrow-down" class:arrowHidden on:click={scrollReturn}><div></div></button></slot>
+{/if}
 <svelte-virtual-list-viewport
 	bind:this={viewport}
 	bind:offsetHeight={viewport_height}
 	on:scroll={handle_scroll}
 >
+	{#if loadingStart}
+		<slot name="loading"><div>Loading…</div></slot>
+	{/if}
 	<svelte-virtual-list-contents
 		bind:this={contents}
 		style="padding-top: {top}px; padding-bottom: {bottom}px;"
 	>
-		{#if !startIsTop}
-			{#if loadingStart}
-				<slot name="loading"><div>Loading…</div></slot>
-			{/if}
-			<slot name="returnArrow"><div>Return to bottom v</div></slot>
-		{/if}
 		{#each items as item}
 			<svelte-virtual-list-row>
 				<slot {item}>Missing template</slot>
 			</svelte-virtual-list-row>
 		{/each}
-		{#if startIsTop}
-			<slot name="returnArrow"><div>Return to top ^</div></slot>
-			{#if loadingEnd}
-				<slot name="loading"><div>Loading…</div></slot>
-			{/if}
-		{/if}
 	</svelte-virtual-list-contents>
+	{#if loadingEnd}
+		<slot name="loading"><div>Loading…</div></slot>
+	{/if}
 </svelte-virtual-list-viewport>
+{#if startIsTop}
+	<slot name="returnArrow"><button class="arrow-up" class:arrowHidden on:click={scrollReturn}><div></div></button></slot>
+{/if}
+</svelte-virtual-list>
 
 <style>
-	svelte-virtual-list-viewport {
-		position: relative;
-		overflow-y: auto;
-		-webkit-overflow-scrolling: touch;
+	svelte-virtual-list {
 		display: block;
+		position: relative;
+	}
+
+	svelte-virtual-list-viewport {
+		overflow-y: auto;
+	}
+
+	.arrow-down, .arrow-up {
+		position: absolute;
+		right: 2em;
+		display: inline-block;
+		background: #ccc;
+		border-radius: 100%;
+		padding: 0.8em;
+		border: none;
+		cursor: pointer;
+
+		transition-duration: 0.2s;
+		transition-property: all;
+	}
+
+	.arrow-down:hover, .arrow-up:hover {
+		background: #eee;
+	}
+
+	.arrow-down {
+		top: 1.5em;
+	}
+
+	.arrow-up {
+		bottom: 1.5em;
+	}
+
+	.arrow-down.arrowHidden {
+		top: -5em;
+	}
+
+	.arrow-up.arrowHidden {
+		bottom: -5em;
+	}
+
+	.arrow-down > div, .arrow-up > div {
+		border-left: 2px solid #222;
+		border-top: 2px solid #222;
+		width: 1em;
+		height: 1em;
+	}
+
+	.arrow-down > div {
+		transform: rotate(-135deg) translate(20%, 20%);
+	}
+
+	.arrow-up > div {
+		transform: rotate(45deg) translate(20%, 20%);
 	}
 </style>

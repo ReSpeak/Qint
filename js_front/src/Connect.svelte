@@ -249,21 +249,24 @@
 		box-shadow: 0 0.3em 0.3em #0005;
 	}
 
-	.bookmark-list > :global(*) {
-		position: relative;
-		height: 100%;
-		width: 100%;
-		min-height: 30vh;
-		max-height: 50vh;
-		background-color: #eefa;
+	.bookmark-list :global(svelte-virtual-list) {
 		border-radius: 0 0 0.4em 0.4em;
 		box-shadow: 0 0.3em 0.3em #0005;
+		overflow-y: hidden;
+	}
+
+	.bookmark-list :global(svelte-virtual-list-viewport) {
+		display: block;
+		position: relative;
+		background-color: #eefa;
+		min-height: 30vh;
+		max-height: 50vh;
 		padding: 0.5em;
 		overflow-y: auto;
 	}
 
 	@media (min-width: 35em) {
-		.bookmark-list > :global(*) {
+		.bookmark-list :global(svelte-virtual-list-viewport) {
 			padding: 1em 8em 4em 8em;
 		}
 	}
