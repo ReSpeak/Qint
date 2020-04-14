@@ -71,6 +71,7 @@ export class Connection {
 	private messageHandler(evt: MessageEvent) {
 		const msg = JSON.parse(evt.data) as InMsg;
 		if ("Events" in msg) {
+			this.state.set(ConnectionState.Connected);
 			for (const tsevt of msg.Events) {
 				console.log(tsevt);
 			}
@@ -78,11 +79,13 @@ export class Connection {
 			// TODO
 		} else if ("Error" in msg) {
 			console.warn("Con Error:", msg.Error);
+			if (get(this.state) == ConnectionState.Connecting) {
+				this.socket?.close();
+				this.error.set(msg.Error);
+			}
 		} else {
 			console.error("Unknown message", msg);
 		}
-		this.state.set(ConnectionState.Connected);
-
 	}
 
 	private takenumber(a: number) {}

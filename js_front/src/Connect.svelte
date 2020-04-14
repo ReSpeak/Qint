@@ -7,6 +7,7 @@
 	import Icon from "./ui/Icon.svelte";
 	import BookmarkComp from "./Bookmark.svelte";
 	import { SERVER_ICON, CLIENT_ICON } from "./ui/const";
+	import LoadableVirtualList from "./ui/LoadableVirtualList.svelte";
 
 	export let connection;
 	let state = connection.state;
@@ -14,13 +15,49 @@
 	let data = new self(connection);
 	let username = writable(data.username);
 	let address = writable(data.address);
-	let bookmarks = Bookmark.get();
+	let bookmarks;
+	let bookmarkError;
 
 	function onConnect() {
 		if (get(state) === ConnectionState.Disconnected)
 			data.connect();
 		else
 			data.reset();
+	}
+
+	async function loadBookmarks(fromStart) {
+		if (bookmarks.length == 0) {
+			// That's not dynamic, but we currently have no pagination
+			try {
+				return await Bookmark.get();
+			} catch (err) {
+				console.error("Failed to load bookmarks", err);
+				bookmarkError = err;
+			}
+		}
+		/*if (fromStart) {
+			let end = 0;
+			if (bookmarks.length > 0) {
+				end = bookmarks[0].name;
+			}
+			let res = [];
+			for (let i = Math.max(end - 5, 0); i < end; i++) {
+				res.push({ name: i });
+			}
+			if (res.length != 0)
+				return res;
+		} else {
+			let start = 0;
+			if (bookmarks.length > 0) {
+				start = bookmarks[bookmarks.length - 1].name;
+			}
+			let res = [];
+			for (let i = start + 1; i < start + 5; i++) {
+				res.push({ name: i });
+			}
+			if (res.length != 0)
+				return res;
+		}*/
 	}
 
 	onMount(async () => {
@@ -96,28 +133,25 @@
 
 	<div class="bookmark-container">
 		<div class="bookmark-blur"></div>
-		<ul class="bookmark-list">
-			{#await bookmarks}
-			<li><i>spinner</i> Loading bookmarks</li>
-			{:then list}
-			{#each list as bookmark, i}
-			<li>
-				<BookmarkComp connect={data} {username} {address} {bookmark}/>
-			</li>
-			{/each}
-			{:catch error}
-			<li>
-				<article class="message is-danger">
-					<div class="message-header">
-						<p>Error</p>
-					</div>
-					<div class="message-body">
-						Failed to fetch bookmarks, is Qint running?
-					</div>
-				</article>
-			</li>
-			{/await}
-		</ul>
+		<div class="bookmark-list">
+			{#if bookmarkError}
+				<div>
+					<article class="message is-danger">
+						<div class="message-header">
+							<p>Error</p>
+						</div>
+						<div class="message-body">
+							Failed to fetch bookmarks, is Qint running?
+						</div>
+					</article>
+				</div>
+			{:else}
+				<LoadableVirtualList bind:items={bookmarks} loadMore={loadBookmarks} let:item>
+					<div slot="loading" class="loader"></div>
+					<BookmarkComp connect={data} {username} {address} bookmark={item}/>
+				</LoadableVirtualList>
+			{/if}
+		</div>
 	</div>
 </div>
 
@@ -238,7 +272,7 @@
 		box-shadow: 0 0.3em 0.3em #0005;
 	}
 
-	.bookmark-list {
+	.bookmark-list > :global(*) {
 		position: relative;
 		height: 100%;
 		width: 100%;
@@ -252,7 +286,7 @@
 	}
 
 	@media (min-width: 35em) {
-		.bookmark-list {
+		.bookmark-list > :global(*) {
 			padding: 1em 8em 4em 8em;
 		}
 	}
