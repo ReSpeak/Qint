@@ -50,13 +50,29 @@ export class Connection {
 		this.book.addChannel(Channel.fromDebug(1, 0, 0).set_name("A"));
 		this.book.addChannel(Channel.fromDebug(2, 1, 0).set_name("B"));
 		this.book.addChannel(Channel.fromDebug(3, 1, 2).set_name("C"));
+		this.book.addChannel(Channel.fromDebug(4, 1, 2).set_name("C"));
+		this.book.addChannel(Channel.fromDebug(5, 1, 2).set_name("C"));
+		this.book.addChannel(Channel.fromDebug(6, 1, 2).set_name("C"));
+		this.book.addChannel(Channel.fromDebug(7, 1, 2).set_name("C"));
+		this.book.addChannel(Channel.fromDebug(8, 1, 2).set_name("C"));
+		this.book.addChannel(Channel.fromDebug(9, 1, 2).set_name("C"));
 		this.book.server.update(s => { s.name = "Server der Verplanten"; return s; });
 		this.chat.messages.update(m => [...m,
 			new Message("asd", "asdfg"),
 			new Message("asd", "asdfg"),
 			new Message("foor", "asdfg"),
 			new Message("as<>d", "a<div>sdfg"),
-			new Message("asd", "asdfg"),
+			new Message("asd", "asdfg\nasdgf"),
+			new Message("asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
+			new Message("asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
+			new Message("asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
+			new Message("asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
+			new Message("asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
+			new Message("asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
+			new Message("asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
+			new Message("asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
+			new Message("asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
+			new Message("asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
 		]);
 	}
 

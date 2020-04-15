@@ -71,6 +71,7 @@
 	.message-time {
 		grid-column: 1;
 		font-size: 0.8em;
+		padding-top: 0.25em;
 		* {
 			color: gray;
 		}

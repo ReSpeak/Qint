@@ -39,6 +39,14 @@ struct Message(models::Message);
 struct Server(models::Server);
 struct ServerClient(models::ServersClients);
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, juniper::GraphQLEnum)]
+enum GMessageTarget {
+	Server,
+	Channel,
+	Client,
+	Poke,
+}
+
 #[derive(Debug, juniper::GraphQLInputObject)]
 struct UpdateBookmark {
 	id: ID,
@@ -226,8 +234,18 @@ impl Chat {
 	fn last_read(&self) -> &NaiveDateTime { &self.0.last_read }
 	fn timezone(&self) -> i32 { self.0.timezone }
 
-	// TODO Pagination
-	async fn messages(&self, state: &State) -> GResult<Vec<Message>> {
+	/// Fetches 50 messages, older than the given start time and id.
+	///
+	/// If no start is given, the latest messages are returned.
+	async fn messages(&self, state: &State, start_time: Option<NaiveDateTime>, start_id: Option<ID>) -> GResult<Vec<Message>> {
+		let start_id = start_id.map(|i| i.parse::<u64>().map(|i| i as i64))
+			.transpose()?;
+		let start = match (start_time, start_id) {
+			(Some(t), Some(i)) => Some((t, i)),
+			(None, None) => None,
+			_ => return Err(format_err!("start_time and start_id need to be \
+				both set or unset").into()),
+		};
 		let id = self.0.id;
 		let res = state
 			.database
@@ -238,13 +256,14 @@ impl Chat {
 					.filter(messages::chat.eq(id))
 					.order((messages::time.desc(), messages::id.desc()))
 					.limit(MESSAGES_LIMIT);
-				GResult::Ok(
-					query
-						.load::<models::Message>(&db.con)?
-						.into_iter()
-						.map(Message)
-						.collect(),
-				)
+				let res = if let Some((t, i)) = start {
+					query.filter(messages::time.lt(t).and(messages::id.lt(i)))
+						.load::<models::Message>(&db.con)
+				} else {
+					query.load::<models::Message>(&db.con)
+				};
+
+				GResult::Ok(res?.into_iter().map(Message).collect())
 			}))
 			.await??;
 		Ok(res)
@@ -557,6 +576,80 @@ impl Query {
 					.map(Bookmark);
 
 				GResult::Ok(result)
+			}))
+			.await??;
+		Ok(res)
+	}
+
+	async fn chat(state: &State, typ: GMessageTarget, server: ID, id: Option<ID>) -> GResult<Option<Chat>> {
+		let server = base64::decode(server.as_bytes())?;
+		let res = state
+			.database
+			.send(RunOnDbMsg(move |db| {
+				use schema::{channel_chats, chats, client_chats, client_pokes, server_chats};
+
+				let res = match typ {
+					GMessageTarget::Server => {
+						if id.is_some() {
+							return Err(format_err!("Server message target needs no id").into());
+						}
+						let query = server_chats::table
+							.filter(server_chats::server.eq(server))
+							.inner_join(chats::table)
+							.select(chats::all_columns);
+						query.first::<models::Chat>(&db.con)
+					}
+					GMessageTarget::Channel => {
+						let id = if let Some(id) = id {
+							id.parse::<u64>()? as i64
+						} else {
+							return Err(format_err!("Channel message target needs id").into());
+						};
+						let query = channel_chats::table
+							.filter(
+								channel_chats::server
+									.eq(server)
+									.and(channel_chats::channel.eq(id)),
+							)
+							.inner_join(chats::table)
+							.select(chats::all_columns);
+						query.first::<models::Chat>(&db.con)
+					}
+					GMessageTarget::Client => {
+						let id = if let Some(id) = id {
+							base64::decode(id.as_bytes())?
+						} else {
+							return Err(format_err!("Poke message target needs id").into());
+						};
+						let query = client_chats::table
+							.filter(
+								client_chats::server
+									.eq(server)
+									.and(client_chats::client.eq(id)),
+							)
+							.inner_join(chats::table)
+							.select(chats::all_columns);
+						query.first::<models::Chat>(&db.con)
+					}
+					GMessageTarget::Poke => {
+						let id = if let Some(id) = id {
+							base64::decode(id.as_bytes())?
+						} else {
+							return Err(format_err!("Poke message target needs id").into());
+						};
+						let query = client_pokes::table
+							.filter(
+								client_pokes::server
+									.eq(server)
+									.and(client_pokes::client.eq(id)),
+							)
+							.inner_join(chats::table)
+							.select(chats::all_columns);
+						query.first::<models::Chat>(&db.con)
+					}
+				};
+
+				GResult::Ok(res.optional()?.map(Chat))
 			}))
 			.await??;
 		Ok(res)

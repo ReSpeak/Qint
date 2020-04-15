@@ -11,12 +11,6 @@
 </script>
 
 <div class="menu channel-list">
-	<p class="menu-label">
-		{icon}
-		<span class="expand" class:selected-server="{selected_server}">
-			{$server.name}
-		</span>
-	</p>
 	<ul class="menu-list">
 		{#each $children as channel}
 			<Channel {channel}/>

@@ -252,17 +252,13 @@
 	.bookmark-list :global(svelte-virtual-list) {
 		border-radius: 0 0 0.4em 0.4em;
 		box-shadow: 0 0.3em 0.3em #0005;
-		overflow-y: hidden;
 	}
 
 	.bookmark-list :global(svelte-virtual-list-viewport) {
-		display: block;
-		position: relative;
 		background-color: #eefa;
 		min-height: 30vh;
 		max-height: 50vh;
 		padding: 0.5em;
-		overflow-y: auto;
 	}
 
 	@media (min-width: 35em) {

@@ -2,6 +2,7 @@
 	import Server from "../tree/Server.svelte";
 
 	export let connection;
+	let server = connection.book.server;
 </script>
 
 <aside class="sidebar">
@@ -42,21 +43,39 @@
 		</div>
 	</div>
 
-	<Server {connection} />
+	<div class="sidebar-content">
+		<button class="entry-expand button">
+			<span class="expand" class:selected-server="{true}">
+				{$server.name}
+			</span>
+		</button>
+		<Server {connection} />
 
-	<div class="menu">
-		<ul class="menu-list">
-			<li>
-				<div class="channel-line">
-					<a href="#" class="entry-expand">
-						<span class="entry-expand" style="display:flex;">
-							Splamy (maybe)
-						</span>
-					</a>
-				</div>
-				<ul class="menu-list"></ul>
-			</li>
-		</ul>
+		<button class="entry-expand button chats-header">
+			<span class="entry-expand" style="display:flex;">
+				Splamy (maybe)
+			</span>
+		</button>
+		<div class="menu">
+			<ul class="menu-list">
+				<li>
+					<div class="channel-line">
+					</div>
+					<ul class="menu-list">
+						<li>User</li>
+						<li>User</li>
+						<li>User</li>
+						<li>User</li>
+						<li>User</li>
+						<li>User</li>
+						<li>User</li>
+						<li>User</li>
+						<li>User</li>
+						<li>User</li>
+					</ul>
+				</li>
+			</ul>
+		</div>
 	</div>
 </aside>
 
@@ -75,6 +94,28 @@
 
 	.sidebar .level:not(:last-child) {
 		margin-bottom: 0;
+	}
+
+	.sidebar-content {
+		overflow-y: auto;
+	}
+
+	.sidebar-content button {
+		position: sticky;
+		bottom: 0;
+		top: 0;
+
+		width: 100%;
+		justify-content: start;
+		border: none;
+	}
+
+	.sidebar-content button.chats-header {
+		top: 2em;
+	}
+
+	.sidebar-content > .menu .menu-list li {
+		margin: 2em;
 	}
 
 	.round {

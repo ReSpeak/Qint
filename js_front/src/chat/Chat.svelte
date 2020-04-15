@@ -1,14 +1,18 @@
 <script>
+	import { get } from "svelte/store";
 	import Message from "./Message.svelte";
 	import Icon from "../ui/Icon.svelte";
 	import { DateSeparator } from "./chat";
+	import LoadableVirtualList from "../ui/LoadableVirtualList.svelte";
 	// import { sleep } from "../util";
 
 	// let load_morrr;
 
 	export let connection;
 	let chat = connection.chat;
-	let messages = chat.groupedMessages;
+	//let messages = chat.groupedMessages;
+	let messages;
+	let messagesError;
 	let composingCommand = "";
 
 	let loadMsgTask = Promise.resolve();
@@ -48,10 +52,51 @@
 		connection.sendRawMessage(composingCommand);
 		composingCommand = "";
 	}
+
+	async function loadMessages(fromStart) {
+		if (messages.length == 0) {
+			return get(chat.groupedMessages);
+		}
+	}
 </script>
 
 <div class="chat">
-	<ul class="chat-messages">
+	{#if messagesError}
+		<div>
+			<article class="message is-danger">
+				<div class="message-header">
+					<p>Error</p>
+				</div>
+				<div class="message-body">
+					Failed to fetch messages
+				</div>
+			</article>
+		</div>
+	{:else}
+		<LoadableVirtualList bind:items={messages} loadMore={loadMessages} let:item startIsTop={false}>
+			<div slot="loading" class="loader"></div>
+			{#if item instanceof DateSeparator}
+				<div title="{item.date.format('L')}" class="chat-date">
+					{item.date.format('LL')}
+				</div>
+			{:else}
+				<div class="invoker-icon">
+					<Icon name="account" />
+				</div>
+				<div
+					class="invoker-name has-text-weight-bold"
+					style="user_color"
+				>
+					{item.user}
+				</div>
+
+				{#each item.messages as message}
+					<Message {message} />
+				{/each}
+			{/if}
+		</LoadableVirtualList>
+	{/if}
+	<!--<ul class="chat-messages">
 		{#await loadMsgTask}
 			<div
 				class="is-loading"
@@ -87,7 +132,7 @@
 				Failed to load.
 			</div>
 		{/await}
-	</ul>
+	</ul>-->
 	<form class="chat-form" on:submit="{sendMessage}">
 		<textarea bind:value="{chat.composing}" class="input auto_height" name="message"></textarea>
 		<button class="button" name="send" type="submit">Send</button>
@@ -153,9 +198,16 @@
 	border-bottom: none;
 	}*/
 
-	.chat-messages {
+	.chat :global(svelte-virtual-list) {
+		height: 100%;
+	}
+
+	.chat :global(svelte-virtual-list-viewport) {
+		height: 100%;
+	}
+
+	.chat :global(svelte-virtual-list-contents) {
 		padding: 0.5em;
-		overflow-y: auto;
 		display: grid;
 		grid-template-columns: min-content minmax(0, 1fr);
 	}

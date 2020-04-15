@@ -177,7 +177,7 @@
 
 	// trigger initial refresh
 	onMount(() => {
-		rows = contents.getElementsByTagName('svelte-virtual-list-row');
+		rows = contents.children;
 		mounted = true;
 	});
 </script>
@@ -199,9 +199,7 @@
 		style="padding-top: {top}px; padding-bottom: {bottom}px;"
 	>
 		{#each items as item}
-			<svelte-virtual-list-row>
-				<slot {item}>Missing template</slot>
-			</svelte-virtual-list-row>
+			<slot {item}>Missing template</slot>
 		{/each}
 	</svelte-virtual-list-contents>
 	{#if loadingEnd}
@@ -217,21 +215,26 @@
 	svelte-virtual-list {
 		display: block;
 		position: relative;
+		overflow-y: hidden;
 	}
 
 	svelte-virtual-list-viewport {
+		display: block;
+		position: relative;
 		overflow-y: auto;
 	}
 
 	.arrow-down, .arrow-up {
 		position: absolute;
 		right: 2em;
+		bottom: 1.5em;
 		display: inline-block;
 		background: #ccc;
 		border-radius: 100%;
 		padding: 0.8em;
 		border: none;
 		cursor: pointer;
+		z-index: 3;
 
 		transition-duration: 0.2s;
 		transition-property: all;
@@ -241,19 +244,7 @@
 		background: #eee;
 	}
 
-	.arrow-down {
-		top: 1.5em;
-	}
-
-	.arrow-up {
-		bottom: 1.5em;
-	}
-
-	.arrow-down.arrowHidden {
-		top: -5em;
-	}
-
-	.arrow-up.arrowHidden {
+	.arrowHidden {
 		bottom: -5em;
 	}
 
