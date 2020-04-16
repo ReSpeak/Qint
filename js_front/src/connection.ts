@@ -9,6 +9,7 @@ export class Connection {
 
 	public readonly book: Book = new Book();
 	public readonly chat: Chat = new Chat(this);
+	public server: string | undefined;
 	private socket: WebSocket | undefined;
 	private guid: string | undefined;
 
@@ -58,21 +59,21 @@ export class Connection {
 		this.book.addChannel(Channel.fromDebug(9, 1, 2).set_name("C"));
 		this.book.server.update(s => { s.name = "Server der Verplanten"; return s; });
 		this.chat.messages.update(m => [...m,
-			new Message("asd", "asdfg"),
-			new Message("asd", "asdfg"),
-			new Message("foor", "asdfg"),
-			new Message("as<>d", "a<div>sdfg"),
-			new Message("asd", "asdfg\nasdgf"),
-			new Message("asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
-			new Message("asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
-			new Message("asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
-			new Message("asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
-			new Message("asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
-			new Message("asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
-			new Message("asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
-			new Message("asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
-			new Message("asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
-			new Message("asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
+			new Message("0", "asd", "asdfg"),
+			new Message("0", "asd", "asdfg"),
+			new Message("0", "foor", "asdfg"),
+			new Message("0", "as<>d", "a<div>sdfg"),
+			new Message("0", "asd", "asdfg\nasdgf"),
+			new Message("0", "asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
+			new Message("0", "asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
+			new Message("0", "asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
+			new Message("0", "asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
+			new Message("0", "asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
+			new Message("0", "asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
+			new Message("0", "asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
+			new Message("0", "asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
+			new Message("0", "asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
+			new Message("0", "asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
 		]);
 	}
 
@@ -86,8 +87,10 @@ export class Connection {
 
 	private messageHandler(evt: MessageEvent) {
 		const msg = JSON.parse(evt.data) as InMsg;
-		if ("Events" in msg) {
+		if ("Connected" in msg) {
 			this.state.set(ConnectionState.Connected);
+			this.server = msg.Connected.server;
+		} else if ("Events" in msg) {
 			for (const tsevt of msg.Events) {
 				console.log(tsevt);
 			}

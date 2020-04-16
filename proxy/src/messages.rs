@@ -18,6 +18,11 @@ pub enum MessageP2F {
 	/// The connection failed. The websocket connection should be closed
 	/// afterwards.
 	Error(String),
+	/// We are successfully connected to the server.
+	Connected {
+		/// The id of the server.
+		server: String,
+	},
 	/// The list of currently talking clients and `true` if they are whispering.
 	TalkersChanged(Vec<(ClientId, bool)>),
 	/// The connection received events.

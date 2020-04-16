@@ -17,4 +17,29 @@ export const MessageTarget = {
 	ToClientPoke(id: number): MessageTarget {
 		return { Poke: id };
 	},
+
+	getType(target: MessageTarget): string {
+		if ("Server" in target) {
+			return "SERVER";
+		} else if ("Channel" in target) {
+			return "CHANNEL";
+		} else if ("Client" in target) {
+			return "CLIENT";
+		} else if ("Poke" in target) {
+			return "POKE";
+		} else {
+			throw "Invalid message target type";
+		}
+	},
+
+	getId(target: MessageTarget): string | undefined {
+		if ("Channel" in target) {
+			return target.Channel.toString();
+		} else if ("Client" in target) {
+			return target.Client.toString();
+		} else if ("Poke" in target) {
+			return target.Poke.toString();
+		}
+		return;
+	}
 };

@@ -237,14 +237,19 @@ impl Chat {
 	/// Fetches 50 messages, older than the given start time and id.
 	///
 	/// If no start is given, the latest messages are returned.
-	async fn messages(&self, state: &State, start_time: Option<NaiveDateTime>, start_id: Option<ID>) -> GResult<Vec<Message>> {
+	/// If `before_start` is `true`, get messages older than the start if it is
+	/// `false`, get messages that were sent after the start.
+	async fn messages(
+		&self, state: &State, start_time: Option<NaiveDateTime>,
+		start_id: Option<ID>, before_start: Option<bool>,
+	) -> GResult<Vec<Message>> {
 		let start_id = start_id.map(|i| i.parse::<u64>().map(|i| i as i64))
 			.transpose()?;
-		let start = match (start_time, start_id) {
-			(Some(t), Some(i)) => Some((t, i)),
-			(None, None) => None,
-			_ => return Err(format_err!("start_time and start_id need to be \
-				both set or unset").into()),
+		let start = match (start_time, start_id, before_start) {
+			(Some(t), Some(i), Some(b)) => Some((t, i, b)),
+			(None, None, None) => None,
+			_ => return Err(format_err!("start_time, start_id and before_start \
+				need to be all set or unset").into()),
 		};
 		let id = self.0.id;
 		let res = state
@@ -254,13 +259,21 @@ impl Chat {
 
 				let query = messages::table
 					.filter(messages::chat.eq(id))
-					.order((messages::time.desc(), messages::id.desc()))
 					.limit(MESSAGES_LIMIT);
-				let res = if let Some((t, i)) = start {
+				let res = if let Some((t, i, true)) = start {
 					query.filter(messages::time.lt(t).and(messages::id.lt(i)))
+						.order((messages::time.desc(), messages::id.desc()))
 						.load::<models::Message>(&db.con)
+				} else if let Some((t, i, false)) = start {
+					query.filter(messages::time.gt(t).and(messages::id.gt(i)))
+						.order((messages::time, messages::id))
+						.load::<models::Message>(&db.con).map(|mut m| {
+							m.reverse();
+							m
+						})
 				} else {
-					query.load::<models::Message>(&db.con)
+					query.order((messages::time.desc(), messages::id.desc()))
+						.load::<models::Message>(&db.con)
 				};
 
 				GResult::Ok(res?.into_iter().map(Message).collect())

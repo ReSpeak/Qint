@@ -54,9 +54,7 @@
 	}
 
 	async function loadMessages(fromStart) {
-		if (messages.length == 0) {
-			return get(chat.groupedMessages);
-		}
+		return chat.getMessages(fromStart, messages);
 	}
 </script>
 

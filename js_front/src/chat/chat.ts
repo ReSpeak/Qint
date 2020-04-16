@@ -2,6 +2,7 @@ import { get, writable, Writable, derived, Readable } from "svelte/store";
 import moment from "moment";
 import { Moment } from "moment";
 import { Connection } from "../connection";
+import { graphql, toDatetime } from "../graphql";
 import { MessageTarget } from "../structs/ts";
 
 export class Chat {
@@ -36,6 +37,77 @@ export class Chat {
 		return groups;
 	}
 
+	public async getMessages(fromStart: boolean, curMsgs: ChatEntries[]): Promise<ChatEntries[] | undefined> {
+		if (this.connection.server !== undefined) {
+			let start_time;
+			let start_id;
+			let lastMsg;
+
+			let i = fromStart ? 0 : curMsgs.length - 1;
+			let step = fromStart ? 1 : -1;
+			while (i > 0 && i < curMsgs.length) {
+				const group = curMsgs[i];
+				if (group instanceof GroupedMessages && group.messages.length > 0) {
+					lastMsg = group.messages[fromStart ? 0 : group.messages.length - 1];
+				}
+				i += step;
+			}
+
+			if (lastMsg) {
+				start_time = lastMsg.date.unix();
+				start_id = lastMsg.id;
+			}
+
+			try {
+				const res = await graphql(`query GetMessages($chat_type: GMessageTarget!, $server: ID!, $chat_id: ID,
+						$start_time: NaiveDateTime, $start_id: ID, $before_start: Boolean) {
+					chat(typ: $chat_type, server: $server, id: $chat_id) {
+						lastRead
+						timezone
+						messages(startTime: $start_time, startId: $start_id, beforeStart: $before_start) {
+							id
+							invoker {
+								name
+							}
+							invokerName
+							content
+							status
+							time
+							timezone
+						}
+					}
+				}`, {
+					chat_type: MessageTarget.getType(get(this.selectedChat)),
+					server: this.connection.server,
+					chat_id: MessageTarget.getId(get(this.selectedChat)),
+					start_time,
+					start_id,
+					before_start: start_time ? fromStart : undefined,
+				});
+				if ("data" in res) {
+					// We never chatted here
+					if (!("chat" in res.data) || res.data.chat.messages.length == 0)
+						return;
+
+					let msgs: Message[] = [];
+					res.data.chat.messages.forEach((msg: any) => {
+						msgs.push(new Message(msg.id, msg.invoker?.name || msg.invokerName,
+							msg.content, toDatetime(msg.time, msg.timezone)));
+					});
+					return Chat.group_messages(msgs);
+				} else {
+					console.error("GetMessages result does not contain data", res);
+				}
+			} catch (err) {
+				console.error("Failed to load messages", err);
+				//messagesError.set(err);
+			}
+		} else {
+			console.error("Cannot get messages for a non-existant connection");
+		}
+		return;
+	}
+
 	public sendMessage() {
 		this.connection.sendMessage({
 			SendMessage: {
@@ -48,6 +120,7 @@ export class Chat {
 
 export class Message {
 	constructor(
+		public id: string,
 		public user: string,
 		public text: string,
 		public date: Moment = moment(),

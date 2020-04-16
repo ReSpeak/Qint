@@ -22,7 +22,13 @@ interface OMsgSendMessage {
 }
 
 // In Messages
-export type InMsg = InMsgError | InTalkersChanged | InMsgEvents;
+export type InMsg = InMsgConnected | InMsgError | InTalkersChanged | InMsgEvents;
+
+interface InMsgConnected {
+	Connected: {
+		server: string;
+	};
+}
 
 interface InMsgError {
 	Error: string;

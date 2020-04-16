@@ -178,6 +178,8 @@
 	// trigger initial refresh
 	onMount(() => {
 		rows = contents.children;
+		isAtStart = startIsTop;
+		isAtEnd = !startIsTop;
 		mounted = true;
 	});
 </script>

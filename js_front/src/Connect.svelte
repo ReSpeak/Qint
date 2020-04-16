@@ -249,12 +249,13 @@
 		box-shadow: 0 0.3em 0.3em #0005;
 	}
 
-	.bookmark-list :global(svelte-virtual-list) {
+	.bookmark-list :global(svelte-virtual-list), .bookmark-list > div {
 		border-radius: 0 0 0.4em 0.4em;
 		box-shadow: 0 0.3em 0.3em #0005;
 	}
 
-	.bookmark-list :global(svelte-virtual-list-viewport) {
+	// TODO the error message is broken (start without proxy running)
+	.bookmark-list :global(svelte-virtual-list-viewport), .bookmark-list .message {
 		background-color: #eefa;
 		min-height: 30vh;
 		max-height: 50vh;
@@ -262,7 +263,7 @@
 	}
 
 	@media (min-width: 35em) {
-		.bookmark-list :global(svelte-virtual-list-viewport) {
+		.bookmark-list :global(svelte-virtual-list-viewport), .bookmark-list .message {
 			padding: 1em 8em 4em 8em;
 		}
 	}

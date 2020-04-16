@@ -163,6 +163,14 @@ impl Ws {
 							.and_then(|c| c.get_server_key().ok())
 						{
 							Some(server_key) => {
+								// Send server id
+								let server = base64::encode(
+									&server_key.to_short());
+								self.send_message(
+									&MessageP2F::Connected { server },
+									ctx,
+								);
+
 								// Save in database
 								let logger = self.logger.clone();
 								let opts =
