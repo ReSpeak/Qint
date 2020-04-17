@@ -12,9 +12,6 @@
 	afterUpdate(() => {
 		flash(div);
 	});
-
-	// Dummy stuff
-	let icon;
 </script>
 
 <svelte:options immutable />

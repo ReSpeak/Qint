@@ -2,6 +2,7 @@
 	import { get } from "svelte/store";
 	import Message from "./Message.svelte";
 	import Icon from "../ui/Icon.svelte";
+	import ClientIcon from "../ui/ClientIcon.svelte";
 	import { DateSeparator } from "./chat";
 	import LoadableVirtualList from "../ui/LoadableVirtualList.svelte";
 	// import { sleep } from "../util";
@@ -79,13 +80,13 @@
 				</div>
 			{:else}
 				<div class="invoker-icon">
-					<Icon name="account" />
+					<ClientIcon client={item.invoker} {connection} />
 				</div>
 				<div
 					class="invoker-name has-text-weight-bold"
 					style="user_color"
 				>
-					{item.user}
+					{item.invoker.name || item.invokerName}
 				</div>
 
 				{#each item.messages as message}

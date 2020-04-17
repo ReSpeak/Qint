@@ -1,3 +1,6 @@
+// Broken warning with juniper derive
+#![allow(unused_braces)]
+
 use std::sync::Arc;
 
 use actix_web::*;
@@ -399,15 +402,29 @@ impl Message {
 	}
 
 	/// The send of the message or `None` if we got the message from the server.
-	async fn invoker(&self, state: &State) -> GResult<Option<Client>> {
+	async fn invoker(&self, state: &State) -> GResult<Option<ServerClient>> {
 		if let Some(id) = self.0.invoker.clone() {
+			let chat = self.0.chat;
 			let res = state
 				.database
-				.send(RunOnDbMsg(|db| {
-					use schema::clients;
+				.send(RunOnDbMsg(move |db| {
+					use schema::{channel_chats, client_chats, server_chats,
+						servers_clients};
 
-					let query = clients::table.filter(clients::uid.eq(id));
-					GResult::Ok(Client(query.first::<models::Client>(&db.con)?))
+					let query = servers_clients::table.filter(
+						servers_clients::client.eq(id)
+						.and(servers_clients::server.eq_any(
+							channel_chats::table.filter(channel_chats::chat.eq(&chat))
+							.select(channel_chats::server))
+						.or(servers_clients::server.eq_any(
+							client_chats::table.filter(client_chats::chat.eq(&chat))
+							.select(client_chats::server)))
+						.or(servers_clients::server.eq_any(
+							server_chats::table.filter(server_chats::chat.eq(&chat))
+							.select(server_chats::server)))))
+						.select(servers_clients::all_columns);
+					GResult::Ok(ServerClient(
+						query.first::<models::ServersClients>(&db.con)?))
 				}))
 				.await??;
 			Ok(Some(res))

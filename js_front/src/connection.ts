@@ -11,7 +11,7 @@ export class Connection {
 	public readonly chat: Chat = new Chat(this);
 	public server: string | undefined;
 	private socket: WebSocket | undefined;
-	private guid: string | undefined;
+	public guid: string | undefined;
 
 	constructor() {
 		this.fillDummyData();
@@ -58,23 +58,6 @@ export class Connection {
 		this.book.addChannel(Channel.fromDebug(8, 1, 2).set_name("C"));
 		this.book.addChannel(Channel.fromDebug(9, 1, 2).set_name("C"));
 		this.book.server.update(s => { s.name = "Server der Verplanten"; return s; });
-		this.chat.messages.update(m => [...m,
-			new Message("0", "asd", "asdfg"),
-			new Message("0", "asd", "asdfg"),
-			new Message("0", "foor", "asdfg"),
-			new Message("0", "as<>d", "a<div>sdfg"),
-			new Message("0", "asd", "asdfg\nasdgf"),
-			new Message("0", "asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
-			new Message("0", "asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
-			new Message("0", "asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
-			new Message("0", "asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
-			new Message("0", "asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
-			new Message("0", "asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
-			new Message("0", "asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
-			new Message("0", "asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
-			new Message("0", "asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
-			new Message("0", "asd", "asdfg\nasdgf\nasdgf\nasdgf\nasdgf"),
-		]);
 	}
 
 	public sendMessage(data: OutMsg): void {

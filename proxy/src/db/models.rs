@@ -236,12 +236,6 @@ pub struct OldMessage {
 	pub client_avatar: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Queryable, Serialize)]
-pub struct OldChat {
-	pub last_read: NaiveDateTime,
-	pub timezone: i32,
-}
-
 impl Ord for OldMessage {
 	fn cmp(&self, other: &Self) -> Ordering {
 		self.time.cmp(&other.time).then_with(|| self.id.cmp(&other.id))

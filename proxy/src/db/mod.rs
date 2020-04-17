@@ -813,7 +813,7 @@ impl<'a> EventHandler<'a> {
 				server: &server,
 				client: &client_uid,
 				icon,
-				avatar: avatar.as_ref().map(|s| s.as_str()),
+				avatar: avatar.as_deref(),
 				last_seen: utc_time,
 				timezone: utc_to_local_offset,
 			};

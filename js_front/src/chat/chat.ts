@@ -4,6 +4,7 @@ import { Moment } from "moment";
 import { Connection } from "../connection";
 import { graphql, toDatetime } from "../graphql";
 import { MessageTarget } from "../structs/ts";
+import { Client } from "../tree/book";
 
 export class Chat {
 	public readonly selectedChat: Writable<MessageTarget> = writable(MessageTarget.ToServer());
@@ -24,12 +25,13 @@ export class Chat {
 		let currentGroup: GroupedMessages | undefined;
 		let currentDate: Moment | undefined;
 		for (const message of messages) {
-			if (!currentGroup || message.user !== currentGroup.user) {
+			if (!currentGroup || message.invoker !== currentGroup.invoker
+				|| message.invokerName !== currentGroup.invokerName) {
 				if (!currentDate || !currentDate.isSame(message.date, "day") ) {
 					currentDate = message.date;
 					groups.push(new DateSeparator(message.date));
 				}
-				currentGroup = new GroupedMessages(message.user);
+				currentGroup = new GroupedMessages(message.invoker, message.invokerName);
 				groups.push(currentGroup);
 			}
 			currentGroup.messages.push(message);
@@ -68,7 +70,13 @@ export class Chat {
 						messages(startTime: $start_time, startId: $start_id, beforeStart: $before_start) {
 							id
 							invoker {
-								name
+								client {
+									uid
+									name
+									customName
+								}
+								icon
+								avatar
 							}
 							invokerName
 							content
@@ -92,7 +100,13 @@ export class Chat {
 
 					const msgs: Message[] = [];
 					res.data.chat.messages.forEach((msg: any) => {
-						msgs.push(new Message(msg.id, msg.invoker?.name || msg.invokerName,
+						let client;
+						if (msg.invoker) {
+							client = new Client(msg.invoker.client.uid,
+								msg.invoker.client.customName || msg.invoker.client.name,
+								msg.invoker.icon, msg.invoker.avatar);
+						}
+						msgs.push(new Message(msg.id, client, msg.invokerName,
 							msg.content, toDatetime(msg.time, msg.timezone)));
 					});
 					const before_start = start_time ? fromStart : false;
@@ -126,7 +140,8 @@ export class Chat {
 export class Message {
 	constructor(
 		public id: string,
-		public user: string,
+		public invoker: Client | undefined,
+		public invokerName: string | undefined,
 		public text: string,
 		public date: Moment = moment(),
 	) { }
@@ -144,6 +159,7 @@ export class GroupedMessages {
 	public date?: Moment;
 	public messages: Message[] = [];
 	constructor(
-		public user: string
+		public invoker: Client | undefined,
+		public invokerName: string | undefined,
 	) { }
 }

@@ -82,7 +82,31 @@ export class Book {
 }
 
 export class Client implements ITreeNode {
-	public name?: string;
+	constructor(
+		public uid: string,
+		public name: string,
+		public icon?: string,
+		public avatar?: string,
+	) { }
+
+	/**
+	 * TeamSpeak uses a different encoding of the uid for fetching avatars.
+	 *
+	 * The raw data (base64-decoded) is encoded in hex, but instead of using
+	 * [0-9a-f] with [a-p].
+	 */
+	public getAvatarUid(): string | undefined {
+		if (!this.avatar)
+			return;
+		let res = "";
+		let b = atob(this.uid);
+		for (let i = 0; i < b.length; i++) {
+			const c = b.charCodeAt(i);
+			res += String.fromCharCode('a'.charCodeAt(0) + (c >> 4));
+			res += String.fromCharCode('a'.charCodeAt(0) + (c & 0xf));
+		}
+		return res;
+	}
 }
 
 export class Channel implements ITreeParent, ITreeNode {
