@@ -75,6 +75,7 @@
 					viewport.scrollTo(0, scrollTop + rest);
 				} else {
 					isAtStart = true;
+					top = 0;
 				}
 			} else if (!isAtEnd && content_buffer_end < viewport_height) {
 				loadingEnd = loadMore(false).finally(() => loadingEnd = undefined);
@@ -95,6 +96,7 @@
 					bottom = Math.max(0, bottom - new_height);
 				} else {
 					isAtEnd = true;
+					bottom = 0;
 				}
 			} else {
 				return;

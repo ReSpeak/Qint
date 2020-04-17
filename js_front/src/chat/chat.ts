@@ -45,10 +45,11 @@ export class Chat {
 
 			let i = fromStart ? 0 : curMsgs.length - 1;
 			let step = fromStart ? 1 : -1;
-			while (i > 0 && i < curMsgs.length) {
+			while (i >= 0 && i < curMsgs.length) {
 				const group = curMsgs[i];
 				if (group instanceof GroupedMessages && group.messages.length > 0) {
 					lastMsg = group.messages[fromStart ? 0 : group.messages.length - 1];
+					break;
 				}
 				i += step;
 			}
@@ -89,11 +90,15 @@ export class Chat {
 					if (!("chat" in res.data) || res.data.chat.messages.length == 0)
 						return;
 
-					let msgs: Message[] = [];
+					const msgs: Message[] = [];
 					res.data.chat.messages.forEach((msg: any) => {
 						msgs.push(new Message(msg.id, msg.invoker?.name || msg.invokerName,
 							msg.content, toDatetime(msg.time, msg.timezone)));
 					});
+					const before_start = start_time ? fromStart : false;
+					console.log("Fetching messages " + (before_start ? "before" : "after"), [start_time, start_id], "; got", msgs);
+
+					// TODO We need to combine this with the existing messages
 					return Chat.group_messages(msgs);
 				} else {
 					console.error("GetMessages result does not contain data", res);

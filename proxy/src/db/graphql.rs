@@ -264,16 +264,21 @@ impl Chat {
 					query.filter(messages::time.lt(t).and(messages::id.lt(i)))
 						.order((messages::time.desc(), messages::id.desc()))
 						.load::<models::Message>(&db.con)
-				} else if let Some((t, i, false)) = start {
-					query.filter(messages::time.gt(t).and(messages::id.gt(i)))
-						.order((messages::time, messages::id))
-						.load::<models::Message>(&db.con).map(|mut m| {
+						.map(|mut m| {
 							m.reverse();
 							m
 						})
+				} else if let Some((t, i, false)) = start {
+					query.filter(messages::time.gt(t).and(messages::id.gt(i)))
+						.order((messages::time, messages::id))
+						.load::<models::Message>(&db.con)
 				} else {
 					query.order((messages::time.desc(), messages::id.desc()))
 						.load::<models::Message>(&db.con)
+						.map(|mut m| {
+							m.reverse();
+							m
+						})
 				};
 
 				GResult::Ok(res?.into_iter().map(Message).collect())
