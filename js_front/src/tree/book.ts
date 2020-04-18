@@ -23,12 +23,15 @@ export class Book {
 	}
 
 	public updateChannel(id: number, obj: any) {
-		const channel = this.getChannel(id);
-		if (channel === undefined) {
-			console.error(`Cannot update non-existant channel ${id}`);
-			return;
-		}
-		channel.update(obj);
+		this.channels.update(channels => {
+			const channel = channels.get(id);
+			if (channel === undefined) {
+				console.error(`Cannot update non-existant channel ${id}`);
+				return channels;
+			}
+			channel.update(obj);
+			return channels;
+		});
 	}
 
 	public removeChannel(id: number): void {
@@ -55,22 +58,32 @@ export class Book {
 	}
 
 	public updateClient(id: number, obj: any) {
-		const client = this.getClient(id);
-		if (client === undefined) {
-			console.error(`Cannot update non-existant client ${id}`);
-			return;
-		}
-		if ("channel" in obj) {
-			let parent = this.getChannel(client.channel);
-			if (parent !== undefined) {
-				parent.children.update(pch => { pch.remove_item(client); return pch; });
+		this.clients.update(clients => {
+			const client = this.getClient(id);
+			if (client === undefined) {
+				console.error(`Cannot update non-existant client ${id}`);
+				return clients;
 			}
-			parent = this.getChannel(obj.channel);
-			if (parent !== undefined) {
-				parent.children.update(pch => [client, ...pch]);
+			const oldChannel = client.channel;
+			client.update(obj);
+			// Update node in channel tree
+			if ("channel" in obj) {
+				let parent = this.getChannel(oldChannel);
+				if (parent !== undefined) {
+					parent.children.update(pch => { pch.remove_item(client); return pch; });
+				}
+				parent = this.getChannel(obj.channel);
+				if (parent !== undefined) {
+					parent.children.update(pch => [client, ...pch]);
+				}
+			} else {
+				const parent = this.getChannel(obj.channel);
+				if (parent !== undefined) {
+					parent.children.update(pch => pch);
+				}
 			}
-		}
-		client.update(obj);
+			return clients;
+		});
 	}
 
 	public removeClient(id: number): void {
@@ -83,6 +96,13 @@ export class Book {
 		this.clients.update(clients => {
 			clients.delete(id);
 			return clients;
+		});
+	}
+
+	public updateServer(obj: any) {
+		this.server.update(s => {
+			s.update(obj);
+			return s;
 		});
 	}
 
@@ -110,12 +130,16 @@ export class Book {
 				this.addChannel(Channel.fromJson(msg.PropertyAdded.prop.Channel));
 			} else if ("Client" in msg.PropertyAdded.prop) {
 				this.addClient(Client.fromJson(msg.PropertyAdded.prop.Client));
+			} else if ("Server" in msg.PropertyAdded.prop) {
+				this.updateServer(msg.PropertyAdded.prop.Server);
 			}
 		} else if ("PropertyChanged" in msg) {
 			if ("Channel" in msg.PropertyChanged.prop && "Channel" in msg.PropertyChanged.id) {
 				this.updateChannel(msg.PropertyChanged.id.Channel, msg.PropertyChanged.prop.Channel);
 			} else if ("Client" in msg.PropertyChanged.prop && "Client" in msg.PropertyChanged.id) {
 				this.updateClient(msg.PropertyChanged.id.Client, msg.PropertyChanged.prop.Client);
+			} else if ("Server" in msg.PropertyChanged.prop) {
+				this.updateServer(msg.PropertyChanged.prop.Server);
 			}
 		} else if ("PropertyRemoved" in msg) {
 			if ("Channel" in msg.PropertyRemoved.id) {
@@ -256,6 +280,10 @@ export class Server implements ITreeParent {
 
 	// ITreeParent
 	public children: Writable<ITreeNode[]> = writable([]);
+
+	public update(obj: any): void {
+		Object.assign(this, obj);
+	}
 }
 
 export interface ITreeParent {

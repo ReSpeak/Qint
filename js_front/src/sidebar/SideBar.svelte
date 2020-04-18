@@ -1,10 +1,14 @@
 <script>
 	import Server from "../tree/Server.svelte";
+	import ServerIcon from "../ui/ServerIcon.svelte";
 
 	export let connection;
 	let server = connection.book.server;
+	let selectedChat = connection.chat.selectedChat;
 	let dropdownActive = false;
 	let dropdown;
+
+	$: selectedServerChat = "Server" in $selectedChat;
 
 	function handleFocus(event) {
 		// Check of the target lies within the dropdown
@@ -58,7 +62,8 @@
 	</div>
 
 	<div class="sidebar-content">
-		<button class="entry-expand button" on:click={() => connection.chat.selectServer()}>
+		<button class="entry-expand button" class:selectedServerChat on:click={() => connection.chat.selectServer()}>
+			<ServerIcon {connection} />
 			<span class="expand" class:selected-server={true}>
 				{$server.name}
 			</span>
@@ -112,6 +117,15 @@
 </aside>
 
 <style lang="scss">
+	button {
+		background: none;
+		border: none;
+		border-radius: 0;
+	}
+	button:focus {
+		box-shadow: none;
+	}
+
 	.sidebar {
 		display: inline-flex;
 		flex-direction: column;
@@ -120,7 +134,7 @@
 		bottom: 0;
 		box-sizing: border-box;
 		width: var(--channel-tree-width);
-		background-color: #eeeeee;
+		background-color: #eee;
 		border-right: rgb(179, 179, 179) 2px solid;
 	}
 
@@ -141,14 +155,19 @@
 		bottom: 0;
 		top: 0;
 		z-index: 1;
+		background-color: #fff;
+		box-shadow: 0 0.3em 0.3em #bbb;
 
 		width: 100%;
 		justify-content: start;
-		border: none;
+	}
+
+	button.selectedServerChat {
+		background: #ddd;
 	}
 
 	.sidebar-content button.chats-header {
-		top: 2em;
+		top: 2.2em;
 	}
 
 	.sidebar-content > .menu .menu-list li {
@@ -157,15 +176,6 @@
 
 	.round {
 		border-radius: 100%;
-	}
-
-	.dropdown button {
-		background: none;
-		border: none;
-	}
-
-	.dropdown button:focus {
-		box-shadow: none;
 	}
 
 	.dropdown-trigger button {

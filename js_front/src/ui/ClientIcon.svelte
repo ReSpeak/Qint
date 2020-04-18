@@ -11,7 +11,9 @@
 </script>
 
 {#if clientIconPath}
-	<img src={clientIconPath} alt="" />
+	<span class="icon">
+		<img src={clientIconPath} alt="" />
+	</span>
 {:else}
 	<Icon name="account" />
 {/if}

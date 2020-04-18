@@ -2,21 +2,21 @@
 	import Icon from './Icon.svelte';
 	import getClientIconPath from "./clientIcon";
 
-	export let channel;
 	// Either connection or server has to be set to fetch the icon
 	export let connection = undefined;
 	export let server = undefined;
+	let conServer = connection.book.server;
 
 	// I’m sorry for using javascript
-	$: channelIconPath = getClientIconPath(channel, connection, server);
+	$: serverIconPath = getClientIconPath($conServer, connection, server);
 </script>
 
-{#if channelIconPath}
+{#if serverIconPath}
 	<span class="icon">
-		<img src={channelIconPath} alt="" />
+		<img src={serverIconPath} alt="" />
 	</span>
 {:else}
-	<Icon name="chat-outline" />
+	<Icon name="server" />
 {/if}
 
 <style lang="scss">

@@ -14,9 +14,7 @@ export class Connection {
 	private socket?: WebSocket;
 	public guid?: string;
 
-	constructor() {
-		this.fillDummyData();
-	}
+	constructor() { }
 
 	public reset() {
 		this.state.set(ConnectionState.Disconnected);
@@ -61,10 +59,6 @@ export class Connection {
 			'-' + d2h[vals[6]] + d2h[vals[7]] +
 			'-' + d2h[vals[8]] + d2h[vals[9]] +
 			'-' + d2h[vals[10]] + d2h[vals[11]] + d2h[vals[12]] + d2h[vals[13]] + d2h[vals[14]] + d2h[vals[15]];
-	}
-
-	private fillDummyData() {
-		this.book.server.update(s => { s.name = "Server der Verplanten"; return s; });
 	}
 
 	public sendMessage(data: OutMsg) {
