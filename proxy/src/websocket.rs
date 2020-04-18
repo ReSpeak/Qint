@@ -160,14 +160,18 @@ impl Ws {
 						match self
 							.connection
 							.as_ref()
-							.and_then(|c| c.get_server_key().ok())
+							.and_then(|c| c.get_server_key().ok()
+								.and_then(|s| c.get_state().map(|c| (s, c.own_client)).ok()))
 						{
-							Some(server_key) => {
+							Some((server_key, own_client)) => {
 								// Send server id
 								let server = base64::encode(
 									&server_key.to_short());
 								self.send_message(
-									&MessageP2F::Connected { server },
+									&MessageP2F::Connected {
+										server,
+										own_client,
+									},
 									ctx,
 								);
 

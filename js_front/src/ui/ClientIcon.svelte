@@ -11,9 +11,15 @@
 </script>
 
 {#if clientIconPath}
-	<span class="icon">
-		<img src={clientIconPath} alt="" />
-	</span>
+	<img src={clientIconPath} alt="" />
 {:else}
 	<Icon name="account" />
 {/if}
+
+<style lang="scss">
+	img {
+		object-fit: scale-down;
+		height: 1.5em;
+		width: 1.5em;
+	}
+</style>

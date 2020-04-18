@@ -26,6 +26,8 @@ pub enum MessageP2F {
 	Connected {
 		/// The id of the server.
 		server: String,
+		/// The id of our own client.
+		own_client: ClientId,
 	},
 	/// The list of currently talking clients and `true` if they are whispering.
 	TalkersChanged(Vec<(ClientId, bool)>),

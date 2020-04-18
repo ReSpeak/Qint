@@ -56,6 +56,7 @@ export type InMsg = InMsgConnected | InMsgError | InTalkersChanged | InMsgEvents
 interface InMsgConnected {
 	Connected: {
 		server: string;
+		own_client: number,
 	};
 }
 

@@ -5,11 +5,10 @@
 
 	export let connection;
 	export let client;
+	let selectedChat = connection.chat.selectedChat;
 
-	let collapsed = false;
-	// TODO dummy
-	let ownClient = false;
-	let selectedClient = false;
+	let ownClient = client.id === connection.ownClient;
+	$: selectedClient = "Client" in $selectedChat && $selectedChat.Client === client.id;
 	let div;
 
 	function setChat() {
@@ -24,13 +23,12 @@
 <li>
 	<div
 		bind:this={div}
-		class="flex-line"
-		class:own-client="{ownClient}"
-		class:selected-client="{selectedClient}"
+		class:ownClient
+		class:selectedClient
 	>
-		<button class="button expand" on:click={setChat}>
+		<button class="button" on:click={setChat}>
 			<ClientIcon {client} {connection} />
-			<span class="expand">{client.name}</span>
+			<span>{client.name}</span>
 		</button>
 	</div>
 </li>
@@ -41,8 +39,18 @@
 		border: none;
 		padding: 0.2em 1em 0.2em 1em;
 		height: auto;
+		width: 100%;
+		justify-content: start;
 	}
 	.button:focus {
 		box-shadow: none;
+	}
+
+	.ownClient span {
+		font-weight: bold;
+	}
+
+	.selectedClient {
+		background-color: #ddd;
 	}
 </style>

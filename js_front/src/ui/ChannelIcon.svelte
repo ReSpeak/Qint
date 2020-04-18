@@ -12,9 +12,15 @@
 </script>
 
 {#if channelIconPath}
-	<span class="icon">
-		<img src={channelIconPath} alt="" />
-	</span>
+	<img src={channelIconPath} alt="" />
 {:else}
 	<Icon name="chat-outline" />
 {/if}
+
+<style lang="scss">
+	img {
+		object-fit: scale-down;
+		height: 1.5em;
+		width: 1.5em;
+	}
+</style>

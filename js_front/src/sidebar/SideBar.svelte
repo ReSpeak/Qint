@@ -84,7 +84,7 @@
 		</div>
 
 		<button class="entry-expand button chats-header">
-			<span class="entry-expand" style="display:flex;">
+			<span class="entry-expand">
 				Splamy (maybe)
 			</span>
 		</button>

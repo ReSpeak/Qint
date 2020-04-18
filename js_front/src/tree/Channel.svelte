@@ -1,5 +1,6 @@
 <script>
 	import { afterUpdate } from "svelte";
+	import { get } from "svelte/store";
 	import Icon from "../ui/Icon.svelte";
 	import ChannelIcon from "../ui/ChannelIcon.svelte";
 	import { flash } from "../util";
@@ -9,12 +10,22 @@
 	export let connection;
 	export let channel;
 	let children = channel.children;
+	let selectedChat = connection.chat.selectedChat;
 
 	let collapsed = false;
-	// TODO dummy
-	let ownClient = false;
-	let selectedChannel = false;
+	// Update if a client moves in or out
+	$: ownClient = updateOwnClient($children);
+	$: selectedChannel = "Channel" in $selectedChat && $selectedChat.Channel === channel.id;
 	let div;
+
+	function updateOwnClient() {
+		let isOwn = false;
+		let client = get(connection.book.clients).get(connection.ownClient);
+		if (client) {
+			isOwn = client.channel === channel.id;
+		}
+		return isOwn;
+	}
 
 	function switchChannel() {
 		connection.switchChannel(channel);
@@ -32,16 +43,16 @@
 <li>
 	<div
 		bind:this={div}
-		class="flex-line"
-		class:own-client="{ownClient}"
-		class:selected-channel="{selectedChannel}"
+		class="nameContainer"
+		class:ownClient
+		class:selectedChannel
 	>
-		<button class="button collapse-button" on:click={() => collapsed = !collapsed}>
+		<button class="button" on:click={() => collapsed = !collapsed} class:invisible={$children.length == 0}>
 			<Icon name="chevron-right{collapsed ? '' : ' mdi-rotate-90'}" />
 		</button>
-		<button class="button expand" on:click={setChat} on:dblclick={switchChannel}>
+		<button class="button nameButton" on:click={setChat} on:dblclick={switchChannel}>
 			<ChannelIcon {channel} {connection} />
-			<span class="expand">{channel.name}</span>
+			<span>{channel.name}</span>
 		</button>
 	</div>
 	<ul class="menu-list" class:collapsed>
@@ -61,6 +72,8 @@
 		border: none;
 		padding: 0.3em;
 		height: auto;
+		width: 100%;
+		justify-content: start;
 	}
 	.button:focus {
 		box-shadow: none;
@@ -71,7 +84,28 @@
 		padding-left: 0.5em;
 	}
 
+	.nameContainer {
+		display: grid;
+		grid-template-columns: min-content auto;
+	}
+
+	.nameButton :global(.icon) {
+		margin-left: 0;
+	}
+
+	.invisible {
+		visibility: hidden;
+	}
+
 	.collapsed {
 		display: none;
+	}
+
+	.ownClient span {
+		font-weight: bold;
+	}
+
+	.selectedChannel {
+		background-color: #ddd;
 	}
 </style>

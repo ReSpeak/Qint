@@ -131,7 +131,7 @@
 		font-size: 1em;
 	}
 
-	.chat-form input {
+	.chat-form textarea {
 		flex-grow: 1;
 		/*background-color: white;
 	color: black;
@@ -165,21 +165,18 @@
 		grid-template-columns: min-content minmax(0, 1fr);
 	}
 
-	.invoker-icon,
-	.invoker-name,
-	.message-time,
-	.message-content {
+	.invoker-icon {
 		padding: 0.1em 0.5em;
 	}
 
 	.invoker-icon {
 		grid-column: 1;
+		display: flex;
+		margin-top: 0.7em;
 	}
 
 	.invoker-name {
 		grid-column: 2;
-		margin-top: auto;
-		margin-bottom: auto;
-		//font-size: 0.8em;
+		margin-top: 0.7em;
 	}
 </style>

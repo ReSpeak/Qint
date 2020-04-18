@@ -9,9 +9,10 @@ export class Connection {
 
 	public readonly book: Book = new Book();
 	public readonly chat: Chat = new Chat(this);
-	public server: string | undefined;
-	private socket: WebSocket | undefined;
-	public guid: string | undefined;
+	public server?: string;
+	public ownClient?: number;
+	private socket?: WebSocket;
+	public guid?: string;
 
 	constructor() {
 		this.fillDummyData();
@@ -63,15 +64,6 @@ export class Connection {
 	}
 
 	private fillDummyData() {
-		/*this.book.addChannel(Channel.fromDebug(1, 0, 0).set_name("A"));
-		this.book.addChannel(Channel.fromDebug(2, 1, 0).set_name("B"));
-		this.book.addChannel(Channel.fromDebug(3, 1, 2).set_name("C"));
-		this.book.addChannel(Channel.fromDebug(4, 1, 2).set_name("C"));
-		this.book.addChannel(Channel.fromDebug(5, 1, 2).set_name("C"));
-		this.book.addChannel(Channel.fromDebug(6, 1, 2).set_name("C"));
-		this.book.addChannel(Channel.fromDebug(7, 1, 2).set_name("C"));
-		this.book.addChannel(Channel.fromDebug(8, 1, 2).set_name("C"));
-		this.book.addChannel(Channel.fromDebug(9, 1, 2).set_name("C"));*/
 		this.book.server.update(s => { s.name = "Server der Verplanten"; return s; });
 	}
 
@@ -96,6 +88,7 @@ export class Connection {
 		if ("Connected" in msg) {
 			this.state.set(ConnectionState.Connected);
 			this.server = msg.Connected.server;
+			this.ownClient = msg.Connected.own_client;
 		} else if ("Events" in msg) {
 			for (const tsevt of msg.Events) {
 				try {

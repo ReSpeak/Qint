@@ -106,7 +106,7 @@ export class Chat {
 			});
 			if ("data" in res) {
 				// We never chatted here
-				if (!("chat" in res.data) || res.data.chat.messages.length == 0)
+				if (!res.data.chat || res.data.chat.messages.length == 0)
 					return;
 
 				const msgs: Message[] = [];
