@@ -25,7 +25,7 @@ export class Connection {
 
 	public connect(opt: IConnectOptions) {
 		this.error.set(undefined);
-		this.guid = "36c07459-a731-4868-9f10-a9b7564a4461"; // TODO random
+		this.guid = Connection.createUuidV4();
 		this.socket = new WebSocket(`ws://localhost:4422/con/${this.guid}/ws?format=Json`);
 		this.socket.onopen = () => {
 			this.sendMessage({
@@ -47,8 +47,23 @@ export class Connection {
 		this.state.set(ConnectionState.Connecting);
 	}
 
+	// See https://jsperf.com/node-uuid-performance/64 about how to generate a uuid fast
+	private static createUuidV4(): string {
+		var d2h: string[] = [], vals = new Array(16);
+		for (var i = 0; i < 256; ++i) d2h.push((0x100 + i).toString(16).substr(1));
+
+		for (var i = 0; i < 16; ++i) vals[i] = Math.random() * 256 | 0;
+		vals[6] = vals[6] & 0x0f | 0x40;
+		vals[8] = vals[8] & 0x3f | 0x80;
+		return d2h[vals[0]] + d2h[vals[1]] + d2h[vals[2]] + d2h[vals[3]] +
+			'-' + d2h[vals[4]] + d2h[vals[5]] +
+			'-' + d2h[vals[6]] + d2h[vals[7]] +
+			'-' + d2h[vals[8]] + d2h[vals[9]] +
+			'-' + d2h[vals[10]] + d2h[vals[11]] + d2h[vals[12]] + d2h[vals[13]] + d2h[vals[14]] + d2h[vals[15]];
+	}
+
 	private fillDummyData() {
-		this.book.addChannel(Channel.fromDebug(1, 0, 0).set_name("A"));
+		/*this.book.addChannel(Channel.fromDebug(1, 0, 0).set_name("A"));
 		this.book.addChannel(Channel.fromDebug(2, 1, 0).set_name("B"));
 		this.book.addChannel(Channel.fromDebug(3, 1, 2).set_name("C"));
 		this.book.addChannel(Channel.fromDebug(4, 1, 2).set_name("C"));
@@ -56,7 +71,7 @@ export class Connection {
 		this.book.addChannel(Channel.fromDebug(6, 1, 2).set_name("C"));
 		this.book.addChannel(Channel.fromDebug(7, 1, 2).set_name("C"));
 		this.book.addChannel(Channel.fromDebug(8, 1, 2).set_name("C"));
-		this.book.addChannel(Channel.fromDebug(9, 1, 2).set_name("C"));
+		this.book.addChannel(Channel.fromDebug(9, 1, 2).set_name("C"));*/
 		this.book.server.update(s => { s.name = "Server der Verplanten"; return s; });
 	}
 
@@ -75,7 +90,17 @@ export class Connection {
 			this.server = msg.Connected.server;
 		} else if ("Events" in msg) {
 			for (const tsevt of msg.Events) {
-				console.log(tsevt);
+				try {
+					console.log(tsevt);
+					if (tsevt === "ChannelListFinished") {
+					} else if ("Message" in tsevt) {
+						// TODO Update chat
+					} else {
+						this.book.messageHandler(tsevt);
+					}
+				} catch (err) {
+					console.error("Failed to handle event", tsevt, err);
+				}
 			}
 		} else if ("TalkersChanged" in msg) {
 			// TODO

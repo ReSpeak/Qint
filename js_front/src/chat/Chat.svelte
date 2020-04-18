@@ -5,57 +5,39 @@
 	import ClientIcon from "../ui/ClientIcon.svelte";
 	import { DateSeparator } from "./chat";
 	import LoadableVirtualList from "../ui/LoadableVirtualList.svelte";
-	// import { sleep } from "../util";
-
-	// let load_morrr;
 
 	export let connection;
 	let chat = connection.chat;
-	//let messages = chat.groupedMessages;
 	let messages;
 	let messagesError;
 	let composingCommand = "";
 
-	let loadMsgTask = Promise.resolve();
-	// console.log(connection);
-	// let msgs = connection.messages;
 	// let selected_chat = connection.selected_chat;
 
 	// connection.selected_chat.subscribe(_ => handleClick());
-
-	// async function request() {
-	// 	//const resp = await fetch(`/messages/${}`);
-	// 	//const data = await resp.json();
-	// 	await sleep(500);
-	// 	console.log("before");
-	// 	let data = [{ message: "hallo", user: $selected_chat }];
-	// 	msgs.update(m => [...m, ...data]);
-	// 	console.log("after");
-	// }
-
-	// //waiting_for_msg = request();
-	// function handleClick() {
-	// 	load_morrr = request();
-	// }
 
 	// function changeChat() {
 	// 	selected_chat.update(s => "user" + Math.random());
 	// }
 
 	function sendMessage(e) {
-		e.preventDefault();
 		chat.sendMessage();
 		chat.composing = "";
 	}
 
 	function sendCommand(e) {
-		e.preventDefault();
 		connection.sendRawMessage(composingCommand);
 		composingCommand = "";
 	}
 
 	async function loadMessages(fromStart) {
-		return chat.getMessages(fromStart, messages);
+		messagesError = undefined;
+		try {
+			return chat.getMessages(fromStart, messages);
+		} catch (err) {
+			console.error("Failed to load messages", err);
+			messagesError = err;
+		}
 	}
 </script>
 
@@ -95,48 +77,11 @@
 			{/if}
 		</LoadableVirtualList>
 	{/if}
-	<!--<ul class="chat-messages">
-		{#await loadMsgTask}
-			<div
-				class="is-loading"
-				style="color: gray; font-style: italic; text-align: center;"
-			>
-				Loading…
-			</div>
-		{:then}
-			{#each $messages as group}
-				{#if group instanceof DateSeparator}
-					<div title="{group.date.format('L')}" class="chat-date">
-						{group.date.format('LL')}
-					</div>
-				{:else}
-					<div class="invoker-icon">
-						<Icon name="account" />
-					</div>
-					<div
-						class="invoker-name has-text-weight-bold"
-						style="user_color"
-					>
-						{group.user}
-					</div>
-
-					{#each group.messages as message}
-						<Message {message} />
-					{/each}
-				{/if}
-			{/each}
-			<div class="chat-end"></div>
-		{:catch}
-			<div style="color: red; font-style: italic; text-align: center;">
-				Failed to load.
-			</div>
-		{/await}
-	</ul>-->
-	<form class="chat-form" on:submit="{sendMessage}">
+	<form class="chat-form" on:submit|preventDefault="{sendMessage}">
 		<textarea bind:value="{chat.composing}" class="input auto_height" name="message"></textarea>
 		<button class="button" name="send" type="submit">Send</button>
 	</form>
-	<form class="chat-form" on:submit="{sendCommand}">
+	<form class="chat-form" on:submit|preventDefault="{sendCommand}">
 		<textarea bind:value="{composingCommand}" class="input auto_height" name="message" type="text"></textarea>
 		<button class="button" name="send" type="submit">Send Command</button>
 	</form>

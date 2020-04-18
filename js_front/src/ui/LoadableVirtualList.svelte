@@ -174,7 +174,7 @@
 		if (startIsTop)
 			viewport.scrollTo(0, 0);
 		else
-			viewport.scrollTo(0, viewport.scrollHeight);
+			viewport.scrollTo(0, viewport.scrollHeight - viewport.clientHeight);
 	}
 
 	// trigger initial refresh

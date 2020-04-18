@@ -202,6 +202,16 @@ impl Ws {
 								error!(self.logger, "Failed to get server key")
 							}
 						}
+					} else if let TsEvent::ChannelListFinished = e {
+						// Subscribe to all channels
+						if let Some(con) = &mut self.connection {
+							if let Ok(mut data) = con.get_mut_state() {
+								if let Err(e) = data.get_server().set_subscribed(true) {
+									error!(self.logger, "Failed to subscribe to server";
+										"error" => %e);
+								}
+							}
+						}
 					}
 				}
 

@@ -42,13 +42,82 @@ interface InMsgEvents {
 	Events: InBookMsg[];
 }
 
-// export type IMsgBookAdd = IMsgBookAddClient | IMsgBookAddChannel | IMsgBookAddServer;
-// export type IMsgBookChange = IMsgBookChangeClient | IMsgBookChangeChannel | IMsgBookChangeServer;
-// export type IMsgBookRemove = IMsgBookRemoveClient | IMsgBookRemoveChannel;
+interface IMsgPropertyIdChannel {
+	Channel: number;
+}
 
-// type InBookMsg = IMsgBookAdd | IMsgBookChange | IMsgBookRemove | IMsgConnected;
+interface IMsgPropertyIdClient {
+	Client: number;
+}
 
-type InBookMsg = any;
+interface IMsgPropertyIdClientServerGroup {
+	ClientServerGroup: [number, number];
+}
+
+interface IMsgPropertyIdServer {
+	Server: {};
+}
+
+type PropertyId = IMsgPropertyIdChannel | IMsgPropertyIdClient | IMsgPropertyIdClientServerGroup | IMsgPropertyIdServer;
+
+interface IMsgPropertyValueChannel {
+	Channel: any;
+}
+
+interface IMsgPropertyValueClient {
+	Client: any;
+}
+
+interface IMsgPropertyValueServer {
+	Server: any;
+}
+
+type PropertyValue = IMsgPropertyValueChannel | IMsgPropertyValueClient | IMsgPropertyValueServer;
+
+
+interface Invoker {
+	name: string;
+	id: number;
+	uid: string | undefined;
+}
+
+interface IMsgBookAdded {
+	PropertyAdded: {
+		id: PropertyId;
+		prop: PropertyValue;
+		invoker: Invoker;
+	};
+}
+
+interface IMsgBookChanged {
+	PropertyChanged: {
+		id: PropertyId;
+		prop: PropertyValue;
+		invoker: Invoker;
+	};
+}
+
+interface IMsgBookRemoved {
+	PropertyRemoved: {
+		id: PropertyId;
+		prop: PropertyValue;
+		invoker: Invoker;
+	};
+}
+
+type IMskBookChannelListFinished = "ChannelListFinished";
+
+interface IMsgBookMessage {
+	Message: {
+		target: MessageTarget;
+		invoker: Invoker;
+		message: string;
+	};
+}
+
+export type InBookChangeMsg = IMsgBookAdded | IMsgBookChanged | IMsgBookRemoved;
+
+export type InBookMsg = InBookChangeMsg | IMskBookChannelListFinished | IMsgBookMessage;
 
 // type BookOp<TOp extends string, TTo extends string, TObj> = {
 // 	to: TTo;

@@ -13,7 +13,13 @@
 <div class="menu channel-list">
 	<ul class="menu-list">
 		{#each $children as channel}
-			<Channel {channel}/>
+			<Channel {connection} {channel}/>
 		{/each}
 	</ul>
 </div>
+
+<style>
+	ul {
+		margin: 0 0 0 0.2em;
+	}
+</style>
