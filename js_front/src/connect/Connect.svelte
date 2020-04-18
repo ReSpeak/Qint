@@ -3,11 +3,11 @@
 	import { get, writable } from "svelte/store";
 	import { Bookmark } from "./bookmark";
 	import self from "./connect";
-	import { ConnectionState } from "./connection";
-	import Icon from "./ui/Icon.svelte";
+	import { ConnectionState } from "../connection";
+	import Icon from "../ui/Icon.svelte";
 	import BookmarkComp from "./Bookmark.svelte";
-	import { SERVER_ICON, CLIENT_ICON } from "./ui/const";
-	import LoadableVirtualList from "./ui/LoadableVirtualList.svelte";
+	import { SERVER_ICON, CLIENT_ICON } from "../ui/const";
+	import LoadableVirtualList from "../ui/LoadableVirtualList.svelte";
 
 	export let connection;
 	let state = connection.state;
@@ -17,6 +17,7 @@
 	let address = writable(data.address);
 	let bookmarks;
 	let bookmarkError;
+	let usernameInput;
 
 	function onConnect() {
 		if (get(state) === ConnectionState.Disconnected)
@@ -38,6 +39,7 @@
 	}
 
 	onMount(async () => {
+		usernameInput.focus();
 		let recent = await Bookmark.getRecent();
 		if (recent.data.mostRecentBookmark) {
 			if (data.username === "") {
@@ -70,13 +72,14 @@
 			<div>
 				<p class="control has-icons-left">
 					<input
-						bind:value="{$username}"
+						bind:this={usernameInput}
+						bind:value={$username}
 						name="username"
 						id="username"
 						class="input"
 						type="text"
 						placeholder="Username"
-						disabled="{$state !== ConnectionState.Disconnected}"
+						disabled={$state !== ConnectionState.Disconnected}
 					/>
 					<Icon name="{CLIENT_ICON}" is_left />
 				</p>

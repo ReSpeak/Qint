@@ -3,13 +3,29 @@
 
 	export let connection;
 	let server = connection.book.server;
+	let dropdownActive = false;
+	let dropdown;
+
+	function handleFocus(event) {
+		// Check of the target lies within the dropdown
+		if (event.relatedTarget) {
+			if (!dropdown.contains(event.relatedTarget)) {
+				dropdownActive = false;
+			}
+		}
+	}
 </script>
 
 <aside class="sidebar">
-	<div class="level" style="padding: 0.5em;">
-		<div class="dropdown" onclick="dropdown_click">
+	<div class="level">
+		<div class="dropdown" bind:this={dropdown} class:is-active={dropdownActive} on:focusout={handleFocus}>
 			<div class="dropdown-trigger">
-				<figure class="media-left" style="cursor: pointer;">
+				<button
+					class="button"
+					aria-haspopup="true"
+					aria-controls="dropdown-menu"
+					on:click={() => dropdownActive = !dropdownActive}
+				>
 					<p class="image is-32x32">
 						<img
 							class="round"
@@ -17,19 +33,17 @@
 							alt="Home icon"
 						/>
 					</p>
-				</figure>
+				</button>
 			</div>
-			<div class="dropdown-menu" id="dropdown-menu3" role="menu">
+			<div class="dropdown-menu" id="dropdown-menu3" role="menu" on:click={() => dropdownActive = false}>
 				<div class="dropdown-content">
-					<a href="#" class="dropdown-item">{'Options'}</a>
+					<button class="button dropdown-item">
+						Settings
+					</button>
 					<hr class="dropdown-divider" />
-					<a
-						href="#"
-						class="dropdown-item"
-						onclick="disconnect_click"
-					>
-						{'Disconnect'}
-					</a>
+					<button class="button dropdown-item" on:click={() => connection.disconnect()}>
+						Disconnect
+					</button>
 				</div>
 			</div>
 		</div>
@@ -44,12 +58,30 @@
 	</div>
 
 	<div class="sidebar-content">
-		<button class="entry-expand button">
-			<span class="expand" class:selected-server="{true}">
+		<button class="entry-expand button" on:click={() => connection.chat.selectServer()}>
+			<span class="expand" class:selected-server={true}>
 				{$server.name}
 			</span>
 		</button>
 		<Server {connection} />
+		<div class="menu">
+			<ul class="menu-list">
+				<li>
+					<ul class="menu-list">
+						<li>Channel</li>
+						<li>Channel</li>
+						<li>Channel</li>
+						<li>Channel</li>
+						<li>Channel</li>
+						<li>Channel</li>
+						<li>Channel</li>
+						<li>Channel</li>
+						<li>Channel</li>
+						<li>Channel</li>
+					</ul>
+				</li>
+			</ul>
+		</div>
 
 		<button class="entry-expand button chats-header">
 			<span class="entry-expand" style="display:flex;">
@@ -92,6 +124,10 @@
 		border-right: rgb(179, 179, 179) 2px solid;
 	}
 
+	.sidebar > .level {
+		padding: 0.5em;
+	}
+
 	.sidebar .level:not(:last-child) {
 		margin-bottom: 0;
 	}
@@ -121,5 +157,20 @@
 
 	.round {
 		border-radius: 100%;
+	}
+
+	.dropdown button {
+		background: none;
+		border: none;
+	}
+
+	.dropdown button:focus {
+		box-shadow: none;
+	}
+
+	.dropdown-trigger button {
+		margin-right: 0.5em;
+		padding: 0;
+		height: auto;
 	}
 </style>

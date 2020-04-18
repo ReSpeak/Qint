@@ -1,5 +1,5 @@
 import { Moment } from "moment";
-import { graphql, toDatetime } from "./graphql";
+import { graphql, toDatetime } from "../graphql";
 
 export class Bookmark {
 	public id: string | undefined;

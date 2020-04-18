@@ -4,7 +4,7 @@ import { Moment } from "moment";
 import { Connection } from "../connection";
 import { graphql, toDatetime } from "../graphql";
 import { MessageTarget } from "../structs/ts";
-import { GraphQlClient } from "../tree/book";
+import { Channel, Client, GraphQlClient } from "../tree/book";
 
 export class Chat {
 	public readonly selectedChat: Writable<MessageTarget> = writable(MessageTarget.ToServer());
@@ -19,6 +19,18 @@ export class Chat {
 	constructor(
 		private connection: Connection
 	) { }
+
+	public selectChannel(channel: Channel) {
+		this.selectedChat.set(MessageTarget.ToChannel(channel.id));
+	}
+
+	public selectClient(client: Client) {
+		this.selectedChat.set(MessageTarget.ToClient(client.id));
+	}
+
+	public selectServer() {
+		this.selectedChat.set(MessageTarget.ToServer());
+	}
 
 	private static group_messages(messages: Message[]): ChatEntries[] {
 		const groups = [];
@@ -87,7 +99,7 @@ export class Chat {
 			}`, {
 				chat_type: MessageTarget.getType(get(this.selectedChat)),
 				server: this.connection.server,
-				chat_id: MessageTarget.getId(get(this.selectedChat)),
+				chat_id: MessageTarget.getId(get(this.selectedChat), this.connection),
 				start_time,
 				start_id,
 				before_start: start_time ? fromStart : undefined,

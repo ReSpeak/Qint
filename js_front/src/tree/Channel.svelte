@@ -14,8 +14,16 @@
 	// TODO dummy
 	let ownClient = false;
 	let selectedChannel = false;
-
 	let div;
+
+	function switchChannel() {
+		connection.switchChannel(channel);
+	}
+
+	function setChat() {
+		connection.chat.selectChannel(channel);
+	}
+
 	afterUpdate(() => {
 		flash(div);
 	});
@@ -28,10 +36,10 @@
 		class:own-client="{ownClient}"
 		class:selected-channel="{selectedChannel}"
 	>
-		<button class="button collapse-button" onclick="{() => collapsed = !collapsed}">
-			<Icon name="chevron-right{collapsed ? ' mdi-rotate-90' : ''}" />
+		<button class="button collapse-button" on:click={() => collapsed = !collapsed}>
+			<Icon name="chevron-right{collapsed ? '' : ' mdi-rotate-90'}" />
 		</button>
-		<button class="button expand">
+		<button class="button expand" on:click={setChat} on:dblclick={switchChannel}>
 			<ChannelIcon {channel} {connection} />
 			<span class="expand">{channel.name}</span>
 		</button>
@@ -61,5 +69,9 @@
 	.menu-list li ul {
 		margin: 0 0 0 0.5em;
 		padding-left: 0.5em;
+	}
+
+	.collapsed {
+		display: none;
 	}
 </style>

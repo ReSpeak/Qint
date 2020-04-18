@@ -1,7 +1,7 @@
 <script>
 	import { onMount, onDestroy } from "svelte";
 	import { writable } from "svelte/store";
-	import Connect from "./Connect.svelte";
+	import Connect from "./connect/Connect.svelte";
 	import Connected from "./Connected.svelte";
 	import { ConnectionState } from "./connection";
 

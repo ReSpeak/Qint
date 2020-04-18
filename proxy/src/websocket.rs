@@ -375,6 +375,14 @@ impl Ws {
 					}),
 				);
 			}
+			MessageF2P::Disconnect(o) => {
+				if let Some(con) = &mut self.connection {
+					if let Err(e) = con.disconnect(o) {
+						error!(self.logger, "Failed to disconnect";
+							"error" => ?e);
+					}
+				}
+			}
 			MessageF2P::SendMessage { target, message } => {
 				if let Some(con) = &mut self.connection {
 					match con.get_mut_state() {
@@ -470,6 +478,27 @@ impl Ws {
 					}
 				} else {
 					// TODO Respond with error
+				}
+			}
+			MessageF2P::SwitchChannel(channel) => {
+				if let Some(con) = &mut self.connection {
+					match con.get_mut_state() {
+						Err(e) => {
+							error!(self.logger, "Failed to get state"; "error" => ?e);
+						}
+						Ok(mut state) => {
+							let own_id = state.own_client;
+							if let Some(mut cl) = state.get_client(&own_id) {
+								if let Err(e) = cl.set_channel(channel)
+								{
+									error!(self.logger, "Failed to switch channel";
+										"error" => ?e);
+								}
+							} else {
+								error!(self.logger, "Failed to find own client");
+							}
+						}
+					}
 				}
 			}
 		}

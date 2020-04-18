@@ -1,5 +1,5 @@
 import { Chat, Message } from "./chat/chat";
-import { OutMsg, InMsg } from "./structs/ws";
+import { OutMsg, InMsg, Reason } from "./structs/ws";
 import { get, writable, Writable } from "svelte/store";
 import { Book, Channel, Server } from "./tree/book";
 
@@ -75,12 +75,20 @@ export class Connection {
 		this.book.server.update(s => { s.name = "Server der Verplanten"; return s; });
 	}
 
-	public sendMessage(data: OutMsg): void {
+	public sendMessage(data: OutMsg) {
 		this.socket?.send(JSON.stringify(data));
 	}
 
-	public sendRawMessage(data: string): void {
+	public sendRawMessage(data: string) {
 		this.socket?.send(data);
+	}
+
+	public disconnect(reason?: Reason, message?: string) {
+		this.sendMessage({ Disconnect: { reason, message } });
+	}
+
+	public switchChannel(channel: Channel) {
+		this.sendMessage({ SwitchChannel: channel.id });
 	}
 
 	private messageHandler(evt: MessageEvent) {

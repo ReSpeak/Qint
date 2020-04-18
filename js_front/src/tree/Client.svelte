@@ -10,8 +10,12 @@
 	// TODO dummy
 	let ownClient = false;
 	let selectedClient = false;
-
 	let div;
+
+	function setChat() {
+		connection.chat.selectClient(client);
+	}
+
 	afterUpdate(() => {
 		flash(div);
 	});
@@ -24,7 +28,7 @@
 		class:own-client="{ownClient}"
 		class:selected-client="{selectedClient}"
 	>
-		<button class="button expand">
+		<button class="button expand" on:click={setChat}>
 			<ClientIcon {client} {connection} />
 			<span class="expand">{client.name}</span>
 		</button>

@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
-use tsclientlib::{ClientId, MessageTarget, Version};
+use tsclientlib::{
+	ChannelId, ClientId, DisconnectOptions, MessageTarget, Version,
+};
 
 use crate::book_events::JsEvent;
 
@@ -8,7 +10,9 @@ use crate::book_events::JsEvent;
 #[serde(deny_unknown_fields)]
 pub enum MessageF2P {
 	Connect(ConnectOptions),
+	Disconnect(DisconnectOptions),
 	SendMessage { target: MessageTarget, message: String },
+	SwitchChannel(ChannelId),
 }
 
 /// A message sent over a websocket connection from the proxy to the frontend.

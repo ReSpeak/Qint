@@ -21,9 +21,9 @@
 	let viewport_height = 0;
 	let mounted;
 	// `true` if `items` is at the start and no more items can be loaded.
-	let isAtStart = true;
+	export let isAtStart = true;
 	// `true` if `items` is at the end and no more items can be loaded.
-	let isAtEnd = false;
+	export let isAtEnd = false;
 
 	// The promise for loading items
 	let loadingStart;
@@ -36,6 +36,24 @@
 
 	// Refresh if something changes
 	$: if (mounted) loadData(viewport_height);
+
+	export function update() {
+		return handle_scroll();
+	}
+
+	export function clear() {
+		items = [];
+		isAtStart = startIsTop;
+		isAtEnd = !startIsTop;
+		// TODO Cancel running promises
+		loadingStart = undefined;
+		loadingEnd = undefined;
+		arrowHidden = true;
+		lastScrollTop = 0;
+		top = 0;
+		bottom = 0;
+		update();
+	}
 
 	async function loadData() {
 		// Load as long as necessary
@@ -104,8 +122,8 @@
 		}
 	}
 
-	async function handle_scroll(event) {
-		const { clientHeight, scrollHeight, scrollTop } = viewport;
+	async function handle_scroll() {
+		let { clientHeight, scrollHeight, scrollTop } = viewport;
 		// Show or hide return button
 		if ((scrollTop < lastScrollTop) == startIsTop
 			&& scrollTop != 0 && scrollHeight - scrollTop != clientHeight) {
@@ -120,6 +138,11 @@
 			return;
 
 		await loadData();
+
+		// Update
+		clientHeight = viewport.clientHeight;
+		scrollHeight = viewport.scrollHeight;
+		scrollTop = viewport.scrollTop;
 
 		// Remove excessive items
 		let i = 0;

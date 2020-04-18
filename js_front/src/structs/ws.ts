@@ -3,23 +3,52 @@ import { MessageTarget } from "./ts";
 // tslint:disable: interface-name
 
 // Out Messages
-export type OutMsg =
-	{ Connect: OMsgConnect }
-	| { SendMessage: OMsgSendMessage };
+export type OutMsg = OMsgConnect | OMsgDisconnect | OMsgSendMessage | OMsgSwitchChannel;
 
 interface OMsgConnect {
-	address: string;
-	name: string;
-	log_commands: boolean;
-	log_packets: boolean;
-	log_udp_packets: boolean;
-	version: string;
+	Connect: {
+		address: string;
+		name: string;
+		log_commands: boolean;
+		log_packets: boolean;
+		log_udp_packets: boolean;
+		version: string;
+	};
+}
+
+export enum Reason {
+	None,
+	Moved,
+	Subscription,
+	LostConnection,
+	KickChannel,
+	KickServer,
+	KickServerBan,
+	Serverstop,
+	Clientdisconnect,
+	Channelupdate,
+	Channeledit,
+	ClientdisconnectServerShutdown,
+}
+
+interface OMsgDisconnect {
+	Disconnect: {
+		reason?: Reason;
+		message?: string;
+	};
 }
 
 interface OMsgSendMessage {
-	target: MessageTarget;
-	message: string;
+	SendMessage: {
+		target: MessageTarget;
+		message: string;
+	};
 }
+
+interface OMsgSwitchChannel {
+	SwitchChannel: number;
+}
+
 
 // In Messages
 export type InMsg = InMsgConnected | InMsgError | InTalkersChanged | InMsgEvents;

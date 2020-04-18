@@ -1,4 +1,5 @@
 <script>
+	import { onMount } from 'svelte';
 	import { get } from "svelte/store";
 	import Message from "./Message.svelte";
 	import Icon from "../ui/Icon.svelte";
@@ -8,13 +9,17 @@
 
 	export let connection;
 	let chat = connection.chat;
+
+	let messageList;
 	let messages;
 	let messagesError;
-	let composingCommand = "";
+	let composingCommand;
+	let messageInput;
 
-	// let selected_chat = connection.selected_chat;
-
-	// connection.selected_chat.subscribe(_ => handleClick());
+	connection.chat.selectedChat.subscribe(_ => {
+		if (messageList)
+			messageList.clear()
+	});
 
 	// function changeChat() {
 	// 	selected_chat.update(s => "user" + Math.random());
@@ -39,6 +44,10 @@
 			messagesError = err;
 		}
 	}
+
+	onMount(() => {
+		messageInput.focus();
+	});
 </script>
 
 <div class="chat">
@@ -54,7 +63,7 @@
 			</article>
 		</div>
 	{:else}
-		<LoadableVirtualList bind:items={messages} loadMore={loadMessages} let:item startIsTop={false}>
+		<LoadableVirtualList bind:this={messageList} bind:items={messages} loadMore={loadMessages} let:item startIsTop={false}>
 			<div slot="loading" class="loader"></div>
 			{#if item instanceof DateSeparator}
 				<div title="{item.date.format('L')}" class="chat-date">
@@ -78,7 +87,7 @@
 		</LoadableVirtualList>
 	{/if}
 	<form class="chat-form" on:submit|preventDefault="{sendMessage}">
-		<textarea bind:value="{chat.composing}" class="input auto_height" name="message"></textarea>
+		<textarea bind:this={messageInput} bind:value="{chat.composing}" class="input auto_height" name="message"></textarea>
 		<button class="button" name="send" type="submit">Send</button>
 	</form>
 	<form class="chat-form" on:submit|preventDefault="{sendCommand}">
