@@ -2,6 +2,7 @@ import { Chat, Message } from "./chat/chat";
 import { OutMsg, InMsg, Reason } from "./structs/ws";
 import { get, writable, Writable } from "svelte/store";
 import { Book, Channel, Server } from "./tree/book";
+import { plugins, loadPlugins } from "./plugins";
 
 export class Connection {
 	public readonly state = writable(ConnectionState.Disconnected);
@@ -14,7 +15,9 @@ export class Connection {
 	private socket?: WebSocket;
 	public guid?: string;
 
-	constructor() { }
+	constructor() {
+		loadPlugins();
+	}
 
 	public reset() {
 		this.state.set(ConnectionState.Disconnected);
@@ -79,6 +82,13 @@ export class Connection {
 
 	private messageHandler(evt: MessageEvent) {
 		const msg = JSON.parse(evt.data) as InMsg;
+		// Plugins
+		for (const plugin of plugins) {
+			if ("handleEvent" in plugin) {
+				plugin.handleEvent(this, msg);
+			}
+		}
+
 		if ("Connected" in msg) {
 			this.state.set(ConnectionState.Connected);
 			this.server = msg.Connected.server;
