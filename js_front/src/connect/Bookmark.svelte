@@ -1,6 +1,6 @@
 <script>
 	import { onMount } from 'svelte';
-	import { BOOKMARK_OFF, BOOKMARK_ON, SERVER_ICON } from "../ui/const";
+	import { BOOKMARK_OFF, BOOKMARK_ON, SERVER_ICON } from "../util";
 
 	export let connect;
 	export let username;

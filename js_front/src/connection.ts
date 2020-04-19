@@ -3,6 +3,7 @@ import { OutMsg, InMsg, Reason } from "./structs/ws";
 import { get, writable, Writable } from "svelte/store";
 import { Book, Channel, Server } from "./tree/book";
 import { plugins, loadPlugins } from "./plugins";
+import { BASE_ADDRESS } from "./util";
 
 export class Connection {
 	public readonly state = writable(ConnectionState.Disconnected);
@@ -21,14 +22,23 @@ export class Connection {
 
 	public reset() {
 		this.state.set(ConnectionState.Disconnected);
-		this.socket?.close();
+		if (this.socket)
+			this.socket.close();
 		this.socket = undefined;
 	}
 
 	public connect(opt: IConnectOptions) {
 		this.error.set(undefined);
 		this.guid = Connection.createUuidV4();
-		this.socket = new WebSocket(`ws://localhost:4422/con/${this.guid}/ws?format=Json`);
+		let path = BASE_ADDRESS;
+		if (!path.startsWith("http"))
+			path = window.location.origin;
+		if (!path.startsWith("http"))
+			throw Error("Failed to get websocket path");
+		// Replace http by ws, so https gets wss
+		path = path.slice(4);
+
+		this.socket = new WebSocket(`ws${path}/con/${this.guid}/ws?format=Json`);
 		this.socket.onopen = () => {
 			this.sendMessage({
 				Connect: {
@@ -65,11 +75,13 @@ export class Connection {
 	}
 
 	public sendMessage(data: OutMsg) {
-		this.socket?.send(JSON.stringify(data));
+		if (this.socket)
+			this.socket.send(JSON.stringify(data));
 	}
 
 	public sendRawMessage(data: string) {
-		this.socket?.send(data);
+		if (this.socket)
+			this.socket.send(data);
 	}
 
 	public disconnect(reason?: Reason, message?: string) {
@@ -112,7 +124,8 @@ export class Connection {
 		} else if ("Error" in msg) {
 			console.warn("Con Error:", msg.Error);
 			if (get(this.state) == ConnectionState.Connecting) {
-				this.socket?.close();
+				if (this.socket)
+					this.socket.close();
 				this.error.set(msg.Error);
 			}
 		} else {

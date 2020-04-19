@@ -6,7 +6,7 @@ Qint allows you to speak with other people over the internet.
 
 ## Dependencies
 - [Rust](https://rust-lang.org), preferred installation method is [rustup](https://rustup.rs)
-- [npm](https://www.npmjs.com)
+- [yarn](https://yarnpkg.com)
 - [SDL2](https://www.libsdl.org), Windows installation guide is [below](#download-sdl2-on-windows)
 - [OpenSSL](https://www.openssl.org) 1.1, on linux only
 - [libopus](https://opus-codec.org), on linux only
@@ -32,10 +32,14 @@ TODO, e.g. install llvm with scoop and set `$env:LIBCLANG_PATH = ""` before buil
 ### Build the frontend
 ```bash
 cd Qint/frontend
-npm run build
-```
+# Install dependencies
+yarn
 
-To check if it builds, you can also run `wasm-pack build --dev --target web`.
+# For the development server
+yarn run dev
+# For builds
+yarn run build
+```
 
 ### Build and start the backend
 ```bash

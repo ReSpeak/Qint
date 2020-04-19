@@ -1,5 +1,14 @@
 export const debug: boolean = true;
 
+export const SERVER_ICON = "server";
+export const CHANNEL_ICON = "chat-outline";
+export const CLIENT_ICON = "account-outline";
+export const BOOKMARK_ON = "star";
+export const BOOKMARK_OFF = "star-outline";
+
+// @ts-ignore
+export const BASE_ADDRESS = "__buildEnv__" === "development" ? "http://localhost:4422" : "";
+
 export async function sleep(timeout: number): Promise<void> {
 	return new Promise(resolve => setTimeout(resolve, timeout));
 }

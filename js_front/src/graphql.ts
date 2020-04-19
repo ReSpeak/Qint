@@ -1,8 +1,9 @@
 import moment from "moment";
 import { Moment } from "moment";
+import { BASE_ADDRESS } from "./util";
 
 export function graphql(query: string, variables: any = undefined): Promise<any> {
-	return fetch("http://localhost:4422/db", {
+	return fetch(`${BASE_ADDRESS}/db`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ query, variables })

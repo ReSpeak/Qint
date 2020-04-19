@@ -1,6 +1,6 @@
 import hljs from "highlight.js";
 
-export default function hljs_highlight(code: string, lang?: string) {
+export default function hljsHighlight(code: string, lang?: string) {
 	const elem = document.createElement("code");
 	elem.classList.add("hljs");
 
