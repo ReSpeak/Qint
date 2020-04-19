@@ -276,10 +276,13 @@ async fn download_file(
 		let stream = FramedRead::new(file_stream, BytesCodec::new())
 			.map(|r| r.map(web::BytesMut::freeze));
 		// Cache icons and avatars for offline usage
-		if channel.0 == 0 && (data.2.starts_with("icon_")
-			|| data.2.starts_with("avatar_")) {
-			let stream = FileCache::cache_file(&*state, server, channel,
-				&data.2, stream).await;
+		if channel.0 == 0
+			&& (data.2.starts_with("icon_") || data.2.starts_with("avatar_"))
+		{
+			let stream = FileCache::cache_file(
+				&*state, server, channel, &data.2, stream,
+			)
+			.await;
 			HttpResponse::Ok().content_length(len).streaming(stream)
 		} else {
 			HttpResponse::Ok().content_length(len).streaming(stream)
@@ -295,13 +298,16 @@ async fn download_cache_file(
 	state: web::Data<State>, data: web::Path<(String, u64, String)>,
 ) -> impl Responder {
 	let server = match base64::decode(&data.0) {
-		Err(e) => return HttpResponse::BadRequest()
-			.body(format!("Not a valid server uid: {}", e)),
+		Err(e) => {
+			return HttpResponse::BadRequest()
+				.body(format!("Not a valid server uid: {}", e));
+		}
 		Ok(uid) => Uid(uid),
 	};
 	let channel = ChannelId(data.1);
-	if let Some((len, stream)) = FileCache::get_cached_file(
-		&*state, server, channel, &data.2).await {
+	if let Some((len, stream)) =
+		FileCache::get_cached_file(&*state, server, channel, &data.2).await
+	{
 		HttpResponse::Ok().content_length(len).streaming(stream)
 	} else {
 		HttpResponse::NotFound().finish()
@@ -429,14 +435,8 @@ async fn main() -> Result<()> {
 			.service(download_cache_file)
 			.service(db::graphql::db_graphql)
 			.service(db::graphql::graphiql)
-			.service(
-				Files::new("", "../frontend/static/")
-					.index_file("index.html")
-					.default_handler(Files::new(
-						"",
-						"../frontend/dist/",
-					)),
-			)
+			.service(Files::new("", "../js_front/public/")
+				.index_file("index.html"))
 	})
 	.bind(addr)?
 	.run()

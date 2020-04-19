@@ -32,7 +32,10 @@ pub(crate) struct Ws {
 	id: ConnectionId,
 	connection: Option<Connection>,
 	connect_options: Option<messages::ConnectOptions>,
-	file_downloads: HashMap<FileTransferHandle, oneshot::Sender<Result<FileDownloadResult>>>,
+	file_downloads: HashMap<
+		FileTransferHandle,
+		oneshot::Sender<Result<FileDownloadResult>>,
+	>,
 
 	websocket_closed: bool,
 	self_talking: bool,
@@ -157,16 +160,15 @@ impl Ws {
 							}),
 						);
 
-						match self
-							.connection
-							.as_ref()
-							.and_then(|c| c.get_server_key().ok()
-								.and_then(|s| c.get_state().map(|c| (s, c.own_client)).ok()))
-						{
+						match self.connection.as_ref().and_then(|c| {
+							c.get_server_key().ok().and_then(|s| {
+								c.get_state().map(|c| (s, c.own_client)).ok()
+							})
+						}) {
 							Some((server_key, own_client)) => {
 								// Send server id
-								let server = base64::encode(
-									&server_key.to_short());
+								let server =
+									base64::encode(&server_key.to_short());
 								self.send_message(
 									&MessageP2F::Connected {
 										server,
@@ -210,7 +212,9 @@ impl Ws {
 						// Subscribe to all channels
 						if let Some(con) = &mut self.connection {
 							if let Ok(mut data) = con.get_mut_state() {
-								if let Err(e) = data.get_server().set_subscribed(true) {
+								if let Err(e) =
+									data.get_server().set_subscribed(true)
+								{
 									error!(self.logger, "Failed to subscribe to server";
 										"error" => %e);
 								}
@@ -493,13 +497,15 @@ impl Ws {
 						Ok(mut state) => {
 							let own_id = state.own_client;
 							if let Some(mut cl) = state.get_client(&own_id) {
-								if let Err(e) = cl.set_channel(channel)
-								{
+								if let Err(e) = cl.set_channel(channel) {
 									error!(self.logger, "Failed to switch channel";
 										"error" => ?e);
 								}
 							} else {
-								error!(self.logger, "Failed to find own client");
+								error!(
+									self.logger,
+									"Failed to find own client"
+								);
 							}
 						}
 					}
@@ -524,11 +530,17 @@ impl Handler<DownloadFile> for Ws {
 		&mut self, msg: DownloadFile, _: &mut Self::Context,
 	) -> Self::Result {
 		if let Some(con) = &mut self.connection {
-			let uid = match con.get_server_key()
-				.and_then(|k| k.get_uid_no_base64().map_err(|e| e.into())) {
+			let uid = match con
+				.get_server_key()
+				.and_then(|k| k.get_uid_no_base64().map_err(|e| e.into()))
+			{
 				Ok(k) => Uid(k),
-				Err(e) => return Box::pin(futures::future::err(
-					format_err!("Failed to get uid: {}", e))),
+				Err(e) => {
+					return Box::pin(futures::future::err(format_err!(
+						"Failed to get uid: {}",
+						e
+					)));
+				}
 			};
 
 			let handle = match con.download_file(
@@ -538,15 +550,17 @@ impl Handler<DownloadFile> for Ws {
 				None,
 			) {
 				Ok(r) => r,
-				Err(e) => return Box::pin(futures::future::err(
-					format_err!("Failed to download file: {}", e))),
+				Err(e) => {
+					return Box::pin(futures::future::err(format_err!(
+						"Failed to download file: {}",
+						e
+					)));
+				}
 			};
 			let (send, recv) = oneshot::channel();
 			self.file_downloads.insert(handle, send);
 			Box::pin(recv.map(|r| match r {
-				Ok(Ok(r)) => {
-					Ok((r.size, r.stream, uid))
-				}
+				Ok(Ok(r)) => Ok((r.size, r.stream, uid)),
 				Ok(Err(e)) => Err(e),
 				Err(e) => Err(e.into()),
 			}))

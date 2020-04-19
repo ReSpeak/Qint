@@ -4,7 +4,6 @@
 // Icons: There can be collisions as only CRC-32 is used, we may update
 // them at some time when the modification time on the server is newer
 // than on the cached file.
-
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -21,14 +20,13 @@ use crate::State;
 
 /// Files are stored in
 /// `<cache_path>/files/<base32 of server uid>/<channel_id>/<base32 of path>`.
-pub struct FileCache {
-}
+pub struct FileCache {}
 
 /// A struct that writes into files.
 ///
 /// When it is dropped and not the whole content was written, the file is
 /// deleted.
-struct FileWriter<S: Stream<Item=Result<Bytes, std::io::Error>> + Unpin> {
+struct FileWriter<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin> {
 	stream: S,
 	orig_buf: Option<Bytes>,
 	buf: Option<Bytes>,
@@ -44,8 +42,7 @@ impl FileCache {
 
 	fn get_path(
 		state: &State, server: Uid, channel: ChannelId, path: &str,
-	) -> PathBuf
-	{
+	) -> PathBuf {
 		let mut p = state.settings.cache_path.clone();
 		p.push(Self::path_encode(&server.0));
 		p.push(channel.0.to_string());
@@ -55,8 +52,8 @@ impl FileCache {
 
 	pub async fn cache_file(
 		state: &State, server: Uid, channel: ChannelId, path: &str,
-		file: impl Stream<Item=Result<Bytes, std::io::Error>> + Unpin,
-	) -> impl Stream<Item=Result<Bytes, std::io::Error>>
+		file: impl Stream<Item = Result<Bytes, std::io::Error>> + Unpin,
+	) -> impl Stream<Item = Result<Bytes, std::io::Error>>
 	{
 		let path = Self::get_path(state, server, channel, path);
 		if let Err(e) = fs::create_dir_all(&path.parent().unwrap()).await {
@@ -78,8 +75,7 @@ impl FileCache {
 	/// Returns length and stream if the file is cached.
 	pub async fn get_cached_file(
 		state: &State, server: Uid, channel: ChannelId, path: &str,
-	) -> Option<(u64, impl Stream<Item=Result<Bytes, std::io::Error>>)>
-	{
+	) -> Option<(u64, impl Stream<Item = Result<Bytes, std::io::Error>>)> {
 		let path = Self::get_path(state, server, channel, path);
 		let meta = match fs::metadata(&path).await {
 			Ok(r) => r,
@@ -104,7 +100,7 @@ impl FileCache {
 	}
 }
 
-impl<S: Stream<Item=Result<Bytes, std::io::Error>> + Unpin> FileWriter<S> {
+impl<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin> FileWriter<S> {
 	fn new(stream: S, file: fs::File, path: PathBuf) -> Self {
 		Self {
 			stream,
@@ -117,7 +113,9 @@ impl<S: Stream<Item=Result<Bytes, std::io::Error>> + Unpin> FileWriter<S> {
 	}
 }
 
-impl<S: Stream<Item=Result<Bytes, std::io::Error>> + Unpin> Drop for FileWriter<S> {
+impl<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin> Drop
+	for FileWriter<S>
+{
 	fn drop(&mut self) {
 		if !self.finished {
 			self.file = None;
@@ -126,9 +124,13 @@ impl<S: Stream<Item=Result<Bytes, std::io::Error>> + Unpin> Drop for FileWriter<
 	}
 }
 
-impl<S: Stream<Item=Result<Bytes, std::io::Error>> + Unpin> Stream for FileWriter<S> {
+impl<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin> Stream
+	for FileWriter<S>
+{
 	type Item = Result<Bytes, std::io::Error>;
-	fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
+	fn poll_next(
+		mut self: Pin<&mut Self>, cx: &mut Context,
+	) -> Poll<Option<Self::Item>> {
 		loop {
 			let this = &mut *self;
 			while let Some(buf) = &mut this.buf {
@@ -136,7 +138,9 @@ impl<S: Stream<Item=Result<Bytes, std::io::Error>> + Unpin> Stream for FileWrite
 					this.buf = None;
 					break;
 				}
-				match Pin::new(&mut this.file.as_mut().unwrap()).poll_write_buf(cx, buf) {
+				match Pin::new(&mut this.file.as_mut().unwrap())
+					.poll_write_buf(cx, buf)
+				{
 					Poll::Pending => return Poll::Pending,
 					Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e))),
 					Poll::Ready(Ok(_)) => {}

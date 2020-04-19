@@ -245,14 +245,20 @@ impl Chat {
 	async fn messages(
 		&self, state: &State, start_time: Option<NaiveDateTime>,
 		start_id: Option<ID>, before_start: Option<bool>,
-	) -> GResult<Vec<Message>> {
-		let start_id = start_id.map(|i| i.parse::<u64>().map(|i| i as i64))
-			.transpose()?;
+	) -> GResult<Vec<Message>>
+	{
+		let start_id =
+			start_id.map(|i| i.parse::<u64>().map(|i| i as i64)).transpose()?;
 		let start = match (start_time, start_id, before_start) {
 			(Some(t), Some(i), Some(b)) => Some((t, i, b)),
 			(None, None, None) => None,
-			_ => return Err(format_err!("start_time, start_id and before_start \
-				need to be all set or unset").into()),
+			_ => {
+				return Err(format_err!(
+					"start_time, start_id and before_start need to be all set \
+					 or unset"
+				)
+				.into());
+			}
 		};
 		let id = self.0.id;
 		let res = state
@@ -264,7 +270,8 @@ impl Chat {
 					.filter(messages::chat.eq(id))
 					.limit(MESSAGES_LIMIT);
 				let res = if let Some((t, i, true)) = start {
-					query.filter(messages::time.lt(t).and(messages::id.lt(i)))
+					query
+						.filter(messages::time.lt(t).and(messages::id.lt(i)))
 						.order((messages::time.desc(), messages::id.desc()))
 						.load::<models::Message>(&db.con)
 						.map(|mut m| {
@@ -272,11 +279,13 @@ impl Chat {
 							m
 						})
 				} else if let Some((t, i, false)) = start {
-					query.filter(messages::time.gt(t).and(messages::id.gt(i)))
+					query
+						.filter(messages::time.gt(t).and(messages::id.gt(i)))
 						.order((messages::time, messages::id))
 						.load::<models::Message>(&db.con)
 				} else {
-					query.order((messages::time.desc(), messages::id.desc()))
+					query
+						.order((messages::time.desc(), messages::id.desc()))
 						.load::<models::Message>(&db.con)
 						.map(|mut m| {
 							m.reverse();
@@ -408,23 +417,42 @@ impl Message {
 			let res = state
 				.database
 				.send(RunOnDbMsg(move |db| {
-					use schema::{channel_chats, client_chats, server_chats,
-						servers_clients};
+					use schema::{
+						channel_chats, client_chats, server_chats,
+						servers_clients,
+					};
 
-					let query = servers_clients::table.filter(
-						servers_clients::client.eq(id)
-						.and(servers_clients::server.eq_any(
-							channel_chats::table.filter(channel_chats::chat.eq(&chat))
-							.select(channel_chats::server))
-						.or(servers_clients::server.eq_any(
-							client_chats::table.filter(client_chats::chat.eq(&chat))
-							.select(client_chats::server)))
-						.or(servers_clients::server.eq_any(
-							server_chats::table.filter(server_chats::chat.eq(&chat))
-							.select(server_chats::server)))))
+					let query = servers_clients::table
+						.filter(
+							servers_clients::client.eq(id).and(
+								servers_clients::server
+									.eq_any(
+										channel_chats::table
+											.filter(
+												channel_chats::chat.eq(&chat),
+											)
+											.select(channel_chats::server),
+									)
+									.or(servers_clients::server.eq_any(
+										client_chats::table
+											.filter(
+												client_chats::chat.eq(&chat),
+											)
+											.select(client_chats::server),
+									))
+									.or(servers_clients::server.eq_any(
+										server_chats::table
+											.filter(
+												server_chats::chat.eq(&chat),
+											)
+											.select(server_chats::server),
+									)),
+							),
+						)
 						.select(servers_clients::all_columns);
 					GResult::Ok(ServerClient(
-						query.first::<models::ServersClients>(&db.con)?))
+						query.first::<models::ServersClients>(&db.con)?,
+					))
 				}))
 				.await??;
 			Ok(Some(res))
@@ -616,17 +644,25 @@ impl Query {
 		Ok(res)
 	}
 
-	async fn chat(state: &State, typ: GMessageTarget, server: ID, id: Option<ID>) -> GResult<Option<Chat>> {
+	async fn chat(
+		state: &State, typ: GMessageTarget, server: ID, id: Option<ID>,
+	) -> GResult<Option<Chat>> {
 		let server = base64::decode(server.as_bytes())?;
 		let res = state
 			.database
 			.send(RunOnDbMsg(move |db| {
-				use schema::{channel_chats, chats, client_chats, client_pokes, server_chats};
+				use schema::{
+					channel_chats, chats, client_chats, client_pokes,
+					server_chats,
+				};
 
 				let res = match typ {
 					GMessageTarget::Server => {
 						if id.is_some() {
-							return Err(format_err!("Server message target needs no id").into());
+							return Err(format_err!(
+								"Server message target needs no id"
+							)
+							.into());
 						}
 						let query = server_chats::table
 							.filter(server_chats::server.eq(server))
@@ -638,7 +674,10 @@ impl Query {
 						let id = if let Some(id) = id {
 							id.parse::<u64>()? as i64
 						} else {
-							return Err(format_err!("Channel message target needs id").into());
+							return Err(format_err!(
+								"Channel message target needs id"
+							)
+							.into());
 						};
 						let query = channel_chats::table
 							.filter(
@@ -654,7 +693,10 @@ impl Query {
 						let id = if let Some(id) = id {
 							base64::decode(id.as_bytes())?
 						} else {
-							return Err(format_err!("Poke message target needs id").into());
+							return Err(format_err!(
+								"Poke message target needs id"
+							)
+							.into());
 						};
 						let query = client_chats::table
 							.filter(
@@ -670,7 +712,10 @@ impl Query {
 						let id = if let Some(id) = id {
 							base64::decode(id.as_bytes())?
 						} else {
-							return Err(format_err!("Poke message target needs id").into());
+							return Err(format_err!(
+								"Poke message target needs id"
+							)
+							.into());
 						};
 						let query = client_pokes::table
 							.filter(
