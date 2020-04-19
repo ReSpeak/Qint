@@ -8,6 +8,12 @@ export class Book {
 	public clients: Writable<Map<number, Client>> = writable(new Map());
 	public channels: Writable<Map<number, Channel>> = writable(new Map());
 
+	public reset() {
+		this.server.set(new Server());
+		this.clients.set(new Map());
+		this.channels.set(new Map());
+	}
+
 	public addChannel(channel: Channel) {
 		this.channels.update(channels => {
 			if (channels.has(channel.id)) throw Error(`Channel ${channel.id} already exists`);

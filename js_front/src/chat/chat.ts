@@ -8,17 +8,18 @@ import { Channel, Client, GraphQlClient } from "../tree/book";
 
 export class Chat {
 	public readonly selectedChat: Writable<MessageTarget> = writable(MessageTarget.ToServer());
-
-	public readonly messages: Writable<Message[]> = writable([]);
-
+	public readonly unreadCount: Writable<number> = writable(0);
 	public composing: string = "";
-
-	public readonly groupedMessages: Readable<ChatEntries[]>
-		= derived(this.messages, Chat.group_messages);
 
 	constructor(
 		private connection: Connection
 	) { }
+
+	public reset() {
+		this.selectedChat.set(MessageTarget.ToServer());
+		this.unreadCount.set(0);
+		this.composing = "";
+	}
 
 	public selectChannel(channel: Channel) {
 		this.selectedChat.set(MessageTarget.ToChannel(channel.id));

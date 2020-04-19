@@ -22,6 +22,11 @@ export class Connection {
 
 	public reset() {
 		this.state.set(ConnectionState.Disconnected);
+		this.book.reset();
+		this.chat.reset();
+		this.server = undefined;
+		this.ownClient = undefined;
+		this.guid = undefined;
 		if (this.socket)
 			this.socket.close();
 		this.socket = undefined;

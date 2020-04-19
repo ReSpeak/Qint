@@ -1,6 +1,7 @@
 // Broken warning with juniper derive
 #![allow(unused_braces)]
 
+use std::convert::TryInto;
 use std::sync::Arc;
 
 use actix_web::*;
@@ -297,6 +298,26 @@ impl Chat {
 			}))
 			.await??;
 		Ok(res)
+	}
+
+	/// How many messages in this chat were not yet read.
+	async fn unread_count(&self, state: &State) -> GResult<i32> {
+		let id = self.0.id;
+		let res: i64 = state
+			.database
+			.send(RunOnDbMsg(move |db| {
+				use schema::{chats, messages};
+
+				let query = messages::table
+					.inner_join(chats::table)
+					.filter(chats::id.eq(id)
+						.and(messages::time.gt(chats::last_read)))
+					.count();
+
+				query.get_result(&db.con)
+			}))
+			.await??;
+		Ok(res.try_into()?)
 	}
 }
 
@@ -632,7 +653,7 @@ impl Query {
 		let res = state
 			.database
 			.send(RunOnDbMsg(|db| {
-				let query = bookmarks::table.order(bookmarks::last_used);
+				let query = bookmarks::table.order(bookmarks::last_used.desc());
 				let result = query
 					.first::<models::Bookmark>(&db.con)
 					.optional()?
@@ -730,6 +751,21 @@ impl Query {
 				};
 
 				GResult::Ok(res.optional()?.map(Chat))
+			}))
+			.await??;
+		Ok(res)
+	}
+
+	async fn server(state: &State, server: ID) -> GResult<Server> {
+		let server = base64::decode(server.as_bytes())?;
+		let res = state
+			.database
+			.send(RunOnDbMsg(|db| {
+				use schema::servers;
+
+				let query =
+					servers::table.filter(servers::public_key.eq(server));
+				GResult::Ok(Server(query.first::<models::Server>(&db.con)?))
 			}))
 			.await??;
 		Ok(res)
