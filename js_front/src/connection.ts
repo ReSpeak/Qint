@@ -45,6 +45,21 @@ export class Connection {
 
 		this.socket = new WebSocket(`ws${path}/con/${this.guid}/ws?format=Json`);
 		this.socket.onopen = () => {
+			let version;
+			let platform = window.navigator.oscpu.toLowerCase();
+			if (platform.includes("windows")) {
+				version = "Windows_3_X_X__1";
+			} else if (platform.includes("linux")) {
+				version = "Linux_3_X_X";
+			} else if (platform.includes("android")) {
+				version = "Android_3_X_X";
+			} else if (platform.includes("ios")) {
+				version = "iOS_3_X_X";
+			} else if (platform.includes("mac")) {
+				version = "OS_X_3_X_X";
+			} else {
+				version = "Windows_3_X_X__2";
+			}
 			this.sendMessage({
 				Connect: {
 					address: opt.address,
@@ -52,7 +67,7 @@ export class Connection {
 					log_commands: false,
 					log_packets: false,
 					log_udp_packets: false,
-					version: "Linux_5_0_0_test_87"
+					version,
 				}
 			});
 		};

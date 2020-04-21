@@ -134,9 +134,13 @@ export class Chat {
 	}
 
 	public sendMessage() {
+		const target = get(this.selectedChat);
+		if ("Channel" in target)
+			target.Channel = null;
+
 		this.connection.sendMessage({
 			SendMessage: {
-				target: get(this.selectedChat),
+				target,
 				message: this.composing
 			}
 		});
