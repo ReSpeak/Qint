@@ -208,7 +208,8 @@
 
 		const start = i;
 		if (start == rows.length) {
-			clear();
+			if (start != 0)
+				clear();
 			return;
 		}
 
