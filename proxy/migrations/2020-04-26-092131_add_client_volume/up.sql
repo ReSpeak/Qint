@@ -1,0 +1,1 @@
+ALTER TABLE clients ADD volume REAL NOT NULL DEFAULT 1.0;

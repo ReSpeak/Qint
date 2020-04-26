@@ -310,8 +310,11 @@ impl Chat {
 
 				let query = messages::table
 					.inner_join(chats::table)
-					.filter(chats::id.eq(id)
-						.and(messages::time.gt(chats::last_read)))
+					.filter(
+						chats::id
+							.eq(id)
+							.and(messages::time.gt(chats::last_read)),
+					)
 					.count();
 
 				query.get_result(&db.con)

@@ -63,6 +63,7 @@ table! {
 		name -> Text,
 		public_key -> Nullable<Binary>,
 		custom_name -> Nullable<Text>,
+		volume -> Float,
 	}
 }
 
