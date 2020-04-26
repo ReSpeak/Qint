@@ -6,7 +6,7 @@ use std::task::{self, Poll};
 use actix::fut::wrap_future;
 use actix::*;
 use actix_web_actors::ws;
-use anyhow::{bail, format_err, Result};
+use anyhow::{bail, format_err, Error, Result};
 use futures::prelude::*;
 use slog::{debug, error, o, warn, Logger};
 use tokio::net::TcpStream;
@@ -45,17 +45,14 @@ pub(crate) struct Ws {
 /// Polls the connection for events.
 struct ConnectionPoller;
 
+pub(crate) struct GetClientVolumeMsg(pub ClientId);
 pub(crate) struct SetSelfTalkingMsg(pub bool);
 pub(crate) struct TalkersChangedMsg(pub Vec<(ClientId, bool)>);
+pub(crate) struct SaveClientMsg(pub Uid);
 pub(crate) struct SendPacketMsg(pub OutPacket);
 pub(crate) struct DisconnectMsg;
 
 pub(crate) struct DownloadFile {
-	pub channel: ChannelId,
-	pub path: String,
-}
-
-pub(crate) struct UploadFile {
 	pub channel: ChannelId,
 	pub path: String,
 }
@@ -80,11 +77,17 @@ impl Actor for Ws {
 	}
 }
 
+impl Message for GetClientVolumeMsg {
+	type Result = Result<f32>;
+}
 impl Message for SetSelfTalkingMsg {
 	type Result = ();
 }
 impl Message for TalkersChangedMsg {
 	type Result = ();
+}
+impl Message for SaveClientMsg {
+	type Result = Result<()>;
 }
 impl Message for SendPacketMsg {
 	type Result = Result<PacketId>;
@@ -95,9 +98,6 @@ impl Message for DisconnectMsg {
 impl Message for DownloadFile {
 	/// The size of the file and the stream
 	type Result = Result<(u64, TcpStream, Uid)>;
-}
-impl Message for UploadFile {
-	type Result = Result<TcpStream>;
 }
 
 impl Ws {
@@ -195,10 +195,14 @@ impl Ws {
 										})
 										.map(move |r| match r {
 											Ok(Err(e)) => {
-												warn!(logger, "Failed to save connection in database"; "error" => ?e)
+												warn!(logger, "Failed to save \
+													connection in database";
+													"error" => ?e)
 											}
 											Err(e) => {
-												warn!(logger, "Failed to save connection in database"; "error" => ?e)
+												warn!(logger, "Failed to save \
+													connection in database";
+													"error" => ?e)
 											}
 											_ => {}
 										}),
@@ -215,8 +219,8 @@ impl Ws {
 								if let Err(e) =
 									data.get_server().set_subscribed(true)
 								{
-									error!(self.logger, "Failed to subscribe to server";
-										"error" => %e);
+									error!(self.logger, "Failed to subscribe \
+										to server"; "error" => %e);
 								}
 							}
 						}
@@ -232,7 +236,8 @@ impl Ws {
 							data,
 							&events,
 						) {
-							error!(self.logger, "Database failed to handle events"; "error" => ?e);
+							error!(self.logger, "Database failed to handle \
+								events"; "error" => ?e);
 						}
 
 						self.send_message(
@@ -572,17 +577,64 @@ impl Handler<DownloadFile> for Ws {
 	}
 }
 
-impl Handler<UploadFile> for Ws {
-	type Result = ResponseFuture<Result<TcpStream>>;
+impl Handler<GetClientVolumeMsg> for Ws {
+	type Result = ActorResponse<Self, f32, Error>;
 	fn handle(
-		&mut self, _msg: UploadFile, _: &mut Self::Context,
-	) -> Self::Result {
-		if let Some(_con) = &self.connection {
-			Box::pin(futures::future::err(format_err!("TODO, not implemented")))
+		&mut self, GetClientVolumeMsg(client): GetClientVolumeMsg,
+		_: &mut Self::Context,
+	) -> Self::Result
+	{
+		if let Some(con) = &self.connection {
+			match con.get_state() {
+				Ok(state) => {
+					let uid_fut: Box<
+						dyn ActorFuture<Actor = Self, Output = Result<Vec<u8>>>,
+					>;
+					if let Some(client) = state.clients.get(&client) {
+						uid_fut = Box::new(wrap_future(future::ready(
+							client
+								.uid
+								.as_ref()
+								.map(|u| u.0.clone())
+								.ok_or_else(|| {
+									format_err!("Client has no uid")
+								}),
+						)));
+					} else {
+						// TODO Get uid from server
+						uid_fut = Box::new(wrap_future(future::err(
+							format_err!("Not yet implemented"),
+						)));
+					}
+					// Get volume from db
+					ActorResponse::r#async(
+						uid_fut
+							.then(|uid, this, _| match uid {
+								Ok(uid) => wrap_future(
+									this.state
+										.database
+										.send(db::GetClientVolumeMsg(uid))
+										.map_err(|e| e.into())
+										.left_future(),
+								),
+								Err(e) => {
+									wrap_future(future::err(e).right_future())
+								}
+							})
+							.map(|res, _, _| match res {
+								Ok(Ok(Some(v))) => Ok(v),
+								Ok(Ok(None)) => Ok(1.0),
+								Ok(Err(e)) => Err(e),
+								Err(e) => Err(e),
+							}),
+					)
+				}
+				Err(e) => ActorResponse::r#async(wrap_future(future::err(e))),
+			}
 		} else {
-			Box::pin(futures::future::err(format_err!(
+			ActorResponse::r#async(wrap_future(future::err(format_err!(
 				"Connection does not exist"
-			)))
+			))))
 		}
 	}
 }
@@ -611,6 +663,32 @@ impl Handler<TalkersChangedMsg> for Ws {
 		if self.talkers != talkers {
 			self.talkers = talkers;
 			self.update_talkers(ctx);
+		}
+	}
+}
+
+impl Handler<SaveClientMsg> for Ws {
+	type Result = Result<()>;
+	fn handle(
+		&mut self, SaveClientMsg(uid): SaveClientMsg, _: &mut Self::Context,
+	) -> Self::Result {
+		if let Some(con) = &mut self.connection {
+			let state = con.get_state()?;
+			if let Some(client) =
+				state.clients.values().find(|c| c.uid.as_ref() == Some(&uid))
+			{
+				db::DbHandler::create_client(
+					&self.state.database,
+					&self.logger,
+					con,
+					state,
+					client,
+				)
+			} else {
+				bail!("Client not found")
+			}
+		} else {
+			bail!("Connection does not exist")
 		}
 	}
 }

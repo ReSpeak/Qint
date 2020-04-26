@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -6,13 +6,13 @@ use actix::*;
 use anyhow::Result;
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired, AudioStatus};
 use sdl2::AudioSubsystem;
-use slog::{debug, error, o, Logger};
+use slog::{debug, error, o, warn, Logger};
 use tokio::runtime::Handle;
 use tsclientlib::ClientId;
 use tsproto_packets::packets::InAudioBuf;
 
 use super::*;
-use crate::websocket::{TalkersChangedMsg, Ws};
+use crate::websocket::{GetClientVolumeMsg, TalkersChangedMsg, Ws};
 use crate::ConnectionId;
 
 type Id = (ConnectionId, ClientId);
@@ -118,11 +118,54 @@ impl TsToAudio {
 impl Handler<PlayMsg> for TsToAudio {
 	type Result = Result<()>;
 	fn handle(
-		&mut self, PlayMsg(id, packet): PlayMsg, _: &mut Self::Context,
+		&mut self, PlayMsg(id, packet): PlayMsg, ctx: &mut Self::Context,
 	) -> Self::Result {
 		if let Some(device) = &self.device {
 			let mut data = self.data.lock().unwrap();
-			data.handle_packet(id, packet)?;
+			if let Some(new_id) = data.handle_packet(id, packet)? {
+				let cons = self.connections.lock().unwrap();
+				let talkers = data
+					.get_queues()
+					.iter()
+					.filter_map(|((con, client), queue)| {
+						if *con == new_id.0 {
+							Some((*client, queue.is_whispering()))
+						} else {
+							None
+						}
+					})
+					.collect();
+				if let Some(con) = cons.get(&new_id.0) {
+					actix::spawn(
+						con.send(TalkersChangedMsg(talkers)).map(|_| ()),
+					);
+
+					// Get the volume of the new talker
+					ctx.spawn(
+						fut::wrap_future(
+							con.send(GetClientVolumeMsg(new_id.1)),
+						)
+						.map(move |v, this: &mut Self, _| match v {
+							Ok(Ok(v)) => {
+								let mut data = this.data.lock().unwrap();
+								if let Some(q) =
+									data.get_mut_queues().get_mut(&new_id)
+								{
+									q.volume = v;
+								}
+							}
+							Ok(Err(e)) => {
+								warn!(this.logger, "Failed to get volume for \
+									client"; "error" => %e);
+							}
+							Err(e) => {
+								warn!(this.logger, "Failed to get volume for \
+									client"; "error" => %e);
+							}
+						}),
+					);
+				}
+			}
 
 			if device.status() == AudioStatus::Paused {
 				debug!(self.logger, "Resuming playback");
@@ -142,25 +185,28 @@ impl AudioCallback for SdlCallback {
 		}
 
 		let mut data = self.data.lock().unwrap();
-		data.fill_buffer(buffer);
-		if data.talkers_changed() {
-			// Message all connections, this could be more optimal by messaging
-			// only connections that need it
+		let removed = data.fill_buffer(buffer);
+		let message_connections =
+			removed.iter().map(|i| i.0).collect::<HashSet<_>>();
+		if !message_connections.is_empty() {
 			let cons = self.connections.lock().unwrap();
-			for (con_id, con) in cons.iter() {
+			for c in message_connections {
 				let talkers = data
 					.get_queues()
 					.iter()
 					.filter_map(|((con, client), queue)| {
-						if con == con_id {
+						if *con == c {
 							Some((*client, queue.is_whispering()))
 						} else {
 							None
 						}
 					})
 					.collect();
-				self.handle
-					.spawn(con.send(TalkersChangedMsg(talkers)).map(|_| ()));
+				if let Some(con) = cons.get(&c) {
+					self.handle.spawn(
+						con.send(TalkersChangedMsg(talkers)).map(|_| ()),
+					);
+				}
 			}
 		}
 	}

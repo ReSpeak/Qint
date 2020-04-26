@@ -16,6 +16,7 @@ pub struct Client {
 	pub name: String,
 	pub public_key: Option<Vec<u8>>,
 	pub custom_name: Option<String>,
+	pub volume: f32,
 }
 
 #[derive(Insertable)]

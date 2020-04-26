@@ -11,11 +11,13 @@ use diesel::prelude::*;
 use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
 use juniper::{EmptySubscription, FieldError, RootNode, ID};
+use tsclientlib::Uid;
 
 use super::models::MessageStatus;
 use super::schema::bookmarks;
 use super::{models, schema, RunOnDbMsg};
-use crate::State;
+use crate::websocket::SaveClientMsg;
+use crate::{ConnectionId, State};
 
 const BOOKMARKS_LIMIT: i64 = 20;
 const MESSAGES_LIMIT: i64 = 50;
@@ -337,6 +339,7 @@ impl Client {
 	fn custom_name(&self) -> Option<&str> {
 		self.0.custom_name.as_ref().map(|s| s.as_str())
 	}
+	fn volume(&self) -> f64 { self.0.volume as f64 }
 
 	/// The chat with this client on the specified server.
 	async fn chat(&self, state: &State, server: ID) -> GResult<Option<Chat>> {
@@ -783,6 +786,8 @@ impl Mutation {
 		let res = state
 			.database
 			.send(RunOnDbMsg(|db| {
+				use schema::channels;
+
 				let id: i64 = update.id.parse::<u64>()? as i64;
 
 				let ch = if let Some(c) = update.channel {
@@ -801,7 +806,6 @@ impl Mutation {
 					};
 
 					// Search channel
-					use schema::channels;
 					let ch_id: i64 = c.parse::<u64>()? as i64;
 					let res = channels::table
 						.filter(
@@ -839,6 +843,46 @@ impl Mutation {
 
 		if res == 0 {
 			Err(format_err!("Bookmark not found"))?;
+		}
+
+		Ok(Void::new())
+	}
+
+	/// Connection is the websocket uuid, client is the client uid.
+	async fn set_client_volume(
+		state: &State, connection: ID, client: ID, volume: f64,
+	) -> GResult<Void> {
+		let connection = connection.parse()?;
+		let client = base64::decode(client.as_bytes())?;
+
+		let con;
+		{
+			let cons = state.connections.lock().unwrap();
+			if let Some(c) = cons.get(&ConnectionId(connection)) {
+				con = c.clone();
+			} else {
+				return Err(format_err!("Connection not found").into());
+			}
+		}
+		con.send(SaveClientMsg(Uid(client.clone()))).await??;
+
+		let res = state
+			.database
+			.send(RunOnDbMsg(move |db| {
+				use schema::clients;
+
+				let res = diesel::update(
+					clients::table.filter(clients::uid.eq(&client)),
+				)
+				.set(clients::volume.eq(volume as f32))
+				.execute(&db.con)?;
+
+				GResult::Ok(res)
+			}))
+			.await??;
+
+		if res == 0 {
+			Err(format_err!("Client not found"))?;
 		}
 
 		Ok(Void::new())

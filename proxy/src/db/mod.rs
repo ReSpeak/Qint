@@ -45,6 +45,8 @@ struct EventHandler<'a> {
 /// Identity id, `true` will create a new identity if this id does not exist.
 #[derive(Clone, Debug)]
 pub struct GetIdentityMsg(pub u64, pub bool);
+#[derive(Clone, Debug)]
+pub struct GetClientVolumeMsg(pub Vec<u8>);
 pub struct UpdateIdentityMsg(pub Identity);
 struct RunOnDbMsg<
 	I: 'static,
@@ -97,6 +99,9 @@ impl Actor for DbHandler {
 
 impl Message for GetIdentityMsg {
 	type Result = Result<Identity>;
+}
+impl Message for GetClientVolumeMsg {
+	type Result = Result<Option<f32>>;
 }
 impl<I: 'static, E: 'static, F: FnOnce(&mut DbHandler) -> result::Result<I, E>>
 	Message for RunOnDbMsg<I, E, F>
@@ -312,6 +317,20 @@ impl Handler<GetIdentityMsg> for DbHandler {
 				Ok(identity)
 			}
 		}
+	}
+}
+
+impl Handler<GetClientVolumeMsg> for DbHandler {
+	type Result = Result<Option<f32>>;
+	fn handle(
+		&mut self, msg: GetClientVolumeMsg, _: &mut Self::Context,
+	) -> Self::Result {
+		use schema::clients::dsl::*;
+		Ok(clients
+			.find(&msg.0)
+			.select(volume)
+			.first::<f32>(&self.con)
+			.optional()?)
 	}
 }
 
@@ -606,6 +625,15 @@ impl DbHandler {
 		}
 		Ok(())
 	}
+
+	pub fn create_client(
+		db: &Addr<Self>, logger: &Logger, con: &TsConnection, data: &TsData,
+		client: &Client,
+	) -> Result<()>
+	{
+		let handler = EventHandler::new(db, logger, con, data);
+		handler.handle_add_client(client, true)
+	}
 }
 
 impl<'a> EventHandler<'a> {
@@ -746,7 +774,9 @@ impl<'a> EventHandler<'a> {
 		}
 	}
 
-	fn handle_add_client(&self, client: &Client, create: bool) -> Result<()> {
+	pub fn handle_add_client(
+		&self, client: &Client, create: bool,
+	) -> Result<()> {
 		let client_uid = match &client.uid {
 			Some(client_uid) => client_uid.0.clone(),
 			None => bail!("Client has no uid"),
