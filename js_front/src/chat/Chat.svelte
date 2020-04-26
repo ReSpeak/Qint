@@ -13,26 +13,21 @@
 	let messageList;
 	let messages;
 	let messagesError;
-	let composingCommand;
 	let messageInput;
 
-	connection.chat.selectedChat.subscribe(_ => {
+	chat.selectedChat.subscribe(_ => {
 		if (messageList)
 			messageList.clear()
 	});
 
-	// function changeChat() {
-	// 	selected_chat.update(s => "user" + Math.random());
-	// }
+	chat.unreadCount.subscribe(_ => {
+		if (messageList)
+			messageList.newItems(false);
+	});
 
 	function sendMessage(e) {
 		chat.sendMessage();
 		chat.composing = "";
-	}
-
-	function sendCommand(e) {
-		connection.sendRawMessage(composingCommand);
-		composingCommand = "";
 	}
 
 	async function loadMessages(fromStart) {
@@ -89,10 +84,6 @@
 	<form class="chat-form" on:submit|preventDefault="{sendMessage}">
 		<textarea bind:this={messageInput} bind:value="{chat.composing}" class="input auto_height" name="message"></textarea>
 		<button class="button" name="send" type="submit">Send</button>
-	</form>
-	<form class="chat-form" on:submit|preventDefault="{sendCommand}">
-		<textarea bind:value="{composingCommand}" class="input auto_height" name="message" type="text"></textarea>
-		<button class="button" name="send" type="submit">Send Command</button>
 	</form>
 </div>
 

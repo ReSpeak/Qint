@@ -68,7 +68,6 @@
 		box-shadow: none;
 		display: grid;
 		justify-content: stretch;
-		grid-template-columns: 2.5em auto;
 		width: 100%;
 		height: 100%;
 	}

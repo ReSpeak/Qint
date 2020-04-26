@@ -5,7 +5,6 @@
 	let book = connection.book;
 	let server = book.server;
 	let children = $server.children;
-	console.log($children);
 	let selected_server = true; // TODO
 	let icon = ""; // TODO
 </script>

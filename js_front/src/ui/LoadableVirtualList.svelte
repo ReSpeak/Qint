@@ -1,6 +1,6 @@
 <script>
 	// Based on https://github.com/sveltejs/svelte-virtual-list/blob/master/VirtualList.svelte
-	import { onMount, tick } from 'svelte';
+	import { afterUpdate, onMount, tick } from 'svelte';
 
 	// props
 	// `true` if the view starts at the top and scrolls to the bottom,
@@ -28,6 +28,7 @@
 	// The promise for loading items
 	let loadingStart;
 	let loadingEnd;
+	let isLoading = false;
 	let arrowHidden = true;
 	let lastScrollTop = 0;
 
@@ -55,47 +56,80 @@
 		update();
 	}
 
+	// There are new items available
+	export async function newItems(atStart) {
+		// If the view is fully scrolled to the end and we need to scroll after updating
+		let awayFromBorder;
+		if (atStart && isAtStart) {
+			isAtStart = false;
+			awayFromBorder = viewport.scrollTop == 0;
+		} else if (!atStart && isAtEnd) {
+			isAtEnd = false;
+			awayFromBorder = viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop;
+		} else {
+			// Nothing to do
+			return;
+		}
+		if (awayFromBorder > viewport.clientHeight * 2) {
+			return;
+		}
+
+		await loadData();
+		if (awayFromBorder == 0) {
+			if (atStart)
+				viewport.scrollTo(0, 0);
+			else
+				viewport.scrollTo(0, viewport.scrollHeight - viewport.clientHeight);
+		}
+	}
+
 	async function loadData() {
+		// Already loading
+		if (isLoading)
+			return;
+		isLoading = true;
+		await tick(); // wait until the DOM is up to date
+		if (!viewport)
+			return;
+
 		// Load as long as necessary
 		while (true) {
-			await tick(); // wait until the DOM is up to date
-
-			if (items.length >= maxItems)
+			if (items.length >= maxItems) {
+				isLoading = false;
 				return;
-			// Already loading
-			if (loadingStart || loadingEnd)
-				return;
+			}
 
-			const { scrollTop } = viewport;
 			// Invisible content around the viewport
-			const content_buffer_start = scrollTop - top;
-			const content_buffer_end = Math.max(0, contents.offsetHeight - scrollTop - viewport_height - bottom);
+			const content_buffer_start = viewport.scrollTop - top;
+			const content_buffer_end = Math.max(0, viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight - bottom);
 
 			// Check if we need to load more
-			if (!isAtStart && content_buffer_start < viewport_height) {
+			if (!isAtStart && content_buffer_start < viewport.clientHeight) {
 				loadingStart = loadMore(true).finally(() => loadingStart = undefined);
 				const newItems = await loadingStart;
 				if (newItems) {
 					items = [...newItems, ...items];
+					const oldHeight = contents.offsetHeight;
+					console.log("0", viewport.scrollTop, viewport.scrollHeight, viewport.clientHeight, oldHeight);
 
 					// Prevent jumping
 					await tick();
 
-					let new_height = 0;
-					for (let i = 0; i < newItems.length; i++)
-						new_height += rows[i].offsetHeight;
+					let new_height = contents.offsetHeight - oldHeight;
+					console.log("1", viewport.scrollTop, viewport.scrollHeight, viewport.clientHeight);
 
 					let rest = 0;
 					if (new_height > top)
 						rest = new_height - top;
 					top = Math.max(0, top - new_height);
 					// TODO Stutters here sometimes because we interupt the smooth scrolling
-					viewport.scrollTo(0, scrollTop + rest);
+					viewport.scrollTo(0, viewport.scrollTop + rest);
+					console.log("2", viewport.scrollTop, viewport.scrollHeight, viewport.clientHeight);
 				} else {
 					isAtStart = true;
 					top = 0;
 				}
-			} else if (!isAtEnd && content_buffer_end < viewport_height) {
+			} else if (!isAtEnd && content_buffer_end < viewport.clientHeight) {
 				loadingEnd = loadMore(false).finally(() => loadingEnd = undefined);
 				const newItems = await loadingEnd;
 				if (newItems) {
@@ -117,87 +151,115 @@
 					bottom = 0;
 				}
 			} else {
+				isLoading = false;
 				return;
 			}
 		}
+		isLoading = false;
+	}
+
+	function getRowTop(i) {
+		let t = -1;
+		const cs = rows[i].children;
+		for (let j = 0; j < cs.length; j++) {
+			const c = cs[j];
+			if (t == -1 || (c.offsetTop != 0 && c.offsetTop < t)) {
+				t = c.offsetTop;
+			}
+		}
+		return t;
 	}
 
 	async function handle_scroll() {
-		let { clientHeight, scrollHeight, scrollTop } = viewport;
+		if (!viewport)
+			return;
 		// Show or hide return button
-		if ((scrollTop < lastScrollTop) == startIsTop
-			&& scrollTop != 0 && scrollHeight - scrollTop != clientHeight) {
+		if ((viewport.scrollTop < lastScrollTop) == startIsTop
+			&& viewport.scrollTop != 0 && viewport.scrollHeight - viewport.scrollTop != viewport.clientHeight) {
 			arrowHidden = false;
 		} else {
 			arrowHidden = true;
 		}
-		lastScrollTop = scrollTop;
+		lastScrollTop = viewport.scrollTop;
 
 		// Already loading, update nothing
-		if (loadingStart || loadingEnd)
+		if (isLoading)
 			return;
 
 		await loadData();
 
-		// Update
-		clientHeight = viewport.clientHeight;
-		scrollHeight = viewport.scrollHeight;
-		scrollTop = viewport.scrollTop;
+		if (rows.length != items.length) {
+			console.error("Should have the same amount of rows as items", rows, items);
+			return;
+		}
 
 		// Remove excessive items
 		let i = 0;
 		let y = 0;
-		const maxTop = scrollTop - top - 2 * viewport_height;
+		const constOffset = rows.length > 0 ? getRowTop(0) : 0;
+		const maxTop = viewport.scrollTop - constOffset - 2 * viewport.clientHeight;
 
-		while (i < items.length) {
-			const row_height = rows[i].offsetHeight;
-			if (y + row_height >= maxTop)
+		// Could be binary search
+		while (i < rows.length) {
+			if (getRowTop(i) >= maxTop)
 				break;
-
-			y += row_height;
 			i += 1;
 		}
 
 		const start = i;
-		top += y;
-
-		const minTop = scrollTop - top + 3 * viewport_height;
-		while (i < items.length) {
-			y += rows[i].offsetHeight;
-			i += 1;
-
-			if (y > minTop)
-				break;
+		if (start == rows.length) {
+			clear();
+			return;
 		}
 
-		const end = i + 1;
-		let rest = 0;
-		while (i < items.length) {
-			rest += rows[i].offsetHeight;
+		top = getRowTop(start) - constOffset;
+
+		const minTop = viewport.scrollTop + 3 * viewport.clientHeight;
+		while (i < rows.length) {
+			if (getRowTop(i) > minTop)
+				break;
 			i += 1;
+		}
+
+		const end = i;
+		let rest = 0;
+		if (rows.length > 0 && end < rows.length) {
+			const oldEnd = getRowTop(rows.length - 1) + rows[rows.length - 1].offsetHeight;
+			const newEnd = getRowTop(end) + rows[end].offsetHeight
+			rest = oldEnd - newEnd;
 		}
 
 		// Clamp top and bottom
-		const maxSize = 50 * viewport_height;
+		const maxSize = 50 * viewport.clientHeight;
 		bottom = Math.min(bottom + rest, maxSize);
 		if (top > maxSize) {
 			rest = top - maxSize;
 			top = maxSize;
-			viewport.scrollTo(0, scrollTop - rest);
+			viewport.scrollTo(0, viewport.scrollTop - rest);
 		}
 
 		if (start > 0)
 			isAtStart = false;
-		if (end < items.length)
+		if (end < rows.length)
 			isAtEnd = false;
-		items = items.slice(start, end);
+		if (start != 0 || end != rows.length) {
+			console.log("slice", start, end, rows.length, top, bottom);
+			items = items.slice(start, end);
+		}
 	}
 
 	function scrollReturn() {
-		if (startIsTop)
-			viewport.scrollTo(0, 0);
-		else
-			viewport.scrollTo(0, viewport.scrollHeight - viewport.clientHeight);
+		if (startIsTop) {
+			if (isAtStart)
+				viewport.scrollTo(0, 0);
+			else
+				clear();
+		} else {
+			if (isAtEnd)
+				viewport.scrollTo(0, viewport.scrollHeight - viewport.clientHeight);
+			else
+				clear();
+		}
 	}
 
 	// trigger initial refresh
@@ -226,7 +288,9 @@
 		style="padding-top: {top}px; padding-bottom: {bottom}px;"
 	>
 		{#each items as item}
-			<slot {item}>Missing template</slot>
+			<svelte-virtual-list-item>
+				<slot {item}>Missing template</slot>
+			</svelte-virtual-list-item>
 		{/each}
 	</svelte-virtual-list-contents>
 	{#if loadingEnd}
@@ -246,9 +310,22 @@
 	}
 
 	svelte-virtual-list-viewport {
-		display: block;
+		display: grid;
+		align-items: end;
 		position: relative;
 		overflow-y: auto;
+	}
+
+	svelte-virtual-list-viewport :global(object) {
+		display: none !important;
+	}
+
+	svelte-virtual-list-contents {
+		display: table-cell;
+	}
+
+	svelte-virtual-list-item {
+		display: contents;
 	}
 
 	.arrow-down, .arrow-up {

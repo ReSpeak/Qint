@@ -46,7 +46,7 @@ export class Connection {
 		this.socket = new WebSocket(`ws${path}/con/${this.guid}/ws?format=Json`);
 		this.socket.onopen = () => {
 			let version;
-			let platform = window.navigator.oscpu.toLowerCase();
+			let platform = (window.navigator.oscpu || window.navigator.userAgent).toLowerCase();
 			if (platform.includes("windows")) {
 				version = "Windows_3_X_X__1";
 			} else if (platform.includes("linux")) {
@@ -131,7 +131,7 @@ export class Connection {
 					console.log(tsevt);
 					if (tsevt === "ChannelListFinished") {
 					} else if ("Message" in tsevt) {
-						// TODO Update chat
+						this.chat.unreadCount.update(c => c + 1);
 					} else {
 						this.book.messageHandler(tsevt);
 					}
