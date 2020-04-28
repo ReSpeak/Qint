@@ -69,24 +69,6 @@
 			</span>
 		</button>
 		<Server {connection} />
-		<div class="menu">
-			<ul class="menu-list">
-				<li>
-					<ul class="menu-list">
-						<li>Channel</li>
-						<li>Channel</li>
-						<li>Channel</li>
-						<li>Channel</li>
-						<li>Channel</li>
-						<li>Channel</li>
-						<li>Channel</li>
-						<li>Channel</li>
-						<li>Channel</li>
-						<li>Channel</li>
-					</ul>
-				</li>
-			</ul>
-		</div>
 
 		<button class="entry-expand button chats-header">
 			<span class="entry-expand">
@@ -99,13 +81,6 @@
 					<div class="channel-line">
 					</div>
 					<ul class="menu-list">
-						<li>User</li>
-						<li>User</li>
-						<li>User</li>
-						<li>User</li>
-						<li>User</li>
-						<li>User</li>
-						<li>User</li>
 						<li>User</li>
 						<li>User</li>
 						<li>User</li>

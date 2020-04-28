@@ -50,6 +50,7 @@ pub(crate) struct SetSelfTalkingMsg(pub bool);
 pub(crate) struct TalkersChangedMsg(pub Vec<(ClientId, bool)>);
 pub(crate) struct SaveClientMsg(pub Uid);
 pub(crate) struct SendPacketMsg(pub OutPacket);
+pub(crate) struct SetVolumeMsg(pub Uid, pub f32);
 pub(crate) struct DisconnectMsg;
 
 pub(crate) struct DownloadFile {
@@ -92,6 +93,9 @@ impl Message for SaveClientMsg {
 impl Message for SendPacketMsg {
 	type Result = Result<PacketId>;
 }
+impl Message for SetVolumeMsg {
+	type Result = ();
+}
 impl Message for DisconnectMsg {
 	type Result = ();
 }
@@ -132,6 +136,23 @@ impl Ws {
 			}
 		}
 		self.send_message(&MessageP2F::TalkersChanged(Vec::new()), ctx);
+	}
+
+	fn send_to_audio<T: Message<Result = Result<()>> + Send + 'static>(
+		&self, msg: T,
+	) where audio::ts_to_audio::TsToAudio: Handler<T> {
+		let logger = self.logger.clone();
+		actix::spawn(self.state.audio_data.ts2a.send(msg).map(
+			move |r| match r {
+				Ok(Ok(())) => {}
+				Ok(Err(e)) => {
+					debug!(logger, "Audio error"; "error" => %e);
+				}
+				Err(_) => {
+					warn!(logger, "Failed to send audio to handler");
+				}
+			},
+		));
 	}
 
 	fn handle_event(
@@ -263,25 +284,7 @@ impl Ws {
 					),
 				});
 				let id = (self.id, from);
-				let logger = self.logger.clone();
-				actix::spawn(
-					self.state
-						.audio_data
-						.ts2a
-						.send(audio::ts_to_audio::PlayMsg(id, audio))
-						.map(move |r| match r {
-							Ok(Ok(())) => {}
-							Ok(Err(e)) => {
-								debug!(logger, "Audio error"; "error" => %e);
-							}
-							Err(_) => {
-								warn!(
-									logger,
-									"Failed to send audio to handler"
-								);
-							}
-						}),
-				);
+				self.send_to_audio(audio::ts_to_audio::PlayMsg(id, audio));
 			}
 			TsStreamItem::IdentityLevelIncreased => {
 				if let Some(con) = &self.connection {
@@ -702,6 +705,32 @@ impl Handler<SendPacketMsg> for Ws {
 			con.get_tsproto_client_mut()?.send_packet(packet)
 		} else {
 			bail!("Connection does not exist")
+		}
+	}
+}
+
+impl Handler<SetVolumeMsg> for Ws {
+	type Result = ();
+	fn handle(
+		&mut self, SetVolumeMsg(client, volume): SetVolumeMsg,
+		_: &mut Self::Context,
+	) -> Self::Result
+	{
+		if let Some(con) = &self.connection {
+			if let Ok(state) = con.get_state() {
+				for c in state.clients.values() {
+					if c.uid.as_ref() == Some(&client) {
+						let id = (self.id, c.id);
+						self.send_to_audio(audio::ts_to_audio::SetVolumeMsg(
+							id, volume,
+						));
+					}
+				}
+			} else {
+				error!(self.logger, "Connection is not connected")
+			}
+		} else {
+			error!(self.logger, "Connection does not exist")
 		}
 	}
 }

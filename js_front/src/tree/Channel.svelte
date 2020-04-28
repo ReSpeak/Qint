@@ -13,6 +13,7 @@
 	let selectedChat = connection.chat.selectedChat;
 
 	let collapsed = false;
+	let hovered = false;
 	// Update if a client moves in or out
 	$: ownClient = updateOwnClient($children);
 	$: selectedChannel = "Channel" in $selectedChat && $selectedChat.Channel === channel.id;
@@ -35,6 +36,15 @@
 		connection.chat.selectChannel(channel);
 	}
 
+	function leave(event) {
+		if (event.relatedTarget) {
+			if (div.contains(event.relatedTarget)) {
+				return;
+			}
+		}
+		hovered = false;
+	}
+
 	afterUpdate(() => {
 		flash(div);
 	});
@@ -46,6 +56,7 @@
 		class="nameContainer"
 		class:ownClient
 		class:selectedChannel
+		on:mouseover={() => hovered = true} on:mouseout={leave}
 	>
 		<button class="button" on:click={() => collapsed = !collapsed} class:invisible={$children.length == 0}>
 			<Icon name="chevron-right{collapsed ? '' : ' mdi-rotate-90'}" />
@@ -54,6 +65,12 @@
 			<ChannelIcon {channel} {connection} />
 			<span>{channel.name}</span>
 		</button>
+		{#if hovered}
+			<div class="hover menu" style="top: {div.getBoundingClientRect().top}px;">
+				<div class="corner"></div>
+				{channel.name}
+			</div>
+		{/if}
 	</div>
 	<ul class="menu-list" class:collapsed>
 		{#each $children as child}
@@ -72,7 +89,6 @@
 		border: none;
 		padding: 0.3em;
 		height: auto;
-		width: 100%;
 		justify-content: start;
 	}
 	.button:focus {
@@ -87,6 +103,15 @@
 	.nameContainer {
 		display: grid;
 		grid-template-columns: min-content auto;
+	}
+
+	.nameButton {
+		overflow: hidden;
+	}
+
+	.nameButton span {
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.nameButton :global(.icon) {
@@ -107,5 +132,9 @@
 
 	.selectedChannel {
 		background-color: #ddd;
+	}
+
+	.hover {
+		left: calc(var(--channel-tree-width) - 0.5em);
 	}
 </style>

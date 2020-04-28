@@ -1,5 +1,7 @@
 import { Writable, writable, Readable, derived, get } from "svelte/store";
 import { InBookChangeMsg } from "../structs/ws";
+import { graphql } from "../graphql";
+import { Connection } from "../connection";
 
 type ChannelId = number;
 
@@ -178,6 +180,16 @@ export class GraphQlClient {
 		return c;
 	}
 
+	public getUid(): string | undefined {
+		if (!this.uid)
+			return;
+		let res = "";
+		for (let i = 0; i < this.uid.length; i++) {
+			res += String.fromCharCode(this.uid[i]);
+		}
+		return btoa(res);
+	}
+
 	/**
 	 * TeamSpeak uses a different encoding of the uid for fetching avatars.
 	 *
@@ -228,6 +240,7 @@ export class Client extends GraphQlClient implements ITreeNode {
 	public ​​​​talk_power_request?: string;
 	public ​​​​uid!: number[];
 	public unread_messages!: number;
+	public volume?: number;
 
 	// ITreeParent
 	public children: Writable<ITreeNode[]> = writable([]);
@@ -242,6 +255,25 @@ export class Client extends GraphQlClient implements ITreeNode {
 
 	public update(obj: any): void {
 		Object.assign(this, obj);
+	}
+
+	public async updateVolume(connection: Connection, volume: number): Promise<void> {
+		await graphql(`mutation SetClientVolume($connection: ID!, $client: ID!, $volume: Float!) {
+			setClientVolume(connection: $connection, client: $client, volume: $volume) { void }
+		}`, {
+			connection: connection.guid,
+			client: this.getUid(),
+			volume,
+		});
+	}
+
+	public async loadVolume() {
+		const res = await graphql(`query GetClientVolume($client: ID!) {
+			client(uid: $client) { volume }
+		}`, {
+			client: this.getUid(),
+		});
+		this.volume = res.data.client.volume;
 	}
 }
 

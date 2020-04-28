@@ -33,4 +33,27 @@
 	:global(input::placeholder) {
 		color: black;
 	}
+
+
+
+	:global(.hover.menu) {
+		position: fixed;
+		z-index: 3;
+		border: solid 1px #333;
+		border-radius: 0.5em;
+		background: white;
+		padding: 0.5em;
+	}
+
+	:global(.hover.menu .corner) {
+		position: absolute;
+		transform: rotate(45deg);
+		left: -0.3em;
+		top: 0.8em;
+		width: 0.5em;
+		height: 0.5em;
+		border-left: solid 1px #333;
+		border-bottom: solid 1px #333;
+		background: white;
+	}
 </style>

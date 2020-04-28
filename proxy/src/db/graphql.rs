@@ -8,15 +8,17 @@ use actix_web::*;
 use anyhow::format_err;
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
+use futures::prelude::*;
 use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
 use juniper::{EmptySubscription, FieldError, RootNode, ID};
+use slog::error;
 use tsclientlib::Uid;
 
 use super::models::MessageStatus;
 use super::schema::bookmarks;
 use super::{models, schema, RunOnDbMsg};
-use crate::websocket::SaveClientMsg;
+use crate::websocket::{SaveClientMsg, SetVolumeMsg};
 use crate::{ConnectionId, State};
 
 const BOOKMARKS_LIMIT: i64 = 20;
@@ -776,6 +778,21 @@ impl Query {
 			.await??;
 		Ok(res)
 	}
+
+	async fn client(state: &State, uid: ID) -> GResult<Client> {
+		let client = base64::decode(uid.as_bytes())?;
+		let res = state
+			.database
+			.send(RunOnDbMsg(|db| {
+				use schema::clients;
+
+				let query =
+					clients::table.filter(clients::uid.eq(client));
+				GResult::Ok(Client(query.first::<models::Client>(&db.con)?))
+			}))
+			.await??;
+		Ok(res)
+	}
 }
 
 #[juniper::graphql_object(Context = State)]
@@ -854,6 +871,8 @@ impl Mutation {
 	) -> GResult<Void> {
 		let connection = connection.parse()?;
 		let client = base64::decode(client.as_bytes())?;
+		let uid = Uid(client.clone());
+		let volume = volume as f32;
 
 		let con;
 		{
@@ -864,7 +883,15 @@ impl Mutation {
 				return Err(format_err!("Connection not found").into());
 			}
 		}
-		con.send(SaveClientMsg(Uid(client.clone()))).await??;
+		let logger = state.logger.clone();
+		actix::spawn(con.send(SetVolumeMsg(uid.clone(), volume)).map(
+			move |r| {
+				if let Err(e) = r {
+					error!(logger, "Failed to set volume"; "error" => %e);
+				}
+			},
+		));
+		con.send(SaveClientMsg(uid)).await??;
 
 		let res = state
 			.database
@@ -874,7 +901,7 @@ impl Mutation {
 				let res = diesel::update(
 					clients::table.filter(clients::uid.eq(&client)),
 				)
-				.set(clients::volume.eq(volume as f32))
+				.set(clients::volume.eq(volume))
 				.execute(&db.con)?;
 
 				GResult::Ok(res)

@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use actix::*;
-use anyhow::Result;
+use anyhow::{format_err, Result};
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired, AudioStatus};
 use sdl2::AudioSubsystem;
 use slog::{debug, error, o, warn, Logger};
@@ -19,6 +19,7 @@ type Id = (ConnectionId, ClientId);
 type AudioHandler = tsclientlib::audio::AudioHandler<Id>;
 
 pub struct PlayMsg(pub Id, pub InAudioBuf);
+pub struct SetVolumeMsg(pub Id, pub f32);
 
 pub(crate) struct TsToAudio {
 	logger: Logger,
@@ -35,6 +36,9 @@ struct SdlCallback {
 }
 
 impl Message for PlayMsg {
+	type Result = Result<()>;
+}
+impl Message for SetVolumeMsg {
 	type Result = Result<()>;
 }
 
@@ -173,6 +177,23 @@ impl Handler<PlayMsg> for TsToAudio {
 			}
 		}
 		Ok(())
+	}
+}
+
+impl Handler<SetVolumeMsg> for TsToAudio {
+	type Result = Result<()>;
+	fn handle(
+		&mut self, SetVolumeMsg(id, volume): SetVolumeMsg,
+		_: &mut Self::Context,
+	) -> Self::Result
+	{
+		let mut data = self.data.lock().unwrap();
+		if let Some(queue) = data.get_mut_queues().get_mut(&id) {
+			queue.volume = volume;
+			Ok(())
+		} else {
+			Err(format_err!("Client not found"))
+		}
 	}
 }
 
