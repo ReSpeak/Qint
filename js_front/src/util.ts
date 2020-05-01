@@ -40,3 +40,51 @@ export function getDataColor(data: number[] | string) {
 	let varL = 30 + data[3] % 30; // = 45 ± 15 => [30- 60]
 	return `color: hsl(${varH}, ${varS}%, ${varL}%);`;
 }
+
+export class BinarySearchResult {
+	public constructor(
+		public found: boolean,
+		// Index of found element or index where element can be inserted to maintain order
+		public index: number,
+	) {}
+}
+
+/// The comparator function should implement an order consistent with the sort order of the underlying slice,
+/// returning an order code that indicates whether its argument is
+/// less (< 0), equal (0) or greater (> 0) the desired target.
+export function binarySearchBy<T>(list: T[], f: (t: T) => number, start?: number, end?: number): BinarySearchResult {
+	// Code is copied from Rust
+	let base = start || 0;
+	let size = (end === undefined ? list.length : end) - base;
+	if (size === 0)
+		return new BinarySearchResult(false, 0);
+
+	while (size > 1) {
+		let half = Math.floor(size / 2);
+		let mid = base + half;
+		// mid is always in [0, size), that means mid is >= 0 and < size.
+		// mid >= 0: by definition
+		// mid < size: mid = size / 2 + size / 4 + size / 8 ...
+		let cmp = f(list[mid]);
+		if (cmp <= 0)
+			base = mid;
+		size -= half;
+	}
+	// base is always in [0, size) because base <= mid.
+	let cmp = f(list[base]);
+	if (cmp === 0)
+		return new BinarySearchResult(true, base);
+	else
+		return new BinarySearchResult(false, base + (cmp < 0 ? 1 : 0));
+}
+
+export function binarySearchByKey<T, E>(list: T[], elem: E, f: (t: T) => E, start?: number, end?: number): BinarySearchResult {
+	return binarySearchBy(list, t => {
+		let x = f(t);
+		if (elem < x)
+			return 1;
+		if (elem > x)
+			return -1;
+		return 0;
+	}, start, end);
+}

@@ -116,6 +116,7 @@
 
 	.nameButton :global(.icon) {
 		margin-left: 0;
+		flex-shrink: 0;
 	}
 
 	.invisible {

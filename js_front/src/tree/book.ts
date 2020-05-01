@@ -2,7 +2,7 @@ import { Writable, writable, Readable, derived, get } from "svelte/store";
 import { InBookChangeMsg } from "../structs/ws";
 import { graphql } from "../graphql";
 import { Connection } from "../connection";
-import { getDataColor } from "../util";
+import { binarySearchBy, binarySearchByKey, getDataColor } from "../util";
 
 type ChannelId = number;
 
@@ -17,6 +17,85 @@ export class Book {
 		this.channels.set(new Map());
 	}
 
+	private static findChannelStart(list: ITreeNode[]): number {
+		return binarySearchByKey(list, 1, e => e instanceof Client ? 0 : 2).index;
+	}
+
+	private static listString(list: ITreeNode[]): string {
+		let res = "";
+		for (let e of list) {
+			if (e instanceof Client) {
+				res += `${e.name}, `;
+			} else if (e instanceof Channel) {
+				res += `(${e.name}, ${e.id}, ${e.order}), `;
+			} else {
+				console.log(e);
+				res += `${e}, `;
+			}
+		}
+		return res;
+	}
+
+	private static addChannelSorted(list: ITreeNode[], elem: Channel): ITreeNode[] {
+		//console.log("before", Book.listString(list));
+		let start = Book.findChannelStart(list);
+		if (elem.order === 0) {
+			list.splice(start, 0, elem);
+			let lastElem = elem;
+			for (let i = start; i < list.length; i++) {
+				let c = list[i] as Channel;
+				while (c.order === lastElem.id) {
+					list.splice(i, 1);
+					list.splice(start + 1, 0, c);
+					start++;
+					lastElem = c;
+					i++;
+					if (i >= list.length)
+						break;
+					c = list[i] as Channel;
+				}
+			}
+		} else {
+			let inserted;
+			let elems = [elem];
+			let lastElem = elem;
+			for (let i = start; i < list.length; i++) {
+				let c = list[i] as Channel;
+				if (inserted === undefined) {
+					if (c.id === elem.order) {
+						i++;
+						list.splice(i, 0, ...elems);
+						inserted = i;
+					} else {
+						while (c.order === lastElem.id) {
+							list.splice(i, 1);
+							elems.push(c);
+							lastElem = c;
+							if (i >= list.length)
+								break;
+							c = list[i] as Channel;
+						}
+					}
+				} else {
+					while (c.order === lastElem.id) {
+						list.splice(i, 1);
+						list.splice(inserted + 1, 0, c);
+						inserted++;
+						lastElem = c;
+						i++;
+						if (i >= list.length)
+							break;
+						c = list[i] as Channel;
+					}
+				}
+			}
+			if (inserted === undefined)
+				list.splice(list.length, 0, ...elems);
+		}
+		//console.log("after", Book.listString(list));
+		return list;
+	}
+
 	public addChannel(channel: Channel) {
 		this.channels.update(channels => {
 			if (channels.has(channel.id)) throw Error(`Channel ${channel.id} already exists`);
@@ -25,7 +104,7 @@ export class Book {
 			if (channel.parent === 0) parent = get(this.server);
 			else parent = channels.get(channel.parent);
 			if (parent) {
-				parent.children.update(pch => [...pch, channel]); // TODO sorted
+				parent.children.update(pch => Book.addChannelSorted(pch, channel));
 			}
 			return channels;
 		});
@@ -38,7 +117,19 @@ export class Book {
 				console.error(`Cannot update non-existant channel ${id}`);
 				return channels;
 			}
+			const oldParent = channel.parent;
 			channel.update(obj);
+			// Update node in channel tree
+			if ("parent" in obj || "order" in obj) {
+				let parent = this.getChannel(oldParent);
+				if (parent !== undefined) {
+					parent.children.update(pch => { pch.remove_item(channel); return pch; });
+				}
+				parent = this.getChannel(channel.parent);
+				if (parent !== undefined) {
+					parent.children.update(pch => Book.addChannelSorted(pch, channel));
+				}
+			}
 			return channels;
 		});
 	}
@@ -56,12 +147,32 @@ export class Book {
 		});
 	}
 
+	private static addClientSorted(list: ITreeNode[], elem: Client): ITreeNode[] {
+		//console.log("before", Book.listString(list));
+		let end = Book.findChannelStart(list);
+		let i = binarySearchBy(list, t => {
+			let c = t as Client;
+			if (elem.talk_power < c.talk_power)
+				return -1;
+			if (elem.talk_power > c.talk_power)
+				return 1;
+			if (elem.name < c.name)
+				return 1;
+			if (elem.name > c.name)
+				return -1;
+			return elem.id - c.id;
+		}, 0, end).index;
+		list.splice(i, 0, elem);
+		//console.log("after", Book.listString(list));
+		return list;
+	}
+
 	public addClient(client: Client) {
 		this.clients.update(clients => {
 			if (clients.has(client.id)) throw Error(`Client ${client.id} already exists`);
 			clients.set(client.id, client);
 			let parent: ITreeParent = get(this.channels).get(client.channel);
-			parent.children.update(pch => [client, ...pch]); // TODO sorted
+			parent.children.update(pch => Book.addClientSorted(pch, client));
 			return clients;
 		});
 	}
@@ -76,17 +187,17 @@ export class Book {
 			const oldChannel = client.channel;
 			client.update(obj);
 			// Update node in channel tree
-			if ("channel" in obj) {
+			if ("channel" in obj || "talk_power" in obj || "name" in obj) {
 				let parent = this.getChannel(oldChannel);
 				if (parent !== undefined) {
 					parent.children.update(pch => { pch.remove_item(client); return pch; });
 				}
-				parent = this.getChannel(obj.channel);
+				parent = this.getChannel(client.channel);
 				if (parent !== undefined) {
-					parent.children.update(pch => [client, ...pch]);
+					parent.children.update(pch => Book.addClientSorted(pch, client));
 				}
 			} else {
-				const parent = this.getChannel(obj.channel);
+				const parent = this.getChannel(client.channel);
 				if (parent !== undefined) {
 					parent.children.update(pch => pch);
 				}
