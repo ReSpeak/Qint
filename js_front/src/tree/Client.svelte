@@ -8,16 +8,26 @@
 	export let client;
 	let selectedChat = connection.chat.selectedChat;
 	let hovered = false;
-	let volume = 1.0;
+	let newHover = false;
+	// Volume is in dB, https://www.dr-lex.be/info-stuff/volumecontrols.html
+	let minVolume = -30;
+	let maxVolume = +30;
+	let volume = 0;
 
 	$: ownClient = client.id === connection.ownClient;
 	$: selectedClient = "Client" in $selectedChat && $selectedChat.Client === client.id;
 	$: loadVolume(hovered);
 	let div;
 	let volumeUpdated;
+	let volumeTimer;
 
 	function setChat() {
 		connection.chat.selectClient(client);
+	}
+
+	function hover() {
+		hovered = true;
+		newHover = true;
 	}
 
 	function leave(event) {
@@ -26,31 +36,49 @@
 				return;
 			}
 		}
-		hovered = false;
+		newHover = false;
+		setTimeout(() => {
+			if (!newHover)
+				hovered = false;
+		}, 50);
 	}
 
 	async function loadVolume(hovered) {
 		if (hovered) {
 			volumeUpdated = false;
 			await client.loadVolume();
-			if (!volumeUpdated)
-				volume = client.volume;
+			if (!volumeUpdated) {
+				if (client.volume == 0) {
+					volume = minVolume;
+				} else {
+					volume = Math.round(20 * Math.log10(client.volume));
+				}
+			}
 		}
 	}
 
 	function toggleVolume() {
-		if (volume == 0.0) {
-			volume = 1.0;
+		if (volume == minVolume) {
+			volume = 0;
 		} else {
-			volume = 0.0;
+			volume = minVolume;
 		}
 		updateVolume();
 	}
 
 	function updateVolume() {
 		volumeUpdated = true;
-		// TODO This should not be linear
-		client.updateVolume(connection, volume);
+		if (volumeTimer)
+			return;
+		// Update every few ms
+		volumeTimer = setTimeout(() => {
+			volumeTimer = undefined;
+			let vol = 0;
+			if (volume != minVolume) {
+				vol = Math.pow(10, volume / 20);
+			}
+			client.updateVolume(connection, vol);
+		}, 100);
 	}
 
 	afterUpdate(() => {
@@ -63,7 +91,8 @@
 		bind:this={div}
 		class:ownClient
 		class:selectedClient
-		on:mouseover={() => hovered = true} on:mouseout={leave}
+		on:mouseover={hover} on:mouseout={leave}
+		on:focusin={hover} on:focusout={leave}
 	>
 		<button class="button clientButton" on:click={setChat}>
 			<ClientIcon {client} {connection} />
@@ -74,14 +103,14 @@
 				<div class="corner"></div>
 				<div class="name" style={client.getColor()}>{client.name}</div>
 				<button class="volume button" on:click={toggleVolume}>
-					{#if volume == 0.0}
+					{#if volume == minVolume}
 						<Icon name="volume-off" />
 					{:else}
 						<Icon name="volume-high" />
 					{/if}
 				</button>
-				<input type="range" min="0" max="2" step="0.01" bind:value={volume}
-					class="volume slider" title="Volume: {volume}" on:change={updateVolume} />
+				<input type="range" min={minVolume} max={maxVolume} step="2" bind:value={volume}
+					class="volume slider" title="{volume} dB" on:input={updateVolume} />
 			</div>
 		{/if}
 	</div>

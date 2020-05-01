@@ -16,8 +16,10 @@
 	let messageInput;
 
 	chat.selectedChat.subscribe(_ => {
-		if (messageList)
-			messageList.clear()
+		if (messageList) {
+			messageList.clear();
+			messageInput.focus();
+		}
 	});
 
 	chat.unreadCount.subscribe(_ => {
@@ -28,6 +30,7 @@
 	function sendMessage(e) {
 		chat.sendMessage();
 		chat.composing = "";
+		messageInput.focus();
 	}
 
 	async function loadMessages(fromStart) {
