@@ -40,6 +40,17 @@
 		}
 	}
 
+	function getItemClient(item) {
+		if (item.invoker) {
+			return {
+				uid: item.invoker.uid,
+				name: item.invoker.name || item.invokerName,
+			};
+		} else {
+			return { name: item.invokerName };
+		}
+	}
+
 	onMount(() => {
 		messageInput.focus();
 	});
@@ -68,11 +79,8 @@
 				<div class="invoker-icon">
 					<ClientIcon client={item.invoker} {connection} />
 				</div>
-				<div
-					class="invoker-name has-text-weight-bold"
-					style="user_color"
-				>
-					{item.invoker.name || item.invokerName}
+				<div class="invoker-name has-text-weight-bold">
+					<span style={item.getClientColor()}>{item.getClientName()}</span>
 				</div>
 
 				{#each item.messages as message}

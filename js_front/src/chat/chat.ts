@@ -5,6 +5,7 @@ import { Connection } from "../connection";
 import { graphql, toDatetime } from "../graphql";
 import { MessageTarget } from "../structs/ts";
 import { Channel, Client, GraphQlClient } from "../tree/book";
+import { getDataColor } from "../util";
 
 export class Chat {
 	public readonly selectedChat: Writable<MessageTarget> = writable(MessageTarget.ToServer());
@@ -172,4 +173,16 @@ export class GroupedMessages {
 		public invoker: GraphQlClient | undefined,
 		public invokerName: string | undefined,
 	) { }
+
+	public getClientColor() {
+		if (this.invoker && this.invoker.uid) {
+			return getDataColor(this.invoker.uid)
+		} else {
+			return getDataColor(this.getClientName());
+		}
+	}
+
+	public getClientName() {
+		return (this.invoker ? this.invoker.name : undefined) || this.invokerName || "";
+	}
 }

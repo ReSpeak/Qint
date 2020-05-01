@@ -10,7 +10,7 @@
 	let hovered = false;
 	let volume = 1.0;
 
-	let ownClient = client.id === connection.ownClient;
+	$: ownClient = client.id === connection.ownClient;
 	$: selectedClient = "Client" in $selectedChat && $selectedChat.Client === client.id;
 	$: loadVolume(hovered);
 	let div;
@@ -67,12 +67,12 @@
 	>
 		<button class="button clientButton" on:click={setChat}>
 			<ClientIcon {client} {connection} />
-			<span>{client.name}</span>
+			<span style={client.getColor()}>{client.name}</span>
 		</button>
 		{#if hovered}
 			<div class="hover menu" style="top: {div.getBoundingClientRect().top}px;">
 				<div class="corner"></div>
-				<div class="name">{client.name}</div>
+				<div class="name" style={client.getColor()}>{client.name}</div>
 				<button class="volume button" on:click={toggleVolume}>
 					{#if volume == 0.0}
 						<Icon name="volume-off" />
@@ -100,7 +100,7 @@
 		box-shadow: none;
 	}
 
-	.ownClient span {
+	.ownClient :global(span) {
 		font-weight: bold;
 	}
 

@@ -26,3 +26,17 @@ export function flash(element: HTMLElement) {
 		});
 	});
 }
+
+export function getDataColor(data: number[] | string) {
+	if (data.length < 4) {
+		return "";
+	}
+	if (typeof data === "string") {
+		data = [0, 1, 2, 3, 4].map(i => (data as string).charCodeAt(i))
+	}
+
+	let varH = ((data[0] << 8) | data[1]) % 360;
+	let varS = 60 + data[2] % 40; // = 80 ± 20 => [60-100]
+	let varL = 30 + data[3] % 30; // = 45 ± 15 => [30- 60]
+	return `color: hsl(${varH}, ${varS}%, ${varL}%);`;
+}

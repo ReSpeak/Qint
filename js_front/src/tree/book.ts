@@ -2,6 +2,7 @@ import { Writable, writable, Readable, derived, get } from "svelte/store";
 import { InBookChangeMsg } from "../structs/ws";
 import { graphql } from "../graphql";
 import { Connection } from "../connection";
+import { getDataColor } from "../util";
 
 type ChannelId = number;
 
@@ -257,6 +258,14 @@ export class Client extends GraphQlClient implements ITreeNode {
 		Object.assign(this, obj);
 	}
 
+	public getColor() {
+		if (this.uid) {
+			return getDataColor(this.uid)
+		} else {
+			return getDataColor(this.name);
+		}
+	}
+
 	public async updateVolume(connection: Connection, volume: number): Promise<void> {
 		await graphql(`mutation SetClientVolume($connection: ID!, $client: ID!, $volume: Float!) {
 			setClientVolume(connection: $connection, client: $client, volume: $volume) { void }
@@ -315,12 +324,25 @@ export class Channel implements ITreeParent, ITreeNode {
 
 export class Server implements ITreeParent {
 	public name?: string;
+	public public_key?: number[];
+	// Base64 encoded, result from graphql
+	public publicKey?: string;
 
 	// ITreeParent
 	public children: Writable<ITreeNode[]> = writable([]);
 
 	public update(obj: any): void {
 		Object.assign(this, obj);
+	}
+
+	public getColor() {
+		if (this.public_key) {
+			return getDataColor(this.public_key)
+		} else if (this.publicKey) {
+			return getDataColor(atob(this.publicKey))
+		} else {
+			return getDataColor(this.name || "");
+		}
 	}
 }
 

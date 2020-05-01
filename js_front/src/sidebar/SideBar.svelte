@@ -64,7 +64,7 @@
 	<div class="sidebar-content">
 		<button class="entry-expand button" class:selectedServerChat on:click={() => connection.chat.selectServer()}>
 			<ServerIcon {connection} />
-			<span class="expand" class:selected-server={true}>
+			<span class="expand" class:selected-server={true} style={$server.getColor()}>
 				{$server.name}
 			</span>
 		</button>
