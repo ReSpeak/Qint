@@ -70,7 +70,7 @@
 	}
 
 	async function load(from, count) {
-		//await sleep(1000);
+		await sleep(100);
 		let fElems = dummies()
 			.linq()
 			.skip(from)
@@ -101,14 +101,16 @@
 			if (elems.length > hold_count) {
 				await tick(); // await previous change
 				await modifyElems(elems.slice(elems.length - hold_count)); // mofification at start => helper
-				hold_id_start = hold_id_end - newElems.length;
+				hold_id_start = hold_id_end - elems.length;
+				console.log("Holding", hold_id_start, hold_id_end);
 			}
 		} else if (from + newElems.length == hold_id_start) {
 			await modifyElems([...newElems, ...elems]); // mofification at start => helper
 			hold_id_start -= newElems.length;
 			if (elems.length > hold_count) {
 				elems = elems.slice(0, hold_count); // modification is at the end => safe
-				hold_id_end = hold_id_start - newElems.length;
+				hold_id_end = hold_id_start + elems.length;
+				console.log("Holding", hold_id_start, hold_id_end);
 			}
 		} else {
 			// case when jumping to non-adjacent blocks
