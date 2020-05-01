@@ -34,17 +34,31 @@ export class Chat {
 		this.selectedChat.set(MessageTarget.ToServer());
 	}
 
+	private static isSameInvoker(group: GroupedMessages, msg: Message): boolean {
+		if (group.invoker) {
+			if (!msg.invoker)
+				return false;
+			if (group.invoker.uid.length !== msg.invoker.uid.length)
+				return false;
+			for (let i = 0; i < group.invoker.uid.length; i++) {
+				if (group.invoker.uid[i] !== msg.invoker.uid[i])
+					return false;
+			}
+		}
+		return group.invokerName === msg.invokerName;
+	}
+
 	private static group_messages(messages: Message[]): ChatEntries[] {
 		const groups = [];
 		let currentGroup: GroupedMessages | undefined;
 		let currentDate: Moment | undefined;
 		for (const message of messages) {
-			if (!currentGroup || message.invoker !== currentGroup.invoker
-				|| message.invokerName !== currentGroup.invokerName) {
-				if (!currentDate || !currentDate.isSame(message.date, "day") ) {
-					currentDate = message.date;
-					groups.push(new DateSeparator(message.date));
-				}
+			if (!currentDate || !currentDate.isSame(message.date, "day") ) {
+				currentDate = message.date;
+				groups.push(new DateSeparator(message.date));
+				currentGroup = undefined;
+			}
+			if (!currentGroup || !Chat.isSameInvoker(currentGroup, message)) {
 				currentGroup = new GroupedMessages(message.invoker, message.invokerName);
 				groups.push(currentGroup);
 			}
