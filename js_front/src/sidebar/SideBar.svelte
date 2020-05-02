@@ -1,4 +1,5 @@
 <script>
+	import { writable } from "svelte/store";
 	import Server from "../tree/Server.svelte";
 	import ServerIcon from "../ui/ServerIcon.svelte";
 
@@ -7,7 +8,10 @@
 	let selectedChat = connection.chat.selectedChat;
 	let dropdownActive = false;
 	let dropdown;
+	let searchValue = "";
+	let filter = writable("");
 
+	$: filter.set(searchValue);
 	$: selectedServerChat = "Server" in $selectedChat;
 
 	function handleFocus(event) {
@@ -53,7 +57,7 @@
 		</div>
 		<div class="media-content">
 			<p class="control has-icons-right">
-				<input class="input" type="text" placeholder="Search" />
+				<input class="input" type="text" placeholder="Search" bind:value={searchValue} />
 				<span class="icon is-small is-right">
 					<i class="mdi mdi-magnify mdi-dark"></i>
 				</span>
@@ -68,7 +72,7 @@
 				{$server.name}
 			</span>
 		</button>
-		<Server {connection} />
+		<Server {connection} {filter} />
 
 		<button class="entry-expand button chats-header">
 			<span class="entry-expand">

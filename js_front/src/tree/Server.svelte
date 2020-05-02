@@ -2,6 +2,7 @@
 	import Channel from "./Channel.svelte";
 
 	export let connection;
+	export let filter;
 	let book = connection.book;
 	let server = book.server;
 	let children = $server.children;
@@ -12,7 +13,7 @@
 <div class="menu channel-list">
 	<ul class="menu-list">
 		{#each $children as channel}
-			<Channel {connection} {channel}/>
+			<Channel {connection} {filter} {channel}/>
 		{/each}
 	</ul>
 </div>

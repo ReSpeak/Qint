@@ -8,12 +8,15 @@
 	import ClientComp from "./Client.svelte";
 
 	export let connection;
+	export let filter;
+	export let filterShow = true;
 	export let channel;
 	let children = channel.children;
 	let selectedChat = connection.chat.selectedChat;
 
 	let collapsed = false;
 	let hovered = false;
+	$: filterShow = applyFilter($filter, channel, $children);
 	// Update if a client moves in or out
 	$: ownClient = updateOwnClient($children);
 	$: selectedChannel = "Channel" in $selectedChat && $selectedChat.Channel === channel.id;
@@ -26,6 +29,11 @@
 			isOwn = client.channel === channel.id;
 		}
 		return isOwn;
+	}
+
+	function applyFilter(filter, channel, children) {
+		return filter === "" || channel.name.toLowerCase().includes(filter.toLowerCase())
+			|| children.some(c => c.filterShow);
 	}
 
 	function switchChannel() {
@@ -50,7 +58,7 @@
 	});
 </script>
 
-<li>
+<li class="container" class:hidden={!filterShow}>
 	<div
 		bind:this={div}
 		class="nameContainer"
@@ -75,15 +83,19 @@
 	<ul class="menu-list" class:collapsed>
 		{#each $children as child}
 			{#if child instanceof Channel}
-				<svelte:self {connection} channel={child} />
+				<svelte:self {connection} {filter} channel={child} bind:filterShow={child.filterShow} />
 			{:else}
-				<ClientComp {connection} client={child} />
+				<ClientComp {connection} {filter} client={child} bind:filterShow={child.filterShow} />
 			{/if}
 		{/each}
 	</ul>
 </li>
 
 <style>
+	.container.hidden {
+		display: none;
+	}
+
 	.button {
 		background: none;
 		border: none;

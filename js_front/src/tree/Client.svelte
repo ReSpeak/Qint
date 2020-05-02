@@ -5,6 +5,8 @@
 	import { flash } from "../util";
 
 	export let connection;
+	export let filter;
+	export let filterShow = true;
 	export let client;
 	let selectedChat = connection.chat.selectedChat;
 	let hovered = false;
@@ -14,6 +16,7 @@
 	let maxVolume = +30;
 	let volume = 0;
 
+	$: filterShow = applyFilter($filter, client);
 	$: ownClient = client.id === connection.ownClient;
 	$: selectedClient = "Client" in $selectedChat && $selectedChat.Client === client.id;
 	$: loadVolume(hovered);
@@ -23,6 +26,10 @@
 
 	function setChat() {
 		connection.chat.selectClient(client);
+	}
+
+	function applyFilter(filter, client) {
+		return filter === "" || client.name.toLowerCase().includes(filter.toLowerCase());
 	}
 
 	function hover() {
@@ -86,7 +93,7 @@
 	});
 </script>
 
-<li>
+<li class="container" class:hidden={!filterShow}>
 	<div
 		bind:this={div}
 		class:ownClient
@@ -117,6 +124,10 @@
 </li>
 
 <style>
+	.container.hidden {
+		display: none;
+	}
+
 	.clientButton {
 		background: none;
 		border: none;
