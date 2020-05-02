@@ -41,6 +41,18 @@ export function getDataColor(data: number[] | string) {
 	return `color: hsl(${varH}, ${varS}%, ${varL}%);`;
 }
 
+export function arraysEqual<T>(a: T[], b: T[]): boolean {
+	if (a === b) return true;
+	if (a == null || b == null || a.length != b.length)
+		return false;
+
+	for (var i = 0; i < a.length; ++i) {
+		if (a[i] !== b[i])
+			return false;
+	}
+	return true;
+}
+
 export class BinarySearchResult {
 	public constructor(
 		public found: boolean,

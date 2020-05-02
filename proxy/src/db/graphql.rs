@@ -77,7 +77,7 @@ struct UpdateBookmarkDb {
 pub async fn graphiql() -> impl Responder {
 	HttpResponse::Ok()
 		.content_type("text/html; charset=utf-8")
-		.body(graphiql_source("/db"))
+		.body(graphiql_source("/db", None))
 }
 
 #[post("/db")]

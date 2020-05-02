@@ -58,11 +58,11 @@
 		class:selectedChannel
 		on:mouseover={() => hovered = true} on:mouseout={leave}
 	>
-		<button class="button" on:click={() => collapsed = !collapsed} class:invisible={$children.length == 0}>
+		<button class="button collapseButton" on:click={() => collapsed = !collapsed} class:haschildren={$children.length !== 0}>
 			<Icon name="chevron-right{collapsed ? '' : ' mdi-rotate-90'}" />
+			<ChannelIcon {channel} {connection} />
 		</button>
 		<button class="button nameButton" on:click={setChat} on:dblclick={switchChannel}>
-			<ChannelIcon {channel} {connection} />
 			<span>{channel.name}</span>
 		</button>
 		{#if hovered}
@@ -100,6 +100,27 @@
 		padding-left: 0.5em;
 	}
 
+	.collapseButton {
+		display: grid;
+		padding: 0;
+	}
+
+	.collapseButton > :global(.icon) {
+		transition: all 0.1s;
+		grid-row: 1;
+		grid-column: 1;
+		margin: 0;
+	}
+	.collapseButton > :global(*:first-child) {
+		opacity: 0;
+	}
+	.collapseButton.haschildren:hover > :global(*:first-child) {
+		opacity: 1;
+	}
+	.collapseButton.haschildren:hover > :global(*:last-child) {
+		opacity: 0;
+	}
+
 	.nameContainer {
 		display: grid;
 		grid-template-columns: min-content auto;
@@ -107,6 +128,7 @@
 
 	.nameButton {
 		overflow: hidden;
+		padding: 0;
 	}
 
 	.nameButton span {
@@ -117,10 +139,6 @@
 	.nameButton :global(.icon) {
 		margin-left: 0;
 		flex-shrink: 0;
-	}
-
-	.invisible {
-		visibility: hidden;
 	}
 
 	.collapsed {

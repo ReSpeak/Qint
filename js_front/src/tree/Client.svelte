@@ -120,7 +120,8 @@
 	.clientButton {
 		background: none;
 		border: none;
-		padding: 0.2em 1em 0.2em 1em;
+		padding: 0;
+		padding-left: 0.5em;
 		height: auto;
 		width: 100%;
 		justify-content: start;

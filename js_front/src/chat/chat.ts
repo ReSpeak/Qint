@@ -5,7 +5,7 @@ import { Connection } from "../connection";
 import { graphql, toDatetime } from "../graphql";
 import { MessageTarget } from "../structs/ts";
 import { Channel, Client, GraphQlClient } from "../tree/book";
-import { getDataColor } from "../util";
+import { getDataColor, arraysEqual } from "../util";
 
 export class Chat {
 	public readonly selectedChat: Writable<MessageTarget> = writable(MessageTarget.ToServer());
@@ -38,12 +38,8 @@ export class Chat {
 		if (group.invoker) {
 			if (!msg.invoker)
 				return false;
-			if (group.invoker.uid.length !== msg.invoker.uid.length)
+			if (!arraysEqual(group.invoker.uid, msg.invoker.uid))
 				return false;
-			for (let i = 0; i < group.invoker.uid.length; i++) {
-				if (group.invoker.uid[i] !== msg.invoker.uid[i])
-					return false;
-			}
 		}
 		return group.invokerName === msg.invokerName;
 	}

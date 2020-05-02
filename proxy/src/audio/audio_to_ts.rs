@@ -112,6 +112,7 @@ impl Handler<SetListenerMsg> for AudioToTs {
 
 		self.connection = Some(msg.connection);
 		self.update_talking();
+		debug!(self.logger, "Add listener");
 	}
 }
 
@@ -120,6 +121,7 @@ impl Handler<RemoveListenerMsg> for AudioToTs {
 	fn handle(
 		&mut self, _: RemoveListenerMsg, _: &mut Self::Context,
 	) -> Self::Result {
+		debug!(self.logger, "Removing listener");
 		self.is_playing = false;
 		self.update_talking();
 		if let Some(device) = &self.device {
@@ -135,11 +137,14 @@ impl Handler<SetPlayingMsg> for AudioToTs {
 		&mut self, SetPlayingMsg(play): SetPlayingMsg, _: &mut Self::Context,
 	) -> Self::Result {
 		if let Some(device) = &self.device {
+			debug!(self.logger, "Set device playing"; "play" => play);
 			if play {
 				device.resume();
 			} else {
 				device.pause();
 			}
+		} else {
+			warn!(self.logger, "Set playing without device"; "play" => play);
 		}
 		self.is_playing = play;
 		self.update_talking();
@@ -215,7 +220,7 @@ impl AudioToTs {
 				// This spec will always be the desired spec, the sdl wrapper
 				// passes zero as `allowed_changes`.
 				debug!(self.logger, "Got capture spec"; "spec" => ?spec,
-				"driver" => self.audio_subsystem.current_audio_driver());
+					"driver" => self.audio_subsystem.current_audio_driver());
 				let channels = if spec.channels == 1 {
 					audiopus::Channels::Mono
 				} else {
