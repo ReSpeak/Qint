@@ -20,10 +20,13 @@
 	let usernameInput;
 
 	function onConnect() {
-		if (get(state) === ConnectionState.Disconnected)
+		if (get(state) === ConnectionState.Disconnected) {
+			data.username = get(username);
+			data.address = get(address);
 			data.connect();
-		else
+		} else {
 			data.reset();
+		}
 	}
 
 	async function loadBookmarks(fromStart) {
@@ -59,7 +62,7 @@
 		<article class="connect-error message is-danger">
 			<div class="message-header">
 				<p>Error</p>
-				<button class="delete" aria-label="delete" on:click="{() => error.set(undefined)}"></button>
+				<button class="delete" aria-label="delete" on:click={() => error.set(undefined)}></button>
 			</div>
 			<div class="message-body">
 				{$error}
@@ -68,7 +71,7 @@
 	{/if}
 	<div class="inner-connect-container">
 		<div class="connect-blur"></div>
-		<form class="connect-form" on:submit|preventDefault="{onConnect}">
+		<form class="connect-form" on:submit|preventDefault={onConnect}>
 			<div>
 				<p class="control has-icons-left">
 					<input
@@ -81,13 +84,13 @@
 						placeholder="Username"
 						disabled={$state !== ConnectionState.Disconnected}
 					/>
-					<Icon name="{CLIENT_ICON}" is_left />
+					<Icon name={CLIENT_ICON} is_left />
 				</p>
 			</div>
 			<div>
 				<p class="control has-icons-left">
 					<input
-						bind:value="{$address}"
+						bind:value={$address}
 						name="server"
 						id="server"
 						class="input"
@@ -95,7 +98,7 @@
 						placeholder="Server"
 						disabled="{$state !== ConnectionState.Disconnected}"
 					/>
-					<Icon name="{SERVER_ICON}" is_left />
+					<Icon name={SERVER_ICON} is_left />
 				</p>
 			</div>
 			<div>

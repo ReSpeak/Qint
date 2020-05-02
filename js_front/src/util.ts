@@ -53,6 +53,19 @@ export function arraysEqual<T>(a: T[], b: T[]): boolean {
 	return true;
 }
 
+export function escapeHtml(s: string) {
+	return s.replace('&', "&amp;")
+		.replace('<', "&lt;")
+		.replace('>', "&gt;")
+		.replace('"', "&quot;")
+		.replace('\'', "&#x27;")
+		.replace('/', "&#x2F;");
+}
+
+export function ignoreCaseRegex(search: string) {
+	return RegExp(search.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"), "gi");
+}
+
 export class BinarySearchResult {
 	public constructor(
 		public found: boolean,

@@ -1,6 +1,7 @@
 <script>
 	import { afterUpdate } from "svelte";
 	import ClientIcon from "../ui/ClientIcon.svelte";
+	import FilterString from "../ui/FilterString.svelte";
 	import Icon from "../ui/Icon.svelte";
 	import { flash } from "../util";
 
@@ -103,7 +104,7 @@
 	>
 		<button class="button clientButton" on:click={setChat}>
 			<ClientIcon {client} {connection} />
-			<span style={client.getColor()}>{client.name}</span>
+			<span style={client.getColor()}><FilterString filter={$filter} content={client.name} /></span>
 		</button>
 		{#if hovered}
 			<div class="hover menu" style="top: {div.getBoundingClientRect().top}px;">
@@ -123,7 +124,7 @@
 	</div>
 </li>
 
-<style>
+<style lang="scss">
 	.container.hidden {
 		display: none;
 	}

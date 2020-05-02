@@ -3,6 +3,7 @@
 	import { get } from "svelte/store";
 	import Icon from "../ui/Icon.svelte";
 	import ChannelIcon from "../ui/ChannelIcon.svelte";
+	import FilterString from "../ui/FilterString.svelte";
 	import { flash } from "../util";
 	import { Channel } from "./book";
 	import ClientComp from "./Client.svelte";
@@ -71,7 +72,7 @@
 			<ChannelIcon {channel} {connection} />
 		</button>
 		<button class="button nameButton" on:click={setChat} on:dblclick={switchChannel}>
-			<span>{channel.name}</span>
+			<FilterString filter={$filter} content={channel.name} />
 		</button>
 		{#if hovered}
 			<div class="hover menu" style="top: {div.getBoundingClientRect().top}px;">
@@ -91,7 +92,7 @@
 	</ul>
 </li>
 
-<style>
+<style lang="scss">
 	.container.hidden {
 		display: none;
 	}
@@ -143,21 +144,16 @@
 		padding: 0;
 	}
 
-	.nameButton span {
+	.nameButton > :global(*) {
 		overflow: hidden;
 		text-overflow: ellipsis;
-	}
-
-	.nameButton :global(.icon) {
-		margin-left: 0;
-		flex-shrink: 0;
 	}
 
 	.collapsed {
 		display: none;
 	}
 
-	.ownClient span {
+	.ownClient > :global(*) {
 		font-weight: bold;
 	}
 

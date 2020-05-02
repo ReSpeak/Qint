@@ -18,7 +18,7 @@
 	</ul>
 </div>
 
-<style>
+<style lang="scss">
 	ul {
 		margin: 0 0 0 0.2em;
 	}
