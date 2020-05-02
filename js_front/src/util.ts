@@ -26,3 +26,8 @@ export function flash(element: HTMLElement) {
 		});
 	});
 }
+
+export function assert(condition?: boolean, message?: string, ...data: any[]): void {
+	if (debug === false) return;
+	console.assert(condition, message, ...data);
+}
