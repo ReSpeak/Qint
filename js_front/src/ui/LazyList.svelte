@@ -7,7 +7,6 @@
 
 	let fetchCount = 25;
 	let pxBeforeLoad = 100; // TODO? could be adjusted dynamically
-	let pxBufferBothSides = pxBeforeLoad * 2;
 	// The amout of items that will be removed when out of view
 	let nItemsToRemove = 25;
 	// How far the nThItemsToRemove has to be out of view to remove the batch
@@ -18,13 +17,13 @@
 	// Otherwise we might end in an loop of adding and removing a side.
 	assert(nThItemDistanceToView > pxBeforeLoad);
 
-	// the lowest and highest id currently in the list
+	// the lowest and highest _included_ id currently in the list
 	let holdIdStart = 200;
 	let holdIdEnd = holdIdStart + elems.length;
 
 	// the lowest and highest id that could be retrieved from the source
 	let fetchIdMin = 0;
-	let fetchIdMax = 999;
+	let fetchIdMax = 500;
 
 	// The holding list element which has the scrollbar
 	let pan;
@@ -36,21 +35,35 @@
 
 	let fetchTask; // prevent asycn weirness by only allowing one async task
 
+	const dummy_pre = "";//makeid(Math.random() * 500 + 500);
 	function* dummies() {
 		for (let i = 0; ; i++) {
-			yield { id: i, text: "n" + i };
+			yield { id: i, text: dummy_pre };
 		}
+	}
+
+	function makeid(length) {
+		var result = "";
+		var characters =
+			" \nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+		var charactersLength = characters.length;
+		for (var i = 0; i < length; i++) {
+			result += characters.charAt(
+				Math.floor(Math.random() * charactersLength)
+			);
+		}
+		return result;
 	}
 
 	function handle_scroll(e) {
 		// console.log(
 		// 	pan.scrollHeight, // complete content
-		// 	pan.scrollTop, // current scroll position
+		// 	pan.scrollTop,    // current scroll position
 		// 	pan.scrollTopMax, // max scoll position
 		// 	pan.offsetHeight, // container height
-		// 	pan.clientHeight // inner view height (after subtracting border/padding)
-		// 	ELEM.offsetTop, // is the bottom of the element measured from the top of the container
+		// 	pan.clientHeight, // inner view height (after subtracting border/padding)
 		// );
+		// ! ELEM.offsetTop   // is the bottom of a element measured from the top of the container
 		// ! clientHeight + scrollTopMax == scrollHeight
 		if (lastScollPos !== undefined) {
 			scrollDiff = pan.scrollTop - lastScollPos;
@@ -58,21 +71,21 @@
 		}
 		lastScollPos = pan.scrollTop;
 
-		if (fetchTask) {
-			return;
-		}
-
 		start_fill();
 	}
 
 	function start_fill() {
-		fetchTask = fill();
+		if (fetchTask) {
+			return;
+		}
+		fetchTask = fill_loop();
 	}
 
-	async function fill() {
-		for (let i = 0; i < 10; i++) {
-			if (i == 9) throw Error("yah, thats a loop");
-			if (await fill_loop()) break;
+	async function fill_loop() {
+		const loadMaxBeforeError = 50;
+		for (let i = 0; i < loadMaxBeforeError; i++) {
+			if (i == loadMaxBeforeError - 1) throw Error("yah, thats a loop");
+			if (await fill_body()) break;
 		}
 		console.log("Task done");
 		fetchTask = undefined;
@@ -81,13 +94,9 @@
 	/**
 	 * Returns true when the list is satisfied with loading data
 	 */
-	async function fill_loop() {
-		await tryTrimEnd();
+	async function fill_body() {
 		const distFromTop = pan.scrollTop;
 		const distFromBot = pan.scrollTopMax - pan.scrollTop;
-
-		const viewableHeight = pan.clientHeight;
-		const wantContentHeight = viewableHeight + pxBufferBothSides;
 
 		const wantFetchStart = distFromTop < pxBeforeLoad && scrollDiff <= 0;
 		const wantFetchEnd = distFromBot < pxBeforeLoad && scrollDiff >= 0;
@@ -107,17 +116,9 @@
 			console.log("want end", from, count);
 			await load(from, count);
 			return false;
+		} else {
+			return true;
 		}
-
-		await tick();
-
-		const hasContentHeight = pan.scrollHeight;
-		const wantedContentHeigthReached =
-			hasContentHeight >= wantContentHeight;
-		if (!wantedContentHeigthReached) {
-			throw Error("Why so sleepy?");
-		}
-		return true;
 	}
 
 	async function load(from, count) {
@@ -145,7 +146,7 @@
 		if (elems.length <= nItemsToRemove) return;
 		await tick();
 		let childList = pan.querySelectorAll(".scrollPane > .lazyListElement");
-		let nThChild = childList[childList.length - nItemsToRemove]; // -1 ??
+		let nThChild = childList[childList.length - nItemsToRemove];
 		// The top of the element within our list (unscrolled)
 		let topStaticOffset = nThChild.offsetTop - nThChild.offsetHeight;
 		// The top of the element without our list (with scroll offset)
@@ -161,7 +162,7 @@
 				pan.offsetHeight
 			);
 			elems = elems.slice(0, elems.length - nItemsToRemove); // modification is at the end => safe
-			holdIdEnd = holdIdStart + elems.length;
+			holdIdEnd = holdIdStart + elems.length - 1;
 			console.log("After trim end", holdIdStart, holdIdEnd);
 		}
 	}
@@ -170,7 +171,7 @@
 		if (elems.length <= nItemsToRemove) return;
 		await tick();
 		let childList = pan.querySelectorAll(".scrollPane > .lazyListElement");
-		let nThChild = childList[nItemsToRemove];
+		let nThChild = childList[nItemsToRemove - 1];
 		// The bottom of the element within our list (unscrolled)
 		let bottomStaticOffset = nThChild.offsetTop;
 		// The top of the element without our list (with scroll offset)
@@ -186,7 +187,7 @@
 				pan.offsetHeight
 			);
 			await modifyElems(elems.slice(nItemsToRemove)); // mofification at start => helper
-			holdIdStart = holdIdEnd - elems.length;
+			holdIdStart = holdIdEnd - elems.length + 1;
 			console.log("After trim start", holdIdStart, holdIdEnd);
 		}
 	}
@@ -204,14 +205,13 @@
 			holdIdStart -= newElems.length;
 			await tryTrimEnd();
 		} else {
-			// case when jumping to non-adjacent blocks
-			// OR: overlapping case, but that should be trimmed to one of the two top one (TODO)
-			throw new Error("not impl");
+			elems = newElems;
 		}
 	}
 
 	onMount(() => {
 		start_fill();
+		pan.onresize = start_fill;
 	});
 </script>
 
@@ -227,12 +227,8 @@
 
 <style>
 	.lazyList {
-		border: 1px black solid;
-		height: 75vh;
 		overflow-x: hidden;
 		overflow-y: scroll;
-	}
-
-	.scrollPane {
+		height: 100%;
 	}
 </style>
