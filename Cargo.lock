@@ -1275,6 +1275,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "getopts"
+version = "0.2.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14dbbfd5c71d70241ecf9e6f13737f7b5ce823821063188d7e46c41d371eebd5"
+dependencies = [
+ "unicode-width",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2075,6 +2084,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "pulldown-cmark"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e142c3b8f49d2200605ee6ba0b1d757310e9e7a72afe78c36ee2ef67300ee00"
+dependencies = [
+ "bitflags",
+ "getopts",
+ "memchr",
+ "unicase",
+]
+
+[[package]]
 name = "qint-proxy"
 version = "0.1.0"
 dependencies = [
@@ -2097,8 +2118,12 @@ dependencies = [
  "futures",
  "heck",
  "juniper",
+ "lazy_static",
  "libsqlite3-sys",
  "log 0.4.8",
+ "nom 5.1.1",
+ "pulldown-cmark",
+ "regex",
  "rmp-serde",
  "rnnoise-c",
  "sdl2",

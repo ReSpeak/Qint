@@ -29,9 +29,9 @@
 		class:message-error="{false}"
 		class:viewRaw
 	>
-		<div class="content message-rendered latex_proc">{message.text}</div>
+		<div class="content message-rendered latex_proc">{@html message.rendered}</div>
 		<div class="message-raw">
-			<pre>{message.text}</pre>
+			<pre>{message.raw}</pre>
 		</div>
 		<div class="tool-buttons">
 			<div class="tool-buttons-wrap buttons has-addons">

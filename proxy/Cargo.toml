@@ -26,7 +26,11 @@ flakebi-ring = "0.16.9"
 futures = "0.3"
 juniper = { git = "https://github.com/graphql-rust/juniper" }
 #juniper = { path = "../../juniper/juniper" }
+lazy_static = "1"
 libsqlite3-sys = { version = "0.9", features = ["bundled"] }
+nom = "5"
+pulldown-cmark = "0.7"
+regex = "1"
 rmp-serde = "0.14"
 rnnoise-c = "0.1"
 sdl2 = "0.32"

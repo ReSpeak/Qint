@@ -103,6 +103,7 @@ export class Chat {
 						}
 						invokerName
 						content
+						rendered
 						status
 						time
 						timezone
@@ -128,7 +129,7 @@ export class Chat {
 						client = GraphQlClient.fromGraphqlInvoker(msg.invoker);
 					}
 					msgs.push(new Message(msg.id, client, msg.invokerName,
-						msg.content, toDatetime(msg.time, msg.timezone)));
+						msg.content, msg.rendered, toDatetime(msg.time, msg.timezone)));
 				});
 				const before_start = start_time ? fromStart : true;
 				console.log("Fetching messages " + (before_start ? "before" : "after"), [start_time, start_id], "; got", msgs);
@@ -163,7 +164,8 @@ export class Message {
 		public id: string,
 		public invoker: GraphQlClient | undefined,
 		public invokerName: string | undefined,
-		public text: string,
+		public raw: string,
+		public rendered: string,
 		public date: Moment = moment(),
 	) { }
 }

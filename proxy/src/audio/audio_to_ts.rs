@@ -162,8 +162,9 @@ impl Handler<PlayPacketMsg> for AudioToTs {
 			let logger = self.logger.clone();
 			tokio::spawn(con.send(SendPacketMsg(packet)).map(move |r| {
 				if let Err(e) = r {
-					error!(logger, "Failed to send audio packet";
-						"error" => ?e);
+					warn!(logger, "Failed to send audio packet";
+						"error" => %e);
+					// TODO Remove connection
 				}
 			}));
 

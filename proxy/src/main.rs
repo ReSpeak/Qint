@@ -27,6 +27,7 @@ mod audio;
 mod book_events;
 mod db;
 mod filecache;
+mod markdown;
 mod messages;
 mod secret;
 mod websocket;
@@ -395,8 +396,7 @@ async fn main() -> Result<()> {
 			.service(download_cache_file)
 			.service(db::graphql::db_graphql)
 			.service(db::graphql::graphiql)
-			.service(Files::new("", "../js_front/public/")
-				.index_file("index.html"))
+			.service(Files::new("", "../js_front/public/").index_file("index.html"))
 	})
 	.bind(addr)?
 	.run()

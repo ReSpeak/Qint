@@ -1,4 +1,5 @@
 <script>
+	// TODO Use scroll-anchoring https://blog.eqrion.net/pin-to-bottom/
 	import { onMount } from 'svelte';
 	import { get } from "svelte/store";
 	import Message from "./Message.svelte";

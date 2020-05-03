@@ -32,9 +32,6 @@
 	let arrowHidden = true;
 	let lastScrollTop = 0;
 
-	let top = 0;
-	let bottom = 0;
-
 	// Refresh if something changes
 	$: if (mounted) loadData(viewport_height);
 
@@ -51,8 +48,6 @@
 		loadingEnd = undefined;
 		arrowHidden = true;
 		lastScrollTop = 0;
-		top = 0;
-		bottom = 0;
 		update();
 	}
 
@@ -100,8 +95,8 @@
 			}
 
 			// Invisible content around the viewport
-			const content_buffer_start = viewport.scrollTop - top;
-			const content_buffer_end = Math.max(0, viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight - bottom);
+			const content_buffer_start = viewport.scrollTop;
+			const content_buffer_end = Math.max(0, viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight);
 
 			// Check if we need to load more
 			if (!isAtStart && content_buffer_start < viewport.clientHeight) {
@@ -118,16 +113,11 @@
 					let new_height = contents.offsetHeight - oldHeight;
 					console.log("1", viewport.scrollTop, viewport.scrollHeight, viewport.clientHeight);
 
-					let rest = 0;
-					if (new_height > top)
-						rest = new_height - top;
-					top = Math.max(0, top - new_height);
 					// TODO Stutters here sometimes because we interupt the smooth scrolling
-					viewport.scrollTo(0, viewport.scrollTop + rest);
+					viewport.scrollTo(0, viewport.scrollTop + new_height);
 					console.log("2", viewport.scrollTop, viewport.scrollHeight, viewport.clientHeight);
 				} else {
 					isAtStart = true;
-					top = 0;
 				}
 			} else if (!isAtEnd && content_buffer_end < viewport.clientHeight) {
 				loadingEnd = loadMore(false).finally(() => loadingEnd = undefined);
@@ -141,14 +131,8 @@
 					let new_height = 0;
 					for (let i = items.length - newItems.length; i < items.length; i++)
 						new_height += rows[i].offsetHeight;
-
-					let rest = 0;
-					if (new_height > bottom)
-						rest = new_height - bottom;
-					bottom = Math.max(0, bottom - new_height);
 				} else {
 					isAtEnd = true;
-					bottom = 0;
 				}
 			} else {
 				isLoading = false;
@@ -213,38 +197,12 @@
 			return;
 		}
 
-		top = getRowTop(start) - constOffset;
-
-		const minTop = viewport.scrollTop + 3 * viewport.clientHeight;
-		while (i < rows.length) {
-			if (getRowTop(i) > minTop)
-				break;
-			i += 1;
-		}
-
-		const end = i;
-		let rest = 0;
-		if (rows.length > 0 && end < rows.length) {
-			const oldEnd = getRowTop(rows.length - 1) + rows[rows.length - 1].offsetHeight;
-			const newEnd = getRowTop(end) + rows[end].offsetHeight
-			rest = oldEnd - newEnd;
-		}
-
-		// Clamp top and bottom
-		const maxSize = 50 * viewport.clientHeight;
-		bottom = Math.min(bottom + rest, maxSize);
-		if (top > maxSize) {
-			rest = top - maxSize;
-			top = maxSize;
-			viewport.scrollTo(0, viewport.scrollTop - rest);
-		}
-
 		if (start > 0)
 			isAtStart = false;
 		if (end < rows.length)
 			isAtEnd = false;
 		if (start != 0 || end != rows.length) {
-			console.log("slice", start, end, rows.length, top, bottom);
+			console.log("slice", start, end, rows.length);
 			items = items.slice(start, end);
 		}
 	}
@@ -284,10 +242,7 @@
 	{#if loadingStart}
 		<slot name="loading"><div>Loading…</div></slot>
 	{/if}
-	<svelte-virtual-list-contents
-		bind:this={contents}
-		style="padding-top: {top}px; padding-bottom: {bottom}px;"
-	>
+	<svelte-virtual-list-contents bind:this={contents}>
 		{#each items as item}
 			<svelte-virtual-list-item>
 				<slot {item}>Missing template</slot>

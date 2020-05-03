@@ -432,6 +432,9 @@ impl Message {
 		}
 	}
 
+	/// Html of rendered markdown and bb code.
+	fn rendered(&self) -> String { crate::markdown::markdown(&self.0.content) }
+
 	/// Name of the invoker if we don't have their uid.
 	fn invoker_name(&self) -> Option<&str> { self.0.invoker_name.as_ref().map(|s| s.as_str()) }
 	fn content(&self) -> &str { &self.0.content }
