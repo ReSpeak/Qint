@@ -40,9 +40,7 @@ impl FileCache {
 		base32::encode(base32::Alphabet::RFC4648 { padding: false }, data)
 	}
 
-	fn get_path(
-		state: &State, server: Uid, channel: ChannelId, path: &str,
-	) -> PathBuf {
+	fn get_path(state: &State, server: Uid, channel: ChannelId, path: &str) -> PathBuf {
 		let mut p = state.settings.cache_path.clone();
 		p.push(Self::path_encode(&server.0));
 		p.push(channel.0.to_string());
@@ -92,8 +90,8 @@ impl FileCache {
 				None
 			}
 			Ok(file) => {
-				let stream = FramedRead::new(file, BytesCodec::new())
-					.map(|r| r.map(web::BytesMut::freeze));
+				let stream =
+					FramedRead::new(file, BytesCodec::new()).map(|r| r.map(web::BytesMut::freeze));
 				Some((meta.len(), stream))
 			}
 		}
@@ -113,9 +111,7 @@ impl<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin> FileWriter<S> {
 	}
 }
 
-impl<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin> Drop
-	for FileWriter<S>
-{
+impl<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin> Drop for FileWriter<S> {
 	fn drop(&mut self) {
 		if !self.finished {
 			self.file = None;
@@ -124,13 +120,9 @@ impl<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin> Drop
 	}
 }
 
-impl<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin> Stream
-	for FileWriter<S>
-{
+impl<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin> Stream for FileWriter<S> {
 	type Item = Result<Bytes, std::io::Error>;
-	fn poll_next(
-		mut self: Pin<&mut Self>, cx: &mut Context,
-	) -> Poll<Option<Self::Item>> {
+	fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
 		loop {
 			let this = &mut *self;
 			while let Some(buf) = &mut this.buf {
@@ -138,9 +130,7 @@ impl<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin> Stream
 					this.buf = None;
 					break;
 				}
-				match Pin::new(&mut this.file.as_mut().unwrap())
-					.poll_write_buf(cx, buf)
-				{
+				match Pin::new(&mut this.file.as_mut().unwrap()).poll_write_buf(cx, buf) {
 					Poll::Pending => return Poll::Pending,
 					Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e))),
 					Poll::Ready(Ok(_)) => {}

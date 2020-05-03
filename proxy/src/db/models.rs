@@ -180,26 +180,13 @@ pub struct ServersClientsInsert<'a> {
 	pub timezone: i32,
 }
 
-#[derive(
-	Clone, Copy, DbEnum, Debug, Deserialize, Eq, Hash, PartialEq, Serialize,
-)]
+#[derive(Clone, Copy, DbEnum, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum EventType {
 	ChannelSwitched,
 	NameChanged,
 }
 
-#[derive(
-	Clone,
-	Copy,
-	DbEnum,
-	Debug,
-	Deserialize,
-	Eq,
-	GraphQLEnum,
-	Hash,
-	PartialEq,
-	Serialize,
-)]
+#[derive(Clone, Copy, DbEnum, Debug, Deserialize, Eq, GraphQLEnum, Hash, PartialEq, Serialize)]
 pub enum MessageStatus {
 	Sending,
 	Success,
@@ -220,9 +207,7 @@ pub struct Bookmark {
 	pub server: Option<Vec<u8>>,
 }
 
-#[derive(
-	Clone, Debug, Deserialize, Eq, Hash, PartialEq, Queryable, Serialize,
-)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Queryable, Serialize)]
 pub struct OldMessage {
 	pub id: i64,
 	pub invoker: Option<Vec<u8>>,
@@ -244,14 +229,10 @@ impl Ord for OldMessage {
 }
 
 impl PartialOrd for OldMessage {
-	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-		Some(self.cmp(other))
-	}
+	fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
 }
 impl Identity {
-	pub fn into_identity(
-		self, secret: &Secret,
-	) -> Result<tsclientlib::Identity> {
+	pub fn into_identity(self, secret: &Secret) -> Result<tsclientlib::Identity> {
 		let key = secret.open(self.private_key)?;
 		Ok(tsclientlib::Identity::new_with_max_counter(
 			EccKeyPrivP256::import(&key)?,
@@ -262,9 +243,7 @@ impl Identity {
 }
 
 impl<'a> NewIdentity<'a> {
-	pub fn new(
-		id: &tsclientlib::Identity, client_uid: &'a [u8], secret: &Secret,
-	) -> Result<Self> {
+	pub fn new(id: &tsclientlib::Identity, client_uid: &'a [u8], secret: &Secret) -> Result<Self> {
 		let private_key = secret.seal(id.key().to_short().to_vec())?;
 		Ok(Self {
 			private_key,

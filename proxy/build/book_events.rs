@@ -10,10 +10,7 @@ use tsproto_structs::messages_to_book::{self, MessagesToBookDeclarations};
 #[derive(Template)]
 #[TemplatePath = "build/BookEvents.tt"]
 #[derive(Debug)]
-pub struct BookEvents<'a>(
-	&'a BookDeclarations,
-	&'a MessagesToBookDeclarations<'a>,
-);
+pub struct BookEvents<'a>(&'a BookDeclarations, &'a MessagesToBookDeclarations<'a>);
 
 impl Deref for BookEvents<'_> {
 	type Target = BookDeclarations;
@@ -29,18 +26,11 @@ fn get_rust_type(p: &Property) -> String {
 	if p.opt { format!("Option<{}>", res) } else { res }
 }
 
-fn get_properties<'a>(
-	structs: &'a [Struct], s: &'a Struct,
-) -> Vec<&'a Property> {
-	s.properties
-		.iter()
-		.filter(|p| !structs.iter().any(|s| s.name == p.type_s))
-		.collect()
+fn get_properties<'a>(structs: &'a [Struct], s: &'a Struct) -> Vec<&'a Property> {
+	s.properties.iter().filter(|p| !structs.iter().any(|s| s.name == p.type_s)).collect()
 }
 
-fn get_all_properties<'a>(
-	structs: &'a [Struct], parts: &[&str],
-) -> Vec<&'a Property> {
+fn get_all_properties<'a>(structs: &'a [Struct], parts: &[&str]) -> Vec<&'a Property> {
 	let mut props = Vec::new();
 	for struc in structs {
 		if !parts.contains(&struc.name.as_str()) {
@@ -67,10 +57,6 @@ fn get_to_owned(p: &Property) -> String {
 	if to_owned.is_empty() {
 		"val".into()
 	} else {
-		if p.opt {
-			format!("val.as_ref().map(|val| {})", to_owned)
-		} else {
-			to_owned.into()
-		}
+		if p.opt { format!("val.as_ref().map(|val| {})", to_owned) } else { to_owned.into() }
 	}
 }

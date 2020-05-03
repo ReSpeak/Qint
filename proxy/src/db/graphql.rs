@@ -34,8 +34,7 @@ struct Void {
 	void: bool,
 }
 
-pub(crate) type Schema =
-	RootNode<'static, Query, Mutation, EmptySubscription<State>>;
+pub(crate) type Schema = RootNode<'static, Query, Mutation, EmptySubscription<State>>;
 type GResult<T> = std::result::Result<T, FieldError>;
 
 struct Bookmark(models::Bookmark);
@@ -75,9 +74,7 @@ struct UpdateBookmarkDb {
 
 #[get("/graphiql")]
 pub async fn graphiql() -> impl Responder {
-	HttpResponse::Ok()
-		.content_type("text/html; charset=utf-8")
-		.body(graphiql_source("/db", None))
+	HttpResponse::Ok().content_type("text/html; charset=utf-8").body(graphiql_source("/db", None))
 }
 
 #[post("/db")]
@@ -86,11 +83,7 @@ pub(crate) async fn db_graphql(
 ) -> Result<impl Responder> {
 	let res = data.execute(&state.graphql_schema, &*state).await;
 	let json_res = serde_json::to_string(&res)?;
-	let mut resp = if res.is_ok() {
-		HttpResponse::Ok()
-	} else {
-		HttpResponse::BadRequest()
-	};
+	let mut resp = if res.is_ok() { HttpResponse::Ok() } else { HttpResponse::BadRequest() };
 	Ok(resp.content_type("application/json").body(json_res))
 }
 
@@ -118,14 +111,9 @@ impl Bookmark {
 					.send(RunOnDbMsg(move |db| {
 						use schema::channels;
 
-						let query = channels::table.filter(
-							channels::server
-								.eq(server)
-								.and(channels::id.eq(id)),
-						);
-						GResult::Ok(Channel(
-							query.first::<models::Channel>(&db.con)?,
-						))
+						let query = channels::table
+							.filter(channels::server.eq(server).and(channels::id.eq(id)));
+						GResult::Ok(Channel(query.first::<models::Channel>(&db.con)?))
 					}))
 					.await??;
 				Ok(Some(res))
@@ -166,8 +154,7 @@ impl Bookmark {
 				.send(RunOnDbMsg(|db| {
 					use schema::servers;
 
-					let query =
-						servers::table.filter(servers::public_key.eq(id));
+					let query = servers::table.filter(servers::public_key.eq(id));
 					GResult::Ok(Server(query.first::<models::Server>(&db.con)?))
 				}))
 				.await??;
@@ -195,18 +182,12 @@ impl Channel {
 			.await??;
 		Ok(Some(res))
 	}
-	fn parent(&self) -> Option<ID> {
-		self.0.parent.map(|i| ID::new(i.to_string()))
-	}
+	fn parent(&self) -> Option<ID> { self.0.parent.map(|i| ID::new(i.to_string())) }
 	/// References the channel above this one (zero if this is the first
 	/// channel).
-	fn order_id(&self) -> Option<ID> {
-		self.0.order_id.map(|i| ID::new(i.to_string()))
-	}
+	fn order_id(&self) -> Option<ID> { self.0.order_id.map(|i| ID::new(i.to_string())) }
 	fn name(&self) -> &str { &self.0.name }
-	fn icon(&self) -> Option<ID> {
-		self.0.icon.map(|i| ID::new((i as u32).to_string()))
-	}
+	fn icon(&self) -> Option<ID> { self.0.icon.map(|i| ID::new((i as u32).to_string())) }
 	fn deleted(&self) -> bool { self.0.deleted }
 
 	/// The channel chat.
@@ -219,16 +200,10 @@ impl Channel {
 				use schema::{channel_chats, chats};
 
 				let query = channel_chats::table
-					.filter(
-						channel_chats::server
-							.eq(server)
-							.and(channel_chats::channel.eq(id)),
-					)
+					.filter(channel_chats::server.eq(server).and(channel_chats::channel.eq(id)))
 					.inner_join(chats::table)
 					.select(chats::all_columns);
-				GResult::Ok(
-					query.first::<models::Chat>(&db.con).optional()?.map(Chat),
-				)
+				GResult::Ok(query.first::<models::Chat>(&db.con).optional()?.map(Chat))
 			}))
 			.await??;
 		Ok(res)
@@ -248,19 +223,17 @@ impl Chat {
 	/// If `before_start` is `true`, get messages older than the start if it is
 	/// `false`, get messages that were sent after the start.
 	async fn messages(
-		&self, state: &State, start_time: Option<NaiveDateTime>,
-		start_id: Option<ID>, before_start: Option<bool>,
+		&self, state: &State, start_time: Option<NaiveDateTime>, start_id: Option<ID>,
+		before_start: Option<bool>,
 	) -> GResult<Vec<Message>>
 	{
-		let start_id =
-			start_id.map(|i| i.parse::<u64>().map(|i| i as i64)).transpose()?;
+		let start_id = start_id.map(|i| i.parse::<u64>().map(|i| i as i64)).transpose()?;
 		let start = match (start_time, start_id, before_start) {
 			(Some(t), Some(i), Some(b)) => Some((t, i, b)),
 			(None, None, None) => None,
 			_ => {
 				return Err(format_err!(
-					"start_time, start_id and before_start need to be all set \
-					 or unset"
+					"start_time, start_id and before_start need to be all set or unset"
 				)
 				.into());
 			}
@@ -271,9 +244,7 @@ impl Chat {
 			.send(RunOnDbMsg(move |db| {
 				use schema::messages;
 
-				let query = messages::table
-					.filter(messages::chat.eq(id))
-					.limit(MESSAGES_LIMIT);
+				let query = messages::table.filter(messages::chat.eq(id)).limit(MESSAGES_LIMIT);
 				let res = if let Some((t, i, true)) = start {
 					query
 						.filter(messages::time.lt(t).and(messages::id.lt(i)))
@@ -314,11 +285,7 @@ impl Chat {
 
 				let query = messages::table
 					.inner_join(chats::table)
-					.filter(
-						chats::id
-							.eq(id)
-							.and(messages::time.gt(chats::last_read)),
-					)
+					.filter(chats::id.eq(id).and(messages::time.gt(chats::last_read)))
 					.count();
 
 				query.get_result(&db.con)
@@ -338,9 +305,7 @@ impl Client {
 		self.0.public_key.as_ref().map(|p| base64::encode(&p))
 	}
 	/// The custom name of the client if we assigned one.
-	fn custom_name(&self) -> Option<&str> {
-		self.0.custom_name.as_ref().map(|s| s.as_str())
-	}
+	fn custom_name(&self) -> Option<&str> { self.0.custom_name.as_ref().map(|s| s.as_str()) }
 	fn volume(&self) -> f64 { self.0.volume as f64 }
 
 	/// The chat with this client on the specified server.
@@ -353,16 +318,10 @@ impl Client {
 				use schema::{chats, client_chats};
 
 				let query = client_chats::table
-					.filter(
-						client_chats::server
-							.eq(server)
-							.and(client_chats::client.eq(id)),
-					)
+					.filter(client_chats::server.eq(server).and(client_chats::client.eq(id)))
 					.inner_join(chats::table)
 					.select(chats::all_columns);
-				GResult::Ok(
-					query.first::<models::Chat>(&db.con).optional()?.map(Chat),
-				)
+				GResult::Ok(query.first::<models::Chat>(&db.con).optional()?.map(Chat))
 			}))
 			.await??;
 		Ok(res)
@@ -378,16 +337,10 @@ impl Client {
 				use schema::{chats, client_pokes};
 
 				let query = client_pokes::table
-					.filter(
-						client_pokes::server
-							.eq(server)
-							.and(client_pokes::client.eq(id)),
-					)
+					.filter(client_pokes::server.eq(server).and(client_pokes::client.eq(id)))
 					.inner_join(chats::table)
 					.select(chats::all_columns);
-				GResult::Ok(
-					query.first::<models::Chat>(&db.con).optional()?.map(Chat),
-				)
+				GResult::Ok(query.first::<models::Chat>(&db.con).optional()?.map(Chat))
 			}))
 			.await??;
 		Ok(res)
@@ -446,10 +399,7 @@ impl Message {
 			let res = state
 				.database
 				.send(RunOnDbMsg(move |db| {
-					use schema::{
-						channel_chats, client_chats, server_chats,
-						servers_clients,
-					};
+					use schema::{channel_chats, client_chats, server_chats, servers_clients};
 
 					let query = servers_clients::table
 						.filter(
@@ -457,31 +407,23 @@ impl Message {
 								servers_clients::server
 									.eq_any(
 										channel_chats::table
-											.filter(
-												channel_chats::chat.eq(&chat),
-											)
+											.filter(channel_chats::chat.eq(&chat))
 											.select(channel_chats::server),
 									)
 									.or(servers_clients::server.eq_any(
 										client_chats::table
-											.filter(
-												client_chats::chat.eq(&chat),
-											)
+											.filter(client_chats::chat.eq(&chat))
 											.select(client_chats::server),
 									))
 									.or(servers_clients::server.eq_any(
 										server_chats::table
-											.filter(
-												server_chats::chat.eq(&chat),
-											)
+											.filter(server_chats::chat.eq(&chat))
 											.select(server_chats::server),
 									)),
 							),
 						)
 						.select(servers_clients::all_columns);
-					GResult::Ok(ServerClient(
-						query.first::<models::ServersClients>(&db.con)?,
-					))
+					GResult::Ok(ServerClient(query.first::<models::ServersClients>(&db.con)?))
 				}))
 				.await??;
 			Ok(Some(res))
@@ -491,9 +433,7 @@ impl Message {
 	}
 
 	/// Name of the invoker if we don't have their uid.
-	fn invoker_name(&self) -> Option<&str> {
-		self.0.invoker_name.as_ref().map(|s| s.as_str())
-	}
+	fn invoker_name(&self) -> Option<&str> { self.0.invoker_name.as_ref().map(|s| s.as_str()) }
 	fn content(&self) -> &str { &self.0.content }
 	fn status(&self) -> MessageStatus { self.0.status }
 	fn time(&self) -> &NaiveDateTime { &self.0.time }
@@ -507,9 +447,7 @@ impl Server {
 	fn name(&self) -> &str { &self.0.name }
 	/// The last used address to connect to this server.
 	fn address(&self) -> &str { &self.0.address }
-	fn icon(&self) -> Option<ID> {
-		self.0.icon.map(|i| ID::new((i as u32).to_string()))
-	}
+	fn icon(&self) -> Option<ID> { self.0.icon.map(|i| ID::new((i as u32).to_string())) }
 
 	/// The server chat.
 	async fn chat(&self, state: &State) -> GResult<Option<Chat>> {
@@ -523,9 +461,7 @@ impl Server {
 					.filter(server_chats::server.eq(id))
 					.inner_join(chats::table)
 					.select(chats::all_columns);
-				GResult::Ok(
-					query.first::<models::Chat>(&db.con).optional()?.map(Chat),
-				)
+				GResult::Ok(query.first::<models::Chat>(&db.con).optional()?.map(Chat))
 			}))
 			.await??;
 		Ok(res)
@@ -533,9 +469,7 @@ impl Server {
 
 	/// The channels on this server.
 	// TODO Pagination
-	async fn channels(
-		&self, state: &State, include_deleted: bool,
-	) -> GResult<Vec<Channel>> {
+	async fn channels(&self, state: &State, include_deleted: bool) -> GResult<Vec<Channel>> {
 		let id = self.0.public_key.clone();
 		let res = state
 			.database
@@ -546,9 +480,7 @@ impl Server {
 				let res = if include_deleted {
 					query.load::<models::Channel>(&db.con)
 				} else {
-					query
-						.filter(channels::deleted.eq(false))
-						.load::<models::Channel>(&db.con)
+					query.filter(channels::deleted.eq(false)).load::<models::Channel>(&db.con)
 				};
 				GResult::Ok(res?.into_iter().map(Channel).collect())
 			}))
@@ -565,8 +497,7 @@ impl Server {
 			.send(RunOnDbMsg(move |db| {
 				use schema::servers_clients;
 
-				let query = servers_clients::table
-					.filter(servers_clients::server.eq(id));
+				let query = servers_clients::table.filter(servers_clients::server.eq(id));
 				GResult::Ok(
 					query
 						.load::<models::ServersClients>(&db.con)?
@@ -611,13 +542,9 @@ impl ServerClient {
 	}
 
 	/// The icon of this client on this server.
-	fn icon(&self) -> Option<ID> {
-		self.0.icon.map(|i| ID::new((i as u32).to_string()))
-	}
+	fn icon(&self) -> Option<ID> { self.0.icon.map(|i| ID::new((i as u32).to_string())) }
 	/// The avatar of this client on this server.
-	fn avatar(&self) -> Option<&str> {
-		self.0.avatar.as_ref().map(|s| s.as_str())
-	}
+	fn avatar(&self) -> Option<&str> { self.0.avatar.as_ref().map(|s| s.as_str()) }
 	/// When we saw this client last on this server
 	fn last_seen(&self) -> &NaiveDateTime { &self.0.last_seen }
 	fn timezone(&self) -> i32 { self.0.timezone }
@@ -631,10 +558,7 @@ impl Query {
 			.database
 			.send(RunOnDbMsg(|db| {
 				let query = bookmarks::table
-					.order((
-						bookmarks::bookmark.desc(),
-						bookmarks::last_used.desc(),
-					))
+					.order((bookmarks::bookmark.desc(), bookmarks::last_used.desc()))
 					.limit(BOOKMARKS_LIMIT);
 				let result = /*if let Some((book, last)) = msg.start {
 				// (bookmark == book AND last_used > last) OR (!bookmark AND book)
@@ -662,10 +586,7 @@ impl Query {
 			.database
 			.send(RunOnDbMsg(|db| {
 				let query = bookmarks::table.order(bookmarks::last_used.desc());
-				let result = query
-					.first::<models::Bookmark>(&db.con)
-					.optional()?
-					.map(Bookmark);
+				let result = query.first::<models::Bookmark>(&db.con).optional()?.map(Bookmark);
 
 				GResult::Ok(result)
 			}))
@@ -680,18 +601,12 @@ impl Query {
 		let res = state
 			.database
 			.send(RunOnDbMsg(move |db| {
-				use schema::{
-					channel_chats, chats, client_chats, client_pokes,
-					server_chats,
-				};
+				use schema::{channel_chats, chats, client_chats, client_pokes, server_chats};
 
 				let res = match typ {
 					GMessageTarget::Server => {
 						if id.is_some() {
-							return Err(format_err!(
-								"Server message target needs no id"
-							)
-							.into());
+							return Err(format_err!("Server message target needs no id").into());
 						}
 						let query = server_chats::table
 							.filter(server_chats::server.eq(server))
@@ -703,16 +618,11 @@ impl Query {
 						let id = if let Some(id) = id {
 							id.parse::<u64>()? as i64
 						} else {
-							return Err(format_err!(
-								"Channel message target needs id"
-							)
-							.into());
+							return Err(format_err!("Channel message target needs id").into());
 						};
 						let query = channel_chats::table
 							.filter(
-								channel_chats::server
-									.eq(server)
-									.and(channel_chats::channel.eq(id)),
+								channel_chats::server.eq(server).and(channel_chats::channel.eq(id)),
 							)
 							.inner_join(chats::table)
 							.select(chats::all_columns);
@@ -722,16 +632,11 @@ impl Query {
 						let id = if let Some(id) = id {
 							base64::decode(id.as_bytes())?
 						} else {
-							return Err(format_err!(
-								"Poke message target needs id"
-							)
-							.into());
+							return Err(format_err!("Poke message target needs id").into());
 						};
 						let query = client_chats::table
 							.filter(
-								client_chats::server
-									.eq(server)
-									.and(client_chats::client.eq(id)),
+								client_chats::server.eq(server).and(client_chats::client.eq(id)),
 							)
 							.inner_join(chats::table)
 							.select(chats::all_columns);
@@ -741,16 +646,11 @@ impl Query {
 						let id = if let Some(id) = id {
 							base64::decode(id.as_bytes())?
 						} else {
-							return Err(format_err!(
-								"Poke message target needs id"
-							)
-							.into());
+							return Err(format_err!("Poke message target needs id").into());
 						};
 						let query = client_pokes::table
 							.filter(
-								client_pokes::server
-									.eq(server)
-									.and(client_pokes::client.eq(id)),
+								client_pokes::server.eq(server).and(client_pokes::client.eq(id)),
 							)
 							.inner_join(chats::table)
 							.select(chats::all_columns);
@@ -771,8 +671,7 @@ impl Query {
 			.send(RunOnDbMsg(|db| {
 				use schema::servers;
 
-				let query =
-					servers::table.filter(servers::public_key.eq(server));
+				let query = servers::table.filter(servers::public_key.eq(server));
 				GResult::Ok(Server(query.first::<models::Server>(&db.con)?))
 			}))
 			.await??;
@@ -796,9 +695,7 @@ impl Query {
 
 #[juniper::graphql_object(Context = State)]
 impl Mutation {
-	async fn update_bookmark(
-		state: &State, update: UpdateBookmark,
-	) -> GResult<Void> {
+	async fn update_bookmark(state: &State, update: UpdateBookmark) -> GResult<Void> {
 		let res = state
 			.database
 			.send(RunOnDbMsg(|db| {
@@ -816,19 +713,13 @@ impl Mutation {
 					let server = if let Some(s) = server {
 						s
 					} else {
-						Err(format_err!(
-							"Cannot set channel: Bookmark needs a server"
-						))?
+						Err(format_err!("Cannot set channel: Bookmark needs a server"))?
 					};
 
 					// Search channel
 					let ch_id: i64 = c.parse::<u64>()? as i64;
 					let res = channels::table
-						.filter(
-							channels::id
-								.eq(ch_id)
-								.and(channels::server.eq(server)),
-						)
+						.filter(channels::id.eq(ch_id).and(channels::server.eq(server)))
 						.select(diesel::dsl::count_star())
 						.execute(&db.con)?;
 					if res == 0 {
@@ -847,11 +738,9 @@ impl Mutation {
 					bookmark: update.bookmark,
 				};
 
-				let res = diesel::update(
-					bookmarks::table.filter(bookmarks::id.eq(id)),
-				)
-				.set(db_update)
-				.execute(&db.con)?;
+				let res = diesel::update(bookmarks::table.filter(bookmarks::id.eq(id)))
+					.set(db_update)
+					.execute(&db.con)?;
 
 				GResult::Ok(res)
 			}))
@@ -883,13 +772,11 @@ impl Mutation {
 			}
 		}
 		let logger = state.logger.clone();
-		actix::spawn(con.send(SetVolumeMsg(uid.clone(), volume)).map(
-			move |r| {
-				if let Err(e) = r {
-					error!(logger, "Failed to set volume"; "error" => %e);
-				}
-			},
-		));
+		actix::spawn(con.send(SetVolumeMsg(uid.clone(), volume)).map(move |r| {
+			if let Err(e) = r {
+				error!(logger, "Failed to set volume"; "error" => %e);
+			}
+		}));
 		con.send(SaveClientMsg(uid)).await??;
 
 		let res = state
@@ -897,11 +784,9 @@ impl Mutation {
 			.send(RunOnDbMsg(move |db| {
 				use schema::clients;
 
-				let res = diesel::update(
-					clients::table.filter(clients::uid.eq(&client)),
-				)
-				.set(clients::volume.eq(volume))
-				.execute(&db.con)?;
+				let res = diesel::update(clients::table.filter(clients::uid.eq(&client)))
+					.set(clients::volume.eq(volume))
+					.execute(&db.con)?;
 
 				GResult::Ok(res)
 			}))

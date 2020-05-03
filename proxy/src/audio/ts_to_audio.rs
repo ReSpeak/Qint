@@ -50,24 +50,17 @@ impl Actor for TsToAudio {
 
 		ctx.run_interval(Duration::from_secs(1), |t2a, _| {
 			// Restart on errors
-			if t2a
-				.device
-				.as_ref()
-				.map(|d| d.status() == AudioStatus::Stopped)
-				.unwrap_or(true)
-			{
+			if t2a.device.as_ref().map(|d| d.status() == AudioStatus::Stopped).unwrap_or(true) {
 				// Try to reconnect to audio
 				t2a.open_playback();
 			}
 
 			if let Some(device) = &t2a.device {
-				let data_empty =
-					t2a.data.lock().unwrap().get_queues().is_empty();
+				let data_empty = t2a.data.lock().unwrap().get_queues().is_empty();
 				if device.status() == AudioStatus::Paused && !data_empty {
 					debug!(t2a.logger, "Resuming playback");
 					device.resume();
-				} else if device.status() == AudioStatus::Playing && data_empty
-				{
+				} else if device.status() == AudioStatus::Playing && data_empty {
 					debug!(t2a.logger, "Pausing playback");
 					device.pause();
 				}
@@ -85,13 +78,7 @@ impl TsToAudio {
 		let logger = logger.new(o!("pipeline" => "ts-to-audio"));
 		let data = Arc::new(Mutex::new(AudioHandler::new(logger.clone())));
 
-		Ok(Self {
-			logger,
-			audio_subsystem,
-			device: None,
-			data: data.clone(),
-			connections,
-		})
+		Ok(Self { logger, audio_subsystem, device: None, data: data.clone(), connections })
 	}
 
 	fn open_playback(&mut self) {
@@ -121,9 +108,7 @@ impl TsToAudio {
 
 impl Handler<PlayMsg> for TsToAudio {
 	type Result = Result<()>;
-	fn handle(
-		&mut self, PlayMsg(id, packet): PlayMsg, ctx: &mut Self::Context,
-	) -> Self::Result {
+	fn handle(&mut self, PlayMsg(id, packet): PlayMsg, ctx: &mut Self::Context) -> Self::Result {
 		if let Some(device) = &self.device {
 			let mut data = self.data.lock().unwrap();
 			if let Some(new_id) = data.handle_packet(id, packet)? {
@@ -132,29 +117,18 @@ impl Handler<PlayMsg> for TsToAudio {
 					.get_queues()
 					.iter()
 					.filter_map(|((con, client), queue)| {
-						if *con == new_id.0 {
-							Some((*client, queue.is_whispering()))
-						} else {
-							None
-						}
+						if *con == new_id.0 { Some((*client, queue.is_whispering())) } else { None }
 					})
 					.collect();
 				if let Some(con) = cons.get(&new_id.0) {
-					actix::spawn(
-						con.send(TalkersChangedMsg(talkers)).map(|_| ()),
-					);
+					actix::spawn(con.send(TalkersChangedMsg(talkers)).map(|_| ()));
 
 					// Get the volume of the new talker
-					ctx.spawn(
-						fut::wrap_future(
-							con.send(GetClientVolumeMsg(new_id.1)),
-						)
-						.map(move |v, this: &mut Self, _| match v {
+					ctx.spawn(fut::wrap_future(con.send(GetClientVolumeMsg(new_id.1))).map(
+						move |v, this: &mut Self, _| match v {
 							Ok(Ok(v)) => {
 								let mut data = this.data.lock().unwrap();
-								if let Some(q) =
-									data.get_mut_queues().get_mut(&new_id)
-								{
+								if let Some(q) = data.get_mut_queues().get_mut(&new_id) {
 									q.volume = v;
 								}
 							}
@@ -166,8 +140,8 @@ impl Handler<PlayMsg> for TsToAudio {
 								warn!(this.logger, "Failed to get volume for \
 									client"; "error" => %e);
 							}
-						}),
-					);
+						},
+					));
 				}
 			}
 
@@ -183,10 +157,8 @@ impl Handler<PlayMsg> for TsToAudio {
 impl Handler<SetVolumeMsg> for TsToAudio {
 	type Result = Result<()>;
 	fn handle(
-		&mut self, SetVolumeMsg(id, volume): SetVolumeMsg,
-		_: &mut Self::Context,
-	) -> Self::Result
-	{
+		&mut self, SetVolumeMsg(id, volume): SetVolumeMsg, _: &mut Self::Context,
+	) -> Self::Result {
 		let mut data = self.data.lock().unwrap();
 		if let Some(queue) = data.get_mut_queues().get_mut(&id) {
 			queue.volume = volume;
@@ -207,8 +179,7 @@ impl AudioCallback for SdlCallback {
 
 		let mut data = self.data.lock().unwrap();
 		let removed = data.fill_buffer(buffer);
-		let message_connections =
-			removed.iter().map(|i| i.0).collect::<HashSet<_>>();
+		let message_connections = removed.iter().map(|i| i.0).collect::<HashSet<_>>();
 		if !message_connections.is_empty() {
 			let cons = self.connections.lock().unwrap();
 			for c in message_connections {
@@ -216,17 +187,11 @@ impl AudioCallback for SdlCallback {
 					.get_queues()
 					.iter()
 					.filter_map(|((con, client), queue)| {
-						if *con == c {
-							Some((*client, queue.is_whispering()))
-						} else {
-							None
-						}
+						if *con == c { Some((*client, queue.is_whispering())) } else { None }
 					})
 					.collect();
 				if let Some(con) = cons.get(&c) {
-					self.handle.spawn(
-						con.send(TalkersChangedMsg(talkers)).map(|_| ()),
-					);
+					self.handle.spawn(con.send(TalkersChangedMsg(talkers)).map(|_| ()));
 				}
 			}
 		}

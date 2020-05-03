@@ -10,8 +10,7 @@ use crate::book_events::BookEvents;
 fn main() {
 	let target = env::var("TARGET").unwrap();
 	if target.contains("pc-windows") {
-		let manifest_dir =
-			PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+		let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
 		let mut lib_dir = manifest_dir.clone();
 		let mut dll_dir = manifest_dir.clone();
 		if target.contains("msvc") {
@@ -32,9 +31,7 @@ fn main() {
 		}
 		println!("cargo:rustc-link-search=all={}", lib_dir.display());
 		println!("cargo:rerun-if-changed={}/SDL2.dll", dll_dir.display());
-		for entry in std::fs::read_dir(dll_dir)
-			.expect("Can't read DLL dir, please add SDL")
-		{
+		for entry in std::fs::read_dir(dll_dir).expect("Can't read DLL dir, please add SDL") {
 			let entry_path = entry.expect("Invalid fs entry").path();
 			let file_name_result = entry_path.file_name();
 			let mut new_file_path = manifest_dir.clone();
@@ -44,10 +41,7 @@ fn main() {
 					new_file_path.push(file_name);
 					std::fs::copy(&entry_path, new_file_path.as_path())
 						.expect("Can't copy SDL from DLL dir");
-					println!(
-						"cargo:rerun-if-changed={}",
-						new_file_path.display()
-					);
+					println!("cargo:rerun-if-changed={}", new_file_path.display());
 				}
 			}
 		}

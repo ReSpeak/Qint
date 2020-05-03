@@ -71,12 +71,7 @@ impl Actor for AudioToTs {
 		self.open_device();
 
 		ctx.run_interval(Duration::from_secs(1), |a2t, _| {
-			if a2t
-				.device
-				.as_ref()
-				.map(|d| d.status() == AudioStatus::Stopped)
-				.unwrap_or(true)
-			{
+			if a2t.device.as_ref().map(|d| d.status() == AudioStatus::Stopped).unwrap_or(true) {
 				// Try to reconnect to audio
 				a2t.open_device();
 			}
@@ -101,9 +96,7 @@ impl Message for PlayPacketMsg {
 
 impl Handler<SetListenerMsg> for AudioToTs {
 	type Result = ();
-	fn handle(
-		&mut self, msg: SetListenerMsg, _: &mut Self::Context,
-	) -> Self::Result {
+	fn handle(&mut self, msg: SetListenerMsg, _: &mut Self::Context) -> Self::Result {
 		// Remove from previous connection
 		let is_playing = self.is_playing;
 		self.is_playing = false;
@@ -118,9 +111,7 @@ impl Handler<SetListenerMsg> for AudioToTs {
 
 impl Handler<RemoveListenerMsg> for AudioToTs {
 	type Result = bool;
-	fn handle(
-		&mut self, _: RemoveListenerMsg, _: &mut Self::Context,
-	) -> Self::Result {
+	fn handle(&mut self, _: RemoveListenerMsg, _: &mut Self::Context) -> Self::Result {
 		debug!(self.logger, "Removing listener");
 		self.is_playing = false;
 		self.update_talking();
@@ -154,10 +145,8 @@ impl Handler<SetPlayingMsg> for AudioToTs {
 impl Handler<PlayPacketMsg> for AudioToTs {
 	type Result = ();
 	fn handle(
-		&mut self, PlayPacketMsg(packet, is_end): PlayPacketMsg,
-		_: &mut Self::Context,
-	) -> Self::Result
-	{
+		&mut self, PlayPacketMsg(packet, is_end): PlayPacketMsg, _: &mut Self::Context,
+	) -> Self::Result {
 		// Write into packet sink
 		if let Some(con) = &mut self.connection {
 			if !con.connected() {
@@ -187,10 +176,8 @@ impl Handler<PlayPacketMsg> for AudioToTs {
 
 impl AudioToTs {
 	pub(crate) fn new(
-		logger: Logger, audio_subsystem: AudioSubsystem,
-		spawn_send: mpsc::Sender<PlayPacketMsg>,
-	) -> Result<Self>
-	{
+		logger: Logger, audio_subsystem: AudioSubsystem, spawn_send: mpsc::Sender<PlayPacketMsg>,
+	) -> Result<Self> {
 		let logger = logger.new(o!("pipeline" => "audio-to-ts"));
 
 		Ok(Self {
@@ -246,19 +233,15 @@ impl AudioToTs {
 
 	fn update_talking(&self) {
 		if let Some(con) = &self.connection {
-			tokio::spawn(
-				con.send(SetSelfTalkingMsg(self.is_playing && self.is_talking)),
-			);
+			tokio::spawn(con.send(SetSelfTalkingMsg(self.is_playing && self.is_talking)));
 		}
 	}
 }
 
 impl SdlCallback {
 	fn new(
-		logger: Logger, channels: audiopus::Channels,
-		spawn_send: mpsc::Sender<PlayPacketMsg>,
-	) -> Self
-	{
+		logger: Logger, channels: audiopus::Channels, spawn_send: mpsc::Sender<PlayPacketMsg>,
+	) -> Self {
 		Self {
 			logger,
 			channels,
@@ -283,8 +266,7 @@ impl SdlCallback {
 	}
 
 	fn send_packet(&mut self, packet: OutPacket, is_end: bool) {
-		if let Err(e) = self.spawn_send.try_send(PlayPacketMsg(packet, is_end))
-		{
+		if let Err(e) = self.spawn_send.try_send(PlayPacketMsg(packet, is_end)) {
 			warn!(self.logger, "Failed to send audio packet";
 				"error" => %e);
 		}
@@ -339,8 +321,7 @@ impl AudioCallback for SdlCallback {
 			if did_talk {
 				// Send empty packet to signal end
 				trace!(self.logger, "Sending last empty packet");
-				let packet =
-					OutAudio::new(&AudioData::C2S { id: 0, codec, data: &[] });
+				let packet = OutAudio::new(&AudioData::C2S { id: 0, codec, data: &[] });
 				self.send_packet(packet, true);
 			}
 			self.last_buffer.resize(buffer.len(), 0.0);
@@ -357,10 +338,7 @@ impl AudioCallback for SdlCallback {
 		if !did_talk {
 			// Send cached last buffer if there was one
 			if !self.last_buffer.is_empty() {
-				trace!(
-					self.logger,
-					"Start to talk: Sending cached last buffer"
-				);
+				trace!(self.logger, "Start to talk: Sending cached last buffer");
 				for d in &mut self.last_buffer {
 					*d /= i16::max_value() as f32;
 				}
@@ -388,23 +366,15 @@ impl AudioCallback for SdlCallback {
 			}
 		}
 
-		match self
-			.encoder
-			.as_ref()
-			.unwrap()
-			.encode_float(buffer, &mut self.opus_output[..])
-		{
+		match self.encoder.as_ref().unwrap().encode_float(buffer, &mut self.opus_output[..]) {
 			Err(e) => {
 				warn!(self.logger, "Failed to encode opus"; "error" => ?e);
 			}
 			Ok(len) => {
 				trace!(self.logger, "Sending packet");
 				// Create packet
-				let packet = OutAudio::new(&AudioData::C2S {
-					id: 0,
-					codec,
-					data: &self.opus_output[..len],
-				});
+				let packet =
+					OutAudio::new(&AudioData::C2S { id: 0, codec, data: &self.opus_output[..len] });
 				self.send_packet(packet, false);
 			}
 		}

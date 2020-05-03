@@ -10,26 +10,11 @@ use tsproto_types::crypto::EccKeyPubP256;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum JsEvent {
-	PropertyAdded {
-		id: JsPropertyId,
-		prop: JsProperty,
-		invoker: Option<Invoker>,
-	},
-	PropertyChanged {
-		id: JsPropertyId,
-		prop: JsProperty,
-		invoker: Option<Invoker>,
-	},
-	PropertyRemoved {
-		id: JsPropertyId,
-		invoker: Option<Invoker>,
-	},
+	PropertyAdded { id: JsPropertyId, prop: JsProperty, invoker: Option<Invoker> },
+	PropertyChanged { id: JsPropertyId, prop: JsProperty, invoker: Option<Invoker> },
+	PropertyRemoved { id: JsPropertyId, invoker: Option<Invoker> },
 	ChannelListFinished,
-	Message {
-		target: MessageTarget,
-		invoker: Invoker,
-		message: String,
-	},
+	Message { target: MessageTarget, invoker: Invoker, message: String },
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

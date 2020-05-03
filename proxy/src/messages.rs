@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
-use tsclientlib::{
-	ChannelId, ClientId, DisconnectOptions, MessageTarget, Version,
-};
+use tsclientlib::{ChannelId, ClientId, DisconnectOptions, MessageTarget, Version};
 
 use crate::book_events::JsEvent;
 

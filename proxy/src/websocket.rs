@@ -14,8 +14,8 @@ use tokio::sync::oneshot;
 use tsclientlib::events::Event as TsEvent;
 use tsclientlib::StreamItem as TsStreamItem;
 use tsclientlib::{
-	events, ChannelId, ClientId, Connection, DisconnectOptions,
-	FileDownloadResult, FileTransferHandle, MessageTarget, Uid,
+	events, ChannelId, ClientId, Connection, DisconnectOptions, FileDownloadResult,
+	FileTransferHandle, MessageTarget, Uid,
 };
 use tsproto::resend::PacketId;
 use tsproto_packets::packets::{AudioData, OutPacket};
@@ -32,10 +32,7 @@ pub(crate) struct Ws {
 	id: ConnectionId,
 	connection: Option<Connection>,
 	connect_options: Option<messages::ConnectOptions>,
-	file_downloads: HashMap<
-		FileTransferHandle,
-		oneshot::Sender<Result<FileDownloadResult>>,
-	>,
+	file_downloads: HashMap<FileTransferHandle, oneshot::Sender<Result<FileDownloadResult>>>,
 
 	websocket_closed: bool,
 	self_talking: bool,
@@ -105,9 +102,7 @@ impl Message for DownloadFile {
 }
 
 impl Ws {
-	pub fn new(
-		logger: Logger, state: Arc<State>, options: WsOptions, id: ConnectionId,
-	) -> Self {
+	pub fn new(logger: Logger, state: Arc<State>, options: WsOptions, id: ConnectionId) -> Self {
 		let logger = logger.new(o!("id" => id.0.to_string()));
 		Self {
 			logger,
@@ -138,34 +133,25 @@ impl Ws {
 		self.send_message(&MessageP2F::TalkersChanged(Vec::new()), ctx);
 	}
 
-	fn send_to_audio<T: Message<Result = Result<()>> + Send + 'static>(
-		&self, msg: T,
-	) where audio::ts_to_audio::TsToAudio: Handler<T> {
+	fn send_to_audio<T: Message<Result = Result<()>> + Send + 'static>(&self, msg: T)
+	where audio::ts_to_audio::TsToAudio: Handler<T> {
 		let logger = self.logger.clone();
-		actix::spawn(self.state.audio_data.ts2a.send(msg).map(
-			move |r| match r {
-				Ok(Ok(())) => {}
-				Ok(Err(e)) => {
-					debug!(logger, "Audio error"; "error" => %e);
-				}
-				Err(_) => {
-					warn!(logger, "Failed to send audio to handler");
-				}
-			},
-		));
+		actix::spawn(self.state.audio_data.ts2a.send(msg).map(move |r| match r {
+			Ok(Ok(())) => {}
+			Ok(Err(e)) => {
+				debug!(logger, "Audio error"; "error" => %e);
+			}
+			Err(_) => {
+				warn!(logger, "Failed to send audio to handler");
+			}
+		}));
 	}
 
-	fn handle_event(
-		&mut self, event: TsStreamItem, ctx: &mut <Self as Actor>::Context,
-	) {
+	fn handle_event(&mut self, event: TsStreamItem, ctx: &mut <Self as Actor>::Context) {
 		match event {
 			TsStreamItem::ConEvents(events) => {
 				for e in &events {
-					if let TsEvent::PropertyAdded {
-						id: events::PropertyId::Server,
-						..
-					} = e
-					{
+					if let TsEvent::PropertyAdded { id: events::PropertyId::Server, .. } = e {
 						// Connected
 						// Activate audio
 						let logger = self.logger.clone();
@@ -182,26 +168,21 @@ impl Ws {
 						);
 
 						match self.connection.as_ref().and_then(|c| {
-							c.get_server_key().ok().and_then(|s| {
-								c.get_state().map(|c| (s, c.own_client)).ok()
-							})
+							c.get_server_key()
+								.ok()
+								.and_then(|s| c.get_state().map(|c| (s, c.own_client)).ok())
 						}) {
 							Some((server_key, own_client)) => {
 								// Send server id
-								let server =
-									base64::encode(&server_key.to_short());
+								let server = base64::encode(&server_key.to_short());
 								self.send_message(
-									&MessageP2F::Connected {
-										server,
-										own_client,
-									},
+									&MessageP2F::Connected { server, own_client },
 									ctx,
 								);
 
 								// Save in database
 								let logger = self.logger.clone();
-								let opts =
-									self.connect_options.as_ref().unwrap();
+								let opts = self.connect_options.as_ref().unwrap();
 								let id = self.state.settings.default_identity;
 								actix::spawn(
 									self.state
@@ -215,31 +196,23 @@ impl Ws {
 											server_key,
 										})
 										.map(move |r| match r {
-											Ok(Err(e)) => {
-												warn!(logger, "Failed to save \
+											Ok(Err(e)) => warn!(logger, "Failed to save \
 													connection in database";
-													"error" => ?e)
-											}
-											Err(e) => {
-												warn!(logger, "Failed to save \
+													"error" => ?e),
+											Err(e) => warn!(logger, "Failed to save \
 													connection in database";
-													"error" => ?e)
-											}
+													"error" => ?e),
 											_ => {}
 										}),
 								);
 							}
-							None => {
-								error!(self.logger, "Failed to get server key")
-							}
+							None => error!(self.logger, "Failed to get server key"),
 						}
 					} else if let TsEvent::ChannelListFinished = e {
 						// Subscribe to all channels
 						if let Some(con) = &mut self.connection {
 							if let Ok(mut data) = con.get_mut_state() {
-								if let Err(e) =
-									data.get_server().set_subscribed(true)
-								{
+								if let Err(e) = data.get_server().set_subscribed(true) {
 									error!(self.logger, "Failed to subscribe \
 										to server"; "error" => %e);
 								}
@@ -265,9 +238,7 @@ impl Ws {
 							&MessageP2F::Events(
 								events
 									.into_iter()
-									.filter_map(|e| {
-										book_events::convert_event(data, &e)
-									})
+									.filter_map(|e| book_events::convert_event(data, &e))
 									.collect(),
 							),
 							ctx,
@@ -279,33 +250,25 @@ impl Ws {
 				let from = ClientId(match audio.data().data() {
 					AudioData::S2C { from, .. } => *from,
 					AudioData::S2CWhisper { from, .. } => *from,
-					_ => panic!(
-						"Can only handle S2C packets but got a C2S packet"
-					),
+					_ => panic!("Can only handle S2C packets but got a C2S packet"),
 				});
 				let id = (self.id, from);
 				self.send_to_audio(audio::ts_to_audio::PlayMsg(id, audio));
 			}
 			TsStreamItem::IdentityLevelIncreased => {
 				if let Some(con) = &self.connection {
-					let event = db::UpdateIdentityMsg(
-						con.get_options().get_identity().unwrap().clone(),
-					);
+					let event =
+						db::UpdateIdentityMsg(con.get_options().get_identity().unwrap().clone());
 					let logger = self.logger.clone();
-					actix::spawn(self.state.database.send(event).map(
-						move |r| match r {
-							Ok(Ok(())) => {}
-							Ok(Err(e)) => {
-								error!(logger, "Failed to handle event in database"; "error" => ?e);
-							}
-							Err(_) => {
-								error!(
-									logger,
-									"Failed to send event to database"
-								);
-							}
-						},
-					));
+					actix::spawn(self.state.database.send(event).map(move |r| match r {
+						Ok(Ok(())) => {}
+						Ok(Err(e)) => {
+							error!(logger, "Failed to handle event in database"; "error" => ?e);
+						}
+						Err(_) => {
+							error!(logger, "Failed to send event to database");
+						}
+					}));
 				}
 			}
 			TsStreamItem::FileDownload(handle, file) => {
@@ -338,9 +301,7 @@ impl Ws {
 		}
 	}
 
-	fn handle_ws_message(
-		&mut self, msg: MessageF2P, ctx: &mut <Self as Actor>::Context,
-	) {
+	fn handle_ws_message(&mut self, msg: MessageF2P, ctx: &mut <Self as Actor>::Context) {
 		match msg {
 			MessageF2P::Connect(o) => {
 				let id = self.state.settings.default_identity;
@@ -353,25 +314,16 @@ impl Ws {
 					)
 					.map(move |identity, actor: &mut Self, ctx| {
 						identity.and_then(|id| {
-							let options = tsclientlib::ConnectOptions::new(
-								o.address.clone(),
-							)
-							.name(o.name.clone())
-							.identity(id)
-							.version(o.version.clone())
-							.logger(actor.logger.clone())
-							.log_commands(
-								o.log_commands
-									|| actor.state.settings.verbosity > 0,
-							)
-							.log_packets(
-								o.log_packets
-									|| actor.state.settings.verbosity > 1,
-							)
-							.log_udp_packets(
-								o.log_udp_packets
-									|| actor.state.settings.verbosity > 2,
-							);
+							let options = tsclientlib::ConnectOptions::new(o.address.clone())
+								.name(o.name.clone())
+								.identity(id)
+								.version(o.version.clone())
+								.logger(actor.logger.clone())
+								.log_commands(o.log_commands || actor.state.settings.verbosity > 0)
+								.log_packets(o.log_packets || actor.state.settings.verbosity > 1)
+								.log_udp_packets(
+									o.log_udp_packets || actor.state.settings.verbosity > 2,
+								);
 
 							actor.connect_options = Some(o);
 							actor.connection = Some(Connection::new(options)?);
@@ -382,9 +334,7 @@ impl Ws {
 					.map(move |r, actor: &mut Self, ctx| {
 						if let Err(_) = r {
 							actor.send_message(
-								&MessageP2F::Error(
-									"Failed to connect".to_string(),
-								),
+								&MessageP2F::Error("Failed to connect".to_string()),
 								ctx,
 							);
 						}
@@ -406,8 +356,7 @@ impl Ws {
 							error!(self.logger, "Failed to get state"; "error" => ?e);
 						}
 						Ok(mut state) => {
-							if let Err(e) = state.send_message(target, &message)
-							{
+							if let Err(e) = state.send_message(target, &message) {
 								error!(self.logger, "Failed to send message"; "error" => ?e);
 							}
 						}
@@ -426,17 +375,12 @@ impl Ws {
 						let server = server.to_short().to_vec();
 						let own_channel;
 						let invoker_uid = {
-							if let Some(own_client) =
-								state.clients.get(&state.own_client)
-							{
+							if let Some(own_client) = state.clients.get(&state.own_client) {
 								own_channel = own_client.channel.0;
 								if let Some(uid) = own_client.uid.as_ref() {
 									uid.0.clone()
 								} else {
-									error!(
-										self.logger,
-										"Failed to get own client uid"
-									);
+									error!(self.logger, "Failed to get own client uid");
 									return;
 								}
 							} else {
@@ -447,15 +391,9 @@ impl Ws {
 
 						let chat_type = match target {
 							MessageTarget::Server => ChatType::Server,
-							MessageTarget::Channel => {
-								ChatType::Channel(own_channel)
-							}
-							MessageTarget::Client(id)
-							| MessageTarget::Poke(id) => {
-								let uid = &state
-									.clients
-									.get(&id)
-									.and_then(|c| c.uid.as_ref());
+							MessageTarget::Channel => ChatType::Channel(own_channel),
+							MessageTarget::Client(id) | MessageTarget::Poke(id) => {
+								let uid = &state.clients.get(&id).and_then(|c| c.uid.as_ref());
 								if let Some(uid) = uid {
 									if let MessageTarget::Client(_) = target {
 										ChatType::Client(uid.0.clone())
@@ -475,20 +413,15 @@ impl Ws {
 							chat: ChatId { server, chat_type },
 						};
 						let logger = self.logger.clone();
-						actix::spawn(self.state.database.send(msg).map(
-							move |r| match r {
-								Ok(Ok(())) => {}
-								Ok(Err(e)) => {
-									error!(logger, "Failed to handle event in database"; "error" => ?e);
-								}
-								Err(_) => {
-									error!(
-										logger,
-										"Failed to send event to database"
-									);
-								}
-							},
-						));
+						actix::spawn(self.state.database.send(msg).map(move |r| match r {
+							Ok(Ok(())) => {}
+							Ok(Err(e)) => {
+								error!(logger, "Failed to handle event in database"; "error" => ?e);
+							}
+							Err(_) => {
+								error!(logger, "Failed to send event to database");
+							}
+						}));
 					} else {
 						error!(self.logger, "Failed to get connection state");
 					}
@@ -510,10 +443,7 @@ impl Ws {
 										"error" => ?e);
 								}
 							} else {
-								error!(
-									self.logger,
-									"Failed to find own client"
-								);
+								error!(self.logger, "Failed to find own client");
 							}
 						}
 					}
@@ -522,9 +452,7 @@ impl Ws {
 		}
 	}
 
-	fn send_message(
-		&self, msg: &MessageP2F, ctx: &mut <Self as Actor>::Context,
-	) {
+	fn send_message(&self, msg: &MessageP2F, ctx: &mut <Self as Actor>::Context) {
 		match self.options.format {
 			WsFormat::Msgpack => ctx.binary(rmp_serde::to_vec(msg).unwrap()),
 			WsFormat::Json => ctx.text(serde_json::to_string(msg).unwrap()),
@@ -534,9 +462,7 @@ impl Ws {
 
 impl Handler<DownloadFile> for Ws {
 	type Result = ResponseFuture<Result<(u64, TcpStream, Uid)>>;
-	fn handle(
-		&mut self, msg: DownloadFile, _: &mut Self::Context,
-	) -> Self::Result {
+	fn handle(&mut self, msg: DownloadFile, _: &mut Self::Context) -> Self::Result {
 		if let Some(con) = &mut self.connection {
 			let uid = match con
 				.get_server_key()
@@ -544,19 +470,12 @@ impl Handler<DownloadFile> for Ws {
 			{
 				Ok(k) => Uid(k),
 				Err(e) => {
-					return Box::pin(futures::future::err(format_err!(
-						"Failed to get uid: {}",
-						e
-					)));
+					return Box::pin(futures::future::err(format_err!("Failed to get uid: {}", e)));
 				}
 			};
 
-			let handle = match con.download_file(
-				msg.channel,
-				&format!("/{}", msg.path),
-				None,
-				None,
-			) {
+			let handle = match con.download_file(msg.channel, &format!("/{}", msg.path), None, None)
+			{
 				Ok(r) => r,
 				Err(e) => {
 					return Box::pin(futures::future::err(format_err!(
@@ -573,9 +492,7 @@ impl Handler<DownloadFile> for Ws {
 				Err(e) => Err(e.into()),
 			}))
 		} else {
-			Box::pin(futures::future::err(format_err!(
-				"Connection does not exist"
-			)))
+			Box::pin(futures::future::err(format_err!("Connection does not exist")))
 		}
 	}
 }
@@ -583,31 +500,24 @@ impl Handler<DownloadFile> for Ws {
 impl Handler<GetClientVolumeMsg> for Ws {
 	type Result = ActorResponse<Self, f32, Error>;
 	fn handle(
-		&mut self, GetClientVolumeMsg(client): GetClientVolumeMsg,
-		_: &mut Self::Context,
-	) -> Self::Result
-	{
+		&mut self, GetClientVolumeMsg(client): GetClientVolumeMsg, _: &mut Self::Context,
+	) -> Self::Result {
 		if let Some(con) = &self.connection {
 			match con.get_state() {
 				Ok(state) => {
-					let uid_fut: Box<
-						dyn ActorFuture<Actor = Self, Output = Result<Vec<u8>>>,
-					>;
+					let uid_fut: Box<dyn ActorFuture<Actor = Self, Output = Result<Vec<u8>>>>;
 					if let Some(client) = state.clients.get(&client) {
 						uid_fut = Box::new(wrap_future(future::ready(
 							client
 								.uid
 								.as_ref()
 								.map(|u| u.0.clone())
-								.ok_or_else(|| {
-									format_err!("Client has no uid")
-								}),
+								.ok_or_else(|| format_err!("Client has no uid")),
 						)));
 					} else {
 						// TODO Get uid from server
-						uid_fut = Box::new(wrap_future(future::err(
-							format_err!("Not yet implemented"),
-						)));
+						uid_fut =
+							Box::new(wrap_future(future::err(format_err!("Not yet implemented"))));
 					}
 					// Get volume from db
 					ActorResponse::r#async(
@@ -620,9 +530,7 @@ impl Handler<GetClientVolumeMsg> for Ws {
 										.map_err(|e| e.into())
 										.left_future(),
 								),
-								Err(e) => {
-									wrap_future(future::err(e).right_future())
-								}
+								Err(e) => wrap_future(future::err(e).right_future()),
 							})
 							.map(|res, _, _| match res {
 								Ok(Ok(Some(v))) => Ok(v),
@@ -645,10 +553,8 @@ impl Handler<GetClientVolumeMsg> for Ws {
 impl Handler<SetSelfTalkingMsg> for Ws {
 	type Result = ();
 	fn handle(
-		&mut self, SetSelfTalkingMsg(talking): SetSelfTalkingMsg,
-		ctx: &mut Self::Context,
-	) -> Self::Result
-	{
+		&mut self, SetSelfTalkingMsg(talking): SetSelfTalkingMsg, ctx: &mut Self::Context,
+	) -> Self::Result {
 		if self.self_talking != talking {
 			self.self_talking = talking;
 			self.update_talkers(ctx);
@@ -659,10 +565,8 @@ impl Handler<SetSelfTalkingMsg> for Ws {
 impl Handler<TalkersChangedMsg> for Ws {
 	type Result = ();
 	fn handle(
-		&mut self, TalkersChangedMsg(talkers): TalkersChangedMsg,
-		ctx: &mut Self::Context,
-	) -> Self::Result
-	{
+		&mut self, TalkersChangedMsg(talkers): TalkersChangedMsg, ctx: &mut Self::Context,
+	) -> Self::Result {
 		if self.talkers != talkers {
 			self.talkers = talkers;
 			self.update_talkers(ctx);
@@ -672,21 +576,11 @@ impl Handler<TalkersChangedMsg> for Ws {
 
 impl Handler<SaveClientMsg> for Ws {
 	type Result = Result<()>;
-	fn handle(
-		&mut self, SaveClientMsg(uid): SaveClientMsg, _: &mut Self::Context,
-	) -> Self::Result {
+	fn handle(&mut self, SaveClientMsg(uid): SaveClientMsg, _: &mut Self::Context) -> Self::Result {
 		if let Some(con) = &mut self.connection {
 			let state = con.get_state()?;
-			if let Some(client) =
-				state.clients.values().find(|c| c.uid.as_ref() == Some(&uid))
-			{
-				db::DbHandler::create_client(
-					&self.state.database,
-					&self.logger,
-					con,
-					state,
-					client,
-				)
+			if let Some(client) = state.clients.values().find(|c| c.uid.as_ref() == Some(&uid)) {
+				db::DbHandler::create_client(&self.state.database, &self.logger, con, state, client)
 			} else {
 				bail!("Client not found")
 			}
@@ -712,18 +606,14 @@ impl Handler<SendPacketMsg> for Ws {
 impl Handler<SetVolumeMsg> for Ws {
 	type Result = ();
 	fn handle(
-		&mut self, SetVolumeMsg(client, volume): SetVolumeMsg,
-		_: &mut Self::Context,
-	) -> Self::Result
-	{
+		&mut self, SetVolumeMsg(client, volume): SetVolumeMsg, _: &mut Self::Context,
+	) -> Self::Result {
 		if let Some(con) = &self.connection {
 			if let Ok(state) = con.get_state() {
 				for c in state.clients.values() {
 					if c.uid.as_ref() == Some(&client) {
 						let id = (self.id, c.id);
-						self.send_to_audio(audio::ts_to_audio::SetVolumeMsg(
-							id, volume,
-						));
+						self.send_to_audio(audio::ts_to_audio::SetVolumeMsg(id, volume));
 					}
 				}
 			} else {
@@ -737,9 +627,7 @@ impl Handler<SetVolumeMsg> for Ws {
 
 impl Handler<DisconnectMsg> for Ws {
 	type Result = ();
-	fn handle(
-		&mut self, _: DisconnectMsg, ctx: &mut Self::Context,
-	) -> Self::Result {
+	fn handle(&mut self, _: DisconnectMsg, ctx: &mut Self::Context) -> Self::Result {
 		self.disconnect(ctx);
 	}
 }
@@ -763,14 +651,13 @@ impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for Ws {
 				self.handle_ws_message(msg, ctx);
 			}
 			Ok(ws::Message::Binary(msg)) => {
-				let msg: MessageF2P =
-					match rmp_serde::from_read_ref(msg.as_ref()) {
-						Ok(r) => r,
-						Err(e) => {
-							error!(self.logger, "Error msgpack deserializing message"; "error" => ?e);
-							return;
-						}
-					};
+				let msg: MessageF2P = match rmp_serde::from_read_ref(msg.as_ref()) {
+					Ok(r) => r,
+					Err(e) => {
+						error!(self.logger, "Error msgpack deserializing message"; "error" => ?e);
+						return;
+					}
+				};
 				self.handle_ws_message(msg, ctx);
 			}
 			Ok(ws::Message::Close(_)) => {
@@ -787,8 +674,8 @@ impl ActorFuture for ConnectionPoller {
 	type Output = ();
 	type Actor = Ws;
 	fn poll(
-		self: Pin<&mut Self>, actor: &mut Self::Actor,
-		ctx: &mut <Self::Actor as Actor>::Context, task: &mut task::Context,
+		self: Pin<&mut Self>, actor: &mut Self::Actor, ctx: &mut <Self::Actor as Actor>::Context,
+		task: &mut task::Context,
 	) -> Poll<Self::Output>
 	{
 		loop {
@@ -808,10 +695,7 @@ impl ActorFuture for ConnectionPoller {
 				Poll::Ready(Some(Err(e))) => {
 					error!(actor.state.logger, "Connection failed"; "error" => ?e);
 					actor.connection = None;
-					actor.send_message(
-						&MessageP2F::Error("Connection failed".to_string()),
-						ctx,
-					);
+					actor.send_message(&MessageP2F::Error("Connection failed".to_string()), ctx);
 					break Poll::Ready(());
 				}
 				Poll::Ready(Some(Ok(item))) => {

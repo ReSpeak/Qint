@@ -19,8 +19,7 @@ impl Secret {
 	pub fn new() -> Result<Self> {
 		let rand = SystemRandom::new();
 		let mut key = vec![0; ALG.key_len()];
-		rand.fill(&mut key)
-			.map_err(|_| format_err!("Failed to create random numbers"))?;
+		rand.fill(&mut key).map_err(|_| format_err!("Failed to create random numbers"))?;
 		Ok(Self(key))
 	}
 
@@ -34,8 +33,7 @@ impl Secret {
 		let nonce = SingleNonce(Some(nonce));
 
 		let mut key = SealingKey::new(
-			UnboundKey::new(&ALG, &self.0)
-				.map_err(|_| format_err!("Failed to create key"))?,
+			UnboundKey::new(&ALG, &self.0).map_err(|_| format_err!("Failed to create key"))?,
 			nonce,
 		);
 
@@ -59,8 +57,7 @@ impl Secret {
 		data.truncate(data.len() - nonce_len);
 
 		let mut key = OpeningKey::new(
-			UnboundKey::new(&ALG, &self.0)
-				.map_err(|_| format_err!("Failed to create key"))?,
+			UnboundKey::new(&ALG, &self.0).map_err(|_| format_err!("Failed to create key"))?,
 			nonce,
 		);
 
