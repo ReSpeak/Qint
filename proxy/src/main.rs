@@ -174,7 +174,8 @@ async fn create_ws(
 	let ws_con = Ws::new(state.logger.clone(), (*state).clone(), options.0, id);
 	match ws::start_with_addr(ws_con, &req, stream) {
 		Err(e) => {
-			error!(state.logger, "Failed to create websocket actor"; "error" => ?e);
+			error!(state.logger, "Failed to create websocket actor";
+				"error" => ?e);
 			Either::A(
 				HttpResponse::InternalServerError()
 					.body("Failed to start connection"),
@@ -226,7 +227,8 @@ async fn list_plugins(state: web::Data<State>) -> impl Responder {
 	let dir = match path.read_dir() {
 		Ok(r) => r,
 		Err(e) => {
-			warn!(state.logger, "Failed to list plugins"; "dir" => ?path, "error" => ?e);
+			warn!(state.logger, "Failed to list plugins"; "dir" => ?path,
+				"error" => ?e);
 			return std::io::Result::<_>::Ok(web::Json(Vec::new()));
 		}
 	};
@@ -257,7 +259,8 @@ async fn download_file(
 	let cons = state.connections.lock().unwrap();
 	if let Some(con) = cons.get(&ConnectionId(data.0)).cloned() {
 		drop(cons);
-		debug!(state.logger, "Downloading file"; "channel" => data.1, "path" => &data.2);
+		debug!(state.logger, "Downloading file"; "channel" => data.1,
+			"path" => &data.2);
 		let (len, file_stream, server) = match con
 			.send(websocket::DownloadFile { channel, path: data.2.clone() })
 			.await
@@ -351,7 +354,7 @@ async fn main() -> Result<()> {
 			Err(e) => {
 				// Only a soft error
 				info!(logger, "Failed to read settings, using defaults";
-				"error" => %e);
+					"error" => %e);
 				// Create settings directory
 				fs::create_dir_all(&config_path)?;
 

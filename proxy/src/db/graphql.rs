@@ -786,8 +786,7 @@ impl Query {
 			.send(RunOnDbMsg(|db| {
 				use schema::clients;
 
-				let query =
-					clients::table.filter(clients::uid.eq(client));
+				let query = clients::table.filter(clients::uid.eq(client));
 				GResult::Ok(Client(query.first::<models::Client>(&db.con)?))
 			}))
 			.await??;
