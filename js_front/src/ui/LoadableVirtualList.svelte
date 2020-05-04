@@ -197,14 +197,14 @@
 			return;
 		}
 
-		if (start > 0)
+		/*if (start > 0)
 			isAtStart = false;
 		if (end < rows.length)
 			isAtEnd = false;
 		if (start != 0 || end != rows.length) {
 			console.log("slice", start, end, rows.length);
 			items = items.slice(start, end);
-		}
+		}*/
 	}
 
 	function scrollReturn() {

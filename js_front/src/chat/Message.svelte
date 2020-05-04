@@ -1,17 +1,58 @@
 <script>
-	import { afterUpdate } from "svelte";
+	import hljs from 'highlight.js';
+	import katex from 'katex';
+	import { afterUpdate, onMount } from "svelte";
 	import { flash } from "../util";
 	import Icon from "../ui/Icon.svelte";
 
 	export let message;
 
-	let promise;
 	let viewRaw = false;
+	let rendered;
+	$: renderedObj = render(message.rendered);
+
+	function render(html) {
+		var obj = document.createElement('div');
+		obj.innerHTML = html;
+		// Apply highlight.js
+		for (let elem of obj.getElementsByTagName("code")) {
+			const lang = elem.getAttribute('data-lang');
+			if (hljs.listLanguages().includes(lang)) {
+				elem.classList.add(lang);
+			}
+			hljs.highlightBlock(elem);
+		}
+
+		// Apply KaTeX
+		for (let elem of obj.getElementsByClassName("latex")) {
+			const code = elem.getAttribute('data-latex');
+			const mode = elem.getAttribute('data-displaymode');
+			try {
+				katex.render(code, elem, {
+					displayMode: mode === "true",
+					throwOnError: false,
+				});
+			} catch {
+				console.error("Failed to render latex");
+				elem.innerText = code;
+			}
+		}
+		if (rendered) {
+			rendered.innerHTML = '';
+			rendered.appendChild(obj);
+		}
+		return obj;
+	}
 
 	let div;
 	afterUpdate(() => {
 		flash(div);
 	});
+
+	onMount(() => {
+		rendered.innerHTML = '';
+		rendered.appendChild(renderedObj);
+	})
 </script>
 
 <svelte:options immutable />
@@ -29,7 +70,7 @@
 		class:message-error="{false}"
 		class:viewRaw
 	>
-		<div class="content message-rendered latex_proc">{@html message.rendered}</div>
+		<div class="content message-rendered" bind:this={rendered}></div>
 		<div class="message-raw">
 			<pre>{message.raw}</pre>
 		</div>

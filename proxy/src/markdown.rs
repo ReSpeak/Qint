@@ -647,31 +647,18 @@ fn nom_bb_match_tag(s: &str) -> Option<BBTag> {
 // [JS] Highlight.js
 
 fn hljs_render_code(code: &str, lang: &str) -> Option<VNode> {
-	//let elem = js! { return window.hljs_highlight(@{code}, @{lang}); };
-	//Node::try_from(elem).ok().map(|n| VNode::VRef(n))
-	// TODO
-	None
+	let mut tag = VTag::new("code");
+	tag.add_attribute("data-lang", lang);
+	tag.add_child(code.to_string().into());
+	Some(tag.into())
 }
 
 // [JS] KaTeX (LaTeX)
 
 fn katex_render_code(code: &str, display_mode: bool) -> Option<VNode> {
-	/*let elem = js! {
-		let code = @{code};
-		const elem = document.createElement("div");
-		let res;
-		try {
-			window.katex.render(code, elem, {
-				displayMode: @{display_mode},
-				throwOnError: false,
-			});
-		} catch {
-			elem.innerText = code;
-			console.log("Failed to render latex");
-		}
-		return elem;
-	};
-	Node::try_from(elem).ok().map(|n| VNode::VRef(n))*/
-	// TODO
-	None
+	let mut tag = VTag::new("div");
+	tag.add_class("latex");
+	tag.add_attribute("data-latex", code);
+	tag.add_attribute("data-displaymode", if display_mode { "true" } else { "false" });
+	Some(tag.into())
 }
