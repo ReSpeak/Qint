@@ -50,6 +50,8 @@
 			if (div.contains(event.relatedTarget)) {
 				return;
 			}
+		} else {
+			return;
 		}
 		hovered = false;
 	}
@@ -158,7 +160,7 @@
 	}
 
 	.selectedChannel {
-		background-color: #ddd;
+		background-color: mix($background, $text, 80%);
 	}
 
 	.hover {

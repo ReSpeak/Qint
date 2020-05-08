@@ -96,12 +96,12 @@
 </aside>
 
 <style lang="scss">
-	button {
+	.button {
 		background: none;
 		border: none;
 		border-radius: 0;
 	}
-	button:focus {
+	.button:focus {
 		box-shadow: none;
 	}
 
@@ -113,7 +113,7 @@
 		bottom: 0;
 		box-sizing: border-box;
 		width: var(--channel-tree-width);
-		background-color: $background;
+		background-color: $box-background-color;
 		border-right: rgb(179, 179, 179) 2px solid;
 	}
 
@@ -134,15 +134,15 @@
 		bottom: 0;
 		top: 0;
 		z-index: 1;
-		background-color: #fff;
-		box-shadow: 0 0.3em 0.3em #bbb;
+		background-color: $background;
+		box-shadow: 0 0.3em 0.3em #0005;
 
 		width: 100%;
 		justify-content: start;
 	}
 
 	button.selectedServerChat {
-		background: #ddd;
+		background-color: mix($background, $text, 80%);
 	}
 
 	.sidebar-content button.chats-header {

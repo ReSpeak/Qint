@@ -35,7 +35,7 @@
 		left: 0;
 		right: 0;
 
-		background-color: #ff0a;
+		background-color: change-color(mix($warning, $background, 80%), $alpha: 0.8);
 		border: 1px solid #bb0;
 		border-radius: 0.2em;
 	}

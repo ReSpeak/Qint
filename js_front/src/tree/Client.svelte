@@ -43,6 +43,8 @@
 			if (div.contains(event.relatedTarget)) {
 				return;
 			}
+		} else {
+			return;
 		}
 		newHover = false;
 		setTimeout(() => {
@@ -147,7 +149,7 @@
 	}
 
 	.selectedClient {
-		background-color: #ddd;
+		background-color: mix($background, $text, 80%);
 	}
 
 	.hover {

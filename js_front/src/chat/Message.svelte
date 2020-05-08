@@ -98,7 +98,7 @@
 		display: contents;
 
 		&:hover > * {
-			background-color: #eee;
+			background-color: mix($background, $text, 80%);
 
 			.tool-buttons {
 				visibility: visible;
@@ -111,7 +111,7 @@
 		font-size: 0.8em;
 		padding-top: 0.25em;
 		* {
-			color: gray;
+			color: mix($text, $background, 60%);
 		}
 	}
 
@@ -169,13 +169,17 @@
 		}
 	}
 
+	.message-raw pre {
+		background: none;
+	}
+
 	:global(code[rel]::before) {
 		font-size: 0.8em;
 		content: attr(rel);
 		position: absolute;
 		bottom: 1em;
 		right: 2em;
-		color: orange;
+		color: $orange;
 		font-weight: bold;
 		font-family: Sans-Serif;
 		text-transform: uppercase;

@@ -51,7 +51,7 @@
 
 <style lang="scss">
 	.bookmarkItem {
-		background-color: #eeea;
+		background-color: change-color(scale-color($background, $lightness: +10%), $alpha: 0.7);
 		border-radius: 0.4em;
 		margin: 0.5em;
 		display: grid;
@@ -73,18 +73,18 @@
 	}
 
 	.bookmarkItem:hover {
-		background-color: #fffa;
+		background-color: change-color(scale-color($background, $lightness: +15%), $alpha: 0.7);
 	}
 
 	.bookmarkItem:hover .bookmarkIcon {
-		color: #4a4a4a;
+		color: $text-strong;
 	}
 
 	.bookmarkIcon {
 		grid-column: 1;
 		grid-row: 1 / 3;
 		text-align: center;
-		color: #777;
+		color: $text-light;
 	}
 
 	.bookmarkName, .bookmarkInfo {
@@ -99,7 +99,7 @@
 	.bookmarkInfo {
 		grid-column: 2;
 		grid-row: 2;
-		color: #666;
+		color: mix($text, $background, 60%);
 		font-size: 0.85em;
 	}
 
@@ -107,14 +107,14 @@
 		grid-column: 2;
 		height: 100%;
 		text-align: center;
-		color: #d8b507;
+		color: $yellow;
 		background: none;
 		border: none;
 		box-shadow: none;
 	}
 
 	.bookmarkStar:hover {
-		color: #e8c507;
+		color: scale-color($yellow, $lightness: +5%);
 	}
 
 	.bookmarkStar .bookmarkOn {

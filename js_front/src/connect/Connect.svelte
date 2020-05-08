@@ -139,9 +139,12 @@
 </div>
 
 <style lang="scss">
+	/* background.jpg: https://www.goodfreephotos.com/other-landscapes/scenic-view-of-the-mountains-and-pond-landscape.jpg.php */
+	/* background-dark.jpg: https://www.goodfreephotos.com/canada/alberta/jasper-national-park/night-landscape-reflection-and-aurora-in-jasper-national-park-alberta-canada.jpg.php */
+	$background-image: "/background-dark.jpg";
+
 	.connect-container {
-		/* https://www.goodfreephotos.com/other-landscapes/scenic-view-of-the-mountains-and-pond-landscape.jpg.php */
-		background: url("/background.jpg") repeat fixed center center / cover;
+		background: url($background-image) repeat fixed center center / cover;
 		position: absolute;
 		top: 0;
 		bottom: 0;
@@ -161,7 +164,7 @@
 
 	.connect-blur::before {
 		filter: blur(5px);
-		background: url("/background.jpg") repeat fixed center center / cover;
+		background: url($background-image) repeat fixed center center / cover;
 		content: "";
 		position: absolute;
 		top: 0;
@@ -176,14 +179,14 @@
 		bottom: 0;
 		left: 0;
 		right: 0;
-		background-color: #dffc;
+		background-color: change-color($background, $alpha: 0.8);
 		border-radius: 0.4em 0.4em 0 0;
 		box-shadow: 0 0.3em 0.3em #0005;
 	}
 
 	.connect-form {
 		position: relative;
-		background-color: #eefa;
+		background-color: change-color($background, $alpha: 0.7);
 		border-radius: 0.4em 0.4em 0 0;
 		box-shadow: 0 0.3em 0.3em #0005;
 		padding: 0.5em;
@@ -235,7 +238,7 @@
 
 	.bookmark-blur::before {
 		filter: blur(5px);
-		background: url("/background.jpg") repeat fixed center center / cover;
+		background: url($background-image) repeat fixed center center / cover;
 		content: "";
 		position: absolute;
 		top: 0;
@@ -250,7 +253,7 @@
 		bottom: 0;
 		left: 0;
 		right: 0;
-		background-color: #dffc;
+		background-color: change-color($background, $alpha: 0.8);
 		border-radius: 0 0 0.4em 0.4em;
 		box-shadow: 0 0.3em 0.3em #0005;
 	}
@@ -262,7 +265,7 @@
 
 	// TODO the error message is broken (start without proxy running)
 	.bookmark-list :global(svelte-virtual-list-viewport), .bookmark-list .message {
-		background-color: #eefa;
+		background-color: change-color($background, $alpha: 0.7);
 		min-height: 30vh;
 		max-height: 50vh;
 		padding: 0.5em;

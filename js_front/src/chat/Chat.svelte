@@ -114,18 +114,17 @@
 	.chat-date {
 		grid-column-start: 1;
 		grid-column-end: 3;
-		border-top: 1px solid gray;
+		border-top: 1px solid mix($text, $background, 60%);
 		margin: 1em 1em 0em 1em;
 		text-align: center;
-		color: gray;
+		color: mix($text, $background, 60%);
 	}
 
 	.chat-form {
 		display: flex;
 		width: 100%;
-		padding: 0.5em;
 
-		box-shadow: 0px -5px 20px -5px #bbb;
+		box-shadow: 0px -5px 20px -5px #0005;
 	}
 
 	.chat-form > * {
@@ -136,23 +135,23 @@
 
 	.chat-form textarea {
 		flex-grow: 1;
-		/*background-color: white;
-	color: black;
-	border-top: 1px solid black;
-	border-right: 1px solid black;
-	border-left: none;
-	border-bottom: none;*/
+		border-top: 1px solid;
+		border-right: 1px solid;
+		border-left: none;
+		border-bottom: none;
+		border-radius: 0;
 	}
 
-	/*.chat-form button {
-	background-color: white;
-	color: blue;
-	vertical-align: middle;
-	border-top: 1px solid black;
-	border-left: none;
-	border-right: none;
-	border-bottom: none;
-	}*/
+	.chat-form button {
+		background: none;
+		color: $blue;
+		vertical-align: middle;
+		border-top: 1px solid;
+		border-left: none;
+		border-right: none;
+		border-bottom: none;
+		border-radius: 0;
+	}
 
 	.chat :global(svelte-virtual-list) {
 		height: 100%;
