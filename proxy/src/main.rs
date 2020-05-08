@@ -6,6 +6,7 @@ extern crate diesel_migrations;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 
 use actix::*;
@@ -256,12 +257,27 @@ async fn download_file(
 
 		let stream =
 			FramedRead::new(file_stream, BytesCodec::new()).map(|r| r.map(web::BytesMut::freeze));
+		let mut stream = stream.peekable();
+		let mut response = HttpResponse::Ok();
+		if let Some(Ok(r)) = Pin::new(&mut stream).peek().await {
+			// https://en.wikipedia.org/wiki/List_of_file_signatures
+			if r.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
+				response.content_type("image/png");
+			} else if r.starts_with(&[0xFF, 0xD8, 0xFF, 0xDB])
+				|| r.starts_with(&[0xFF, 0xD8, 0xFF, 0xE0])
+				|| r.starts_with(&[0xFF, 0xD8, 0xFF, 0xEE]) {
+				response.content_type("image/jpeg");
+			} else if r.windows(3).any(|w| w == b"svg") {
+				response.content_type("image/svg+xml");
+			}
+		}
+
 		// Cache icons and avatars for offline usage
 		if channel.0 == 0 && (data.2.starts_with("icon_") || data.2.starts_with("avatar_")) {
 			let stream = FileCache::cache_file(&*state, server, channel, &data.2, stream).await;
-			HttpResponse::Ok().content_length(len).streaming(stream)
+			response.content_length(len).streaming(stream)
 		} else {
-			HttpResponse::Ok().content_length(len).streaming(stream)
+			response.content_length(len).streaming(stream)
 		}
 	} else {
 		HttpResponse::Gone().finish()
