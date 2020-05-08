@@ -16,6 +16,10 @@
 {/if}
 
 <style lang="scss" global>
+	@import "@mdi/font/css/materialdesignicons";
+	@import "katex/dist/katex.min.css";
+	@import "highlight.js/styles/vs2015.css";
+
 	:global(:root) {
 		--channel-tree-width: 20em;
 	}

@@ -3,7 +3,6 @@ import replace from '@rollup/plugin-replace';
 import resolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
 import livereload from "rollup-plugin-livereload";
-import postcss from 'rollup-plugin-postcss';
 import { terser } from "rollup-plugin-terser";
 import rollts from "@wessberg/rollup-plugin-ts";
 import copy from 'rollup-plugin-copy';
@@ -59,9 +58,6 @@ export default {
 		rollts({
 			tsconfig: "tsconfig.json",
 			typescript: typescript
-		}),
-		postcss({
-			extract: 'public/bulma.css'
 		}),
 		copy({
 			targets: [
