@@ -1,11 +1,26 @@
 <script>
 	import { sleep, assert } from "../util";
 	import { tick, onMount } from "svelte";
+	import { ListFetchDir } from "./lazyList";
+
+	// the lowest and highest id that could be retrieved from the source
+	export let fetchIdMin = undefined; // T
+	export let fetchIdMax = undefined; // T
+	export let compare = (a, b) => {
+		return a - b;
+	}; // (a, b) => -1 | 0 | +1
+	export let fetchElements; // (id, dir) => { elements: T[], hasEnd: boolean }
+	//export let afterFetch = undefined; // () => any
+	export let startIsTop = true;
+	assert(fetchElements, "No fetch function");
+
+	// A small hack to fetch new data when min/max changes
+	$: start_fill(fetchIdMin);
+	$: start_fill(fetchIdMax);
 
 	// the data elements held by this list
-	export let elems;
+	let elems = [];
 
-	let fetchCount = 25;
 	let pxBeforeLoad = 100; // TODO? could be adjusted dynamically
 	// The amout of items that will be removed when out of view
 	let nItemsToRemove = 25;
@@ -18,12 +33,8 @@
 	assert(nThItemDistanceToView > pxBeforeLoad);
 
 	// the lowest and highest _included_ id currently in the list
-	let holdIdStart = 200;
-	let holdIdEnd = holdIdStart + elems.length;
-
-	// the lowest and highest id that could be retrieved from the source
-	let fetchIdMin = 0;
-	let fetchIdMax = 500;
+	$: holdIdStart = elems.length !== 0 ? elems[0] : undefined;
+	$: holdIdEnd = elems.length !== 0 ? elems[elems.length - 1] : undefined;
 
 	// The holding list element which has the scrollbar
 	let pan;
@@ -32,28 +43,8 @@
 	// In which direction and how far the content has scrolled since last check
 	// >0 down, <0 up
 	let scrollDiff = 0;
-
-	let fetchTask; // prevent asycn weirness by only allowing one async task
-
-	const dummy_pre = "";//makeid(Math.random() * 500 + 500);
-	function* dummies() {
-		for (let i = 0; ; i++) {
-			yield { id: i, text: dummy_pre };
-		}
-	}
-
-	function makeid(length) {
-		var result = "";
-		var characters =
-			" \nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-		var charactersLength = characters.length;
-		for (var i = 0; i < length; i++) {
-			result += characters.charAt(
-				Math.floor(Math.random() * charactersLength)
-			);
-		}
-		return result;
-	}
+	// prevent async weirness by only allowing one async task
+	let fetchTask;
 
 	function handle_scroll(e) {
 		// console.log(
@@ -83,8 +74,8 @@
 
 	async function fill_loop() {
 		const loadMaxBeforeError = 50;
-		for (let i = 0; i < loadMaxBeforeError; i++) {
-			if (i == loadMaxBeforeError - 1) throw Error("yah, thats a loop");
+		for (let i = 0; i <= loadMaxBeforeError; i++) {
+			if (i == loadMaxBeforeError) throw Error("yah, thats a loop");
 			if (await fill_body()) break;
 		}
 		console.log("Task done");
@@ -92,44 +83,59 @@
 	}
 
 	/**
-	 * Returns true when the list is satisfied with loading data
+	 * @returns true when the list is satisfied with loading data
 	 */
 	async function fill_body() {
+		if (holdIdStart === undefined || holdIdEnd === undefined) {
+			await load(undefined, ListFetchDir.New);
+			return false;
+		}
+		// if (holdIdStart === undefined && holdIdEnd === undefined) {
+		// 	await load(undefined, ListFetchDir.New);
+		// 	return false;
+		// }
+
 		const distFromTop = pan.scrollTop;
 		const distFromBot = pan.scrollTopMax - pan.scrollTop;
 
 		const wantFetchStart = distFromTop < pxBeforeLoad && scrollDiff <= 0;
 		const wantFetchEnd = distFromBot < pxBeforeLoad && scrollDiff >= 0;
 
-		const canLoadBeforeStart = holdIdStart > fetchIdMin;
-		const canLoadAfterEnd = holdIdEnd < fetchIdMax;
+		const canLoadBeforeStart =
+			holdIdStart === undefined || compare(holdIdStart, fetchIdMin) > 0;
+		const canLoadAfterEnd =
+			holdIdStart === undefined || compare(holdIdEnd, fetchIdMax) < 0;
 
 		if (wantFetchStart && canLoadBeforeStart) {
-			const count = Math.min(holdIdStart - fetchIdMin, fetchCount);
-			const from = holdIdStart - count;
-			console.log("want start", from, count);
-			await load(from, count);
+			//const count = Math.min(holdIdStart - fetchIdMin, fetchCount);
+			//const from = holdIdStart - count;
+			//console.log("want start", from, count);
+			await load(holdIdStart, ListFetchDir.Before);
 			return false;
 		} else if (wantFetchEnd && canLoadAfterEnd) {
-			const from = holdIdEnd + 1;
-			const count = Math.min(fetchIdMax - holdIdEnd, fetchCount);
-			console.log("want end", from, count);
-			await load(from, count);
+			//const from = holdIdEnd + 1;
+			//const count = Math.min(fetchIdMax - holdIdEnd, fetchCount);
+			//console.log("want end", from, count);
+			await load(holdIdEnd, ListFetchDir.After);
 			return false;
 		} else {
 			return true;
 		}
 	}
 
-	async function load(from, count) {
+	async function load(from, dir) {
 		await sleep(100);
-		let fElems = dummies()
-			.linq()
-			.skip(from)
-			.take(count)
-			.toArray();
-
-		await applyElements(fElems, from);
+		const elements = await fetchElements(from, dir);
+		if (result.length === 0) {
+			if (dir === ListFetchDir.Before) fetchIdMin = from;
+			else if (dir === ListFetchDir.After) fetchIdMax = from;
+			else {
+				fetchIdMin = from;
+				fetchIdMax = from;
+			}
+			return;
+		}
+		await applyElements(result.elems, dir);
 	}
 
 	async function modifyElems(newElems) {
@@ -137,7 +143,6 @@
 		elems = newElems;
 		await tick();
 		var scrollDiff = pan.scrollHeight - lastScrollHeight;
-		//console.log("moddiff", scrollDiff);
 		pan.scrollTop += scrollDiff;
 		lastScollPos += scrollDiff;
 	}
@@ -156,13 +161,14 @@
 		// below the bottom of our view
 		if (topCurrentOffset > pan.offsetHeight + nThItemDistanceToView) {
 			console.log(
-				"trim end requested",
+				"trim end",
 				topCurrentOffset,
 				nThItemDistanceToView,
 				pan.offsetHeight
 			);
-			elems = elems.slice(0, elems.length - nItemsToRemove); // modification is at the end => safe
-			holdIdEnd = holdIdStart + elems.length - 1;
+			// modification is at the end => safe
+			elems = elems.slice(0, elems.length - nItemsToRemove);
+			holdIdEnd = elems[elems.length - 1];
 			console.log("After trim end", holdIdStart, holdIdEnd);
 		}
 	}
@@ -181,31 +187,40 @@
 		// above the top of our view
 		if (bottomCurrentOffset < 0 - nThItemDistanceToView) {
 			console.log(
-				"trim start requested",
+				"trim start",
 				bottomCurrentOffset,
 				nThItemDistanceToView,
 				pan.offsetHeight
 			);
-			await modifyElems(elems.slice(nItemsToRemove)); // mofification at start => helper
-			holdIdStart = holdIdEnd - elems.length + 1;
+			// mofification at start => helper
+			await modifyElems(elems.slice(nItemsToRemove));
+			holdIdStart = elems[0];
 			console.log("After trim start", holdIdStart, holdIdEnd);
 		}
 	}
 
-	async function applyElements(newElems, from) {
+	async function applyElements(newElems, dir) {
 		// TODO:not sure, but I think add + trim could be done in one step
-		if (from === holdIdEnd + 1) {
-			// This case adds elements at the end => trim start
-			elems = [...elems, ...newElems]; // modification is at the end => safe
-			holdIdEnd += newElems.length;
-			await tryTrimStart();
-		} else if (from + newElems.length == holdIdStart) {
-			// This case adds elements at the start => trim end
-			await modifyElems([...newElems, ...elems]); // mofification at start => helper
-			holdIdStart -= newElems.length;
-			await tryTrimEnd();
-		} else {
-			elems = newElems;
+		switch (dir) {
+			case ListFetchDir.After:
+				// This case adds elements at the end => trim start
+				elems = [...elems, ...newElems]; // modification is at the end => safe
+				holdIdEnd += newElems.length;
+				await tryTrimStart();
+				break;
+
+			case ListFetchDir.Before:
+				// This case adds elements at the start => trim end
+				await modifyElems([...newElems, ...elems]); // mofification at start => helper
+				holdIdStart -= newElems.length;
+				await tryTrimEnd();
+
+			case ListFetchDir.New:
+				elems = newElems;
+				break;
+
+			default:
+				throw new Error("Unhandled direction case");
 		}
 	}
 
