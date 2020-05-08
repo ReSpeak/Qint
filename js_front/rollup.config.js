@@ -65,7 +65,8 @@ export default {
 		}),
 		copy({
 			targets: [
-				{ src: './node_modules/@mdi/font/fonts/*', dest: 'public/fonts' }
+				{ src: './node_modules/@mdi/font/fonts/*', dest: 'public/fonts' },
+				{ src: './node_modules/katex/dist/fonts/*', dest: 'public/fonts' }
 			]
 		}),
 
