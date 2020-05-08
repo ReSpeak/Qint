@@ -1,5 +1,4 @@
 import "@mdi/font/css/materialdesignicons.css";
-import "bulma";
 import "katex/dist/katex.min.css";
 import "highlight.js/styles/vs2015.css";
 

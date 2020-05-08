@@ -15,7 +15,7 @@
 	<Connected {connection} />
 {/if}
 
-<style lang="scss">
+<style lang="scss" global>
 	:global(:root) {
 		--channel-tree-width: 20em;
 	}

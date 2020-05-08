@@ -113,7 +113,7 @@
 		bottom: 0;
 		box-sizing: border-box;
 		width: var(--channel-tree-width);
-		background-color: #eee;
+		background-color: $background;
 		border-right: rgb(179, 179, 179) 2px solid;
 	}
 
