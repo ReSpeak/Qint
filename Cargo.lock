@@ -2137,7 +2137,7 @@ dependencies = [
  "slog-term",
  "structopt",
  "t4rust-derive",
- "time 0.2.13",
+ "time 0.2.15",
  "tokio",
  "tokio-util 0.3.1",
  "toml 0.4.10",
@@ -3088,9 +3088,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.2.13"
+version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6b5580a7510e7f3c6f199c1cd448515063f7056f026fe42e930c11d97c83e83"
+checksum = "e1330829d2e6c06771eeae476be12ff1aa9eb5e29ca718a431ab27168efde6c1"
 dependencies = [
  "cfg-if",
  "libc",
@@ -3320,7 +3320,7 @@ dependencies = [
  "slog",
  "t4rust-derive",
  "thiserror",
- "time 0.2.13",
+ "time 0.2.15",
  "tsproto-packets",
  "tsproto-structs",
  "tsproto-types",
@@ -3347,7 +3347,7 @@ dependencies = [
  "slog-term",
  "t4rust-derive",
  "thiserror",
- "time 0.2.13",
+ "time 0.2.15",
  "tokio",
  "trust-dns-proto 0.19.5",
  "trust-dns-resolver 0.19.5",
@@ -3384,7 +3384,7 @@ dependencies = [
  "slog-term",
  "stable_deref_trait",
  "thiserror",
- "time 0.2.13",
+ "time 0.2.15",
  "tokio",
  "tsproto-packets",
  "tsproto-types",
@@ -3438,7 +3438,7 @@ dependencies = [
  "simple_asn1",
  "t4rust-derive",
  "thiserror",
- "time 0.2.13",
+ "time 0.2.15",
  "tsproto-structs",
  "untrusted",
 ]

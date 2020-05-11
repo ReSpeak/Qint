@@ -393,7 +393,8 @@ export class Client extends GraphQlClient implements ITreeNode {
 		}`, {
 			client: this.getUid(),
 		});
-		this.volume = res.data.client.volume;
+		if (res.data)
+			this.volume = res.data.client.volume;
 	}
 }
 

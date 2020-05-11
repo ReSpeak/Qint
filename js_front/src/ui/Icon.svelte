@@ -4,7 +4,7 @@
 	export let name = undefined;
 	export let is_left = false;
 
-	if (name === undefined) name = "dummy";
+	$: if (name === undefined) name = "dummy";
 </script>
 
 <span class="icon {is_left ? 'is-left' : ''}">

@@ -6,8 +6,6 @@
 	let book = connection.book;
 	let server = book.server;
 	let children = $server.children;
-	let selected_server = true; // TODO
-	let icon = ""; // TODO
 </script>
 
 <div class="menu channel-list">

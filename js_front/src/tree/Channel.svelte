@@ -12,11 +12,11 @@
 	export let filter;
 	export let filterShow = true;
 	export let channel;
-	let children = channel.children;
 	let selectedChat = connection.chat.selectedChat;
 
 	let collapsed = false;
 	let hovered = false;
+	$: children = channel.children;
 	$: filterShow = applyFilter($filter, channel, $children);
 	// Update if a client moves in or out
 	$: ownClient = updateOwnClient($children);
