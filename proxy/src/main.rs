@@ -205,6 +205,16 @@ async fn audiosend_false(state: web::Data<State>) -> impl Responder {
 	}
 }
 
+#[post("/audiosend/resetml")]
+async fn audiosend_resetml(state: web::Data<State>) -> impl Responder {
+	if state.audio_data.a2ts.send(audio::audio_to_ts::ResetMlMsg).await.is_err() {
+		error!(state.logger, "Failed to reset rnnoise");
+		HttpResponse::InternalServerError()
+	} else {
+		HttpResponse::Ok()
+	}
+}
+
 #[get("/plugins")]
 async fn list_plugins(state: web::Data<State>) -> impl Responder {
 	let path = &state.settings.plugin_path;
@@ -406,6 +416,7 @@ async fn main() -> Result<()> {
 			.service(create_ws)
 			.service(audiosend_true)
 			.service(audiosend_false)
+			.service(audiosend_resetml)
 			.service(list_plugins)
 			.service(get_plugin)
 			.service(download_file)

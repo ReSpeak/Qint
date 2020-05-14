@@ -408,6 +408,8 @@ impl Handler<ConnectedMsg> for DbHandler {
 			})
 			.transpose()?;
 
+		// TODO We need to know the server here (added in handle_connected)
+
 		let (utc_time, utc_to_local_offset) = EventHandler::get_now();
 		if let Some(id) = id {
 			// Update

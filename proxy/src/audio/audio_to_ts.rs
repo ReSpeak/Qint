@@ -1,3 +1,5 @@
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 use actix::*;
@@ -20,6 +22,7 @@ pub(crate) struct SetListenerMsg {
 
 pub struct RemoveListenerMsg;
 pub struct SetPlayingMsg(pub bool);
+pub struct ResetMlMsg;
 /// An audio packet and `true` if this is the last packet.
 pub(crate) struct PlayPacketMsg(OutPacket, bool);
 
@@ -41,6 +44,8 @@ pub struct AudioToTs {
 	is_playing: bool,
 	/// If we are actually talking and sending audio
 	is_talking: bool,
+	/// If rnnoise should be reset.
+	reset_ml: Arc<AtomicBool>,
 }
 
 struct SdlCallback {
@@ -60,6 +65,8 @@ struct SdlCallback {
 	/// This is `TALKING_TIME + 1` if voice activation triggers and greater 0 if
 	/// packets should be sent.
 	is_talking: u8,
+	/// If rnnoise should be reset.
+	reset_ml: Arc<AtomicBool>,
 
 	spawn_send: mpsc::Sender<PlayPacketMsg>,
 }
@@ -88,6 +95,9 @@ impl Message for RemoveListenerMsg {
 	type Result = bool;
 }
 impl Message for SetPlayingMsg {
+	type Result = ();
+}
+impl Message for ResetMlMsg {
 	type Result = ();
 }
 impl Message for PlayPacketMsg {
@@ -142,6 +152,16 @@ impl Handler<SetPlayingMsg> for AudioToTs {
 	}
 }
 
+impl Handler<ResetMlMsg> for AudioToTs {
+	type Result = ();
+	fn handle(
+		&mut self, _: ResetMlMsg, _: &mut Self::Context,
+	) -> Self::Result {
+		self.reset_ml.store(true, Ordering::Relaxed);
+		debug!(self.logger, "Reset rnnoise");
+	}
+}
+
 impl Handler<PlayPacketMsg> for AudioToTs {
 	type Result = ();
 	fn handle(
@@ -190,6 +210,7 @@ impl AudioToTs {
 
 			is_playing: false,
 			is_talking: false,
+			reset_ml: Arc::new(AtomicBool::new(false)),
 		})
 	}
 
@@ -215,7 +236,7 @@ impl AudioToTs {
 					audiopus::Channels::Stereo
 				};
 
-				SdlCallback::new(self.logger.clone(), channels, spawn_send)
+				SdlCallback::new(self.logger.clone(), channels, spawn_send, self.reset_ml.clone())
 			})
 			.map_err(|e| format_err!("SDL error: {}", e))
 		{
@@ -242,6 +263,7 @@ impl AudioToTs {
 impl SdlCallback {
 	fn new(
 		logger: Logger, channels: audiopus::Channels, spawn_send: mpsc::Sender<PlayPacketMsg>,
+		reset_ml: Arc<AtomicBool>,
 	) -> Self {
 		Self {
 			logger,
@@ -251,6 +273,7 @@ impl SdlCallback {
 			opus_output: [0; MAX_OPUS_FRAME_SIZE],
 			last_buffer: Default::default(),
 			is_talking: 0,
+			reset_ml,
 			spawn_send,
 		}
 	}
@@ -284,6 +307,11 @@ impl AudioCallback for SdlCallback {
 			warn!(self.logger, "Size not fitting for denoising");
 			should_talk = true;
 		} else {
+			if self.reset_ml.load(Ordering::Relaxed) {
+				self.reset_ml.store(false, Ordering::Relaxed);
+				self.denoise = DenoiseState::new();
+			}
+
 			// Scale to the expected range
 			for d in &mut *buffer {
 				*d *= i16::max_value() as f32;
