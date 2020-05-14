@@ -109,13 +109,14 @@
 		bottom: 0;
 		left: var(--channel-tree-width);
 		right: 0;
+		line-height: 1.2;
 	}
 
 	.chat-date {
 		grid-column-start: 1;
 		grid-column-end: 3;
 		border-top: 1px solid mix($text, $background, 60%);
-		margin: 1em 1em 0em 1em;
+		margin: 0.2em 1em 0em 1em;
 		text-align: center;
 		color: mix($text, $background, 60%);
 	}
@@ -168,17 +169,14 @@
 	}
 
 	.invoker-icon {
-		padding: 0.1em 0.5em;
-	}
-
-	.invoker-icon {
 		grid-column: 1;
 		display: flex;
-		margin-top: 0.7em;
+		margin-top: 0.5em;
+		padding: 0 0.5em;
 	}
 
 	.invoker-name {
 		grid-column: 2;
-		margin-top: 0.7em;
+		margin-top: 0.5em;
 	}
 </style>
