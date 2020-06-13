@@ -98,7 +98,7 @@
 		display: contents;
 
 		&:hover > * {
-			background-color: mix($background, $text, 80%);
+			background-color: mix($background, $text, 90%);
 
 			.tool-buttons {
 				visibility: visible;
@@ -128,11 +128,16 @@
 
 			tab-size: 4;
 			-moz-tab-size: 4;
+			// TODO Prevent scrollbar
 		}
 	}
 
 	.message-rendered {
 		white-space: pre-wrap;
+	}
+
+	.message-rendered :global(pre) {
+		background: none;
 	}
 
 	.tool-buttons {
@@ -156,13 +161,15 @@
 			display: none;
 		}
 		.message-rendered {
-			display: unset;
+			display: inherit;
+			// Work-around for tight line-height
+			margin-bottom: 0.1em;
 		}
 	}
 
 	.message-content.viewRaw {
 		.message-raw {
-			display: unset;
+			display: inherit;
 		}
 		.message-rendered {
 			display: none;
