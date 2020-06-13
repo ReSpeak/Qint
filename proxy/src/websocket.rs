@@ -271,6 +271,9 @@ impl Ws {
 					}));
 				}
 			}
+			TsStreamItem::DisconnectedTemporarily => {
+				self.send_message(&MessageP2F::DisconnectedTemporarily(), ctx);
+			}
 			TsStreamItem::FileDownload(handle, file) => {
 				if let Some(transfer) = self.file_downloads.remove(&handle) {
 					let _ = transfer.send(Ok(file));

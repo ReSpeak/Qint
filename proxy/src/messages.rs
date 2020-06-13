@@ -27,6 +27,8 @@ pub enum MessageP2F {
 		/// The id of our own client.
 		own_client: ClientId,
 	},
+	/// The connection to the server was lost. Trying to reconnect automatically.
+	DisconnectedTemporarily(),
 	/// The list of currently talking clients and `true` if they are whispering.
 	TalkersChanged(Vec<(ClientId, bool)>),
 	/// The connection received events.

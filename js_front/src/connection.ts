@@ -125,6 +125,12 @@ export class Connection {
 			this.state.set(ConnectionState.Connected);
 			this.server = msg.Connected.server;
 			this.ownClient = msg.Connected.own_client;
+		} else if ("DisconnectedTemporarily" in msg) {
+			this.state.set(ConnectionState.Connecting);
+			this.book.reset();
+			this.chat.reset();
+			this.server = undefined;
+			this.ownClient = undefined;
 		} else if ("Events" in msg) {
 			for (const tsevt of msg.Events) {
 				try {

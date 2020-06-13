@@ -51,13 +51,17 @@ interface OMsgSwitchChannel {
 
 
 // In Messages
-export type InMsg = InMsgConnected | InMsgError | InTalkersChanged | InMsgEvents;
+export type InMsg = InMsgConnected | InDisconnectedTemporarily | InMsgError | InTalkersChanged | InMsgEvents;
 
 interface InMsgConnected {
 	Connected: {
 		server: string;
 		own_client: number,
 	};
+}
+
+interface InDisconnectedTemporarily {
+	DisconnectedTemporarily: null;
 }
 
 interface InMsgError {
