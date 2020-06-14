@@ -3,6 +3,7 @@
 	export let size = 18;
 	export let name = undefined;
 	export let is_left = false;
+	export let style = "";
 
 	$: if (name === undefined) name = "dummy";
 </script>
@@ -11,7 +12,7 @@
 	{#if raw}
 		{raw}
 	{:else}
-		<i class="mdi mdi-{name} mdi-{size}px"></i>
+		<i class="mdi mdi-{name} mdi-{size}px" {style}></i>
 	{/if}
 </span>
 

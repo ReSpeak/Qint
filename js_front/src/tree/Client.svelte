@@ -43,8 +43,6 @@
 			if (div.contains(event.relatedTarget)) {
 				return;
 			}
-		} else {
-			return;
 		}
 		newHover = false;
 		setTimeout(() => {
@@ -107,11 +105,27 @@
 		<button class="button clientButton" on:click={setChat}>
 			<ClientIcon {client} {connection} />
 			<span style={client.getColor()}><FilterString filter={$filter} content={client.name} /></span>
+			<span class="icons">
+				{#if client.input_muted}
+					<Icon name="microphone-off" style="color: red;" />
+				{/if}
+				{#if client.output_muted}
+					<Icon name="volume-off" style="color: red;" />
+				{/if}
+				{#if client.away_message !== null}
+					<Icon name="sleep" style="color: blue;" />
+				{/if}
+			</span>
 		</button>
 		{#if hovered}
 			<div class="hover menu" style="top: {div.getBoundingClientRect().top}px;">
 				<div class="corner"></div>
-				<div class="name" style={client.getColor()}>{client.name}</div>
+				<div class="name">
+					<span style={client.getColor()}>{client.name}</span>
+					{#if client.away_message !== null && client.away_message.length !== 0}
+						({client.away_message})
+					{/if}
+				</div>
 				<button class="volume button" on:click={toggleVolume}>
 					{#if volume == minVolume}
 						<Icon name="volume-off" />
@@ -139,6 +153,10 @@
 		height: auto;
 		width: 100%;
 		justify-content: start;
+
+		display: grid;
+		grid-auto-flow: column;
+		grid-template-columns: min-content min-content 1fr;
 	}
 	.clientButton:focus {
 		box-shadow: none;
@@ -150,6 +168,14 @@
 
 	.selectedClient {
 		background-color: mix($background, $text, 80%);
+	}
+
+	.icons {
+		justify-self: end;
+	}
+
+	.button .icons > :global(span) {
+		margin: 0;
 	}
 
 	.hover {

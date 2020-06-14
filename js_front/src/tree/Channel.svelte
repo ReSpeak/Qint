@@ -50,8 +50,6 @@
 			if (div.contains(event.relatedTarget)) {
 				return;
 			}
-		} else {
-			return;
 		}
 		hovered = false;
 	}
