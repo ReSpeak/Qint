@@ -109,7 +109,7 @@ interface IMsgPropertyValueServer {
 type PropertyValue = IMsgPropertyValueChannel | IMsgPropertyValueClient | IMsgPropertyValueServer;
 
 
-interface Invoker {
+export interface Invoker {
 	name: string;
 	id: number;
 	uid: string | undefined;
@@ -119,7 +119,7 @@ interface IMsgBookAdded {
 	PropertyAdded: {
 		id: PropertyId;
 		prop: PropertyValue;
-		invoker: Invoker;
+		invoker: Invoker | undefined;
 	};
 }
 
@@ -127,7 +127,7 @@ interface IMsgBookChanged {
 	PropertyChanged: {
 		id: PropertyId;
 		prop: PropertyValue;
-		invoker: Invoker;
+		invoker: Invoker | undefined;
 	};
 }
 
@@ -135,7 +135,7 @@ interface IMsgBookRemoved {
 	PropertyRemoved: {
 		id: PropertyId;
 		prop: PropertyValue;
-		invoker: Invoker;
+		invoker: Invoker | undefined;
 	};
 }
 

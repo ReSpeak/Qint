@@ -4,6 +4,7 @@ import { get, writable, Writable } from "svelte/store";
 import { Book, Channel, Server } from "./tree/book";
 import { plugins, loadPlugins } from "./plugins";
 import { BASE_ADDRESS } from "./util";
+import { handleEvents } from "./notification";
 
 export class Connection {
 	public readonly state = writable(ConnectionState.Disconnected);
@@ -139,6 +140,7 @@ export class Connection {
 					} else if ("Message" in tsevt) {
 						this.chat.unreadCount.update(c => c + 1);
 					} else {
+						handleEvents(this, tsevt, plugins);
 						this.book.messageHandler(tsevt);
 					}
 				} catch (err) {

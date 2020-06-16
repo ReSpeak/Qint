@@ -226,9 +226,13 @@ export class Book {
 		});
 	}
 
+	public getServer(): Server {
+		return get(this.server);
+	}
+
 	public getNode(id: number): Server | Channel | undefined {
 		if (id === 0)
-			return get(this.server) as Server;
+			return get(this.server);
 		else
 			return get(this.channels).get(id);
 	}
