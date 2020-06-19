@@ -17,18 +17,18 @@ interface OMsgConnect {
 }
 
 export enum Reason {
-	None,
-	Moved,
-	Subscription,
-	LostConnection,
-	KickChannel,
-	KickServer,
-	KickServerBan,
-	Serverstop,
-	Clientdisconnect,
-	Channelupdate,
-	Channeledit,
-	ClientdisconnectServerShutdown,
+	None = "None",
+	Moved = "Moved",
+	Subscription = "Subscription",
+	LostConnection = "LostConnection",
+	KickChannel = "KickChannel",
+	KickServer = "KickServer",
+	KickServerBan = "KickServerBan",
+	Serverstop = "Serverstop",
+	Clientdisconnect = "Clientdisconnect",
+	Channelupdate = "Channelupdate",
+	Channeledit = "Channeledit",
+	ClientdisconnectServerShutdown = "ClientdisconnectServerShutdown",
 }
 
 interface OMsgDisconnect {
@@ -115,11 +115,16 @@ export interface Invoker {
 	uid: string | undefined;
 }
 
+export interface ExtraInfo {
+	reason: Reason | null;
+}
+
 interface IMsgBookAdded {
 	PropertyAdded: {
 		id: PropertyId;
 		prop: PropertyValue;
-		invoker: Invoker | undefined;
+		invoker: Invoker | null;
+		extra: ExtraInfo;
 	};
 }
 
@@ -127,7 +132,8 @@ interface IMsgBookChanged {
 	PropertyChanged: {
 		id: PropertyId;
 		prop: PropertyValue;
-		invoker: Invoker | undefined;
+		invoker: Invoker | null;
+		extra: ExtraInfo;
 	};
 }
 
@@ -135,7 +141,8 @@ interface IMsgBookRemoved {
 	PropertyRemoved: {
 		id: PropertyId;
 		prop: PropertyValue;
-		invoker: Invoker | undefined;
+		invoker: Invoker | null;
+		extra: ExtraInfo;
 	};
 }
 

@@ -4,15 +4,15 @@ use std::net::{IpAddr, SocketAddr};
 use serde::{Deserialize, Serialize};
 use time::{Duration, OffsetDateTime};
 use tsclientlib::data::Connection;
-use tsclientlib::events::{Event, PropertyId, PropertyValueRef};
+use tsclientlib::events::{Event, ExtraInfo, PropertyId, PropertyValueRef};
 use tsclientlib::*;
 use tsproto_types::crypto::EccKeyPubP256;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum JsEvent {
-	PropertyAdded { id: JsPropertyId, prop: JsProperty, invoker: Option<Invoker> },
-	PropertyChanged { id: JsPropertyId, prop: JsProperty, invoker: Option<Invoker> },
-	PropertyRemoved { id: JsPropertyId, invoker: Option<Invoker> },
+	PropertyAdded { id: JsPropertyId, prop: JsProperty, invoker: Option<Invoker>, extra: ExtraInfo },
+	PropertyChanged { id: JsPropertyId, prop: JsProperty, invoker: Option<Invoker>, extra: ExtraInfo },
+	PropertyRemoved { id: JsPropertyId, invoker: Option<Invoker>, extra: ExtraInfo },
 	ChannelListFinished,
 	Message { target: MessageTarget, invoker: Invoker, message: String },
 }

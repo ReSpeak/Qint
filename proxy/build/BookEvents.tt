@@ -90,24 +90,27 @@ pub enum JsProperty {
 
 pub fn convert_event(con: &Connection, e: &Event) -> Option<JsEvent> {
 	match e {
-		Event::PropertyAdded { id, invoker } => {
+		Event::PropertyAdded { id, invoker, extra } => {
 			Some(JsEvent::PropertyAdded {
 				id: id.clone().try_into().ok()?,
 				prop: property_to_js(id, con.get_property(id).ok()?)?,
 				invoker: invoker.clone(),
+				extra: extra.clone(),
 			})
 		}
-		Event::PropertyChanged { id, invoker, .. } => {
+		Event::PropertyChanged { id, invoker, extra, .. } => {
 			Some(JsEvent::PropertyChanged {
 				id: id.clone().try_into().ok()?,
 				prop: property_to_js(id, con.get_property(id).ok()?)?,
 				invoker: invoker.clone(),
+				extra: extra.clone(),
 			})
 		}
-		Event::PropertyRemoved { id, invoker, .. } => {
+		Event::PropertyRemoved { id, invoker, extra, .. } => {
 			Some(JsEvent::PropertyRemoved {
 				id: id.clone().try_into().ok()?,
 				invoker: invoker.clone(),
+				extra: extra.clone(),
 			})
 		}
 		Event::ChannelListFinished => Some(JsEvent::ChannelListFinished),

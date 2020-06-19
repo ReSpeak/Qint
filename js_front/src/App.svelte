@@ -9,7 +9,7 @@
 	$: state = connection.state;
 </script>
 
-{#if $state !== ConnectionState.Connected}
+{#if $state !== ConnectionState.Connected && $state !== ConnectionState.ChannelListFinished}
 	<Connect {connection} />
 {:else}
 	<Connected {connection} />

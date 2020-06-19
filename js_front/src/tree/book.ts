@@ -327,7 +327,7 @@ export class GraphQlClient {
 
 export class Client extends GraphQlClient implements ITreeNode {
 	public avatar_hash!: string;
-	public ​​​​away_message?: string;
+	public ​​​​away_message!: string | null;
 	public ​​​​badges!: string;
 	public ​​​​channel!: number;
 	public ​​​​channel_group!: number;
@@ -349,11 +349,11 @@ export class Client extends GraphQlClient implements ITreeNode {
 	public ​​​​output_hardware_enabled!: boolean;
 	public ​​​​output_muted!: boolean;
 	public ​​​​output_only_muted!: boolean;
-	public ​​​​permission_hints?: string;
+	public ​​​​permission_hints!: string | null;
 	public ​​​​phonetic_name!: string;
 	public ​​​​talk_power!: number;
 	public ​​​​talk_power_granted!: boolean;
-	public ​​​​talk_power_request?: string;
+	public ​​​​talk_power_request!: string | null;
 	public ​​​​uid!: number[];
 	public unread_messages!: number;
 	public volume?: number;
@@ -404,9 +404,28 @@ export class Client extends GraphQlClient implements ITreeNode {
 
 export class Channel implements ITreeParent, ITreeNode {
 	public id!: ChannelId;
-	public name?: string;
 	public parent!: ChannelId;
+	public name!: string;
+	public topic!: string | null;
+	public codec!: string | null; // TODO enum
+	public codec_quality!: number | null;
+	public max_clients!: any;
+	public max_family_clients!: any | null;
 	public order!: ChannelId;
+	public channel_type!: string; // TODO enum
+	public is_default!: boolean | null;
+	public has_password!: boolean | null;
+	public codec_latency_factor!: number | null;
+	public is_unencrypted!: boolean | null;
+	public delete_delay!: any | null;
+	public needed_talk_power!: number | null;
+	public forced_silence!: boolean | null;
+	public phonetic_name!: string | null;
+	public icon_id!: any | null;
+	public is_private!: boolean | null;
+	public subscribed!: boolean;
+	public permission_hints!: any | null;
+	public optional_data!: any | null;
 
 	// ITreeParent
 	public children: Writable<ITreeNode[]> = writable([]);
@@ -439,7 +458,8 @@ export class Channel implements ITreeParent, ITreeNode {
 }
 
 export class Server implements ITreeParent {
-	public name?: string;
+	public name!: string;
+	public phonetic_name!: string;
 	public public_key?: number[];
 	// Base64 encoded, result from graphql
 	public publicKey?: string;

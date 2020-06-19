@@ -33,6 +33,10 @@ export class Connection {
 		this.socket = undefined;
 	}
 
+	public getState(): ConnectionState {
+		return get(this.state);
+	}
+
 	public connect(opt: IConnectOptions) {
 		this.error.set(undefined);
 		this.guid = Connection.createUuidV4();
@@ -136,11 +140,12 @@ export class Connection {
 			for (const tsevt of msg.Events) {
 				try {
 					console.log(tsevt);
+					handleEvents(this, tsevt, plugins);
 					if (tsevt === "ChannelListFinished") {
+						this.state.set(ConnectionState.ChannelListFinished);
 					} else if ("Message" in tsevt) {
 						this.chat.unreadCount.update(c => c + 1);
 					} else {
-						handleEvents(this, tsevt, plugins);
 						this.book.messageHandler(tsevt);
 					}
 				} catch (err) {
@@ -168,6 +173,7 @@ export enum ConnectionState {
 	Disconnected,
 	Connecting,
 	Connected,
+	ChannelListFinished,
 }
 
 interface IConnectOptions {
