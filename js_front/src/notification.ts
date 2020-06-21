@@ -76,7 +76,7 @@ export function handleEvents(con: Connection, msg: InBookMsg, plugins: any[]) {
 		if (msg === "ChannelListFinished") {
 		} else if ("Message" in msg) {
 			const longMessage = msg.Message.message.length > 20 || msg.Message.message.length == 0 || msg.Message.message.includes("//");
-			if ("Poke" in msg.Message.target) {
+			if (msg.Message.target !== "Server" && msg.Message.target !== "Channel" && "Poke" in msg.Message.target) {
 				if (longMessage)
 					handler(con, msg, notif`${msg.Message.invoker} poked you`);
 				else

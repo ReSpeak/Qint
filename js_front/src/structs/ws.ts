@@ -1,6 +1,11 @@
 import { Client, Channel, Server } from "../tree/book";
-import { MessageTarget } from "./ts";
 // tslint:disable: interface-name
+
+export type WsMessageTarget =
+	"Server"
+	| "Channel"
+	| { Client: number }
+	| { Poke: number };
 
 // Out Messages
 export type OutMsg = OMsgConnect | OMsgDisconnect | OMsgSendMessage | OMsgSwitchChannel;
@@ -40,7 +45,7 @@ interface OMsgDisconnect {
 
 interface OMsgSendMessage {
 	SendMessage: {
-		target: MessageTarget;
+		target: WsMessageTarget;
 		message: string;
 	};
 }
@@ -150,7 +155,7 @@ type IMskBookChannelListFinished = "ChannelListFinished";
 
 interface IMsgBookMessage {
 	Message: {
-		target: MessageTarget;
+		target: WsMessageTarget;
 		invoker: Invoker;
 		message: string;
 	};

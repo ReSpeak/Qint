@@ -281,7 +281,7 @@ impl Ws {
 			}
 			TsStreamItem::FileTransferFailed(handle, e) => {
 				if let Some(transfer) = self.file_downloads.remove(&handle) {
-					let _ = transfer.send(Err(e));
+					let _ = transfer.send(Err(e.into()));
 				}
 			}
 			_ => {}
@@ -469,6 +469,7 @@ impl Handler<DownloadFile> for Ws {
 		if let Some(con) = &mut self.connection {
 			let uid = match con
 				.get_server_key()
+				.map_err(Error::from)
 				.and_then(|k| k.get_uid_no_base64().map_err(|e| e.into()))
 			{
 				Ok(k) => Uid(k),
@@ -543,7 +544,7 @@ impl Handler<GetClientVolumeMsg> for Ws {
 							}),
 					)
 				}
-				Err(e) => ActorResponse::r#async(wrap_future(future::err(e))),
+				Err(e) => ActorResponse::r#async(wrap_future(future::err(e.into()))),
 			}
 		} else {
 			ActorResponse::r#async(wrap_future(future::err(format_err!(
@@ -599,7 +600,7 @@ impl Handler<SendPacketMsg> for Ws {
 		&mut self, SendPacketMsg(packet): SendPacketMsg, _: &mut Self::Context,
 	) -> Self::Result {
 		if let Some(con) = &mut self.connection {
-			con.get_tsproto_client_mut()?.send_packet(packet)
+			Ok(con.get_tsproto_client_mut()?.send_packet(packet)?)
 		} else {
 			bail!("Connection does not exist")
 		}
