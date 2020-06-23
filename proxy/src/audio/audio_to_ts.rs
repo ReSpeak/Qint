@@ -248,7 +248,7 @@ impl AudioToTs {
 			}
 			Err(e) => {
 				error!(self.logger, "Failed to open capture device";
-					"error" => ?e);
+					"error" => %e);
 			}
 		}
 	}
@@ -360,7 +360,7 @@ impl AudioCallback for SdlCallback {
 		}
 
 		if let Err(e) = self.create_encoder() {
-			error!(self.logger, "Failed to create opus encoder"; "error" => ?e);
+			error!(self.logger, "Failed to create opus encoder"; "error" => %e);
 			return;
 		}
 
@@ -378,8 +378,7 @@ impl AudioCallback for SdlCallback {
 					.encode_float(&self.last_buffer, &mut self.opus_output[..])
 				{
 					Err(e) => {
-						warn!(self.logger, "Failed to encode opus";
-							"error" => ?e);
+						warn!(self.logger, "Failed to encode opus"; "error" => %e);
 					}
 					Ok(len) => {
 						// Create packet
@@ -397,7 +396,7 @@ impl AudioCallback for SdlCallback {
 
 		match self.encoder.as_ref().unwrap().encode_float(buffer, &mut self.opus_output[..]) {
 			Err(e) => {
-				warn!(self.logger, "Failed to encode opus"; "error" => ?e);
+				warn!(self.logger, "Failed to encode opus"; "error" => %e);
 			}
 			Ok(len) => {
 				trace!(self.logger, "Sending packet");

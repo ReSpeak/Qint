@@ -100,7 +100,7 @@ impl TsToAudio {
 			Ok(device) => self.device = Some(device),
 			Err(e) => {
 				self.device = None;
-				error!(self.logger, "Failed to open playback device"; "error" => ?e);
+				error!(self.logger, "Failed to open playback device"; "error" => %e);
 			}
 		}
 	}

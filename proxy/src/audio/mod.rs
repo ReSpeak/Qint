@@ -72,7 +72,7 @@ pub(crate) fn start(
 				task::spawn_local(a2ts2.send(msg).map(move |r| match r {
 					Ok(()) => {}
 					Err(e) => error!(logger, "Failed to send audio data to Audio2TS \
-							pipeline"; "error" => ?e),
+							pipeline"; "error" => %e),
 				}));
 			}
 		});

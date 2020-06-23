@@ -162,7 +162,7 @@ impl Ws {
 							})
 							.map(move |r| {
 								if let Err(e) = r {
-									error!(logger, "Failed to set listener"; "error" => ?e);
+									error!(logger, "Failed to set listener"; "error" => %e);
 								}
 							}),
 						);
@@ -198,10 +198,10 @@ impl Ws {
 										.map(move |r| match r {
 											Ok(Err(e)) => warn!(logger, "Failed to save \
 													connection in database";
-													"error" => ?e),
+													"error" => %e),
 											Err(e) => warn!(logger, "Failed to save \
 													connection in database";
-													"error" => ?e),
+													"error" => %e),
 											_ => {}
 										}),
 								);
@@ -231,7 +231,7 @@ impl Ws {
 							&events,
 						) {
 							error!(self.logger, "Database failed to handle \
-								events"; "error" => ?e);
+								events"; "error" => %e);
 						}
 
 						self.send_message(
@@ -263,7 +263,7 @@ impl Ws {
 					actix::spawn(self.state.database.send(event).map(move |r| match r {
 						Ok(Ok(())) => {}
 						Ok(Err(e)) => {
-							error!(logger, "Failed to handle event in database"; "error" => ?e);
+							error!(logger, "Failed to handle event in database"; "error" => %e);
 						}
 						Err(_) => {
 							error!(logger, "Failed to send event to database");
@@ -348,7 +348,7 @@ impl Ws {
 				if let Some(con) = &mut self.connection {
 					if let Err(e) = con.disconnect(o) {
 						error!(self.logger, "Failed to disconnect";
-							"error" => ?e);
+							"error" => %e);
 					}
 				}
 			}
@@ -356,11 +356,11 @@ impl Ws {
 				if let Some(con) = &mut self.connection {
 					match con.get_mut_state() {
 						Err(e) => {
-							error!(self.logger, "Failed to get state"; "error" => ?e);
+							error!(self.logger, "Failed to get state"; "error" => %e);
 						}
 						Ok(mut state) => {
 							if let Err(e) = state.send_message(target, &message) {
-								error!(self.logger, "Failed to send message"; "error" => ?e);
+								error!(self.logger, "Failed to send message"; "error" => %e);
 							}
 						}
 					}
@@ -369,7 +369,7 @@ impl Ws {
 						Ok(key) => key,
 						Err(e) => {
 							// TODO Return as error
-							error!(self.logger, "Failed to get server key"; "error" => ?e);
+							error!(self.logger, "Failed to get server key"; "error" => %e);
 							return;
 						}
 					};
@@ -419,7 +419,7 @@ impl Ws {
 						actix::spawn(self.state.database.send(msg).map(move |r| match r {
 							Ok(Ok(())) => {}
 							Ok(Err(e)) => {
-								error!(logger, "Failed to handle event in database"; "error" => ?e);
+								error!(logger, "Failed to handle event in database"; "error" => %e);
 							}
 							Err(_) => {
 								error!(logger, "Failed to send event to database");
@@ -436,14 +436,14 @@ impl Ws {
 				if let Some(con) = &mut self.connection {
 					match con.get_mut_state() {
 						Err(e) => {
-							error!(self.logger, "Failed to get state"; "error" => ?e);
+							error!(self.logger, "Failed to get state"; "error" => %e);
 						}
 						Ok(mut state) => {
 							let own_id = state.own_client;
 							if let Some(mut cl) = state.get_client(&own_id) {
 								if let Err(e) = cl.set_channel(channel) {
 									error!(self.logger, "Failed to switch channel";
-										"error" => ?e);
+										"error" => %e);
 								}
 							} else {
 								error!(self.logger, "Failed to find own client");
@@ -648,7 +648,7 @@ impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for Ws {
 				let msg: MessageF2P = match serde_json::from_str(&msg) {
 					Ok(r) => r,
 					Err(e) => {
-						error!(self.logger, "Error json deserializing message"; "error" => ?e);
+						error!(self.logger, "Error json deserializing message"; "error" => %e);
 						return;
 					}
 				};
@@ -658,7 +658,7 @@ impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for Ws {
 				let msg: MessageF2P = match rmp_serde::from_read_ref(msg.as_ref()) {
 					Ok(r) => r,
 					Err(e) => {
-						error!(self.logger, "Error msgpack deserializing message"; "error" => ?e);
+						error!(self.logger, "Error msgpack deserializing message"; "error" => %e);
 						return;
 					}
 				};
@@ -697,7 +697,7 @@ impl ActorFuture for ConnectionPoller {
 					break Poll::Ready(());
 				}
 				Poll::Ready(Some(Err(e))) => {
-					error!(actor.state.logger, "Connection failed"; "error" => ?e);
+					error!(actor.state.logger, "Connection failed"; "error" => %e);
 					actor.connection = None;
 					actor.send_message(&MessageP2F::Error("Connection failed".to_string()), ctx);
 					break Poll::Ready(());
