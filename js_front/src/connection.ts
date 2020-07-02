@@ -4,7 +4,7 @@ import { get, writable, Writable } from "svelte/store";
 import { Book, Channel, Server } from "./tree/book";
 import { plugins, loadPlugins } from "./plugins";
 import { BASE_ADDRESS } from "./util";
-import { handleEvents } from "./notification";
+import { handleMessage } from "./notification";
 
 export class Connection {
 	public readonly state = writable(ConnectionState.Disconnected);
@@ -126,6 +126,7 @@ export class Connection {
 			}
 		}
 
+		handleMessage(this, msg, plugins);
 		if ("Connected" in msg) {
 			this.state.set(ConnectionState.Connected);
 			this.server = msg.Connected.server;
@@ -140,7 +141,6 @@ export class Connection {
 			for (const tsevt of msg.Events) {
 				try {
 					console.log(tsevt);
-					handleEvents(this, tsevt, plugins);
 					if (tsevt === "ChannelListFinished") {
 						this.state.set(ConnectionState.ChannelListFinished);
 					} else if ("Message" in tsevt) {

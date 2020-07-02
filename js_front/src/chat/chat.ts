@@ -44,10 +44,20 @@ export class Chat {
 		return group.invokerName === msg.invokerName;
 	}
 
-	private static group_messages(messages: Message[]): ChatEntries[] {
+	private static group_messages(messages: Message[], lastEntry: ChatEntries | undefined): ChatEntries[] {
 		const groups = [];
 		let currentGroup: GroupedMessages | undefined;
 		let currentDate: Moment | undefined;
+
+		if (lastEntry !== undefined) {
+			currentDate = lastEntry.date;
+			if (lastEntry instanceof GroupedMessages) {
+				currentGroup = lastEntry;
+				if (lastEntry.messages.length > 0)
+					currentDate = lastEntry.messages[lastEntry.messages.length - 1].date;
+			}
+		}
+
 		for (const message of messages) {
 			if (!currentDate || !currentDate.isSame(message.date, "day") ) {
 				currentDate = message.date;
@@ -134,8 +144,7 @@ export class Chat {
 				const before_start = start_time ? fromStart : true;
 				console.log("Fetching messages " + (before_start ? "before" : "after"), [start_time, start_id], "; got", msgs);
 
-				// TODO We need to combine this with the existing messages
-				return Chat.group_messages(msgs);
+				return Chat.group_messages(msgs, !before_start && curMsgs.length > 0 ? curMsgs[curMsgs.length - 1] : undefined);
 			} else {
 				console.error("GetMessages result does not contain data", res);
 			}

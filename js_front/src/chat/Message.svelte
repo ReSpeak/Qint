@@ -134,6 +134,7 @@
 
 	.message-rendered {
 		white-space: pre-wrap;
+		word-wrap: break-word;
 	}
 
 	.message-rendered :global(pre) {

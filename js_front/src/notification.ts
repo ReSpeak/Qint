@@ -1,5 +1,5 @@
 import { Book, Channel, Client, Server } from "./tree/book";
-import { InBookMsg, Invoker, Reason } from "./structs/ws";
+import { InBookMsg, InMsg, Invoker, Reason } from "./structs/ws";
 import { Connection, ConnectionState } from "./connection";
 
 type NotificationArg = Book | Channel | Client | Invoker | Server | string;
@@ -59,15 +59,35 @@ function notif(strings: TemplateStringsArray, ...keys: NotificationArg[]): TsNot
 
 let synth = window.speechSynthesis;
 
-export function handleEvents(con: Connection, msg: InBookMsg, plugins: any[]) {
-	var handler = textToSpeechNotification;
+function getHandler(plugins: any[]): (con: Connection, e: InMsg | InBookMsg, no: TsNotification) => void {
 	for (var p of plugins) {
 		if ("handleNotification" in p) {
-			handler = p.handleNotification;
-			break;
+			return p.handleNotification;
 		}
 	}
+	return textToSpeechNotification;
+}
 
+export function handleMessage(con: Connection, msg: InMsg, plugins: any[]) {
+	try {
+		var handler = getHandler(plugins);
+		if ("Connected" in msg) {
+		} else if ("DisconnectedTemporarily" in msg) {
+			handler(con, msg, notif`Timed out`);
+		} else if ("Events" in msg) {
+			for (const tsevt of msg.Events) {
+				handleEvents(con, tsevt, handler);
+			}
+		} else if ("TalkersChanged" in msg) {
+		} else if ("Error" in msg) {
+			handler(con, msg, notif`Error`);
+		}
+	} catch (e) {
+		console.error("Failed to create notification for message", e);
+	}
+}
+
+function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection, e: InMsg | InBookMsg, no: TsNotification) => void) {
 	try {
 		const ownClientId = con.ownClient!;
 		const ownClient = con.book.getClient(ownClientId)
@@ -318,16 +338,16 @@ export function handleEvents(con: Connection, msg: InBookMsg, plugins: any[]) {
 			}
 		}
 	} catch (e) {
-		console.error("Failed to create notification", e);
+		console.error("Failed to create notification for event", e);
 	}
 }
 
-function textToSpeechNotification(con: Connection, _e: InBookMsg, no: TsNotification) {
+function textToSpeechNotification(con: Connection, _e: InMsg | InBookMsg, no: TsNotification) {
 	const utter = new SpeechSynthesisUtterance(no.toString(con));
 	synth.cancel();
 	synth.speak(utter);
 }
 
-function textNotification(_c: Connection, _e: InBookMsg, no: TsNotification) {
+function textNotification(_c: Connection, _e: InMsg | InBookMsg, no: TsNotification) {
 	// TODO
 }
