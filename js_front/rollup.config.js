@@ -4,9 +4,8 @@ import resolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
 import livereload from "rollup-plugin-livereload";
 import { terser } from "rollup-plugin-terser";
-import rollts from "@wessberg/rollup-plugin-ts";
 import copy from 'rollup-plugin-copy';
-import typescript from 'typescript';
+import typescript from '@rollup/plugin-typescript';
 
 const svelteOptions = require("./svelte.config");
 
@@ -30,9 +29,6 @@ export default {
 			css: css => {
 				css.write("public/bundle.css");
 			},
-			// preprocess: [
-			// 	scss({ /* scss options */ }),
-			// ]
 			onwarn(warning, onwarn) {
 				if (!/A11y:/.test(warning.message)) {
 					onwarn(warning);
@@ -55,10 +51,7 @@ export default {
 				importee === "svelte" || importee.startsWith("svelte/")
 		}),
 		commonjs(),
-		rollts({
-			tsconfig: "tsconfig.json",
-			typescript: typescript
-		}),
+		typescript(),
 		copy({
 			targets: [
 				{ src: './node_modules/@mdi/font/fonts/*', dest: 'public/fonts' },

@@ -27,6 +27,11 @@ export function flash(element: HTMLElement) {
 	});
 }
 
+export function assert(condition?: any, message?: string, ...data: any[]): asserts condition {
+	if (debug === false) return;
+	console.assert(condition, message, ...data);
+	if (!condition) debugger;
+}
 export function getDataColor(data: number[] | string) {
 	if (data.length < 4) {
 		return "";
