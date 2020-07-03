@@ -1,7 +1,7 @@
 <script>
 	import { sleep, assert } from "../util";
 	import { tick, onMount } from "svelte";
-	import { ListFetchDir } from "./lazyList";
+	import { ListFetchDir, ListEmpty } from "./lazyList";
 
 	// the lowest and highest id that could be retrieved from the source
 	export let fetchIdMin = undefined; // T
@@ -83,6 +83,8 @@
 	}
 
 	/**
+	 * Will repeatedly fetch list blocks from the source until no more elements
+	 * can be fetched or the list is full enough.
 	 * @returns true when the list is satisfied with loading data
 	 */
 	async function fill_body() {
@@ -123,10 +125,16 @@
 		}
 	}
 
+	/**
+	 * Checks the direction of the request. Fetches the data from the source
+	 * and applies them into the list.
+	 * This will fetch one block only.
+	 */
 	async function load(from, dir) {
 		await sleep(100);
 		const elements = await fetchElements(from, dir);
-		if (result.length === 0) {
+
+		if (elements.length === 0) {
 			if (dir === ListFetchDir.Before) fetchIdMin = from;
 			else if (dir === ListFetchDir.After) fetchIdMax = from;
 			else {
@@ -135,11 +143,16 @@
 			}
 			return;
 		}
-		await applyElements(result.elems, dir);
+		await applyElements(elements, dir);
 	}
 
+	/**
+	 * Utility method to replace the current list with a new list without
+	 * changing the scroll position.
+	 */
 	async function modifyElems(newElems) {
 		const lastScrollHeight = pan.scrollHeight;
+		assert(Array.isArray(newElems));
 		elems = newElems;
 		await tick();
 		var scrollDiff = pan.scrollHeight - lastScrollHeight;
@@ -147,6 +160,10 @@
 		lastScollPos += scrollDiff;
 	}
 
+	/**
+	 * Checks if a block at the end of the list is far enough out of view and
+	 * removes it.
+	 */
 	async function tryTrimEnd() {
 		if (elems.length <= nItemsToRemove) return;
 		await tick();
@@ -173,6 +190,10 @@
 		}
 	}
 
+	/**
+	 * Checks if a block at the start of the list is far enough out of view and
+	 * removes it.
+	 */
 	async function tryTrimStart() {
 		if (elems.length <= nItemsToRemove) return;
 		await tick();
@@ -199,6 +220,9 @@
 		}
 	}
 
+	/**
+	 * Appends/Prepends or replaces the list with the new passed list.
+	 */
 	async function applyElements(newElems, dir) {
 		// TODO:not sure, but I think add + trim could be done in one step
 		switch (dir) {
@@ -216,6 +240,7 @@
 				await tryTrimEnd();
 
 			case ListFetchDir.New:
+				assert(Array.isArray(newElems));
 				elems = newElems;
 				break;
 
@@ -232,6 +257,7 @@
 
 <div class="lazyList" bind:this="{pan}" on:scroll="{handle_scroll}">
 	<div class="scrollPane">
+		<!-- {@debug elems} -->
 		{#each elems as data}
 			<div class="lazyListElement">
 				<slot {data} />

@@ -6,3 +6,5 @@ export enum ListFetchDir {
 	After,
 	New,
 }
+
+export const ListEmpty = {};
