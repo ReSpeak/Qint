@@ -1,52 +1,74 @@
-<script>
+<script lang="typescript">
 	import { sleep, assert } from "../util";
 	import { tick, onMount } from "svelte";
-	import { ListFetchDir, ListEmpty } from "./lazyList";
+	import { writable } from 'svelte/store';
+	import * as svst from 'svelte/store';
+	import { ListFetchDir } from "./lazyList";
+
+	class T {}
+
+	interface FetchResult {
+		items: T[];
+		/** true if there are no more elements before the returned items */
+		canLoadBeforeStart: boolean;
+		/** true if there are no more elements after the returned items */
+		canLoadAfterEnd: boolean;
+	}
 
 	// the lowest and highest id that could be retrieved from the source
-	export let fetchIdMin = undefined; // T
-	export let fetchIdMax = undefined; // T
-	export let compare = (a, b) => {
-		return a - b;
-	}; // (a, b) => -1 | 0 | +1
-	export let fetchElements; // (id, dir) => { elements: T[], hasEnd: boolean }
-	//export let afterFetch = undefined; // () => any
-	export let startIsTop = true;
+
+	let canLoadAfterEnd: boolean = true;
+	let canLoadBeforeStart: boolean = true;
+
+	export function sourceChanged(dir: ListFetchDir) {
+		switch (dir) {
+		case ListFetchDir.New:
+			canLoadBeforeStart = true;
+			canLoadAfterEnd = true;
+			break;
+		case ListFetchDir.Before: canLoadBeforeStart = true; break;
+		case ListFetchDir.After: canLoadAfterEnd = true; break;
+		}
+		start_fill();
+	}
+
+	export let fetchElements: (
+		id: T | undefined,
+		dir: ListFetchDir
+	) => Promise<FetchResult> = undefined as any;
 	assert(fetchElements, "No fetch function");
 
-	// A small hack to fetch new data when min/max changes
-	$: start_fill(fetchIdMin);
-	$: start_fill(fetchIdMax);
-
 	// the data elements held by this list
-	let elems = [];
+	let elems: T[] = [];
 
-	let pxBeforeLoad = 100; // TODO? could be adjusted dynamically
+	let pxBeforeLoad = 300; // TODO? could be adjusted dynamically
 	// The amout of items that will be removed when out of view
 	let nItemsToRemove = 25;
 	// How far the nThItemsToRemove has to be out of view to remove the batch
-	let nThItemDistanceToView = 200;
+	let nThItemDistanceToView = 400;
 
 	// Require the minimum distance before deleting an item to be higher
 	// than the minimun size the list wants to buffer.
 	// Otherwise we might end in an loop of adding and removing a side.
 	assert(nThItemDistanceToView > pxBeforeLoad);
 
+	declare let holdIdStart: T | undefined;
+	declare let holdIdEnd: T | undefined;
 	// the lowest and highest _included_ id currently in the list
 	$: holdIdStart = elems.length !== 0 ? elems[0] : undefined;
 	$: holdIdEnd = elems.length !== 0 ? elems[elems.length - 1] : undefined;
 
 	// The holding list element which has the scrollbar
-	let pan;
+	let pan: HTMLElement;
 	// Utility holder to calculate `scrollDiff`
-	let lastScollPos = undefined;
+	let lastScrollPos: number = 0;
 	// In which direction and how far the content has scrolled since last check
 	// >0 down, <0 up
 	let scrollDiff = 0;
-	// prevent async weirness by only allowing one async task
-	let fetchTask;
+	// prevent async weirdness by only allowing one async task
+	let fetchTask: Promise<void> | undefined;
 
-	function handle_scroll(e) {
+	function handle_scroll(e: MouseEvent) {
 		// console.log(
 		// 	pan.scrollHeight, // complete content
 		// 	pan.scrollTop,    // current scroll position
@@ -56,11 +78,8 @@
 		// );
 		// ! ELEM.offsetTop   // is the bottom of a element measured from the top of the container
 		// ! clientHeight + scrollTopMax == scrollHeight
-		if (lastScollPos !== undefined) {
-			scrollDiff = pan.scrollTop - lastScollPos;
-			//console.log("diff", scrollDiff);
-		}
-		lastScollPos = pan.scrollTop;
+		scrollDiff = pan.scrollTop - lastScrollPos;
+		lastScrollPos = pan.scrollTop;
 
 		start_fill();
 	}
@@ -83,41 +102,35 @@
 	}
 
 	/**
-	 * Will repeatedly fetch list blocks from the source until no more elements
+	 * Will repeatedly fetch list chunks from the source until no more elements
 	 * can be fetched or the list is full enough.
 	 * @returns true when the list is satisfied with loading data
 	 */
-	async function fill_body() {
+	async function fill_body(): Promise<boolean> {
+		if (!canLoadAfterEnd && !canLoadBeforeStart) return true;
+
 		if (holdIdStart === undefined || holdIdEnd === undefined) {
 			await load(undefined, ListFetchDir.New);
 			return false;
 		}
-		// if (holdIdStart === undefined && holdIdEnd === undefined) {
-		// 	await load(undefined, ListFetchDir.New);
-		// 	return false;
-		// }
 
 		const distFromTop = pan.scrollTop;
-		const distFromBot = pan.scrollTopMax - pan.scrollTop;
+		const pan_scrollTopMax = pan.scrollHeight - pan.clientHeight;
+		const distFromBot = pan_scrollTopMax - pan.scrollTop;
 
 		const wantFetchStart = distFromTop < pxBeforeLoad && scrollDiff <= 0;
 		const wantFetchEnd = distFromBot < pxBeforeLoad && scrollDiff >= 0;
 
-		const canLoadBeforeStart =
-			holdIdStart === undefined || compare(holdIdStart, fetchIdMin) > 0;
-		const canLoadAfterEnd =
-			holdIdStart === undefined || compare(holdIdEnd, fetchIdMax) < 0;
-
 		if (wantFetchStart && canLoadBeforeStart) {
 			//const count = Math.min(holdIdStart - fetchIdMin, fetchCount);
 			//const from = holdIdStart - count;
-			//console.log("want start", from, count);
+			console.log("want start", holdIdStart);
 			await load(holdIdStart, ListFetchDir.Before);
 			return false;
 		} else if (wantFetchEnd && canLoadAfterEnd) {
 			//const from = holdIdEnd + 1;
 			//const count = Math.min(fetchIdMax - holdIdEnd, fetchCount);
-			//console.log("want end", from, count);
+			console.log("want end", holdIdEnd);
 			await load(holdIdEnd, ListFetchDir.After);
 			return false;
 		} else {
@@ -130,34 +143,48 @@
 	 * and applies them into the list.
 	 * This will fetch one block only.
 	 */
-	async function load(from, dir) {
-		await sleep(100);
-		const elements = await fetchElements(from, dir);
+	async function load(
+		from: T,
+		dir: ListFetchDir.After | ListFetchDir.Before
+	): Promise<void>;
+	async function load(
+		from: undefined | T,
+		dir: ListFetchDir.New
+	): Promise<void>;
+	async function load(from: T | undefined, dir: ListFetchDir): Promise<void> {
+		assert(dir === ListFetchDir.New || from !== undefined);
+		const result = await fetchElements(from, dir);
+		console.log("From fetch: ", result);
 
-		if (elements.length === 0) {
-			if (dir === ListFetchDir.Before) fetchIdMin = from;
-			else if (dir === ListFetchDir.After) fetchIdMax = from;
-			else {
-				fetchIdMin = from;
-				fetchIdMax = from;
-			}
-			return;
+		if (dir === ListFetchDir.Before) {
+			if(result.items.length === 0) assert(!result.canLoadBeforeStart);
+			canLoadBeforeStart = result.canLoadBeforeStart;
+		} else if (dir === ListFetchDir.After) {
+			if(result.items.length === 0) assert(!result.canLoadAfterEnd);
+			canLoadAfterEnd = result.canLoadAfterEnd;
+		} else {
+			if(result.items.length === 0) assert(!result.canLoadBeforeStart && !result.canLoadAfterEnd);
+			canLoadBeforeStart = result.canLoadBeforeStart;
+			canLoadAfterEnd = result.canLoadAfterEnd;
 		}
-		await applyElements(elements, dir);
+		await applyElements(result.items, dir);
 	}
 
 	/**
 	 * Utility method to replace the current list with a new list without
 	 * changing the scroll position.
 	 */
-	async function modifyElems(newElems) {
+	async function modifyElems(newElems: T[]) {
 		const lastScrollHeight = pan.scrollHeight;
-		assert(Array.isArray(newElems));
+		const lastScrollTop = pan.scrollTop;
+		console.log("Before change scrollHeight", lastScrollHeight, ", scrollTop", pan.scrollTop);
 		elems = newElems;
 		await tick();
-		var scrollDiff = pan.scrollHeight - lastScrollHeight;
-		pan.scrollTop += scrollDiff;
-		lastScollPos += scrollDiff;
+		console.log("In change scrollTop", pan.scrollTop);
+		const scrollAdjust = pan.scrollHeight - lastScrollHeight;
+		pan.scrollTop = lastScrollTop + scrollAdjust;
+		lastScrollPos += scrollAdjust;
+		console.log("After change scrollHeight", pan.scrollHeight, ", scrollTop", pan.scrollTop, ", scrollAdjust", scrollAdjust);
 	}
 
 	/**
@@ -167,7 +194,9 @@
 	async function tryTrimEnd() {
 		if (elems.length <= nItemsToRemove) return;
 		await tick();
-		let childList = pan.querySelectorAll(".scrollPane > .lazyListElement");
+		let childList = pan.querySelectorAll<HTMLElement>(
+			".scrollPane > .lazyListElement"
+		);
 		let nThChild = childList[childList.length - nItemsToRemove];
 		// The top of the element within our list (unscrolled)
 		let topStaticOffset = nThChild.offsetTop - nThChild.offsetHeight;
@@ -185,7 +214,7 @@
 			);
 			// modification is at the end => safe
 			elems = elems.slice(0, elems.length - nItemsToRemove);
-			holdIdEnd = elems[elems.length - 1];
+			canLoadAfterEnd = true;
 			console.log("After trim end", holdIdStart, holdIdEnd);
 		}
 	}
@@ -197,7 +226,9 @@
 	async function tryTrimStart() {
 		if (elems.length <= nItemsToRemove) return;
 		await tick();
-		let childList = pan.querySelectorAll(".scrollPane > .lazyListElement");
+		let childList = pan.querySelectorAll<HTMLElement>(
+			".scrollPane > .lazyListElement"
+		);
 		let nThChild = childList[nItemsToRemove - 1];
 		// The bottom of the element within our list (unscrolled)
 		let bottomStaticOffset = nThChild.offsetTop;
@@ -215,7 +246,7 @@
 			);
 			// mofification at start => helper
 			await modifyElems(elems.slice(nItemsToRemove));
-			holdIdStart = elems[0];
+			canLoadBeforeStart = true;
 			console.log("After trim start", holdIdStart, holdIdEnd);
 		}
 	}
@@ -223,24 +254,22 @@
 	/**
 	 * Appends/Prepends or replaces the list with the new passed list.
 	 */
-	async function applyElements(newElems, dir) {
+	async function applyElements(newElems: T[], dir: ListFetchDir) {
 		// TODO:not sure, but I think add + trim could be done in one step
 		switch (dir) {
 			case ListFetchDir.After:
 				// This case adds elements at the end => trim start
 				elems = [...elems, ...newElems]; // modification is at the end => safe
-				holdIdEnd += newElems.length;
 				await tryTrimStart();
 				break;
 
 			case ListFetchDir.Before:
 				// This case adds elements at the start => trim end
 				await modifyElems([...newElems, ...elems]); // mofification at start => helper
-				holdIdStart -= newElems.length;
 				await tryTrimEnd();
+				break;
 
 			case ListFetchDir.New:
-				assert(Array.isArray(newElems));
 				elems = newElems;
 				break;
 
@@ -257,7 +286,6 @@
 
 <div class="lazyList" bind:this="{pan}" on:scroll="{handle_scroll}">
 	<div class="scrollPane">
-		<!-- {@debug elems} -->
 		{#each elems as data}
 			<div class="lazyListElement">
 				<slot {data} />

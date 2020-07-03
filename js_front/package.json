@@ -7,7 +7,6 @@
 		"@rollup/plugin-node-resolve": "^7.1.1",
 		"@rollup/plugin-replace": "^2.3.2",
 		"@types/highlight.js": "^9.12.3",
-		"@wessberg/rollup-plugin-ts": "1.2.12",
 		"node-sass": "^4.14.1",
 		"npm-run-all": "^4.1.5",
 		"rollup": "^1.27.14",
@@ -19,10 +18,12 @@
 		"sass": "^1.26.5",
 		"svelte": "^3.22.2",
 		"svelte-preprocess": "^3.7.4",
+		"tslib": "^2.0.0",
 		"typescript": "^3.8.3"
 	},
 	"dependencies": {
 		"@mdi/font": "^5.0.45",
+		"@rollup/plugin-typescript": "^5.0.1",
 		"bulma": "^0.8.2",
 		"bulmaswatch": "^0.8.1",
 		"highlight.js": "^10.0.2",

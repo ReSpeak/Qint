@@ -1,6 +1,7 @@
 <script>
 	import LazyList from "./ui/LazyList.svelte";
 	import { ListFetchDir } from "./ui/lazyList";
+	import { sleep } from "./util";
 
 	function* dummies(start, count) {
 		for (let i = start; i < start + count; i++) {
@@ -8,9 +9,10 @@
 		}
 	}
 
-	function fetchElements(idFrom, dir) {
-		const min = 0;
-		const max = 300;
+	async function fetchElements(idFrom, dir) {
+		await sleep(100);
+		const min = minId;
+		const max = maxId;
 		const take = 25;
 
 		if (dir === ListFetchDir.Before) {
@@ -20,29 +22,33 @@
 				items: dummies(from, count)
 					.linq()
 					.toArray(),
-				hasEnd: from === min,
+				canLoadBeforeStart: from > min,
+				canLoadAfterEnd: from + count < max,
 			};
-		} else if (dir === ListFetchDir.Before) {
+		} else if (dir === ListFetchDir.After) {
 			const from = idFrom.id + 1;
-			const count = Math.min(max - from - 1, take);
+			const count = Math.min(max - from, take);
 			return {
 				items: dummies(from, count)
 					.linq()
 					.toArray(),
-				hasEnd: from + count - 1 === max,
+				canLoadBeforeStart: idFrom.id > min,
+				canLoadAfterEnd: from + count < max,
 			};
 		} else {
 			return {
 				items: dummies(0, 1)
 					.linq()
 					.toArray(),
-				hasEnd: false,
+				canLoadBeforeStart: 0 > min,
+				canLoadAfterEnd: 1 < max,
 			};
 		}
 	}
 
-	let minId = { id: 0 };
-	let maxId = { id: 0 };
+	let minId = 0;
+	let maxId = 5;
+	let myLazyList;
 </script>
 
 <span>Before List</span>
@@ -50,10 +56,8 @@
 <div class="testingList">
 	<LazyList
 		{fetchElements}
-		compare="{(a, b) => a.id - b.id}"
-		bind:fetchIdMin="{minId}"
-		bind:fetchIdMax="{maxId}"
 		let:data
+		bind:this={myLazyList}
 	>
 		<slot>
 			<b>{data.id}</b>
@@ -65,10 +69,11 @@
 <span>After List</span>
 <button
 	on:click="{() => {
-		maxId = { id: maxId.id + 1 };
+		maxId += 10;
+		myLazyList.sourceChanged(ListFetchDir.After);
 	}}"
 >
-	Add new Message: {maxId.id}
+	Add new Message: {maxId}
 </button>
 
 <style>
