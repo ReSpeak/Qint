@@ -17,8 +17,10 @@
 		// Apply highlight.js
 		for (let elem of obj.getElementsByTagName("code")) {
 			const lang = elem.getAttribute('data-lang');
-			if (hljs.listLanguages().includes(lang)) {
-				elem.classList.add(lang);
+			const hl_lang = hljs.getLanguage(lang);
+			if (hl_lang !== undefined) {
+				elem.setAttribute("rel", hl_lang.name);
+				elem.classList.add("lang-" + hl_lang.name);
 			}
 			hljs.highlightBlock(elem);
 		}
