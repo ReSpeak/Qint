@@ -82,7 +82,7 @@
 		{/if}
 	</div>
 	<ul class="menu-list" class:collapsed>
-		{#each $children as child}
+		{#each $children as child (child.id)}
 			{#if child instanceof Channel}
 				<svelte:self {connection} {filter} channel={child} bind:filterShow={child.filterShow} />
 			{:else}

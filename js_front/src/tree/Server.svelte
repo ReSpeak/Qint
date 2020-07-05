@@ -10,7 +10,7 @@
 
 <div class="menu channel-list">
 	<ul class="menu-list">
-		{#each $children as channel}
+		{#each $children as channel (channel.id)}
 			<Channel {connection} {filter} {channel}/>
 		{/each}
 	</ul>
