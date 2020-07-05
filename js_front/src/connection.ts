@@ -51,7 +51,7 @@ export class Connection {
 		this.socket = new WebSocket(`ws${path}/con/${this.guid}/ws?format=Json`);
 		this.socket.onopen = () => {
 			let version;
-			let platform = (window.navigator.oscpu || window.navigator.userAgent).toLowerCase();
+			let platform = ((window.navigator as any).oscpu || window.navigator.userAgent).toLowerCase();
 			if (platform.includes("windows")) {
 				version = "Windows_3_X_X__1";
 			} else if (platform.includes("linux")) {

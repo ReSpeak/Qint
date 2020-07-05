@@ -571,9 +571,9 @@ dependencies = [
 
 [[package]]
 name = "bit-vec"
-version = "0.5.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f59bbe95d4e52a6398ec21238d31577f2b28a9d86807f06ca59d191d8440d0bb"
+checksum = "5f0dc55f2d8a1a85650ac47858bb001b4c0dd73d79e3c455a842925e68d29cd3"
 
 [[package]]
 name = "bitflags"
@@ -2285,13 +2285,13 @@ checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
 
 [[package]]
 name = "quicklz"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b29ae867d37859e2dd63f26d5495a2b8464ef93ec57f23d7a82100f40738998"
+checksum = "f26da6a97893756d640b25af3a5cbe26c15488afd90805f0856587820ed0151f"
 dependencies = [
  "bit-vec",
  "byteorder",
- "failure",
+ "thiserror",
 ]
 
 [[package]]
@@ -3439,7 +3439,6 @@ checksum = "e604eb7b43c06650e854be16a2a03155743d3752dd1c943f6829e26b7a36e382"
 name = "ts-bookkeeping"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "base64 0.12.3",
  "derive_more",
  "heck",
@@ -3460,7 +3459,6 @@ dependencies = [
 name = "tsclientlib"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "audiopus",
  "base64 0.12.3",
  "futures",
@@ -3486,6 +3484,7 @@ dependencies = [
  "tsproto-packets",
  "tsproto-structs",
  "tsproto-types",
+ "url",
 ]
 
 [[package]]
@@ -3493,7 +3492,6 @@ name = "tsproto"
 version = "0.1.0"
 dependencies = [
  "aes",
- "anyhow",
  "base64 0.11.0",
  "bitflags",
  "curve25519-dalek",
