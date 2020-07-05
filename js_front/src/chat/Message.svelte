@@ -1,5 +1,5 @@
 <script>
-	import hljs from 'highlight.js';
+	import { hljsHighlight } from './hljs';
 	import katex from 'katex';
 	import { afterUpdate, onMount } from "svelte";
 	import { flash } from "../util";
@@ -16,14 +16,7 @@
 		obj.innerHTML = html;
 		// Apply highlight.js
 		for (let elem of obj.getElementsByTagName("code")) {
-			const lang = elem.getAttribute('data-lang');
-			const hl_lang = hljs.getLanguage(lang);
-			console.log(lang, hl_lang);
-			if (hl_lang !== undefined) {
-				elem.setAttribute("rel", hl_lang.name);
-				elem.classList.add("lang-" + hl_lang.name);
-			}
-			hljs.highlightBlock(elem);
+			hljsHighlight(elem);
 		}
 
 		// Apply KaTeX
@@ -184,12 +177,16 @@
 		background: none;
 	}
 
+	:global(code.hljs) {
+		position: relative;
+	}
+
 	:global(code[rel]::before) {
 		font-size: 0.8em;
 		content: attr(rel);
 		position: absolute;
-		bottom: 1em;
-		right: 2em;
+		bottom: 0;
+		right: 3px;
 		color: $orange;
 		font-weight: bold;
 		font-family: Sans-Serif;
