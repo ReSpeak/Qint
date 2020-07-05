@@ -16,6 +16,7 @@ export class Connection {
 	public ownClient?: number;
 	private socket?: WebSocket;
 	public guid?: string;
+	private muted: boolean = false;
 
 	constructor() {
 		loadPlugins();
@@ -31,10 +32,27 @@ export class Connection {
 		if (this.socket)
 			this.socket.close();
 		this.socket = undefined;
+		this.muted = false;
 	}
 
 	public getState(): ConnectionState {
 		return get(this.state);
+	}
+
+	public async toggleMute() {
+		this.muted = !this.muted;
+		const mutePath = this.muted ? "mute" : "unmute";
+		try {
+			await fetch(`${BASE_ADDRESS}/con/${this.guid}/${mutePath}`, {
+				method: 'POST',
+			});
+		} catch(e) {
+			console.error("Failed to change mute:", e);
+		}
+	}
+
+	public isMuted(): boolean {
+		return this.muted;
 	}
 
 	public connect(opt: IConnectOptions) {
@@ -79,7 +97,19 @@ export class Connection {
 		this.socket.onerror = (error) => {
 			this.error.set("Connection failed, is Qint running?");
 		};
-		this.socket.onclose = () => this.reset();
+		this.socket.onclose = () => {
+			// Plugins
+			for (const plugin of plugins) {
+				try {
+					if ("handleEvent" in plugin) {
+						plugin.handleEvent(this, { Disconnected: null });
+					}
+				} catch (e) {
+					console.error("Failed to handle event in plugin:", e);
+				}
+			}
+			this.reset();
+		};
 		this.socket.onmessage = (evt) => this.messageHandler(evt);
 		this.state.set(ConnectionState.Connecting);
 	}
@@ -121,8 +151,12 @@ export class Connection {
 		const msg = JSON.parse(evt.data) as InMsg;
 		// Plugins
 		for (const plugin of plugins) {
-			if ("handleEvent" in plugin) {
-				plugin.handleEvent(this, msg);
+			try {
+				if ("handleEvent" in plugin) {
+					plugin.handleEvent(this, msg);
+				}
+			} catch (e) {
+				console.error("Failed to handle event in plugin:", e);
 			}
 		}
 

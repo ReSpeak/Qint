@@ -1,5 +1,4 @@
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::collections::HashSet;
 use std::time::Duration;
 
 use actix::*;
@@ -16,15 +15,11 @@ use tsproto_packets::packets::{AudioData, CodecType, OutAudio, OutPacket};
 use super::*;
 use crate::websocket::{SendPacketMsg, SetSelfTalkingMsg, Ws};
 
-pub(crate) struct SetListenerMsg {
-	pub connection: Addr<Ws>,
-}
-
-pub struct RemoveListenerMsg;
-pub struct SetPlayingMsg(pub bool);
-pub struct ResetMlMsg;
+pub(crate) struct AddListenerMsg(pub Addr<Ws>);
+pub(crate) struct RemoveListenerMsg(pub Addr<Ws>);
 /// An audio packet and `true` if this is the last packet.
 pub(crate) struct PlayPacketMsg(OutPacket, bool);
+pub(crate) struct ResetMsg;
 
 /// Threshold for voice activation detection.
 const VAD_THRESHOLD: f32 = 0.2;
@@ -37,15 +32,11 @@ pub struct AudioToTs {
 	logger: Logger,
 	audio_subsystem: AudioSubsystem,
 	spawn_send: mpsc::Sender<PlayPacketMsg>,
-	connection: Option<Addr<Ws>>,
+	connections: HashSet<Addr<Ws>>,
 
 	device: Option<AudioDevice<SdlCallback>>,
-	/// If we are muted or not
-	is_playing: bool,
 	/// If we are actually talking and sending audio
 	is_talking: bool,
-	/// If rnnoise should be reset.
-	reset_ml: Arc<AtomicBool>,
 }
 
 struct SdlCallback {
@@ -65,8 +56,6 @@ struct SdlCallback {
 	/// This is `TALKING_TIME + 1` if voice activation triggers and greater 0 if
 	/// packets should be sent.
 	is_talking: u8,
-	/// If rnnoise should be reset.
-	reset_ml: Arc<AtomicBool>,
 
 	spawn_send: mpsc::Sender<PlayPacketMsg>,
 }
@@ -86,79 +75,52 @@ impl Actor for AudioToTs {
 	}
 }
 
-impl Message for SetListenerMsg {
+impl Message for AddListenerMsg {
 	type Result = ();
 }
-
 impl Message for RemoveListenerMsg {
 	/// `true` if there was a listener registered before, `false` if not.
 	type Result = bool;
 }
-impl Message for SetPlayingMsg {
-	type Result = ();
-}
-impl Message for ResetMlMsg {
-	type Result = ();
-}
 impl Message for PlayPacketMsg {
 	type Result = ();
 }
-
-impl Handler<SetListenerMsg> for AudioToTs {
+impl Message for ResetMsg {
 	type Result = ();
-	fn handle(&mut self, msg: SetListenerMsg, _: &mut Self::Context) -> Self::Result {
-		// Remove from previous connection
-		let is_playing = self.is_playing;
-		self.is_playing = false;
-		self.update_talking();
-		self.is_playing = is_playing;
+}
 
-		self.connection = Some(msg.connection);
-		self.update_talking();
+impl Handler<AddListenerMsg> for AudioToTs {
+	type Result = ();
+	fn handle(&mut self, msg: AddListenerMsg, _: &mut Self::Context) -> Self::Result {
+		if self.connections.is_empty() {
+			if let Some(device) = &self.device {
+				device.resume();
+			}
+		}
+		self.connections.insert(msg.0.clone());
+		if self.is_talking {
+			// Update is_talking for this connection
+			tokio::spawn(msg.0.send(SetSelfTalkingMsg(self.is_talking)));
+		}
 		debug!(self.logger, "Add listener");
 	}
 }
 
 impl Handler<RemoveListenerMsg> for AudioToTs {
 	type Result = bool;
-	fn handle(&mut self, _: RemoveListenerMsg, _: &mut Self::Context) -> Self::Result {
+	fn handle(&mut self, msg: RemoveListenerMsg, _: &mut Self::Context) -> Self::Result {
 		debug!(self.logger, "Removing listener");
-		self.is_playing = false;
-		self.update_talking();
-		if let Some(device) = &self.device {
-			device.pause();
+		if self.is_talking {
+			// Update is_talking for this connection
+			tokio::spawn(msg.0.send(SetSelfTalkingMsg(false)));
 		}
-		self.connection.take().is_some()
-	}
-}
-
-impl Handler<SetPlayingMsg> for AudioToTs {
-	type Result = ();
-	fn handle(
-		&mut self, SetPlayingMsg(play): SetPlayingMsg, _: &mut Self::Context,
-	) -> Self::Result {
-		if let Some(device) = &self.device {
-			debug!(self.logger, "Set device playing"; "play" => play);
-			if play {
-				device.resume();
-			} else {
+		let r = self.connections.remove(&msg.0);
+		if self.connections.is_empty() {
+			if let Some(device) = &self.device {
 				device.pause();
 			}
-		} else {
-			warn!(self.logger, "Set playing without device"; "play" => play);
 		}
-		self.is_playing = play;
-		self.update_talking();
-	}
-}
-
-impl Handler<ResetMlMsg> for AudioToTs {
-	type Result = ();
-	fn handle(
-		&mut self, _: ResetMlMsg, _: &mut Self::Context,
-	) -> Self::Result {
-		self.reset_ml.store(true, Ordering::Relaxed);
-		debug!(self.logger, "Reset rnnoise");
+		r
 	}
 }
 
@@ -168,30 +130,45 @@ impl Handler<PlayPacketMsg> for AudioToTs {
 		&mut self, PlayPacketMsg(packet, is_end): PlayPacketMsg, _: &mut Self::Context,
 	) -> Self::Result {
 		// Write into packet sink
-		if let Some(con) = &mut self.connection {
+		let is_talking = self.is_talking;
+		let logger = self.logger.clone();
+		self.connections.retain(|con| {
 			if !con.connected() {
-				self.connection = None;
-				if let Some(d) = &self.device {
-					d.pause();
+				if is_talking {
+					// Update is_talking for this connection
+					tokio::spawn(con.send(SetSelfTalkingMsg(false)));
 				}
-				return;
+				false
+			} else {
+				let logger = logger.clone();
+				tokio::spawn(con.send(SendPacketMsg(packet.clone())).map(move |r| {
+					if let Err(e) = r {
+						warn!(logger, "Failed to send audio packet";
+							"error" => %e);
+					}
+				}));
+
+				true
 			}
-			let talking = self.is_talking;
+		});
+
+		if self.is_talking != !is_end {
 			self.is_talking = !is_end;
+			self.update_talking();
+		}
 
-			let logger = self.logger.clone();
-			tokio::spawn(con.send(SendPacketMsg(packet)).map(move |r| {
-				if let Err(e) = r {
-					warn!(logger, "Failed to send audio packet";
-						"error" => %e);
-					// TODO Remove connection
-				}
-			}));
-
-			if talking != self.is_talking {
-				self.update_talking();
+		if self.connections.is_empty() {
+			if let Some(d) = &self.device {
+				d.pause();
 			}
 		}
+	}
+}
+
+impl Handler<ResetMsg> for AudioToTs {
+	type Result = ();
+	fn handle(&mut self, _: ResetMsg, _: &mut Self::Context) -> Self::Result {
+		self.open_device();
 	}
 }
 
@@ -205,12 +182,10 @@ impl AudioToTs {
 			logger,
 			audio_subsystem,
 			spawn_send,
-			connection: None,
+			connections: Default::default(),
 			device: None,
 
-			is_playing: false,
 			is_talking: false,
-			reset_ml: Arc::new(AtomicBool::new(false)),
 		})
 	}
 
@@ -236,12 +211,12 @@ impl AudioToTs {
 					audiopus::Channels::Stereo
 				};
 
-				SdlCallback::new(self.logger.clone(), channels, spawn_send, self.reset_ml.clone())
+				SdlCallback::new(self.logger.clone(), channels, spawn_send)
 			})
 			.map_err(|e| format_err!("SDL error: {}", e))
 		{
 			Ok(device) => {
-				if self.is_playing {
+				if !self.connections.is_empty() {
 					device.resume();
 				}
 				self.device = Some(device);
@@ -254,8 +229,8 @@ impl AudioToTs {
 	}
 
 	fn update_talking(&self) {
-		if let Some(con) = &self.connection {
-			tokio::spawn(con.send(SetSelfTalkingMsg(self.is_playing && self.is_talking)));
+		for con in &self.connections {
+			tokio::spawn(con.send(SetSelfTalkingMsg(self.is_talking)));
 		}
 	}
 }
@@ -263,7 +238,6 @@ impl AudioToTs {
 impl SdlCallback {
 	fn new(
 		logger: Logger, channels: audiopus::Channels, spawn_send: mpsc::Sender<PlayPacketMsg>,
-		reset_ml: Arc<AtomicBool>,
 	) -> Self {
 		Self {
 			logger,
@@ -273,7 +247,6 @@ impl SdlCallback {
 			opus_output: [0; MAX_OPUS_FRAME_SIZE],
 			last_buffer: Default::default(),
 			is_talking: 0,
-			reset_ml,
 			spawn_send,
 		}
 	}
@@ -307,11 +280,6 @@ impl AudioCallback for SdlCallback {
 			warn!(self.logger, "Size not fitting for denoising");
 			should_talk = true;
 		} else {
-			if self.reset_ml.load(Ordering::Relaxed) {
-				self.reset_ml.store(false, Ordering::Relaxed);
-				self.denoise = DenoiseState::new();
-			}
-
 			// Scale to the expected range
 			for d in &mut *buffer {
 				*d *= i16::max_value() as f32;

@@ -56,7 +56,7 @@ interface OMsgSwitchChannel {
 
 
 // In Messages
-export type InMsg = InMsgConnected | InDisconnectedTemporarily | InMsgError | InTalkersChanged | InMsgEvents;
+export type InMsg = InMsgConnected | InDisconnectedTemporarily | InDisconnected | InMsgError | InTalkersChanged | InMsgEvents;
 
 interface InMsgConnected {
 	Connected: {
@@ -67,6 +67,11 @@ interface InMsgConnected {
 
 interface InDisconnectedTemporarily {
 	DisconnectedTemporarily: null;
+}
+
+/// Internal event, not sent over the websocket
+interface InDisconnected {
+	Disconnected: null;
 }
 
 interface InMsgError {

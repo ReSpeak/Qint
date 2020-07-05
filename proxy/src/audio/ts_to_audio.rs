@@ -20,6 +20,7 @@ type AudioHandler = tsclientlib::audio::AudioHandler<Id>;
 
 pub struct PlayMsg(pub Id, pub InAudioBuf);
 pub struct SetVolumeMsg(pub Id, pub f32);
+pub struct ResetMsg;
 
 pub(crate) struct TsToAudio {
 	logger: Logger,
@@ -40,6 +41,9 @@ impl Message for PlayMsg {
 }
 impl Message for SetVolumeMsg {
 	type Result = Result<()>;
+}
+impl Message for ResetMsg {
+	type Result = ();
 }
 
 impl Actor for TsToAudio {
@@ -166,6 +170,13 @@ impl Handler<SetVolumeMsg> for TsToAudio {
 		} else {
 			Err(format_err!("Client not found"))
 		}
+	}
+}
+
+impl Handler<ResetMsg> for TsToAudio {
+	type Result = ();
+	fn handle(&mut self, _: ResetMsg, _: &mut Self::Context) -> Self::Result {
+		self.open_playback();
 	}
 }
 

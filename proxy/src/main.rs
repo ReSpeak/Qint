@@ -164,7 +164,7 @@ async fn create_ws(
 
 	// Check that the id does not exist
 	let mut cons = state.connections.lock().unwrap();
-	if cons.contains_key(&id) {
+	if cons.contains_key(&id) || uuid.is_nil() {
 		return Either::A(
 			HttpResponse::PreconditionFailed()
 				.body("Connection id is already occupied".to_string()),
@@ -184,33 +184,64 @@ async fn create_ws(
 	}
 }
 
-#[post("/audiosend/true")]
-async fn audiosend_true(state: web::Data<State>) -> impl Responder {
-	if state.audio_data.a2ts.send(audio::audio_to_ts::SetPlayingMsg(true)).await.is_err() {
-		error!(state.logger, "Failed to set playing state");
-		HttpResponse::InternalServerError()
+#[post("/con/{id}/mute")]
+async fn mute(state: web::Data<State>, uuid: web::Path<Uuid>) -> impl Responder {
+	let cons = state.connections.lock().unwrap();
+	if uuid.is_nil() {
+		for c in cons.values() {
+			if let Err(e) = c.send(websocket::SetMuteMsg(true)).await {
+				error!(state.logger, "Failed to set mute state"; "error" => %e);
+				return HttpResponse::InternalServerError().body("Failed to set mute state");
+			}
+		}
 	} else {
-		HttpResponse::Ok()
+		let id = ConnectionId(*uuid);
+
+		if let Some(c) = cons.get(&id) {
+			if let Err(e) = c.send(websocket::SetMuteMsg(true)).await {
+				error!(state.logger, "Failed to set mute state"; "error" => %e);
+				return HttpResponse::InternalServerError().body("Failed to set mute state");
+			}
+		}
 	}
+	HttpResponse::Ok().body("Success")
 }
 
-#[post("/audiosend/false")]
-async fn audiosend_false(state: web::Data<State>) -> impl Responder {
-	if state.audio_data.a2ts.send(audio::audio_to_ts::SetPlayingMsg(false)).await.is_err() {
-		error!(state.logger, "Failed to set playing state");
-		HttpResponse::InternalServerError()
+#[post("/con/{id}/unmute")]
+async fn unmute(state: web::Data<State>, uuid: web::Path<Uuid>) -> impl Responder {
+	let cons = state.connections.lock().unwrap();
+	if uuid.is_nil() {
+		for c in cons.values() {
+			if let Err(e) = c.send(websocket::SetMuteMsg(false)).await {
+				error!(state.logger, "Failed to set mute state"; "error" => %e);
+				return HttpResponse::InternalServerError().body("Failed to set mute state");
+			}
+		}
 	} else {
-		HttpResponse::Ok()
+		let id = ConnectionId(*uuid);
+
+		if let Some(c) = cons.get(&id) {
+			if let Err(e) = c.send(websocket::SetMuteMsg(false)).await {
+				error!(state.logger, "Failed to set mute state"; "error" => %e);
+				return HttpResponse::InternalServerError().body("Failed to set mute state");
+			}
+		}
 	}
+	HttpResponse::Ok().body("Success")
 }
 
-#[post("/audiosend/resetml")]
-async fn audiosend_resetml(state: web::Data<State>) -> impl Responder {
-	if state.audio_data.a2ts.send(audio::audio_to_ts::ResetMlMsg).await.is_err() {
-		error!(state.logger, "Failed to reset rnnoise");
+#[post("/audio/reset")]
+async fn audio_reset(state: web::Data<State>) -> impl Responder {
+	if state.audio_data.a2ts.send(audio::audio_to_ts::ResetMsg).await.is_err() {
+		error!(state.logger, "Failed to reset audio pipeline");
 		HttpResponse::InternalServerError()
 	} else {
-		HttpResponse::Ok()
+		if state.audio_data.ts2a.send(audio::ts_to_audio::ResetMsg).await.is_err() {
+			error!(state.logger, "Failed to reset audio pipeline");
+			HttpResponse::InternalServerError()
+		} else {
+			HttpResponse::Ok()
+		}
 	}
 }
 
@@ -412,9 +443,9 @@ async fn main() -> Result<()> {
 			.wrap(Cors::new().max_age(3600).finish())
 			.data(state)
 			.service(create_ws)
-			.service(audiosend_true)
-			.service(audiosend_false)
-			.service(audiosend_resetml)
+			.service(mute)
+			.service(unmute)
+			.service(audio_reset)
 			.service(list_plugins)
 			.service(get_plugin)
 			.service(download_file)

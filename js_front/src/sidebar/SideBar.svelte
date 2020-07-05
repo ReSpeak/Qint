@@ -45,6 +45,9 @@
 			</div>
 			<div class="dropdown-menu" id="dropdown-menu3" role="menu" on:click={() => dropdownActive = false}>
 				<div class="dropdown-content">
+					<button class="button dropdown-item" on:click={() => connection.toggleMute()}>
+						Toggle Mute
+					</button>
 					<button class="button dropdown-item">
 						Settings
 					</button>

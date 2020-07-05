@@ -43,11 +43,13 @@ pub(crate) struct Ws {
 struct ConnectionPoller;
 
 pub(crate) struct GetClientVolumeMsg(pub ClientId);
+/// Audio detection tells us if we are talking.
 pub(crate) struct SetSelfTalkingMsg(pub bool);
 pub(crate) struct TalkersChangedMsg(pub Vec<(ClientId, bool)>);
 pub(crate) struct SaveClientMsg(pub Uid);
 pub(crate) struct SendPacketMsg(pub OutPacket);
 pub(crate) struct SetVolumeMsg(pub Uid, pub f32);
+pub(crate) struct SetMuteMsg(pub bool);
 pub(crate) struct DisconnectMsg;
 
 pub(crate) struct DownloadFile {
@@ -91,6 +93,9 @@ impl Message for SendPacketMsg {
 	type Result = Result<PacketId>;
 }
 impl Message for SetVolumeMsg {
+	type Result = ();
+}
+impl Message for SetMuteMsg {
 	type Result = ();
 }
 impl Message for DisconnectMsg {
@@ -153,19 +158,7 @@ impl Ws {
 				for e in &events {
 					if let TsEvent::PropertyAdded { id: events::PropertyId::Server, .. } = e {
 						// Connected
-						// Activate audio
-						let logger = self.logger.clone();
-						let a2ts = self.state.audio_data.a2ts.clone();
-						actix::spawn(
-							a2ts.send(audio::audio_to_ts::SetListenerMsg {
-								connection: ctx.address(),
-							})
-							.map(move |r| {
-								if let Err(e) = r {
-									error!(logger, "Failed to set listener"; "error" => %e);
-								}
-							}),
-						);
+						self.activate_audio(ctx);
 
 						match self.connection.as_ref().and_then(|c| {
 							c.get_server_key()
@@ -272,7 +265,10 @@ impl Ws {
 				}
 			}
 			TsStreamItem::DisconnectedTemporarily => {
+				self.deactivate_audio(ctx);
 				self.send_message(&MessageP2F::DisconnectedTemporarily(), ctx);
+				self.talkers.clear();
+				self.update_talkers(ctx);
 			}
 			TsStreamItem::FileDownload(handle, file) => {
 				if let Some(transfer) = self.file_downloads.remove(&handle) {
@@ -288,7 +284,37 @@ impl Ws {
 		}
 	}
 
+	fn activate_audio(&mut self, ctx: &mut <Self as Actor>::Context) {
+		// Activate audio
+		let logger = self.logger.clone();
+		let a2ts = self.state.audio_data.a2ts.clone();
+		actix::spawn(
+			a2ts.send(audio::audio_to_ts::AddListenerMsg(ctx.address()))
+			.map(move |r| {
+				if let Err(e) = r {
+					error!(logger, "Failed to add audio listener"; "error" => %e);
+				}
+			}),
+		);
+	}
+
+	fn deactivate_audio(&mut self, ctx: &mut <Self as Actor>::Context) {
+		// Deactivate audio
+		let logger = self.logger.clone();
+		let a2ts = self.state.audio_data.a2ts.clone();
+		actix::spawn(
+			a2ts.send(audio::audio_to_ts::RemoveListenerMsg(ctx.address()))
+			.map(move |r| {
+				if let Err(e) = r {
+					error!(logger, "Failed to remove audio listener"; "error" => %e);
+				}
+			}),
+		);
+	}
+
 	fn disconnect(&mut self, ctx: &mut <Self as Actor>::Context) {
+		self.deactivate_audio(ctx);
+		self.talkers.clear();
 		if let Some(con) = &mut self.connection {
 			if let Err(e) = con.disconnect(DisconnectOptions::new()) {
 				warn!(self.logger, "Failed to disconnect properly";
@@ -625,6 +651,17 @@ impl Handler<SetVolumeMsg> for Ws {
 			}
 		} else {
 			error!(self.logger, "Connection does not exist")
+		}
+	}
+}
+
+impl Handler<SetMuteMsg> for Ws {
+	type Result = ();
+	fn handle(&mut self, SetMuteMsg(mute): SetMuteMsg, ctx: &mut Self::Context) -> Self::Result {
+		if mute {
+			self.deactivate_audio(ctx);
+		} else {
+			self.activate_audio(ctx);
 		}
 	}
 }

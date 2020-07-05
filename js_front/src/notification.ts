@@ -74,6 +74,8 @@ export function handleMessage(con: Connection, msg: InMsg, plugins: any[]) {
 		if ("Connected" in msg) {
 		} else if ("DisconnectedTemporarily" in msg) {
 			handler(con, msg, notif`Timed out`);
+		} else if ("Disconnected" in msg) {
+			handler(con, msg, notif`Disconnected`);
 		} else if ("Events" in msg) {
 			for (const tsevt of msg.Events) {
 				handleEvents(con, tsevt, handler);
@@ -241,10 +243,17 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 					}
 
 					if ("input_muted" in newC) {
-						if (newC.input_muted)
-							handler(con, msg, notif`${client} is muted`);
-						else
-							handler(con, msg, notif`${client} is unmuted`);
+						if (client.id === ownClientId) {
+							if (newC.input_muted)
+								handler(con, msg, notif`muted`);
+							else
+								handler(con, msg, notif`unmuted`);
+						} else {
+							if (newC.input_muted)
+								handler(con, msg, notif`${client} is muted`);
+							else
+								handler(con, msg, notif`${client} is unmuted`);
+						}
 					}
 
 					if ("output_muted" in newC) {
