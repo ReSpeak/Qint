@@ -18,6 +18,7 @@
 		for (let elem of obj.getElementsByTagName("code")) {
 			const lang = elem.getAttribute('data-lang');
 			const hl_lang = hljs.getLanguage(lang);
+			console.log(lang, hl_lang);
 			if (hl_lang !== undefined) {
 				elem.setAttribute("rel", hl_lang.name);
 				elem.classList.add("lang-" + hl_lang.name);

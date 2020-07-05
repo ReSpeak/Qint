@@ -50,8 +50,8 @@ enum RenderMdMeta {
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum TextKind {
 	None,
-	Normal,
-	Latex(bool), // display mode
+	Normal(bool), // bool:code mode (when true, text wont be bb processed)
+	Latex(bool), // bool:display mode
 }
 
 /// Escapes a string so it can be put into html (between tags).
@@ -245,7 +245,13 @@ impl RenderMd {
 	fn done_text(&mut self) {
 		match self.text_state {
 			TextKind::None => return,
-			TextKind::Normal => self.push_node(bb(&self.text_builder)),
+			TextKind::Normal(code) => {
+				if code {
+					self.push_node(self.text_builder.to_string().into())
+				} else {
+					self.push_node(bb(&self.text_builder))
+				}
+			},
 			TextKind::Latex(dm) => {
 				if let Some(node) = katex_render_code(&self.text_builder, dm) {
 					self.push_node(node);
@@ -284,9 +290,15 @@ impl RenderMd {
 					self.push_vtag(vtag);
 				}
 				Event::Text(text) => {
-					self.text_state = self.text_state.when_none(TextKind::Normal);
+					let is_code = if let Some(parent_node) = self.spine.last() {
+						matches!(parent_node.0, RenderMdMeta::Code(_))
+					} else {
+						false
+					};
+					self.text_state = self.text_state.when_none(TextKind::Normal(is_code));
 					self.text_builder.push_str(&text);
 				}
+				// This only covers inline code blocks
 				Event::Code(text) => {
 					let mut code = VTag::new("code");
 					code.add_child(text.to_string().into());
@@ -300,7 +312,7 @@ impl RenderMd {
 					} else if self.text_state.is_latex() && text.eq_ignore_ascii_case("</LATEX>") {
 						self.done_text();
 					} else {
-						self.text_state = self.text_state.when_none(TextKind::Normal);
+						self.text_state = self.text_state.when_none(TextKind::Normal(false));
 						self.text_builder.push_str(&text);
 					}
 				}
@@ -520,7 +532,7 @@ impl RenderBb {
 			match seg {
 				BBSegment::Text(text) => {
 					self.text_builder.push_str(&text);
-					self.text_state = TextKind::Normal;
+					self.text_state = TextKind::Normal(false);
 				}
 				BBSegment::Open(tag, arg) => {
 					let vtag = match tag {
