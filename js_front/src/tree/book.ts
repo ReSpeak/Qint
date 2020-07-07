@@ -280,12 +280,7 @@ export class Book {
 		let oldTalkers = this.currentTalkers;
 		for (var talker of talkers) {
 			const id = talker[0];
-			var i = oldTalkers.indexOf([id, true]);
-			if (i === -1)
-				i = oldTalkers.indexOf([id, false]);
-
-			if (i !== -1)
-				oldTalkers.splice(i);
+			const i = oldTalkers.findIndex(t => t[0] === id);
 
 			if (i === -1 || oldTalkers[i][1] !== talker[1]) {
 				this.clients.update(clients => {
@@ -302,6 +297,9 @@ export class Book {
 					return clients;
 				});
 			}
+
+			if (i !== -1)
+				oldTalkers.splice(i, 1);
 		}
 
 		// Remove old talkers
