@@ -10,11 +10,13 @@ export class Book {
 	public server: Writable<Server> = writable(new Server());
 	public clients: Writable<Map<number, Client>> = writable(new Map());
 	public channels: Writable<Map<number, Channel>> = writable(new Map());
+	private currentTalkers: [number, boolean][] = [];
 
 	public reset() {
 		this.server.set(new Server());
 		this.clients.set(new Map());
 		this.channels.set(new Map());
+		this.currentTalkers = [];
 	}
 
 	private static findChannelStart(list: ITreeNode[]): number {
@@ -273,6 +275,54 @@ export class Book {
 			}
 		}
 	}
+
+	public talkersHandler(talkers: [number, boolean][]) {
+		let oldTalkers = this.currentTalkers;
+		for (var talker of talkers) {
+			const id = talker[0];
+			var i = oldTalkers.indexOf([id, true]);
+			if (i === -1)
+				i = oldTalkers.indexOf([id, false]);
+
+			if (i !== -1)
+				oldTalkers.splice(i);
+
+			if (i === -1 || oldTalkers[i][1] !== talker[1]) {
+				this.clients.update(clients => {
+					const client = this.getClient(id);
+					if (client === undefined) {
+						console.error(`Cannot update non-existant client ${id}`);
+						return clients;
+					}
+					client.talking = talker[1];
+					const parent = this.getChannel(client.channel);
+					if (parent !== undefined) {
+						parent.children.update(pch => pch);
+					}
+					return clients;
+				});
+			}
+		}
+
+		// Remove old talkers
+		for (var talker of oldTalkers) {
+			const id = talker[0];
+			this.clients.update(clients => {
+				const client = this.getClient(id);
+				if (client === undefined) {
+					console.error(`Cannot update non-existant client ${id}`);
+					return clients;
+				}
+				client.talking = undefined;
+				const parent = this.getChannel(client.channel);
+				if (parent !== undefined) {
+					parent.children.update(pch => pch);
+				}
+				return clients;
+			});
+		}
+		this.currentTalkers = talkers;
+	}
 }
 
 export class GraphQlClient {
@@ -356,7 +406,10 @@ export class Client extends GraphQlClient implements ITreeNode {
 	public ​​​​talk_power_request!: string | null;
 	public ​​​​uid!: number[];
 	public unread_messages!: number;
+
 	public volume?: number;
+	/// true if whispering, false if talking, undefined if silent
+	public talking?: boolean;
 
 	// ITreeParent
 	public children: Writable<ITreeNode[]> = writable([]);

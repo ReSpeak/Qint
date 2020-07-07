@@ -3,7 +3,6 @@
 	import ClientIcon from "../ui/ClientIcon.svelte";
 	import FilterString from "../ui/FilterString.svelte";
 	import Icon from "../ui/Icon.svelte";
-	import { flash } from "../util";
 
 	export let connection;
 	export let filter;
@@ -88,10 +87,6 @@
 			client.updateVolume(connection, vol);
 		}, 100);
 	}
-
-	afterUpdate(() => {
-		flash(div);
-	});
 </script>
 
 <li class="container" class:hidden={!filterShow}>
@@ -102,7 +97,8 @@
 		on:mouseover={hover} on:mouseout={leave}
 		on:focusin={hover} on:focusout={leave}
 	>
-		<button class="button clientButton" on:click={setChat}>
+		<button class="button clientButton" class:talking={client.talking !== undefined} on:click={setChat}>
+			<div class="inner"></div>
 			<ClientIcon {client} {connection} />
 			<span style={client.getColor()}><FilterString filter={$filter} content={client.name} /></span>
 			<span class="icons">
@@ -197,5 +193,31 @@
 	.hover .volume.slider {
 		grid-row: 2;
 		grid-column: 2;
+	}
+
+	.clientButton.talking {
+		position: relative;
+		z-index: 1;
+	}
+
+	.clientButton .inner {
+		transition: opacity 0.2s ease-in-out;
+		position: absolute;
+		top: 0;
+		right: 0;
+		bottom: 0;
+		left: 0;
+		z-index: -1;
+
+		background-image: url("/talking.svg");
+		background-size: 100% auto;
+		-webkit-mask-image: radial-gradient(rgba(0,0,0,1), rgba(0,0,0,0));
+		mask-image: radial-gradient(rgba(0,0,0,1), rgba(0,0,0,0));
+
+		opacity: 0;
+	}
+
+	.clientButton.talking .inner {
+		opacity: 1;
 	}
 </style>

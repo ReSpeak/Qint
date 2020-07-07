@@ -204,7 +204,7 @@ async fn mute(state: web::Data<State>, uuid: web::Path<Uuid>) -> impl Responder 
 			}
 		}
 	}
-	HttpResponse::Ok().body("Success")
+	HttpResponse::Ok().finish()
 }
 
 #[post("/con/{id}/unmute")]
@@ -227,7 +227,7 @@ async fn unmute(state: web::Data<State>, uuid: web::Path<Uuid>) -> impl Responde
 			}
 		}
 	}
-	HttpResponse::Ok().body("Success")
+	HttpResponse::Ok().finish()
 }
 
 #[post("/audio/reset")]

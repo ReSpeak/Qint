@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="background-color: #444;" width="400" height="40" preserveAspectRatio="xMidYMid" viewBox="0 0 400 40">
+<g>
+<linearGradient id="grad" x1="0" x2="1" y1="0" y2="0">
+  <stop stop-color="#ff00ff" offset="0"></stop>
+  <stop stop-color="#00ffff" offset="1"></stop>
+</linearGradient>
+<path d="" fill="url(#grad)" opacity="0.4">
+  <animate attributeName="d" dur="5s" repeatCount="indefinite" keyTimes="0;0.333;0.667;1" calcmod="spline" keySplines="0.2 0 0.8 1;0.2 0 0.8 1;0.2 0 0.8 1" begin="0s" values="
+  M 0 40 L 0 20 q -20 20 0 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 L 400 40 Z;
+  M 0 40 L 0 20 q -10 10 0 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 L 400 40 Z;
+  M 0 40 L 0 20 q -20 -20 0 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 L 400 40 Z;
+  M 0 40 L 0 20 q -20 20 0 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 L 400 40 Z"></animate>
+</path>
+</g>
+</svg>

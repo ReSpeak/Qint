@@ -4,7 +4,6 @@
 	import Icon from "../ui/Icon.svelte";
 	import ChannelIcon from "../ui/ChannelIcon.svelte";
 	import FilterString from "../ui/FilterString.svelte";
-	import { flash } from "../util";
 	import { Channel } from "./book";
 	import ClientComp from "./Client.svelte";
 
@@ -53,10 +52,6 @@
 		}
 		hovered = false;
 	}
-
-	afterUpdate(() => {
-		flash(div);
-	});
 </script>
 
 <li class="container" class:hidden={!filterShow}>

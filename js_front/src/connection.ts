@@ -187,7 +187,7 @@ export class Connection {
 				}
 			}
 		} else if ("TalkersChanged" in msg) {
-			// TODO
+			this.book.talkersHandler(msg.TalkersChanged);
 		} else if ("Error" in msg) {
 			console.warn("Con Error:", msg.Error);
 			if (get(this.state) == ConnectionState.Connecting) {
