@@ -149,6 +149,8 @@
 		height: auto;
 		width: 100%;
 		justify-content: start;
+		position: relative;
+		z-index: 1;
 
 		display: grid;
 		grid-auto-flow: column;
@@ -195,15 +197,10 @@
 		grid-column: 2;
 	}
 
-	.clientButton.talking {
-		position: relative;
-		z-index: 1;
-	}
-
 	.clientButton .inner {
-		transition: opacity 0.2s ease-in-out;
+		transition: opacity 0.2s ease-in-out, height 0.2s ease-in-out;
 		position: absolute;
-		top: 0;
+		// top: 0;
 		right: 0;
 		bottom: 0;
 		left: 0;
@@ -215,9 +212,11 @@
 		mask-image: radial-gradient(rgba(0,0,0,1), rgba(0,0,0,0));
 
 		opacity: 0;
+		height: 50%;
 	}
 
 	.clientButton.talking .inner {
 		opacity: 1;
+		height: 100%;
 	}
 </style>
