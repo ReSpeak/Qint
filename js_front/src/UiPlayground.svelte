@@ -56,12 +56,12 @@
 <div class="testingList">
 	<LazyList
 		{fetchElements}
-		let:data
+		let:item
 		bind:this={myLazyList}
 	>
 		<slot>
-			<b>{data.id}</b>
-			<span style="white-space: pre-wrap;">Elem: {data.text}</span>
+			<b>{item.id}</b>
+			<span style="white-space: pre-wrap;">Elem: {item.text}</span>
 			<br />
 		</slot>
 	</LazyList>

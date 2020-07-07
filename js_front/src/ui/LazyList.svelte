@@ -3,22 +3,18 @@
 	import { tick, onMount } from "svelte";
 	import { writable } from 'svelte/store';
 	import * as svst from 'svelte/store';
-	import { ListFetchDir } from "./lazyList";
+	import { ListFetchDir, FetchResult } from "./lazyList";
 
 	class T {}
 
-	interface FetchResult {
-		items: T[];
-		/** true if there are no more elements before the returned items */
-		canLoadBeforeStart: boolean;
-		/** true if there are no more elements after the returned items */
-		canLoadAfterEnd: boolean;
-	}
-
-	// the lowest and highest id that could be retrieved from the source
-
 	let canLoadAfterEnd: boolean = true;
 	let canLoadBeforeStart: boolean = true;
+
+	export function clear() {
+		elems = [];
+		canLoadAfterEnd = false;
+		canLoadBeforeStart = false;
+	}
 
 	export function sourceChanged(dir: ListFetchDir) {
 		switch (dir) {
@@ -35,7 +31,7 @@
 	export let fetchElements: (
 		id: T | undefined,
 		dir: ListFetchDir
-	) => Promise<FetchResult> = undefined as any;
+	) => Promise<FetchResult<T>> = undefined as any;
 	assert(fetchElements, "No fetch function");
 
 	// the data elements held by this list
@@ -48,7 +44,7 @@
 	let nThItemDistanceToView = 400;
 
 	// Require the minimum distance before deleting an item to be higher
-	// than the minimun size the list wants to buffer.
+	// than the minimum size the list wants to buffer.
 	// Otherwise we might end in an loop of adding and removing a side.
 	assert(nThItemDistanceToView > pxBeforeLoad);
 
@@ -77,7 +73,7 @@
 		// 	pan.clientHeight, // inner view height (after subtracting border/padding)
 		// );
 		// ! ELEM.offsetTop   // is the bottom of a element measured from the top of the container
-		// ! clientHeight + scrollTopMax == scrollHeight
+		// ! clientHeight + scrollTopMax === scrollHeight
 		scrollDiff = pan.scrollTop - lastScrollPos;
 		lastScrollPos = pan.scrollTop;
 
@@ -94,7 +90,7 @@
 	async function fill_loop() {
 		const loadMaxBeforeError = 50;
 		for (let i = 0; i <= loadMaxBeforeError; i++) {
-			if (i == loadMaxBeforeError) throw Error("yah, thats a loop");
+			if (i === loadMaxBeforeError) throw Error("yah, thats a loop");
 			if (await fill_body()) break;
 		}
 		console.log("Task done");
@@ -122,14 +118,10 @@
 		const wantFetchEnd = distFromBot < pxBeforeLoad && scrollDiff >= 0;
 
 		if (wantFetchStart && canLoadBeforeStart) {
-			//const count = Math.min(holdIdStart - fetchIdMin, fetchCount);
-			//const from = holdIdStart - count;
 			console.log("want start", holdIdStart);
 			await load(holdIdStart, ListFetchDir.Before);
 			return false;
 		} else if (wantFetchEnd && canLoadAfterEnd) {
-			//const from = holdIdEnd + 1;
-			//const count = Math.min(fetchIdMax - holdIdEnd, fetchCount);
 			console.log("want end", holdIdEnd);
 			await load(holdIdEnd, ListFetchDir.After);
 			return false;
@@ -143,17 +135,12 @@
 	 * and applies them into the list.
 	 * This will fetch one block only.
 	 */
-	async function load(
-		from: T,
-		dir: ListFetchDir.After | ListFetchDir.Before
-	): Promise<void>;
-	async function load(
-		from: undefined | T,
-		dir: ListFetchDir.New
-	): Promise<void>;
+	async function load(from: T, dir: ListFetchDir.After | ListFetchDir.Before): Promise<void>;
+	async function load(from: undefined | T, dir: ListFetchDir.New): Promise<void>;
 	async function load(from: T | undefined, dir: ListFetchDir): Promise<void> {
 		assert(dir === ListFetchDir.New || from !== undefined);
 		const result = await fetchElements(from, dir);
+		assert(result, "result from fetch is not valid");
 		console.log("From fetch: ", result);
 
 		if (dir === ListFetchDir.Before) {
@@ -286,9 +273,9 @@
 
 <div class="lazyList" bind:this="{pan}" on:scroll="{handle_scroll}">
 	<div class="scrollPane">
-		{#each elems as data}
+		{#each elems as item}
 			<div class="lazyListElement">
-				<slot {data} />
+				<slot {item} />
 			</div>
 		{/each}
 	</div>
@@ -299,5 +286,9 @@
 		overflow-x: hidden;
 		overflow-y: scroll;
 		height: 100%;
+	}
+
+	.lazyListElement {
+		display: contents;
 	}
 </style>

@@ -58,8 +58,8 @@
 			{message.date.format('HH:mm')}
 		</span>
 	</div>
-	<!-- msg.status == MessageStatus::Sending -->
-	<!-- msg.status == MessageStatus::Error -->
+	<!-- msg.status === MessageStatus::Sending -->
+	<!-- msg.status === MessageStatus::Error -->
 	<div
 		class="message-content"
 		class:message-sending="{false}"

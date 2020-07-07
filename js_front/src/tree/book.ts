@@ -2,7 +2,8 @@ import { Writable, writable, Readable, derived, get } from "svelte/store";
 import { InBookChangeMsg } from "../structs/ws";
 import { graphql } from "../graphql";
 import { Connection } from "../connection";
-import { binarySearchBy, binarySearchByKey, getDataColor } from "../util";
+import { binarySearchBy, binarySearchByKey, getDataColor, arraysEqual } from "../util";
+import "../extensions";
 
 type ChannelId = number;
 
@@ -290,9 +291,9 @@ export class GraphQlClient {
 		for (let i = 0; i < b.length; i++) {
 			c.uid.push(b.charCodeAt(i));
 		}
-		c.name = obj.client.customName || obj.client.name;
-		c.icon_id = obj.icon || 0;
-		c.avatar_hash = obj.avatar || "";
+		c.name = obj.client.customName ?? obj.client.name;
+		c.icon_id = obj.icon ?? 0;
+		c.avatar_hash = obj.avatar ?? "";
 		return c;
 	}
 
@@ -323,38 +324,46 @@ export class GraphQlClient {
 		}
 		return res;
 	}
+
+	public equals(other: GraphQlClient | undefined): boolean { return GraphQlClient.equals(this, other); }
+
+	public static equals(first: GraphQlClient | undefined, second: GraphQlClient | undefined): boolean {
+		if (first === second) return true;
+		if (first === undefined || second === undefined) return false;
+		return arraysEqual(first.uid, second.uid);
+	}
 }
 
 export class Client extends GraphQlClient implements ITreeNode {
 	public avatar_hash!: string;
-	public ​​​​away_message!: string | null;
-	public ​​​​badges!: string;
-	public ​​​​channel!: number;
-	public ​​​​channel_group!: number;
-	public ​​​​client_type!: string;
-	public ​​​​country_code!: string;
-	public ​​​​database_id!: number;
-	public ​​​​description!: string
-	public ​​​​icon_id!: number;
-	public ​​​​id!: number;
-	public ​​​​inherited_channel_group_from_channel!: number;
-	public ​​​​input_hardware_enabled!: boolean;
-	public ​​​​input_muted!: boolean;
-	public ​​​​is_channel_commander!: boolean;
-	public ​​​​is_priority_speaker!: boolean;
-	public ​​​​is_recording!: boolean;
-	public ​​​​metadata!: string
-	public ​​​​name!: string;
-	public ​​​​needed_serverquery_view_power!: number;
-	public ​​​​output_hardware_enabled!: boolean;
-	public ​​​​output_muted!: boolean;
-	public ​​​​output_only_muted!: boolean;
-	public ​​​​permission_hints!: string | null;
-	public ​​​​phonetic_name!: string;
-	public ​​​​talk_power!: number;
-	public ​​​​talk_power_granted!: boolean;
-	public ​​​​talk_power_request!: string | null;
-	public ​​​​uid!: number[];
+	public away_message!: string | null;
+	public badges!: string;
+	public channel!: number;
+	public channel_group!: number;
+	public client_type!: string;
+	public country_code!: string;
+	public database_id!: number;
+	public description!: string
+	public icon_id!: number;
+	public id!: number;
+	public inherited_channel_group_from_channel!: number;
+	public input_hardware_enabled!: boolean;
+	public input_muted!: boolean;
+	public is_channel_commander!: boolean;
+	public is_priority_speaker!: boolean;
+	public is_recording!: boolean;
+	public metadata!: string
+	public name!: string;
+	public needed_serverquery_view_power!: number;
+	public output_hardware_enabled!: boolean;
+	public output_muted!: boolean;
+	public output_only_muted!: boolean;
+	public permission_hints!: string | null;
+	public phonetic_name!: string;
+	public talk_power!: number;
+	public talk_power_granted!: boolean;
+	public talk_power_request!: string | null;
+	public uid!: number[];
 	public unread_messages!: number;
 	public volume?: number;
 
@@ -477,7 +486,7 @@ export class Server implements ITreeParent {
 		} else if (this.publicKey) {
 			return getDataColor(atob(this.publicKey))
 		} else {
-			return getDataColor(this.name || "");
+			return getDataColor(this.name ?? "");
 		}
 	}
 }

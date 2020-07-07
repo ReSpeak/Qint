@@ -1,54 +1,63 @@
-<script>
+<script lang="typescript">
 	// TODO Use scroll-anchoring https://blog.eqrion.net/pin-to-bottom/
 	import { onMount } from 'svelte';
 	import { get } from "svelte/store";
 	import Message from "./Message.svelte";
 	import Icon from "../ui/Icon.svelte";
 	import ClientIcon from "../ui/ClientIcon.svelte";
-	import { DateSeparator } from "./chat";
+	import * as i_chat from "./chat";
 	import LoadableVirtualList from "../ui/LoadableVirtualList.svelte";
+	import LazyList from "../ui/LazyList.svelte";
+	import { ListFetchDir, ILazyList } from "../ui/lazyList";
+	import { Connection } from "../connection";
+	import { assert } from "../util";
 
-	export let connection;
+	export let connection: Connection = undefined as any;
+	assert(fetchElements, "No connection provided");
 	let chat = connection.chat;
 
-	let messageList;
-	let messages;
-	let messagesError;
-	let messageInput;
+	let chatList: ILazyList;
+	let messagesError: unknown | undefined;
+	let messageInput: HTMLTextAreaElement;
 
 	chat.selectedChat.subscribe(_ => {
-		if (messageList) {
-			messageList.clear();
-			messageInput.focus();
+		console.log("switch chat");
+		if (chatList) {
+			chatList.clear();
+			chatList.sourceChanged(ListFetchDir.New);
 		}
+		if (messageInput)
+			messageInput.focus();
 	});
 
 	chat.unreadCount.subscribe(_ => {
-		if (messageList)
-			messageList.newItems(false);
+		if (chatList)
+			chatList.sourceChanged(ListFetchDir.After);
 	});
 
-	function sendMessage(e) {
+	function sendMessage(e: Event) {
 		chat.sendMessage();
 		chat.composing = "";
 		messageInput.focus();
 	}
 
-	async function loadMessages(fromStart) {
+	async function fetchElements(idFrom: i_chat.GroupedMessages | undefined, dir: ListFetchDir) {
 		messagesError = undefined;
 		try {
-			return chat.getMessages(fromStart, messages);
+			console.log("fetching data");
+			return chat.getMessages(idFrom, dir);
 		} catch (err) {
 			console.error("Failed to load messages", err);
 			messagesError = err;
+			return i_chat.Chat.EmptyFetch;
 		}
 	}
 
-	function getItemClient(item) {
+	function getItemClient(item: i_chat.Message) {
 		if (item.invoker) {
 			return {
 				uid: item.invoker.uid,
-				name: item.invoker.name || item.invokerName,
+				name: item.invoker.name ?? item.invokerName,
 			};
 		} else {
 			return { name: item.invokerName };
@@ -73,25 +82,24 @@
 			</article>
 		</div>
 	{:else}
-		<LoadableVirtualList bind:this={messageList} bind:items={messages} loadMore={loadMessages} let:item startIsTop={false}>
+		<LazyList bind:this={chatList} {fetchElements} let:item>
 			<div slot="loading" class="loader"></div>
-			{#if item instanceof DateSeparator}
-				<div title="{item.date.format('L')}" class="chat-date">
-					{item.date.format('LL')}
+			{#if item.displayDateSeparator}
+				<div title="{item.topDate.format('L')}" class="chat-date">
+					{item.topDate.format('LL')}
 				</div>
-			{:else}
-				<div class="invoker-icon">
-					<ClientIcon client={item.invoker} {connection} />
-				</div>
-				<div class="invoker-name has-text-weight-bold">
-					<span style={item.getClientColor()}>{item.getClientName()}</span>
-				</div>
-
-				{#each item.messages as message}
-					<Message {message} />
-				{/each}
 			{/if}
-		</LoadableVirtualList>
+			<div class="invoker-icon">
+				<ClientIcon client={item.invoker} {connection} />
+			</div>
+			<div class="invoker-name has-text-weight-bold">
+				<span style={item.clientColor}>{item.displayName}</span>
+			</div>
+
+			{#each item.messages as message}
+				<Message {message} />
+			{/each}
+		</LazyList>
 	{/if}
 	<form class="chat-form" on:submit|preventDefault="{sendMessage}">
 		<textarea bind:this={messageInput} bind:value="{chat.composing}" class="input auto_height" name="message"></textarea>
@@ -163,6 +171,12 @@
 	}
 
 	.chat :global(svelte-virtual-list-contents) {
+		padding: 0.5em;
+		display: grid;
+		grid-template-columns: min-content minmax(0, 1fr);
+	}
+
+	.chat :global(.scrollPane) {
 		padding: 0.5em;
 		display: grid;
 		grid-template-columns: min-content minmax(0, 1fr);

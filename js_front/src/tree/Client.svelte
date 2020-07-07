@@ -56,7 +56,7 @@
 			volumeUpdated = false;
 			await client.loadVolume();
 			if (!volumeUpdated) {
-				if (client.volume == 0) {
+				if (client.volume === 0) {
 					volume = minVolume;
 				} else {
 					volume = Math.round(20 * Math.log10(client.volume));
@@ -66,7 +66,7 @@
 	}
 
 	function toggleVolume() {
-		if (volume == minVolume) {
+		if (volume === minVolume) {
 			volume = 0;
 		} else {
 			volume = minVolume;
@@ -82,7 +82,7 @@
 		volumeTimer = setTimeout(() => {
 			volumeTimer = undefined;
 			let vol = 0;
-			if (volume != minVolume) {
+			if (volume !== minVolume) {
 				vol = Math.pow(10, volume / 20);
 			}
 			client.updateVolume(connection, vol);
@@ -127,7 +127,7 @@
 					{/if}
 				</div>
 				<button class="volume button" on:click={toggleVolume}>
-					{#if volume == minVolume}
+					{#if volume === minVolume}
 						<Icon name="volume-off" />
 					{:else}
 						<Icon name="volume-high" />

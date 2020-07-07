@@ -48,7 +48,7 @@ export function getDataColor(data: number[] | string) {
 
 export function arraysEqual<T>(a: T[], b: T[]): boolean {
 	if (a === b) return true;
-	if (a == null || b == null || a.length != b.length)
+	if (a == null || b == null || a.length !== b.length)
 		return false;
 
 	for (var i = 0; i < a.length; ++i) {
@@ -76,7 +76,7 @@ export class BinarySearchResult {
 		public found: boolean,
 		// Index of found element or index where element can be inserted to maintain order
 		public index: number,
-	) {}
+	) { }
 }
 
 /// The comparator function should implement an order consistent with the sort order of the underlying slice,
@@ -84,7 +84,7 @@ export class BinarySearchResult {
 /// less (< 0), equal (0) or greater (> 0) the desired target.
 export function binarySearchBy<T>(list: T[], f: (t: T) => number, start?: number, end?: number): BinarySearchResult {
 	// Code is copied from Rust
-	let base = start || 0;
+	let base = start ?? 0;
 	let size = (end === undefined ? list.length : end) - base;
 	if (size === 0)
 		return new BinarySearchResult(false, 0);
@@ -117,4 +117,20 @@ export function binarySearchByKey<T, E>(list: T[], elem: E, f: (t: T) => E, star
 			return -1;
 		return 0;
 	}, start, end);
+}
+
+export class Lazy<T> {
+	private value: T | undefined;
+
+	constructor(
+		private generator: () => T
+	) { }
+
+	public get(): T {
+		if (this.generator !== undefined) {
+			this.value = this.generator();
+			this.generator = undefined!;
+		}
+		return this.value!;
+	}
 }

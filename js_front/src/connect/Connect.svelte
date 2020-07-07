@@ -30,7 +30,7 @@
 	}
 
 	async function loadBookmarks(fromStart) {
-		if (bookmarks.length == 0) {
+		if (bookmarks.length === 0) {
 			// That's not dynamic, but we currently have no pagination
 			try {
 				return await Bookmark.get();
