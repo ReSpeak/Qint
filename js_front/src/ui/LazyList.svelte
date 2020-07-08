@@ -5,6 +5,8 @@
 	import * as svst from 'svelte/store';
 	import { ListFetchDir, FetchResult } from "./lazyList";
 
+	// Dummy class to have nice typing for our 'generic' parameter T which
+	// represents the element type.
 	class T {}
 
 	let canLoadAfterEnd: boolean = true;
@@ -46,7 +48,7 @@
 	// Require the minimum distance before deleting an item to be higher
 	// than the minimum size the list wants to buffer.
 	// Otherwise we might end in an loop of adding and removing a side.
-	assert(nThItemDistanceToView > pxBeforeLoad);
+	assert(nThItemDistanceToView > pxBeforeLoad, "Distance to delete must be greater than distance to load");
 
 	declare let holdIdStart: T | undefined;
 	declare let holdIdEnd: T | undefined;
@@ -138,19 +140,19 @@
 	async function load(from: T, dir: ListFetchDir.After | ListFetchDir.Before): Promise<void>;
 	async function load(from: undefined | T, dir: ListFetchDir.New): Promise<void>;
 	async function load(from: T | undefined, dir: ListFetchDir): Promise<void> {
-		assert(dir === ListFetchDir.New || from !== undefined);
+		assert(dir === ListFetchDir.New || from !== undefined, "Invalid load request. from:", from, "dir:", dir);
 		const result = await fetchElements(from, dir);
 		assert(result, "result from fetch is not valid");
 		console.log("From fetch: ", result);
 
 		if (dir === ListFetchDir.Before) {
-			if(result.items.length === 0) assert(!result.canLoadBeforeStart);
+			if(result.items.length === 0) assert(!result.canLoadBeforeStart, "Empty fetch result, but can still load", dir, result);
 			canLoadBeforeStart = result.canLoadBeforeStart;
 		} else if (dir === ListFetchDir.After) {
-			if(result.items.length === 0) assert(!result.canLoadAfterEnd);
+			if(result.items.length === 0) assert(!result.canLoadAfterEnd, "Empty fetch result, but can still load", dir, result);
 			canLoadAfterEnd = result.canLoadAfterEnd;
 		} else {
-			if(result.items.length === 0) assert(!result.canLoadBeforeStart && !result.canLoadAfterEnd);
+			if(result.items.length === 0) assert(!result.canLoadBeforeStart && !result.canLoadAfterEnd, "Empty fetch result, but can still load", dir, result);
 			canLoadBeforeStart = result.canLoadBeforeStart;
 			canLoadAfterEnd = result.canLoadAfterEnd;
 		}
@@ -181,14 +183,15 @@
 	async function tryTrimEnd() {
 		if (elems.length <= nItemsToRemove) return;
 		await tick();
-		let childList = pan.querySelectorAll<HTMLElement>(
-			".scrollPane > .lazyListElement"
-		);
+		let childList = pan.querySelectorAll<HTMLElement>(".scrollPane > .lazyListElement");
+
 		let nThChild = childList[childList.length - nItemsToRemove];
 		// The top of the element within our list (unscrolled)
 		let topStaticOffset = nThChild.offsetTop - nThChild.offsetHeight;
 		// The top of the element without our list (with scroll offset)
 		let topCurrentOffset = topStaticOffset - pan.scrollTop;
+
+		console.log("tryTrimEnd", childList, nThChild, topStaticOffset, topCurrentOffset, ">", pan.offsetHeight + nThItemDistanceToView);
 
 		// Check if the top of our item is more than nThItemDistanceToView
 		// below the bottom of our view
@@ -213,9 +216,7 @@
 	async function tryTrimStart() {
 		if (elems.length <= nItemsToRemove) return;
 		await tick();
-		let childList = pan.querySelectorAll<HTMLElement>(
-			".scrollPane > .lazyListElement"
-		);
+		let childList = pan.querySelectorAll<HTMLElement>(".scrollPane > .lazyListElement");
 		let nThChild = childList[nItemsToRemove - 1];
 		// The bottom of the element within our list (unscrolled)
 		let bottomStaticOffset = nThChild.offsetTop;
@@ -275,7 +276,9 @@
 	<div class="scrollPane">
 		{#each elems as item}
 			<div class="lazyListElement">
+				<div class="lazyListMeasureStart" />
 				<slot {item} />
+				<div class="lazyListMeasureEnd" />
 			</div>
 		{/each}
 	</div>

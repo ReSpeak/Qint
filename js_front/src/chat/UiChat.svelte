@@ -2,10 +2,10 @@
 	// TODO Use scroll-anchoring https://blog.eqrion.net/pin-to-bottom/
 	import { onMount } from 'svelte';
 	import { get } from "svelte/store";
-	import Message from "./Message.svelte";
+	import UiMessage from "./UiMessage.svelte";
+	import { Chat, Message } from "./chat";
 	import Icon from "../ui/Icon.svelte";
 	import ClientIcon from "../ui/ClientIcon.svelte";
-	import * as i_chat from "./chat";
 	import LoadableVirtualList from "../ui/LoadableVirtualList.svelte";
 	import LazyList from "../ui/LazyList.svelte";
 	import { ListFetchDir, ILazyList } from "../ui/lazyList";
@@ -41,7 +41,7 @@
 		messageInput.focus();
 	}
 
-	async function fetchElements(idFrom: i_chat.GroupedMessages | undefined, dir: ListFetchDir) {
+	async function fetchElements(idFrom: Message | undefined, dir: ListFetchDir) {
 		messagesError = undefined;
 		try {
 			console.log("fetching data");
@@ -49,11 +49,11 @@
 		} catch (err) {
 			console.error("Failed to load messages", err);
 			messagesError = err;
-			return i_chat.Chat.EmptyFetch;
+			return Chat.EmptyFetch;
 		}
 	}
 
-	function getItemClient(item: i_chat.Message) {
+	function getItemClient(item: Message) {
 		if (item.invoker) {
 			return {
 				uid: item.invoker.uid,
@@ -85,20 +85,19 @@
 		<LazyList bind:this={chatList} {fetchElements} let:item>
 			<div slot="loading" class="loader"></div>
 			{#if item.displayDateSeparator}
-				<div title="{item.topDate.format('L')}" class="chat-date">
-					{item.topDate.format('LL')}
+				<div title="{item.date.format('L')}" class="chat-date">
+					{item.date.format('LL')}
 				</div>
 			{/if}
-			<div class="invoker-icon">
-				<ClientIcon client={item.invoker} {connection} />
-			</div>
-			<div class="invoker-name has-text-weight-bold">
-				<span style={item.clientColor}>{item.displayName}</span>
-			</div>
-
-			{#each item.messages as message}
-				<Message {message} />
-			{/each}
+			{#if item.displayGroupHeader}
+				<div class="invoker-icon">
+					<ClientIcon client={item.invoker} {connection} />
+				</div>
+				<div class="invoker-name has-text-weight-bold">
+					<span style={item.clientColor}>{item.displayName}</span>
+				</div>
+			{/if}
+			<UiMessage message={item} />
 		</LazyList>
 	{/if}
 	<form class="chat-form" on:submit|preventDefault="{sendMessage}">

@@ -1,13 +1,13 @@
 <script>
 	import SideBar from "./sidebar/SideBar.svelte";
-	import Chat from "./chat/Chat.svelte";
+	import UiChat from "./chat/UiChat.svelte";
 
 	export let connection;
 </script>
 
 <div class="connected-container">
 	<SideBar {connection}/>
-	<Chat {connection}/>
+	<UiChat {connection}/>
 </div>
 
 <style>

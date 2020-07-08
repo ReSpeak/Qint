@@ -12,7 +12,7 @@ export class Chat {
 	public readonly selectedChat: Writable<MessageTarget> = writable(MessageTarget.ToServer());
 	public readonly unreadCount: Writable<number> = writable(0);
 	public composing: string = "";
-	public static readonly EmptyFetch: FetchResult<GroupedMessages> = {
+	public static readonly EmptyFetch: FetchResult<Message> = {
 		items: [],
 		canLoadBeforeStart: false,
 		canLoadAfterEnd: false
@@ -40,45 +40,30 @@ export class Chat {
 		this.selectedChat.set(MessageTarget.ToServer());
 	}
 
-	private static tryMergeGroups(a: GroupedMessages, b: GroupedMessages, intoFirst: boolean): boolean {
-		if (!GraphQlClient.equals(a.invoker, b.invoker))
-			return false;
-		const into = intoFirst ? a : b;
-		into.messages = [...a.messages, ...b.messages];
-		return true;
-	}
+	private static groupMessages(messages: Message[], lastEntry: Message | undefined, dir: ListFetchDir): void {
+		if (lastEntry) {
+			lastEntry.displayGroupHeader = false;
+			lastEntry.displayDateSeparator = false;
+			if (dir === ListFetchDir.Before) messages.unshift(lastEntry);
+			else if (dir === ListFetchDir.After) messages.push(lastEntry);
+		}
 
-	private static groupMessages(messages: Message[], lastEntry: GroupedMessages | undefined, dir: ListFetchDir): GroupedMessages[] {
-		const groups = [];
-		let currentGroup: GroupedMessages | undefined;
-		let currentDate: Moment | undefined;
-
+		let previousMessage: Message | undefined;
+		let previousDate: Moment | undefined;
 		for (const message of messages) {
-			if (!currentGroup || !GraphQlClient.equals(currentGroup?.invoker, message.invoker)) {
-				currentGroup = new GroupedMessages();
-				groups.push(currentGroup);
-				if (!currentDate || !currentDate.isSame(message.date, "day")) {
-					currentDate = message.date;
-					currentGroup.displayDateSeparator = true;
-				}
-			}
-			currentGroup.messages.push(message);
+			message.displayGroupHeader = !previousMessage || !GraphQlClient.equals(previousMessage.invoker, message.invoker);
+			message.displayDateSeparator = !previousDate || !previousDate.isSame(message.date, "day");
+			previousMessage = message;
+			previousDate = message.date;
 		}
 
-		if (groups.length > 0 && lastEntry !== undefined) {
-			if (dir === ListFetchDir.Before) {
-				if (this.tryMergeGroups(groups[groups.length - 1], lastEntry, false))
-					groups.length -= 1; // remove last (the one merged into lastEntry)
-			} else {
-				if (this.tryMergeGroups(lastEntry, groups[0], true))
-					groups.shift(); // remove first (the one merged into lastEntry)
-			}
+		if (lastEntry) {
+			if (dir === ListFetchDir.Before) messages.shift();
+			else if (dir === ListFetchDir.After) messages.pop();
 		}
-
-		return groups;
 	}
 
-	public async getMessages(idFrom: GroupedMessages | undefined, dir: ListFetchDir): Promise<FetchResult<GroupedMessages>> {
+	public async getMessages(idFrom: Message | undefined, dir: ListFetchDir): Promise<FetchResult<Message>> {
 		if (this.connection.server === undefined) {
 			console.error("Cannot get messages for a non-existant connection");
 			return Chat.EmptyFetch;
@@ -95,12 +80,8 @@ export class Chat {
 		}
 
 		if (idFrom) {
-			let message;
-			if (before_start) message = idFrom.getFirstMessage();
-			else message = idFrom.getLastMessage();
-
-			start_time = message.date.unix();
-			start_id = message.id;
+			start_time = idFrom.date.unix();
+			start_id = idFrom.id;
 		}
 
 		const res = await graphql(`query GetMessages($chat_type: GMessageTarget!, $server: ID!, $chat_id: ID,
@@ -153,8 +134,10 @@ export class Chat {
 			});
 			console.log("Fetching messages " + (before_start ? "before" : "after"), [start_time, start_id], "; got", msgs);
 
+			Chat.groupMessages(msgs, idFrom, dir);
+
 			return {
-				items: Chat.groupMessages(msgs, idFrom, dir),
+				items: msgs,
 				canLoadBeforeStart: true,
 				canLoadAfterEnd: true
 			};
@@ -179,6 +162,13 @@ export class Chat {
 }
 
 export class Message {
+	private _clientColor: Lazy<string>;
+	public displayDateSeparator: boolean = false;
+	public displayGroupHeader: boolean = false;
+
+	public get displayName(): string { return this.invoker?.name ?? this.invokerName ?? ""; }
+	public get clientColor() { return this._clientColor.get(); }
+
 	constructor(
 		public id: string,
 		public invoker: GraphQlClient | undefined,
@@ -186,7 +176,17 @@ export class Message {
 		public raw: string,
 		public rendered: string,
 		public date: Moment,
-	) { }
+	) {
+		this._clientColor = new Lazy(() => this.generateClientColor());
+	}
+
+	private generateClientColor(): string {
+		if (this.invoker?.uid) {
+			return getDataColor(this.invoker.uid)
+		} else {
+			return getDataColor(this.displayName);
+		}
+	}
 
 	public hasSameInvoker(other: Message): boolean { return Message.hasSameInvoker(this, other); }
 
@@ -197,42 +197,5 @@ export class Message {
 			return first.invokerName === second.invokerName;
 		}
 		return first.invoker.equals(second.invoker);
-	}
-}
-
-export class GroupedMessages {
-	private _clientColor: Lazy<string>;
-	public displayDateSeparator: boolean = false;
-	public messages: Message[] = [];
-	public get clientColor() { return this._clientColor.get(); }
-	public get invoker() { return this.getFirstMessage().invoker; }
-	public get invokerName() { return this.getFirstMessage().invokerName; }
-	public get topDate() { return this.getFirstMessage().date; }
-	public get displayName() {
-		const msg = this.getFirstMessage();
-		return msg.invoker?.name ?? msg.invokerName ?? "";
-	}
-
-	constructor() {
-		this._clientColor = new Lazy(() => this.generateClientColor());
-	}
-
-	public getFirstMessage(): Message {
-		assert(this.messages.length > 0, "Why the hell is an empty group here?");
-		return this.messages[0];
-	}
-
-	public getLastMessage(): Message {
-		assert(this.messages.length > 0, "Why the hell is an empty group here?");
-		return this.messages[this.messages.length - 1];
-	}
-
-	private generateClientColor(): string {
-		const msg = this.getFirstMessage();
-		if (msg.invoker?.uid) {
-			return getDataColor(msg.invoker.uid)
-		} else {
-			return getDataColor(this.displayName);
-		}
 	}
 }
