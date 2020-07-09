@@ -90,11 +90,13 @@
 				</div>
 			{/if}
 			{#if item.displayGroupHeader}
-				<div class="invoker-icon">
-					<ClientIcon client={item.invoker} {connection} />
-				</div>
-				<div class="invoker-name has-text-weight-bold">
-					<span style={item.clientColor}>{item.displayName}</span>
+				<div class="invoker-row">
+					<div class="invoker-icon chat-left-col">
+						<ClientIcon client={item.invoker} {connection} />
+					</div>
+					<div class="invoker-name has-text-weight-bold">
+						<span style={item.clientColor}>{item.displayName}</span>
+					</div>
 				</div>
 			{/if}
 			<UiMessage message={item} />
@@ -119,15 +121,6 @@
 		line-height: 1.2;
 	}
 
-	.chat-date {
-		grid-column-start: 1;
-		grid-column-end: 3;
-		border-top: 1px solid mix($text, $background, 60%);
-		margin: 0.2em 1em 0em 1em;
-		text-align: center;
-		color: mix($text, $background, 60%);
-	}
-
 	.chat-form {
 		display: flex;
 		width: 100%;
@@ -143,53 +136,72 @@
 
 	.chat-form textarea {
 		flex-grow: 1;
-		border-top: 1px solid;
-		border-right: 1px solid;
-		border-left: none;
-		border-bottom: none;
-		border-radius: 0;
+		border: {
+			top: 1px solid;
+			right: 1px solid;
+			left: none;
+			bottom: none;
+			radius: 0;
+		}
 	}
 
 	.chat-form button {
 		background: none;
 		color: $blue;
 		vertical-align: middle;
-		border-top: 1px solid;
-		border-left: none;
-		border-right: none;
-		border-bottom: none;
-		border-radius: 0;
-	}
-
-	.chat :global(svelte-virtual-list) {
-		height: 100%;
-	}
-
-	.chat :global(svelte-virtual-list-viewport) {
-		height: 100%;
-	}
-
-	.chat :global(svelte-virtual-list-contents) {
-		padding: 0.5em;
-		display: grid;
-		grid-template-columns: min-content minmax(0, 1fr);
+		border: {
+			top: 1px solid;
+			left: none;
+			right: none;
+			bottom: none;
+			radius: 0;
+		}
 	}
 
 	.chat :global(.scrollPane) {
 		padding: 0.5em;
-		display: grid;
-		grid-template-columns: min-content minmax(0, 1fr);
+		display: flex;
+		flex-direction: column;
+	}
+
+	.chat :global(.scrollPane > .lazyListElement) {
+		display: flex;
+		flex-direction: column;
+	}
+
+
+	@mixin block-margin {
+		margin-top: 0.5em;
+	}
+
+	.chat-date {
+		flex: 1;
+
+		border-top: 1px solid mix($text, $background, 60%);
+		@include block-margin;
+		margin: { left: 1em; right: 1em; };
+		text-align: center;
+		color: mix($text, $background, 60%);
+	}
+
+	.invoker-row {
+		display: flex;
+		align-items: center;
+		@include block-margin;
+	}
+
+	.chat :global(.chat-left-col) {
+		width: 48px;
+		padding-right: 8px;
+		padding-left: 8px;
 	}
 
 	.invoker-icon {
-		grid-column: 1;
 		display: flex;
-		margin-top: 0.5em;
-		padding: 0 0.5em;
+		justify-content: center;
+		text-align: center;
 	}
 
 	.invoker-name {
-		grid-column: 2;
-		margin-top: 0.5em;
 	}
 </style>

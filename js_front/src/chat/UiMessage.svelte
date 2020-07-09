@@ -53,7 +53,7 @@
 
 <svelte:options immutable />
 <div bind:this={div} class="message-row">
-	<div class="message-time">
+	<div class="message-time chat-left-col">
 		<span title="{message.date.format('dddd, MMMM Do YYYY, HH:mm:ss')}">
 			{message.date.format('HH:mm')}
 		</span>
@@ -90,10 +90,14 @@
 </div>
 
 <style lang="scss">
-	.message-row {
-		display: contents;
+	$row-pad: 0.25em;
 
-		&:hover > * {
+	.message-row {
+		display: flex;
+		padding: $row-pad 0;
+		line-height: 1em;
+
+		&:hover {
 			background-color: mix($background, $text, 90%);
 
 			.tool-buttons {
@@ -103,16 +107,14 @@
 	}
 
 	.message-time {
-		grid-column: 1;
 		font-size: 0.8em;
-		padding-top: 0.25em;
 		* {
 			color: mix($text, $background, 60%);
 		}
 	}
 
 	.message-content {
-		grid-column: 2;
+		flex: 1;
 
 		// for tool buttons
 		position: relative;
@@ -144,9 +146,13 @@
 		top: 0;
 
 		.tool-buttons-wrap {
+			box-sizing: border-box;
 			position: absolute;
 			right: 20px;
-			top: -10px;
+			// Note: if {-top == bottom} the box is perfectly
+			// centered on the top of the message line.
+			top: -$row-pad;
+			bottom: $row-pad;
 			flex-wrap: nowrap;
 		}
 	}

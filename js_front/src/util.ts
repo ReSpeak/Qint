@@ -15,15 +15,17 @@ export async function sleep(timeout: number): Promise<void> {
 
 export function flash(element: HTMLElement) {
 	requestAnimationFrame(() => {
-		element.style.transition = "none";
-		element.style.color = "rgba(255,62,0,1)";
-		element.style.backgroundColor = "rgba(255,62,0,0.2)";
+		element.classList.remove("update-flash-fade");
+		element.classList.add("update-flash");
 
 		setTimeout(() => {
-			element.style.transition = "color 1s, background 1s";
-			element.style.color = "";
-			element.style.backgroundColor = "";
+			element.classList.add("update-flash-fade");
+			element.classList.remove("update-flash");
 		});
+
+		setTimeout(() => {
+			element.classList.remove("update-flash-fade");
+		}, 1000);
 	});
 }
 

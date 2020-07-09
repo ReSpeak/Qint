@@ -276,9 +276,7 @@
 	<div class="scrollPane">
 		{#each elems as item}
 			<div class="lazyListElement">
-				<div class="lazyListMeasureStart" />
 				<slot {item} />
-				<div class="lazyListMeasureEnd" />
 			</div>
 		{/each}
 	</div>
@@ -292,6 +290,6 @@
 	}
 
 	.lazyListElement {
-		display: contents;
+		/*display: contents;*/
 	}
 </style>
