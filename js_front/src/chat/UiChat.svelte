@@ -114,11 +114,6 @@
 		display: flex;
 		flex-direction: column;
 		justify-content: flex-end;
-		position: absolute;
-		top: 0;
-		bottom: 0;
-		left: var(--channel-tree-width);
-		right: 0;
 		line-height: 1.2;
 
 		// The LazyList
