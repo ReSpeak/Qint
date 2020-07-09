@@ -93,7 +93,8 @@
 	$row-pad: 0.25em;
 
 	.message-row {
-		display: flex;
+		display: grid;
+		grid-template-columns: min-content minmax(0, 1fr);
 		padding: $row-pad 0;
 		line-height: 1em;
 
