@@ -393,7 +393,7 @@
 	.arrow-up {
 		position: absolute;
 		right: 2em;
-		bottom: 1.5em;
+		bottom: -5em;
 		display: inline-block;
 		background: #ccc;
 		border-radius: 100%;
@@ -412,7 +412,7 @@
 	}
 
 	.showJumpDown {
-		bottom: -5em;
+		bottom: 1.5em;
 	}
 
 	.arrow-down > div,

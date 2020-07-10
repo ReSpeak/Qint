@@ -150,3 +150,12 @@ export class Lazy<T> {
 		return this.value!;
 	}
 }
+
+export async function wrap_async<T>(f: () => T) : Promise<T> {
+	return new Promise((resolve, _) => {
+		setTimeout(() => {
+			const val = f();
+			resolve(val);
+		});
+	});
+}

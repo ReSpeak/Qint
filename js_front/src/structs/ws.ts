@@ -1,4 +1,3 @@
-import { Client, Channel, Server } from "../tree/book";
 // tslint:disable: interface-name
 
 export type WsMessageTarget =

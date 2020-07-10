@@ -147,10 +147,7 @@ export class Chat {
 	}
 
 	public sendMessage() {
-		const target = { ...get(this.selectedChat) };
-		if ("Channel" in target)
-			target.Channel = null;
-
+		const target = MessageTarget.toWs(get(this.selectedChat));
 		this.connection.sendMessage({
 			SendMessage: {
 				target,
