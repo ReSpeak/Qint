@@ -70,11 +70,11 @@ export class Chat {
 
 		let start_time;
 		let start_id;
-		let before_start: boolean | undefined;
+		let load_at_beginning: boolean | undefined;
 		switch (dir) {
-			case ListFetchDir.Before: before_start = true; break;
-			case ListFetchDir.New: before_start = undefined; break;
-			case ListFetchDir.After: before_start = false; break;
+			case ListFetchDir.Before: load_at_beginning = true; break;
+			case ListFetchDir.New: load_at_beginning = undefined; break;
+			case ListFetchDir.After: load_at_beginning = false; break;
 			default: assert(false, "Unknown direction");
 		}
 
@@ -84,11 +84,11 @@ export class Chat {
 		}
 
 		const res = await graphql(`query GetMessages($chat_type: GMessageTarget!, $server: ID!, $chat_id: ID,
-					$start_time: NaiveDateTime, $start_id: ID, $before_start: Boolean) {
+					$start_time: NaiveDateTime, $start_id: ID, $load_at_beginning: Boolean) {
 				chat(typ: $chat_type, server: $server, id: $chat_id) {
 					lastRead
 					timezone
-					messages(startTime: $start_time, startId: $start_id, beforeStart: $before_start) {
+					messages(startTime: $start_time, startId: $start_id, beforeStart: $load_at_beginning) {
 						id
 						invoker {
 							client {
@@ -113,7 +113,7 @@ export class Chat {
 			chat_id: MessageTarget.getId(get(this.selectedChat), this.connection),
 			start_time,
 			start_id,
-			before_start: before_start,
+			load_at_beginning: load_at_beginning,
 		});
 		if ("data" in res) {
 			// We never chatted here
@@ -131,14 +131,14 @@ export class Chat {
 				msgs.push(new Message(msg.id, client, msg.invokerName,
 					msg.content, msg.rendered, toDatetime(msg.time, msg.timezone)));
 			});
-			console.log("Fetching messages " + (before_start ? "before" : "after"), [start_time, start_id], "; got", msgs);
+			console.log("Fetching messages " + (load_at_beginning ? "before" : "after"), [start_time, start_id], "; got", msgs);
 
 			Chat.groupMessages(msgs, idFrom, dir);
 
 			return {
 				items: msgs,
 				canLoadBeforeStart: true,
-				canLoadAfterEnd: true
+				canLoadAfterEnd: dir !== ListFetchDir.New // Heuristic: when fetching new we start at the end
 			};
 		} else {
 			console.error("GetMessages result does not contain data", res);

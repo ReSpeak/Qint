@@ -17,5 +17,5 @@ export interface FetchResult<T> {
 
 export interface ILazyList {
 	clear(): void;
-	sourceChanged(dir: ListFetchDir): void;
+	sourceChanged(dir: ListFetchDir, anchor?: ListFetchDir): void;
 }

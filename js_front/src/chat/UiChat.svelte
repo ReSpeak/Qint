@@ -24,7 +24,7 @@
 		console.log("switch chat");
 		if (chatList) {
 			chatList.clear();
-			chatList.sourceChanged(ListFetchDir.New);
+			chatList.sourceChanged(ListFetchDir.New, ListFetchDir.After);
 		}
 		if (messageInput)
 			messageInput.focus();

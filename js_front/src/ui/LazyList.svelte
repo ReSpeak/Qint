@@ -1,8 +1,8 @@
 <script lang="typescript">
 	import { sleep, assert } from "../util";
 	import { tick, onMount } from "svelte";
-	import { writable } from 'svelte/store';
-	import * as svst from 'svelte/store';
+	import { writable } from "svelte/store";
+	import * as svst from "svelte/store";
 	import { ListFetchDir, FetchResult } from "./lazyList";
 
 	// Dummy class to have nice typing for our 'generic' parameter T which
@@ -11,6 +11,8 @@
 
 	let canLoadAfterEnd: boolean = true;
 	let canLoadBeforeStart: boolean = true;
+	let arrowHidden = true;
+	let loadAnchored: ListFetchDir | undefined = undefined;
 
 	export function clear() {
 		elems = [];
@@ -18,16 +20,56 @@
 		canLoadBeforeStart = false;
 	}
 
-	export function sourceChanged(dir: ListFetchDir) {
+	export function sourceChanged(dir: ListFetchDir, anchor?: ListFetchDir) {
+		loadAnchored = anchor;
 		switch (dir) {
-		case ListFetchDir.New:
-			canLoadBeforeStart = true;
-			canLoadAfterEnd = true;
-			break;
-		case ListFetchDir.Before: canLoadBeforeStart = true; break;
-		case ListFetchDir.After: canLoadAfterEnd = true; break;
+			case ListFetchDir.New:
+				canLoadBeforeStart = true;
+				canLoadAfterEnd = true;
+				break;
+			case ListFetchDir.Before:
+				canLoadBeforeStart = true;
+				break;
+			case ListFetchDir.After:
+				canLoadAfterEnd = true;
+				break;
 		}
 		start_fill();
+	}
+
+	export function jumpTo(dir: ListFetchDir, target?: T) {
+		console.log("jumping to", ListFetchDir[dir], target);
+		switch (dir) {
+			case ListFetchDir.Before:
+				if (!canLoadBeforeStart) {
+					scrollToStart();
+					break;
+				}
+				clear();
+				sourceChanged(ListFetchDir.New, ListFetchDir.Before);
+				break;
+
+			case ListFetchDir.After:
+				if (!canLoadAfterEnd) {
+					scrollToEnd();
+					break;
+				}
+				clear();
+				sourceChanged(ListFetchDir.New, ListFetchDir.After);
+				break;
+
+			case ListFetchDir.New:
+				assert(target, "target must be given when jumping to a new item");
+				// TODO
+				break;
+		}
+	}
+
+	function scrollToStart() {
+		pan.scrollTop = 0;
+	}
+	function scrollToEnd() {
+		pan.scrollTop = pan.scrollHeight - pan.clientHeight;
 	}
 
 	export let fetchElements: (
@@ -48,7 +90,10 @@
 	// Require the minimum distance before deleting an item to be higher
 	// than the minimum size the list wants to buffer.
 	// Otherwise we might end in an loop of adding and removing a side.
-	assert(nThItemDistanceToView > pxBeforeLoad, "Distance to delete must be greater than distance to load");
+	assert(
+		nThItemDistanceToView > pxBeforeLoad,
+		"Distance to delete must be greater than distance to load"
+	);
 
 	declare let holdIdStart: T | undefined;
 	declare let holdIdEnd: T | undefined;
@@ -79,6 +124,8 @@
 		scrollDiff = pan.scrollTop - lastScrollPos;
 		lastScrollPos = pan.scrollTop;
 
+		arrowHidden = pan.scrollTop >= pan.scrollHeight - pan.clientHeight;
+
 		start_fill();
 	}
 
@@ -108,7 +155,7 @@
 		if (!canLoadAfterEnd && !canLoadBeforeStart) return true;
 
 		if (holdIdStart === undefined || holdIdEnd === undefined) {
-			await load(undefined, ListFetchDir.New);
+			await load(ListFetchDir.New);
 			return false;
 		}
 
@@ -121,11 +168,11 @@
 
 		if (wantFetchStart && canLoadBeforeStart) {
 			console.log("want start", holdIdStart);
-			await load(holdIdStart, ListFetchDir.Before);
+			await load(ListFetchDir.Before, holdIdStart);
 			return false;
 		} else if (wantFetchEnd && canLoadAfterEnd) {
 			console.log("want end", holdIdEnd);
-			await load(holdIdEnd, ListFetchDir.After);
+			await load(ListFetchDir.After, holdIdEnd);
 			return false;
 		} else {
 			return true;
@@ -137,22 +184,46 @@
 	 * and applies them into the list.
 	 * This will fetch one block only.
 	 */
-	async function load(from: T, dir: ListFetchDir.After | ListFetchDir.Before): Promise<void>;
-	async function load(from: undefined | T, dir: ListFetchDir.New): Promise<void>;
-	async function load(from: T | undefined, dir: ListFetchDir): Promise<void> {
-		assert(dir === ListFetchDir.New || from !== undefined, "Invalid load request. from:", from, "dir:", dir);
+	async function load(dir: ListFetchDir.After | ListFetchDir.Before, from: T): Promise<void>;
+	async function load(dir: ListFetchDir.New, from?: T): Promise<void>;
+	async function load(dir: ListFetchDir, from?: T): Promise<void> {
+		assert(
+			dir === ListFetchDir.New || from !== undefined,
+			"Invalid load request. from:",
+			from,
+			"dir:",
+			dir
+		);
 		const result = await fetchElements(from, dir);
 		assert(result, "result from fetch is not valid");
 		console.log("From fetch: ", result);
 
 		if (dir === ListFetchDir.Before) {
-			if(result.items.length === 0) assert(!result.canLoadBeforeStart, "Empty fetch result, but can still load", dir, result);
+			if (result.items.length === 0)
+				assert(
+					!result.canLoadBeforeStart,
+					"Empty fetch result, but can still load",
+					dir,
+					result
+				);
 			canLoadBeforeStart = result.canLoadBeforeStart;
 		} else if (dir === ListFetchDir.After) {
-			if(result.items.length === 0) assert(!result.canLoadAfterEnd, "Empty fetch result, but can still load", dir, result);
+			if (result.items.length === 0)
+				assert(
+					!result.canLoadAfterEnd,
+					"Empty fetch result, but can still load",
+					dir,
+					result
+				);
 			canLoadAfterEnd = result.canLoadAfterEnd;
 		} else {
-			if(result.items.length === 0) assert(!result.canLoadBeforeStart && !result.canLoadAfterEnd, "Empty fetch result, but can still load", dir, result);
+			if (result.items.length === 0)
+				assert(
+					!result.canLoadBeforeStart && !result.canLoadAfterEnd,
+					"Empty fetch result, but can still load",
+					dir,
+					result
+				);
 			canLoadBeforeStart = result.canLoadBeforeStart;
 			canLoadAfterEnd = result.canLoadAfterEnd;
 		}
@@ -173,7 +244,14 @@
 		const scrollAdjust = pan.scrollHeight - lastScrollHeight;
 		pan.scrollTop = lastScrollTop + scrollAdjust;
 		lastScrollPos += scrollAdjust;
-		console.log("After change scrollHeight", pan.scrollHeight, ", scrollTop", pan.scrollTop, ", scrollAdjust", scrollAdjust);
+		console.log(
+			"modifyElems scrollHeight",
+			pan.scrollHeight,
+			"scrollTop",
+			pan.scrollTop,
+			"scrollAdjust",
+			scrollAdjust
+		);
 	}
 
 	/**
@@ -191,17 +269,20 @@
 		// The top of the element without our list (with scroll offset)
 		let topCurrentOffset = topStaticOffset - pan.scrollTop;
 
-		console.log("tryTrimEnd", childList, nThChild, topStaticOffset, topCurrentOffset, ">", pan.offsetHeight + nThItemDistanceToView);
+		console.log(
+			"tryTrimEnd",
+			childList,
+			nThChild,
+			topStaticOffset,
+			topCurrentOffset,
+			">",
+			pan.offsetHeight + nThItemDistanceToView
+		);
 
 		// Check if the top of our item is more than nThItemDistanceToView
 		// below the bottom of our view
 		if (topCurrentOffset > pan.offsetHeight + nThItemDistanceToView) {
-			console.log(
-				"trim end",
-				topCurrentOffset,
-				nThItemDistanceToView,
-				pan.offsetHeight
-			);
+			console.log("trim end", topCurrentOffset, nThItemDistanceToView, pan.offsetHeight);
 			// modification is at the end => safe
 			elems = elems.slice(0, elems.length - nItemsToRemove);
 			canLoadAfterEnd = true;
@@ -226,12 +307,7 @@
 		// Check if the bottom of our item is more than nThItemDistanceToView
 		// above the top of our view
 		if (bottomCurrentOffset < 0 - nThItemDistanceToView) {
-			console.log(
-				"trim start",
-				bottomCurrentOffset,
-				nThItemDistanceToView,
-				pan.offsetHeight
-			);
+			console.log("trim start", bottomCurrentOffset, nThItemDistanceToView, pan.offsetHeight);
 			// mofification at start => helper
 			await modifyElems(elems.slice(nItemsToRemove));
 			canLoadBeforeStart = true;
@@ -259,6 +335,12 @@
 
 			case ListFetchDir.New:
 				elems = newElems;
+				if (loadAnchored === ListFetchDir.Before) {
+					scrollToStart();
+				} else if (loadAnchored === ListFetchDir.After) {
+					await tick();
+					scrollToEnd();
+				}
 				break;
 
 			default:
@@ -272,18 +354,28 @@
 	});
 </script>
 
-<div class="lazyList" bind:this="{pan}" on:scroll="{handle_scroll}">
-	<div class="scrollPane">
-		{#each elems as item}
-			<div class="lazyListElement">
-				<slot {item} />
-			</div>
-		{/each}
+<div class="lazyList">
+	<div class="lazyListView" bind:this="{pan}" on:scroll="{handle_scroll}">
+		<div class="scrollPane">
+			{#each elems as item}
+				<div class="lazyListElement">
+					<slot {item} />
+				</div>
+			{/each}
+		</div>
 	</div>
+	<button class="arrow-down" class:arrowHidden on:click="{() => jumpTo(ListFetchDir.After)}">
+		<div></div>
+	</button>
 </div>
 
-<style>
+<style lang="scss">
 	.lazyList {
+		position: relative;
+		overflow: hidden;
+	}
+
+	.lazyListView {
 		overflow-x: hidden;
 		overflow-y: scroll;
 		height: 100%;
@@ -291,5 +383,49 @@
 
 	.lazyListElement {
 		/*display: contents;*/
+	}
+
+	// Jump start end buttons
+
+	.arrow-down,
+	.arrow-up {
+		position: absolute;
+		right: 2em;
+		bottom: 1.5em;
+		display: inline-block;
+		background: #ccc;
+		border-radius: 100%;
+		padding: 0.8em;
+		border: none;
+		cursor: pointer;
+		z-index: 3;
+
+		transition-duration: 0.2s;
+		transition-property: all;
+	}
+
+	.arrow-down:hover,
+	.arrow-up:hover {
+		background: #eee;
+	}
+
+	.arrowHidden {
+		bottom: -5em;
+	}
+
+	.arrow-down > div,
+	.arrow-up > div {
+		border-left: 2px solid #222;
+		border-top: 2px solid #222;
+		width: 1em;
+		height: 1em;
+	}
+
+	.arrow-down > div {
+		transform: rotate(-135deg) translate(20%, 20%);
+	}
+
+	.arrow-up > div {
+		transform: rotate(45deg) translate(20%, 20%);
 	}
 </style>
