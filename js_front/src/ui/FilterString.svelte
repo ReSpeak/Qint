@@ -1,20 +1,26 @@
-<script>
+<script lang="typescript">
 	import { escapeHtml, ignoreCaseRegex } from "../util";
-	export let filter;
-	export let content;
+	export let filter!: string;
+	export let content!: string;
 
+	declare let filteredContent: string;
 	$: filteredContent = applyFilter(filter, content);
 
-	function applyFilter(filter, content) {
+	function applyFilter(filter: string, content: string): string {
 		if (filter === "") {
 			return escapeHtml(content);
 		} else {
-			return escapeHtml(content).replace(ignoreCaseRegex(escapeHtml(filter)), '<span class="filterHighlight"><span>$&</span></span>');
+			return escapeHtml(content).replace(
+				ignoreCaseRegex(escapeHtml(filter)),
+				'<span class="filterHighlight"><span>$&</span></span>'
+			);
 		}
 	}
 </script>
 
-<span>{@html filteredContent}</span>
+<span>
+	{@html filteredContent}
+</span>
 
 <style lang="scss">
 	span > :global(.filterHighlight) {
@@ -27,7 +33,7 @@
 	}
 
 	span > :global(.filterHighlight):after {
-		content: '';
+		content: "";
 		display: block;
 		position: absolute;
 		top: 0;

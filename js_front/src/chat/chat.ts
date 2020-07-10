@@ -43,8 +43,8 @@ export class Chat {
 		if (lastEntry) {
 			lastEntry.displayGroupHeader = false;
 			lastEntry.displayDateSeparator = false;
-			if (dir === ListFetchDir.Before) messages.unshift(lastEntry);
-			else if (dir === ListFetchDir.After) messages.push(lastEntry);
+			if (dir === ListFetchDir.Before) messages.push(lastEntry);
+			else if (dir === ListFetchDir.After) messages.unshift(lastEntry);
 		}
 
 		let previousMessage: Message | undefined;
@@ -57,8 +57,8 @@ export class Chat {
 		}
 
 		if (lastEntry) {
-			if (dir === ListFetchDir.Before) messages.shift();
-			else if (dir === ListFetchDir.After) messages.pop();
+			if (dir === ListFetchDir.Before) messages.pop();
+			else if (dir === ListFetchDir.After) messages.shift();
 		}
 	}
 

@@ -12,8 +12,7 @@
 	import { Connection } from "../connection";
 	import { assert } from "../util";
 
-	export let connection: Connection = undefined as any;
-	assert(fetchElements, "No connection provided");
+	export let connection!: Connection;
 	let chat = connection.chat;
 
 	let chatList: ILazyList;
@@ -66,6 +65,7 @@
 
 	onMount(() => {
 		messageInput.focus();
+		console.log("Chatto", chatList);
 	});
 </script>
 
@@ -112,7 +112,7 @@
 
 <style lang="scss">
 	.chat {
-		display: inline-flex;
+		display: flex;
 		flex-direction: column;
 		justify-content: flex-end;
 		position: absolute;
@@ -121,13 +121,18 @@
 		left: var(--channel-tree-width);
 		right: 0;
 		line-height: 1.2;
+
+		// The LazyList
+		> :global(.lazyList) {
+			flex: 1;
+		}
 	}
 
 	.chat-form {
 		display: flex;
 		width: 100%;
 
-		box-shadow: 0px -5px 20px -5px #0005;
+		box-shadow: 0px -5px 20px -5px rgba(0, 0, 0, 0.3);
 	}
 
 	.chat-form > * {
