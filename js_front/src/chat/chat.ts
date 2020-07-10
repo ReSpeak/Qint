@@ -147,7 +147,7 @@ export class Chat {
 	}
 
 	public sendMessage() {
-		const target = get(this.selectedChat);
+		const target = { ...get(this.selectedChat) };
 		if ("Channel" in target)
 			target.Channel = null;
 

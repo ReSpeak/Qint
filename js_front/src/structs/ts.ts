@@ -37,7 +37,7 @@ export const MessageTarget = {
 
 	getId(target: MessageTarget, connection: Connection): string | undefined {
 		if ("Channel" in target) {
-			return target.Channel ? target.Channel.toString() : undefined;
+			return target.Channel.toString();
 		} else if ("Client" in target) {
 			// TODO Should be uid
 			const uid = get(connection.book.clients).get(target.Client).uid;
