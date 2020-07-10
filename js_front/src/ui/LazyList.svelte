@@ -1,5 +1,5 @@
 <script lang="typescript">
-	import { sleep, assert } from "../util";
+	import { sleep, assert, binarySearchBy, BinarySearchResult } from "../util";
 	import { tick, onMount } from "svelte";
 	import { writable } from "svelte/store";
 	import * as svst from "svelte/store";
@@ -20,11 +20,12 @@
 	// the data elements held by this list
 	let elems: T[] = [];
 
-	let pxBeforeLoad = 300; // TODO? could be adjusted dynamically
-	// The amout of items that will be removed when out of view
-	let nItemsToRemove = 25;
-	// How far the nThItemsToRemove has to be out of view to remove the batch
-	let nThItemDistanceToView = 400;
+	let pxBeforeLoad = 500; // TODO? could be adjusted dynamically
+	/** The minimum amout of items that must be at least `minPxDistanceToRemove`
+	 * will be removed when out of view */
+	let minItemsToRemove = 20;
+	/** How far the item at index `minItemsToRemove` has to be out of view to be removed */
+	let minPxDistanceToRemove = 1500;
 
 	declare let holdIdStart: T | undefined;
 	declare let holdIdEnd: T | undefined;
@@ -100,7 +101,7 @@
 	// than the minimum size the list wants to buffer.
 	// Otherwise we might end in an loop of adding and removing a side.
 	assert(
-		nThItemDistanceToView > pxBeforeLoad,
+		minPxDistanceToRemove > pxBeforeLoad,
 		"Distance to delete must be greater than distance to load"
 	);
 
@@ -253,26 +254,34 @@
 	 * removes it.
 	 */
 	async function tryTrimEnd() {
-		if (elems.length <= nItemsToRemove) return;
+		if (elems.length <= minItemsToRemove) return;
 		await tick();
-		let childList = pan.querySelectorAll<HTMLElement>(".scrollPane > .lazyListElement");
+		
+		const childList = pan.querySelectorAll<HTMLElement>(".scrollPane > .lazyListElement");
+		assert(childList.length === elems.length, "HTML node count does not match elements count");
+		
+		const distFn = (e: HTMLElement) => {
+			// The top of the element within our list (unscrolled)
+			const topStaticOffset = e.offsetTop - e.offsetHeight;
+			// The top of the element without our list (with scroll offset)
+			const topCurrentOffset = topStaticOffset - pan.scrollTop;
+			// The distance from the top of the element to the bottom of our list
+			const distFromBottom = topCurrentOffset - pan.offsetHeight;
+			// (Boolean) If the distance is further than our remove distance threshold.
+			// < 0 false | > 0 true
+			const diffToRemove = distFromBottom - minPxDistanceToRemove;
+			return diffToRemove;
+		};
 
-		let nThChild = childList[childList.length - nItemsToRemove];
-		// The top of the element within our list (unscrolled)
-		let topStaticOffset = nThChild.offsetTop - nThChild.offsetHeight;
-		// The top of the element without our list (with scroll offset)
-		let topCurrentOffset = topStaticOffset - pan.scrollTop;
+		const trimSearchResult = binarySearchBy(childList, distFn, 0, childList.length - minItemsToRemove + 1);
+		const child = childList[trimSearchResult.index];
+		const dist = distFn(child);
+		console.log("tryTrimEnd", trimSearchResult, "would trim", child, "with dist", dist);
 
-		// console.log("tryTrimEnd", childList, nThChild, topStaticOffset, topCurrentOffset, ">", pan.offsetHeight + nThItemDistanceToView );
-
-		// Check if the top of our item is more than nThItemDistanceToView
-		// below the bottom of our view
-		if (topCurrentOffset > pan.offsetHeight + nThItemDistanceToView) {
-			// console.log("trim end", topCurrentOffset, nThItemDistanceToView, pan.offsetHeight);
+		if (dist > 0) {
 			// modification is at the end => safe
-			elems = elems.slice(0, elems.length - nItemsToRemove);
+			elems = elems.slice(0, trimSearchResult.index);
 			canLoadAfterEnd = true;
-			// console.log("After trim end", holdIdStart, holdIdEnd);
 		}
 	}
 
@@ -281,23 +290,33 @@
 	 * removes it.
 	 */
 	async function tryTrimStart() {
-		if (elems.length <= nItemsToRemove) return;
+		if (elems.length <= minItemsToRemove) return;
 		await tick();
 		let childList = pan.querySelectorAll<HTMLElement>(".scrollPane > .lazyListElement");
-		let nThChild = childList[nItemsToRemove - 1];
-		// The bottom of the element within our list (unscrolled)
-		let bottomStaticOffset = nThChild.offsetTop;
-		// The top of the element without our list (with scroll offset)
-		let bottomCurrentOffset = bottomStaticOffset - pan.scrollTop;
+		assert(childList.length === elems.length, "HTML node count does not match elements count");
 
-		// Check if the bottom of our item is more than nThItemDistanceToView
-		// above the top of our view
-		if (bottomCurrentOffset < 0 - nThItemDistanceToView) {
-			// console.log("trim start", bottomCurrentOffset, nThItemDistanceToView, pan.offsetHeight);
+		const distFn = (e: HTMLElement) => {
+			// The bottom of the element within our list (unscrolled)
+			const bottomStaticOffset = e.offsetTop;
+			// The top of the element without our list (with scroll offset)
+			const bottomCurrentOffset = bottomStaticOffset - pan.scrollTop;
+			// The distance from bottom of the element to the top of our list
+			const distFromTop = 0 - bottomCurrentOffset;
+			// (Boolean) If the distance is further than our remove distance threshold.
+			// < 0 false | > 0 true
+			const diffToRemove = minPxDistanceToRemove - distFromTop;
+			return diffToRemove;
+		};
+
+		const trimSearchResult = binarySearchBy(childList, distFn, minItemsToRemove - 1, undefined);
+		const child = childList[trimSearchResult.index];
+		const dist = distFn(child);
+		console.log("tryTrimStart", trimSearchResult, "would trim", child, "with dist", dist);
+
+		if (dist > 0) {
 			// mofification at start => helper
-			await modifyElems(elems.slice(nItemsToRemove));
+			await modifyElems(elems.slice(trimSearchResult.index));
 			canLoadBeforeStart = true;
-			// console.log("After trim start", holdIdStart, holdIdEnd);
 		}
 	}
 
@@ -344,7 +363,7 @@
 <div class="lazyList">
 	<div class="lazyListView" bind:this="{pan}" on:scroll="{handle_scroll}">
 		<div class="scrollPane">
-			{#each elems as item}
+			{#each elems as item (item)}
 				<div class="lazyListElement">
 					<slot {item} />
 				</div>
@@ -366,10 +385,6 @@
 		overflow-x: hidden;
 		overflow-y: scroll;
 		height: 100%;
-	}
-
-	.lazyListElement {
-		/*display: contents;*/
 	}
 
 	// Jump start end buttons

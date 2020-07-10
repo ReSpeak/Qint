@@ -9,10 +9,14 @@ export const BOOKMARK_OFF = "star-outline";
 // @ts-ignore
 export const BASE_ADDRESS = "__buildEnv__" === "development" ? "http://localhost:4422" : "";
 
+export interface IArray<T> {
+	length: number;
+	[index: number]: T;
+}
+
 export async function sleep(timeout: number): Promise<void> {
 	return new Promise(resolve => setTimeout(resolve, timeout));
 }
-
 export function flash(element: HTMLElement) {
 	requestAnimationFrame(() => {
 		element.classList.remove("update-flash-fade");
@@ -48,7 +52,7 @@ export function getDataColor(data: number[] | string) {
 	return `color: hsl(${varH}, ${varS}%, ${varL}%);`;
 }
 
-export function arraysEqual<T>(a: T[], b: T[]): boolean {
+export function arraysEqual<T>(a: IArray<T>, b: IArray<T>): boolean {
 	if (a === b) return true;
 	if (a == null || b == null || a.length !== b.length)
 		return false;
@@ -81,38 +85,48 @@ export class BinarySearchResult {
 	) { }
 }
 
-/// The comparator function should implement an order consistent with the sort order of the underlying slice,
-/// returning an order code that indicates whether its argument is
-/// less (< 0), equal (0) or greater (> 0) the desired target.
-export function binarySearchBy<T>(list: T[], f: (t: T) => number, start?: number, end?: number): BinarySearchResult {
+/** The comparator function should implement an order consistent with the sort order of the underlying slice,
+ * returning an order code that indicates whether its argument is
+ * less (< 0), equal (0) or greater (> 0) the desired target.
+ * @param list the list to search through
+ * @param f the compare function, indicating whether the passed element is bigger or smaller than the target.
+ * @param [start] The starting index for the search. 0 by default.
+ * @param [end] The end index for the search. End of the list by default.
+ */
+export function binarySearchBy<T>(list: IArray<T>, f: (t: T) => number, start?: number, end?: number): BinarySearchResult {
+	start = start ?? 0;
+	end = end ?? list.length;
+	assert(start >= 0 && start <= list.length, "Start must be within list range");
+	assert(end >= 0 && end <= list.length, "End must be within list range");
+	assert(start <= end, "Start must be smaller than end");
 	// Code is copied from Rust
-	let base = start ?? 0;
-	let size = (end === undefined ? list.length : end) - base;
+	let base = start;
+	let size = end - base;
 	if (size === 0)
 		return new BinarySearchResult(false, 0);
 
 	while (size > 1) {
-		let half = Math.floor(size / 2);
-		let mid = base + half;
+		const half = Math.floor(size / 2);
+		const mid = base + half;
 		// mid is always in [0, size), that means mid is >= 0 and < size.
 		// mid >= 0: by definition
 		// mid < size: mid = size / 2 + size / 4 + size / 8 ...
-		let cmp = f(list[mid]);
+		const cmp = f(list[mid]);
 		if (cmp <= 0)
 			base = mid;
 		size -= half;
 	}
 	// base is always in [0, size) because base <= mid.
-	let cmp = f(list[base]);
+	const cmp = f(list[base]);
 	if (cmp === 0)
 		return new BinarySearchResult(true, base);
 	else
 		return new BinarySearchResult(false, base + (cmp < 0 ? 1 : 0));
 }
 
-export function binarySearchByKey<T, E>(list: T[], elem: E, f: (t: T) => E, start?: number, end?: number): BinarySearchResult {
+export function binarySearchByKey<T, E>(list: IArray<T>, elem: E, f: (t: T) => E, start?: number, end?: number): BinarySearchResult {
 	return binarySearchBy(list, t => {
-		let x = f(t);
+		const x = f(t);
 		if (elem < x)
 			return 1;
 		if (elem > x)

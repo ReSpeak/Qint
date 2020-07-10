@@ -6,9 +6,9 @@ type NotificationArg = Book | Channel | Client | Invoker | Server | string;
 
 class TsNotification {
 	constructor(
-		/// The string pieces
+		/** The string pieces */
 		public pieces: TemplateStringsArray,
-		/// The dynamically formatted pieces. Every arg is preceded by a string piece.
+		/** The dynamically formatted pieces. Every arg is preceded by a string piece. */
 		public args: NotificationArg[],
 	) {}
 

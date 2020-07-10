@@ -14,7 +14,7 @@ Object.defineProperty(Array.prototype, "remove_item", {
 	}
 });
 
-// ////// LINQ
+// ******** LINQ ********
 
 interface Generator<T = unknown, TReturn = any, TNext = unknown> {
 	linq(): Linqerator<T, TReturn, TNext>;

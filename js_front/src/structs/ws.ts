@@ -69,7 +69,7 @@ interface InDisconnectedTemporarily {
 	DisconnectedTemporarily: null;
 }
 
-/// Internal event, not sent over the websocket
+/** NOTE: Internal event, not sent over the websocket */
 interface InDisconnected {
 	Disconnected: null;
 }
