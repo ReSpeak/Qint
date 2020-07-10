@@ -86,7 +86,9 @@
 			<div slot="loading" class="loader"></div>
 			{#if item.displayDateSeparator}
 				<div title="{item.date.format('L')}" class="chat-date">
-					{item.date.format('LL')}
+					<div class="chat-date-line"></div>
+					<span>{item.date.format('LL')}</span>
+					<div class="chat-date-line"></div>
 				</div>
 			{/if}
 			{#if item.displayGroupHeader}
@@ -176,12 +178,18 @@
 
 	.chat-date {
 		flex: 1;
+		display: flex;
+		align-items: center;
 
-		border-top: 1px solid mix($text, $background, 60%);
 		@include block-margin;
-		margin: { left: 1em; right: 1em; };
 		text-align: center;
 		color: mix($text, $background, 60%);
+	}
+
+	.chat-date-line {
+		flex: 1;
+		border-top: 1px solid mix($text, $background, 60%);
+		margin: { left: 0.5em; right: 0.5em; };
 	}
 
 	.invoker-row {
