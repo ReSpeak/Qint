@@ -14,7 +14,7 @@
 	export let enableFetching: boolean = true;
 	let canLoadAfterEnd: boolean = true;
 	let canLoadBeforeStart: boolean = true;
-	let arrowHidden = true;
+	let showJumpDown = true;
 	let loadAnchored: ListFetchDir | undefined = undefined;
 
 	// the data elements held by this list
@@ -26,13 +26,6 @@
 	let minItemsToRemove = 20;
 	/** How far the item at index `minItemsToRemove` has to be out of view to be removed */
 	let minPxDistanceToRemove = 1500;
-
-	declare let holdIdStart: T | undefined;
-	declare let holdIdEnd: T | undefined;
-	// the lowest and highest _included_ id currently in the list
-	$: holdIdStart = elems.length !== 0 ? elems[0] : undefined;
-	$: holdIdEnd = elems.length !== 0 ? elems[elems.length - 1] : undefined;
-
 	// The holding list element which has the scrollbar
 	let pan: HTMLElement;
 	// Utility holder to calculate `scrollDiff`
@@ -55,6 +48,7 @@
 		loadAnchored = anchor;
 		switch (dir) {
 			case ListFetchDir.New:
+				clear();
 				canLoadBeforeStart = true;
 				canLoadAfterEnd = true;
 				break;
@@ -75,7 +69,6 @@
 					scrollToStart();
 					break;
 				}
-				clear();
 				sourceChanged(ListFetchDir.New, ListFetchDir.Before);
 				break;
 
@@ -84,7 +77,6 @@
 					scrollToEnd();
 					break;
 				}
-				clear();
 				sourceChanged(ListFetchDir.New, ListFetchDir.After);
 				break;
 
@@ -113,6 +105,12 @@
 	function scrollToEnd() {
 		pan.scrollTop = pan.scrollHeight - pan.clientHeight;
 	}
+	function getFirstElem() {
+		return elems.length !== 0 ? elems[0] : undefined;
+	}
+	function getLastElem() {
+		return elems.length !== 0 ? elems[elems.length - 1] : undefined;
+	}
 
 	function handle_scroll(e: MouseEvent) {
 		// console.log(
@@ -127,7 +125,7 @@
 		scrollDiff = pan.scrollTop - lastScrollPos;
 		lastScrollPos = pan.scrollTop;
 
-		arrowHidden = pan.scrollTop >= pan.scrollHeight - pan.clientHeight;
+		showJumpDown = canLoadAfterEnd || pan.scrollTop < pan.scrollHeight - pan.clientHeight;
 
 		start_fill();
 	}
@@ -156,6 +154,8 @@
 	async function fill_body(): Promise<boolean> {
 		if ((!canLoadAfterEnd && !canLoadBeforeStart) || !enableFetching) return true;
 
+		const holdIdStart = getFirstElem();
+		const holdIdEnd = getLastElem();
 		if (holdIdStart === undefined || holdIdEnd === undefined) {
 			await load(ListFetchDir.New);
 			return false;
@@ -165,8 +165,8 @@
 		const pan_scrollTopMax = pan.scrollHeight - pan.clientHeight;
 		const distFromBot = pan_scrollTopMax - pan.scrollTop;
 
-		const wantFetchStart = distFromTop < pxBeforeLoad && scrollDiff <= 0;
-		const wantFetchEnd = distFromBot < pxBeforeLoad && scrollDiff >= 0;
+		const wantFetchStart = distFromTop <= pxBeforeLoad && scrollDiff <= 0;
+		const wantFetchEnd = distFromBot <= pxBeforeLoad && scrollDiff >= 0;
 
 		if (wantFetchStart && canLoadBeforeStart) {
 			// console.log("want start", holdIdStart);
@@ -256,10 +256,10 @@
 	async function tryTrimEnd() {
 		if (elems.length <= minItemsToRemove) return;
 		await tick();
-		
+
 		const childList = pan.querySelectorAll<HTMLElement>(".scrollPane > .lazyListElement");
 		assert(childList.length === elems.length, "HTML node count does not match elements count");
-		
+
 		const distFn = (e: HTMLElement) => {
 			// The top of the element within our list (unscrolled)
 			const topStaticOffset = e.offsetTop - e.offsetHeight;
@@ -273,14 +273,14 @@
 			return diffToRemove;
 		};
 
-		const trimSearchResult = binarySearchBy(childList, distFn, 0, childList.length - minItemsToRemove + 1);
-		const child = childList[trimSearchResult.index];
+		const res = binarySearchBy(childList, distFn, 0, childList.length - minItemsToRemove + 1);
+		const child = childList[res.index];
 		const dist = distFn(child);
-		console.log("tryTrimEnd", trimSearchResult, "would trim", child, "with dist", dist);
+		console.log("tryTrimEnd", res, "would trim", child, "with dist", dist);
 
 		if (dist > 0) {
 			// modification is at the end => safe
-			elems = elems.slice(0, trimSearchResult.index);
+			elems = elems.slice(0, res.index);
 			canLoadAfterEnd = true;
 		}
 	}
@@ -308,14 +308,14 @@
 			return diffToRemove;
 		};
 
-		const trimSearchResult = binarySearchBy(childList, distFn, minItemsToRemove - 1, undefined);
-		const child = childList[trimSearchResult.index];
+		const res = binarySearchBy(childList, distFn, minItemsToRemove - 1, undefined);
+		const child = childList[res.index];
 		const dist = distFn(child);
-		console.log("tryTrimStart", trimSearchResult, "would trim", child, "with dist", dist);
+		console.log("tryTrimStart", res, "would trim", child, "with dist", dist);
 
 		if (dist > 0) {
 			// mofification at start => helper
-			await modifyElems(elems.slice(trimSearchResult.index));
+			await modifyElems(elems.slice(res.index));
 			canLoadBeforeStart = true;
 		}
 	}
@@ -370,7 +370,7 @@
 			{/each}
 		</div>
 	</div>
-	<button class="arrow-down" class:arrowHidden on:click="{() => jumpTo(ListFetchDir.After)}">
+	<button class="arrow-down" class:showJumpDown on:click="{() => jumpTo(ListFetchDir.After)}">
 		<div></div>
 	</button>
 </div>
@@ -411,7 +411,7 @@
 		background: #eee;
 	}
 
-	.arrowHidden {
+	.showJumpDown {
 		bottom: -5em;
 	}
 
