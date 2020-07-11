@@ -17,7 +17,7 @@
 	let volume = 0;
 
 	$: filterShow = applyFilter($filter, client);
-	$: ownClient = client.id === connection.ownClient;
+	$: ownClient = client.id === connection.ownClientId;
 	$: selectedClient = "Client" in $selectedChat && $selectedChat.Client === client.id;
 	$: loadVolume(hovered);
 	let div;

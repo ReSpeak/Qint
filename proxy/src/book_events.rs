@@ -1,7 +1,7 @@
 use std::convert::{TryFrom, TryInto};
 use std::net::{IpAddr, SocketAddr};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use time::{Duration, OffsetDateTime};
 use tsclientlib::data::Connection;
 use tsclientlib::events::{Event, ExtraInfo, PropertyId, PropertyValueRef};
@@ -23,6 +23,11 @@ pub enum JsPropertyId {
 	Client(ClientId),
 	ClientServerGroup(ClientId, ServerGroupId),
 	Server,
+}
+
+// Any value that is present is considered Some value, including null.
+fn deserialize_some<'de, T: Deserialize<'de>, D: Deserializer<'de>>(deserializer: D) -> Result<Option<T>, D::Error> {
+	Deserialize::deserialize(deserializer).map(Some)
 }
 
 include!(concat!(env!("OUT_DIR"), "/book_events.rs"));

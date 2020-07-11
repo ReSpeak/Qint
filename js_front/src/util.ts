@@ -7,7 +7,7 @@ export const BOOKMARK_ON = "star";
 export const BOOKMARK_OFF = "star-outline";
 
 // @ts-ignore
-export const BASE_ADDRESS = "__buildEnv__" === "development" ? "http://localhost:4422" : "";
+export const BASE_ADDRESS = ""; //"__buildEnv__" === "development" ? "http://localhost:4422" : "";
 
 export interface IArray<T> {
 	length: number;

@@ -20,6 +20,7 @@ use tsclientlib::{
 use tsproto::resend::PacketId;
 use tsproto_packets::packets::{AudioData, OutPacket};
 
+use crate::book_events::{JsEvent, JsProperty, JsPropertyId};
 use crate::db::{ChatId, ChatType};
 use crate::messages::{self, MessageF2P, MessageP2F};
 use crate::{audio, book_events, db, ConnectionId, State, WsFormat, WsOptions};
@@ -284,32 +285,35 @@ impl Ws {
 		}
 	}
 
+	fn set_audio_active(active: bool, logger: Logger, a2ts: Addr<audio::audio_to_ts::AudioToTs>,
+		ctx: &mut <Self as Actor>::Context) {
+		if active {
+			actix::spawn(
+				a2ts.send(audio::audio_to_ts::AddListenerMsg(ctx.address()))
+				.map(move |r| {
+					if let Err(e) = r {
+						error!(logger, "Failed to add audio listener"; "error" => %e);
+					}
+				})
+			);
+		} else {
+			actix::spawn(
+				a2ts.send(audio::audio_to_ts::RemoveListenerMsg(ctx.address()))
+				.map(move |r| {
+					if let Err(e) = r {
+						error!(logger, "Failed to remove audio listener"; "error" => %e);
+					}
+				}),
+			);
+		}
+	}
+
 	fn activate_audio(&mut self, ctx: &mut <Self as Actor>::Context) {
-		// Activate audio
-		let logger = self.logger.clone();
-		let a2ts = self.state.audio_data.a2ts.clone();
-		actix::spawn(
-			a2ts.send(audio::audio_to_ts::AddListenerMsg(ctx.address()))
-			.map(move |r| {
-				if let Err(e) = r {
-					error!(logger, "Failed to add audio listener"; "error" => %e);
-				}
-			}),
-		);
+		Self::set_audio_active(true, self.logger.clone(), self.state.audio_data.a2ts.clone(), ctx);
 	}
 
 	fn deactivate_audio(&mut self, ctx: &mut <Self as Actor>::Context) {
-		// Deactivate audio
-		let logger = self.logger.clone();
-		let a2ts = self.state.audio_data.a2ts.clone();
-		actix::spawn(
-			a2ts.send(audio::audio_to_ts::RemoveListenerMsg(ctx.address()))
-			.map(move |r| {
-				if let Err(e) = r {
-					error!(logger, "Failed to remove audio listener"; "error" => %e);
-				}
-			}),
-		);
+		Self::set_audio_active(false, self.logger.clone(), self.state.audio_data.a2ts.clone(), ctx);
 	}
 
 	fn disconnect(&mut self, ctx: &mut <Self as Actor>::Context) {
@@ -378,102 +382,81 @@ impl Ws {
 					}
 				}
 			}
-			MessageF2P::SendMessage { target, message } => {
-				if let Some(con) = &mut self.connection {
-					match con.get_mut_state() {
-						Err(e) => {
-							error!(self.logger, "Failed to get state"; "error" => %e);
+			MessageF2P::Events(events) => {
+				for e in events {
+					match e {
+						JsEvent::Message { target, message, .. } => {
+							self.send_chat_message(target, message);
 						}
-						Ok(mut state) => {
-							if let Err(e) = state.send_message(target, &message) {
-								error!(self.logger, "Failed to send message"; "error" => %e);
-							}
-						}
-					}
-
-					let server = match con.get_server_key() {
-						Ok(key) => key,
-						Err(e) => {
-							// TODO Return as error
-							error!(self.logger, "Failed to get server key"; "error" => %e);
-							return;
-						}
-					};
-
-					if let Ok(state) = con.get_state() {
-						let server = server.to_short().to_vec();
-						let own_channel;
-						let invoker_uid = {
-							if let Some(own_client) = state.clients.get(&state.own_client) {
-								own_channel = own_client.channel.0;
-								if let Some(uid) = own_client.uid.as_ref() {
-									uid.0.clone()
-								} else {
-									error!(self.logger, "Failed to get own client uid");
-									return;
-								}
-							} else {
-								error!(self.logger, "Failed to get own client");
-								return;
-							}
-						};
-
-						let chat_type = match target {
-							MessageTarget::Server => ChatType::Server,
-							MessageTarget::Channel => ChatType::Channel(own_channel),
-							MessageTarget::Client(id) | MessageTarget::Poke(id) => {
-								let uid = &state.clients.get(&id).and_then(|c| c.uid.as_ref());
-								if let Some(uid) = uid {
-									if let MessageTarget::Client(_) = target {
-										ChatType::Client(uid.0.clone())
-									} else {
-										ChatType::Poke(uid.0.clone())
+						JsEvent::PropertyChanged { id, prop, .. } => {
+							if let Some(con) = &mut self.connection {
+								match con.get_mut_state() {
+									Err(e) => {
+										error!(self.logger, "Failed to get state"; "error" => %e);
 									}
-								} else {
-									error!(self.logger, "Failed to get uid of client"; "client" => ?id);
-									return;
-								}
-							}
-						};
+									Ok(mut state) => {
+										if let JsProperty::Client { channel, input_muted, output_muted, away_message, .. } = prop {
+											if let JsPropertyId::Client(client_id) = id {
+												let mut changed = false;
+												if let Some(input_muted) = input_muted {
+													changed = true;
 
-						let msg = db::WriteMessageMsg {
-							message,
-							invoker_uid,
-							chat: ChatId { server, chat_type },
-						};
-						let logger = self.logger.clone();
-						actix::spawn(self.state.database.send(msg).map(move |r| match r {
-							Ok(Ok(())) => {}
-							Ok(Err(e)) => {
-								error!(logger, "Failed to handle event in database"; "error" => %e);
-							}
-							Err(_) => {
-								error!(logger, "Failed to send event to database");
-							}
-						}));
-					} else {
-						error!(self.logger, "Failed to get connection state");
-					}
-				} else {
-					// TODO Respond with error
-				}
-			}
-			MessageF2P::SwitchChannel(channel) => {
-				if let Some(con) = &mut self.connection {
-					match con.get_mut_state() {
-						Err(e) => {
-							error!(self.logger, "Failed to get state"; "error" => %e);
-						}
-						Ok(mut state) => {
-							let own_id = state.own_client;
-							if let Some(mut cl) = state.get_client(&own_id) {
-								if let Err(e) = cl.set_channel(channel) {
-									error!(self.logger, "Failed to switch channel";
-										"error" => %e);
+													// TODO !input_muted && !output_muted && away_message.is_none()
+													Self::set_audio_active(!input_muted,
+														self.logger.clone(),
+														self.state.audio_data.a2ts.clone(),
+														ctx);
+
+													if let Err(e) = state.set_input_muted(input_muted) {
+														error!(self.logger, "Failed to set input_muted";
+															"error" => %e);
+													}
+												}
+
+												if let Some(output_muted) = output_muted {
+													changed = true;
+													if let Err(e) = state.set_output_muted(output_muted) {
+														error!(self.logger, "Failed to set output_muted";
+															"error" => %e);
+													}
+												}
+
+												if let Some(away_message) = away_message {
+													changed = true;
+													if let Err(e) = state.set_away(away_message.as_deref()) {
+														error!(self.logger, "Failed to set away";
+															"error" => %e);
+													}
+												}
+
+												if let Some(mut cl) = state.get_client(&client_id) {
+													if let Some(channel) = channel {
+														changed = true;
+														if let Err(e) = cl.set_channel(channel) {
+															error!(self.logger, "Failed to set channel";
+																"error" => %e);
+														}
+													}
+												} else {
+													error!(self.logger, "Failed to find client");
+												}
+
+												if !changed {
+													warn!(self.logger, "Unknown property change");
+												}
+											} else {
+												warn!(self.logger, "Wrong id");
+											}
+										} else {
+											warn!(self.logger, "Unknown property change");
+										}
+									}
 								}
-							} else {
-								error!(self.logger, "Failed to find own client");
 							}
+						}
+						_ => {
+							warn!(self.logger, "Received unknown event"; "event" => ?e);
+							// TODO Report error
 						}
 					}
 				}
@@ -485,6 +468,87 @@ impl Ws {
 		match self.options.format {
 			WsFormat::Msgpack => ctx.binary(rmp_serde::to_vec(msg).unwrap()),
 			WsFormat::Json => ctx.text(serde_json::to_string(msg).unwrap()),
+		}
+	}
+
+	fn send_chat_message(&mut self, target: MessageTarget, message: String) {
+		if let Some(con) = &mut self.connection {
+			match con.get_mut_state() {
+				Err(e) => {
+					error!(self.logger, "Failed to get state"; "error" => %e);
+				}
+				Ok(mut state) => {
+					if let Err(e) = state.send_message(target, &message) {
+						error!(self.logger, "Failed to send message"; "error" => %e);
+					}
+				}
+			}
+
+			let server = match con.get_server_key() {
+				Ok(key) => key,
+				Err(e) => {
+					// TODO Return as error
+					error!(self.logger, "Failed to get server key"; "error" => %e);
+					return;
+				}
+			};
+
+			if let Ok(state) = con.get_state() {
+				let server = server.to_short().to_vec();
+				let own_channel;
+				let invoker_uid = {
+					if let Some(own_client) = state.clients.get(&state.own_client) {
+						own_channel = own_client.channel.0;
+						if let Some(uid) = own_client.uid.as_ref() {
+							uid.0.clone()
+						} else {
+							error!(self.logger, "Failed to get own client uid");
+							return;
+						}
+					} else {
+						error!(self.logger, "Failed to get own client");
+						return;
+					}
+				};
+
+				let chat_type = match target {
+					MessageTarget::Server => ChatType::Server,
+					MessageTarget::Channel => ChatType::Channel(own_channel),
+					MessageTarget::Client(id) | MessageTarget::Poke(id) => {
+						let uid = &state.clients.get(&id).and_then(|c| c.uid.as_ref());
+						if let Some(uid) = uid {
+							if let MessageTarget::Client(_) = target {
+								ChatType::Client(uid.0.clone())
+							} else {
+								ChatType::Poke(uid.0.clone())
+							}
+						} else {
+							error!(self.logger, "Failed to get uid of client"; "client" => ?id);
+							return;
+						}
+					}
+				};
+
+				let msg = db::WriteMessageMsg {
+					message,
+					invoker_uid,
+					chat: ChatId { server, chat_type },
+				};
+				let logger = self.logger.clone();
+				actix::spawn(self.state.database.send(msg).map(move |r| match r {
+					Ok(Ok(())) => {}
+					Ok(Err(e)) => {
+						error!(logger, "Failed to handle event in database"; "error" => %e);
+					}
+					Err(_) => {
+						error!(logger, "Failed to send event to database");
+					}
+				}));
+			} else {
+				error!(self.logger, "Failed to get connection state");
+			}
+		} else {
+			// TODO Respond with error
 		}
 	}
 }

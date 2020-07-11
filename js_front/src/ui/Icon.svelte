@@ -1,7 +1,7 @@
-<script>
-	export let raw = undefined;
+<script lang="typescript">
+	export let raw: string | undefined = undefined;
 	export let size = 18;
-	export let name = undefined;
+	export let name: string | undefined = undefined;
 	export let is_left = false;
 	export let style = "";
 

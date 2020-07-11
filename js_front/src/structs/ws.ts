@@ -7,7 +7,7 @@ export type WsMessageTarget =
 	| { Poke: number };
 
 // Out Messages
-export type OutMsg = OMsgConnect | OMsgDisconnect | OMsgSendMessage | OMsgSwitchChannel;
+export type OutMsg = OMsgConnect | OMsgDisconnect | OMsgEvents;
 
 interface OMsgConnect {
 	Connect: {
@@ -42,15 +42,8 @@ interface OMsgDisconnect {
 	};
 }
 
-interface OMsgSendMessage {
-	SendMessage: {
-		target: WsMessageTarget;
-		message: string;
-	};
-}
-
-interface OMsgSwitchChannel {
-	SwitchChannel: number;
+interface OMsgEvents {
+	Events: InBookMsg[];
 }
 
 

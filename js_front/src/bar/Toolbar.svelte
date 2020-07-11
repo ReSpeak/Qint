@@ -10,6 +10,29 @@
 	let dropdownActive = false;
 	let dropdown: HTMLElement;
 
+	let ownClient = connection.ownClient;
+	declare let input_muted: boolean | undefined;
+	$: input_muted = $ownClient?.input_muted;
+	declare let output_muted: boolean | undefined;
+	$: output_muted = $ownClient?.output_muted;
+	declare let is_away: boolean | undefined;
+	$: is_away = $ownClient?.away_message !== null;
+
+	function changeOwnClient(change: any) {
+		connection.sendMessage({
+			Events: [{
+				PropertyChanged: {
+					id: {
+						Client: connection.ownClientId!,
+					},
+					prop: { Client: change },
+					invoker: null,
+					extra: { reason: null },
+				}
+			}]
+		});
+	}
+
 	function handleFocus(event: FocusEvent) {
 		// Check of the target lies within the dropdown
 		if (event.relatedTarget && event.relatedTarget instanceof HTMLElement) {
@@ -32,7 +55,17 @@
 		</button>
 	</div>
 	<div class="rightButtons">
-		<div class="dropdown" bind:this={dropdown} class:is-active={dropdownActive} on:focusout={handleFocus}>
+		<button class="button toolbutton" class:active={input_muted} on:click={() => changeOwnClient({ input_muted: !input_muted })}>
+			<Icon name={input_muted ? "microphone-off" : "microphone"} />
+		</button>
+		<button class="button toolbutton" class:active={output_muted} on:click={() => changeOwnClient({ output_muted: !output_muted })}>
+			<Icon name={output_muted ? "volume-off" : "volume-high"} />
+		</button>
+		<button class="button toolbutton" class:active={is_away} on:click={() => changeOwnClient({ away_message: is_away ? null : "" })}>
+			<Icon name={is_away ? "sleep" : "sleep-off"} />
+		</button>
+
+		<div class="dropdown is-right" bind:this={dropdown} class:is-active={dropdownActive} on:focusout={handleFocus}>
 			<div class="dropdown-trigger">
 				<button
 					class="button toolbutton"
@@ -51,9 +84,6 @@
 			</div>
 			<div class="dropdown-menu" id="dropdown-menu3" role="menu" on:click={() => dropdownActive = false}>
 				<div class="dropdown-content">
-					<button class="button dropdown-item" on:click={() => connection.toggleMute()}>
-						Toggle Mute
-					</button>
 					<button class="button dropdown-item">
 						Settings
 					</button>
@@ -81,13 +111,17 @@
 		float: right;
 	}
 
-	.toolbutton {
+	.button.toolbutton {
 		background-color: #444444;
 		border-radius: 100%;
 	}
 	.button {
+		background: none;
 		border: none;
 		margin: 0.2em;
+	}
+	.button.dropdown-item:hover {
+		background: none;
 	}
 	.button:focus {
 		box-shadow: none;

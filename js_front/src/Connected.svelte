@@ -31,13 +31,14 @@
 		<Sidebar {connection} {filter}/>
 	{/if}
 	{#if $showChat}
-		<UIChat {connection}/>
+		<UiChat {connection}/>
 	{/if}
 </div>
 
 <style lang="scss">
 	.connected-container {
 		display: grid;
+		grid-template-rows: max-content 1fr;
 
 		position: absolute;
 		top: 0;

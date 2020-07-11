@@ -1,3 +1,4 @@
+import { get } from "svelte/store";
 import { Book, Channel, Client, Server } from "./tree/book";
 import { InBookMsg, InMsg, Invoker, Reason } from "./structs/ws";
 import { Connection, ConnectionState } from "./connection";
@@ -91,8 +92,8 @@ export function handleMessage(con: Connection, msg: InMsg, plugins: any[]) {
 
 function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection, e: InMsg | InBookMsg, no: TsNotification) => void) {
 	try {
-		const ownClientId = con.ownClient!;
-		const ownClient = con.book.getClient(ownClientId)
+		const ownClientId = con.ownClientId!;
+		const ownClient = get(con.ownClient);
 		const ownChannelId = ownClient !== undefined ? ownClient.channel : 0;
 
 		if (msg === "ChannelListFinished") {

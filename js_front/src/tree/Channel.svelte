@@ -24,8 +24,8 @@
 
 	function updateOwnClient() {
 		let isOwn = false;
-		let client = get(connection.book.clients).get(connection.ownClient);
-		if (client) {
+		let client = get(connection.ownClient);
+		if (client !== undefined) {
 			isOwn = client.channel === channel.id;
 		}
 		return isOwn;

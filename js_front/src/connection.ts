@@ -1,7 +1,7 @@
-import { Chat, Message } from "./chat/chat";
+import { Chat } from "./chat/chat";
 import { OutMsg, InMsg, Reason } from "./structs/ws";
-import { get, writable, Writable } from "svelte/store";
-import { Book, Channel, Server } from "./tree/book";
+import { derived, get, writable, Readable, Writable } from "svelte/store";
+import { Book, Channel, Client } from "./tree/book";
 import { plugins, loadPlugins } from "./plugins";
 import { BASE_ADDRESS } from "./util";
 import { handleMessage } from "./notification";
@@ -13,7 +13,9 @@ export class Connection {
 	public readonly book: Book = new Book();
 	public readonly chat: Chat = new Chat(this);
 	public server?: string;
-	public ownClient?: number;
+	public ownClientId?: number;
+	public ownClient: Readable<Client | undefined> = derived(this.book.clients,
+		cls => this.ownClientId !== undefined ? cls.get(this.ownClientId) : undefined);
 	private socket?: WebSocket;
 	public guid?: string;
 	private muted: boolean = false;
@@ -27,7 +29,7 @@ export class Connection {
 		this.book.reset();
 		this.chat.reset();
 		this.server = undefined;
-		this.ownClient = undefined;
+		this.ownClientId = undefined;
 		this.guid = undefined;
 		if (this.socket)
 			this.socket.close();
@@ -37,18 +39,6 @@ export class Connection {
 
 	public getState(): ConnectionState {
 		return get(this.state);
-	}
-
-	public async toggleMute() {
-		this.muted = !this.muted;
-		const mutePath = this.muted ? "mute" : "unmute";
-		try {
-			await fetch(`${BASE_ADDRESS}/con/${this.guid}/${mutePath}`, {
-				method: 'POST',
-			});
-		} catch(e) {
-			console.error("Failed to change mute:", e);
-		}
 	}
 
 	public isMuted(): boolean {
@@ -144,7 +134,22 @@ export class Connection {
 	}
 
 	public switchChannel(channel: Channel) {
-		this.sendMessage({ SwitchChannel: channel.id });
+		this.sendMessage({
+			Events: [{
+				PropertyChanged: {
+					id: {
+						Client: this.ownClientId!,
+					},
+					prop: {
+						Client: {
+							channel: channel.id,
+						},
+					},
+					invoker: null,
+					extra: { reason: null },
+				}
+			}]
+		});
 	}
 
 	private messageHandler(evt: MessageEvent) {
@@ -164,13 +169,13 @@ export class Connection {
 		if ("Connected" in msg) {
 			this.state.set(ConnectionState.Connected);
 			this.server = msg.Connected.server;
-			this.ownClient = msg.Connected.own_client;
+			this.ownClientId = msg.Connected.own_client;
 		} else if ("DisconnectedTemporarily" in msg) {
 			this.state.set(ConnectionState.Connecting);
 			this.book.reset();
 			this.chat.reset();
 			this.server = undefined;
-			this.ownClient = undefined;
+			this.ownClientId = undefined;
 		} else if ("Events" in msg) {
 			for (const tsevt of msg.Events) {
 				try {

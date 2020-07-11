@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use tsclientlib::{ChannelId, ClientId, DisconnectOptions, MessageTarget, Version};
+use tsclientlib::{ClientId, DisconnectOptions, Version};
 
 use crate::book_events::JsEvent;
 
@@ -9,8 +9,8 @@ use crate::book_events::JsEvent;
 pub enum MessageF2P {
 	Connect(ConnectOptions),
 	Disconnect(DisconnectOptions),
-	SendMessage { target: MessageTarget, message: String },
-	SwitchChannel(ChannelId),
+	/// Events can be used to trigger actions, like writing a message or switching channel
+	Events(Vec<JsEvent>),
 }
 
 /// A message sent over a websocket connection from the proxy to the frontend.

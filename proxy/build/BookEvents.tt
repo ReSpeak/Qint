@@ -4,7 +4,7 @@ use std::fmt;
 
 fn get_props(_fmt: &mut fmt::Formatter, structs: &[Struct], parts: &[&str]) -> fmt::Result {
 	for p in get_all_properties(structs, parts) { #>
-		#[serde(skip_serializing_if = "Option::is_none")]
+		#[serde(default, deserialize_with = "deserialize_some", skip_serializing_if = "Option::is_none")]
 		<#= p.name.to_snake_case() #>: Option<<#= get_rust_type(p) #>>,
 	<# }
 	Ok(())
