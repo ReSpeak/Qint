@@ -9,7 +9,6 @@ export class Bookmark {
 	public bookmark: boolean | undefined;
 	public lastUsed: Moment | undefined;
 	public server: any;
-	public data: any;
 
 	constructor(content: any) {
 		Object.assign(this, content);
@@ -47,11 +46,11 @@ export class Bookmark {
 	}
 
 	public static async getRecent(): Promise<Bookmark> {
-		return new Bookmark(await graphql(`query GetRecentBookmark {
+		return new Bookmark((await graphql(`query GetRecentBookmark {
 			mostRecentBookmark {
 				username
 				address
 			}
-		}`));
+		}`)).data.mostRecentBookmark);
 	}
 }

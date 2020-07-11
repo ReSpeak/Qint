@@ -30,8 +30,6 @@
 	async function loadBookmarks() {
 		// That's not dynamic, but we currently have no pagination
 		try {
-			throw new Error("error");
-			
 			return await Bookmark.get();
 		} catch (err) {
 			console.error("Failed to load bookmarks", err);
@@ -42,13 +40,13 @@
 	onMount(async () => {
 		usernameInput.focus();
 		let recent = await Bookmark.getRecent();
-		if (recent.data.mostRecentBookmark) {
+		if (recent) {
 			if (data.username === "") {
-				data.username = recent.data.mostRecentBookmark.username;
+				data.username = recent.username ?? "";
 				username.set(data.username);
 			}
 			if (data.address === "") {
-				data.address = recent.data.mostRecentBookmark.address;
+				data.address = recent.address ?? "";
 				address.set(data.address);
 			}
 		}
@@ -70,8 +68,8 @@
 		</article>
 	{/if}
 	<div class="inner-connect-container">
-		<div class="connect-blur"></div>
-		<form class="connect-form" on:submit|preventDefault="{onConnect}">
+		<div class="connect-blur blur"></div>
+		<form class="connect-form blur-shade" on:submit|preventDefault="{onConnect}">
 			<div>
 				<p class="control has-icons-left">
 					<input
@@ -115,33 +113,30 @@
 	</div>
 
 	<div class="bookmark-container">
-		<div class="bookmark-blur"></div>
-		<div class="bookmark-list">
-			<div>
-				{#await loadBookmarks()}
-					<div>Loading…</div>
-				{:then bookmarks}
-					<div class="viewContainer">
-						<div class="scollPane">
-							{#each bookmarks as item}
-								<BookmarkComp
-									connect="{data}"
-									{username}
-									{address}
-									bookmark="{item}"
-								/>
-							{/each}
-						</div>
+		<div class="bookmark-blur blur"></div>
+		<div class="bookmark-list blur-shade">
+			{#await loadBookmarks()}
+				<div>Loading…</div>
+			{:then bookmarks}
+				<div class="viewContainer">
+					<div class="scollPane">
+						{#each bookmarks as item}
+							<BookmarkComp connect="{data}" {username} {address} bookmark="{item}" />
+						{/each}
 					</div>
-				{:catch bookmarkError}
-					<article class="message is-danger">
-						<div class="message-header">
-							<p>Error</p>
-						</div>
-						<div class="message-body">Failed to fetch bookmarks, is Qint running?</div>
-					</article>
-				{/await}
-			</div>
+				</div>
+			{:catch bookmarkError}
+				<article class="message is-danger">
+					<div class="message-header">
+						<p>Error</p>
+					</div>
+					<div class="message-body">
+						<span>Failed to fetch bookmarks, is Qint running?</span>
+						<br />
+						<span>Reason: {bookmarkError.message}</span>
+					</div>
+				</article>
+			{/await}
 		</div>
 	</div>
 </div>
@@ -159,6 +154,45 @@
 		left: 0;
 		right: 0;
 		overflow: auto;
+
+		> div {
+			box-shadow: 0 0.3em 0.3em rgba(0, 0, 0, 0.5);
+		}
+	}
+
+	.blur {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		background-color: change-color($background, $alpha: 0.8);
+
+		&::before {
+			filter: blur(5px);
+			background: url($background-image) repeat fixed center center / cover;
+			content: "";
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+		}
+	}
+
+	.blur-shade {
+		position: relative;
+		background-color: change-color($background, $alpha: 0.7);
+	}
+
+	.connect-blur,
+	.connect-form {
+		border-radius: 0.4em 0.4em 0 0;
+	}
+
+	.bookmark-blur,
+	.bookmark-list {
+		border-radius: 0 0 0.4em 0.4em;
 	}
 
 	.inner-connect-container {
@@ -168,36 +202,6 @@
 		position: relative;
 		top: 10%;
 		margin: auto auto;
-	}
-
-	.connect-blur::before {
-		filter: blur(5px);
-		background: url($background-image) repeat fixed center center / cover;
-		content: "";
-		position: absolute;
-		top: 0;
-		left: 0;
-		width: 100%;
-		height: 100%;
-	}
-
-	.connect-blur {
-		position: absolute;
-		top: 0;
-		bottom: 0;
-		left: 0;
-		right: 0;
-		background-color: change-color($background, $alpha: 0.8);
-		border-radius: 0.4em 0.4em 0 0;
-		box-shadow: 0 0.3em 0.3em #0005;
-	}
-
-	.connect-form {
-		position: relative;
-		background-color: change-color($background, $alpha: 0.7);
-		border-radius: 0.4em 0.4em 0 0;
-		box-shadow: 0 0.3em 0.3em #0005;
-		padding: 0.5em;
 	}
 
 	@media (min-width: 35em) {
@@ -243,48 +247,14 @@
 		margin-bottom: 5em;
 	}
 
-	.bookmark-blur::before {
-		filter: blur(5px);
-		background: url($background-image) repeat fixed center center / cover;
-		content: "";
-		position: absolute;
-		top: 0;
-		left: 0;
-		width: 100%;
-		height: 100%;
-	}
-
-	.bookmark-blur {
-		position: absolute;
-		top: 0;
-		bottom: 0;
-		left: 0;
-		right: 0;
-		background-color: change-color($background, $alpha: 0.8);
-		border-radius: 0 0 0.4em 0.4em;
-		box-shadow: 0 0.3em 0.3em #0005;
-	}
-
-	.bookmark-list .viewContainer,
-	.bookmark-list > div {
-		border-radius: 0 0 0.4em 0.4em;
-		box-shadow: 0 0.3em 0.3em #0005;
-	}
-
-	// TODO the error message is broken (start without proxy running)
-	.bookmark-list .scollPane,
-	.bookmark-list .message {
-		background-color: change-color($background, $alpha: 0.7);
+	.bookmark-list .scollPane {
 		min-height: 30vh;
 		max-height: 50vh;
-		padding: 0.5em;
 	}
 
-	.message {
-		position: relative;
-		background-color: change-color($background, $alpha: 0.7);
+	.bookmark-list .message {
+		background-color: rgba(0, 0, 0, 0);
 	}
-
 	.message-body {
 		position: relative;
 		background-color: #fff;
@@ -296,6 +266,8 @@
 			padding: 1em 8em 4em 8em;
 		}
 	}
+
+	// Temporary list hacks until LazyList is used for bookmarks
 
 	.viewContainer {
 		display: block;
