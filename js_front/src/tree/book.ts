@@ -260,6 +260,7 @@ export class Book {
 				this.addClient(Client.fromJson(msg.PropertyAdded.prop.Client));
 			} else if ("Server" in msg.PropertyAdded.prop) {
 				this.updateServer(msg.PropertyAdded.prop.Server);
+				document.title = get(this.server).name + " – Qint";
 			}
 		} else if ("PropertyChanged" in msg) {
 			if ("Channel" in msg.PropertyChanged.prop && "Channel" in msg.PropertyChanged.id) {

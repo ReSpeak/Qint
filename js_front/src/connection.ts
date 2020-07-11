@@ -35,6 +35,7 @@ export class Connection {
 			this.socket.close();
 		this.socket = undefined;
 		this.muted = false;
+		document.title = "Qint";
 	}
 
 	public getState(): ConnectionState {

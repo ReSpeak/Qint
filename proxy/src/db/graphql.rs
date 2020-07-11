@@ -79,7 +79,7 @@ pub async fn graphiql() -> impl Responder {
 
 #[post("/db")]
 pub(crate) async fn db_graphql(
-	state: web::Data<State>, data: web::Json<GraphQLRequest>,
+	state: web::Data<Arc<State>>, data: web::Json<GraphQLRequest>,
 ) -> Result<impl Responder> {
 	let res = data.execute(&state.graphql_schema, &*state).await;
 	let json_res = serde_json::to_string(&res)?;

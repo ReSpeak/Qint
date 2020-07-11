@@ -23,7 +23,7 @@ use tsproto_packets::packets::{AudioData, OutPacket};
 use crate::book_events::{JsEvent, JsProperty, JsPropertyId};
 use crate::db::{ChatId, ChatType};
 use crate::messages::{self, MessageF2P, MessageP2F};
-use crate::{audio, book_events, db, ConnectionId, State, WsFormat, WsOptions};
+use crate::{audio, book_events, db, ConnectionId, State, Tristate, WsFormat, WsOptions};
 
 /// A websocket connection
 pub(crate) struct Ws {
@@ -50,7 +50,9 @@ pub(crate) struct TalkersChangedMsg(pub Vec<(ClientId, bool)>);
 pub(crate) struct SaveClientMsg(pub Uid);
 pub(crate) struct SendPacketMsg(pub OutPacket);
 pub(crate) struct SetVolumeMsg(pub Uid, pub f32);
-pub(crate) struct SetMuteMsg(pub bool);
+pub(crate) struct SetInputMutedMsg(pub Tristate);
+pub(crate) struct SetOutputMutedMsg(pub Tristate);
+pub(crate) struct SetAwayMsg(pub Tristate);
 pub(crate) struct DisconnectMsg;
 
 pub(crate) struct DownloadFile {
@@ -96,8 +98,14 @@ impl Message for SendPacketMsg {
 impl Message for SetVolumeMsg {
 	type Result = ();
 }
-impl Message for SetMuteMsg {
-	type Result = ();
+impl Message for SetInputMutedMsg {
+	type Result = Result<()>;
+}
+impl Message for SetOutputMutedMsg {
+	type Result = Result<()>;
+}
+impl Message for SetAwayMsg {
+	type Result = Result<()>;
 }
 impl Message for DisconnectMsg {
 	type Result = ();
@@ -719,14 +727,60 @@ impl Handler<SetVolumeMsg> for Ws {
 	}
 }
 
-impl Handler<SetMuteMsg> for Ws {
-	type Result = ();
-	fn handle(&mut self, SetMuteMsg(mute): SetMuteMsg, ctx: &mut Self::Context) -> Self::Result {
-		if mute {
-			self.deactivate_audio(ctx);
+impl Handler<SetInputMutedMsg> for Ws {
+	type Result = Result<()>;
+	fn handle(&mut self, SetInputMutedMsg(new): SetInputMutedMsg, _: &mut Self::Context) -> Self::Result {
+		if let Some(con) = &mut self.connection {
+			let mut state = con.get_mut_state()?;
+			let own_client = state.own_client;
+			let old: bool = if let Some(own_client) = state.get_client(&own_client) {
+				own_client.input_muted
+			} else {
+				bail!("Failed to get own client");
+			};
+			state.set_input_muted(new.get_value(old))?;
 		} else {
-			self.activate_audio(ctx);
+			bail!("Connection does not exist");
 		}
+		Ok(())
+	}
+}
+
+impl Handler<SetOutputMutedMsg> for Ws {
+	type Result = Result<()>;
+	fn handle(&mut self, SetOutputMutedMsg(new): SetOutputMutedMsg, _: &mut Self::Context) -> Self::Result {
+		if let Some(con) = &mut self.connection {
+			let mut state = con.get_mut_state()?;
+			let own_client = state.own_client;
+			let old: bool = if let Some(own_client) = state.get_client(&own_client) {
+				own_client.output_muted
+			} else {
+				bail!("Failed to get own client");
+			};
+			state.set_output_muted(new.get_value(old))?;
+		} else {
+			bail!("Connection does not exist");
+		}
+		Ok(())
+	}
+}
+
+impl Handler<SetAwayMsg> for Ws {
+	type Result = Result<()>;
+	fn handle(&mut self, SetAwayMsg(new): SetAwayMsg, _: &mut Self::Context) -> Self::Result {
+		if let Some(con) = &mut self.connection {
+			let mut state = con.get_mut_state()?;
+			let own_client = state.own_client;
+			let old: bool = if let Some(own_client) = state.get_client(&own_client) {
+				own_client.away_message.is_some()
+			} else {
+				bail!("Failed to get own client");
+			};
+			state.set_away(if new.get_value(old) { Some("") } else { None })?;
+		} else {
+			bail!("Connection does not exist");
+		}
+		Ok(())
 	}
 }
 

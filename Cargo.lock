@@ -16,9 +16,9 @@ dependencies = [
  "futures",
  "lazy_static",
  "log 0.4.8",
- "parking_lot",
+ "parking_lot 0.10.2",
  "pin-project",
- "smallvec",
+ "smallvec 1.4.0",
  "tokio",
  "tokio-util 0.2.0",
  "trust-dns-proto 0.18.0-alpha.2",
@@ -173,7 +173,7 @@ dependencies = [
  "copyless",
  "futures-channel",
  "futures-util",
- "smallvec",
+ "smallvec 1.4.0",
  "tokio",
 ]
 
@@ -232,7 +232,7 @@ dependencies = [
  "lazy_static",
  "log 0.4.8",
  "num_cpus",
- "parking_lot",
+ "parking_lot 0.10.2",
  "threadpool",
 ]
 
@@ -1707,6 +1707,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8dd5a6d5999d9907cda8ed67bbd137d3af8085216c2ac62de5be860bd41f304a"
 
 [[package]]
+name = "livesplit-hotkey"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "619f989df7b9faeae8dbfb9bb585681efe1b5adce0fa46a95a208ac490230426"
+dependencies = [
+ "mio",
+ "parking_lot 0.8.0",
+ "promising-future",
+ "quick-error",
+ "serde",
+ "serde_derive",
+ "stdweb 0.3.0",
+ "winapi 0.3.9",
+ "x11-dl",
+]
+
+[[package]]
+name = "lock_api"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed946d4529956a20f2d63ebe1b69996d5a2137c91913fe3ebbeff957f5bca7ff"
+dependencies = [
+ "scopeguard",
+]
+
+[[package]]
 name = "lock_api"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2074,12 +2100,39 @@ dependencies = [
 
 [[package]]
 name = "parking_lot"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa7767817701cce701d5585b9c4db3cdd02086398322c1d7e8bf5094a96a2ce7"
+dependencies = [
+ "lock_api 0.2.0",
+ "parking_lot_core 0.5.0",
+ "rustc_version",
+]
+
+[[package]]
+name = "parking_lot"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3a704eb390aafdc107b0e392f56a82b668e3a71366993b5340f5833fd62505e"
 dependencies = [
- "lock_api",
- "parking_lot_core",
+ "lock_api 0.3.4",
+ "parking_lot_core 0.7.2",
+]
+
+[[package]]
+name = "parking_lot_core"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb88cb1cb3790baa6776844f968fea3be44956cf184fa1be5a03341f5491278c"
+dependencies = [
+ "cfg-if",
+ "cloudabi",
+ "libc",
+ "rand 0.6.5",
+ "redox_syscall",
+ "rustc_version",
+ "smallvec 0.6.13",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -2092,7 +2145,7 @@ dependencies = [
  "cloudabi",
  "libc",
  "redox_syscall",
- "smallvec",
+ "smallvec 1.4.0",
  "winapi 0.3.9",
 ]
 
@@ -2200,6 +2253,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "promising-future"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44ba461c1b8785e502867026d893fa52801faccfbfe59efdae7da4b9094b4ce2"
+dependencies = [
+ "threadpool",
+]
+
+[[package]]
 name = "pulldown-cmark"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2236,6 +2298,7 @@ dependencies = [
  "juniper",
  "lazy_static",
  "libsqlite3-sys",
+ "livesplit-hotkey",
  "log 0.4.8",
  "nom 5.1.2",
  "pulldown-cmark",
@@ -2920,6 +2983,15 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
+version = "0.6.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7b0758c52e15a8b5e3691eae6cc559f08eee9406e548a4477ba4e67770a82b6"
+dependencies = [
+ "maybe-uninit",
+]
+
+[[package]]
+name = "smallvec"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c7cb5678e1615754284ec264d9bb5b4c27d2018577fd90ac0ceb578591ed5ee4"
@@ -2962,6 +3034,16 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "stdweb"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b9c504d47623c911c70686c17a3321a3400942e57970d2a2959a7b3b2ade630"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "stdweb"
@@ -3220,7 +3302,7 @@ dependencies = [
  "libc",
  "serde",
  "standback",
- "stdweb",
+ "stdweb 0.4.20",
  "time-macros",
  "version_check 0.9.2",
  "winapi 0.3.9",
@@ -3364,7 +3446,7 @@ dependencies = [
  "lazy_static",
  "log 0.4.8",
  "rand 0.7.3",
- "smallvec",
+ "smallvec 1.4.0",
  "socket2",
  "tokio",
  "url",
@@ -3384,7 +3466,7 @@ dependencies = [
  "lazy_static",
  "log 0.4.8",
  "rand 0.7.3",
- "smallvec",
+ "smallvec 1.4.0",
  "thiserror",
  "tokio",
  "url",
@@ -3404,7 +3486,7 @@ dependencies = [
  "log 0.4.8",
  "lru-cache",
  "resolv-conf",
- "smallvec",
+ "smallvec 1.4.0",
  "tokio",
  "trust-dns-proto 0.18.0-alpha.2",
 ]
@@ -3423,7 +3505,7 @@ dependencies = [
  "log 0.4.8",
  "lru-cache",
  "resolv-conf",
- "smallvec",
+ "smallvec 1.4.0",
  "thiserror",
  "tokio",
  "trust-dns-proto 0.19.5",
@@ -3878,6 +3960,18 @@ checksum = "d59cefebd0c892fa2dd6de581e937301d8552cb44489cdff035c6187cb63fa5e"
 dependencies = [
  "winapi 0.2.8",
  "winapi-build",
+]
+
+[[package]]
+name = "x11-dl"
+version = "2.18.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2bf981e3a5b3301209754218f962052d4d9ee97e478f4d26d4a6eced34c1fef8"
+dependencies = [
+ "lazy_static",
+ "libc",
+ "maybe-uninit",
+ "pkg-config",
 ]
 
 [[package]]

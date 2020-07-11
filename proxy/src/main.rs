@@ -31,6 +31,7 @@ mod filecache;
 mod markdown;
 mod messages;
 mod secret;
+mod shortcut;
 mod websocket;
 
 use filecache::FileCache;
@@ -102,18 +103,27 @@ struct Settings {
 	/// 3. Print udp packets
 	#[serde(default)]
 	verbosity: u8,
+
+	shortcuts: shortcut::ShortcutConfig,
 }
 
-#[derive(Clone)]
 pub struct State {
 	logger: Logger,
 	/// The list of all currently existing connections
 	connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
 	audio_data: audio::AudioData,
+	shortcuts: shortcut::Shortcuts,
 	settings: Settings,
 	database: Addr<db::DbHandler>,
 	graphql_schema: Arc<db::graphql::Schema>,
 	secret: Secret,
+}
+
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, serde::Serialize, serde::Deserialize)]
+pub enum Tristate {
+	True,
+	False,
+	Toggle,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]
@@ -148,15 +158,26 @@ impl Default for Settings {
 			plugin_path: Default::default(),
 			default_identity: Default::default(),
 			verbosity: Default::default(),
+			shortcuts: Default::default(),
 		}
 	}
 }
 
 impl juniper::Context for State {}
 
+impl Tristate {
+	pub fn get_value(&self, old: bool) -> bool {
+		match self {
+			Tristate::True => true,
+			Tristate::False => false,
+			Tristate::Toggle => !old,
+		}
+	}
+}
+
 #[get("/con/{id}/ws")]
 async fn create_ws(
-	state: web::Data<State>, uuid: web::Path<Uuid>, options: web::Query<WsOptions>,
+	state: web::Data<Arc<State>>, uuid: web::Path<Uuid>, options: web::Query<WsOptions>,
 	req: HttpRequest, stream: web::Payload,
 ) -> impl Responder
 {
@@ -171,7 +192,7 @@ async fn create_ws(
 		);
 	}
 
-	let ws_con = Ws::new(state.logger.clone(), (*state).clone(), options.0, id);
+	let ws_con = Ws::new(state.logger.clone(), (**state).clone(), options.0, id);
 	match ws::start_with_addr(ws_con, &req, stream) {
 		Err(e) => {
 			error!(state.logger, "Failed to create websocket actor"; "error" => %e);
@@ -184,54 +205,18 @@ async fn create_ws(
 	}
 }
 
-#[post("/con/{id}/mute")]
-async fn mute(state: web::Data<State>, uuid: web::Path<Uuid>) -> impl Responder {
-	let cons = state.connections.lock().unwrap();
-	if uuid.is_nil() {
-		for c in cons.values() {
-			if let Err(e) = c.send(websocket::SetMuteMsg(true)).await {
-				error!(state.logger, "Failed to set mute state"; "error" => %e);
-				return HttpResponse::InternalServerError().body("Failed to set mute state");
-			}
-		}
+#[post("/shortcut")]
+async fn run_shortcut(state: web::Data<Arc<State>>, action: web::Json<shortcut::Action>) -> impl Responder {
+	if let Err(e) = action.run(&state).await {
+		error!(state.logger, "Failed to run action"; "action" => ?action, "error" => %e);
+		HttpResponse::InternalServerError()
 	} else {
-		let id = ConnectionId(*uuid);
-
-		if let Some(c) = cons.get(&id) {
-			if let Err(e) = c.send(websocket::SetMuteMsg(true)).await {
-				error!(state.logger, "Failed to set mute state"; "error" => %e);
-				return HttpResponse::InternalServerError().body("Failed to set mute state");
-			}
-		}
+		HttpResponse::Ok()
 	}
-	HttpResponse::Ok().finish()
-}
-
-#[post("/con/{id}/unmute")]
-async fn unmute(state: web::Data<State>, uuid: web::Path<Uuid>) -> impl Responder {
-	let cons = state.connections.lock().unwrap();
-	if uuid.is_nil() {
-		for c in cons.values() {
-			if let Err(e) = c.send(websocket::SetMuteMsg(false)).await {
-				error!(state.logger, "Failed to set mute state"; "error" => %e);
-				return HttpResponse::InternalServerError().body("Failed to set mute state");
-			}
-		}
-	} else {
-		let id = ConnectionId(*uuid);
-
-		if let Some(c) = cons.get(&id) {
-			if let Err(e) = c.send(websocket::SetMuteMsg(false)).await {
-				error!(state.logger, "Failed to set mute state"; "error" => %e);
-				return HttpResponse::InternalServerError().body("Failed to set mute state");
-			}
-		}
-	}
-	HttpResponse::Ok().finish()
 }
 
 #[post("/audio/reset")]
-async fn audio_reset(state: web::Data<State>) -> impl Responder {
+async fn audio_reset(state: web::Data<Arc<State>>) -> impl Responder {
 	if state.audio_data.a2ts.send(audio::audio_to_ts::ResetMsg).await.is_err() {
 		error!(state.logger, "Failed to reset audio pipeline");
 		HttpResponse::InternalServerError()
@@ -246,7 +231,7 @@ async fn audio_reset(state: web::Data<State>) -> impl Responder {
 }
 
 #[get("/plugins")]
-async fn list_plugins(state: web::Data<State>) -> impl Responder {
+async fn list_plugins(state: web::Data<Arc<State>>) -> impl Responder {
 	let path = &state.settings.plugin_path;
 	let mut res = Vec::new();
 	let dir = match path.read_dir() {
@@ -265,7 +250,7 @@ async fn list_plugins(state: web::Data<State>) -> impl Responder {
 }
 
 #[get("/plugins/{name}")]
-async fn get_plugin(state: web::Data<State>, data: web::Path<String>) -> impl Responder {
+async fn get_plugin(state: web::Data<Arc<State>>, data: web::Path<String>) -> impl Responder {
 	let path = state.settings.plugin_path.join(&*data);
 	fs::read_to_string(path)
 		.with_header(http::header::CONTENT_TYPE, "application/javascript; charset=utf-8")
@@ -273,7 +258,7 @@ async fn get_plugin(state: web::Data<State>, data: web::Path<String>) -> impl Re
 
 #[get("/con/{id}/file/{channel}/{path:.*}")]
 async fn download_file(
-	state: web::Data<State>, data: web::Path<(Uuid, u64, String)>,
+	state: web::Data<Arc<State>>, data: web::Path<(Uuid, u64, String)>,
 ) -> impl Responder {
 	let channel = ChannelId(data.1);
 	let cons = state.connections.lock().unwrap();
@@ -326,7 +311,7 @@ async fn download_file(
 /// Get a cached file by server id, channel and path.
 #[get("/filecache/{id}/{channel}/{path:.*}")]
 async fn download_cache_file(
-	state: web::Data<State>, data: web::Path<(String, u64, String)>,
+	state: web::Data<Arc<State>>, data: web::Path<(String, u64, String)>,
 ) -> impl Responder {
 	let server = match base64::decode(&data.0) {
 		Err(e) => {
@@ -428,12 +413,23 @@ async fn main() -> Result<()> {
 
 	// Start sound
 	let audio_data = audio::start(logger.clone(), connections.clone())?;
-
+	let shortcut_config = settings.shortcuts.clone();
+	let shortcuts = shortcut::Shortcuts::new(shortcut_config)?;
 	let addr = settings.listen_address.clone();
 
 	let graphql_schema = db::graphql::create_schema();
-	let state =
-		State { logger, connections, audio_data, settings, database, graphql_schema, secret };
+	let state = Arc::new(State {
+		logger,
+		connections,
+		audio_data,
+		shortcuts,
+		settings,
+		database,
+		graphql_schema,
+		secret,
+	});
+
+	state.shortcuts.apply_config(&state)?;
 
 	let state2 = state.clone();
 	HttpServer::new(move || {
@@ -443,8 +439,7 @@ async fn main() -> Result<()> {
 			.wrap(Cors::new().max_age(3600).finish())
 			.data(state)
 			.service(create_ws)
-			.service(mute)
-			.service(unmute)
+			.service(run_shortcut)
 			.service(audio_reset)
 			.service(list_plugins)
 			.service(get_plugin)
