@@ -7,7 +7,6 @@
 	import Icon from "../ui/Icon.svelte";
 	import BookmarkComp from "./Bookmark.svelte";
 	import { SERVER_ICON, CLIENT_ICON } from "../util";
-	import LoadableVirtualList from "../ui/LoadableVirtualList.svelte";
 
 	export let connection!: Connection;
 	let state = connection.state;

@@ -6,7 +6,6 @@
 	import { Chat, Message } from "./chat";
 	import Icon from "../ui/Icon.svelte";
 	import ClientIcon from "../ui/ClientIcon.svelte";
-	import LoadableVirtualList from "../ui/LoadableVirtualList.svelte";
 	import LazyList from "../ui/LazyList.svelte";
 	import { ListFetchDir, ILazyList } from "../ui/lazyList";
 	import { Connection } from "../connection";
