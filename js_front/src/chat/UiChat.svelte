@@ -30,7 +30,7 @@
 
 	chat.unreadCount.subscribe(_ => {
 		if (chatList)
-			chatList.sourceChanged(ListFetchDir.After);
+			chatList.sourceChanged(ListFetchDir.After, ListFetchDir.After);
 	});
 
 	function sendMessage(e: Event) {

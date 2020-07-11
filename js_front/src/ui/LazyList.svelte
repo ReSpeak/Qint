@@ -1,5 +1,5 @@
 <script lang="typescript">
-	import { sleep, assert, binarySearchBy, BinarySearchResult } from "../util";
+	import { sleep, assert, binarySearchByKey, BinarySearchResult, IArray } from "../util";
 	import { tick, onMount } from "svelte";
 	import { writable } from "svelte/store";
 	import * as svst from "svelte/store";
@@ -14,7 +14,7 @@
 	export let enableFetching: boolean = true;
 	let canLoadAfterEnd: boolean = true;
 	let canLoadBeforeStart: boolean = true;
-	let showJumpDown = true;
+	let isAtBottom = true;
 	let loadAnchored: ListFetchDir | undefined = undefined;
 
 	// the data elements held by this list
@@ -28,6 +28,7 @@
 	let minPxDistanceToRemove = 1500;
 	// The holding list element which has the scrollbar
 	let pan: HTMLElement;
+	let scrollPane: HTMLElement;
 	// Utility holder to calculate `scrollDiff`
 	let lastScrollPos: number = 0;
 	// In which direction and how far the content has scrolled since last check
@@ -42,6 +43,7 @@
 		elems = [];
 		canLoadAfterEnd = false;
 		canLoadBeforeStart = false;
+		isAtBottom = false;
 	}
 
 	export function sourceChanged(dir: ListFetchDir, anchor?: ListFetchDir) {
@@ -96,6 +98,7 @@
 		minPxDistanceToRemove > pxBeforeLoad,
 		"Distance to delete must be greater than distance to load"
 	);
+	assert(minItemsToRemove >= 1, "Minimum items to remove must be >=1");
 
 	// *** Private functions ***
 
@@ -125,7 +128,7 @@
 		scrollDiff = pan.scrollTop - lastScrollPos;
 		lastScrollPos = pan.scrollTop;
 
-		showJumpDown = canLoadAfterEnd || pan.scrollTop < pan.scrollHeight - pan.clientHeight;
+		isAtBottom = !canLoadAfterEnd && pan.scrollTop >= pan.scrollHeight - pan.clientHeight;
 
 		start_fill();
 	}
@@ -256,8 +259,7 @@
 	async function tryTrimEnd() {
 		if (elems.length <= minItemsToRemove) return;
 		await tick();
-
-		const childList = pan.querySelectorAll<HTMLElement>(".scrollPane > .lazyListElement");
+		const childList = (scrollPane.children as any) as IArray<HTMLElement>;
 		assert(childList.length === elems.length, "HTML node count does not match elements count");
 
 		const distFn = (e: HTMLElement) => {
@@ -265,20 +267,15 @@
 			const topStaticOffset = e.offsetTop - e.offsetHeight;
 			// The top of the element without our list (with scroll offset)
 			const topCurrentOffset = topStaticOffset - pan.scrollTop;
-			// The distance from the top of the element to the bottom of our list
-			const distFromBottom = topCurrentOffset - pan.offsetHeight;
-			// (Boolean) If the distance is further than our remove distance threshold.
-			// < 0 false | > 0 true
-			const diffToRemove = distFromBottom - minPxDistanceToRemove;
-			return diffToRemove;
+			return topCurrentOffset;
 		};
 
-		const res = binarySearchBy(childList, distFn, 0, childList.length - minItemsToRemove + 1);
-		const child = childList[res.index];
-		const dist = distFn(child);
-		console.log("tryTrimEnd", res, "would trim", child, "with dist", dist);
+		const removeDistance = pan.offsetHeight + minPxDistanceToRemove;
+		const removeIndex = childList.length - minItemsToRemove;
+		const res = binarySearchByKey(childList, removeDistance, distFn, 0, removeIndex + 1);
 
-		if (dist > 0) {
+		console.log("tryTrimEnd", res, res.index <= removeIndex);
+		if (res.index <= removeIndex) {
 			// modification is at the end => safe
 			elems = elems.slice(0, res.index);
 			canLoadAfterEnd = true;
@@ -292,7 +289,7 @@
 	async function tryTrimStart() {
 		if (elems.length <= minItemsToRemove) return;
 		await tick();
-		let childList = pan.querySelectorAll<HTMLElement>(".scrollPane > .lazyListElement");
+		const childList = (scrollPane.children as any) as IArray<HTMLElement>;
 		assert(childList.length === elems.length, "HTML node count does not match elements count");
 
 		const distFn = (e: HTMLElement) => {
@@ -300,22 +297,23 @@
 			const bottomStaticOffset = e.offsetTop;
 			// The top of the element without our list (with scroll offset)
 			const bottomCurrentOffset = bottomStaticOffset - pan.scrollTop;
-			// The distance from bottom of the element to the top of our list
-			const distFromTop = 0 - bottomCurrentOffset;
-			// (Boolean) If the distance is further than our remove distance threshold.
-			// < 0 false | > 0 true
-			const diffToRemove = minPxDistanceToRemove - distFromTop;
-			return diffToRemove;
+			return bottomCurrentOffset;
 		};
 
-		const res = binarySearchBy(childList, distFn, minItemsToRemove - 1, undefined);
-		const child = childList[res.index];
-		const dist = distFn(child);
-		console.log("tryTrimStart", res, "would trim", child, "with dist", dist);
+		const res = binarySearchByKey(
+			childList,
+			-minPxDistanceToRemove,
+			distFn,
+			minItemsToRemove - 1,
+			undefined
+		);
 
-		if (dist > 0) {
+		console.log("tryTrimStart", res, res.index >= minItemsToRemove);
+		// We are trimming index-1 since the result item is the first element
+		// that is _smaller_ than our threshold distance.
+		if (res.index >= minItemsToRemove) {
 			// mofification at start => helper
-			await modifyElems(elems.slice(res.index));
+			await modifyElems(elems.slice(res.index - 1));
 			canLoadBeforeStart = true;
 		}
 	}
@@ -362,15 +360,22 @@
 <svelte:options accessors />
 <div class="lazyList">
 	<div class="lazyListView" bind:this="{pan}" on:scroll="{handle_scroll}">
-		<div class="scrollPane">
+		<div class="scrollPane" bind:this="{scrollPane}">
 			{#each elems as item (item)}
 				<div class="lazyListElement">
 					<slot {item} />
 				</div>
 			{/each}
 		</div>
+		{#if loadAnchored === ListFetchDir.After}
+			<div id="anchor"></div>
+		{/if}
 	</div>
-	<button class="arrow-down" class:showJumpDown on:click="{() => jumpTo(ListFetchDir.After)}">
+	<button
+		class="arrow-down"
+		class:showJumpDown="{!isAtBottom}"
+		on:click="{() => jumpTo(ListFetchDir.After)}"
+	>
 		<div></div>
 	</button>
 </div>
@@ -385,6 +390,10 @@
 		overflow-x: hidden;
 		overflow-y: scroll;
 		height: 100%;
+		* {
+			/* don't allow the children of the scrollable element to be selected as an anchor node */
+			overflow-anchor: none;
+		}
 	}
 
 	// Jump start end buttons
@@ -429,5 +438,15 @@
 
 	.arrow-up > div {
 		transform: rotate(45deg) translate(20%, 20%);
+	}
+
+	// Anchoring
+	// See: https://blog.eqrion.net/pin-to-bottom/
+
+	#anchor {
+		/* allow the final child to be selected as an anchor node */
+		overflow-anchor: auto;
+		/* anchor nodes are required to have non-zero area */
+		height: 1px;
 	}
 </style>
