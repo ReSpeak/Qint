@@ -69,7 +69,7 @@ export class Connection {
 		this.socket = new WebSocket(`ws${path}/con/${this.guid}/ws?format=Json`);
 		this.socket.onopen = () => {
 			let version;
-			let platform = ((window.navigator as any).oscpu || window.navigator.userAgent).toLowerCase();
+			let platform = ((window.navigator as any).oscpu ?? window.navigator.userAgent).toLowerCase();
 			if (platform.includes("windows")) {
 				version = "Windows_3_X_X__1";
 			} else if (platform.includes("linux")) {
@@ -190,7 +190,7 @@ export class Connection {
 			this.book.talkersHandler(msg.TalkersChanged);
 		} else if ("Error" in msg) {
 			console.warn("Con Error:", msg.Error);
-			if (get(this.state) == ConnectionState.Connecting) {
+			if (get(this.state) === ConnectionState.Connecting) {
 				if (this.socket)
 					this.socket.close();
 				this.error.set(msg.Error);

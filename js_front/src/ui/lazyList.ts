@@ -7,4 +7,15 @@ export enum ListFetchDir {
 	New,
 }
 
-export const ListEmpty = {};
+export interface FetchResult<T> {
+	items: T[];
+	/** true if there are no more elements before the returned items */
+	canLoadBeforeStart: boolean;
+	/** true if there are no more elements after the returned items */
+	canLoadAfterEnd: boolean;
+}
+
+export interface ILazyList {
+	clear(): void;
+	sourceChanged(dir: ListFetchDir, anchor?: ListFetchDir): void;
+}

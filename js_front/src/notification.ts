@@ -6,9 +6,9 @@ type NotificationArg = Book | Channel | Client | Invoker | Server | string;
 
 class TsNotification {
 	constructor(
-		/// The string pieces
+		/** The string pieces */
 		public pieces: TemplateStringsArray,
-		/// The dynamically formatted pieces. Every arg is preceded by a string piece.
+		/** The dynamically formatted pieces. Every arg is preceded by a string piece. */
 		public args: NotificationArg[],
 	) {}
 
@@ -97,7 +97,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 
 		if (msg === "ChannelListFinished") {
 		} else if ("Message" in msg) {
-			const longMessage = msg.Message.message.length > 20 || msg.Message.message.length == 0 || msg.Message.message.includes("//");
+			const longMessage = msg.Message.message.length > 20 || msg.Message.message.length === 0 || msg.Message.message.includes("//");
 			if (msg.Message.target !== "Server" && msg.Message.target !== "Channel" && "Poke" in msg.Message.target) {
 				if (longMessage)
 					handler(con, msg, notif`${msg.Message.invoker} poked you`);
@@ -113,7 +113,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 			if ("PropertyAdded" in msg) {
 				const invoker = msg.PropertyAdded.invoker;
 				if ("Channel" in msg.PropertyAdded.prop) {
-					if (con.getState() == ConnectionState.ChannelListFinished) {
+					if (con.getState() === ConnectionState.ChannelListFinished) {
 					}
 				} else if ("Client" in msg.PropertyAdded.prop) {
 					const reason = msg.PropertyAdded.extra.reason;
@@ -173,7 +173,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 							} else {
 								if (channel.id === ownChannelId)
 									handler(con, msg, notif`${client} joined`);
-								else if (client.channel == ownChannelId)
+								else if (client.channel === ownChannelId)
 									handler(con, msg, notif`${client} left to ${channel}`);
 								else
 									handler(con, msg, notif`${client} switched to ${channel}`);
@@ -190,7 +190,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 										handler(con, msg, notif`${client} was moved in by ${invoker}`);
 									else
 										handler(con, msg, notif`${client} was moved in`);
-								} else if (client.channel == ownChannelId) {
+								} else if (client.channel === ownChannelId) {
 									if (invoker !== null)
 										handler(con, msg, notif`${client} was moved out to ${channel} by ${invoker}`);
 									else
@@ -214,7 +214,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 										handler(con, msg, notif`${client} was kicked in by ${invoker}`);
 									else
 										handler(con, msg, notif`${client} was kicked in`);
-								} else if (client.channel == ownChannelId) {
+								} else if (client.channel === ownChannelId) {
 									if (invoker !== null)
 										handler(con, msg, notif`${client} was kicked out to ${con.book.getChannel(client.channel)!} by ${invoker}`);
 									else

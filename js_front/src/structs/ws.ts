@@ -1,4 +1,3 @@
-import { Client, Channel, Server } from "../tree/book";
 // tslint:disable: interface-name
 
 export type WsMessageTarget =
@@ -69,7 +68,7 @@ interface InDisconnectedTemporarily {
 	DisconnectedTemporarily: null;
 }
 
-/// Internal event, not sent over the websocket
+/** NOTE: Internal event, not sent over the websocket */
 interface InDisconnected {
 	Disconnected: null;
 }

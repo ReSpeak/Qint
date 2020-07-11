@@ -540,15 +540,14 @@ impl DbHandler {
 						};
 
 						if let Err(e) = r {
-							error!(logger, "Failed to handle event for database"; "error" => ?e);
+							error!(logger, "Failed to handle event for database"; "error" => %e);
 						}
 					}
 				}
 			}
 
 			if let Err(e) = r {
-				error!(logger, "Failed to handle event for database";
-					"error" => ?e);
+				error!(logger, "Failed to handle event for database"; "error" => %e);
 			}
 		}
 		Ok(())
@@ -577,10 +576,10 @@ impl<'a> EventHandler<'a> {
 		let logger = self.logger.clone();
 		actix::spawn(self.db.send(RunMsg(Box::new(f))).map(move |r| match r {
 			Err(e) => {
-				error!(logger, "Failed to send to database"; "error" => ?e);
+				error!(logger, "Failed to send to database"; "error" => %e);
 			}
 			Ok(Err(e)) => {
-				error!(logger, "Failed to write to database"; "error" => ?e);
+				error!(logger, "Failed to write to database"; "error" => %e);
 			}
 			_ => {}
 		}))

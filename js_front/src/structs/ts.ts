@@ -1,5 +1,6 @@
 import { get } from "svelte/store";
 import { Connection } from "../connection";
+import { WsMessageTarget } from "./ws";
 
 export type MessageTarget =
 	{ Server: null}
@@ -35,12 +36,26 @@ export const MessageTarget = {
 		}
 	},
 
+	toWs(target: MessageTarget): WsMessageTarget {
+		if ("Server" in target) {
+			return "Server";
+		} else if ("Channel" in target) {
+			return "Channel";
+		} else if ("Client" in target) {
+			return { Client: target.Client };
+		} else if ("Poke" in target) {
+			return { Poke: target.Poke };
+		} else {
+			throw "Invalid message target type";
+		}
+	},
+
 	getId(target: MessageTarget, connection: Connection): string | undefined {
 		if ("Channel" in target) {
-			return target.Channel ? target.Channel.toString() : undefined;
+			return target.Channel.toString();
 		} else if ("Client" in target) {
 			// TODO Should be uid
-			const uid = get(connection.book.clients).get(target.Client).uid;
+			const uid = get(connection.book.clients).get(target.Client)?.uid ?? [];
 			let uidStr = "";
 			uid.forEach((c: number) => {
 				uidStr += String.fromCharCode(c);

@@ -52,4 +52,12 @@
 		border-bottom: solid 1px $border;
 		background: $background;
 	}
+
+	:global(.update-flash) {
+		color: rgba(255,62,0,1) !important;
+		background-color: rgba(255,62,0,0.2) !important;
+	}
+	:global(.update-flash-fade) {
+		transition: color 1s, background 1s;
+	}
 </style>

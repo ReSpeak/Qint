@@ -57,7 +57,7 @@
 		let awayFromBorder;
 		if (atStart && isAtStart) {
 			isAtStart = false;
-			awayFromBorder = viewport.scrollTop == 0;
+			awayFromBorder = viewport.scrollTop === 0;
 		} else if (!atStart && isAtEnd) {
 			isAtEnd = false;
 			awayFromBorder = viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop;
@@ -70,7 +70,7 @@
 		}
 
 		await loadData();
-		if (awayFromBorder == 0) {
+		if (awayFromBorder === 0) {
 			if (atStart)
 				viewport.scrollTo(0, 0);
 			else
@@ -147,7 +147,7 @@
 		const cs = rows[i].children;
 		for (let j = 0; j < cs.length; j++) {
 			const c = cs[j];
-			if (t == -1 || (c.offsetTop != 0 && c.offsetTop < t)) {
+			if (t === -1 || (c.offsetTop !== 0 && c.offsetTop < t)) {
 				t = c.offsetTop;
 			}
 		}
@@ -158,8 +158,8 @@
 		if (!viewport)
 			return;
 		// Show or hide return button
-		if ((viewport.scrollTop < lastScrollTop) == startIsTop
-			&& viewport.scrollTop != 0 && viewport.scrollHeight - viewport.scrollTop != viewport.clientHeight) {
+		if ((viewport.scrollTop < lastScrollTop) === startIsTop
+			&& viewport.scrollTop !== 0 && viewport.scrollHeight - viewport.scrollTop !== viewport.clientHeight) {
 			arrowHidden = false;
 		} else {
 			arrowHidden = true;
@@ -172,7 +172,7 @@
 
 		await loadData();
 
-		if (rows.length != items.length) {
+		if (rows.length !== items.length) {
 			console.error("Should have the same amount of rows as items", rows, items);
 			return;
 		}
@@ -191,8 +191,8 @@
 		}
 
 		const start = i;
-		if (start == rows.length) {
-			if (start != 0)
+		if (start === rows.length) {
+			if (start !== 0)
 				clear();
 			return;
 		}
@@ -201,7 +201,7 @@
 			isAtStart = false;
 		if (end < rows.length)
 			isAtEnd = false;
-		if (start != 0 || end != rows.length) {
+		if (start !== 0 || end !== rows.length) {
 			console.log("slice", start, end, rows.length);
 			items = items.slice(start, end);
 		}*/
