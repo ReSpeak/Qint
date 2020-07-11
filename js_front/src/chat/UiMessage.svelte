@@ -2,14 +2,14 @@
 	import { hljsHighlight } from "./hljs";
 	import katex from "katex";
 	import { afterUpdate, onMount } from "svelte";
-	import { flash, wrap_async } from "../util";
+	import { flash } from "../util";
 	import Icon from "../ui/Icon.svelte";
 
 	export let message;
 
 	let viewRaw = false;
 	let rendered;
-	let renderTask = wrap_async(() => rendered.appendChild(render(message.rendered)));
+	$: renderedObj = render(message.rendered);
 
 	function render(html) {
 		var obj = document.createElement("div");
@@ -46,8 +46,8 @@
 	});
 
 	onMount(() => {
-		//rendered.innerHTML = "";
-		//rendered.appendChild(renderedObj);
+		rendered.innerHTML = "";
+		rendered.appendChild(renderedObj);
 	});
 </script>
 
