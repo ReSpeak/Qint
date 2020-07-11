@@ -1,23 +1,21 @@
-<script>
-	import { onMount } from 'svelte';
+<script lang="typescript">
+	import { onMount } from "svelte";
 	import { get, writable } from "svelte/store";
 	import { Bookmark } from "./bookmark";
 	import self from "./connect";
-	import { ConnectionState } from "../connection";
+	import { ConnectionState, Connection } from "../connection";
 	import Icon from "../ui/Icon.svelte";
 	import BookmarkComp from "./Bookmark.svelte";
 	import { SERVER_ICON, CLIENT_ICON } from "../util";
 	import LoadableVirtualList from "../ui/LoadableVirtualList.svelte";
 
-	export let connection;
+	export let connection!: Connection;
 	let state = connection.state;
 	let error = connection.error;
 	let data = new self(connection);
 	let username = writable(data.username);
 	let address = writable(data.address);
-	let bookmarks;
-	let bookmarkError;
-	let usernameInput;
+	let usernameInput!: HTMLInputElement;
 
 	function onConnect() {
 		if (get(state) === ConnectionState.Disconnected) {
@@ -29,15 +27,15 @@
 		}
 	}
 
-	async function loadBookmarks(fromStart) {
-		if (bookmarks.length === 0) {
-			// That's not dynamic, but we currently have no pagination
-			try {
-				return await Bookmark.get();
-			} catch (err) {
-				console.error("Failed to load bookmarks", err);
-				bookmarkError = err;
-			}
+	async function loadBookmarks() {
+		// That's not dynamic, but we currently have no pagination
+		try {
+			throw new Error("error");
+			
+			return await Bookmark.get();
+		} catch (err) {
+			console.error("Failed to load bookmarks", err);
+			throw err;
 		}
 	}
 
@@ -62,35 +60,37 @@
 		<article class="connect-error message is-danger">
 			<div class="message-header">
 				<p>Error</p>
-				<button class="delete" aria-label="delete" on:click={() => error.set(undefined)}></button>
+				<button
+					class="delete"
+					aria-label="delete"
+					on:click="{() => error.set(undefined)}"
+				></button>
 			</div>
-			<div class="message-body">
-				{$error}
-			</div>
+			<div class="message-body">{$error}</div>
 		</article>
 	{/if}
 	<div class="inner-connect-container">
 		<div class="connect-blur"></div>
-		<form class="connect-form" on:submit|preventDefault={onConnect}>
+		<form class="connect-form" on:submit|preventDefault="{onConnect}">
 			<div>
 				<p class="control has-icons-left">
 					<input
-						bind:this={usernameInput}
-						bind:value={$username}
+						bind:this="{usernameInput}"
+						bind:value="{$username}"
 						name="username"
 						id="username"
 						class="input"
 						type="text"
 						placeholder="Username"
-						disabled={$state !== ConnectionState.Disconnected}
+						disabled="{$state !== ConnectionState.Disconnected}"
 					/>
-					<Icon name={CLIENT_ICON} is_left />
+					<Icon name="{CLIENT_ICON}" is_left />
 				</p>
 			</div>
 			<div>
 				<p class="control has-icons-left">
 					<input
-						bind:value={$address}
+						bind:value="{$address}"
 						name="server"
 						id="server"
 						class="input"
@@ -98,17 +98,17 @@
 						placeholder="Server"
 						disabled="{$state !== ConnectionState.Disconnected}"
 					/>
-					<Icon name={SERVER_ICON} is_left />
+					<Icon name="{SERVER_ICON}" is_left />
 				</p>
 			</div>
 			<div>
 				<button class="button is-primary" name="connect" type="submit">
-				{#if $state === ConnectionState.Disconnected}
-					Connect
-				{:else}
-					<div class="loader"></div>
-					Cancel
-				{/if}
+					{#if $state === ConnectionState.Disconnected}
+						Connect
+					{:else}
+						<div class="loader"></div>
+						Cancel
+					{/if}
 				</button>
 			</div>
 		</form>
@@ -117,23 +117,31 @@
 	<div class="bookmark-container">
 		<div class="bookmark-blur"></div>
 		<div class="bookmark-list">
-			{#if bookmarkError}
-				<div>
+			<div>
+				{#await loadBookmarks()}
+					<div>Loading…</div>
+				{:then bookmarks}
+					<div class="viewContainer">
+						<div class="scollPane">
+							{#each bookmarks as item}
+								<BookmarkComp
+									connect="{data}"
+									{username}
+									{address}
+									bookmark="{item}"
+								/>
+							{/each}
+						</div>
+					</div>
+				{:catch bookmarkError}
 					<article class="message is-danger">
 						<div class="message-header">
 							<p>Error</p>
 						</div>
-						<div class="message-body">
-							Failed to fetch bookmarks, is Qint running?
-						</div>
+						<div class="message-body">Failed to fetch bookmarks, is Qint running?</div>
 					</article>
-				</div>
-			{:else}
-				<LoadableVirtualList bind:items={bookmarks} loadMore={loadBookmarks} let:item>
-					<div slot="loading" class="loader"></div>
-					<BookmarkComp connect={data} {username} {address} bookmark={item}/>
-				</LoadableVirtualList>
-			{/if}
+				{/await}
+			</div>
 		</div>
 	</div>
 </div>
@@ -224,7 +232,6 @@
 		margin: auto auto;
 	}
 
-
 	.bookmark-container {
 		max-width: 100%;
 		width: 40em;
@@ -258,22 +265,46 @@
 		box-shadow: 0 0.3em 0.3em #0005;
 	}
 
-	.bookmark-list :global(svelte-virtual-list), .bookmark-list > div {
+	.bookmark-list .viewContainer,
+	.bookmark-list > div {
 		border-radius: 0 0 0.4em 0.4em;
 		box-shadow: 0 0.3em 0.3em #0005;
 	}
 
 	// TODO the error message is broken (start without proxy running)
-	.bookmark-list :global(svelte-virtual-list-viewport), .bookmark-list .message {
+	.bookmark-list .scollPane,
+	.bookmark-list .message {
 		background-color: change-color($background, $alpha: 0.7);
 		min-height: 30vh;
 		max-height: 50vh;
 		padding: 0.5em;
 	}
 
+	.message {
+		position: relative;
+		background-color: change-color($background, $alpha: 0.7);
+	}
+
+	.message-body {
+		position: relative;
+		background-color: #fff;
+	}
+
 	@media (min-width: 35em) {
-		.bookmark-list :global(svelte-virtual-list-viewport), .bookmark-list .message {
+		.bookmark-list .scollPane,
+		.bookmark-list .message {
 			padding: 1em 8em 4em 8em;
 		}
+	}
+
+	.viewContainer {
+		display: block;
+		position: relative;
+		overflow-y: hidden;
+	}
+
+	.scollPane {
+		position: relative;
+		overflow-y: auto;
 	}
 </style>

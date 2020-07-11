@@ -9,6 +9,7 @@ export class Bookmark {
 	public bookmark: boolean | undefined;
 	public lastUsed: Moment | undefined;
 	public server: any;
+	public data: any;
 
 	constructor(content: any) {
 		Object.assign(this, content);
