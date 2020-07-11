@@ -172,8 +172,9 @@ export class Book {
 		this.clients.update(clients => {
 			if (clients.has(client.id)) throw Error(`Client ${client.id} already exists`);
 			clients.set(client.id, client);
-			let parent: ITreeParent = get(this.channels).get(client.channel);
-			parent.children.update(pch => Book.addClientSorted(pch, client));
+			let parent: ITreeParent | undefined = get(this.channels).get(client.channel);
+			if (parent !== undefined)
+				parent.children.update(pch => Book.addClientSorted(pch, client));
 			return clients;
 		});
 	}
