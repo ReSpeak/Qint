@@ -9,4 +9,4 @@ exclude = ["frontend"]
 debug = true
 
 [patch.crates-io]
-rnnoise-c = { git = "https://github.com/Flakebi/rnnoise-c" }
+nnnoiseless = { git = "https://github.com/Flakebi/rnnoise", branch = "nnnoiseless" }

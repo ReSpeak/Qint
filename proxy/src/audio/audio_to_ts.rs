@@ -5,7 +5,7 @@ use actix::*;
 use anyhow::{format_err, Result};
 use audiopus::coder::Encoder;
 use futures::prelude::*;
-use rnnoise_c::DenoiseState;
+use nnnoiseless::DenoiseState;
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired, AudioStatus};
 use sdl2::AudioSubsystem;
 use slog::{debug, error, o, trace, warn, Logger};
@@ -43,7 +43,8 @@ struct SdlCallback {
 	logger: Logger,
 	channels: audiopus::Channels,
 	encoder: Option<Encoder>,
-	denoise: DenoiseState,
+	denoise: Box<DenoiseState>,
+	denoise_buffer: [f32; DenoiseState::FRAME_SIZE],
 	opus_output: [u8; MAX_OPUS_FRAME_SIZE],
 	/// The last captured buffer if we are not talking.
 	///
@@ -244,6 +245,7 @@ impl SdlCallback {
 			channels,
 			encoder: None,
 			denoise: DenoiseState::new(),
+			denoise_buffer: [0.0; DenoiseState::FRAME_SIZE],
 			opus_output: [0; MAX_OPUS_FRAME_SIZE],
 			last_buffer: Default::default(),
 			is_talking: 0,
@@ -276,7 +278,7 @@ impl AudioCallback for SdlCallback {
 		let did_talk = self.is_talking != 0;
 		let should_talk;
 		// Denoise
-		if buffer.len() % rnnoise_c::FRAME_SIZE != 0 {
+		if buffer.len() % DenoiseState::FRAME_SIZE != 0 {
 			warn!(self.logger, "Size not fitting for denoising");
 			should_talk = true;
 		} else {
@@ -286,10 +288,11 @@ impl AudioCallback for SdlCallback {
 			}
 
 			let mut vad_probe = 0.0;
-			for i in buffer.chunks_mut(rnnoise_c::FRAME_SIZE) {
-				vad_probe += self.denoise.process_frame_in_place(i);
+			for i in buffer.chunks_mut(DenoiseState::FRAME_SIZE) {
+				vad_probe += self.denoise.process_frame(&mut self.denoise_buffer, i);
+				i.copy_from_slice(&self.denoise_buffer);
 			}
-			vad_probe /= (buffer.len() / rnnoise_c::FRAME_SIZE) as f32;
+			vad_probe /= (buffer.len() / DenoiseState::FRAME_SIZE) as f32;
 
 			trace!(self.logger, "Vad probe"; "value" => vad_probe);
 
