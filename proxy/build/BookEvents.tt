@@ -33,18 +33,18 @@ fn convert_value(_fmt: &mut fmt::Formatter, name: &str, ids: &str, structs: &[St
 		PropertyId::<#= struc.name #><#= ids #> => if let PropertyValueRef::<#= struc.name #>(val) = p {
 			Some(JsProperty::<#= name #>(Js<#= name #> {
 		<# for p in get_all_properties(structs, parts) {
-			if p.modifier.is_none() && struc.properties.iter().any(|prop| prop.name == p.name) { #>
+			if struc.properties.iter().any(|prop| prop.name == p.name) { #>
 				<#= p.name.to_snake_case() #>: Some({
 					<# let owned = get_to_owned(p);
 					if owned == "val" { #>
-					val.<#= p.name.to_snake_case() #>
+					val.<#= p.name.to_snake_case() #><# if p.modifier.is_some() { #>.clone()<# } #>
 					<# } else { #>
 					let val = &val.<#= p.name.to_snake_case() #>;
 					<#= owned #>
 					<# } #>
 				}),
 			<# }
-			} #>
+		} #>
 				.. Default::default()
 			}))
 		} else {
