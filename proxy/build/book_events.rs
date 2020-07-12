@@ -4,7 +4,6 @@ use std::ops::Deref;
 use heck::*;
 use t4rust_derive::Template;
 use tsproto_structs::book::*;
-use tsproto_structs::convert_type;
 use tsproto_structs::messages_to_book::{self, MessagesToBookDeclarations};
 
 #[derive(Template)]
@@ -19,11 +18,6 @@ impl Deref for BookEvents<'_> {
 
 impl Default for BookEvents<'static> {
 	fn default() -> Self { BookEvents(&DATA, &messages_to_book::DATA) }
-}
-
-fn get_rust_type(p: &Property) -> String {
-	let res = convert_type(&p.type_s, false);
-	if p.opt { format!("Option<{}>", res) } else { res }
 }
 
 fn get_properties<'a>(structs: &'a [Struct], s: &'a Struct) -> Vec<&'a Property> {

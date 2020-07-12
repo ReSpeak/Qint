@@ -20,7 +20,7 @@ use tsclientlib::{
 use tsproto::resend::PacketId;
 use tsproto_packets::packets::{AudioData, OutPacket};
 
-use crate::book_events::{JsEvent, JsProperty, JsPropertyId};
+use crate::book_events::{JsClient, JsEvent, JsProperty, JsPropertyId};
 use crate::db::{ChatId, ChatType};
 use crate::messages::{self, MessageF2P, MessageP2F};
 use crate::{audio, book_events, db, ConnectionId, State, Tristate, WsFormat, WsOptions};
@@ -406,7 +406,7 @@ impl Ws {
 										error!(self.logger, "Failed to get state"; "error" => %e);
 									}
 									Ok(mut state) => {
-										if let JsProperty::Client { channel, input_muted, output_muted, away_message, .. } = prop {
+										if let JsProperty::Client( JsClient { channel, input_muted, output_muted, away_message, .. }) = prop {
 											if let JsPropertyId::Client(client_id) = id {
 												let mut changed = false;
 												if let Some(input_muted) = input_muted {

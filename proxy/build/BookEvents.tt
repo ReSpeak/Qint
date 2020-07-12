@@ -4,8 +4,8 @@ use std::fmt;
 
 fn get_props(_fmt: &mut fmt::Formatter, structs: &[Struct], parts: &[&str]) -> fmt::Result {
 	for p in get_all_properties(structs, parts) { #>
-		#[serde(default, deserialize_with = "deserialize_some", skip_serializing_if = "Option::is_none")]
-		<#= p.name.to_snake_case() #>: Option<<#= get_rust_type(p) #>>,
+	#[serde(default, deserialize_with = "deserialize_some", skip_serializing_if = "Option::is_none")]
+	pub <#= p.name.to_snake_case() #>: Option<<#= p.get_rust_type(false) #>>,
 	<# }
 	Ok(())
 }
@@ -31,40 +31,38 @@ fn convert_value(_fmt: &mut fmt::Formatter, name: &str, ids: &str, structs: &[St
 			continue;
 		} #>
 		PropertyId::<#= struc.name #><#= ids #> => if let PropertyValueRef::<#= struc.name #>(val) = p {
-			Some(JsProperty::<#= name #> {
+			Some(JsProperty::<#= name #>(Js<#= name #> {
 		<# for p in get_all_properties(structs, parts) {
 			if p.modifier.is_none() && struc.properties.iter().any(|prop| prop.name == p.name) { #>
-			<#= p.name.to_snake_case() #>: Some({
-				<# let owned = get_to_owned(p);
-				if owned == "val" { #>
-				val.<#= p.name.to_snake_case() #>
-				<# } else { #>
-				let val = &val.<#= p.name.to_snake_case() #>;
-				<#= owned #>
-				<# } #>
-			}),
-			<# } else { #>
-			<#= p.name.to_snake_case() #>: None,
+				<#= p.name.to_snake_case() #>: Some({
+					<# let owned = get_to_owned(p);
+					if owned == "val" { #>
+					val.<#= p.name.to_snake_case() #>
+					<# } else { #>
+					let val = &val.<#= p.name.to_snake_case() #>;
+					<#= owned #>
+					<# } #>
+				}),
 			<# }
 			} #>
-			})
+				.. Default::default()
+			}))
 		} else {
 			panic!("Got wrong PropertyValue type, expected <#= name #>");
 		},
 		<# for prop in get_properties(structs, struc) {
 			if prop.modifier.is_none() {
-				let type_s = get_rust_type(prop).replace('<', "_").replace('>', "").to_camel_case();
+				let type_s = prop.get_rust_type(false).replace('<', "_").replace('>', "").to_camel_case();
 				#>
 		PropertyId::<#= struc.name #><#= prop.get_name() #><#= ids #> => if let PropertyValueRef::<#= type_s #>(val) = p {
-			Some(JsProperty::<#= name #> {
+			Some(JsProperty::<#= name #>(Js<#= name #> {
 		<# for p in get_all_properties(structs, parts) {
 			if prop.name == p.name { #>
-			<#= p.name.to_snake_case() #>: Some(<#= get_to_owned(p) #>),
-			<# } else { #>
-			<#= p.name.to_snake_case() #>: None,
+				<#= p.name.to_snake_case() #>: Some(<#= get_to_owned(p) #>),
 			<# }
 			} #>
-			})
+				.. Default::default()
+			}))
 		} else {
 			panic!("Got wrong PropertyValue type, expected <#= type_s #>");
 		},
@@ -75,17 +73,26 @@ fn convert_value(_fmt: &mut fmt::Formatter, name: &str, ids: &str, structs: &[St
 }
 
 #>
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct JsChannel {
+<# get_props(_fmt, &self.structs, &["Channel", "OptionalChannelData"])?; #>
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct JsClient {
+<# get_props(_fmt, &self.structs, &["Client", "OptionalClientData", "ConnectionClientData"])?; #>
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct JsServer {
+<# get_props(_fmt, &self.structs, &["Server", "OptionalServerData", "ConnectionServerData"])?; #>
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum JsProperty {
-	Channel {
-<# get_props(_fmt, &self.structs, &["Channel", "OptionalChannelData"])?; #>
-	},
-	Client {
-<# get_props(_fmt, &self.structs, &["Client", "OptionalClientData", "ConnectionClientData"])?; #>
-	},
-	Server {
-<# get_props(_fmt, &self.structs, &["Server", "OptionalServerData", "ConnectionServerData"])?; #>
-	},
+	Channel(JsChannel),
+	Client(JsClient),
+	Server(JsServer),
 }
 
 pub fn convert_event(con: &Connection, e: &Event) -> Option<JsEvent> {
