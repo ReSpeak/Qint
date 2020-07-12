@@ -7,9 +7,15 @@ use imp::*;
 
 pub use imp::Shortcuts;
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Shortcut {
+	keycode: KeyCode,
+	action: Action,
+}
+
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ShortcutConfig {
-	actions: HashMap<KeyCode, Action>,
+	actions: Vec<Shortcut>,
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, serde::Serialize, serde::Deserialize)]
@@ -19,27 +25,22 @@ pub enum Action {
 	OutputMute(Tristate),
 }
 
+async fn h<T: Clone + Send + 'static>(state: &crate::State, t: T) -> Result<()>
+	where websocket::Ws: actix::Handler<T>, T: actix::Message<Result = Result<()>>
+{
+	let cons = state.connections.lock().unwrap().values().cloned().collect::<Vec<_>>();
+	for c in cons {
+		c.send(t.clone()).await??;
+	}
+	Ok(())
+}
+
 impl Action {
 	pub async fn run(&self, state: &crate::State) -> Result<()> {
 		match self {
-			Self::InputMute(b) => {
-				let cons = state.connections.lock().unwrap();
-				for c in cons.values() {
-					c.send(websocket::SetInputMutedMsg(*b)).await??;
-				}
-			}
-			Self::OutputMute(b) => {
-				let cons = state.connections.lock().unwrap();
-				for c in cons.values() {
-					c.send(websocket::SetOutputMutedMsg(*b)).await??;
-				}
-			}
-			Self::Away(b) => {
-				let cons = state.connections.lock().unwrap();
-				for c in cons.values() {
-					c.send(websocket::SetAwayMsg(*b)).await??;
-				}
-			}
+			Self::InputMute(b) => h(state, websocket::SetInputMutedMsg(*b)).await?,
+			Self::OutputMute(b) => h(state, websocket::SetOutputMutedMsg(*b)).await?,
+			Self::Away(b) => h(state, websocket::SetAwayMsg(*b)).await?,
 		}
 		Ok(())
 	}
@@ -48,16 +49,17 @@ impl Action {
 #[cfg(windows)]
 mod imp {
 	use std::sync::Arc;
-
+	
 	use anyhow::Result;
-	use livesplit_hotkey::win::*;
+	use tokio::runtime::Handle;
+	use livesplit_hotkey::*;
+	use slog::error;
 
 	use crate::State;
 	use super::ShortcutConfig;
 
-	pub use KeyCode;
+	pub use livesplit_hotkey::KeyCode;
 
-	#[derive(Debug)]
 	pub struct Shortcuts {
 		config: ShortcutConfig,
 		hook: Hook,
@@ -65,7 +67,7 @@ mod imp {
 
 	pub fn key_list() -> Vec<String> {
 		// https://github.com/LiveSplit/livesplit-core/blob/master/crates/livesplit-hotkey/src/windows/key_code.rs
-		vec![
+		[
 			"LButton", "RButton", "Cancel", "MButton", "XButton1", "XButton2", "Back", "Tab",
 			"Clear", "Return", "Shift", "Control", "Menu", "Pause", "Capital", "Kana", "Junja",
 			"Final", "Kanji", "Escape", "Convert", "NonConvert", "Accept", "ModeChange", "Space",
@@ -85,7 +87,7 @@ mod imp {
 			"OemPlus", "OemComma", "OemMinus", "OemPeriod", "Oem2", "Oem3", "Oem4", "Oem5", "Oem6",
 			"Oem7", "Oem8", "Oem102", "ProcessKey", "Packet", "Attn", "CrSel", "ExSel", "ErEof",
 			"Play", "Zoom", "NoName", "Pa1", "OemClear",
-		].iter().map(|s| s.into()).collect()
+		].iter().map(|s| s.to_string()).collect()
 	}
 
 	impl Shortcuts {
@@ -98,13 +100,18 @@ mod imp {
 
 		pub fn apply_config(&self, state: &Arc<State>) -> Result<()> {
 			for a in &self.config.actions {
-				let action = a.1;
+				let action = a.action;
 				let state = state.clone();
 				let logger = state.logger.clone();
-				self.hook.register(a.0, move || {
-					if let Err(e) = action.run(&state) {
-						error!(logger, "Failed to run shortcut action"; "error" => %e);
-					}
+				let handle = Handle::current();
+				self.hook.register(a.keycode, move || {
+					let state = state.clone();
+					let logger = logger.clone();
+					handle.spawn(async move {
+						if let Err(e) = action.run(&state).await {
+							error!(logger, "Failed to run shortcut action"; "error" => %e);
+						}
+					});
 				})?;
 			}
 			Ok(())

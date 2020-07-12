@@ -50,8 +50,11 @@ pub(crate) struct TalkersChangedMsg(pub Vec<(ClientId, bool)>);
 pub(crate) struct SaveClientMsg(pub Uid);
 pub(crate) struct SendPacketMsg(pub OutPacket);
 pub(crate) struct SetVolumeMsg(pub Uid, pub f32);
+#[derive(Clone)]
 pub(crate) struct SetInputMutedMsg(pub Tristate);
+#[derive(Clone)]
 pub(crate) struct SetOutputMutedMsg(pub Tristate);
+#[derive(Clone)]
 pub(crate) struct SetAwayMsg(pub Tristate);
 pub(crate) struct DisconnectMsg;
 

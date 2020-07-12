@@ -127,10 +127,13 @@
 		// ! clientHeight + scrollTopMax === scrollHeight
 		scrollDiff = pan.scrollTop - lastScrollPos;
 		lastScrollPos = pan.scrollTop;
-
-		isAtBottom = !canLoadAfterEnd && pan.scrollTop >= pan.scrollHeight - pan.clientHeight;
+		scrollPanChanged();
 
 		start_fill();
+	}
+
+	function scrollPanChanged() {
+		isAtBottom = !canLoadAfterEnd && pan.scrollTop >= pan.scrollHeight - pan.clientHeight;
 	}
 
 	function start_fill() {
@@ -328,6 +331,7 @@
 				// This case adds elements at the end => trim start
 				elems = [...elems, ...newElems]; // modification is at the end => safe
 				await tryTrimStart();
+				scrollPanChanged();
 				break;
 
 			case ListFetchDir.Before:
