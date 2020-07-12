@@ -1,24 +1,23 @@
-use std::collections::HashMap;
-
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 
 use crate::{websocket, Tristate};
 use imp::*;
 
 pub use imp::Shortcuts;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Shortcut {
 	keycode: KeyCode,
 	action: Action,
 }
 
-#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct ShortcutConfig {
 	actions: Vec<Shortcut>,
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Deserialize, Serialize)]
 pub enum Action {
 	Away(Tristate),
 	InputMute(Tristate),
@@ -49,7 +48,7 @@ impl Action {
 #[cfg(windows)]
 mod imp {
 	use std::sync::Arc;
-	
+
 	use anyhow::Result;
 	use tokio::runtime::Handle;
 	use livesplit_hotkey::*;
@@ -124,11 +123,12 @@ mod imp {
 	use std::sync::Arc;
 
 	use anyhow::Result;
+	use serde::{Deserialize, Serialize};
 
 	use crate::State;
 	use super::ShortcutConfig;
 
-	#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, serde::Serialize, serde::Deserialize)]
+	#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Deserialize, Serialize)]
 	pub enum KeyCode {}
 
 	#[derive(Debug)]

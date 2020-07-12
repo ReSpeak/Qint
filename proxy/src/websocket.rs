@@ -732,7 +732,7 @@ impl Handler<SetVolumeMsg> for Ws {
 
 impl Handler<SetInputMutedMsg> for Ws {
 	type Result = Result<()>;
-	fn handle(&mut self, SetInputMutedMsg(new): SetInputMutedMsg, _: &mut Self::Context) -> Self::Result {
+	fn handle(&mut self, SetInputMutedMsg(new): SetInputMutedMsg, ctx: &mut Self::Context) -> Self::Result {
 		if let Some(con) = &mut self.connection {
 			let mut state = con.get_mut_state()?;
 			let own_client = state.own_client;
@@ -741,7 +741,12 @@ impl Handler<SetInputMutedMsg> for Ws {
 			} else {
 				bail!("Failed to get own client");
 			};
-			state.set_input_muted(new.get_value(old))?;
+			let new_input_muted = new.get_value(old);
+			state.set_input_muted(new_input_muted)?;
+			Self::set_audio_active(!new_input_muted,
+				self.logger.clone(),
+				self.state.audio_data.a2ts.clone(),
+				ctx);
 		} else {
 			bail!("Connection does not exist");
 		}
