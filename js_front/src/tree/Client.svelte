@@ -100,7 +100,7 @@
 		<button class="button clientButton" class:talking={client.talking !== undefined} on:click={setChat}>
 			<div class="inner"></div>
 			<ClientIcon {client} {connection} />
-			<span style={client.getColor()}><FilterString filter={$filter} content={client.name} /></span>
+			<span class="clientName" style={client.getColor()}><FilterString filter={$filter} content={client.name} /></span>
 			<span class="icons">
 				{#if client.input_muted}
 					<Icon name="microphone-off" style="color: red;" />
@@ -153,17 +153,26 @@
 		position: relative;
 		z-index: 1;
 
-		display: grid;
-		grid-auto-flow: column;
-		grid-template-columns: min-content min-content 1fr;
-	}
-	.clientButton:focus {
-		box-shadow: none;
+		display: inline-flex;
+
+		&:focus {
+			box-shadow: none;
+		}
+
+		> :global(.icon) {
+			flex-shrink: 0;
+			margin-right: 0.25em;
+		}
+
+		> :global(*) {
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
 	}
 
-	.clientButton > :global(*) {
-		overflow: hidden;
-		text-overflow: ellipsis;
+	.clientName {
+		flex: 1;
+		text-align: left;
 	}
 
 	.ownClient :global(span) {
