@@ -109,7 +109,7 @@
 					<Icon name="volume-off" style="color: red;" />
 				{/if}
 				{#if client.away_message !== null}
-					<Icon name="sleep" style="color: blue;" />
+					<Icon name="sleep" style="color: rgb(70,180,255);" />
 				{/if}
 			</span>
 		</button>
@@ -148,6 +148,7 @@
 		padding-left: 0.5em;
 		height: auto;
 		width: 100%;
+		overflow: hidden;
 		justify-content: start;
 		position: relative;
 		z-index: 1;
@@ -160,6 +161,11 @@
 		box-shadow: none;
 	}
 
+	.clientButton > :global(*) {
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
 	.ownClient :global(span) {
 		font-weight: bold;
 	}
@@ -169,6 +175,8 @@
 	}
 
 	.icons {
+		display: flex;
+		flex-wrap: nowrap;
 		justify-self: end;
 	}
 
