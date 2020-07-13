@@ -151,11 +151,19 @@ export class Lazy<T> {
 	}
 }
 
-export async function wrap_async<T>(f: () => T) : Promise<T> {
+export async function wrap_async<T>(f: () => T): Promise<T> {
 	return new Promise((resolve, _) => {
 		setTimeout(() => {
 			const val = f();
 			resolve(val);
 		});
 	});
+}
+
+export function findParent(elem: HTMLElement, selector: string): HTMLElement | undefined {
+	while (elem) {
+		if (elem.matches(selector)) return elem;
+		elem = elem.parentElement!;
+	}
+	return undefined;
 }

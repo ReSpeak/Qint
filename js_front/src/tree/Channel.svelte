@@ -1,28 +1,33 @@
-<script>
+<script lang="typescript">
 	import { afterUpdate } from "svelte";
-	import { get } from "svelte/store";
+	import { get, Writable } from "svelte/store";
 	import Icon from "../ui/Icon.svelte";
 	import ChannelIcon from "../ui/ChannelIcon.svelte";
 	import FilterString from "../ui/FilterString.svelte";
-	import { Channel } from "./book";
+	import { Channel, ITreeNode } from "./book";
 	import ClientComp from "./Client.svelte";
+	import { Connection } from "../connection";
 
-	export let connection;
-	export let filter;
-	export let filterShow = true;
-	export let channel;
+	export let connection!: Connection;
+	export let filter!: Writable<string>;
+	export let filterShow: boolean = true;
+	export let channel!: Channel;
 	let selectedChat = connection.chat.selectedChat;
 
 	let collapsed = false;
 	let hovered = false;
+
+	declare let children: Writable<ITreeNode[]>;
+	declare let ownClient: boolean;
+	declare let selectedChannel: boolean;
 	$: children = channel.children;
 	$: filterShow = applyFilter($filter, channel, $children);
 	// Update if a client moves in or out
 	$: ownClient = updateOwnClient($children);
 	$: selectedChannel = "Channel" in $selectedChat && $selectedChat.Channel === channel.id;
-	let div;
+	let div!: HTMLDivElement;
 
-	function updateOwnClient() {
+	function updateOwnClient(children: ITreeNode[]) {
 		let isOwn = false;
 		let client = get(connection.ownClient);
 		if (client !== undefined) {
@@ -31,7 +36,7 @@
 		return isOwn;
 	}
 
-	function applyFilter(filter, channel, children) {
+	function applyFilter(filter: string, channel: Channel, children: ITreeNode[]) {
 		return filter === "" || channel.name.toLowerCase().includes(filter.toLowerCase())
 			|| children.some(c => c.filterShow);
 	}
@@ -44,9 +49,9 @@
 		connection.chat.selectChannel(channel);
 	}
 
-	function leave(event) {
+	function leave(event: MouseEvent) {
 		if (event.relatedTarget) {
-			if (div.contains(event.relatedTarget)) {
+			if (div.contains(event.relatedTarget as Node)) {
 				return;
 			}
 		}
@@ -61,6 +66,7 @@
 		class:ownClient
 		class:selectedChannel
 		on:mouseover={() => hovered = true} on:mouseout={leave}
+		data-type="channel" data-key={channel.id}
 	>
 		<button class="button collapseButton" on:click={() => collapsed = !collapsed} class:haschildren={$children.length !== 0}>
 			<Icon name="chevron-right{collapsed ? '' : ' mdi-rotate-90'}" />

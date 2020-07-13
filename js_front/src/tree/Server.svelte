@@ -1,8 +1,10 @@
-<script>
+<script lang="typescript">
+	import { Writable } from "svelte/store";
 	import Channel from "./Channel.svelte";
+	import { Connection } from "../connection";
 
-	export let connection;
-	export let filter;
+	export let connection!: Connection;
+	export let filter!: Writable<string>;
 	let book = connection.book;
 	let server = book.server;
 	let children = $server.children;

@@ -390,6 +390,7 @@ export class Client extends GraphQlClient implements ITreeNode {
 	public badges!: string;
 	public channel!: number;
 	public channel_group!: number;
+	public server_groups!: number[];
 	public client_type!: string;
 	public country_code!: string;
 	public database_id!: number;
@@ -422,6 +423,9 @@ export class Client extends GraphQlClient implements ITreeNode {
 
 	// ITreeParent
 	public children: Writable<ITreeNode[]> = writable([]);
+
+	// ITeeeNode
+	public filterShow: boolean = true;
 
 	protected constructor() { super(); }
 
@@ -492,6 +496,9 @@ export class Channel implements ITreeParent, ITreeNode {
 	// ITreeParent
 	public children: Writable<ITreeNode[]> = writable([]);
 
+	// ITeeeNode
+	public filterShow: boolean = true;
+
 	private constructor() { }
 
 	public static fromDebug(id: ChannelId, parent: ChannelId, order: ChannelId): Channel {
@@ -510,12 +517,6 @@ export class Channel implements ITreeParent, ITreeNode {
 
 	public update(obj: any): void {
 		Object.assign(this, obj);
-	}
-
-	// XXX Temporary
-	public set_name(name: string): Channel {
-		this.name = name;
-		return this;
 	}
 }
 
@@ -549,4 +550,5 @@ export interface ITreeParent {
 }
 
 export interface ITreeNode {
+	filterShow: boolean;
 }

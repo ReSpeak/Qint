@@ -135,15 +135,19 @@ export class Connection {
 	}
 
 	public switchChannel(channel: Channel) {
+		this.moveClient(this.ownClientId!, channel.id);
+	}
+
+	public moveClient(clientId: number, channelId: number) {
 		this.sendMessage({
 			Events: [{
 				PropertyChanged: {
 					id: {
-						Client: this.ownClientId!,
+						Client: clientId,
 					},
 					prop: {
 						Client: {
-							channel: channel.id,
+							channel: channelId,
 						},
 					},
 					invoker: null,
@@ -205,8 +209,6 @@ export class Connection {
 			console.error("Unknown message", msg);
 		}
 	}
-
-	private takenumber(a: number) {}
 }
 
 export enum ConnectionState {

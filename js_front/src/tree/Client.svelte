@@ -1,13 +1,18 @@
-<script>
+<script lang="typescript">
 	import { afterUpdate } from "svelte";
+	import { Writable } from "svelte/store";
 	import ClientIcon from "../ui/ClientIcon.svelte";
 	import FilterString from "../ui/FilterString.svelte";
 	import Icon from "../ui/Icon.svelte";
+	import { Connection } from "../connection";
+	import { Client } from "./book";
+	import { draggable, DragData } from "../ui/draggable";
+	import { findParent } from "../util";
 
-	export let connection;
-	export let filter;
-	export let filterShow = true;
-	export let client;
+	export let connection!: Connection;
+	export let filter!: Writable<string>;
+	export let filterShow: boolean = true;
+	export let client!: Client;
 	let selectedChat = connection.chat.selectedChat;
 	let hovered = false;
 	let newHover = false;
@@ -16,19 +21,21 @@
 	let maxVolume = +30;
 	let volume = 0;
 
+	declare let ownClient: boolean;
+	declare let selectedClient: boolean;
 	$: filterShow = applyFilter($filter, client);
 	$: ownClient = client.id === connection.ownClientId;
 	$: selectedClient = "Client" in $selectedChat && $selectedChat.Client === client.id;
 	$: loadVolume(hovered);
-	let div;
-	let volumeUpdated;
-	let volumeTimer;
+	let div!: HTMLDivElement;
+	let volumeUpdated = false;;
+	let volumeTimer: number | undefined;
 
 	function setChat() {
 		connection.chat.selectClient(client);
 	}
 
-	function applyFilter(filter, client) {
+	function applyFilter(filter: string, client: Client) {
 		return filter === "" || client.name.toLowerCase().includes(filter.toLowerCase());
 	}
 
@@ -37,9 +44,9 @@
 		newHover = true;
 	}
 
-	function leave(event) {
+	function leave(event: MouseEvent) {
 		if (event.relatedTarget) {
-			if (div.contains(event.relatedTarget)) {
+			if (div.contains(event.relatedTarget as Node)) {
 				return;
 			}
 		}
@@ -50,7 +57,7 @@
 		}, 50);
 	}
 
-	async function loadVolume(hovered) {
+	async function loadVolume(hovered: boolean) {
 		if (hovered) {
 			volumeUpdated = false;
 			await client.loadVolume();
@@ -58,7 +65,7 @@
 				if (client.volume === 0) {
 					volume = minVolume;
 				} else {
-					volume = Math.round(20 * Math.log10(client.volume));
+					volume = Math.round(20 * Math.log10(client.volume ?? 0));
 				}
 			}
 		}
@@ -87,6 +94,27 @@
 			client.updateVolume(connection, vol);
 		}, 100);
 	}
+
+	function dragStart(ev: CustomEvent<DragData>) {
+		ev.detail.dragNode.classList.add("dragStyle");
+		const channelTree = findParent(ev.detail.dragNode, ".channel-list")!;
+		ev.detail.customData = channelTree;
+		// TODO find correct max
+		//ev.detail.maxY = channelTree.clientHeight;
+		ev.detail.lockX = true;
+
+	}
+
+	function dragDrop(ev: CustomEvent<DragData>) {
+		ev.detail.dragNode.classList.remove("dragStyle");
+		const hoverOpt: HTMLElement[] = [...ev.detail.customData.querySelectorAll(":hover")];
+		const dropTarget = hoverOpt.reverse().find(x => x.dataset.type === "channel");
+		console.log(hoverOpt, dropTarget);
+		if (dropTarget !== undefined) {
+			console.log("Would drop to", dropTarget.dataset.key);
+			connection.moveClient(client.id, Number(dropTarget.dataset.key));
+		}
+	}
 </script>
 
 <li class="container" class:hidden={!filterShow}>
@@ -97,7 +125,13 @@
 		on:mouseover={hover} on:mouseout={leave}
 		on:focusin={hover} on:focusout={leave}
 	>
-		<button class="button clientButton" class:talking={client.talking !== undefined} on:click={setChat}>
+		<button
+			class="button clientButton"
+			class:talking={client.talking !== undefined}
+			on:click={setChat}
+			use:draggable on:dragstart={dragStart} on:dragdrop={dragDrop}
+			data-type="client" data-key="{client.id}"
+		>
 			<div class="inner"></div>
 			<ClientIcon {client} {connection} />
 			<span class="clientName" style={client.getColor()}><FilterString filter={$filter} content={client.name} /></span>
@@ -235,5 +269,9 @@
 	.clientButton.talking .inner {
 		opacity: 1;
 		height: 100%;
+	}
+
+	:global(.dragStyle) {
+		background-color: #6040C080 !important;
 	}
 </style>
