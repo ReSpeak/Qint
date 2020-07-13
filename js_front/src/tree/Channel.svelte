@@ -59,7 +59,7 @@
 	}
 </script>
 
-<li class="container" class:hidden={!filterShow}>
+<li class="container" class:hidden={!filterShow} class:collapsed>
 	<div
 		bind:this={div}
 		class="nameContainer"
@@ -82,7 +82,7 @@
 			</div>
 		{/if}
 	</div>
-	<ul class="menu-list" class:collapsed>
+	<ul class="menu-list">
 		{#each $children as child (child.id)}
 			{#if child instanceof Channel}
 				<svelte:self {connection} {filter} channel={child} bind:filterShow={child.filterShow} />
@@ -150,8 +150,12 @@
 		text-overflow: ellipsis;
 	}
 
-	.collapsed {
+	.collapsed .menu-list {
 		display: none;
+	}
+
+	.collapsed .nameContainer .button {
+		color: mix($text, $background, 60%);
 	}
 
 	.ownClient > :global(*) {
