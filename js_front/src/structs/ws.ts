@@ -7,7 +7,7 @@ export type WsMessageTarget =
 	| { Poke: number };
 
 // Out Messages
-export type OutMsg = OMsgConnect | OMsgDisconnect | OMsgEvents;
+export type OutMsg = OMsgConnect | OMsgDisconnect | OMsgEvents | OMsgSetLoudnessThreshold | OMsgSubscribeLoudness;
 
 interface OMsgConnect {
 	Connect: {
@@ -46,9 +46,17 @@ interface OMsgEvents {
 	Events: InBookMsg[];
 }
 
+interface OMsgSetLoudnessThreshold {
+	SetLoudnessThreshold: number;
+}
+
+interface OMsgSubscribeLoudness {
+	SubscribeLoudness: boolean;
+}
+
 
 // In Messages
-export type InMsg = InMsgConnected | InDisconnectedTemporarily | InDisconnected | InMsgError | InTalkersChanged | InMsgEvents;
+export type InMsg = InMsgConnected | InDisconnectedTemporarily | InDisconnected | InMsgError | InTalkersChanged | InMsgEvents | InLoudness;
 
 interface InMsgConnected {
 	Connected: {
@@ -76,6 +84,10 @@ interface InTalkersChanged {
 
 interface InMsgEvents {
 	Events: InBookMsg[];
+}
+
+interface InLoudness {
+	Loudness: number;
 }
 
 interface IMsgPropertyIdChannel {

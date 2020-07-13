@@ -49,6 +49,7 @@ pub(crate) struct SetSelfTalkingMsg(pub bool);
 pub(crate) struct TalkersChangedMsg(pub Vec<(ClientId, bool)>);
 pub(crate) struct SaveClientMsg(pub Uid);
 pub(crate) struct SendPacketMsg(pub OutPacket);
+pub(crate) struct CaptureLoudnessMsg(pub Option<f64>);
 pub(crate) struct SetVolumeMsg(pub Uid, pub f32);
 #[derive(Clone)]
 pub(crate) struct SetInputMutedMsg(pub Tristate);
@@ -97,6 +98,9 @@ impl Message for SaveClientMsg {
 }
 impl Message for SendPacketMsg {
 	type Result = Result<PacketId>;
+}
+impl Message for CaptureLoudnessMsg {
+	type Result = ();
 }
 impl Message for SetVolumeMsg {
 	type Result = ();
@@ -472,6 +476,43 @@ impl Ws {
 					}
 				}
 			}
+			MessageF2P::SetLoudnessThreshold(threshold) => {
+				// TODO Save in settings
+				let logger = self.logger.clone();
+				actix::spawn(
+					self.state.audio_data.a2ts.send(
+						audio::audio_to_ts::SetLoudnessThreshouldMsg(threshold))
+					.map(move |r| {
+						if let Err(e) = r {
+							error!(logger, "Failed to apply loudness threshold"; "error" => %e);
+						}
+					})
+				);
+			}
+			MessageF2P::SubscribeLoudness(subscribe) => {
+				let logger = self.logger.clone();
+				if subscribe {
+					actix::spawn(
+						self.state.audio_data.a2ts.send(
+							audio::audio_to_ts::AddLoudnessListenerMsg(ctx.address()))
+						.map(move |r| {
+							if let Err(e) = r {
+								error!(logger, "Failed to add loudness listener"; "error" => %e);
+							}
+						})
+					);
+				} else {
+					actix::spawn(
+						self.state.audio_data.a2ts.send(
+							audio::audio_to_ts::RemoveLoudnessListenerMsg(ctx.address()))
+						.map(move |r| {
+							if let Err(e) = r {
+								error!(logger, "Failed to remove loudness listener"; "error" => %e);
+							}
+						})
+					);
+				}
+			}
 		}
 	}
 
@@ -692,6 +733,15 @@ impl Handler<SaveClientMsg> for Ws {
 		} else {
 			bail!("Connection does not exist")
 		}
+	}
+}
+
+impl Handler<CaptureLoudnessMsg> for Ws {
+	type Result = ();
+	fn handle(
+		&mut self, CaptureLoudnessMsg(loudness): CaptureLoudnessMsg, ctx: &mut Self::Context,
+	) -> Self::Result {
+		self.send_message(&MessageP2F::Loudness(loudness), ctx);
 	}
 }
 

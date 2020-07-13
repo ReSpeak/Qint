@@ -11,6 +11,10 @@ pub enum MessageF2P {
 	Disconnect(DisconnectOptions),
 	/// Events can be used to trigger actions, like writing a message or switching channel
 	Events(Vec<JsEvent>),
+	/// Set the loudness threshold for sending audio in LUFS
+	SetLoudnessThreshold(f64),
+	/// Ask the proxy to send loudness data or not.
+	SubscribeLoudness(bool),
 }
 
 /// A message sent over a websocket connection from the proxy to the frontend.
@@ -33,6 +37,7 @@ pub enum MessageP2F {
 	TalkersChanged(Vec<(ClientId, bool)>),
 	/// The connection received events.
 	Events(Vec<JsEvent>),
+	Loudness(Option<f64>),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

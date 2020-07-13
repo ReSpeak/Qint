@@ -25,9 +25,6 @@ Download the `SDL2-devel-2.x.x-VC.zip` from [libsdl.org](https://www.libsdl.org)
 From this file, copy `SDL2-2.x.x/lib/x64/*.lib` to `Qint/proxy/msvc/lib/64/`.  
 And copy `SDL2-2.x.x/lib/x64/*.dll` to `Qint/proxy/msvc/dll/64/` and `Qint/proxy/`.
 
-## Download libclang on Windows
-TODO, e.g. install llvm with scoop and set `$env:LIBCLANG_PATH = ""` before building.
-
 ## Build and run Qint
 ### Build the frontend
 ```bash

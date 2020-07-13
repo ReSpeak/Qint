@@ -1040,6 +1040,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ebur128"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22e077e29310bf97aabb3cddffdbe408e1a1e32e65d27c97f5a463d57f91a36c"
+dependencies = [
+ "bitflags",
+ "cc",
+]
+
+[[package]]
 name = "either"
 version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2244,6 +2254,7 @@ dependencies = [
  "diesel-derive-enum",
  "diesel_migrations",
  "directories",
+ "ebur128",
  "flakebi-ring",
  "futures",
  "heck",

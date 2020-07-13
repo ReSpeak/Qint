@@ -19,11 +19,14 @@ use ts_to_audio::TsToAudio;
 pub mod audio_to_ts;
 pub mod ts_to_audio;
 
+/// Sample rate is 48 kHz.
+const SAMPLE_RATE: usize = 48000;
+
 /// The usual frame size.
 ///
 /// Use 48 kHz, 20 ms frames (50 per second) and mono data (1 channel).
 /// This means 1920 samples and 7.5 kiB.
-const USUAL_FRAME_SIZE: usize = 48000 / 50;
+const USUAL_FRAME_SIZE: usize = SAMPLE_RATE / 50;
 
 /// The number of samples to use for SDL output.
 ///
