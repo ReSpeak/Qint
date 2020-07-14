@@ -1,5 +1,13 @@
 [workspace]
 members = ["proxy"]
 
+# Compile in release mode to speed up
+[profile.dev.package.audiopus]
+opt-level = 3
+[profile.dev.package.ebur128]
+opt-level = 3
+[profile.dev.package.nnnoiseless]
+opt-level = 3
+
 [profile.release]
 debug = true
