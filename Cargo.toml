@@ -1,6 +1,5 @@
 [workspace]
 members = ["proxy"]
-exclude = ["frontend", "shared"]
 
 [profile.release]
 debug = true

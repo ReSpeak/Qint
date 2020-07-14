@@ -5,12 +5,6 @@
 		},
 		{
 			"path": "proxy"
-		},
-		{
-			"path": "shared"
-		},
-		{
-			"path": "js_front"
 		}
 	],
 	"settings": {
