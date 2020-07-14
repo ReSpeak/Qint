@@ -1,5 +1,5 @@
 <script lang="typescript">
-	import { sleep, assert, binarySearchByKey, BinarySearchResult, IArray } from "../util";
+	import { sleep, assert, binarySearchByKey, BinarySearchResult } from "../util";
 	import { tick, onMount } from "svelte";
 	import { writable } from "svelte/store";
 	import * as svst from "svelte/store";
@@ -262,7 +262,7 @@
 	async function tryTrimEnd() {
 		if (elems.length <= minItemsToRemove) return;
 		await tick();
-		const childList = (scrollPane.children as any) as IArray<HTMLElement>;
+		const childList = (scrollPane.children as any) as ArrayLike<HTMLElement>;
 		assert(childList.length === elems.length, "HTML node count does not match elements count");
 
 		const distFn = (e: HTMLElement) => {
@@ -292,7 +292,7 @@
 	async function tryTrimStart() {
 		if (elems.length <= minItemsToRemove) return;
 		await tick();
-		const childList = (scrollPane.children as any) as IArray<HTMLElement>;
+		const childList = (scrollPane.children as any) as ArrayLike<HTMLElement>;
 		assert(childList.length === elems.length, "HTML node count does not match elements count");
 
 		const distFn = (e: HTMLElement) => {

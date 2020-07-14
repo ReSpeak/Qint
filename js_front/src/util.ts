@@ -9,11 +9,6 @@ export const BOOKMARK_OFF = "star-outline";
 // @ts-ignore
 export const BASE_ADDRESS = ""; //"__buildEnv__" === "development" ? "http://localhost:4422" : "";
 
-export interface IArray<T> {
-	length: number;
-	[index: number]: T;
-}
-
 export async function sleep(timeout: number): Promise<void> {
 	return new Promise(resolve => setTimeout(resolve, timeout));
 }
@@ -52,7 +47,7 @@ export function getDataColor(data: number[] | string) {
 	return `color: hsl(${varH}, ${varS}%, ${varL}%);`;
 }
 
-export function arraysEqual<T>(a: IArray<T>, b: IArray<T>): boolean {
+export function arraysEqual<T>(a: ArrayLike<T>, b: ArrayLike<T>): boolean {
 	if (a === b) return true;
 	if (a == null || b == null || a.length !== b.length)
 		return false;
@@ -93,7 +88,7 @@ export class BinarySearchResult {
  * @param [start] The starting index for the search. 0 by default.
  * @param [end] The end index for the search. End of the list by default.
  */
-export function binarySearchBy<T>(list: IArray<T>, f: (t: T) => number, start?: number, end?: number): BinarySearchResult {
+export function binarySearchBy<T>(list: ArrayLike<T>, f: (t: T) => number, start?: number, end?: number): BinarySearchResult {
 	start = start ?? 0;
 	end = end ?? list.length;
 	assert(start >= 0 && start <= list.length, "Start must be within list range");
@@ -124,7 +119,7 @@ export function binarySearchBy<T>(list: IArray<T>, f: (t: T) => number, start?: 
 		return new BinarySearchResult(false, base + (cmp < 0 ? 1 : 0));
 }
 
-export function binarySearchByKey<T, E>(list: IArray<T>, elem: E, f: (t: T) => E, start?: number, end?: number): BinarySearchResult {
+export function binarySearchByKey<T, E>(list: ArrayLike<T>, elem: E, f: (t: T) => E, start?: number, end?: number): BinarySearchResult {
 	return binarySearchBy(list, t => {
 		const x = f(t);
 		if (elem < x)

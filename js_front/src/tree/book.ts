@@ -2,7 +2,7 @@ import { Writable, writable, Readable, derived, get } from "svelte/store";
 import { InBookChangeMsg } from "../structs/ws";
 import { graphql } from "../graphql";
 import { Connection } from "../connection";
-import { binarySearchBy, binarySearchByKey, getDataColor, arraysEqual, IArray } from "../util";
+import { binarySearchBy, binarySearchByKey, getDataColor, arraysEqual } from "../util";
 import "../extensions";
 
 type ChannelId = number;
@@ -20,7 +20,7 @@ export class Book {
 		this.currentTalkers = [];
 	}
 
-	private static findChannelStart(list: IArray<ITreeNode>): number {
+	private static findChannelStart(list: ArrayLike<ITreeNode>): number {
 		return binarySearchByKey(list, 1, e => e instanceof Client ? 0 : 2).index;
 	}
 
