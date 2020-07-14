@@ -1,12 +1,6 @@
 [workspace]
-members = [
-	"proxy",
-	"shared",
-]
-exclude = ["frontend"]
+members = ["proxy"]
+exclude = ["frontend", "shared"]
 
 [profile.release]
 debug = true
-
-[patch.crates-io]
-nnnoiseless = { git = "https://github.com/Flakebi/rnnoise", branch = "nnnoiseless" }

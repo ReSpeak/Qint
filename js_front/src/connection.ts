@@ -19,6 +19,7 @@ export class Connection {
 	private socket?: WebSocket;
 	public guid?: string;
 	private muted: boolean = false;
+	public loudness: Writable<number> = writable(0);
 
 	constructor() {
 		loadPlugins();
@@ -205,6 +206,8 @@ export class Connection {
 					this.socket.close();
 				this.error.set(msg.Error);
 			}
+		} else if ("Loudness" in msg) {
+			this.loudness.update(_ => msg.Loudness);
 		} else {
 			console.error("Unknown message", msg);
 		}

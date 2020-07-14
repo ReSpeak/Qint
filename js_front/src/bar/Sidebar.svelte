@@ -1,11 +1,10 @@
 <script lang="typescript">
-	import { writable, Writable } from "svelte/store";
 	import Server from "../tree/Server.svelte";
 	import ServerIcon from "../ui/ServerIcon.svelte";
 	import { Connection } from "../connection";
 
 	export let connection!: Connection;
-	export let filter: Writable<string>;
+	export let filter!: string;
 	let server = connection.book.server;
 	let selectedChat = connection.chat.selectedChat;
 

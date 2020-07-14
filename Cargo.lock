@@ -1894,8 +1894,9 @@ dependencies = [
 
 [[package]]
 name = "nnnoiseless"
-version = "0.1.1"
-source = "git+https://github.com/Flakebi/rnnoise?branch=nnnoiseless#ff12324e0612f67cd79b815e9f58a12adfd0c30a"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "594ecff7332d779102b991133f26c0975e4dabe13d115a9f89bdcc8561422f10"
 dependencies = [
  "num-complex",
  "once_cell",
@@ -2289,18 +2290,6 @@ dependencies = [
  "tsproto-structs",
  "tsproto-types",
  "uuid",
-]
-
-[[package]]
-name = "qint-shared"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "diesel",
- "diesel-derive-enum",
- "serde",
- "tsproto-packets",
- "tsproto-types",
 ]
 
 [[package]]

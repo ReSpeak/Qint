@@ -49,7 +49,7 @@ pub(crate) struct SetSelfTalkingMsg(pub bool);
 pub(crate) struct TalkersChangedMsg(pub Vec<(ClientId, bool)>);
 pub(crate) struct SaveClientMsg(pub Uid);
 pub(crate) struct SendPacketMsg(pub OutPacket);
-pub(crate) struct CaptureLoudnessMsg(pub Option<f64>);
+pub(crate) struct CaptureLoudnessMsg(pub f64);
 pub(crate) struct SetVolumeMsg(pub Uid, pub f32);
 #[derive(Clone)]
 pub(crate) struct SetInputMutedMsg(pub Tristate);
@@ -192,7 +192,7 @@ impl Ws {
 								// Save in database
 								let logger = self.logger.clone();
 								let opts = self.connect_options.as_ref().unwrap();
-								let id = self.state.settings.default_identity;
+								let id = self.state.settings.read().unwrap().default_identity;
 								actix::spawn(
 									self.state
 										.database
@@ -352,7 +352,7 @@ impl Ws {
 	fn handle_ws_message(&mut self, msg: MessageF2P, ctx: &mut <Self as Actor>::Context) {
 		match msg {
 			MessageF2P::Connect(o) => {
-				let id = self.state.settings.default_identity;
+				let id = self.state.settings.read().unwrap().default_identity;
 				ctx.spawn(
 					wrap_future(
 						self.state
@@ -362,15 +362,16 @@ impl Ws {
 					)
 					.map(move |identity, actor: &mut Self, ctx| {
 						identity.and_then(|id| {
+							let settings = actor.state.settings.read().unwrap();
 							let options = tsclientlib::ConnectOptions::new(o.address.clone())
 								.name(o.name.clone())
 								.identity(id)
 								.version(o.version.clone())
 								.logger(actor.logger.clone())
-								.log_commands(o.log_commands || actor.state.settings.verbosity > 0)
-								.log_packets(o.log_packets || actor.state.settings.verbosity > 1)
+								.log_commands(o.log_commands || settings.verbosity > 0)
+								.log_packets(o.log_packets || settings.verbosity > 1)
 								.log_udp_packets(
-									o.log_udp_packets || actor.state.settings.verbosity > 2,
+									o.log_udp_packets || settings.verbosity > 2,
 								);
 
 							actor.connect_options = Some(o);
@@ -477,7 +478,14 @@ impl Ws {
 				}
 			}
 			MessageF2P::SetLoudnessThreshold(threshold) => {
-				// TODO Save in settings
+				{
+					// Save in settings
+					let mut settings = self.state.transient_settings.write().unwrap();
+					settings.loudness_threshold = Some(threshold);
+					if let Err(e) = settings.save(&self.state.settings.read().unwrap().config_path) {
+						error!(self.logger, "Failed to save transient settings"; "error" => %e);
+					}
+				}
 				let logger = self.logger.clone();
 				actix::spawn(
 					self.state.audio_data.a2ts.send(

@@ -119,15 +119,17 @@
 
 		// Overwrite bulma default
 		:global(pre) {
-			padding: 1em 1em 1em 0;
+			padding: 0;
+			margin: 1em 0 1em 0;
 
 			tab-size: 4;
 			-moz-tab-size: 4;
 			// TODO Prevent scrollbar
 		}
 
-		.message-raw pre {
+		.message-raw > pre {
 			background: none;
+			margin: 0;
 		}
 
 		.message-rendered {

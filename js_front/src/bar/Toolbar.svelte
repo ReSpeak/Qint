@@ -4,8 +4,9 @@
 	import Icon from '../ui/Icon.svelte';
 
 	export let connection!: Connection;
-	export let showSidebar!: Writable<boolean>;
-	export let showChat!: Writable<boolean>;
+	export let showSidebar!: boolean;
+	export let showChat!: boolean;
+	export let showGlobalSettings!: boolean;
 	let server = connection.book.server;
 	let dropdownActive = false;
 	let dropdown: HTMLElement;
@@ -47,10 +48,10 @@
 
 <div class="toolbar">
 	<div class="leftButtons">
-		<button class="button toolbutton" class:active={$showSidebar} on:click={() => showSidebar.update(b => !b)}>
+		<button class="button toolbutton" class:active={showSidebar} on:click={() => showSidebar = !showSidebar}>
 			<Icon name="file-tree" />
 		</button>
-		<button class="button toolbutton" class:active={$showChat} on:click={() => showChat.update(b => !b)}>
+		<button class="button toolbutton" class:active={showChat} on:click={() => showChat = !showChat}>
 			<Icon name="chat-outline" />
 		</button>
 	</div>
@@ -84,7 +85,7 @@
 			</div>
 			<div class="dropdown-menu" id="dropdown-menu3" role="menu" on:click={() => dropdownActive = false}>
 				<div class="dropdown-content">
-					<button class="button dropdown-item">
+					<button class="button dropdown-item" on:click={() => showGlobalSettings = true}>
 						Settings
 					</button>
 					<hr class="dropdown-divider" />

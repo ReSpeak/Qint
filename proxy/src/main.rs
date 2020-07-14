@@ -5,9 +5,9 @@ extern crate diesel_migrations;
 
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 use actix::*;
 use actix_cors::Cors;
@@ -16,7 +16,7 @@ use actix_web::*;
 use actix_web_actors::ws;
 use anyhow::{bail, Result};
 use futures::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use slog::{debug, error, info, o, warn, Drain, Logger};
 use structopt::StructOpt;
 use tokio::time::{self, Duration};
@@ -40,6 +40,8 @@ use websocket::Ws;
 
 const DIR_ORGANIZATION: &str = "ReSpeak";
 const DIR_PROJECT: &str = "Qint";
+const SETTINGS_FILENAME: &str = "config.toml";
+const TRANSIENT_SETTINGS_FILENAME: &str = "transient.toml";
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct ConnectionId(pub Uuid);
@@ -82,7 +84,14 @@ struct Args {
 	verbosity: u8,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct TransientSettings {
+	#[serde(skip_serializing_if = "Option::is_none")]
+	loudness_threshold: Option<f64>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Settings {
 	#[serde(default = "default_listen_address")]
@@ -113,7 +122,8 @@ pub struct State {
 	connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
 	audio_data: audio::AudioData,
 	shortcuts: shortcut::Shortcuts,
-	settings: Settings,
+	settings: RwLock<Settings>,
+	transient_settings: RwLock<TransientSettings>,
 	database: Addr<db::DbHandler>,
 	graphql_schema: Arc<db::graphql::Schema>,
 	secret: Secret,
@@ -175,6 +185,15 @@ impl Tristate {
 	}
 }
 
+impl TransientSettings {
+	fn save(&self, config_path: &Path) -> Result<()> {
+		// TODO Could also be msgpack
+		let data = toml::to_string(self)?;
+		fs::write(&config_path.join(TRANSIENT_SETTINGS_FILENAME), data)?;
+		Ok(())
+	}
+}
+
 #[get("/con/{id}/ws")]
 async fn create_ws(
 	state: web::Data<Arc<State>>, uuid: web::Path<Uuid>, options: web::Query<WsOptions>,
@@ -232,7 +251,7 @@ async fn audio_reset(state: web::Data<Arc<State>>) -> impl Responder {
 
 #[get("/plugins")]
 async fn list_plugins(state: web::Data<Arc<State>>) -> impl Responder {
-	let path = &state.settings.plugin_path;
+	let path = &state.settings.read().unwrap().plugin_path;
 	let mut res = Vec::new();
 	let dir = match path.read_dir() {
 		Ok(r) => r,
@@ -251,7 +270,7 @@ async fn list_plugins(state: web::Data<Arc<State>>) -> impl Responder {
 
 #[get("/plugins/{name}")]
 async fn get_plugin(state: web::Data<Arc<State>>, data: web::Path<String>) -> impl Responder {
-	let path = state.settings.plugin_path.join(&*data);
+	let path = state.settings.read().unwrap().plugin_path.join(&*data);
 	fs::read_to_string(path)
 		.with_header(http::header::CONTENT_TYPE, "application/javascript; charset=utf-8")
 }
@@ -355,16 +374,23 @@ async fn main() -> Result<()> {
 	};
 
 	// Load settings
-	let mut settings = match fs::read_to_string(&config_path.join("config.toml")) {
+	let mut settings = match fs::read_to_string(&config_path.join(SETTINGS_FILENAME)) {
 		Ok(r) => toml::from_str(&r)?,
 		Err(e) => {
 			// Only a soft error
-			info!(logger, "Failed to read settings, using defaults";
-					"error" => %e);
+			info!(logger, "Failed to read settings, using defaults"; "error" => %e);
 			// Create settings directory
 			fs::create_dir_all(&config_path)?;
 
 			Settings::default()
+		}
+	};
+
+	let transient_settings = match fs::read_to_string(&config_path.join(TRANSIENT_SETTINGS_FILENAME)) {
+		Ok(r) => toml::from_str(&r)?,
+		Err(e) => {
+			info!(logger, "Failed to read transient settings, using defaults"; "error" => %e);
+			TransientSettings::default()
 		}
 	};
 
@@ -417,13 +443,27 @@ async fn main() -> Result<()> {
 	let shortcuts = shortcut::Shortcuts::new(shortcut_config)?;
 	let addr = settings.listen_address.clone();
 
+	if let Some(threshold) = transient_settings.loudness_threshold {
+		let logger = logger.clone();
+		actix::spawn(
+			audio_data.a2ts.send(
+				audio::audio_to_ts::SetLoudnessThreshouldMsg(threshold))
+			.map(move |r| {
+				if let Err(e) = r {
+					error!(logger, "Failed to apply loudness threshold"; "error" => %e);
+				}
+			})
+		);
+	}
+
 	let graphql_schema = db::graphql::create_schema();
 	let state = Arc::new(State {
 		logger,
 		connections,
 		audio_data,
 		shortcuts,
-		settings,
+		settings: RwLock::new(settings),
+		transient_settings: RwLock::new(transient_settings),
 		database,
 		graphql_schema,
 		secret,

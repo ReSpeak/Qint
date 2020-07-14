@@ -41,7 +41,7 @@ impl FileCache {
 	}
 
 	fn get_path(state: &State, server: Uid, channel: ChannelId, path: &str) -> PathBuf {
-		let mut p = state.settings.cache_path.clone();
+		let mut p = state.settings.read().unwrap().cache_path.clone();
 		p.push(Self::path_encode(&server.0));
 		p.push(channel.0.to_string());
 		p.push(Self::path_encode(path.as_bytes()));

@@ -9,7 +9,7 @@
 	import { Connection } from "../connection";
 
 	export let connection!: Connection;
-	export let filter!: Writable<string>;
+	export let filter!: string;
 	export let filterShow: boolean = true;
 	export let channel!: Channel;
 	let selectedChat = connection.chat.selectedChat;
@@ -21,7 +21,7 @@
 	declare let ownClient: boolean;
 	declare let selectedChannel: boolean;
 	$: children = channel.children;
-	$: filterShow = applyFilter($filter, channel, $children);
+	$: filterShow = applyFilter(filter, channel, $children);
 	// Update if a client moves in or out
 	$: ownClient = updateOwnClient($children);
 	$: selectedChannel = "Channel" in $selectedChat && $selectedChat.Channel === channel.id;
@@ -73,7 +73,7 @@
 			<ChannelIcon {channel} {connection} />
 		</button>
 		<button class="button nameButton" on:click={setChat} on:dblclick={switchChannel}>
-			<FilterString filter={$filter} content={channel.name} />
+			<FilterString {filter} content={channel.name} />
 		</button>
 		{#if hovered}
 			<div class="hover menu" style="top: {div.getBoundingClientRect().top}px;">

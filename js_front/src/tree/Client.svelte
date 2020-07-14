@@ -1,6 +1,5 @@
 <script lang="typescript">
 	import { afterUpdate } from "svelte";
-	import { Writable } from "svelte/store";
 	import ClientIcon from "../ui/ClientIcon.svelte";
 	import FilterString from "../ui/FilterString.svelte";
 	import Icon from "../ui/Icon.svelte";
@@ -10,7 +9,7 @@
 	import { findParent } from "../util";
 
 	export let connection!: Connection;
-	export let filter!: Writable<string>;
+	export let filter!: string;
 	export let filterShow: boolean = true;
 	export let client!: Client;
 	let selectedChat = connection.chat.selectedChat;
@@ -23,7 +22,7 @@
 
 	declare let ownClient: boolean;
 	declare let selectedClient: boolean;
-	$: filterShow = applyFilter($filter, client);
+	$: filterShow = applyFilter(filter, client);
 	$: ownClient = client.id === connection.ownClientId;
 	$: selectedClient = "Client" in $selectedChat && $selectedChat.Client === client.id;
 	$: loadVolume(hovered);
@@ -134,7 +133,7 @@
 		>
 			<div class="inner"></div>
 			<ClientIcon {client} {connection} />
-			<span class="clientName" style={client.getColor()}><FilterString filter={$filter} content={client.name} /></span>
+			<span class="clientName" style={client.getColor()}><FilterString {filter} content={client.name} /></span>
 			<span class="icons">
 				{#if client.input_muted}
 					<Icon name="microphone-off" style="color: red;" />

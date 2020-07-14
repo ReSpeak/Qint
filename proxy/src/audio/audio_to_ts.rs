@@ -23,12 +23,14 @@ pub(crate) struct RemoveListenerMsg(pub Addr<Ws>);
 pub(crate) struct AddLoudnessListenerMsg(pub Addr<Ws>);
 pub(crate) struct RemoveLoudnessListenerMsg(pub Addr<Ws>);
 /// An audio packet and `true` if this is the last packet.
-pub(crate) struct PlayPacketMsg(OutPacket, bool, Option<f64>);
+pub(crate) struct PlayPacketMsg(Option<(OutPacket, bool)>, Option<f64>);
 pub(crate) struct SetLoudnessThreshouldMsg(pub f64);
 pub(crate) struct ResetMsg;
 
 /// Threshold for voice activation detection.
 const VAD_THRESHOLD: f32 = 0.2;
+/// The default minimum loudness for voice activation detection.
+const DEFAULT_LOUDNESS_THRESHOLD: f64 = -50.0;
 
 /// How many packets should still be sent after the voice detection is under the
 /// threshold.
@@ -151,7 +153,7 @@ impl Handler<AddLoudnessListenerMsg> for AudioToTs {
 impl Handler<RemoveLoudnessListenerMsg> for AudioToTs {
 	type Result = bool;
 	fn handle(&mut self, msg: RemoveLoudnessListenerMsg, _: &mut Self::Context) -> Self::Result {
-		let r = self.connections.remove(&msg.0);
+		let r = self.loudness_cons.remove(&msg.0);
 		self.update_device_state();
 		r
 	}
@@ -160,43 +162,47 @@ impl Handler<RemoveLoudnessListenerMsg> for AudioToTs {
 impl Handler<PlayPacketMsg> for AudioToTs {
 	type Result = ();
 	fn handle(
-		&mut self, PlayPacketMsg(packet, is_end, loudness): PlayPacketMsg, _: &mut Self::Context,
+		&mut self, PlayPacketMsg(packet_end, loudness): PlayPacketMsg, _: &mut Self::Context,
 	) -> Self::Result {
 		// Write into packet sink
 		let logger = self.logger.clone();
-		self.connections.retain(|con| {
-			if !con.connected() {
-				false
-			} else {
-				let logger2 = logger.clone();
-				tokio::spawn(con.send(SendPacketMsg(packet.clone())).map(move |r| {
-					if let Err(e) = r {
-						warn!(logger2, "Failed to send audio packet"; "error" => %e);
-					}
-				}));
+		if let Some((packet, is_end)) = packet_end {
+			self.connections.retain(|con| {
+				if !con.connected() {
+					false
+				} else {
+					let logger2 = logger.clone();
+					tokio::spawn(con.send(SendPacketMsg(packet.clone())).map(move |r| {
+						if let Err(e) = r {
+							warn!(logger2, "Failed to send audio packet"; "error" => %e);
+						}
+					}));
 
-				true
+					true
+				}
+			});
+
+			if self.is_talking != !is_end {
+				self.is_talking = !is_end;
+				self.update_talking();
 			}
-		});
+		}
 
-		self.loudness_cons.retain(|con| {
-			if !con.connected() {
-				false
-			} else {
-				let logger = logger.clone();
-				tokio::spawn(con.send(CaptureLoudnessMsg(loudness)).map(move |r| {
-					if let Err(e) = r {
-						warn!(logger, "Failed to send loudness"; "error" => %e);
-					}
-				}));
+		if let Some(loudness) = loudness {
+			self.loudness_cons.retain(|con| {
+				if !con.connected() {
+					false
+				} else {
+					let logger = logger.clone();
+					tokio::spawn(con.send(CaptureLoudnessMsg(loudness)).map(move |r| {
+						if let Err(e) = r {
+							warn!(logger, "Failed to send loudness"; "error" => %e);
+						}
+					}));
 
-				true
-			}
-		});
-
-		if self.is_talking != !is_end {
-			self.is_talking = !is_end;
-			self.update_talking();
+					true
+				}
+			});
 		}
 
 		self.update_device_state();
@@ -230,7 +236,7 @@ impl AudioToTs {
 			spawn_send,
 			connections: Default::default(),
 			loudness_cons: Default::default(),
-			loudness_threshold: Arc::new(AtomicU64::new(f64::NEG_INFINITY.to_bits())),
+			loudness_threshold: Arc::new(AtomicU64::new(DEFAULT_LOUDNESS_THRESHOLD.to_bits())),
 
 			device: None,
 			is_talking: false,
@@ -330,8 +336,8 @@ impl SdlCallback {
 		Ok(())
 	}
 
-	fn send_packet(&mut self, packet: OutPacket, is_end: bool, loudness: Option<f64>) {
-		if let Err(e) = self.spawn_send.try_send(PlayPacketMsg(packet, is_end, loudness)) {
+	fn send_packet(&mut self, packet: Option<(OutPacket, bool)>, loudness: Option<f64>) {
+		if let Err(e) = self.spawn_send.try_send(PlayPacketMsg(packet, loudness)) {
 			warn!(self.logger, "Failed to send audio packet";
 				"error" => %e);
 		}
@@ -344,6 +350,7 @@ impl AudioCallback for SdlCallback {
 		let did_talk = self.is_talking != 0;
 		let mut should_talk;
 		let mut loudness = None;
+		let mut packet_end = None;
 		// Denoise
 		if buffer.len() % DenoiseState::FRAME_SIZE != 0 {
 			warn!(self.logger, "Size not fitting for denoising");
@@ -371,21 +378,19 @@ impl AudioCallback for SdlCallback {
 			}
 		}
 
-		if should_talk {
-			if let Some(ebur128) = &mut self.loudness {
-				// Measure loudness
-				if let Err(e) = ebur128.add_frames_f32(buffer) {
-					warn!(self.logger, "Failed to measure loudness with new data"; "error" => %e);
-				} else {
-					match ebur128.loudness_momentary() {
-						Err(e) => {
-							warn!(self.logger, "Failed to measure loudness"; "error" => %e);
-						}
-						Ok(lufs) => {
-							loudness = Some(lufs);
-							if lufs < f64::from_bits(self.loudness_threshold.load(Ordering::Relaxed)) {
-								should_talk = false;
-							}
+		if let Some(ebur128) = &mut self.loudness {
+			// Measure loudness
+			if let Err(e) = ebur128.add_frames_f32(buffer) {
+				warn!(self.logger, "Failed to measure loudness with new data"; "error" => %e);
+			} else {
+				match ebur128.loudness_momentary() {
+					Err(e) => {
+						warn!(self.logger, "Failed to measure loudness"; "error" => %e);
+					}
+					Ok(lufs) => {
+						loudness = Some(lufs);
+						if lufs < f64::from_bits(self.loudness_threshold.load(Ordering::Relaxed)) {
+							should_talk = false;
 						}
 					}
 				}
@@ -410,7 +415,7 @@ impl AudioCallback for SdlCallback {
 				// Send empty packet to signal end
 				trace!(self.logger, "Sending last empty packet");
 				let packet = OutAudio::new(&AudioData::C2S { id: 0, codec, data: &[] });
-				self.send_packet(packet, true, loudness);
+				self.send_packet(Some((packet, true)), loudness);
 			}
 			self.last_buffer.resize(buffer.len(), 0.0);
 			self.last_buffer.copy_from_slice(buffer);
@@ -446,7 +451,7 @@ impl AudioCallback for SdlCallback {
 							codec,
 							data: &self.opus_output[..len],
 						});
-						self.send_packet(packet, false, loudness);
+						packet_end = Some((packet, false));
 					}
 				}
 				self.last_buffer.clear();
@@ -462,8 +467,12 @@ impl AudioCallback for SdlCallback {
 				// Create packet
 				let packet =
 					OutAudio::new(&AudioData::C2S { id: 0, codec, data: &self.opus_output[..len] });
-				self.send_packet(packet, false, loudness);
+				packet_end = Some((packet, false));
 			}
+		}
+
+		if packet_end.is_some() || loudness.is_some() {
+			self.send_packet(packet_end, loudness);
 		}
 	}
 }

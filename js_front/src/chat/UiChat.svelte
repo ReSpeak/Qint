@@ -38,6 +38,23 @@
 		messageInput.focus();
 	}
 
+	function chatChanged(e: InputEvent) {
+		// Reset to get an accurate scrollHeight
+		messageInput.style.height = "5px";
+		if (messageInput.scrollHeight < 300) {
+			messageInput.style.height = `${messageInput.scrollHeight}px`;
+			messageInput.style.overflowY = "hidden";
+		} else {
+			messageInput.style.overflowY = "auto";
+		}
+	}
+
+	function chatType(e: KeyboardEvent) {
+		if (e.key == "Enter" && !e.shiftKey && !e.ctrlKey) {
+			sendMessage(e);
+		}
+	}
+
 	async function fetchElements(idFrom: Message | undefined, dir: ListFetchDir) {
 		messagesError = undefined;
 		try {
@@ -102,8 +119,15 @@
 			<UiMessage message={item} />
 		</LazyList>
 	{/if}
-	<form class="chat-form" on:submit|preventDefault="{sendMessage}">
-		<textarea bind:this={messageInput} bind:value="{chat.composing}" class="input auto_height" name="message"></textarea>
+	<form class="chat-form" on:submit|preventDefault={sendMessage}>
+		<textarea
+			bind:this={messageInput}
+			bind:value={chat.composing}
+			on:keydown={chatType}
+			on:input={chatChanged}
+			class="input"
+			name="message"
+		></textarea>
 		<button class="button" name="send" type="submit">Send</button>
 	</form>
 </div>

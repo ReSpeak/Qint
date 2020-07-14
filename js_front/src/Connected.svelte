@@ -1,36 +1,55 @@
 <script lang="typescript">
-	import { writable } from "svelte/store";
 	import UiChat from "./chat/UiChat.svelte";
+	import UiGlobalSettings from "./settings/UiGlobalSettings.svelte";
 	import Searchbar from "./bar/Searchbar.svelte";
 	import Sidebar from "./bar/Sidebar.svelte";
 	import Toolbar from "./bar/Toolbar.svelte";
 	import { Connection } from "./connection";
 
 	export let connection: Connection;
-	let filter;
+	let filter!: string;
 
-	let showSidebar = writable(true);
-	let showChat = writable(true);
+	let showSidebar = true;
+	let showChat = true;
+	let showGlobalSettings = false;
 	let columnStyle = "";
+
+	$: globalSettingsChanged(showGlobalSettings);
+	$: chatChanged(showChat);
 
 	$: {
 		columnStyle = "";
-		if ($showSidebar)
+		if (showSidebar)
 			columnStyle += " var(--channel-tree-width)";
 		else
 			columnStyle += " 0";
-		if ($showChat)
+		if (showChat)
 			columnStyle += " 1fr";
+	}
+
+	function globalSettingsChanged(showGlobalSettings: boolean) {
+		if (showGlobalSettings) {
+			showChat = false;
+		}
+	}
+
+	function chatChanged(showChat: boolean) {
+		if (showChat) {
+			showGlobalSettings = false;
+		}
 	}
 </script>
 
 <div class="connected-container" style="grid-template-columns: {columnStyle}">
-	<Toolbar {connection} {showSidebar} {showChat} />
-	{#if $showSidebar}
+	<Toolbar {connection} bind:showSidebar bind:showChat bind:showGlobalSettings />
+	{#if showSidebar}
 		<Searchbar bind:filter/>
 		<Sidebar {connection} {filter}/>
 	{/if}
-	{#if $showChat}
+	{#if showGlobalSettings}
+		<UiGlobalSettings {connection}/>
+	{/if}
+	{#if showChat}
 		<UiChat {connection}/>
 	{/if}
 </div>

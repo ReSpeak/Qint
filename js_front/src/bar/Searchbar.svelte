@@ -1,16 +1,11 @@
 <script lang="typescript">
-	import { writable } from "svelte/store";
-
-	let searchValue = "";
-	export let filter = writable("");
-
-	$: filter.set(searchValue);
+	export let filter = "";
 </script>
 
 <aside class="searchbar">
 	<div class="media-content">
 		<p class="control has-icons-right">
-			<input class="input" type="text" placeholder="Search" bind:value={searchValue} />
+			<input class="input" type="text" placeholder="Search" bind:value={filter} />
 			<span class="icon is-small is-right">
 				<i class="mdi mdi-magnify mdi-dark"></i>
 			</span>

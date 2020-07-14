@@ -37,7 +37,7 @@ pub enum MessageP2F {
 	TalkersChanged(Vec<(ClientId, bool)>),
 	/// The connection received events.
 	Events(Vec<JsEvent>),
-	Loudness(Option<f64>),
+	Loudness(f64),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
