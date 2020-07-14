@@ -7,6 +7,8 @@
 	import { Channel, ITreeNode } from "./book";
 	import ClientComp from "./Client.svelte";
 	import { Connection } from "../connection";
+	import { draggable, DragData } from "../ui/draggable";
+	import { findParent } from "../util";
 
 	export let connection!: Connection;
 	export let filter!: string;
@@ -57,6 +59,26 @@
 		}
 		hovered = false;
 	}
+
+	function dragStart(ev: CustomEvent<DragData>) {
+		ev.detail.dragNode.classList.add("dragStyle");
+		const channelTree = findParent(ev.detail.dragNode, ".channel-list")!;
+		ev.detail.customData = channelTree;
+		// TODO find correct max
+		//ev.detail.maxY = channelTree.clientHeight;
+		ev.detail.lockX = true;
+
+	}
+
+	function dragDrop(ev: CustomEvent<DragData>) {
+		ev.detail.dragNode.classList.remove("dragStyle");
+		const hoverOpt: HTMLElement[] = [...ev.detail.customData.querySelectorAll(":hover")];
+		const dropTarget = hoverOpt.reverse().find(x => x.dataset.type === "channel");
+		console.log(hoverOpt, dropTarget);
+		if (dropTarget !== undefined) {
+			console.log("Would drop to", dropTarget.dataset.key);
+		}
+	}
 </script>
 
 <li class="container" class:hidden={!filterShow} class:collapsed>
@@ -66,6 +88,7 @@
 		class:ownClient
 		class:selectedChannel
 		on:mouseover={() => hovered = true} on:mouseout={leave}
+		use:draggable on:dragstart={dragStart} on:dragdrop={dragDrop}
 		data-type="channel" data-key={channel.id}
 	>
 		<button class="button collapseButton" on:click={() => collapsed = !collapsed} class:haschildren={$children.length !== 0}>

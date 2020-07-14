@@ -23,6 +23,7 @@ export class Connection {
 
 	constructor() {
 		loadPlugins();
+		(window as any).mov = (a: any, b: any, c: any) => this.moveChannel(a, b, c);
 	}
 
 	public reset() {
@@ -149,6 +150,26 @@ export class Connection {
 					prop: {
 						Client: {
 							channel: channelId,
+						},
+					},
+					invoker: null,
+					extra: { reason: null },
+				}
+			}]
+		});
+	}
+
+	public moveChannel(moveChannelId: number, targetChannelId?: number, targetOrder?: number) {
+		this.sendMessage({
+			Events: [{
+				PropertyChanged: {
+					id: {
+						Channel: moveChannelId,
+					},
+					prop: {
+						Channel: {
+							parent: targetChannelId,
+							order: targetOrder,
 						},
 					},
 					invoker: null,

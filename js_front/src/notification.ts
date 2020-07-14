@@ -3,7 +3,7 @@ import { Book, Channel, Client, Server } from "./tree/book";
 import { InBookMsg, InMsg, Invoker, Reason } from "./structs/ws";
 import { Connection, ConnectionState } from "./connection";
 
-type NotificationArg = Book | Channel | Client | Invoker | Server | string;
+type NotificationArg = Book | Channel | Client | Invoker | Server | string | null | undefined;
 
 class TsNotification {
 	constructor(
@@ -19,6 +19,7 @@ class TsNotification {
 			res += this.pieces[i];
 			if (i < this.args.length) {
 				const a = this.args[i];
+				if (a === null || a === undefined) continue;
 				if (a instanceof Channel) {
 					if (a.phonetic_name !== null && a.phonetic_name.length > 0)
 						res += a.phonetic_name;
@@ -167,7 +168,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 
 					if ("channel" in newC) {
 						const reason = msg.PropertyChanged.extra.reason;
-						const channel = con.book.getChannel(newC.channel)!;
+						const channel = con.book.getChannel(newC.channel!)!;
 						if (reason === Reason.None) {
 							if (client.id === ownClientId) {
 								handler(con, msg, notif`Switched to ${channel}`);
@@ -237,7 +238,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 					if ("away_message" in newC) {
 						if (newC.away_message === null)
 							handler(con, msg, notif`${client} is back`);
-						else if (newC.away_message.length === 0)
+						else if (newC.away_message!.length === 0)
 							handler(con, msg, notif`${client} has gone`);
 						else
 							handler(con, msg, notif`${client} has gone to ${newC.away_message}`);
@@ -264,7 +265,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 							handler(con, msg, notif`${client} is listening`);
 					}
 
-					if ("​​​​input_hardware_enabled" in newC) {
+					if ("input_hardware_enabled" in newC) {
 						if (newC.​​​​input_hardware_enabled)
 							handler(con, msg, notif`${client} can talk`);
 						else

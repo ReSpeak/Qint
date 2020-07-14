@@ -269,8 +269,4 @@
 		opacity: 1;
 		height: 100%;
 	}
-
-	:global(.dragStyle) {
-		background-color: #6040C080 !important;
-	}
 </style>

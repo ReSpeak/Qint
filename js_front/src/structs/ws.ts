@@ -1,5 +1,7 @@
 // tslint:disable: interface-name
 
+import { Channel, Client, Server } from "../tree/book";
+
 export type WsMessageTarget =
 	"Server"
 	| "Channel"
@@ -109,15 +111,15 @@ interface IMsgPropertyIdServer {
 type PropertyId = IMsgPropertyIdChannel | IMsgPropertyIdClient | IMsgPropertyIdClientServerGroup | IMsgPropertyIdServer;
 
 interface IMsgPropertyValueChannel {
-	Channel: any;
+	Channel: Partial<Channel>;
 }
 
 interface IMsgPropertyValueClient {
-	Client: any;
+	Client: Partial<Client>;
 }
 
 interface IMsgPropertyValueServer {
-	Server: any;
+	Server: Partial<Server>;
 }
 
 type PropertyValue = IMsgPropertyValueChannel | IMsgPropertyValueClient | IMsgPropertyValueServer;
@@ -133,31 +135,23 @@ export interface ExtraInfo {
 	reason: Reason | null;
 }
 
+type PropertyMod = {
+	id: PropertyId;
+	prop: PropertyValue;
+	invoker: Invoker | null;
+	extra: ExtraInfo;
+};
+
 interface IMsgBookAdded {
-	PropertyAdded: {
-		id: PropertyId;
-		prop: PropertyValue;
-		invoker: Invoker | null;
-		extra: ExtraInfo;
-	};
+	PropertyAdded: PropertyMod;
 }
 
 interface IMsgBookChanged {
-	PropertyChanged: {
-		id: PropertyId;
-		prop: PropertyValue;
-		invoker: Invoker | null;
-		extra: ExtraInfo;
-	};
+	PropertyChanged: PropertyMod;
 }
 
 interface IMsgBookRemoved {
-	PropertyRemoved: {
-		id: PropertyId;
-		prop: PropertyValue;
-		invoker: Invoker | null;
-		extra: ExtraInfo;
-	};
+	PropertyRemoved: PropertyMod;
 }
 
 type IMskBookChannelListFinished = "ChannelListFinished";

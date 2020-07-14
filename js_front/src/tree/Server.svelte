@@ -21,4 +21,8 @@
 	ul {
 		margin: 0 0 0 0.2em;
 	}
+	
+	:global(.dragStyle) {
+		background-color: #6040C080 !important;
+	}
 </style>
