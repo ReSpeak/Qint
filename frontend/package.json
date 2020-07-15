@@ -25,6 +25,7 @@
 	"dependencies": {
 		"@mdi/font": "^5.3.45",
 		"bulma": "^0.9.0",
+		"bulma-slider": "^2.0.4",
 		"bulmaswatch": "^0.8.1",
 		"highlight.js": "^10.1.1",
 		"katex": "^0.11.1",

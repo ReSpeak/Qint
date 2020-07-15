@@ -11,6 +11,7 @@
 	const activeIndex = context.activeIndex;
 </script>
 
+<svelte:options immutable="{true}" />
 {#if $activeIndex === ownIndex}
 	<slot />
 {/if}

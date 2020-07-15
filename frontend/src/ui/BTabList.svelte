@@ -17,12 +17,19 @@
 	}
 </script>
 
+<svelte:options immutable="{true}" />
 <div class="tabList">
 	<div class="tabs">
 		<ul>
 			{#each items as item, index}
-				<li class:is-active={index === $activeIndex}>
-					<a on:click={() => {$activeIndex = index;}}>{item}</a>
+				<li class:is-active="{index === $activeIndex}">
+					<a
+						on:click="{() => {
+							$activeIndex = index;
+						}}"
+					>
+						{item}
+					</a>
 				</li>
 			{/each}
 		</ul>

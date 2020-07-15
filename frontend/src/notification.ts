@@ -11,7 +11,7 @@ class TsNotification {
 		public pieces: TemplateStringsArray,
 		/** The dynamically formatted pieces. Every arg is preceded by a string piece. */
 		public args: NotificationArg[],
-	) {}
+	) { }
 
 	public toString(con: Connection): string {
 		let res = "";
@@ -266,7 +266,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 					}
 
 					if ("input_hardware_enabled" in newC) {
-						if (newC.​​​​input_hardware_enabled)
+						if (newC.input_hardware_enabled)
 							handler(con, msg, notif`${client} can talk`);
 						else
 							handler(con, msg, notif`${client} is silent`);
@@ -354,7 +354,8 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 }
 
 function textToSpeechNotification(con: Connection, _e: InMsg | InBookMsg, no: TsNotification) {
-	const utter = new SpeechSynthesisUtterance(no.toString(con));
+	const utter = con.volatileSettings.synth.getNewUtter();
+	utter.text = no.toString(con);
 	synth.cancel();
 	synth.speak(utter);
 }
