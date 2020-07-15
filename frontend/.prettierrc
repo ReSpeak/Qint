@@ -5,7 +5,7 @@
 	"semi": true,
 	"singleQuote": false,
 	"svelteSortOrder": "scripts-markup-styles",
-	"svelteStrictMode": true,
-	"svelteBracketNewLine": true,
+	"svelteStrictMode": false,
+	"svelteBracketNewLine": false,
 	"printWidth": 100
 }
