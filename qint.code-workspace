@@ -8,6 +8,6 @@
 		}
 	],
 	"settings": {
-		"typescript.tsdk": "js_front\\node_modules\\typescript\\lib"
+		"typescript.tsdk": "frontend\\node_modules\\typescript\\lib"
 	}
 }

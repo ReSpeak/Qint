@@ -9,6 +9,7 @@ export class DragData {
 	public maxY?: number;
 	public minDistBeforeTrigger = 5;
 	public hasTriggered = false;
+	public mouseEvent!: MouseEvent;
 	public customData: any | undefined;
 
 	constructor(
@@ -42,6 +43,7 @@ export function draggable(node: HTMLElement) {
 			if (dd.maxY !== undefined) dy = Math.min(dd.maxY, dy);
 		}
 
+		dd.mouseEvent = event;
 		if (!dd.hasTriggered) {
 			if (Math.abs(dx) + Math.abs(dy) < dd.minDistBeforeTrigger)
 				return;
@@ -55,6 +57,7 @@ export function draggable(node: HTMLElement) {
 	}
 
 	function handleMouseup(event: MouseEvent) {
+		dd.mouseEvent = event;
 		if (dd.hasTriggered) {
 			node.style.transform = `translate(0,0)`;
 			node.style.pointerEvents = "unset";

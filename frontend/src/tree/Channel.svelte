@@ -39,8 +39,11 @@
 	}
 
 	function applyFilter(filter: string, channel: Channel, children: ITreeNode[]) {
-		return filter === "" || channel.name.toLowerCase().includes(filter.toLowerCase())
-			|| children.some(c => c.filterShow);
+		return (
+			filter === "" ||
+			channel.name.toLowerCase().includes(filter.toLowerCase()) ||
+			children.some(c => c.filterShow)
+		);
 	}
 
 	function switchChannel() {
@@ -67,36 +70,74 @@
 		// TODO find correct max
 		//ev.detail.maxY = channelTree.clientHeight;
 		ev.detail.lockX = true;
-
 	}
 
 	function dragDrop(ev: CustomEvent<DragData>) {
 		ev.detail.dragNode.classList.remove("dragStyle");
-		const hoverOpt: HTMLElement[] = [...ev.detail.customData.querySelectorAll(":hover")];
-		const dropTarget = hoverOpt.reverse().find(x => x.dataset.type === "channel");
+		const hoverOpt: HTMLElement[] = [
+			...ev.detail.customData.querySelectorAll(":hover"),
+		].reverse();
+		const dropTarget = hoverOpt.find(x => x.dataset.type === "channel");
 		console.log(hoverOpt, dropTarget);
 		if (dropTarget !== undefined) {
-			console.log("Would drop to", dropTarget.dataset.key);
+			const rect = dropTarget.getBoundingClientRect();
+			let clickY = ev.detail.mouseEvent.clientY - rect.top;
+			let clickPerc = clickY / (rect.bottom - rect.top);
+			let target = connection.book.getChannel(Number(dropTarget.dataset.key))!;
+			// < 0.25      : Dropped in the upper quarter
+			// 0.25 - 0.75 : Dropped in the middle half
+			// > 0.75      : Dropped in the lower quarter
+
+			if (clickPerc < 0.25) {
+				// Case A: Dropped TOP
+				//      => Insert in same parent as target, steal order of target
+				connection.moveChannel(channel.id, target.parent, target.order);
+			} else if (clickPerc < 0.75) {
+				// Case B: Dropped MIDDLE
+				//      => Target is the new parent, order 0 since it's the first child now
+				connection.moveChannel(channel.id, target.id, 0);
+			} else {
+				// Dropped BOTTOM
+				if (get(target.children).length > 0) {
+					// Case C: Channel HAS child
+					//      => Same as middle
+					connection.moveChannel(channel.id, target.id, 0);
+				} else {
+					// Case D: Channel NO child
+					//      => Place below target, parent same as target, order is target
+					connection.moveChannel(channel.id, target.parent, target.id);
+				}
+			}
+
+			console.log("Would drop", channel.id, "to", dropTarget.dataset.key, "at", clickPerc);
 		}
 	}
 </script>
 
-<li class="container" class:hidden={!filterShow} class:collapsed>
+<li class="container" class:hidden="{!filterShow}" class:collapsed>
 	<div
-		bind:this={div}
+		bind:this="{div}"
 		class="nameContainer"
 		class:ownClient
 		class:selectedChannel
-		on:mouseover={() => hovered = true} on:mouseout={leave}
-		use:draggable on:dragstart={dragStart} on:dragdrop={dragDrop}
-		data-type="channel" data-key={channel.id}
+		on:mouseover="{() => (hovered = true)}"
+		on:mouseout="{leave}"
+		use:draggable
+		on:dragstart="{dragStart}"
+		on:dragdrop="{dragDrop}"
+		data-type="channel"
+		data-key="{channel.id}"
 	>
-		<button class="button collapseButton" on:click={() => collapsed = !collapsed} class:haschildren={$children.length !== 0}>
+		<button
+			class="button collapseButton"
+			on:click="{() => (collapsed = !collapsed)}"
+			class:haschildren="{$children.length !== 0}"
+		>
 			<Icon name="chevron-right{collapsed ? '' : ' mdi-rotate-90'}" />
 			<ChannelIcon {channel} {connection} />
 		</button>
-		<button class="button nameButton" on:click={setChat} on:dblclick={switchChannel}>
-			<FilterString {filter} content={channel.name} />
+		<button class="button nameButton" on:click="{setChat}" on:dblclick="{switchChannel}">
+			<FilterString {filter} content="{channel.name}" />
 		</button>
 		{#if hovered}
 			<div class="hover menu" style="top: {div.getBoundingClientRect().top}px;">
@@ -108,9 +149,19 @@
 	<ul class="menu-list">
 		{#each $children as child (child.id)}
 			{#if child instanceof Channel}
-				<svelte:self {connection} {filter} channel={child} bind:filterShow={child.filterShow} />
+				<svelte:self
+					{connection}
+					{filter}
+					channel="{child}"
+					bind:filterShow="{child.filterShow}"
+				/>
 			{:else}
-				<ClientComp {connection} {filter} client={child} bind:filterShow={child.filterShow} />
+				<ClientComp
+					{connection}
+					{filter}
+					client="{child}"
+					bind:filterShow="{child.filterShow}"
+				/>
 			{/if}
 		{/each}
 	</ul>

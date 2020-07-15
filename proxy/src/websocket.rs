@@ -20,7 +20,7 @@ use tsclientlib::{
 use tsproto::resend::PacketId;
 use tsproto_packets::packets::{AudioData, OutPacket};
 
-use crate::book_events::{JsClient, JsEvent, JsProperty, JsPropertyId};
+use crate::book_events::{JsClient, JsChannel, JsEvent, JsProperty, JsPropertyId};
 use crate::db::{ChatId, ChatType};
 use crate::messages::{self, MessageF2P, MessageP2F};
 use crate::{audio, book_events, db, ConnectionId, State, Tristate, WsFormat, WsOptions};
@@ -462,6 +462,25 @@ impl Ws {
 												}
 											} else {
 												warn!(self.logger, "Wrong id");
+											}
+										} else if let JsProperty::Channel(JsChannel { parent, order, .. }) = prop {
+											if let JsPropertyId::Channel(channel_id) = id {
+												let mut changed = false;
+												if let Some(mut chan) = state.get_channel(&channel_id) {
+													if let Some(order) = order {
+														if let Some(parent) = parent {
+															changed = true;
+															if let Err(e) = chan.set_position((parent, order)) {
+																error!(self.logger, "Failed to set parent";
+																	"error" => %e);
+															}
+														}
+													}
+												}
+
+												if !changed {
+													warn!(self.logger, "Unknown property change");
+												}
 											}
 										} else {
 											warn!(self.logger, "Unknown property change");

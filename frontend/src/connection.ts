@@ -159,7 +159,7 @@ export class Connection {
 		});
 	}
 
-	public moveChannel(moveChannelId: number, targetChannelId?: number, targetOrder?: number) {
+	public moveChannel(moveChannelId: number, targetParentId?: number, targetOrderId?: number) {
 		this.sendMessage({
 			Events: [{
 				PropertyChanged: {
@@ -168,8 +168,8 @@ export class Connection {
 					},
 					prop: {
 						Channel: {
-							parent: targetChannelId,
-							order: targetOrder,
+							parent: targetParentId,
+							order: targetOrderId,
 						},
 					},
 					invoker: null,
