@@ -10,21 +10,29 @@
 	import { ListFetchDir, ILazyList } from "../ui/lazyList";
 	import { Connection } from "../connection";
 	import { assert } from "../util";
+	import BInput from "../ui/BInput.svelte";
 
 	export let connection!: Connection;
 	let chat = connection.chat;
 
 	let chatList: ILazyList;
 	let messagesError: unknown | undefined;
-	let messageInput: HTMLTextAreaElement;
+	let messageInput: HTMLElement;
+	let canChatHere = true;
 
-	chat.selectedChat.subscribe(_ => {
+	chat.selectedChat.subscribe(c => {
 		console.log("switch chat");
 		if (chatList) {
 			chatList.sourceChanged(ListFetchDir.New, ListFetchDir.After);
 		}
 		if (messageInput)
 			messageInput.focus();
+
+		if ("Server" in c || "Client" in c) {
+			canChatHere = true;
+		} else if ("Channel" in c) {
+			canChatHere = c.Channel === get(connection.ownClient)!.channel;
+		}
 	});
 
 	chat.unreadCount.subscribe(_ => {
@@ -32,26 +40,16 @@
 			chatList.sourceChanged(ListFetchDir.After, ListFetchDir.After);
 	});
 
-	function sendMessage(e: Event) {
+	function sendMessage(e: UIEvent) {
 		chat.sendMessage();
 		chat.composing = "";
 		messageInput.focus();
 	}
 
-	function chatChanged(e: InputEvent) {
-		// Reset to get an accurate scrollHeight
-		messageInput.style.height = "5px";
-		if (messageInput.scrollHeight < 300) {
-			messageInput.style.height = `${messageInput.scrollHeight}px`;
-			messageInput.style.overflowY = "hidden";
-		} else {
-			messageInput.style.overflowY = "auto";
-		}
-	}
-
-	function chatType(e: KeyboardEvent) {
-		if (e.key == "Enter" && !e.shiftKey && !e.ctrlKey) {
+	function onChatKeyDown(e: KeyboardEvent) {
+		if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey) {
 			sendMessage(e);
+			e.preventDefault();
 		}
 	}
 
@@ -119,17 +117,12 @@
 			<UiMessage message={item} />
 		</LazyList>
 	{/if}
-	<form class="chat-form" on:submit|preventDefault={sendMessage}>
-		<textarea
-			bind:this={messageInput}
-			bind:value={chat.composing}
-			on:keydown={chatType}
-			on:input={chatChanged}
-			class="input"
-			name="message"
-		></textarea>
-		<button class="button" name="send" type="submit">Send</button>
-	</form>
+	{#if canChatHere}
+		<form class="chat-form" on:submit|preventDefault={sendMessage}>
+			<BInput bind:this={messageInput} bind:value={chat.composing} on:keydown={onChatKeyDown} />
+			<button class="button" name="send" type="submit" style="height: auto;">Send</button>
+		</form>
+	{/if}
 </div>
 
 <style lang="scss">
@@ -149,13 +142,13 @@
 	.chat-form {
 		display: flex;
 		width: 100%;
+		height: auto;
 
 		box-shadow: 0px -5px 20px -5px rgba(0, 0, 0, 0.3);
 	}
 
 	.chat-form > * {
 		box-sizing: border-box;
-		height: 2em;
 		font-size: 1em;
 	}
 
@@ -185,15 +178,7 @@
 
 	.chat :global(.scrollPane) {
 		padding: 0.5em;
-		display: flex;
-		flex-direction: column;
 	}
-
-	.chat :global(.scrollPane > .lazyListElement) {
-		display: flex;
-		flex-direction: column;
-	}
-
 
 	@mixin block-margin {
 		margin-top: 0.5em;

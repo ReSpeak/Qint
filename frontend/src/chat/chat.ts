@@ -40,25 +40,28 @@ export class Chat {
 	}
 
 	private static groupMessages(messages: Message[], lastEntry: Message | undefined, dir: ListFetchDir): void {
+		let previousMessage: Message | undefined;
+
 		if (lastEntry) {
-			lastEntry.displayGroupHeader = false;
-			lastEntry.displayDateSeparator = false;
-			if (dir === ListFetchDir.Before) messages.push(lastEntry);
-			else if (dir === ListFetchDir.After) messages.unshift(lastEntry);
+			if (dir === ListFetchDir.Before) {
+				lastEntry.displayGroupHeader = false;
+				lastEntry.displayDateSeparator = false;
+				messages.push(lastEntry);
+			}
+			else if (dir === ListFetchDir.After) {
+				previousMessage = lastEntry;
+			}
 		}
 
-		let previousMessage: Message | undefined;
-		let previousDate: Moment | undefined;
 		for (const message of messages) {
+			const previousDate = previousMessage?.date;
 			message.displayGroupHeader = !previousMessage || !GraphQlClient.equals(previousMessage.invoker, message.invoker);
 			message.displayDateSeparator = !previousDate || !previousDate.isSame(message.date, "day");
 			previousMessage = message;
-			previousDate = message.date;
 		}
 
 		if (lastEntry) {
 			if (dir === ListFetchDir.Before) messages.pop();
-			else if (dir === ListFetchDir.After) messages.shift();
 		}
 	}
 

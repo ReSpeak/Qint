@@ -1,5 +1,11 @@
 <script lang="typescript">
-	import { sleep, assert, binarySearchByKey, BinarySearchResult } from "../util";
+	import {
+		sleep,
+		assert,
+		binarySearchByKey,
+		BinarySearchResult,
+		getResizeObserver,
+	} from "../util";
 	import { tick, onMount } from "svelte";
 	import { writable } from "svelte/store";
 	import * as svst from "svelte/store";
@@ -358,13 +364,31 @@
 	onMount(() => {
 		start_fill();
 		pan.onresize = start_fill;
+		bottomScroller(pan);
+
+		function bottomScroller(scroller: HTMLElement) {
+			let oldScrollTop = scroller.scrollTop;
+			let oldHeight = scroller.clientHeight;
+
+			scroller.addEventListener("scroll", (_: Event) => {
+				if (oldHeight === scroller.clientHeight) oldScrollTop = scroller.scrollTop;
+			});
+
+			var obs = getResizeObserver(() => {
+				let newScrollTop = oldScrollTop + oldHeight - scroller.clientHeight;
+				scroller.scrollTop = newScrollTop;
+				oldScrollTop = newScrollTop;
+				oldHeight = scroller.clientHeight;
+			});
+			obs.observe(pan);
+		}
 	});
 </script>
 
 <svelte:options accessors />
 <div class="lazyList">
-	<div class="lazyListView" bind:this="{pan}" on:scroll="{handle_scroll}">
-		<div class="scrollPane" bind:this="{scrollPane}">
+	<div class="lazyListView" bind:this={pan} on:scroll={handle_scroll}>
+		<div class="scrollPane" bind:this={scrollPane}>
 			{#each elems as item (item)}
 				<div class="lazyListElement">
 					<slot {item} />
@@ -372,15 +396,14 @@
 			{/each}
 		</div>
 		{#if loadAnchored === ListFetchDir.After}
-			<div id="anchor"></div>
+			<div id="anchor" />
 		{/if}
 	</div>
 	<button
 		class="arrow-down"
-		class:showJumpDown="{!isAtBottom}"
-		on:click="{() => jumpTo(ListFetchDir.After)}"
-	>
-		<div></div>
+		class:showJumpDown={!isAtBottom}
+		on:click={() => jumpTo(ListFetchDir.After)}>
+		<div />
 	</button>
 </div>
 

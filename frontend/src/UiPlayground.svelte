@@ -1,14 +1,16 @@
 <script>
-	import TabList from "./ui/TabList.svelte";
-	import TabSlot from "./ui/TabSlot.svelte";
+	import BInput from "./ui/BInput.svelte";
+
+	let val = "dummy";
+	let inp = "hi";
 </script>
 
 <div class="testingList">
-	<TabList>
-		<TabSlot title="Root">HI</TabSlot>
-		<TabSlot title="Aside">Yo</TabSlot>
-		<TabSlot title="Whaaat">Whaaat</TabSlot>
-	</TabList>
+	<BInput bind:value={inp} />
+	<BInput bind:value={val} />
+	<div class="text">{val}</div>
+
+	<input bind:value={inp} />
 </div>
 
 <style>
@@ -19,5 +21,10 @@
 
 	:global(html, body) {
 		background-color: #1a1a1a;
+	}
+
+	.text {
+		color: wheat;
+		white-space: pre;
 	}
 </style>
