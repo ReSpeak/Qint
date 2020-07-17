@@ -77,8 +77,8 @@
 	}
 
 	onMount(() => {
+		chatList.sourceChanged(ListFetchDir.New, ListFetchDir.After);
 		messageInput.focus();
-		console.log("Chatto", chatList);
 	});
 </script>
 
