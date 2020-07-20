@@ -73,4 +73,9 @@
 	:global(.update-flash-fade) {
 		transition: color 1s, background 1s;
 	}
+
+	:global(.button:focus) {
+		box-shadow: none !important;
+		color: $text-strong !important;
+	}
 </style>
