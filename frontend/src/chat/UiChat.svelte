@@ -142,39 +142,23 @@
 
 	.chat-form {
 		display: flex;
-		width: 100%;
 		height: auto;
 
+		margin: 0.5em;
+		margin-top: 0;
+	}
+
+	.chat-form > :global(*) {
 		box-shadow: 0px -5px 20px -5px rgba(0, 0, 0, 0.3);
-	}
-
-	.chat-form > * {
-		box-sizing: border-box;
-		font-size: 1em;
-	}
-
-	.chat-form textarea {
-		flex-grow: 1;
-		border: {
-			top: 1px solid;
-			right: 1px solid;
-			left: none;
-			bottom: none;
-			radius: 0;
-		}
 	}
 
 	.chat-form button {
 		background: none;
 		color: $blue;
 		vertical-align: middle;
-		border: {
-			top: 1px solid;
-			left: none;
-			right: none;
-			bottom: none;
-			radius: 0;
-		}
+		border: 1px solid;
+		border-radius: 5px;
+		margin-left: 0.5em;
 	}
 
 	.chat :global(.scrollPane) {

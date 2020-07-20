@@ -40,12 +40,14 @@
 	name="message"
 	contenteditable="true" />
 
-<style>
+<style lang="scss">
 	.chatTextBox {
 		-moz-appearance: textfield;
 		-webkit-appearance: textfield;
 		height: auto;
 		display: block;
 		white-space: pre-wrap;
+		background-color: transparent;
+		color: $text;
 	}
 </style>
