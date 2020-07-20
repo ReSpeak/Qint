@@ -5,6 +5,8 @@
 	import Connect from "./connect/Connect.svelte";
 	import Connected from "./Connected.svelte";
 	import { ConnectionState } from "./connection";
+	import { BUILD_ENV, BUILD_DAT } from "./util";
+	console.log("BUILD", BUILD_ENV, BUILD_DAT);
 
 	export let connection;
 	$: state = connection.state;
@@ -32,6 +34,10 @@
 	@import "@mdi/font/css/materialdesignicons";
 	@import "katex/dist/katex.min";
 	@import "highlight.js/styles/vs2015";
+	
+	@import "bulma/bulma";
+	@import "bulma-slider/src/sass/index";
+	@import "bulmaswatch/cyborg/overrides";
 
 	:root {
 		--channel-tree-width: 20em;
@@ -66,15 +72,15 @@
 		background: $background;
 	}
 
-	:global(.update-flash) {
+	.update-flash {
 		color: rgba(255, 62, 0, 1) !important;
 		background-color: rgba(255, 62, 0, 0.2) !important;
 	}
-	:global(.update-flash-fade) {
+	.update-flash-fade {
 		transition: color 1s, background 1s;
 	}
 
-	:global(.button:focus) {
+	.button:focus {
 		box-shadow: none !important;
 		color: $text-strong !important;
 	}

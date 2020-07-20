@@ -8,10 +8,9 @@ module.exports = {
 		scss: {
 			includePaths: ['src', 'node_modules'],
 			data: `
-			@import 'bulmaswatch/cyborg/variables';
-			@import 'bulma/bulma';
-			@import 'bulma-slider/src/sass/index';
-			@import 'bulmaswatch/cyborg/overrides';`
+			@import "bulmaswatch/cyborg/variables";
+			@import "bulma/sass/utilities/all";
+			`
 		},
 	}),
 	// ...other svelte options
