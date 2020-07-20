@@ -5,7 +5,7 @@ import { Book, Channel, Client } from "./tree/book";
 import { plugins, loadPlugins } from "./plugins";
 import { BASE_ADDRESS } from "./util";
 import { handleMessage } from "./notification";
-import { VolatileSettings } from "./settings/volatileSettings";
+import { TransientSettings } from "./panel/transientSettings";
 
 export class Connection {
 	public readonly state = writable(ConnectionState.Disconnected);
@@ -13,7 +13,7 @@ export class Connection {
 
 	public readonly book: Book = new Book();
 	public readonly chat: Chat = new Chat(this);
-	public readonly volatileSettings: VolatileSettings = new VolatileSettings();
+	public readonly transientSettings: TransientSettings = new TransientSettings();
 	public server?: string;
 	public ownClientId?: number;
 	public ownClient: Readable<Client | undefined> = derived(this.book.clients,

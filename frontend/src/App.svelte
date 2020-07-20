@@ -11,6 +11,8 @@
 
 	window.onbeforeunload = function(e) {
 		let s = get(state);
+		// For debugging puproses ?
+		window.speechSynthesis.speak(new SpeechSynthesisUtterance("Goodbye"));
 		if (s === ConnectionState.Connected || s === ConnectionState.ChannelListFinished) {
 			if (e) {
 				e.returnValue = true;
@@ -40,6 +42,7 @@
 	html {
 		overflow: auto;
 		background-color: $background;
+		scrollbar-color: gray transparent;
 	}
 
 	.hover.menu {

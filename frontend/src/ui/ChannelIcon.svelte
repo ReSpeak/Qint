@@ -1,6 +1,6 @@
 <script>
 	import Icon from './Icon.svelte';
-	import getClientIconPath from "./clientIcon";
+	import { getClientIconPath } from "./clientIcon";
 
 	export let channel;
 	// Either connection or server has to be set to fetch the icon

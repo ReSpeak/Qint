@@ -2,8 +2,9 @@ import { Writable, writable, Readable, derived, get } from "svelte/store";
 import { InBookChangeMsg } from "../structs/ws";
 import { graphql } from "../graphql";
 import { Connection } from "../connection";
-import { binarySearchBy, binarySearchByKey, getDataColor, arraysEqual } from "../util";
+import { binarySearchBy, binarySearchByKey, getDataColor, arraysEqual, Lazy } from "../util";
 import "../extensions";
+import { Codec, ChannelType } from "../structs/ts";
 
 type ChannelId = number;
 
@@ -331,8 +332,12 @@ export class GraphQlClient {
 	public name!: string;
 	public icon_id!: number;
 	public avatar_hash!: string;
+	private _clientColor: Lazy<string>;
+	public get clientColor() { return this._clientColor.get(); }
 
-	protected constructor() { }
+	protected constructor() {
+		this._clientColor = new Lazy(() => getDataColor(this.uid));
+	}
 
 	public static fromGraphqlInvoker(obj: any): GraphQlClient {
 		const c = new GraphQlClient();
@@ -468,17 +473,19 @@ export class Client extends GraphQlClient implements ITreeNode {
 	}
 }
 
+type MaxClients = "Inherited" | "Unlimited" | { Limited: number };
+
 export class Channel implements ITreeParent, ITreeNode {
 	public id!: ChannelId;
 	public parent!: ChannelId;
 	public name!: string;
 	public topic!: string | null;
-	public codec!: string | null; // TODO enum
+	public codec!: Codec;
 	public codec_quality!: number | null;
-	public max_clients!: any;
-	public max_family_clients!: any | null;
+	public max_clients!: MaxClients;
+	public max_family_clients!: MaxClients | null;
 	public order!: ChannelId;
-	public channel_type!: string; // TODO enum
+	public channel_type!: ChannelType; // Why is this called 'channel_' ?
 	public is_default!: boolean | null;
 	public has_password!: boolean | null;
 	public codec_latency_factor!: number | null;

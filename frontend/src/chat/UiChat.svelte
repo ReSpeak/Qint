@@ -6,6 +6,7 @@
 	import { Chat, Message } from "./chat";
 	import Icon from "../ui/Icon.svelte";
 	import ClientIcon from "../ui/ClientIcon.svelte";
+	import ClientName from "../ui/ClientName.svelte";
 	import LazyList from "../ui/LazyList.svelte";
 	import { ListFetchDir, ILazyList } from "../ui/lazyList";
 	import { Connection } from "../connection";
@@ -110,7 +111,7 @@
 						<ClientIcon client={item.invoker} {connection} />
 					</div>
 					<div class="invoker-name has-text-weight-bold">
-						<span style={item.clientColor}>{item.displayName}</span>
+						<ClientName client={item.invoker} />
 					</div>
 				</div>
 			{/if}

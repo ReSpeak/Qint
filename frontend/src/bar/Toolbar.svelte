@@ -6,6 +6,7 @@
 	export let connection!: Connection;
 	export let showSidebar!: boolean;
 	export let showChat!: boolean;
+	export let showDescription!: boolean;
 	export let showGlobalSettings!: boolean;
 	let server = connection.book.server;
 	let dropdownActive = false;
@@ -53,6 +54,9 @@
 		</button>
 		<button class="button toolbutton" class:active={showChat} on:click={() => showChat = !showChat}>
 			<Icon name="chat-outline" />
+		</button>
+		<button class="button toolbutton" class:active={showDescription} on:click={() => showDescription = !showDescription}>
+			<Icon name="information-outline" />
 		</button>
 	</div>
 	<div class="rightButtons">

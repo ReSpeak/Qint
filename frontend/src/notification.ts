@@ -354,7 +354,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 }
 
 function textToSpeechNotification(con: Connection, _e: InMsg | InBookMsg, no: TsNotification) {
-	const utter = con.volatileSettings.synth.getNewUtter();
+	const utter = con.transientSettings.synth.getNewUtter();
 	utter.text = no.toString(con);
 	synth.cancel();
 	synth.speak(utter);

@@ -32,7 +32,7 @@
 
 	// Text-to-Speech
 	const synth = window.speechSynthesis;
-	const synthSett = connection.volatileSettings.synth;
+	const synthSett = connection.transientSettings.synth;
 	console.log(synthSett);
 	let voices = synth.getVoices();
 	let previewText!: HTMLInputElement;

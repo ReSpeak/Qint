@@ -1,8 +1,8 @@
-export class VolatileSettings {
-	public synth = new VolatileSettingsSynth();
+export class TransientSettings {
+	public synth = new TransientSettingsSynth();
 }
 
-export class VolatileSettingsSynth {
+export class TransientSettingsSynth {
 	public voiceName?: string;
 	public volume: number = 1;
 	public speed: number = 1;
