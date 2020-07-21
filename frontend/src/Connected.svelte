@@ -23,7 +23,7 @@
 	$: {
 		columnStyle = "";
 		if (showSidebar) columnStyle += " var(--channel-tree-width)";
-		else columnStyle += "";
+		else columnStyle += " 0";
 		columnStyle += " 1fr";
 	}
 
