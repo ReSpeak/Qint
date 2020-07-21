@@ -88,13 +88,6 @@ pub struct JsServer {
 <# get_props(_fmt, &self.structs, &["Server", "OptionalServerData", "ConnectionServerData"])?; #>
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub enum JsProperty {
-	Channel(JsChannel),
-	Client(JsClient),
-	Server(JsServer),
-}
-
 pub fn convert_event(con: &Connection, e: &Event) -> Option<JsEvent> {
 	match e {
 		Event::PropertyAdded { id, invoker, extra } => {
@@ -147,3 +140,5 @@ impl TryFrom<PropertyId> for JsPropertyId {
 		}
 	}
 }
+
+// Setter

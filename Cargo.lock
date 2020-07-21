@@ -2279,7 +2279,7 @@ dependencies = [
  "slog-stdlog 3.0.5",
  "slog-term",
  "structopt",
- "t4rust-derive",
+ "t4rust-derive 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.2.16",
  "tokio",
  "tokio-util 0.3.1",
@@ -3137,6 +3137,16 @@ dependencies = [
 [[package]]
 name = "t4rust-derive"
 version = "0.2.0"
+dependencies = [
+ "nom 5.1.2",
+ "proc-macro2",
+ "quote 1.0.7",
+ "syn 1.0.33",
+]
+
+[[package]]
+name = "t4rust-derive"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05da4fefb247b3b208fe1a406c547e1be83b70bc438299f681997254a50f608e"
 dependencies = [
@@ -3476,7 +3486,7 @@ dependencies = [
  "num-traits",
  "serde",
  "slog",
- "t4rust-derive",
+ "t4rust-derive 0.2.0",
  "thiserror",
  "time 0.2.16",
  "tsproto-packets",
@@ -3492,7 +3502,6 @@ dependencies = [
  "base64 0.12.3",
  "futures",
  "git-testament",
- "heck",
  "itertools 0.9.0",
  "num-traits",
  "pin-utils",
@@ -3502,7 +3511,6 @@ dependencies = [
  "slog-async",
  "slog-perf",
  "slog-term",
- "t4rust-derive",
  "thiserror",
  "time 0.2.16",
  "tokio",
@@ -3511,7 +3519,6 @@ dependencies = [
  "ts-bookkeeping",
  "tsproto",
  "tsproto-packets",
- "tsproto-structs",
  "tsproto-types",
  "url",
 ]
@@ -3593,7 +3600,7 @@ dependencies = [
  "rand 0.7.3",
  "serde",
  "simple_asn1",
- "t4rust-derive",
+ "t4rust-derive 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "thiserror",
  "time 0.2.16",
  "tsproto-structs",

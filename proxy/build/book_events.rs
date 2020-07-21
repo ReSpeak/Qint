@@ -4,12 +4,14 @@ use std::ops::Deref;
 use heck::*;
 use t4rust_derive::Template;
 use tsproto_structs::book::*;
+use tsproto_structs::book_to_messages::{self, BookToMessagesDeclarations};
 use tsproto_structs::messages_to_book::{self, MessagesToBookDeclarations};
 
 #[derive(Template)]
 #[TemplatePath = "build/BookEvents.tt"]
 #[derive(Debug)]
-pub struct BookEvents<'a>(&'a BookDeclarations, &'a MessagesToBookDeclarations<'a>);
+pub struct BookEvents<'a>(&'a BookDeclarations, &'a MessagesToBookDeclarations<'a>,
+	&'a BookToMessagesDeclarations<'a>);
 
 impl Deref for BookEvents<'_> {
 	type Target = BookDeclarations;
@@ -17,7 +19,7 @@ impl Deref for BookEvents<'_> {
 }
 
 impl Default for BookEvents<'static> {
-	fn default() -> Self { BookEvents(&DATA, &messages_to_book::DATA) }
+	fn default() -> Self { BookEvents(&DATA, &messages_to_book::DATA, &book_to_messages::DATA) }
 }
 
 fn get_properties<'a>(structs: &'a [Struct], s: &'a Struct) -> Vec<&'a Property> {

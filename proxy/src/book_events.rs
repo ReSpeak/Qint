@@ -26,6 +26,13 @@ pub enum JsPropertyId {
 	Server,
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub enum JsProperty {
+	Channel(JsChannel),
+	Client(JsClient),
+	Server(JsServer),
+}
+
 // Any value that is present is considered Some value, including null.
 fn deserialize_some<'de, T: Deserialize<'de>, D: Deserializer<'de>>(deserializer: D) -> Result<Option<T>, D::Error> {
 	Deserialize::deserialize(deserializer).map(Some)

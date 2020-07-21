@@ -12,6 +12,7 @@ use slog::{debug, error, o, warn, Logger};
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
 use tsclientlib::events::Event as TsEvent;
+use tsclientlib::prelude::*;
 use tsclientlib::StreamItem as TsStreamItem;
 use tsclientlib::{
 	events, ChannelId, ClientId, Connection, DisconnectOptions, FileDownloadResult,
@@ -220,8 +221,8 @@ impl Ws {
 					} else if let TsEvent::ChannelListFinished = e {
 						// Subscribe to all channels
 						if let Some(con) = &mut self.connection {
-							if let Ok(mut data) = con.get_mut_state() {
-								if let Err(e) = data.get_server().set_subscribed(true) {
+							if let Ok(data) = con.get_state() {
+								if let Err(e) = data.server.set_subscribed(true).send(con) {
 									error!(self.logger, "Failed to subscribe \
 										to server"; "error" => %e);
 								}
@@ -406,14 +407,15 @@ impl Ws {
 						}
 						JsEvent::PropertyChanged { id, prop, .. } => {
 							if let Some(con) = &mut self.connection {
-								match con.get_mut_state() {
+								match con.get_state() {
 									Err(e) => {
 										error!(self.logger, "Failed to get state"; "error" => %e);
 									}
-									Ok(mut state) => {
+									Ok(state) => {
 										if let JsProperty::Client( JsClient { channel, input_muted, output_muted, away_message, .. }) = prop {
 											if let JsPropertyId::Client(client_id) = id {
 												let mut changed = false;
+												let mut update_msg = None;
 												if let Some(input_muted) = input_muted {
 													changed = true;
 
@@ -423,38 +425,39 @@ impl Ws {
 														self.state.audio_data.a2ts.clone(),
 														ctx);
 
-													if let Err(e) = state.set_input_muted(input_muted) {
-														error!(self.logger, "Failed to set input_muted";
-															"error" => %e);
-													}
+													update_msg = Some(update_msg.unwrap_or_else(|| state.client_update())
+														.set_input_muted(input_muted));
 												}
 
 												if let Some(output_muted) = output_muted {
 													changed = true;
-													if let Err(e) = state.set_output_muted(output_muted) {
-														error!(self.logger, "Failed to set output_muted";
-															"error" => %e);
-													}
+													update_msg = Some(update_msg.unwrap_or_else(|| state.client_update())
+														.set_output_muted(output_muted));
 												}
 
-												if let Some(away_message) = away_message {
+												if let Some(away_message) = &away_message {
 													changed = true;
-													if let Err(e) = state.set_away(away_message.as_deref()) {
-														error!(self.logger, "Failed to set away";
-															"error" => %e);
-													}
+													update_msg = Some(update_msg.unwrap_or_else(|| state.client_update())
+														.set_away(away_message.as_deref()));
 												}
 
-												if let Some(mut cl) = state.get_client(&client_id) {
+												if let Some(cl) = state.clients.get(&client_id) {
 													if let Some(channel) = channel {
 														changed = true;
-														if let Err(e) = cl.set_channel(channel) {
+														if let Err(e) = cl.client_move(channel).send(con) {
 															error!(self.logger, "Failed to set channel";
 																"error" => %e);
 														}
 													}
 												} else {
 													error!(self.logger, "Failed to find client");
+												}
+
+												if let Some(msg) = update_msg {
+													if let Err(e) = msg.send(con) {
+														error!(self.logger, "Failed to update client";
+															"error" => %e);
+													}
 												}
 
 												if !changed {
@@ -466,11 +469,11 @@ impl Ws {
 										} else if let JsProperty::Channel(JsChannel { parent, order, .. }) = prop {
 											if let JsPropertyId::Channel(channel_id) = id {
 												let mut changed = false;
-												if let Some(mut chan) = state.get_channel(&channel_id) {
+												if let Some(chan) = state.channels.get(&channel_id) {
 													if let Some(order) = order {
 														if let Some(parent) = parent {
 															changed = true;
-															if let Err(e) = chan.set_position((parent, order)) {
+															if let Err(e) = chan.channel_move(parent, order).send(con) {
 																error!(self.logger, "Failed to set parent";
 																	"error" => %e);
 															}
@@ -540,6 +543,9 @@ impl Ws {
 					);
 				}
 			}
+			MessageF2P::SendMessage { target, message } => {
+				self.send_chat_message(target, message);
+			}
 		}
 	}
 
@@ -552,12 +558,12 @@ impl Ws {
 
 	fn send_chat_message(&mut self, target: MessageTarget, message: String) {
 		if let Some(con) = &mut self.connection {
-			match con.get_mut_state() {
+			match con.get_state() {
 				Err(e) => {
 					error!(self.logger, "Failed to get state"; "error" => %e);
 				}
-				Ok(mut state) => {
-					if let Err(e) = state.send_message(target, &message) {
+				Ok(state) => {
+					if let Err(e) = state.send_message(target, &message).send(con) {
 						error!(self.logger, "Failed to send message"; "error" => %e);
 					}
 				}
@@ -811,15 +817,15 @@ impl Handler<SetInputMutedMsg> for Ws {
 	type Result = Result<()>;
 	fn handle(&mut self, SetInputMutedMsg(new): SetInputMutedMsg, ctx: &mut Self::Context) -> Self::Result {
 		if let Some(con) = &mut self.connection {
-			let mut state = con.get_mut_state()?;
+			let state = con.get_state()?;
 			let own_client = state.own_client;
-			let old: bool = if let Some(own_client) = state.get_client(&own_client) {
+			let old: bool = if let Some(own_client) = state.clients.get(&own_client) {
 				own_client.input_muted
 			} else {
 				bail!("Failed to get own client");
 			};
 			let new_input_muted = new.get_value(old);
-			state.set_input_muted(new_input_muted)?;
+			state.client_update().set_input_muted(new_input_muted).send(con)?;
 			Self::set_audio_active(!new_input_muted,
 				self.logger.clone(),
 				self.state.audio_data.a2ts.clone(),
@@ -835,14 +841,14 @@ impl Handler<SetOutputMutedMsg> for Ws {
 	type Result = Result<()>;
 	fn handle(&mut self, SetOutputMutedMsg(new): SetOutputMutedMsg, _: &mut Self::Context) -> Self::Result {
 		if let Some(con) = &mut self.connection {
-			let mut state = con.get_mut_state()?;
+			let state = con.get_state()?;
 			let own_client = state.own_client;
-			let old: bool = if let Some(own_client) = state.get_client(&own_client) {
+			let old: bool = if let Some(own_client) = state.clients.get(&own_client) {
 				own_client.output_muted
 			} else {
 				bail!("Failed to get own client");
 			};
-			state.set_output_muted(new.get_value(old))?;
+			state.client_update().set_output_muted(new.get_value(old)).send(con)?;
 		} else {
 			bail!("Connection does not exist");
 		}
@@ -854,14 +860,14 @@ impl Handler<SetAwayMsg> for Ws {
 	type Result = Result<()>;
 	fn handle(&mut self, SetAwayMsg(new): SetAwayMsg, _: &mut Self::Context) -> Self::Result {
 		if let Some(con) = &mut self.connection {
-			let mut state = con.get_mut_state()?;
+			let state = con.get_state()?;
 			let own_client = state.own_client;
-			let old: bool = if let Some(own_client) = state.get_client(&own_client) {
+			let old: bool = if let Some(own_client) = state.clients.get(&own_client) {
 				own_client.away_message.is_some()
 			} else {
 				bail!("Failed to get own client");
 			};
-			state.set_away(if new.get_value(old) { Some("") } else { None })?;
+			state.client_update().set_away(if new.get_value(old) { Some("") } else { None }).send(con)?;
 		} else {
 			bail!("Connection does not exist");
 		}

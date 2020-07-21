@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use tsclientlib::{ClientId, DisconnectOptions, Version};
+use tsclientlib::{ClientId, DisconnectOptions, MessageTarget, Version};
 
 use crate::book_events::JsEvent;
 
@@ -11,6 +11,7 @@ pub enum MessageF2P {
 	Disconnect(DisconnectOptions),
 	/// Events can be used to trigger actions, like writing a message or switching channel
 	Events(Vec<JsEvent>),
+	SendMessage { target: MessageTarget, message: String }, // TODO
 	/// Set the loudness threshold for sending audio in LUFS
 	SetLoudnessThreshold(f64),
 	/// Ask the proxy to send loudness data or not.

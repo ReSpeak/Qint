@@ -120,7 +120,7 @@
 		// Overwrite bulma default
 		:global(pre) {
 			padding: 0;
-			margin: 1em 0 1em 0;
+			margin: 1em 1em 1em 0;
 
 			tab-size: 4;
 			-moz-tab-size: 4;
