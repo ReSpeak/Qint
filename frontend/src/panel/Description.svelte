@@ -22,10 +22,8 @@
 
 <style lang="scss">
 	.description {
-		overflow-y: scroll;
+		overflow-y: hidden;
 		overflow-x: hidden;
-
-		padding: 0.5em;
 
 		:global(.dataLine) {
 			display: flex;
@@ -38,6 +36,10 @@
 
 		:global(.headLine) {
 			font-weight: bold;
+		}
+
+		:global(.descGroup) {
+			padding: 1em;
 		}
 	}
 </style>

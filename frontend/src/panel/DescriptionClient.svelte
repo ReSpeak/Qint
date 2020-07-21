@@ -5,6 +5,8 @@
 	import PlatformIcon from "../ui/PlatformIcon.svelte";
 	import ClientIcon from "../ui/ClientIcon.svelte";
 	import ClientName from "../ui/ClientName.svelte";
+	import StickyList from "../ui/StickyList.svelte";
+	import StickySlot from "../ui/StickySlot.svelte";
 	import { getClientAvatarPath } from "../ui/clientIcon";
 
 	export let connection!: Connection;
@@ -19,32 +21,37 @@
 	}
 </script>
 
-<div class="descGroup">
-	<div class="dataLine headLine">
-		<ClientIcon {client} {connection} />
-		<ClientName {client} />
-		<div style="flex: 1;" ></div>
-		<div>
-			{"Version"}
-			<PlatformIcon platform={"Platform"} />
+<StickyList>
+	<StickySlot>Info</StickySlot>
+	<div class="descGroup">
+		<div class="dataLine headLine">
+			<ClientIcon {client} {connection} />
+			<ClientName {client} />
+			<div style="flex: 1;" />
+			<div>
+				{'Version'}
+				<PlatformIcon platform={'Platform'} />
+			</div>
 		</div>
+		<div class="dataLine">
+			<div>Description:</div>
+			<div>{client.description}</div>
+		</div>
+		<div class="dataLine">
+			<div>Online since:</div>
+			<div>No Data</div>
+		</div>
+		<div class="dataLine">
+			<div>Time away:</div>
+			<div>No Data</div>
+		</div>
+		{#if avatarPath}
+			<img class="clientAvatar" src={avatarPath} alt="Client avatar" />
+		{/if}
 	</div>
-	<div class="dataLine">
-		<div>Description:</div>
-		<div>{client.description}</div>
-	</div>
-	<div class="dataLine">
-		<div>Online since:</div>
-		<div>No Data</div>
-	</div>
-	<div class="dataLine">
-		<div>Time away:</div>
-		<div>No Data</div>
-	</div>
-</div>
-{#if avatarPath}
-	<img class="clientAvatar" src={avatarPath} alt="Client avatar" />
-{/if}
+	<StickySlot>Actions</StickySlot>
+	klik here for party
+</StickyList>
 
 <style>
 	.clientAvatar {

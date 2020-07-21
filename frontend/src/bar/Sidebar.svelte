@@ -1,62 +1,56 @@
 <script lang="typescript">
 	import Server from "../tree/Server.svelte";
 	import ServerIcon from "../ui/ServerIcon.svelte";
+	import StickyList from "../ui/StickyList.svelte";
+	import StickySlot from "../ui/StickySlot.svelte";
 	import { Connection } from "../connection";
 
 	export let connection!: Connection;
 	export let filter!: string;
 	let server = connection.book.server;
 	let selectedChat = connection.chat.selectedChat;
-
 	declare let selectedServerChat: boolean;
 	$: selectedServerChat = "Server" in $selectedChat;
 </script>
 
 <aside class="sidebar">
-	<button class="entry-expand button" class:selectedServerChat on:click={() => connection.chat.selectServer()}>
-		<ServerIcon {connection} />
-		<span class="expand" class:selected-server={true} style={$server.getColor()}>
-			{$server.name}
-		</span>
-	</button>
-	<Server {connection} {filter} />
+	<StickyList>
+		<StickySlot styled={false} on:click={() => connection.chat.selectServer()}>
+			<div class="button" class:selectedServerChat>
+				<ServerIcon {connection} />
+				<span style={$server.getColor()}>
+					{$server.name}
+				</span>
+			</div>
+		</StickySlot>
 
-	<button class="entry-expand button chats-header">
-		<span class="entry-expand">
-			Splamy (maybe)
-		</span>
-	</button>
-	<div class="menu">
-		<ul class="menu-list">
-			<li>
-				<div class="channel-line">
-				</div>
-				<ul class="menu-list">
-					<li>User</li>
-				</ul>
-			</li>
-		</ul>
-	</div>
+		<Server {connection} {filter} />
+
+		<StickySlot>Notifications</StickySlot>
+		<div class="menu">
+			<ul class="menu-list">
+				<li>
+					<div class="channel-line" />
+					<ul class="menu-list">
+						<li>Splamy (maybe)</li>
+					</ul>
+				</li>
+			</ul>
+		</div>
+	</StickyList>
 </aside>
 
 <style lang="scss">
 	.button {
-		background: none;
+		background: transparent;
 		border: none;
 		border-radius: 0;
-
-		position: sticky;
-		bottom: 0;
-		top: 0;
-		z-index: 10;
-		background-color: $background;
-		box-shadow: 0 0.3em 0.3em #0005;
-
 		width: 100%;
-		justify-content: start;
-	}
-	.button:focus {
-		box-shadow: none;
+		justify-content: flex-start;
+
+		&:focus {
+			box-shadow: none;
+		}
 	}
 
 	.sidebar {
@@ -67,7 +61,7 @@
 		overflow-y: auto;
 	}
 
-	button.selectedServerChat {
+	.selectedServerChat {
 		background-color: mix($background, $text, 80%);
 	}
 

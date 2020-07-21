@@ -38,7 +38,7 @@ export default {
 
 		replace({
 			__buildEnv__: production ? "production" : "development",
-			"__buildDat__.get": `${process.env.npm_package_name} - ${process.env.npm_package_version}`
+			__buildDat__: `${process.env.npm_package_name} - ${process.env.npm_package_version}`
 		}),
 
 		// If you have external dependencies installed from

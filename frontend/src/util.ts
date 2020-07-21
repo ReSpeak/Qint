@@ -9,9 +9,7 @@ export const BOOKMARK_OFF = "star-outline";
 // @ts-ignore
 export const BASE_ADDRESS = ""; //"__buildEnv__" === "development" ? "http://localhost:4422" : "";
 export const BUILD_ENV = "__buildEnv__";
-
-declare const __buildDat__: any;
-export const BUILD_DAT = __buildDat__.get;
+export const BUILD_DAT = "__buildDat__";
 
 export async function sleep(timeout: number): Promise<void> {
 	return new Promise(resolve => setTimeout(resolve, timeout));
