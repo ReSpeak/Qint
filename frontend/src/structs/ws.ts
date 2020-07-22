@@ -1,6 +1,7 @@
 // tslint:disable: interface-name
 
 import { Channel, Client, Server, ServerGroup } from "../tree/book";
+import { ChannelId, ChannelType, ClientId, Codec } from "./ts";
 
 export type WsMessageTarget =
 	"Server"
@@ -9,7 +10,7 @@ export type WsMessageTarget =
 	| { Poke: number };
 
 // Out Messages
-export type OutMsg = OMsgConnect | OMsgDisconnect | OMsgEvents | OMsgSetLoudnessThreshold | OMsgSubscribeLoudness;
+export type OutMsg = OMsgConnect | OMsgDisconnect | OMsgSendMessage | OMsgSetLoudnessThreshold | OMsgSubscribeLoudness | OMsgChange;
 
 interface OMsgConnect {
 	Connect: {
@@ -44,8 +45,11 @@ interface OMsgDisconnect {
 	};
 }
 
-interface OMsgEvents {
-	Events: InBookMsg[];
+interface OMsgSendMessage {
+	SendMessage: {
+		target: WsMessageTarget,
+		message: string;
+	};
 }
 
 interface OMsgSetLoudnessThreshold {
@@ -54,6 +58,65 @@ interface OMsgSetLoudnessThreshold {
 
 interface OMsgSubscribeLoudness {
 	SubscribeLoudness: boolean;
+}
+
+interface OMsgChange {
+	Change: ChangeChannelEdit | ChangeChannelMove | ChangeClientEdit | ChangeClientUpdate
+		| ChangeClientMove;
+}
+
+interface ChangeChannelEdit {
+	ChannelEdit: {
+		id: ChannelId,
+		password?: string | null;
+		channel_type?: ChannelType;
+		description?: string;
+		order?: ChannelId;
+		name?: string;
+		topic?: string;
+		is_default?: boolean;
+		codec?: Codec;
+		codec_quality?: number;
+		needed_talk_power?: number;
+		icon_id?: number;
+		codec_latency_factor?: number;
+		is_unencrypted?: boolean;
+		delete_delay?: any;
+		phonetic_name?: string;
+	};
+}
+
+interface ChangeChannelMove {
+	ChannelMove: {
+		id: ChannelId;
+		parent: ChannelId;
+		order: ChannelId;
+	};
+}
+
+interface ChangeClientEdit {
+	ClientEdit: {
+		id: ClientId,
+		description?: string;
+		talk_power_granted?: boolean;
+	};
+}
+
+interface ChangeClientUpdate {
+	ClientUpdate: {
+		name?: string;
+		input_muted?: boolean;
+		output_muted?: boolean;
+		away?: string | null;
+	}
+}
+
+interface ChangeClientMove {
+	ClientMove: {
+		id : ClientId,
+		channel: ChannelId,
+		password?: string;
+	}
 }
 
 

@@ -2,11 +2,14 @@ use std::collections::HashSet;
 use std::convert::{TryFrom, TryInto};
 use std::net::{IpAddr, SocketAddr};
 
+use anyhow::{format_err, Result};
 use serde::{Deserialize, Deserializer, Serialize};
 use time::{Duration, OffsetDateTime};
 use tsclientlib::data::Connection;
 use tsclientlib::events::{Event, ExtraInfo, PropertyId, PropertyValueRef};
 use tsclientlib::*;
+use tsclientlib::prelude::*;
+use tsproto_packets::packets::OutCommand;
 use tsproto_types::crypto::EccKeyPubP256;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

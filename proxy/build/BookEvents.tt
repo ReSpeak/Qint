@@ -2,6 +2,98 @@
 <#
 use std::fmt;
 
+use tsproto_structs::book_to_messages::{Event, RuleKind, RuleOp};
+
+fn get_all_arguments<'a>(e: &'a Event<'a>, r: Option<&'a RuleKind<'a>>) -> String {
+	let mut args = String::new();
+	for r in e.ids.iter().chain(r.iter().cloned()) {
+		match r {
+			RuleKind::ArgumentMap { .. } |
+			RuleKind::ArgumentFunction { .. } => {
+				let arg = r.get_argument();
+				if !arg.is_empty() {
+					args.push_str(&arg);
+					args.push_str(", ");
+				}
+			}
+			_ => {}
+		}
+	}
+	args
+}
+
+fn set_all_arguments<'a>(e: &'a Event<'a>, r: Option<&'a RuleKind<'a>>) -> String {
+	let mut args = String::new();
+	for r in e.ids.iter().chain(r.iter().cloned()) {
+		match r {
+			RuleKind::ArgumentMap { .. } |
+			RuleKind::ArgumentFunction { .. } => {
+				args.push_str("self.");
+				args.push_str(&r.from_name().to_snake_case());
+				args.push_str(", ");
+			}
+			_ => {}
+		}
+	}
+	args
+}
+
+fn set_all_id_arguments<'a>(e: &'a Event<'a>) -> String {
+	let mut args = String::new();
+	for r in &e.ids {
+		match r {
+			RuleKind::ArgumentMap { .. } |
+			RuleKind::ArgumentFunction { .. } => {
+				args.push_str("self.");
+				args.push_str(&r.from_name().to_snake_case());
+				args.push_str(", ");
+			}
+			_ => {}
+		}
+	}
+	args
+}
+
+fn get_struct(_fmt: &mut fmt::Formatter, name: &str) -> fmt::Result {
+match name {
+	"Channel" => { #>
+		let s = con.channels.get(&self.id).ok_or_else(|| format_err!("Channel {} not found", self.id.0))?;
+	<# }
+	"Client" => { #>
+		let s = con.clients.get(&self.id).ok_or_else(|| format_err!("Client {} not found", self.id.0))?;
+	<# }
+	"Connection" => { #>
+		let s = con;
+	<# }
+	"Server" => { #>
+		let s = &con.server;
+	<# }
+	"ServerGroup" => { #>
+		let s = con.server_groups.get(&self.id).ok_or_else(|| format_err!("ServerGroup {} not found", self.id.0))?;
+	<# }
+	"ChannelGroup" => { #>
+		let s = con.channel_groups.get(&self.id).ok_or_else(|| format_err!("ChannelGroup {} not found", self.id.0))?;
+	<# }
+	_ => panic!("Unimplemented get {}", name),
+}
+	Ok(())
+}
+
+fn get_struct_ids(structs: &JsStructs, mut name: &str) -> String {
+	if name == "Connection" {
+		name = "Server";
+	}
+	let struc = structs.get_struct(name).unwrap_or_else(|| panic!("Did not find struct '{}'", name));
+	let mut ids = String::new();
+	for i in &struc.ids {
+		ids.push_str(&i.0.to_snake_case());
+		ids.push_str(": ");
+		ids.push_str(&i.1);
+		ids.push_str(", ");
+	}
+	ids
+}
+
 fn get_props(_fmt: &mut fmt::Formatter, structs: &[Struct], parts: &[&str]) -> fmt::Result {
 	for p in get_all_properties(structs, parts) { #>
 	#[serde(default, deserialize_with = "deserialize_some", skip_serializing_if = "Option::is_none")]
@@ -156,3 +248,164 @@ impl TryFrom<PropertyId> for JsPropertyId {
 }
 
 // Setter
+<#
+let mut setter_structs = Vec::new();
+
+for e in &self.2.decls {
+	let msg_group = self.2.messages.get_message_group(&e.msg);
+	let uses_lifetime = self.2.messages.uses_lifetime(&e.msg);
+	// Update
+	if e.op == RuleOp::Update {
+		let small_change_name = e.get_small_name();
+		let change_name = e.get_change_name();
+		setter_structs.push(e.msg.name.clone());
+		#>
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct <#= e.msg.name #> {
+	<#= get_struct_ids(&self.3, &e.book_struct.name) #>
+	<#
+	// Event IDs
+	for r in &e.ids {
+		match r {
+			RuleKind::ArgumentMap { .. } |
+			RuleKind::ArgumentFunction { .. } => { #>
+	<#= r.get_argument() #>,
+			<# }
+			_ => {}
+		}
+	}
+
+	// Event Props
+	for r in &e.rules {
+		let name = r.from_name_singular();
+		#>
+	#[serde(default, deserialize_with = "deserialize_some", skip_serializing_if = "Option::is_none")]
+	<#= r.from_name().to_snake_case() #>: Option<<#= r.get_type_no_option_owned() #>>,
+	<# }
+#>
+}
+
+impl <#= e.msg.name #> {
+	pub fn to_packet(self, con: &Connection) -> Result<OutCommand> {
+		<# get_struct(_fmt, e.book_struct.name.as_str())?; #>
+
+		let<# if !e.rules.is_empty() { #> mut<# } #> packet = s.<#= change_name.to_snake_case() #>(<#= set_all_id_arguments(e) #>);
+	<# for r in &e.rules {
+		let type_s = r.get_type_no_option();
+		let as_ref = if type_s == "&str" {
+			".as_deref()"
+		} else if type_s == "Option<&str>" {
+			".as_ref().map(|o| o.as_deref())"
+		} else {
+			""
+		};
+		#>
+		if let Some(p) = self.<#= r.from_name().to_snake_case() #><#= as_ref #> {
+			packet = packet.set_<#= r.from_name().to_snake_case() #>(p);
+		}
+	<# } #>
+		Ok(packet.to_packet())
+	}
+}
+<#
+	} else if e.op == RuleOp::Remove {
+	if e.rules.is_empty() {
+		let args = get_all_arguments(e, None);
+		let name_add = if !args.is_empty() {
+			format!("_{}", &args[..args.find(':').unwrap()])
+		} else {
+			"".into()
+		};
+		let struct_name = format!("{}Remove{}", e.book_struct.name, name_add.to_camel_case());
+		setter_structs.push(struct_name.clone());
+	#>
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct <#= struct_name #> {
+	<#= get_struct_ids(&self.3, &e.book_struct.name) #>
+	<#= args #>
+}
+
+impl <#= struct_name #> {
+	pub fn to_packet(self, con: &Connection) -> Result<OutCommand> {
+		<# get_struct(_fmt, e.book_struct.name.as_str())?; #>
+		Ok(s.remove<#= name_add #>(<#= set_all_id_arguments(e) #>).to_packet())
+	}
+}
+	<#
+	} else {
+		for r in &e.rules {
+			let args = get_all_arguments(e, Some(r));
+			let name_add = if !args.is_empty() {
+				format!("_{}", &args[..args.find(':').unwrap()])
+			} else {
+				"".into()
+			};
+			let struct_name = format!("{}Remove{}", e.book_struct.name, name_add.to_camel_case());
+			setter_structs.push(struct_name.clone());
+	#>
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct <#= struct_name #> {
+	<#= get_struct_ids(&self.3, &e.book_struct.name) #>
+	<#= args #>
+}
+
+impl <#= struct_name #> {
+	pub fn to_packet(self, con: &Connection) -> Result<OutCommand> {
+		<# get_struct(_fmt, e.book_struct.name.as_str())?; #>
+		Ok(s.remove<#= name_add #>(<#= set_all_arguments(e, Some(r)) #>).to_packet())
+	}
+}
+	<#
+		}
+	}
+	} else if e.op == RuleOp::Add {
+		for r in &e.rules {
+			let name = r.from_name_singular();
+			let name = format!("{}{}", e.book_struct.name, name);
+
+			let args = get_all_arguments(e, Some(r));
+			let name_add = if !args.is_empty() {
+				format!("_{}", &args[..args.find(':').unwrap()])
+			} else {
+				"".into()
+			};
+			let struct_name = format!("{}Add{}", e.book_struct.name, r.from_name_singular());
+			setter_structs.push(struct_name.clone());
+	#>
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct <#= struct_name #> {
+	<#= get_struct_ids(&self.3, &e.book_struct.name) #>
+	<#= args #>
+}
+
+impl <#= struct_name #> {
+	pub fn to_packet(self, con: &Connection) -> Result<OutCommand> {
+		<# get_struct(_fmt, e.book_struct.name.as_str())?; #>
+		Ok(s.add_<#= r.from_name_singular().to_snake_case() #>(<#= set_all_arguments(e, Some(r)) #>).to_packet())
+	}
+}
+	<#
+		}
+	}
+} #>
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub enum JsM2B {
+<# for setter in &setter_structs { #>
+	<#= setter #>(<#= setter #>),
+<# } #>
+}
+
+impl JsM2B {
+	pub fn to_packet(self, con: &Connection) -> Result<OutCommand> {
+		match self {
+		<# for setter in &setter_structs { #>
+			JsM2B::<#= setter #>(s) => s.to_packet(con),
+		<# } #>
+		}
+	}
+}

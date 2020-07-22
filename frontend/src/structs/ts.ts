@@ -2,6 +2,9 @@ import { get } from "svelte/store";
 import { Connection } from "../connection";
 import { WsMessageTarget } from "./ws";
 
+export type ChannelId = number;
+export type ClientId = number;
+
 export type MessageTarget =
 	{ Server: null}
 	| { Channel: number }

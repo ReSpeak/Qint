@@ -1,5 +1,4 @@
 <script lang="typescript">
-	import { writable, Writable } from "svelte/store";
 	import { Connection } from "../connection";
 	import Icon from '../ui/Icon.svelte';
 
@@ -8,30 +7,22 @@
 	export let showChat!: boolean;
 	export let showDescription!: boolean;
 	export let showGlobalSettings!: boolean;
-	let server = connection.book.server;
 	let dropdownActive = false;
 	let dropdown: HTMLElement;
 
 	let ownClient = connection.ownClient;
-	declare let input_muted: boolean | undefined;
+	let input_muted: boolean | undefined;
 	$: input_muted = $ownClient?.input_muted;
-	declare let output_muted: boolean | undefined;
+	let output_muted: boolean | undefined;
 	$: output_muted = $ownClient?.output_muted;
-	declare let is_away: boolean | undefined;
+	let is_away: boolean | undefined;
 	$: is_away = $ownClient?.away_message !== null;
 
 	function changeOwnClient(change: any) {
 		connection.sendMessage({
-			Events: [{
-				PropertyChanged: {
-					id: {
-						Client: connection.ownClientId!,
-					},
-					prop: { Client: change },
-					invoker: null,
-					extra: { reason: null },
-				}
-			}]
+			Change: {
+				ClientUpdate: change
+			}
 		});
 	}
 
@@ -66,7 +57,7 @@
 		<button class="button toolbutton" class:active={output_muted} on:click={() => changeOwnClient({ output_muted: !output_muted })}>
 			<Icon name={output_muted ? "volume-off" : "volume-high"} />
 		</button>
-		<button class="button toolbutton" class:active={is_away} on:click={() => changeOwnClient({ away_message: is_away ? null : "" })}>
+		<button class="button toolbutton" class:active={is_away} on:click={() => changeOwnClient({ away: is_away ? null : "" })}>
 			<Icon name={is_away ? "sleep" : "sleep-off"} />
 		</button>
 

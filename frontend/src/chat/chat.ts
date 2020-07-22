@@ -152,17 +152,10 @@ export class Chat {
 	public sendMessage() {
 		const target = MessageTarget.toWs(get(this.selectedChat));
 		this.connection.sendMessage({
-			Events: [{
-				Message: {
-					target,
-					message: this.composing,
-					invoker: {
-						name: "",
-						id: 0,
-						uid: undefined,
-					},
-				}
-			}]
+			SendMessage: {
+				target,
+				message: this.composing,
+			}
 		});
 	}
 }

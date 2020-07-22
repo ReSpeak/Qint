@@ -21,7 +21,6 @@ use tsclientlib::{
 use tsproto::resend::PacketId;
 use tsproto_packets::packets::{AudioData, OutPacket};
 
-use crate::book_events::{JsClient, JsChannel, JsEvent, JsProperty, JsPropertyId};
 use crate::db::{ChatId, ChatType};
 use crate::messages::{self, MessageF2P, MessageP2F};
 use crate::{audio, book_events, db, ConnectionId, State, Tristate, WsFormat, WsOptions};
@@ -399,106 +398,6 @@ impl Ws {
 					}
 				}
 			}
-			MessageF2P::Events(events) => {
-				for e in events {
-					match e {
-						JsEvent::Message { target, message, .. } => {
-							self.send_chat_message(target, message);
-						}
-						JsEvent::PropertyChanged { id, prop, .. } => {
-							if let Some(con) = &mut self.connection {
-								match con.get_state() {
-									Err(e) => {
-										error!(self.logger, "Failed to get state"; "error" => %e);
-									}
-									Ok(state) => {
-										if let JsProperty::Client( JsClient { channel, input_muted, output_muted, away_message, .. }) = prop {
-											if let JsPropertyId::Client(client_id) = id {
-												let mut changed = false;
-												let mut update_msg = None;
-												if let Some(input_muted) = input_muted {
-													changed = true;
-
-													// TODO !input_muted && !output_muted && away_message.is_none()
-													Self::set_audio_active(!input_muted,
-														self.logger.clone(),
-														self.state.audio_data.a2ts.clone(),
-														ctx);
-
-													update_msg = Some(update_msg.unwrap_or_else(|| state.client_update())
-														.set_input_muted(input_muted));
-												}
-
-												if let Some(output_muted) = output_muted {
-													changed = true;
-													update_msg = Some(update_msg.unwrap_or_else(|| state.client_update())
-														.set_output_muted(output_muted));
-												}
-
-												if let Some(away_message) = &away_message {
-													changed = true;
-													update_msg = Some(update_msg.unwrap_or_else(|| state.client_update())
-														.set_away(away_message.as_deref()));
-												}
-
-												if let Some(cl) = state.clients.get(&client_id) {
-													if let Some(channel) = channel {
-														changed = true;
-														if let Err(e) = cl.client_move(channel).send(con) {
-															error!(self.logger, "Failed to set channel";
-																"error" => %e);
-														}
-													}
-												} else {
-													error!(self.logger, "Failed to find client");
-												}
-
-												if let Some(msg) = update_msg {
-													if let Err(e) = msg.send(con) {
-														error!(self.logger, "Failed to update client";
-															"error" => %e);
-													}
-												}
-
-												if !changed {
-													warn!(self.logger, "Unknown property change");
-												}
-											} else {
-												warn!(self.logger, "Wrong id");
-											}
-										} else if let JsProperty::Channel(JsChannel { parent, order, .. }) = prop {
-											if let JsPropertyId::Channel(channel_id) = id {
-												let mut changed = false;
-												if let Some(chan) = state.channels.get(&channel_id) {
-													if let Some(order) = order {
-														if let Some(parent) = parent {
-															changed = true;
-															if let Err(e) = chan.channel_move(parent, order).send(con) {
-																error!(self.logger, "Failed to set parent";
-																	"error" => %e);
-															}
-														}
-													}
-												}
-
-												if !changed {
-													warn!(self.logger, "Unknown property change");
-												}
-											}
-										} else {
-											warn!(self.logger, "Unknown property change");
-										}
-									}
-								}
-							}
-						}
-						_ => {
-							warn!(self.logger, "Received unknown event"; "event" => ?e);
-							// TODO Report error
-						}
-					}
-				}
-			}
 			MessageF2P::SetLoudnessThreshold(threshold) => {
 				{
 					// Save in settings
@@ -545,6 +444,21 @@ impl Ws {
 			}
 			MessageF2P::SendMessage { target, message } => {
 				self.send_chat_message(target, message);
+			}
+			MessageF2P::Change(change) => {
+				if let Some(con) = &mut self.connection {
+					match con.get_state() {
+						Err(e) => {
+							error!(self.logger, "Failed to get state"; "error" => %e);
+						}
+						Ok(state) => {
+							if let Err(e) = change.to_packet(state)
+								.and_then(|p| p.send(con).map_err(|e| e.into())) {
+								error!(self.logger, "Failed to send change"; "error" => %e);
+							}
+						}
+					}
+				}
 			}
 		}
 	}

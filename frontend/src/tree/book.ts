@@ -4,9 +4,7 @@ import { graphql } from "../graphql";
 import { Connection } from "../connection";
 import { binarySearchBy, binarySearchByKey, getDataColor, arraysEqual, Lazy } from "../util";
 import "../extensions";
-import { Codec, ChannelType } from "../structs/ts";
-
-type ChannelId = number;
+import { ChannelId, ClientId, Codec, ChannelType } from "../structs/ts";
 
 export class Book {
 	public server: Writable<Server> = writable(new Server());

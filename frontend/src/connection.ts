@@ -143,40 +143,24 @@ export class Connection {
 
 	public moveClient(clientId: number, channelId: number) {
 		this.sendMessage({
-			Events: [{
-				PropertyChanged: {
-					id: {
-						Client: clientId,
-					},
-					prop: {
-						Client: {
-							channel: channelId,
-						},
-					},
-					invoker: null,
-					extra: { reason: null },
+			Change: {
+				ClientMove: {
+					id: clientId,
+					channel: channelId,
 				}
-			}]
+			}
 		});
 	}
 
-	public moveChannel(moveChannelId: number, targetParentId?: number, targetOrderId?: number) {
+	public moveChannel(moveChannelId: number, targetParentId: number, targetOrderId: number) {
 		this.sendMessage({
-			Events: [{
-				PropertyChanged: {
-					id: {
-						Channel: moveChannelId,
-					},
-					prop: {
-						Channel: {
-							parent: targetParentId,
-							order: targetOrderId,
-						},
-					},
-					invoker: null,
-					extra: { reason: null },
+			Change: {
+				ChannelMove: {
+					id: moveChannelId,
+					parent: targetParentId,
+					order: targetOrderId,
 				}
-			}]
+			}
 		});
 	}
 

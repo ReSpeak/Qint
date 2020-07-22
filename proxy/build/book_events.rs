@@ -11,7 +11,7 @@ use tsproto_structs::messages_to_book::{self, MessagesToBookDeclarations};
 #[TemplatePath = "build/BookEvents.tt"]
 #[derive(Debug)]
 pub struct BookEvents<'a>(&'a BookDeclarations, &'a MessagesToBookDeclarations<'a>,
-	&'a BookToMessagesDeclarations<'a>);
+	&'a BookToMessagesDeclarations<'a>, JsStructs);
 
 impl Deref for BookEvents<'_> {
 	type Target = BookDeclarations;
@@ -19,7 +19,60 @@ impl Deref for BookEvents<'_> {
 }
 
 impl Default for BookEvents<'static> {
-	fn default() -> Self { BookEvents(&DATA, &messages_to_book::DATA, &book_to_messages::DATA) }
+	fn default() -> Self { BookEvents(&DATA, &messages_to_book::DATA, &book_to_messages::DATA,
+		JsStructs::default()) }
+}
+
+// TODO Migrate all code generation in BookEvents.tt to this
+#[derive(Debug)]
+struct JsStruct {
+	name: String,
+	ids: Vec<(String, String)>,
+	/// book structs that are aggregated in this js struct.
+	parts: Vec<String>,
+}
+
+#[derive(Debug)]
+struct JsStructs(Vec<JsStruct>);
+
+impl Default for JsStructs {
+	fn default() -> Self {
+		JsStructs(vec![
+			JsStruct {
+				name: "Channel".into(),
+				ids: vec![("Id".into(), "ChannelId".into())],
+				parts: vec!["Channel".into(), "OptionalChannelData".into()],
+			},
+			JsStruct {
+				name: "Client".into(),
+				ids: vec![("Id".into(), "ClientId".into())],
+				parts: vec!["Client".into(), "OptionalClientData".into(),
+					"ConnectionClientData".into()],
+			},
+			JsStruct {
+				name: "Server".into(),
+				ids: vec![],
+				parts: vec!["Server".into(), "OptionalServerData".into(),
+					"ConnectionServerData".into()],
+			},
+			JsStruct {
+				name: "ServerGroup".into(),
+				ids: vec![("Id".into(), "ServerGroupId".into())],
+				parts: vec!["ServerGroup".into()],
+			},
+			JsStruct {
+				name: "ChannelGroup".into(),
+				ids: vec![("Id".into(), "ChannelGroupId".into())],
+				parts: vec!["ChannelGroup".into()],
+			},
+		])
+	}
+}
+
+impl JsStructs {
+	fn get_struct(&self, name: &str) -> Option<&JsStruct> {
+		self.0.iter().find(|s| s.name == name)
+	}
 }
 
 fn get_properties<'a>(structs: &'a [Struct], s: &'a Struct) -> Vec<&'a Property> {

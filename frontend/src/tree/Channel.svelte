@@ -1,5 +1,4 @@
 <script lang="typescript">
-	import { afterUpdate } from "svelte";
 	import { get, Writable } from "svelte/store";
 	import Icon from "../ui/Icon.svelte";
 	import ChannelIcon from "../ui/ChannelIcon.svelte";
@@ -19,9 +18,9 @@
 	let collapsed = false;
 	let hovered = false;
 
-	declare let children: Writable<ITreeNode[]>;
-	declare let ownClient: boolean;
-	declare let selectedChannel: boolean;
+	let children: Writable<ITreeNode[]>;
+	let ownClient: boolean;
+	let selectedChannel: boolean;
 	$: children = channel.children;
 	$: filterShow = applyFilter(filter, channel, $children);
 	// Update if a client moves in or out

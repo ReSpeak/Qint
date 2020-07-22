@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tsclientlib::{ClientId, DisconnectOptions, MessageTarget, Version};
 
-use crate::book_events::JsEvent;
+use crate::book_events::{JsEvent, JsM2B};
 
 /// A message sent over a websocket connection from the frontend to the proxy.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -9,13 +9,13 @@ use crate::book_events::JsEvent;
 pub enum MessageF2P {
 	Connect(ConnectOptions),
 	Disconnect(DisconnectOptions),
-	/// Events can be used to trigger actions, like writing a message or switching channel
-	Events(Vec<JsEvent>),
-	SendMessage { target: MessageTarget, message: String }, // TODO
+	SendMessage { target: MessageTarget, message: String },
 	/// Set the loudness threshold for sending audio in LUFS
 	SetLoudnessThreshold(f64),
 	/// Ask the proxy to send loudness data or not.
 	SubscribeLoudness(bool),
+	/// Change something in the book.
+	Change(JsM2B),
 }
 
 /// A message sent over a websocket connection from the proxy to the frontend.
