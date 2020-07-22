@@ -2,11 +2,13 @@
 	import { Connection } from "../connection";
 	import { Client } from "../tree/book";
 	import { Moment } from "moment";
+	import Icon from "../ui/Icon.svelte";
 	import PlatformIcon from "../ui/PlatformIcon.svelte";
 	import ClientIcon from "../ui/ClientIcon.svelte";
 	import ClientName from "../ui/ClientName.svelte";
 	import StickyList from "../ui/StickyList.svelte";
 	import StickySlot from "../ui/StickySlot.svelte";
+	import ClientVolume from "../controls/ClientVolume.svelte";
 	import { getClientAvatarPath } from "../ui/clientIcon";
 
 	export let connection!: Connection;
@@ -50,7 +52,26 @@
 		{/if}
 	</div>
 	<StickySlot>Actions</StickySlot>
-	klik here for party
+	<div class="descGroup">
+		<p class="buttons">
+			<button class="button is-small is-warning">
+				<Icon name="shoe-formal" />
+				<span>Kick Channel</span>
+			</button>
+			<button class="button is-small is-danger">
+				<Icon name="shoe-formal" />
+				<span>Kick Server</span>
+			</button>
+			<button class="button is-small is-danger">
+				<Icon name="cancel" />
+				<span>Ban</span>
+			</button>
+		</p>
+		<div class="dataLine">
+			<div>Volume:</div>
+			<ClientVolume {client} {connection} />
+		</div>
+	</div>
 </StickyList>
 
 <style>

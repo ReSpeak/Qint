@@ -1,6 +1,7 @@
 <script lang="typescript">
 	import { afterUpdate } from "svelte";
 	import ClientIcon from "../ui/ClientIcon.svelte";
+	import ClientVolume from "../controls/ClientVolume.svelte";
 	import ServerGroupIcon from "../ui/ServerGroupIcon.svelte";
 	import FilterString from "../ui/FilterString.svelte";
 	import Icon from "../ui/Icon.svelte";
@@ -16,20 +17,14 @@
 	let selectedChat = connection.chat.selectedChat;
 	let hovered = false;
 	let newHover = false;
-	// Volume is in dB, https://www.dr-lex.be/info-stuff/volumecontrols.html
-	let minVolume = -30;
-	let maxVolume = +30;
-	let volume = 0;
+	
 
 	declare let ownClient: boolean;
 	declare let selectedClient: boolean;
 	$: filterShow = applyFilter(filter, client);
 	$: ownClient = client.id === connection.ownClientId;
 	$: selectedClient = "Client" in $selectedChat && $selectedChat.Client === client.id;
-	$: loadVolume(hovered);
 	let div!: HTMLDivElement;
-	let volumeUpdated = false;;
-	let volumeTimer: number | undefined;
 
 	function setChat() {
 		connection.chat.selectClient(client);
@@ -55,44 +50,6 @@
 			if (!newHover)
 				hovered = false;
 		}, 50);
-	}
-
-	async function loadVolume(hovered: boolean) {
-		if (hovered) {
-			volumeUpdated = false;
-			await client.loadVolume();
-			if (!volumeUpdated) {
-				if (client.volume === 0) {
-					volume = minVolume;
-				} else {
-					volume = Math.round(20 * Math.log10(client.volume ?? 0));
-				}
-			}
-		}
-	}
-
-	function toggleVolume() {
-		if (volume === minVolume) {
-			volume = 0;
-		} else {
-			volume = minVolume;
-		}
-		updateVolume();
-	}
-
-	function updateVolume() {
-		volumeUpdated = true;
-		if (volumeTimer)
-			return;
-		// Update every few ms
-		volumeTimer = setTimeout(() => {
-			volumeTimer = undefined;
-			let vol = 0;
-			if (volume !== minVolume) {
-				vol = Math.pow(10, volume / 20);
-			}
-			client.updateVolume(connection, vol);
-		}, 100);
 	}
 
 	function dragStart(ev: CustomEvent<DragData>) {
@@ -159,15 +116,7 @@
 						({client.away_message})
 					{/if}
 				</div>
-				<button class="volume button" on:click={toggleVolume}>
-					{#if volume === minVolume}
-						<Icon name="volume-off" />
-					{:else}
-						<Icon name="volume-high" />
-					{/if}
-				</button>
-				<input type="range" min={minVolume} max={maxVolume} step="2" bind:value={volume}
-					class="volume slider" title="{volume} dB" on:input={updateVolume} />
+				<ClientVolume {client} {connection} />
 			</div>
 		{/if}
 	</div>

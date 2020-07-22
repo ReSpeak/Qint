@@ -454,7 +454,7 @@ export class Client extends GraphQlClient implements ITreeNode {
 	public uid!: number[];
 	public unread_messages!: number;
 
-	public volume?: number;
+	public volume: Writable<number> = writable(0);
 	/// true if whispering, false if talking, undefined if silent
 	public talking?: boolean;
 
@@ -499,7 +499,7 @@ export class Client extends GraphQlClient implements ITreeNode {
 			client: this.getUid(),
 		});
 		if (res.data)
-			this.volume = res.data.client.volume;
+			this.volume.update(() => res.data.client.volume);
 	}
 }
 

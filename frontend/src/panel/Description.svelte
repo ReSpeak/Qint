@@ -27,6 +27,7 @@
 
 		:global(.dataLine) {
 			display: flex;
+			align-items: center;
 			//flex-wrap: nowrap;
 
 			> :global(:first-child) {
