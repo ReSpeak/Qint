@@ -21,6 +21,7 @@ use tsclientlib::{
 use tsproto::resend::PacketId;
 use tsproto_packets::packets::{AudioData, OutPacket};
 
+use crate::book_events::{ClientUpdate, JsM2B};
 use crate::db::{ChatId, ChatType};
 use crate::messages::{self, MessageF2P, MessageP2F};
 use crate::{audio, book_events, db, ConnectionId, State, Tristate, WsFormat, WsOptions};
@@ -452,6 +453,24 @@ impl Ws {
 							error!(self.logger, "Failed to get state"; "error" => %e);
 						}
 						Ok(state) => {
+							if let JsM2B::ClientUpdate(ClientUpdate { input_muted, output_muted, away, .. }) = &change {
+								if input_muted.is_some() || output_muted.is_some() || away.is_some() {
+									if let Some(client) = state.clients.get(&state.own_client) {
+
+										let input_muted = input_muted.unwrap_or_else(|| client.input_muted);
+										let output_muted = output_muted.unwrap_or_else(|| client.output_muted);
+										let is_away = away.as_ref().map(|a| a.is_some())
+											.unwrap_or_else(|| client.away_message.is_some());
+
+										let audio_active = !input_muted && !output_muted && !is_away;
+										Self::set_audio_active(audio_active,
+											self.logger.clone(),
+											self.state.audio_data.a2ts.clone(),
+											ctx);
+									}
+								}
+							}
+
 							if let Err(e) = change.to_packet(state)
 								.and_then(|p| p.send(con).map_err(|e| e.into())) {
 								error!(self.logger, "Failed to send change"; "error" => %e);
