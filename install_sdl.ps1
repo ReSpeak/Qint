@@ -1,0 +1,16 @@
+$version = "2.0.12"
+# Reuse rust build dir
+New-Item -Path "./target" -ItemType "directory" -Force | Out-Null
+# Download zip
+Remove-Item "./target/sdl.zip" -Force
+Invoke-WebRequest -Uri "https://www.libsdl.org/release/SDL2-devel-$version-VC.zip" -OutFile "./target/sdl.zip"
+# Extract and move all
+Expand-Archive -Path "./target/sdl.zip" -DestinationPath "./target/sdl/" -Force
+New-Item "./proxy/msvc/lib/64" -ItemType "directory" -Force | Out-Null
+New-Item "./proxy/msvc/dll/64" -ItemType "directory" -Force | Out-Null
+Copy-Item -Path "./target/sdl/SDL2-$version/lib/x64/*" -Filter "*.lib" -Destination "./proxy/msvc/lib/64/"
+Copy-Item -Path "./target/sdl/SDL2-$version/lib/x64/*" -Filter "*.dll" -Destination "./proxy/msvc/dll/64/"
+Copy-Item -Path "./target/sdl/SDL2-$version/lib/x64/*" -Filter "*.dll" -Destination "./proxy/"
+# Cleanup
+Remove-Item "./target/sdl.zip" -Force
+Remove-Item "./target/sdl" -Recurse -Force

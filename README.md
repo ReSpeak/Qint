@@ -21,6 +21,8 @@ git checkout develop
 ```
 
 ## Download SDL2 on Windows
+Run `./install_sdl.ps1`  
+ \--- OR ---  
 Download the `SDL2-devel-2.x.x-VC.zip` from [libsdl.org](https://www.libsdl.org).  
 From this file, copy `SDL2-2.x.x/lib/x64/*.lib` to `Qint/proxy/msvc/lib/64/`.  
 And copy `SDL2-2.x.x/lib/x64/*.dll` to `Qint/proxy/msvc/dll/64/` and `Qint/proxy/`.
