@@ -19,7 +19,7 @@
 	<Icon name="chat-outline" />
 {/if}
 
-<style lang="scss">
+<style>
 	img {
 		object-fit: scale-down;
 		height: 1.5em;

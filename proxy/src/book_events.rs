@@ -21,16 +21,20 @@ pub enum JsEvent {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum JsPropertyId {
 	Channel(ChannelId),
+	ChannelGroup(ChannelGroupId),
 	Client(ClientId),
 	ClientServerGroup(ClientId, ServerGroupId),
 	Server,
+	ServerGroup(ServerGroupId),
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum JsProperty {
 	Channel(JsChannel),
+	ChannelGroup(JsChannelGroup),
 	Client(JsClient),
 	Server(JsServer),
+	ServerGroup(JsServerGroup),
 }
 
 // Any value that is present is considered Some value, including null.

@@ -18,7 +18,7 @@
 	<Icon name="account" />
 {/if}
 
-<style lang="scss">
+<style>
 	img {
 		object-fit: scale-down;
 		height: 1.5em;

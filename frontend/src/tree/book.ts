@@ -12,6 +12,7 @@ export class Book {
 	public server: Writable<Server> = writable(new Server());
 	public clients: Writable<Map<number, Client>> = writable(new Map());
 	public channels: Writable<Map<number, Channel>> = writable(new Map());
+	public serverGroups: Writable<Map<number, Writable<ServerGroup>>> = writable(new Map());
 	private currentTalkers: [number, boolean][] = [];
 
 	public reset() {
@@ -114,7 +115,7 @@ export class Book {
 		});
 	}
 
-	public updateChannel(id: number, obj: any) {
+	public updateChannel(id: number, obj: Partial<Channel>) {
 		this.channels.update(channels => {
 			const channel = channels.get(id);
 			if (channel === undefined) {
@@ -182,7 +183,7 @@ export class Book {
 		});
 	}
 
-	public updateClient(id: number, obj: any) {
+	public updateClient(id: number, obj: Partial<Client>) {
 		this.clients.update(clients => {
 			const client = this.getClient(id);
 			if (client === undefined) {
@@ -224,10 +225,31 @@ export class Book {
 		});
 	}
 
-	public updateServer(obj: any) {
+	public updateServer(obj: Partial<Server>) {
 		this.server.update(s => {
 			s.update(obj);
 			return s;
+		});
+	}
+
+	public addServerGroup(serverGroup: ServerGroup) {
+		this.serverGroups.update(serverGroups => {
+			serverGroups.set(serverGroup.id, writable(serverGroup));
+			return serverGroups;
+		});
+	}
+
+	public updateServerGroup(id: number, obj: Partial<ServerGroup>) {
+		const serverGroup = get(this.serverGroups).get(id);
+		if (serverGroup === undefined)
+			return;
+		serverGroup.update((sg: ServerGroup) => sg.update(obj));
+	}
+
+	public removeServerGroup(id: number) {
+		this.serverGroups.update(serverGroups => {
+			serverGroups.delete(id);
+			return serverGroups;
 		});
 	}
 
@@ -253,6 +275,12 @@ export class Book {
 		return get(this.clients).get(id);
 	}
 
+	public getServerGroup(id: number): ServerGroup | undefined {
+		const sgStore = get(this.serverGroups).get(id);
+		if (sgStore === undefined) return undefined;
+		return get(sgStore);
+	}
+
 	public messageHandler(msg: InBookChangeMsg) {
 		if ("PropertyAdded" in msg) {
 			if ("Channel" in msg.PropertyAdded.prop) {
@@ -262,6 +290,8 @@ export class Book {
 			} else if ("Server" in msg.PropertyAdded.prop) {
 				this.updateServer(msg.PropertyAdded.prop.Server);
 				document.title = get(this.server).name + " – Qint";
+			} else if ("ServerGroup" in msg.PropertyAdded.prop) {
+				this.addServerGroup(ServerGroup.fromJson(msg.PropertyAdded.prop.ServerGroup));
 			}
 		} else if ("PropertyChanged" in msg) {
 			if ("Channel" in msg.PropertyChanged.prop && "Channel" in msg.PropertyChanged.id) {
@@ -270,12 +300,16 @@ export class Book {
 				this.updateClient(msg.PropertyChanged.id.Client, msg.PropertyChanged.prop.Client);
 			} else if ("Server" in msg.PropertyChanged.prop) {
 				this.updateServer(msg.PropertyChanged.prop.Server);
+			} else if ("ServerGroup" in msg.PropertyChanged.prop && "ServerGroup" in msg.PropertyChanged.id) {
+				this.updateServerGroup(msg.PropertyChanged.id.ServerGroup, msg.PropertyChanged.prop.ServerGroup);
 			}
 		} else if ("PropertyRemoved" in msg) {
 			if ("Channel" in msg.PropertyRemoved.id) {
 				this.removeChannel(msg.PropertyRemoved.id.Channel);
 			} else if ("Client" in msg.PropertyRemoved.id) {
 				this.removeClient(msg.PropertyRemoved.id.Client);
+			} else if ("ServerGroup" in msg.PropertyRemoved.id) {
+				this.removeServerGroup(msg.PropertyRemoved.id.ServerGroup);
 			}
 		}
 	}
@@ -434,14 +468,12 @@ export class Client extends GraphQlClient implements ITreeNode {
 
 	protected constructor() { super(); }
 
-	public static fromJson(obj: any): Client {
-		const c = new Client();
-		Object.assign(c, obj);
-		return c;
+	public static fromJson(obj: Partial<Client>): Client {
+		return new Client().update(obj);
 	}
 
-	public update(obj: any): void {
-		Object.assign(this, obj);
+	public update(obj: Partial<this>): this {
+		return Object.assign(this, obj);
 	}
 
 	public getColor() {
@@ -508,22 +540,12 @@ export class Channel implements ITreeParent, ITreeNode {
 
 	private constructor() { }
 
-	public static fromDebug(id: ChannelId, parent: ChannelId, order: ChannelId): Channel {
-		const c = new Channel();
-		c.id = id;
-		c.parent = parent;
-		c.order = order;
-		return c;
+	public static fromJson(obj: Partial<Channel>): Channel {
+		return new Channel().update(obj);
 	}
 
-	public static fromJson(obj: any): Channel {
-		const c = new Channel();
-		Object.assign(c, obj);
-		return c;
-	}
-
-	public update(obj: any): void {
-		Object.assign(this, obj);
+	public update(obj: Partial<this>): this {
+		return Object.assign(this, obj);
 	}
 }
 
@@ -537,8 +559,8 @@ export class Server implements ITreeParent {
 	// ITreeParent
 	public children: Writable<ITreeNode[]> = writable([]);
 
-	public update(obj: any): void {
-		Object.assign(this, obj);
+	public update(obj: Partial<this>): this {
+		return Object.assign(this, obj);
 	}
 
 	public getColor() {
@@ -551,6 +573,38 @@ export class Server implements ITreeParent {
 		}
 	}
 }
+
+type GroupNamingMode = any;
+type IconHash = any;
+type GroupType = any;
+
+export class Group {
+	id!: number;
+	name!: string;
+	group_type!: GroupType;
+	icon_id!: IconHash;
+	is_permanent!: boolean;
+	sort_id!: number;
+	naming_mode!: GroupNamingMode;
+	needed_modify_power!: number;
+	needed_member_add_power!: number;
+	needed_member_remove_power!: number;
+
+	public update(obj: Partial<this>): this {
+		return Object.assign(this, obj);
+	}
+}
+
+export class ServerGroup extends Group {
+	public static fromJson(obj: Partial<ServerGroup>): ServerGroup {
+		return new ServerGroup().update(obj);
+	}
+};
+export class ChannelGroup extends Group {
+	public static fromJson(obj: Partial<ChannelGroup>): ChannelGroup {
+		return new ChannelGroup().update(obj);
+	}
+};
 
 export interface ITreeParent {
 	children: Writable<ITreeNode[]>;

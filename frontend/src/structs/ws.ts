@@ -1,6 +1,6 @@
 // tslint:disable: interface-name
 
-import { Channel, Client, Server } from "../tree/book";
+import { Channel, Client, Server, ServerGroup } from "../tree/book";
 
 export type WsMessageTarget =
 	"Server"
@@ -92,6 +92,8 @@ interface InLoudness {
 	Loudness: number;
 }
 
+//#region PropertyId
+
 interface IMsgPropertyIdChannel {
 	Channel: number;
 }
@@ -108,7 +110,20 @@ interface IMsgPropertyIdServer {
 	Server: {};
 }
 
-type PropertyId = IMsgPropertyIdChannel | IMsgPropertyIdClient | IMsgPropertyIdClientServerGroup | IMsgPropertyIdServer;
+interface IMsgPropertyIdServerGroup {
+	ServerGroup: number;
+}
+
+type PropertyId =
+	IMsgPropertyIdChannel |
+	IMsgPropertyIdClient |
+	IMsgPropertyIdClientServerGroup |
+	IMsgPropertyIdServer |
+	IMsgPropertyIdServerGroup;
+
+//#endregion
+
+//#region PropertyValue
 
 interface IMsgPropertyValueChannel {
 	Channel: Partial<Channel>;
@@ -122,8 +137,17 @@ interface IMsgPropertyValueServer {
 	Server: Partial<Server>;
 }
 
-type PropertyValue = IMsgPropertyValueChannel | IMsgPropertyValueClient | IMsgPropertyValueServer;
+interface IMsgPropertyValueServerGroup {
+	ServerGroup: Partial<ServerGroup>;
+}
 
+type PropertyValue =
+	IMsgPropertyValueChannel |
+	IMsgPropertyValueClient |
+	IMsgPropertyValueServer |
+	IMsgPropertyValueServerGroup;
+
+//#endregion
 
 export interface Invoker {
 	name: string;

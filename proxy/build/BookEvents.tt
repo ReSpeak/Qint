@@ -79,6 +79,11 @@ pub struct JsChannel {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct JsChannelGroup {
+<# get_props(_fmt, &self.structs, &["ChannelGroup"])?; #>
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct JsClient {
 <# get_props(_fmt, &self.structs, &["Client", "OptionalClientData", "ConnectionClientData"])?; #>
 }
@@ -86,6 +91,11 @@ pub struct JsClient {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct JsServer {
 <# get_props(_fmt, &self.structs, &["Server", "OptionalServerData", "ConnectionServerData"])?; #>
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct JsServerGroup {
+<# get_props(_fmt, &self.structs, &["ServerGroup"])?; #>
 }
 
 pub fn convert_event(con: &Connection, e: &Event) -> Option<JsEvent> {
@@ -123,8 +133,10 @@ pub fn convert_event(con: &Connection, e: &Event) -> Option<JsEvent> {
 fn property_to_js(id: &PropertyId, p: PropertyValueRef) -> Option<JsProperty> {
 	match id {
 <# convert_value(_fmt, "Channel", "(_)", &self.structs, &["Channel", "OptionalChannelData"])?; #>
+<# convert_value(_fmt, "ChannelGroup", "(_)", &self.structs, &["ChannelGroup"])?; #>
 <# convert_value(_fmt, "Client", "(_)", &self.structs, &["Client", "OptionalClientData", "ConnectionClientData"])?; #>
 <# convert_value(_fmt, "Server", "", &self.structs, &["Server", "OptionalServerData", "ConnectionServerData"])?; #>
+<# convert_value(_fmt, "ServerGroup", "(_)", &self.structs, &["ServerGroup"])?; #>
 		_ => None,
 	}
 }
@@ -134,8 +146,10 @@ impl TryFrom<PropertyId> for JsPropertyId {
 	fn try_from(id: PropertyId) -> Result<Self, ()> {
 		match id {
 <# convert_ids(_fmt, "Channel", "(id)", &self.structs, &["Channel", "OptionalChannelData"])?; #>
+<# convert_ids(_fmt, "ChannelGroup", "(id)", &self.structs, &["ChannelGroup"])?; #>
 <# convert_ids(_fmt, "Client", "(id)", &self.structs, &["Client", "OptionalClientData", "ConnectionClientData"])?; #>
 <# convert_ids(_fmt, "Server", "", &self.structs, &["Server", "OptionalServerData", "ConnectionServerData"])?; #>
+<# convert_ids(_fmt, "ServerGroup", "(id)", &self.structs, &["ServerGroup"])?; #>
 			_ => Err(()),
 		}
 	}

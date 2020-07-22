@@ -1,6 +1,7 @@
 <script lang="typescript">
 	import { afterUpdate } from "svelte";
 	import ClientIcon from "../ui/ClientIcon.svelte";
+	import ServerGroupIcon from "../ui/ServerGroupIcon.svelte";
 	import FilterString from "../ui/FilterString.svelte";
 	import Icon from "../ui/Icon.svelte";
 	import { Connection } from "../connection";
@@ -144,6 +145,9 @@
 				{#if client.away_message !== null}
 					<Icon name="sleep" style="color: rgb(70,180,255);" />
 				{/if}
+				{#each client.server_groups as grp (grp)}
+					<ServerGroupIcon id={grp} {connection} />
+				{/each}
 			</span>
 		</button>
 		{#if hovered}
