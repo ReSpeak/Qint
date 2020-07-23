@@ -1,33 +1,31 @@
 <script lang="typescript">
 	// TODO Use scroll-anchoring https://blog.eqrion.net/pin-to-bottom/
-	import { onMount } from 'svelte';
+	import { onMount } from "svelte";
 	import { get } from "svelte/store";
 	import UiMessage from "./UiMessage.svelte";
 	import { Chat, Message } from "./chat";
-	import Icon from "../ui/Icon.svelte";
 	import ClientIcon from "../ui/ClientIcon.svelte";
 	import ClientName from "../ui/ClientName.svelte";
 	import LazyList from "../ui/LazyList.svelte";
-	import { ListFetchDir, ILazyList } from "../ui/lazyList";
+	import { ListFetchDir } from "../ui/lazyList";
 	import { Connection } from "../connection";
-	import { assert } from "../util";
 	import BInput from "../ui/BInput.svelte";
 
-	export let connection!: Connection;
+	export let connection: Connection;
 	let chat = connection.chat;
 
-	let chatList: ILazyList;
+	let chatList: LazyList;
 	let messagesError: unknown | undefined;
-	let messageInput: HTMLElement;
+	let messageInput: BInput;
+
 	let canChatHere = true;
 
-	chat.selectedChat.subscribe(c => {
+	chat.selectedChat.subscribe((c) => {
 		console.log("switch chat");
 		if (chatList) {
 			chatList.sourceChanged(ListFetchDir.New, ListFetchDir.After);
 		}
-		if (messageInput)
-			messageInput.focus();
+		if (messageInput) messageInput.focus();
 
 		if ("Server" in c || "Client" in c) {
 			canChatHere = true;
@@ -36,20 +34,19 @@
 		}
 	});
 
-	chat.unreadCount.subscribe(_ => {
-		if (chatList)
-			chatList.sourceChanged(ListFetchDir.After, ListFetchDir.After);
+	chat.unreadCount.subscribe((_) => {
+		if (chatList) chatList.sourceChanged(ListFetchDir.After, ListFetchDir.After);
 	});
 
-	function sendMessage(e: UIEvent) {
+	function sendMessage() {
 		chat.sendMessage();
 		chat.composing = "";
 		messageInput.focus();
 	}
 
-	function onChatKeyDown(e: KeyboardEvent) {
+	function onChatKeyDown(e: any) {
 		if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey) {
-			sendMessage(e);
+			sendMessage();
 			e.preventDefault();
 		}
 	}
@@ -66,17 +63,6 @@
 		}
 	}
 
-	function getItemClient(item: Message) {
-		if (item.invoker) {
-			return {
-				uid: item.invoker.uid,
-				name: item.invoker.name ?? item.invokerName,
-			};
-		} else {
-			return { name: item.invokerName };
-		}
-	}
-
 	onMount(() => {
 		chatList.sourceChanged(ListFetchDir.New, ListFetchDir.After);
 		messageInput.focus();
@@ -90,19 +76,17 @@
 				<div class="message-header">
 					<p>Error</p>
 				</div>
-				<div class="message-body">
-					Failed to fetch messages
-				</div>
+				<div class="message-body">Failed to fetch messages</div>
 			</article>
 		</div>
 	{:else}
 		<LazyList bind:this={chatList} {fetchElements} let:item>
-			<div slot="loading" class="loader"></div>
+			<div slot="loading" class="loader" />
 			{#if item.displayDateSeparator}
-				<div title="{item.date.format('L')}" class="chat-date">
-					<div class="chat-date-line"></div>
+				<div title={item.date.format('L')} class="chat-date">
+					<div class="chat-date-line" />
 					<span>{item.date.format('LL')}</span>
-					<div class="chat-date-line"></div>
+					<div class="chat-date-line" />
 				</div>
 			{/if}
 			{#if item.displayGroupHeader}
@@ -120,7 +104,10 @@
 	{/if}
 	{#if canChatHere}
 		<form class="chat-form" on:submit|preventDefault={sendMessage}>
-			<BInput bind:this={messageInput} bind:value={chat.composing} on:keydown={onChatKeyDown} />
+			<BInput
+				bind:this={messageInput}
+				bind:value={chat.composing}
+				on:keydown={onChatKeyDown} />
 			<button class="button" name="send" type="submit" style="height: auto;">Send</button>
 		</form>
 	{/if}
@@ -182,7 +169,10 @@
 	.chat-date-line {
 		flex: 1;
 		border-top: 1px solid mix($text, $background, 60%);
-		margin: { left: 0.5em; right: 0.5em; };
+		margin: {
+			left: 0.5em;
+			right: 0.5em;
+		}
 	}
 
 	.invoker-row {

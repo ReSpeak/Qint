@@ -1,19 +1,21 @@
-<script>
+<script lang="typescript">
 	import Icon from './Icon.svelte';
+	import { Channel } from "../tree/book";
+	import { Connection } from "../connection";
 	import { getClientIconPath } from "./clientIcon";
 
-	export let channel;
+	export let channel: Channel;
 	// Either connection or server has to be set to fetch the icon
-	export let connection = undefined;
-	export let server = undefined;
+	export let connection: Connection | undefined = undefined;
+	export let server: string | undefined = undefined;
 
-	// I’m sorry for using javascript
-	$: channelIconPath = getClientIconPath(channel, connection, server);
+	let iconPath: string | undefined;
+	$: iconPath = getClientIconPath(channel, connection, server);
 </script>
 
-{#if channelIconPath}
+{#if iconPath}
 	<span class="icon">
-		<img src={channelIconPath} alt="" />
+		<img src={iconPath} alt="" />
 	</span>
 {:else}
 	<Icon name="chat-outline" />

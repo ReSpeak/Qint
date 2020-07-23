@@ -1,8 +1,8 @@
 <script lang="typescript">
-	export let min!: number;
-	export let max!: number;
+	export let min: number;
+	export let max: number;
 	export let step: number = 1;
-	export let value!: number;
+	export let value: number;
 	export let tooltip: boolean = false;
 	export let display: (n: number) => string = n => String(n);
 

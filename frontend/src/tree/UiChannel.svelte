@@ -1,18 +1,20 @@
 <script lang="typescript">
-	import { get, Writable } from "svelte/store";
+	import { get } from "svelte/store";
+	import type { Writable } from "svelte/store";
 	import Icon from "../ui/Icon.svelte";
 	import ChannelIcon from "../ui/ChannelIcon.svelte";
 	import FilterString from "../ui/FilterString.svelte";
-	import { Channel, ITreeNode } from "./book";
-	import ClientComp from "./Client.svelte";
+	import { Channel, Client } from "./book";
+	import type { ITreeNode } from "./book";
+	import UiClient from "./UiClient.svelte";
 	import { Connection } from "../connection";
 	import { draggable, DragData } from "../ui/draggable";
-	import { findParent } from "../util";
+	import { findParent, assert } from "../util";
 
-	export let connection!: Connection;
-	export let filter!: string;
+	export let connection: Connection;
+	export let filter: string;
 	export let filterShow: boolean = true;
-	export let channel!: Channel;
+	export let channel: Channel;
 	let selectedChat = connection.chat.selectedChat;
 
 	let collapsed = false;
@@ -20,12 +22,15 @@
 
 	let children: Writable<ITreeNode[]>;
 	let ownClient: boolean;
-	let selectedChannel: boolean;
+	let selectedChannel: boolean = false;
 	$: children = channel.children;
 	$: filterShow = applyFilter(filter, channel, $children);
 	// Update if a client moves in or out
 	$: ownClient = updateOwnClient($children);
-	$: selectedChannel = "Channel" in $selectedChat && $selectedChat.Channel === channel.id;
+	$: {
+		const sc = $selectedChat;
+		selectedChannel = "Channel" in sc && sc.Channel === channel.id;
+	}
 	let div!: HTMLDivElement;
 
 	function updateOwnClient(children: ITreeNode[]) {
@@ -38,10 +43,11 @@
 	}
 
 	function applyFilter(filter: string, channel: Channel, children: ITreeNode[]) {
+		assert(filter != null, "fil");
 		return (
 			filter === "" ||
 			channel.name.toLowerCase().includes(filter.toLowerCase()) ||
-			children.some(c => c.filterShow)
+			children.some((c) => c.filterShow)
 		);
 	}
 
@@ -76,7 +82,7 @@
 		const hoverOpt: HTMLElement[] = [
 			...ev.detail.customData.querySelectorAll(":hover"),
 		].reverse();
-		const dropTarget = hoverOpt.find(x => x.dataset.type === "channel");
+		const dropTarget = hoverOpt.find((x) => x.dataset.type === "channel");
 		console.log(hoverOpt, dropTarget);
 		if (dropTarget !== undefined) {
 			const rect = dropTarget.getBoundingClientRect();
@@ -113,54 +119,49 @@
 	}
 </script>
 
-<li class="container" class:hidden="{!filterShow}" class:collapsed>
+<li class="container" class:hidden={!filterShow} class:collapsed>
 	<div
-		bind:this="{div}"
+		bind:this={div}
 		class="nameContainer"
 		class:ownClient
 		class:selectedChannel
-		on:mouseover="{() => (hovered = true)}"
-		on:mouseout="{leave}"
+		on:mouseover={() => (hovered = true)}
+		on:mouseout={leave}
 		use:draggable
-		on:dragstart="{dragStart}"
-		on:dragdrop="{dragDrop}"
+		on:dragstart={dragStart}
+		on:dragdrop={dragDrop}
 		data-type="channel"
-		data-key="{channel.id}"
-	>
+		data-key={channel.id}>
 		<button
 			class="button collapseButton"
-			on:click="{() => (collapsed = !collapsed)}"
-			class:haschildren="{$children.length !== 0}"
-		>
+			on:click={() => (collapsed = !collapsed)}
+			class:haschildren={$children.length !== 0}>
 			<Icon name="chevron-right{collapsed ? '' : ' mdi-rotate-90'}" />
 			<ChannelIcon {channel} {connection} />
 		</button>
-		<button class="button nameButton" on:click="{setChat}" on:dblclick="{switchChannel}">
-			<FilterString {filter} content="{channel.name}" />
+		<button class="button nameButton" on:click={setChat}>
+			<FilterString {filter} content={channel.name} />
+			<Icon name="shoe-print" on:click={switchChannel} />
 		</button>
 		{#if hovered}
 			<div class="hover menu" style="top: {div.getBoundingClientRect().top}px;">
-				<div class="corner"></div>
+				<div class="corner" />
 				{channel.name}
 			</div>
 		{/if}
 	</div>
 	<ul class="menu-list">
-		{#each $children as child (child.id)}
+		{#each $children as child (child.key)}
 			{#if child instanceof Channel}
 				<svelte:self
 					{connection}
 					{filter}
-					channel="{child}"
-					bind:filterShow="{child.filterShow}"
-				/>
+					channel={child}
+					bind:filterShow={child.filterShow} />
+			{:else if child instanceof Client}
+				<UiClient {connection} {filter} client={child} bind:filterShow={child.filterShow} />
 			{:else}
-				<ClientComp
-					{connection}
-					{filter}
-					client="{child}"
-					bind:filterShow="{child.filterShow}"
-				/>
+				{@debug child}
 			{/if}
 		{/each}
 	</ul>

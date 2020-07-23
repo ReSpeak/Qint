@@ -1,15 +1,15 @@
+<script lang="typescript" context="module">
+	import { ListFetchDir } from "./lazyList";
+	export default interface Self {
+		clear(): void;
+		sourceChanged(dir: ListFetchDir, anchor?: ListFetchDir): void;
+	}
+</script>
+
 <script lang="typescript">
-	import {
-		sleep,
-		assert,
-		binarySearchByKey,
-		BinarySearchResult,
-		getResizeObserver,
-	} from "../util";
+	import { assert, binarySearchByKey, getResizeObserver } from "../util";
 	import { tick, onMount } from "svelte";
-	import { writable } from "svelte/store";
-	import * as svst from "svelte/store";
-	import { ListFetchDir, FetchResult } from "./lazyList";
+	import type { FetchResult } from "./lazyList";
 
 	// Dummy class to have nice typing for our 'generic' parameter T which
 	// represents the element type.
@@ -33,8 +33,8 @@
 	/** How far the item at index `minItemsToRemove` has to be out of view to be removed */
 	let minPxDistanceToRemove = 1500;
 	// The holding list element which has the scrollbar
-	let pan: HTMLElement;
-	let scrollPane: HTMLElement;
+	let pan!: HTMLElement;
+	let scrollPane!: HTMLElement;
 	// Utility holder to calculate `scrollDiff`
 	let lastScrollPos: number = 0;
 	// In which direction and how far the content has scrolled since last check
@@ -95,7 +95,7 @@
 		}
 	}
 
-	export let fetchElements!: (id: T | undefined, dir: ListFetchDir) => Promise<FetchResult<T>>;
+	export let fetchElements: (id: T | undefined, dir: ListFetchDir) => Promise<FetchResult<T>>;
 
 	// Require the minimum distance before deleting an item to be higher
 	// than the minimum size the list wants to buffer.

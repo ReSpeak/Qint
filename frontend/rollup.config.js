@@ -9,7 +9,7 @@ import typescript from '@rollup/plugin-typescript';
 
 const svelteOptions = require("./svelte.config");
 
-const production = !process.env.ROLLUP_WATCH;
+const production = false;//!process.env.ROLLUP_WATCH;
 
 export default {
 	input: "src/main.ts",
@@ -24,16 +24,6 @@ export default {
 			...svelteOptions,
 			// enable run-time checks when not in production
 			dev: !production,
-			// we'll extract any component CSS out into
-			// a separate file — better for performance
-			css: css => {
-				css.write("public/bundle.css");
-			},
-			onwarn(warning, onwarn) {
-				if (!/A11y:/.test(warning.message)) {
-					onwarn(warning);
-				}
-			},
 		}),
 
 		replace({

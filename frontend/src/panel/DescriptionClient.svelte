@@ -11,8 +11,8 @@
 	import ClientVolume from "../controls/ClientVolume.svelte";
 	import { getClientAvatarPath } from "../ui/clientIcon";
 
-	export let connection!: Connection;
-	export let clientId!: number;
+	export let connection: Connection;
+	export let clientId: number;
 
 	let client: Client;
 	let avatarPath: string | undefined;

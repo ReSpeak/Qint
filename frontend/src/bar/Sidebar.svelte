@@ -1,15 +1,15 @@
 <script lang="typescript">
-	import Server from "../tree/Server.svelte";
+	import UiServer from "../tree/UiServer.svelte";
 	import ServerIcon from "../ui/ServerIcon.svelte";
 	import StickyList from "../ui/StickyList.svelte";
 	import StickySlot from "../ui/StickySlot.svelte";
 	import { Connection } from "../connection";
 
-	export let connection!: Connection;
-	export let filter!: string;
+	export let connection: Connection;
+	export let filter: string;
 	let server = connection.book.server;
 	let selectedChat = connection.chat.selectedChat;
-	declare let selectedServerChat: boolean;
+	let selectedServerChat: boolean;
 	$: selectedServerChat = "Server" in $selectedChat;
 </script>
 
@@ -24,7 +24,7 @@
 			</div>
 		</StickySlot>
 
-		<Server {connection} {filter} />
+		<UiServer {connection} {filter} />
 
 		<StickySlot>Notifications</StickySlot>
 		<div class="menu">

@@ -8,14 +8,13 @@
 	import { Connection } from "./connection";
 
 	export let connection: Connection;
-	let filter!: string;
+	let filter: string = "";
 
 	let showSidebar = true;
 	let showChat = true;
 	let showDescription = true;
 	let showGlobalSettings = false;
 	let columnStyle = "";
-	let panelStyle = "";
 
 	$: globalSettingsChanged(showGlobalSettings);
 	$: chatChanged(showChat, showDescription);

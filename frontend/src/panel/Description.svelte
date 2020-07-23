@@ -4,7 +4,7 @@
 	import DescriptionChannel from "./DescriptionChannel.svelte";
 	import { MessageTarget } from "../structs/ts";
 
-	export let connection!: Connection;
+	export let connection: Connection;
 	let selected = connection.chat.selectedChat;
 	let s: MessageTarget;
 	$: s = $selected;

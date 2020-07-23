@@ -1,5 +1,4 @@
 <script lang="typescript">
-	import { afterUpdate } from "svelte";
 	import ClientIcon from "../ui/ClientIcon.svelte";
 	import ClientVolume from "../controls/ClientVolume.svelte";
 	import ServerGroupIcon from "../ui/ServerGroupIcon.svelte";
@@ -10,20 +9,22 @@
 	import { draggable, DragData } from "../ui/draggable";
 	import { findParent } from "../util";
 
-	export let connection!: Connection;
-	export let filter!: string;
+	export let connection: Connection;
+	export let client: Client;
+	export let filter: string;
 	export let filterShow: boolean = true;
-	export let client!: Client;
 	let selectedChat = connection.chat.selectedChat;
 	let hovered = false;
 	let newHover = false;
-	
 
-	declare let ownClient: boolean;
-	declare let selectedClient: boolean;
+	let ownClient: boolean;
+	let selectedClient: boolean = false;
 	$: filterShow = applyFilter(filter, client);
 	$: ownClient = client.id === connection.ownClientId;
-	$: selectedClient = "Client" in $selectedChat && $selectedChat.Client === client.id;
+	$: {
+		const sc = $selectedChat;
+		selectedClient = "Client" in sc && sc.Client === client.id;
+	}
 	let div!: HTMLDivElement;
 
 	function setChat() {
@@ -47,8 +48,7 @@
 		}
 		newHover = false;
 		setTimeout(() => {
-			if (!newHover)
-				hovered = false;
+			if (!newHover) hovered = false;
 		}, 50);
 	}
 
@@ -59,13 +59,12 @@
 		// TODO find correct max
 		//ev.detail.maxY = channelTree.clientHeight;
 		ev.detail.lockX = true;
-
 	}
 
 	function dragDrop(ev: CustomEvent<DragData>) {
 		ev.detail.dragNode.classList.remove("dragStyle");
 		const hoverOpt: HTMLElement[] = [...ev.detail.customData.querySelectorAll(":hover")];
-		const dropTarget = hoverOpt.reverse().find(x => x.dataset.type === "channel");
+		const dropTarget = hoverOpt.reverse().find((x) => x.dataset.type === "channel");
 		console.log(hoverOpt, dropTarget);
 		if (dropTarget !== undefined) {
 			console.log("Would drop to", dropTarget.dataset.key);
@@ -79,19 +78,24 @@
 		bind:this={div}
 		class:ownClient
 		class:selectedClient
-		on:mouseover={hover} on:mouseout={leave}
-		on:focusin={hover} on:focusout={leave}
-	>
+		on:mouseover={hover}
+		on:mouseout={leave}
+		on:focusin={hover}
+		on:focusout={leave}>
 		<button
 			class="button clientButton"
 			class:talking={client.talking !== undefined}
 			on:click={setChat}
-			use:draggable on:dragstart={dragStart} on:dragdrop={dragDrop}
-			data-type="client" data-key="{client.id}"
-		>
-			<div class="inner"></div>
+			use:draggable
+			on:dragstart={dragStart}
+			on:dragdrop={dragDrop}
+			data-type="client"
+			data-key={client.id}>
+			<div class="inner" />
 			<ClientIcon {client} {connection} />
-			<span class="clientName" style={client.getColor()}><FilterString {filter} content={client.name} /></span>
+			<span class="clientName" style={client.getColor()}>
+				<FilterString {filter} content={client.name} />
+			</span>
 			<span class="icons">
 				{#if client.input_muted}
 					<Icon name="microphone-off" style="color: red;" />
@@ -109,7 +113,7 @@
 		</button>
 		{#if hovered}
 			<div class="hover menu" style="top: {div.getBoundingClientRect().top}px;">
-				<div class="corner"></div>
+				<div class="corner" />
 				<div class="name">
 					<span style={client.getColor()}>{client.name}</span>
 					{#if client.away_message !== null && client.away_message.length !== 0}
@@ -172,7 +176,6 @@
 	.icons {
 		display: flex;
 		flex-wrap: nowrap;
-		justify-self: end;
 	}
 
 	.button .icons > :global(span) {
@@ -211,8 +214,8 @@
 
 		background-image: url("/talking.svg");
 		background-size: 100% auto;
-		-webkit-mask-image: radial-gradient(rgba(0,0,0,1), rgba(0,0,0,0));
-		mask-image: radial-gradient(rgba(0,0,0,1), rgba(0,0,0,0));
+		-webkit-mask-image: radial-gradient(rgba(0, 0, 0, 1), rgba(0, 0, 0, 0));
+		mask-image: radial-gradient(rgba(0, 0, 0, 1), rgba(0, 0, 0, 0));
 
 		opacity: 0;
 		height: 50%;

@@ -1,9 +1,9 @@
 <script lang="typescript">
 	import { escapeHtml, ignoreCaseRegex } from "../util";
-	export let filter!: string;
-	export let content!: string;
+	export let filter: string;
+	export let content: string;
 
-	declare let filteredContent: string;
+	let filteredContent: string;
 	$: filteredContent = applyFilter(filter, content);
 
 	function applyFilter(filter: string, content: string): string {

@@ -1,9 +1,10 @@
 <script lang="typescript">
 	import { getContext } from "svelte";
-	import { TabListContext, contextKey } from "./bTabList";
+	import { contextKey } from "./bTabList";
+	import type { TabListContext } from "./bTabList";
 	import { assert } from "../util";
 
-	export let title!: string;
+	export let title: string;
 
 	let context: TabListContext = getContext(contextKey);
 	assert(context !== undefined, "TabSlot must be used within a TabList");

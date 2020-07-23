@@ -1,7 +1,8 @@
 <script lang="typescript">
 	import { setContext } from "svelte";
 	import { writable } from "svelte/store";
-	import { TabListContext, contextKey } from "./bTabList";
+	import { contextKey } from "./bTabList";
+	import type { TabListContext } from "./bTabList";
 
 	let items: string[] = [];
 	let activeIndex = writable(0);

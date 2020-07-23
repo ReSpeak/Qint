@@ -1,13 +1,18 @@
 import { Connection } from "../connection";
-import { GraphQlClient } from "../tree/book";
 import { BASE_ADDRESS } from "../util";
 import { writable, Writable } from "svelte/store";
 
-type IconSource = { icon_id: number } | undefined;
+export type IconSource = { icon_id: number | undefined } | undefined;
+type IconSourceLike = {
+	icon_id: number | undefined
+	avatar_hash?: string
+	uid?: number[],
+	getAvatarUid?: () => string | undefined,
+};
 
 export const DummyStore: Writable<IconSource> = writable(undefined);
 
-export function getClientIconPath(client: GraphQlClient, connection?: Connection, server?: string): string | undefined {
+export function getClientIconPath(client: IconSourceLike, connection?: Connection, server?: string): string | undefined {
 	if (!connection && !server) {
 		console.error("ClientIcon needs either connection or server");
 		return;
@@ -17,19 +22,19 @@ export function getClientIconPath(client: GraphQlClient, connection?: Connection
 
 	if (connection) {
 		if (client.avatar_hash !== "" && client.uid)
-			return `${BASE_ADDRESS}/con/${connection.guid}/file/0/avatar_${client.getAvatarUid()}?hash=${client.avatar_hash}`;
+			return `${BASE_ADDRESS}/con/${connection.guid}/file/0/avatar_${client.getAvatarUid!()}?hash=${client.avatar_hash}`;
 		else if (client.icon_id !== 0)
 			return `${BASE_ADDRESS}/con/${connection.guid}/file/0/icon_${client.icon_id}`;
 	} else if (server) {
 		if (client.avatar_hash !== "" && client.uid)
-			return `${BASE_ADDRESS}/filecache/${server}/0/avatar_${client.getAvatarUid()}`;
+			return `${BASE_ADDRESS}/filecache/${server}/0/avatar_${client.getAvatarUid!()}`;
 		else if (client.icon_id !== 0)
 			return `${BASE_ADDRESS}/filecache/${server}/0/icon_${client.icon_id}`;
 	}
 	return;
 }
 
-export function getClientAvatarPath(client: GraphQlClient, connection?: Connection, server?: string): string | undefined {
+export function getClientAvatarPath(client: IconSourceLike, connection?: Connection, server?: string): string | undefined {
 	if (!connection && !server) {
 		console.error("ClientIcon needs either connection or server");
 		return;
@@ -39,10 +44,10 @@ export function getClientAvatarPath(client: GraphQlClient, connection?: Connecti
 
 	if (connection) {
 		if (client.avatar_hash !== "" && client.uid)
-			return `${BASE_ADDRESS}/con/${connection.guid}/file/0/avatar_${client.getAvatarUid()}?hash=${client.avatar_hash}`;
+			return `${BASE_ADDRESS}/con/${connection.guid}/file/0/avatar_${client.getAvatarUid!()}?hash=${client.avatar_hash}`;
 	} else if (server) {
 		if (client.avatar_hash !== "" && client.uid)
-			return `${BASE_ADDRESS}/filecache/${server}/0/avatar_${client.getAvatarUid()}`;
+			return `${BASE_ADDRESS}/filecache/${server}/0/avatar_${client.getAvatarUid!()}`;
 	}
 	return;
 }

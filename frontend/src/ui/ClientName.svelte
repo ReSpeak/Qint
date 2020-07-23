@@ -1,19 +1,26 @@
 <script lang="typescript">
 	import { GraphQlClient } from "../tree/book";
-	import { Message } from "../chat/chat"
+	import { Message } from "../chat/chat";
 	import { getDataColor } from "../util";
 
 	export let client!: GraphQlClient | Message;
-	
-	let data, name;
-	if (client instanceof GraphQlClient) {
-		data = client.uid;
-		name = client.name;
-	} else {
-		data = client.invoker?.uid ?? client.invokerName ?? client.displayName;
-		name = client.invoker?.name ?? client.displayName;
+
+	let color: string = "";
+	let name: string = "";
+
+	function refreshClient(cl: GraphQlClient | Message) {
+		let data, name;
+		if (cl instanceof GraphQlClient) {
+			data = cl.uid;
+			name = cl.name;
+		} else {
+			data = cl.invoker?.uid ?? cl.invokerName ?? cl.displayName;
+			name = cl.invoker?.name ?? cl.displayName;
+		}
+		return [getDataColor(data), name];
 	}
-	let color = getDataColor(data);
+
+	$: [color, name] = refreshClient(client);
 </script>
 
 <span style={color}>{name}</span>

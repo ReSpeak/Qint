@@ -2,13 +2,13 @@
 	import { Connection } from "../connection";
 	import Icon from '../ui/Icon.svelte';
 
-	export let connection!: Connection;
-	export let showSidebar!: boolean;
-	export let showChat!: boolean;
-	export let showDescription!: boolean;
-	export let showGlobalSettings!: boolean;
+	export let connection: Connection;
+	export let showSidebar: boolean;
+	export let showChat: boolean;
+	export let showDescription: boolean;
+	export let showGlobalSettings: boolean;
 	let dropdownActive = false;
-	let dropdown: HTMLElement;
+	let dropdown!: HTMLElement;
 
 	let ownClient = connection.ownClient;
 	let input_muted: boolean | undefined;

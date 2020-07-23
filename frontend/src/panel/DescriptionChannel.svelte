@@ -1,15 +1,15 @@
 <script lang="typescript">
 	import { Connection } from "../connection";
-	import { Writable } from "svelte/store";
-	import { Channel, Client, ITreeNode } from "../tree/book";
-	import { Moment } from "moment";
+	import type { Writable } from "svelte/store";
+	import { Channel, Client } from "../tree/book";
+	import type { ITreeNode } from "../tree/book";
 	import ChannelIcon from "../ui/ChannelIcon.svelte";
 	import StickyList from "../ui/StickyList.svelte";
 	import StickySlot from "../ui/StickySlot.svelte";
-	import { Codec, codecToName } from "../structs/ts";
+	import { codecToName } from "../structs/ts";
 
-	export let connection!: Connection;
-	export let channelId!: number;
+	export let connection: Connection;
+	export let channelId: number;
 
 	let channel: Channel;
 	$: channel = connection.book.getChannel(channelId)!;
@@ -17,7 +17,7 @@
 	$: children = channel.children;
 	let clientCount: number;
 	$: clientCount = $children.filter((c: ITreeNode) => c instanceof Client).length;
-	let formatMaxClients: string | number;
+	let formatMaxClients: string | number = 0;
 	$: {
 		// TODO: calculate inheritance?
 		if (channel.max_clients === "Inherited" || channel.max_clients === "Unlimited")

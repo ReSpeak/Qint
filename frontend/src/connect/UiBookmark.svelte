@@ -1,17 +1,21 @@
-<script>
-	import { onMount } from 'svelte';
+<script lang="typescript">
+	import type { Writable } from "svelte/store";
 	import { BOOKMARK_OFF, BOOKMARK_ON, SERVER_ICON } from "../util";
+	import { Bookmark } from "./bookmark";
+	import Self from "./connect";
 
-	export let connect;
-	export let username;
-	export let address;
-	export let bookmark;
-	let error = undefined;
+	export let connect: Self;
+	export let username: Writable<string | undefined>;
+	export let address: Writable<string | undefined>;
+	export let bookmark: Bookmark;
+	let error: string | undefined = undefined;
 
 	function doConnect() {
-		connect.username = bookmark.username;
-		connect.address = bookmark.address;
-		connect.connect();
+		if (bookmark.username !== undefined && bookmark.address !== undefined) {
+			connect.username = bookmark.username;
+			connect.address = bookmark.address;
+			connect.connect();
+		}
 	}
 
 	function toggle() {
@@ -34,15 +38,25 @@
 	}
 </script>
 
-<div class="bookmarkItem" class:bookmark={bookmark.bookmark} on:mouseover={hover} on:mouseout={leave}>
+<div
+	class="bookmarkItem"
+	class:bookmark={bookmark.bookmark}
+	on:mouseover={hover}
+	on:mouseout={leave}>
 	<button class="button innerBookmarkItem" on:click={doConnect}>
-		<div class="bookmarkIcon"><i class="mdi mdi-{SERVER_ICON} mdi-24px"></i></div>
+		<div class="bookmarkIcon">
+			<i class="mdi mdi-{SERVER_ICON} mdi-24px" />
+		</div>
 		<div class="bookmarkName">{bookmark.name || bookmark.server.name}</div>
-		<div class="bookmarkInfo" title={bookmark.lastUsed.format()}>Last connected on {bookmark.lastUsed.format("lll")}</div>
+		{#if bookmark.lastUsed}
+			<div class="bookmarkInfo" title={bookmark.lastUsed.format() ?? ''}>
+				Last connected on {bookmark.lastUsed.format('lll') ?? '?'}
+			</div>
+		{/if}
 	</button>
 	<button class="button bookmarkStar" on:click={toggle}>
-		<i class="mdi mdi-{BOOKMARK_ON} mdi-24px bookmarkOn"></i>
-		<i class="mdi mdi-{BOOKMARK_OFF} mdi-24px bookmarkOff"></i>
+		<i class="mdi mdi-{BOOKMARK_ON} mdi-24px bookmarkOn" />
+		<i class="mdi mdi-{BOOKMARK_OFF} mdi-24px bookmarkOff" />
 	</button>
 	{#if error}
 		<span class="bookmarkError tag is-danger">{error}</span>
@@ -87,7 +101,8 @@
 		color: $text-light;
 	}
 
-	.bookmarkName, .bookmarkInfo {
+	.bookmarkName,
+	.bookmarkInfo {
 		justify-self: start;
 	}
 
@@ -130,7 +145,7 @@
 	}
 
 	// Display always on touch screens
-	@media (pointer:coarse) {
+	@media (pointer: coarse) {
 		.bookmarkOff {
 			display: inherit;
 		}

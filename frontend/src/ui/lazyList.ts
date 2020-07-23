@@ -14,8 +14,3 @@ export interface FetchResult<T> {
 	/** true if there are no more elements after the returned items */
 	canLoadAfterEnd: boolean;
 }
-
-export interface ILazyList {
-	clear(): void;
-	sourceChanged(dir: ListFetchDir, anchor?: ListFetchDir): void;
-}

@@ -1,4 +1,4 @@
-import { Writable, writable, Readable, derived, get } from "svelte/store";
+import { Writable, writable, get } from "svelte/store";
 import { InBookChangeMsg } from "../structs/ws";
 import { graphql } from "../graphql";
 import { Connection } from "../connection";
@@ -362,7 +362,7 @@ export class Book {
 export class GraphQlClient {
 	public uid!: number[];
 	public name!: string;
-	public icon_id!: number;
+	public icon_id!: IconHash;
 	public avatar_hash!: string;
 	private _clientColor: Lazy<string>;
 	public get clientColor() { return this._clientColor.get(); }
@@ -432,7 +432,7 @@ export class Client extends GraphQlClient implements ITreeNode {
 	public country_code!: string;
 	public database_id!: number;
 	public description!: string
-	public icon_id!: number;
+	//public icon_id!: IconHash; // inherited from GraphQlClient
 	public id!: number;
 	public inherited_channel_group_from_channel!: number;
 	public input_hardware_enabled!: boolean;
@@ -463,6 +463,7 @@ export class Client extends GraphQlClient implements ITreeNode {
 
 	// ITeeeNode
 	public filterShow: boolean = true;
+	public get key() { return `u${this.id}`; }
 
 	protected constructor() { super(); }
 
@@ -498,8 +499,11 @@ export class Client extends GraphQlClient implements ITreeNode {
 		}`, {
 			client: this.getUid(),
 		});
-		if (res.data)
-			this.volume.update(() => res.data.client.volume);
+		if (res.data) {
+			const volume = res.data.client.volume;
+			const scaledVol: number = volume === 0 ? 0 : Math.round(20 * Math.log10(volume));
+			this.volume.update(() => scaledVol);
+		}
 	}
 }
 
@@ -524,7 +528,7 @@ export class Channel implements ITreeParent, ITreeNode {
 	public needed_talk_power!: number | null;
 	public forced_silence!: boolean | null;
 	public phonetic_name!: string | null;
-	public icon_id!: any | null;
+	public icon_id!: IconHash;
 	public is_private!: boolean | null;
 	public subscribed!: boolean;
 	public permission_hints!: any | null;
@@ -535,6 +539,7 @@ export class Channel implements ITreeParent, ITreeNode {
 
 	// ITeeeNode
 	public filterShow: boolean = true;
+	public get key() { return `c${this.id}`; }
 
 	private constructor() { }
 
@@ -550,6 +555,7 @@ export class Channel implements ITreeParent, ITreeNode {
 export class Server implements ITreeParent {
 	public name!: string;
 	public phonetic_name!: string;
+	public icon_id!: IconHash;
 	public public_key?: number[];
 	// Base64 encoded, result from graphql
 	public publicKey?: string;
@@ -573,7 +579,7 @@ export class Server implements ITreeParent {
 }
 
 type GroupNamingMode = any;
-type IconHash = any;
+type IconHash = number | undefined;
 type GroupType = any;
 
 export class Group {
@@ -610,4 +616,5 @@ export interface ITreeParent {
 
 export interface ITreeNode {
 	filterShow: boolean;
+	key: any;
 }

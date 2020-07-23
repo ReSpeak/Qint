@@ -1,6 +1,6 @@
 <script lang="typescript">
 	import { assert } from "../util";
-	export let items!: string[];
+	export let items: any[];
 	export let selected: any;
 	export let display: (item: any) => string = displayFn;
 	let selectedIndex!: number;

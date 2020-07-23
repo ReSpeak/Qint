@@ -1,5 +1,5 @@
 <script lang="typescript">
-	export let filter = "";
+	export let filter: string;
 </script>
 
 <aside class="searchbar">

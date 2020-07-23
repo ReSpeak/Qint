@@ -1,24 +1,24 @@
 <script lang="typescript">
-	import { get, Writable } from "svelte/store";
+	import type { Writable } from "svelte/store";
 	import Icon from "./Icon.svelte";
 	import { Connection } from "../connection";
-	import { ServerGroup } from "../tree/book";
 	import { getIconPath, DummyStore } from "./clientIcon";
+	import type { IconSource } from "./clientIcon";
 
-	export let id!: number;
+	export let id: number;
 	// Either connection or server has to be set to fetch the icon
-	export let connection!: Connection;
+	export let connection: Connection;
 	export let server: string | undefined = undefined;
 
-	let seg: Writable<ServerGroup>;
-	let iconPath: string | undefined;
+	let seg: Writable<IconSource>;
+	let iconPath: string;
 	const sgs = connection.book.serverGroups;
 	$: seg = $sgs.get(id) ?? DummyStore;
-	$: iconPath = getIconPath($seg, connection, server);
+	$: iconPath = getIconPath($seg, connection, server) ?? "";
 </script>
 
 {#if iconPath}
-	{#if iconPath.startsWith("alpha")}
+	{#if iconPath.startsWith('alpha')}
 		<Icon name={iconPath} />
 	{:else}
 		<span class="icon">

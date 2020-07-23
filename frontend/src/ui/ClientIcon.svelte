@@ -1,18 +1,21 @@
-<script>
-	import Icon from './Icon.svelte';
+<script lang="ts">
+	import Icon from "./Icon.svelte";
+	import { Client } from "../tree/book";
+	import { Connection } from "../connection";
 	import { getClientIconPath } from "./clientIcon";
 
-	export let client;
+	export let client: Client;
 	// Either connection or server has to be set to fetch the icon
-	export let connection = undefined;
-	export let server = undefined;
+	export let connection: Connection | undefined = undefined;
+	export let server: string | undefined = undefined;
 
-	$: clientIconPath = getClientIconPath(client, connection, server);
+	let iconPath: string | undefined;
+	$: iconPath = getClientIconPath(client, connection, server);
 </script>
 
-{#if clientIconPath}
+{#if iconPath}
 	<span class="icon">
-		<img src={clientIconPath} alt="Client icon" />
+		<img src={iconPath} alt="Client icon" />
 	</span>
 {:else}
 	<Icon name="account" />

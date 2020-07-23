@@ -1,17 +1,19 @@
-<script>
+<script lang="typescript">
 	import { onMount, onDestroy } from "svelte";
 	import { get } from "svelte/store";
+	import type { Writable } from "svelte/store";
 	import { writable } from "svelte/store";
 	import Connect from "./connect/Connect.svelte";
 	import Connected from "./Connected.svelte";
-	import { ConnectionState } from "./connection";
+	import { ConnectionState, Connection } from "./connection";
 	import { BUILD_ENV, BUILD_DAT } from "./util";
 	console.log("BUILD", BUILD_ENV, BUILD_DAT);
 
-	export let connection;
+	export let connection: Connection;
+	let state: Writable<ConnectionState>;
 	$: state = connection.state;
 
-	window.onbeforeunload = function(e) {
+	window.onbeforeunload = function(e: any) {
 		let s = get(state);
 		// For debugging puproses ?
 		window.speechSynthesis.speak(new SpeechSynthesisUtterance("Goodbye"));
@@ -21,6 +23,7 @@
 			}
 			return true;
 		}
+		return;
 	};
 </script>
 

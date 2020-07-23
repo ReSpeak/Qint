@@ -1,4 +1,4 @@
-<script>
+<script lang="typescript">
 	import StickyList from "./ui/StickyList.svelte";
 	import StickySlot from "./ui/StickySlot.svelte";
 

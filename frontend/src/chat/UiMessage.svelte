@@ -1,17 +1,18 @@
-<script>
+<script lang="typescript">
 	import { hljsHighlight } from "./hljs";
 	import katex from "katex";
 	import { afterUpdate, onMount } from "svelte";
-	import { flash } from "../util";
 	import Icon from "../ui/Icon.svelte";
+	import { Message } from "./chat";
 
-	export let message;
+	export let message: Message;
 
 	let viewRaw = false;
-	let rendered;
+	let rendered!: HTMLElement;
+	let renderedObj!: HTMLElement;
 	$: renderedObj = render(message.rendered);
 
-	function render(html) {
+	function render(html: string) {
 		var obj = document.createElement("div");
 		obj.innerHTML = html;
 		// Apply highlight.js
@@ -20,17 +21,19 @@
 		}
 
 		// Apply KaTeX
-		for (let elem of obj.getElementsByClassName("latex")) {
+		for (let elem of (obj.getElementsByClassName("latex") as any) as HTMLElement[]) {
 			const code = elem.getAttribute("data-latex");
 			const mode = elem.getAttribute("data-displaymode");
 			try {
-				katex.render(code, elem, {
-					displayMode: mode === "true",
-					throwOnError: false,
-				});
+				if (code) {
+					katex.render(code, elem, {
+						displayMode: mode === "true",
+						throwOnError: false,
+					});
+				}
 			} catch {
 				console.error("Failed to render latex");
-				elem.innerText = code;
+				elem.innerText = code ?? "";
 			}
 		}
 		if (rendered) {
@@ -40,11 +43,6 @@
 		return obj;
 	}
 
-	let div;
-	afterUpdate(() => {
-		flash(div);
-	});
-
 	onMount(() => {
 		rendered.innerHTML = "";
 		rendered.appendChild(renderedObj);
@@ -52,9 +50,9 @@
 </script>
 
 <svelte:options immutable />
-<div bind:this="{div}" class="message-row">
+<div class="message-row">
 	<div class="message-time chat-left-col">
-		<span title="{message.date.format('dddd, MMMM Do YYYY, HH:mm:ss')}">
+		<span title={message.date.format('dddd, MMMM Do YYYY, HH:mm:ss')}>
 			{message.date.format('HH:mm')}
 		</span>
 	</div>
@@ -62,11 +60,10 @@
 	<!-- msg.status === MessageStatus::Error -->
 	<div
 		class="message-content"
-		class:message-sending="{false}"
-		class:message-error="{false}"
-		class:viewRaw
-	>
-		<div class="content message-rendered" bind:this="{rendered}"></div>
+		class:message-sending={false}
+		class:message-error={false}
+		class:viewRaw>
+		<div class="content message-rendered" bind:this={rendered} />
 		<div class="message-raw">
 			<pre>{message.raw}</pre>
 		</div>
@@ -78,7 +75,7 @@
 				<button class="button is-small is-rounded">
 					<Icon name="format-quote-close" />
 				</button>
-				<button class="button is-small is-rounded" on:click="{() => (viewRaw = !viewRaw)}">
+				<button class="button is-small is-rounded" on:click={() => (viewRaw = !viewRaw)}>
 					<Icon raw="🥩" />
 				</button>
 			</div>

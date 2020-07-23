@@ -19,12 +19,14 @@ export class Bookmark {
 	public async update(): Promise<void> {
 		await graphql(`mutation UpdateBookmark($update: UpdateBookmark!) {
 			updateBookmark(update: $update) { void }
-		}`, { update: {
-			id: this.id,
-			name: this.name,
-			username: this.username,
-			bookmark: this.bookmark
-		}});
+		}`, {
+			update: {
+				id: this.id,
+				name: this.name,
+				username: this.username,
+				bookmark: this.bookmark
+			}
+		});
 	}
 
 	public static async get(): Promise<Bookmark[]> {

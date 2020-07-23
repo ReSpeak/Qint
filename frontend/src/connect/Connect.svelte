@@ -5,10 +5,10 @@
 	import self from "./connect";
 	import { ConnectionState, Connection } from "../connection";
 	import Icon from "../ui/Icon.svelte";
-	import BookmarkComp from "./Bookmark.svelte";
+	import UiBookmark from "./UiBookmark.svelte";
 	import { SERVER_ICON, CLIENT_ICON } from "../util";
 
-	export let connection!: Connection;
+	export let connection: Connection;
 	let state = connection.state;
 	let error = connection.error;
 	let data = new self(connection);
@@ -57,45 +57,39 @@
 		<article class="connect-error message is-danger">
 			<div class="message-header">
 				<p>Error</p>
-				<button
-					class="delete"
-					aria-label="delete"
-					on:click="{() => error.set(undefined)}"
-				></button>
+				<button class="delete" aria-label="delete" on:click={() => error.set(undefined)} />
 			</div>
 			<div class="message-body">{$error}</div>
 		</article>
 	{/if}
 	<div class="inner-connect-container">
-		<div class="connect-blur blur"></div>
-		<form class="connect-form blur-shade" on:submit|preventDefault="{onConnect}">
+		<div class="connect-blur blur" />
+		<form class="connect-form blur-shade" on:submit|preventDefault={onConnect}>
 			<div>
 				<p class="control has-icons-left">
 					<input
-						bind:this="{usernameInput}"
-						bind:value="{$username}"
+						bind:this={usernameInput}
+						bind:value={$username}
 						name="username"
 						id="username"
 						class="input"
 						type="text"
 						placeholder="Username"
-						disabled="{$state !== ConnectionState.Disconnected}"
-					/>
-					<Icon name="{CLIENT_ICON}" is_left />
+						disabled={$state !== ConnectionState.Disconnected} />
+					<Icon name={CLIENT_ICON} isLeft />
 				</p>
 			</div>
 			<div>
 				<p class="control has-icons-left">
 					<input
-						bind:value="{$address}"
+						bind:value={$address}
 						name="server"
 						id="server"
 						class="input"
 						type="text"
 						placeholder="Server"
-						disabled="{$state !== ConnectionState.Disconnected}"
-					/>
-					<Icon name="{SERVER_ICON}" is_left />
+						disabled={$state !== ConnectionState.Disconnected} />
+					<Icon name={SERVER_ICON} isLeft />
 				</p>
 			</div>
 			<div>
@@ -103,7 +97,7 @@
 					{#if $state === ConnectionState.Disconnected}
 						Connect
 					{:else}
-						<div class="loader"></div>
+						<div class="loader" />
 						Cancel
 					{/if}
 				</button>
@@ -112,7 +106,7 @@
 	</div>
 
 	<div class="bookmark-container">
-		<div class="bookmark-blur blur"></div>
+		<div class="bookmark-blur blur" />
 		<div class="bookmark-list blur-shade">
 			{#await loadBookmarks()}
 				<div>Loading…</div>
@@ -120,7 +114,7 @@
 				<div class="viewContainer">
 					<div class="scollPane">
 						{#each bookmarks as item}
-							<BookmarkComp connect="{data}" {username} {address} bookmark="{item}" />
+							<UiBookmark connect={data} {username} {address} bookmark={item} />
 						{/each}
 					</div>
 				</div>
