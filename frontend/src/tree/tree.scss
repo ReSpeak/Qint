@@ -1,0 +1,85 @@
+@import "bulmaswatch/cyborg/variables";
+@import "bulma/sass/utilities/all";
+
+.container.hidden {
+	display: none;
+}
+
+.ownClient :global(span) {
+	font-weight: bold;
+}
+
+.selectedChannel {
+	background-color: mix($background, $text, 80%);
+}
+
+.noBut {
+	background: none;
+	border: none;
+	padding: 0.3em;
+	height: auto;
+	padding: 0;
+
+	&:focus {
+		box-shadow: none;
+	}
+}
+
+.innerContainer {
+	@extend .noBut;
+	padding-left: 0.5em;
+	width: 100%;
+	overflow: hidden;
+	justify-content: start;
+	position: relative;
+	z-index: 1;
+	display: inline-flex;
+
+	// Copied from button
+	font-size: 1rem;
+	line-height: 1.5;
+	vertical-align: top;
+	white-space: nowrap;
+	color: $text;
+	cursor: pointer;
+	border-radius: 4px;
+
+	&:hover {
+		background: $background;
+	}
+
+	> :global(.icon) {
+		flex-shrink: 0;
+		margin-right: 0.25em;
+	}
+
+	> :global(*) {
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+}
+
+.nameBox {
+	@extend %unselectable;
+	flex: 1;
+	text-align: left;
+
+	&:hover {
+		color: $link-hover;
+	}
+}
+
+.icons {
+	display: flex;
+	flex-wrap: nowrap;
+
+	:global(span.icon) {
+		margin: 0 !important;
+	}	
+}
+
+.hover {
+	left: calc(var(--channel-tree-width) - 0.5em);
+	display: grid;
+	grid-gap: 1em;
+}

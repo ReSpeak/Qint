@@ -10,7 +10,7 @@
 	let tooltip_left = 0;
 	$: if (tooltip && slider) {
 		const perc = (value - min) / (min - max);
-		tooltip_left = -((slider.clientWidth - 48 / 2) * perc) - 48 / 2;
+		tooltip_left = -((slider.clientWidth - 48 / 4) * perc) - 48 / 2;
 	}
 </script>
 
@@ -32,6 +32,7 @@
 
 <style lang="scss">
 	.bslider {
+		display: flex;
 		position: relative;
 		margin: 0 1em;
 	}

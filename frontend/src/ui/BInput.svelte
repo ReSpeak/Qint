@@ -55,5 +55,6 @@
 		white-space: pre-wrap;
 		background-color: transparent;
 		color: $text;
+		word-break: break-all;
 	}
 </style>

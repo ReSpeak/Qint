@@ -18,12 +18,12 @@
 	let newHover = false;
 
 	let ownClient: boolean;
-	let selectedClient: boolean = false;
+	let isSelected: boolean = false;
 	$: filterShow = applyFilter(filter, client);
 	$: ownClient = client.id === connection.ownClientId;
 	$: {
 		const sc = $selectedChat;
-		selectedClient = "Client" in sc && sc.Client === client.id;
+		isSelected = "Client" in sc && sc.Client === client.id;
 	}
 	let div!: HTMLDivElement;
 
@@ -74,26 +74,20 @@
 </script>
 
 <li class="container" class:hidden={!filterShow}>
-	<div
-		bind:this={div}
-		class:ownClient
-		class:selectedClient
-		on:mouseover={hover}
-		on:mouseout={leave}
-		on:focusin={hover}
-		on:focusout={leave}>
-		<button
-			class="button clientButton"
-			class:talking={client.talking !== undefined}
+	<div bind:this={div} on:mouseover={hover} on:mouseout={leave} class="hoverDummy">
+		<div
+			class:ownClient
+			class:isSelected
+			class="innerContainer"
 			on:click={setChat}
 			use:draggable
 			on:dragstart={dragStart}
 			on:dragdrop={dragDrop}
 			data-type="client"
 			data-key={client.id}>
-			<div class="inner" />
+			<div class:talking={client.talking !== undefined} class="talkWave" />
 			<ClientIcon {client} {connection} />
-			<span class="clientName" style={client.getColor()}>
+			<span class="nameBox" style={client.getColor()}>
 				<FilterString {filter} content={client.name} />
 			</span>
 			<span class="icons">
@@ -110,7 +104,7 @@
 					<ServerGroupIcon id={grp} {connection} />
 				{/each}
 			</span>
-		</button>
+		</div>
 		{#if hovered}
 			<div class="hover menu" style="top: {div.getBoundingClientRect().top}px;">
 				<div class="corner" />
@@ -127,66 +121,7 @@
 </li>
 
 <style lang="scss">
-	.container.hidden {
-		display: none;
-	}
-
-	.clientButton {
-		background: none;
-		border: none;
-		padding: 0;
-		padding-left: 0.5em;
-		height: auto;
-		width: 100%;
-		overflow: hidden;
-		justify-content: start;
-		position: relative;
-		z-index: 1;
-
-		display: inline-flex;
-
-		&:focus {
-			box-shadow: none;
-		}
-
-		> :global(.icon) {
-			flex-shrink: 0;
-			margin-right: 0.25em;
-		}
-
-		> :global(*) {
-			overflow: hidden;
-			text-overflow: ellipsis;
-		}
-	}
-
-	.clientName {
-		flex: 1;
-		text-align: left;
-	}
-
-	.ownClient :global(span) {
-		font-weight: bold;
-	}
-
-	.selectedClient {
-		background-color: mix($background, $text, 80%);
-	}
-
-	.icons {
-		display: flex;
-		flex-wrap: nowrap;
-	}
-
-	.button .icons > :global(span) {
-		margin: 0;
-	}
-
-	.hover {
-		left: calc(var(--channel-tree-width) - 0.5em);
-		display: grid;
-		grid-gap: 1em;
-	}
+	@import "./tree";
 
 	.hover .name {
 		grid-row: 1;
@@ -203,7 +138,7 @@
 		grid-column: 2;
 	}
 
-	.clientButton .inner {
+	.talkWave {
 		transition: opacity 0.2s ease-in-out, height 0.2s ease-in-out;
 		position: absolute;
 		// top: 0;
@@ -221,7 +156,7 @@
 		height: 50%;
 	}
 
-	.clientButton.talking .inner {
+	.talkWave.talking {
 		opacity: 1;
 		height: 100%;
 	}

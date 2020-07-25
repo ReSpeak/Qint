@@ -12,7 +12,7 @@
 	{#if raw}
 		{raw}
 	{:else}
-		<i class="mdi mdi-{name} mdi-{size}px" {style}></i>
+		<i class="mdi mdi-{name} mdi-{size}px" {style} />
 	{/if}
 </span>
 

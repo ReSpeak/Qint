@@ -22,14 +22,14 @@
 
 	let children: Writable<ITreeNode[]>;
 	let ownClient: boolean;
-	let selectedChannel: boolean = false;
+	let isSelected: boolean = false;
 	$: children = channel.children;
 	$: filterShow = applyFilter(filter, channel, $children);
 	// Update if a client moves in or out
 	$: ownClient = updateOwnClient($children);
 	$: {
 		const sc = $selectedChat;
-		selectedChannel = "Channel" in sc && sc.Channel === channel.id;
+		isSelected = "Channel" in sc && sc.Channel === channel.id;
 	}
 	let div!: HTMLDivElement;
 
@@ -122,27 +122,34 @@
 <li class="container" class:hidden={!filterShow} class:collapsed>
 	<div
 		bind:this={div}
-		class="nameContainer"
-		class:ownClient
-		class:selectedChannel
 		on:mouseover={() => (hovered = true)}
 		on:mouseout={leave}
-		use:draggable
-		on:dragstart={dragStart}
-		on:dragdrop={dragDrop}
-		data-type="channel"
-		data-key={channel.id}>
-		<button
-			class="button collapseButton"
-			on:click={() => (collapsed = !collapsed)}
-			class:haschildren={$children.length !== 0}>
-			<Icon name="chevron-right{collapsed ? '' : ' mdi-rotate-90'}" />
-			<ChannelIcon {channel} {connection} />
-		</button>
-		<button class="button nameButton" on:click={setChat}>
-			<FilterString {filter} content={channel.name} />
-			<Icon name="shoe-print" on:click={switchChannel} />
-		</button>
+		class="hoverDummy">
+		<div
+			class="innerContainer"
+			class:ownClient
+			class:isSelected
+			use:draggable
+			on:dragstart={dragStart}
+			on:dragdrop={dragDrop}
+			data-type="channel"
+			data-key={channel.id}>
+			<button
+				class="button collapseButton noBut"
+				on:click={() => (collapsed = !collapsed)}
+				class:haschildren={$children.length !== 0}>
+				<Icon name="chevron-right{collapsed ? '' : ' mdi-rotate-90'}" />
+				<ChannelIcon {channel} {connection} />
+			</button>
+			<span class="nameBox" on:click={setChat}>
+				<FilterString {filter} content={channel.name} />
+			</span>
+			<span class="icons">
+				<button class="button noBut" on:click={switchChannel}>
+					<Icon name="shoe-print" />
+				</button>
+			</span>
+		</div>
 		{#if hovered}
 			<div class="hover menu" style="top: {div.getBoundingClientRect().top}px;">
 				<div class="corner" />
@@ -168,37 +175,25 @@
 </li>
 
 <style lang="scss">
-	.container.hidden {
-		display: none;
-	}
-
-	.button {
-		background: none;
-		border: none;
-		padding: 0.3em;
-		height: auto;
-		justify-content: start;
-	}
-	.button:focus {
-		box-shadow: none;
-	}
-
-	.menu-list li ul {
-		margin: 0 0 0 0.5em;
-		padding-left: 0.5em;
-	}
+	@import "./tree";
 
 	.collapseButton {
+		justify-content: start;
 		display: grid;
-		padding: 0;
+
+		> :global(.icon) {
+			transition: all 0.1s;
+			grid-row: 1;
+			grid-column: 1;
+			margin: 0;
+		}
+
+		> :global(*) {
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
 	}
 
-	.collapseButton > :global(.icon) {
-		transition: all 0.1s;
-		grid-row: 1;
-		grid-column: 1;
-		margin: 0;
-	}
 	.collapseButton > :global(*:first-child) {
 		opacity: 0;
 	}
@@ -209,38 +204,16 @@
 		opacity: 0;
 	}
 
-	.nameContainer {
-		display: grid;
-		grid-template-columns: min-content auto;
-	}
-
-	.nameButton {
-		overflow: hidden;
-		padding: 0;
-	}
-
-	.nameButton > :global(*) {
-		overflow: hidden;
-		text-overflow: ellipsis;
+	.menu-list li ul {
+		margin: 0 0 0 0.5em;
+		padding-left: 0.5em;
 	}
 
 	.collapsed .menu-list {
 		display: none;
 	}
 
-	.collapsed .nameContainer .button {
+	.collapsed .innerContainer .nameBox {
 		color: mix($text, $background, 60%);
-	}
-
-	.ownClient > :global(*) {
-		font-weight: bold;
-	}
-
-	.selectedChannel {
-		background-color: mix($background, $text, 80%);
-	}
-
-	.hover {
-		left: calc(var(--channel-tree-width) - 0.5em);
 	}
 </style>
