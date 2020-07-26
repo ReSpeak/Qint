@@ -178,6 +178,7 @@
 	@import "./tree";
 
 	.collapseButton {
+		@include noBut;
 		justify-content: start;
 		display: grid;
 

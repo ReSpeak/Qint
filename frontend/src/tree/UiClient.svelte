@@ -128,16 +128,6 @@
 		grid-column: 1 / 3;
 	}
 
-	.hover .volume.button {
-		grid-row: 2;
-		grid-column: 1;
-	}
-
-	.hover .volume.slider {
-		grid-row: 2;
-		grid-column: 2;
-	}
-
 	.talkWave {
 		transition: opacity 0.2s ease-in-out, height 0.2s ease-in-out;
 		position: absolute;

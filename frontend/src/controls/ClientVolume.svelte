@@ -12,11 +12,9 @@
 	let maxVolume = +30;
 	let clientVolume = client.volume;
 
-	let volumeUpdated = false;
 	let volumeTimer: number | undefined;
 
 	async function loadVolume() {
-		//volumeUpdated = false;
 		await client.loadVolume();
 	}
 
@@ -29,7 +27,6 @@
 	}
 
 	function updateVolume() {
-		volumeUpdated = true;
 		if (volumeTimer)
 			return;
 		// Update every few ms

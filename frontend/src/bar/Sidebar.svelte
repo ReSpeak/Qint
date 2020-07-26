@@ -65,10 +65,6 @@
 		background-color: mix($background, $text, 80%);
 	}
 
-	.sidebar button.chats-header {
-		top: 2.2em;
-	}
-
 	.sidebar > .menu .menu-list li {
 		margin: 2em;
 	}

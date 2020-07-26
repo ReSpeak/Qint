@@ -18,17 +18,17 @@
 	}
 </script>
 
-<svelte:options immutable="{true}" />
+<svelte:options immutable={true} />
 <div class="tabList">
 	<div class="tabs">
 		<ul>
 			{#each items as item, index}
-				<li class:is-active="{index === $activeIndex}">
+				<li class:is-active={index === $activeIndex}>
+					<!-- svelte-ignore a11y-missing-attribute -->
 					<a
-						on:click="{() => {
+						on:click={() => {
 							$activeIndex = index;
-						}}"
-					>
+						}}>
 						{item}
 					</a>
 				</li>

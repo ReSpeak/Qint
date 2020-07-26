@@ -1,7 +1,7 @@
 <script lang="typescript">
 	import { hljsHighlight } from "./hljs";
 	import katex from "katex";
-	import { afterUpdate, onMount } from "svelte";
+	import { onMount } from "svelte";
 	import Icon from "../ui/Icon.svelte";
 	import { Message } from "./chat";
 

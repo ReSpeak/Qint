@@ -9,7 +9,7 @@ import typescript from '@rollup/plugin-typescript';
 
 const svelteOptions = require("./svelte.config");
 
-const production = false;//!process.env.ROLLUP_WATCH;
+const production = !process.env.ROLLUP_WATCH;
 
 export default {
 	input: "src/main.ts",
@@ -42,7 +42,8 @@ export default {
 				importee === "svelte" || importee.startsWith("svelte/")
 		}),
 		commonjs(),
-		typescript(),
+		typeCheck(),
+		typescript({ sourceMap: !production }),
 		copy({
 			targets: [
 				{ src: './node_modules/@mdi/font/fonts/*', dest: 'public/fonts' },
@@ -62,3 +63,14 @@ export default {
 		clearScreen: false
 	}
 };
+
+function typeCheck() {
+	return {
+		writeBundle() {
+			require('child_process').spawn('svelte-check', {
+				stdio: ['ignore', 'inherit', 'inherit'],
+				shell: true
+			});
+		}
+	}
+}

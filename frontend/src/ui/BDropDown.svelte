@@ -15,13 +15,19 @@
 			return String(item);
 		}
 	}
+
+	function changed() {
+		selected = items[selectedIndex];
+		console.log("onchanged");
+	}
 </script>
 
-<svelte:options immutable="{true}" />
+<svelte:options immutable={true} />
 <div class="select is-fullwidth">
-	<select bind:value="{selectedIndex}" on:change="{() => (selected = items[selectedIndex])}">
+	<!-- svelte-ignore a11y-no-onchange -->
+	<select bind:value={selectedIndex} on:change={changed}>
 		{#each items as item, index}
-			<option value="{index}">{display(item)}</option>
+			<option value={index}>{display(item)}</option>
 		{/each}
 	</select>
 </div>

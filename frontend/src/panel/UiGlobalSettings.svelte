@@ -13,13 +13,11 @@
 	let minLoudnessThreshold = -100;
 	let maxLoudnessThreshold = 0;
 	let loudnessThreshold = minLoudnessThreshold;
-	let loudnessUpdated = false;
 	let loudnessTimer: number | undefined;
 
 	connection.sendMessage({ SubscribeLoudness: true });
 
 	function updateLoudness() {
-		loudnessUpdated = true;
 		if (loudnessTimer) return;
 		// Update every few ms
 		loudnessTimer = setTimeout(() => {

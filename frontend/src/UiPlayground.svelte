@@ -1,9 +1,6 @@
 <script lang="typescript">
 	import StickyList from "./ui/StickyList.svelte";
 	import StickySlot from "./ui/StickySlot.svelte";
-
-	let val = "dummy";
-	let inp = "hi";
 </script>
 
 <div class="testingList">

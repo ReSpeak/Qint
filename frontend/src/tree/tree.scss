@@ -1,6 +1,3 @@
-@import "bulmaswatch/cyborg/variables";
-@import "bulma/sass/utilities/all";
-
 .container.hidden {
 	display: none;
 }
@@ -9,11 +6,11 @@
 	font-weight: bold;
 }
 
-.selectedChannel {
+.isSelected {
 	background-color: mix($background, $text, 80%);
 }
 
-.noBut {
+@mixin noBut {
 	background: none;
 	border: none;
 	padding: 0.3em;
@@ -26,7 +23,7 @@
 }
 
 .innerContainer {
-	@extend .noBut;
+	@include noBut;
 	padding-left: 0.5em;
 	width: 100%;
 	overflow: hidden;
@@ -79,7 +76,7 @@
 }
 
 .hover {
-	left: calc(var(--channel-tree-width) - 0.5em);
+	left: calc(var(--channel-tree-width) - 0em);
 	display: grid;
 	grid-gap: 1em;
 }
