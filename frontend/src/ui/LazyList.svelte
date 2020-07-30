@@ -1,12 +1,5 @@
-<script lang="typescript" context="module">
-	import { ListFetchDir } from "./lazyList";
-	export default interface Self {
-		clear(): void;
-		sourceChanged(dir: ListFetchDir, anchor?: ListFetchDir): void;
-	}
-</script>
-
 <script lang="typescript">
+	import { ListFetchDir } from "./lazyList";
 	import { assert, binarySearchByKey, getResizeObserver } from "../util";
 	import { tick, onMount } from "svelte";
 	import type { FetchResult } from "./lazyList";
@@ -67,6 +60,7 @@
 				canLoadAfterEnd = true;
 				break;
 		}
+		console.log("lof", ListFetchDir[loadAnchored!], canLoadAfterEnd);
 		start_fill();
 	}
 
@@ -121,7 +115,7 @@
 		return elems.length !== 0 ? elems[elems.length - 1] : undefined;
 	}
 
-	function handle_scroll(e: MouseEvent) {
+	function handle_scroll() {
 		// console.log(
 		// 	pan.scrollHeight, // complete content
 		// 	pan.scrollTop,    // current scroll position
@@ -387,6 +381,12 @@
 
 <svelte:options accessors />
 <div class="lazyList">
+	<button
+		class="arrow-up"
+		class:showJumpDown={false}
+		on:click={() => jumpTo(ListFetchDir.Before)}>
+		<div />
+	</button>
 	<div class="lazyListView" bind:this={pan} on:scroll={handle_scroll}>
 		<div class="scrollPane" bind:this={scrollPane}>
 			{#each elems as item (item)}
@@ -440,23 +440,21 @@
 
 		transition-duration: 0.2s;
 		transition-property: all;
-	}
 
-	.arrow-down:hover,
-	.arrow-up:hover {
-		background: #eee;
+		&:hover {
+			background: #eee;
+		}
+
+		> div {
+			border-left: 2px solid #222;
+			border-top: 2px solid #222;
+			width: 1em;
+			height: 1em;
+		}
 	}
 
 	.showJumpDown {
 		bottom: 1.5em;
-	}
-
-	.arrow-down > div,
-	.arrow-up > div {
-		border-left: 2px solid #222;
-		border-top: 2px solid #222;
-		width: 1em;
-		height: 1em;
 	}
 
 	.arrow-down > div {

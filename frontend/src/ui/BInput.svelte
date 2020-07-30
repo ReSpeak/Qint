@@ -1,9 +1,3 @@
-<script lang="typescript" context="module">
-	export default interface Self {
-		focus(): void;
-	}
-</script>
-
 <script lang="typescript">
 	import { onMount } from "svelte";
 	export let value: string;

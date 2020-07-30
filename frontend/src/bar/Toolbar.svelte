@@ -11,12 +11,9 @@
 	let dropdown!: HTMLElement;
 
 	let ownClient = connection.ownClient;
-	let input_muted: boolean | undefined;
 	$: input_muted = $ownClient?.input_muted;
-	let output_muted: boolean | undefined;
 	$: output_muted = $ownClient?.output_muted;
-	let is_away: boolean | undefined;
-	$: is_away = $ownClient?.away_message !== null;
+	$: isAway = $ownClient?.away_message !== null;
 
 	function changeOwnClient(change: any) {
 		connection.sendMessage({
@@ -57,8 +54,8 @@
 		<button class="button toolbutton" class:active={output_muted} on:click={() => changeOwnClient({ output_muted: !output_muted })}>
 			<Icon name={output_muted ? "volume-off" : "volume-high"} />
 		</button>
-		<button class="button toolbutton" class:active={is_away} on:click={() => changeOwnClient({ away: is_away ? null : "" })}>
-			<Icon name={is_away ? "sleep" : "sleep-off"} />
+		<button class="button toolbutton" class:active={isAway} on:click={() => changeOwnClient({ away: isAway ? null : "" })}>
+			<Icon name={isAway ? "sleep" : "sleep-off"} />
 		</button>
 
 		<div class="dropdown is-right" bind:this={dropdown} class:is-active={dropdownActive} on:focusout={handleFocus}>

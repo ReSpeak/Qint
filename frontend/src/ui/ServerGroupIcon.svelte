@@ -10,8 +10,6 @@
 	export let connection: Connection;
 	export let server: string | undefined = undefined;
 
-	let seg: Writable<IconSource>;
-	let iconPath: string;
 	const sgs = connection.book.serverGroups;
 	$: seg = $sgs.get(id) ?? DummyStore;
 	$: iconPath = getIconPath($seg, connection, server) ?? "";

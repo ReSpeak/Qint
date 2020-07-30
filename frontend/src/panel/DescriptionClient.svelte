@@ -1,7 +1,7 @@
 <script lang="typescript">
 	import { Connection } from "../connection";
 	import { Client } from "../tree/book";
-	import { Moment } from "moment";
+	//import { Moment } from "moment";
 	import Icon from "../ui/Icon.svelte";
 	import PlatformIcon from "../ui/PlatformIcon.svelte";
 	import ClientIcon from "../ui/ClientIcon.svelte";
@@ -16,7 +16,7 @@
 
 	let client: Client;
 	let avatarPath: string | undefined;
-	let onlineSince: Moment;
+	//let onlineSince: Moment; TODO
 	$: {
 		client = connection.book.getClient(clientId)!;
 		avatarPath = getClientAvatarPath(client, connection);

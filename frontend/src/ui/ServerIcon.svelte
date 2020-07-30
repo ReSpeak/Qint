@@ -7,7 +7,6 @@
 	export let connection: Connection;
 	export let server: string | undefined = undefined;
 	let conServer = connection !== undefined ? connection.book.server : DummyStore;
-	let iconPath: string | undefined;
 	$: iconPath = getIconPath($conServer, connection, server);
 </script>
 

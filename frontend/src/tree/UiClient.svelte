@@ -17,7 +17,6 @@
 	let hovered = false;
 	let newHover = false;
 
-	let ownClient: boolean;
 	let isSelected: boolean = false;
 	$: filterShow = applyFilter(filter, client);
 	$: ownClient = client.id === connection.ownClientId;
@@ -81,8 +80,8 @@
 			class="innerContainer"
 			on:click={setChat}
 			use:draggable
-			on:dragstart={dragStart}
-			on:dragdrop={dragDrop}
+			on:svddrag={dragStart}
+			on:svddrop={dragDrop}
 			data-type="client"
 			data-key={client.id}>
 			<div class:talking={client.talking !== undefined} class="talkWave" />

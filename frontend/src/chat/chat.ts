@@ -1,5 +1,5 @@
 import { get, writable, Writable } from "svelte/store";
-import { Moment } from "moment";
+import type { Moment } from "moment";
 import { Connection } from "../connection";
 import { graphql, toDatetime } from "../graphql";
 import { MessageTarget } from "../structs/ts";

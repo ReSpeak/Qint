@@ -9,7 +9,6 @@
 	export let connection: Connection | undefined = undefined;
 	export let server: string | undefined = undefined;
 
-	let iconPath: string | undefined;
 	$: iconPath = getClientIconPath(channel, connection, server);
 </script>
 

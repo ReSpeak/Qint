@@ -8,7 +8,6 @@
 	console.log("BUILD", BUILD_ENV, BUILD_DAT);
 
 	export let connection: Connection;
-	let state: Writable<ConnectionState>;
 	$: state = connection.state;
 
 	window.onbeforeunload = function(e: any) {

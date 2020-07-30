@@ -20,8 +20,6 @@
 	let collapsed = false;
 	let hovered = false;
 
-	let children: Writable<ITreeNode[]>;
-	let ownClient: boolean;
 	let isSelected: boolean = false;
 	$: children = channel.children;
 	$: filterShow = applyFilter(filter, channel, $children);
@@ -31,7 +29,7 @@
 		const sc = $selectedChat;
 		isSelected = "Channel" in sc && sc.Channel === channel.id;
 	}
-	let div!: HTMLDivElement;
+	let div!: HTMLElement;
 
 	function updateOwnClient(children: ITreeNode[]) {
 		let isOwn = false;
@@ -130,8 +128,8 @@
 			class:ownClient
 			class:isSelected
 			use:draggable
-			on:dragstart={dragStart}
-			on:dragdrop={dragDrop}
+			on:svddrag={dragStart}
+			on:svddrop={dragDrop}
 			data-type="channel"
 			data-key={channel.id}>
 			<button
@@ -177,8 +175,11 @@
 <style lang="scss">
 	@import "./tree";
 
-	.collapseButton {
+	.noBut {
 		@include noBut;
+	}
+
+	.collapseButton {
 		justify-content: start;
 		display: grid;
 

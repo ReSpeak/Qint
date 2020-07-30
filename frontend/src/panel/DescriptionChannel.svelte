@@ -11,11 +11,8 @@
 	export let connection: Connection;
 	export let channelId: number;
 
-	let channel: Channel;
 	$: channel = connection.book.getChannel(channelId)!;
-	let children: Writable<ITreeNode[]>;
 	$: children = channel.children;
-	let clientCount: number;
 	$: clientCount = $children.filter((c: ITreeNode) => c instanceof Client).length;
 	let formatMaxClients: string | number = 0;
 	$: {

@@ -3,7 +3,6 @@
 	export let filter: string;
 	export let content: string;
 
-	let filteredContent: string;
 	$: filteredContent = applyFilter(filter, content);
 
 	function applyFilter(filter: string, content: string): string {

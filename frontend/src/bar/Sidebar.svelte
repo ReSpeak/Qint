@@ -9,7 +9,6 @@
 	export let filter: string;
 	let server = connection.book.server;
 	let selectedChat = connection.chat.selectedChat;
-	let selectedServerChat: boolean;
 	$: selectedServerChat = "Server" in $selectedChat;
 </script>
 

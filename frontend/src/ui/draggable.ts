@@ -49,9 +49,9 @@ export function draggable(node: HTMLElement) {
 				return;
 			dd.hasTriggered = true;
 			node.style.pointerEvents = "none";
-			node.dispatchEvent(new CustomEvent('dragstart', { detail: dd }));
+			node.dispatchEvent(new CustomEvent('svddrag', { detail: dd }));
 		} else {
-			node.dispatchEvent(new CustomEvent('dragmove', { detail: dd }));
+			node.dispatchEvent(new CustomEvent('svdmove', { detail: dd }));
 		}
 		node.style.transform = `translate(${dx}px,${dy}px)`;
 	}
@@ -61,7 +61,7 @@ export function draggable(node: HTMLElement) {
 		if (dd.hasTriggered) {
 			node.style.transform = `translate(0,0)`;
 			node.style.pointerEvents = "unset";
-			node.dispatchEvent(new CustomEvent('dragdrop', { detail: dd }));
+			node.dispatchEvent(new CustomEvent('svddrop', { detail: dd }));
 		}
 		window.removeEventListener('mousemove', handleMousemove);
 		window.removeEventListener('mouseup', handleMouseup);

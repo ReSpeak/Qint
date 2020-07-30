@@ -9,7 +9,6 @@
 
 	let viewRaw = false;
 	let rendered!: HTMLElement;
-	let renderedObj!: HTMLElement;
 	$: renderedObj = render(message.rendered);
 
 	function render(html: string) {

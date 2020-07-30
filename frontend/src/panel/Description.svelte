@@ -6,7 +6,6 @@
 
 	export let connection: Connection;
 	let selected = connection.chat.selectedChat;
-	let s: MessageTarget;
 	$: s = $selected;
 </script>
 
