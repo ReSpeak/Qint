@@ -24,7 +24,7 @@
 		const sc = $selectedChat;
 		isSelected = "Client" in sc && sc.Client === client.id;
 	}
-	let div!: HTMLDivElement;
+	let div!: HTMLElement;
 
 	function setChat() {
 		connection.chat.selectClient(client);

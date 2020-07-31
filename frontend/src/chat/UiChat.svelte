@@ -39,6 +39,7 @@
 	});
 
 	function sendMessage() {
+		if (!chat.composing) return;
 		chat.sendMessage();
 		chat.composing = "";
 		messageInput.focus();
@@ -80,7 +81,7 @@
 			</article>
 		</div>
 	{:else}
-		<LazyList bind:this={chatList} {fetchElements} let:item>
+		<LazyList bind:this={chatList} {fetchElements} suggestJumpEnd={true} let:item>
 			<div slot="loading" class="loader" />
 			{#if item.displayDateSeparator}
 				<div title={item.date.format('L')} class="chat-date">

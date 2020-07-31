@@ -1,8 +1,9 @@
 <script lang="typescript">
 	import { ListFetchDir } from "./lazyList";
-	import { assert, binarySearchByKey, getResizeObserver } from "../util";
-	import { tick, onMount } from "svelte";
+	import { assert, binarySearchByKey } from "../util";
+	import { tick, onMount, onDestroy } from "svelte";
 	import type { FetchResult } from "./lazyList";
+	import ResizeObserver from 'resize-observer-polyfill';
 
 	// Dummy class to have nice typing for our 'generic' parameter T which
 	// represents the element type.
@@ -11,9 +12,12 @@
 	// *** State+Export variables ***
 
 	export let enableFetching: boolean = true;
-	let canLoadAfterEnd: boolean = true;
+	export let suggestJumpStart: boolean = false;
+	export let suggestJumpEnd: boolean = false;
 	let canLoadBeforeStart: boolean = true;
-	let isAtBottom = true;
+	let canLoadAfterEnd: boolean = true;
+	let showJumpStart: boolean;
+	let showJumpEnd: boolean;
 	let loadAnchored: ListFetchDir | undefined = undefined;
 
 	// the data elements held by this list
@@ -28,11 +32,6 @@
 	// The holding list element which has the scrollbar
 	let pan!: HTMLElement;
 	let scrollPane!: HTMLElement;
-	// Utility holder to calculate `scrollDiff`
-	let lastScrollPos: number = 0;
-	// In which direction and how far the content has scrolled since last check
-	// >0 down, <0 up
-	let scrollDiff = 0;
 	// prevent async weirdness by only allowing one async task
 	let fetchTask: Promise<void> | undefined;
 
@@ -42,7 +41,8 @@
 		elems = [];
 		canLoadAfterEnd = false;
 		canLoadBeforeStart = false;
-		isAtBottom = false;
+		showJumpStart = false;
+		showJumpEnd = false;
 	}
 
 	export function sourceChanged(dir: ListFetchDir, anchor?: ListFetchDir) {
@@ -60,7 +60,6 @@
 				canLoadAfterEnd = true;
 				break;
 		}
-		console.log("lof", ListFetchDir[loadAnchored!], canLoadAfterEnd);
 		start_fill();
 	}
 
@@ -89,7 +88,8 @@
 		}
 	}
 
-	export let fetchElements: (id: T | undefined, dir: ListFetchDir) => Promise<FetchResult<T>>;
+	type fetchFun<TL = any> = (id: TL | undefined, dir: ListFetchDir) => Promise<FetchResult<TL>>;
+	export let fetchElements: fetchFun;
 
 	// Require the minimum distance before deleting an item to be higher
 	// than the minimum size the list wants to buffer.
@@ -125,19 +125,25 @@
 		// );
 		// ! ELEM.offsetTop   // is the bottom of a element measured from the top of the container
 		// ! clientHeight + scrollTopMax === scrollHeight
-		scrollDiff = pan.scrollTop - lastScrollPos;
-		lastScrollPos = pan.scrollTop;
 		scrollPanChanged();
 
 		start_fill();
 	}
 
 	function scrollPanChanged() {
-		isAtBottom = !canLoadAfterEnd && pan.scrollTop >= pan.scrollHeight - pan.clientHeight;
+		const isScrollable = pan.scrollHeight > pan.clientHeight;
+		if (suggestJumpStart) {
+			const isScrolledToStart = pan.scrollTop <= 0;
+			showJumpStart = isScrollable && (!isScrolledToStart || canLoadBeforeStart);
+		}
+		if (suggestJumpEnd) {
+			const isScrolledToEnd = pan.scrollTop >= pan.scrollHeight - pan.clientHeight;
+			showJumpEnd = isScrollable && (!isScrolledToEnd || canLoadAfterEnd);
+		}
 	}
 
 	function start_fill() {
-		if (fetchTask) {
+		if (fetchTask || pan === undefined) {
 			return;
 		}
 		fetchTask = fill_loop();
@@ -171,8 +177,8 @@
 		const pan_scrollTopMax = pan.scrollHeight - pan.clientHeight;
 		const distFromBot = pan_scrollTopMax - pan.scrollTop;
 
-		const wantFetchStart = distFromTop <= pxBeforeLoad && scrollDiff <= 0;
-		const wantFetchEnd = distFromBot <= pxBeforeLoad && scrollDiff >= 0;
+		const wantFetchStart = distFromTop <= pxBeforeLoad;
+		const wantFetchEnd = distFromBot <= pxBeforeLoad;
 
 		if (wantFetchStart && canLoadBeforeStart) {
 			// console.log("want start", holdIdStart);
@@ -251,7 +257,6 @@
 		//console.log("In change scrollTop", pan.scrollTop);
 		const scrollAdjust = pan.scrollHeight - lastScrollHeight;
 		pan.scrollTop = lastScrollTop + scrollAdjust;
-		lastScrollPos += scrollAdjust;
 		// console.log("modifyElems scrollHeight", pan.scrollHeight, "scrollTop", pan.scrollTop, "scrollAdjust", scrollAdjust);
 	}
 
@@ -355,9 +360,12 @@
 		}
 	}
 
+	let _obs: ResizeObserver;
 	onMount(() => {
 		start_fill();
-		pan.onresize = start_fill;
+		pan.onresize = () => {
+			start_fill();
+		};
 		bottomScroller(pan);
 
 		function bottomScroller(scroller: HTMLElement) {
@@ -368,23 +376,24 @@
 				if (oldHeight === scroller.clientHeight) oldScrollTop = scroller.scrollTop;
 			});
 
-			var obs = getResizeObserver(() => {
+			_obs = new ResizeObserver(() => {
 				let newScrollTop = oldScrollTop + oldHeight - scroller.clientHeight;
 				scroller.scrollTop = newScrollTop;
 				oldScrollTop = newScrollTop;
 				oldHeight = scroller.clientHeight;
+				scrollPanChanged();
 			});
-			obs.observe(pan);
+			_obs.observe(pan);
 		}
+	});
+	onDestroy(() => {
+		_obs.disconnect();
 	});
 </script>
 
 <svelte:options accessors />
 <div class="lazyList">
-	<button
-		class="arrow-up"
-		class:showJumpDown={false}
-		on:click={() => jumpTo(ListFetchDir.Before)}>
+	<button class="arrow-up" class:showJumpStart on:click={() => jumpTo(ListFetchDir.Before)}>
 		<div />
 	</button>
 	<div class="lazyListView" bind:this={pan} on:scroll={handle_scroll}>
@@ -399,10 +408,7 @@
 			<div id="anchor" />
 		{/if}
 	</div>
-	<button
-		class="arrow-down"
-		class:showJumpDown={!isAtBottom}
-		on:click={() => jumpTo(ListFetchDir.After)}>
+	<button class="arrow-down" class:showJumpEnd on:click={() => jumpTo(ListFetchDir.After)}>
 		<div />
 	</button>
 </div>
@@ -429,7 +435,7 @@
 	.arrow-up {
 		position: absolute;
 		right: 2em;
-		bottom: -5em;
+
 		display: inline-block;
 		background: #ccc;
 		border-radius: 100%;
@@ -453,16 +459,26 @@
 		}
 	}
 
-	.showJumpDown {
+	.arrow-down {
+		bottom: -5em;
+		> div {
+			transform: rotate(-135deg) translate(20%, 20%);
+		}
+	}
+
+	.arrow-up {
+		top: -5em;
+		> div {
+			transform: rotate(45deg) translate(20%, 20%);
+		}
+	}
+
+	.showJumpStart {
+		top: 1.5em;
+	}
+
+	.showJumpEnd {
 		bottom: 1.5em;
-	}
-
-	.arrow-down > div {
-		transform: rotate(-135deg) translate(20%, 20%);
-	}
-
-	.arrow-up > div {
-		transform: rotate(45deg) translate(20%, 20%);
 	}
 
 	// Anchoring

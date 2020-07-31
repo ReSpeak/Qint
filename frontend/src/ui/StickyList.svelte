@@ -1,6 +1,7 @@
 <script lang="typescript">
 	import { onMount } from "svelte";
-	import { getResizeObserver } from "../util";
+	import ResizeObserver from 'resize-observer-polyfill';
+
 	let stickyList!: HTMLElement;
 	let stickyChildren: ArrayLike<HTMLElement> = [];
 	let stickySizes = [] as number[];
@@ -25,7 +26,7 @@
 		stickyChildren = stickyList.querySelectorAll<HTMLElement>(":scope > .stickySlot");
 		stickySizes = Array(stickyChildren.length);
 		stickyAcc = Array(stickyChildren.length);
-		let obs = getResizeObserver(() => updateChildSize());
+		let obs = new ResizeObserver(() => updateChildSize());
 		for (let i = 0; i < stickyChildren.length; i++) {
 			stickyChildren[i].onclick = () => {
 				let nextElement = stickyChildren[i].nextElementSibling! as HTMLElement;

@@ -1,7 +1,6 @@
 <script lang="typescript">
 	import { Connection } from "../connection";
-	import type { Writable } from "svelte/store";
-	import { Channel, Client } from "../tree/book";
+	import { Client } from "../tree/book";
 	import type { ITreeNode } from "../tree/book";
 	import ChannelIcon from "../ui/ChannelIcon.svelte";
 	import StickyList from "../ui/StickyList.svelte";

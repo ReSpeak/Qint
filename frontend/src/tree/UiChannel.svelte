@@ -1,6 +1,5 @@
 <script lang="typescript">
 	import { get } from "svelte/store";
-	import type { Writable } from "svelte/store";
 	import Icon from "../ui/Icon.svelte";
 	import ChannelIcon from "../ui/ChannelIcon.svelte";
 	import FilterString from "../ui/FilterString.svelte";
@@ -31,7 +30,7 @@
 	}
 	let div!: HTMLElement;
 
-	function updateOwnClient(children: ITreeNode[]) {
+	function updateOwnClient(_children: ITreeNode[]) {
 		let isOwn = false;
 		let client = get(connection.ownClient);
 		if (client !== undefined) {

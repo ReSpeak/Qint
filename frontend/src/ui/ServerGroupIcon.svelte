@@ -1,9 +1,7 @@
 <script lang="typescript">
-	import type { Writable } from "svelte/store";
 	import Icon from "./Icon.svelte";
 	import { Connection } from "../connection";
 	import { getIconPath, DummyStore } from "./clientIcon";
-	import type { IconSource } from "./clientIcon";
 
 	export let id: number;
 	// Either connection or server has to be set to fetch the icon

@@ -164,11 +164,3 @@ export function findParent(elem: HTMLElement, selector: string): HTMLElement | u
 	}
 	return undefined;
 }
-
-declare class ResizeObserver {
-	constructor(fn: any);
-	public observe(elem: HTMLElement): void;
-}
-export function getResizeObserver(fn: () => any): ResizeObserver {
-	return new ResizeObserver(fn);
-}

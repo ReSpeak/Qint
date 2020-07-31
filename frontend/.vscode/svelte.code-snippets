@@ -26,6 +26,16 @@
 		],
 		"description": "Svelte ts boilerplate"
 	},
+	"Svelte module context ts boilerplate": {
+		"scope": "svelte",
+		"prefix": "svtmod",
+		"body": [
+			"<script lang=\"typescript\" context=\"module\">",
+			"\t$1",
+			"</script>",
+		],
+		"description": "Svelte module context ts boilerplate"
+	},
 	"Svelte scss boilerplate": {
 		"scope": "svelte",
 		"prefix": "svs",

@@ -1,6 +1,5 @@
 <script lang="typescript">
 	import { get } from "svelte/store";
-	import type { Writable } from "svelte/store";
 	import Connect from "./connect/Connect.svelte";
 	import Connected from "./Connected.svelte";
 	import { ConnectionState, Connection } from "./connection";
