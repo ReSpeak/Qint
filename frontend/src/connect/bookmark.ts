@@ -47,12 +47,17 @@ export class Bookmark {
 		return bookmarks.data.bookmarks.map((b: any) => new Bookmark(b))
 	}
 
-	public static async getRecent(): Promise<Bookmark> {
-		return new Bookmark((await graphql(`query GetRecentBookmark {
+	public static async getRecent(): Promise<Bookmark | undefined> {
+		try {
+			return new Bookmark((await graphql(`query GetRecentBookmark {
 			mostRecentBookmark {
 				username
 				address
 			}
 		}`)).data.mostRecentBookmark);
+		} catch (err) {
+			console.log("Failed to get last bookmark", err);
+			return undefined;
+		}
 	}
 }

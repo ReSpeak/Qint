@@ -164,3 +164,17 @@ export function findParent(elem: HTMLElement, selector: string): HTMLElement | u
 	}
 	return undefined;
 }
+
+/**
+ * Works similar to Object.assign except that it doesn't overwrite existing
+ * object structures. But instead merges them recursively
+*/
+export function soft_merge(obj: any, merge: any) {
+	for (const [key, value] of Object.entries(merge)) {
+		if (typeof obj[key] === "object") {
+			soft_merge(obj[key], value);
+		} else {
+			obj[key] = value;
+		}
+	}
+}

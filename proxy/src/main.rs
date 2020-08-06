@@ -17,6 +17,7 @@ use actix_web_actors::ws;
 use anyhow::{bail, Result};
 use futures::prelude::*;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use slog::{debug, error, info, o, warn, Drain, Logger};
 use structopt::StructOpt;
 use tokio::time::{self, Duration};
@@ -85,10 +86,9 @@ struct Args {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 struct TransientSettings {
-	#[serde(skip_serializing_if = "Option::is_none")]
-	loudness_threshold: Option<f64>,
+	#[serde(flatten, serialize_with = "toml::ser::tables_last")]
+	fields: HashMap<String, Value>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -175,6 +175,23 @@ impl Default for Settings {
 
 impl juniper::Context for State {}
 
+impl State {
+	fn modify_transient_settings<T: FnOnce(&mut TransientSettings)>(&self, f: T) {
+		let mut settings = self.transient_settings.write().unwrap();
+		f(&mut *settings);
+		if let Err(e) = settings.save(&self.settings.read().unwrap().config_path) {
+			error!(self.logger, "Failed to save transient settings"; "error" => %e);
+		}
+	}
+
+	fn save_transient_settings(&self) {
+		let settings = self.transient_settings.read().unwrap();
+		if let Err(e) = settings.save(&self.settings.read().unwrap().config_path) {
+			error!(self.logger, "Failed to save transient settings"; "error" => %e);
+		}
+	}
+}
+
 impl Tristate {
 	pub fn get_value(&self, old: bool) -> bool {
 		match self {
@@ -191,6 +208,26 @@ impl TransientSettings {
 		let data = toml::to_string(self)?;
 		fs::write(&config_path.join(TRANSIENT_SETTINGS_FILENAME), data)?;
 		Ok(())
+	}
+	fn set(&mut self, k: String, v: Value) {
+		if let Value::Null = v {
+			self.fields.remove(&k);
+		} else if let Some(value) = self.fields.get_mut(&k) {
+			merge_json(value, &v);
+		} else {
+			self.fields.insert(k, v);
+		}
+	}
+
+	fn get_loudness_threshold(&self) -> Option<f64> {
+		self.fields.get("loudness_threshold").and_then(|v| v.as_f64())
+	}
+	fn set_loudness_threshold(&mut self, value: Option<f64>) {
+		if let Some(value) = value {
+			self.fields.insert("loudness_threshold".into(), value.into());
+		} else {
+			self.fields.remove("loudness_threshold");
+		}
 	}
 }
 
@@ -225,7 +262,9 @@ async fn create_ws(
 }
 
 #[post("/shortcut")]
-async fn run_shortcut(state: web::Data<Arc<State>>, action: web::Json<shortcut::Action>) -> impl Responder {
+async fn run_shortcut(
+	state: web::Data<Arc<State>>, action: web::Json<shortcut::Action>,
+) -> impl Responder {
 	if let Err(e) = action.run(&state).await {
 		error!(state.logger, "Failed to run action"; "action" => ?action, "error" => %e);
 		HttpResponse::InternalServerError()
@@ -308,7 +347,8 @@ async fn download_file(
 				response.content_type("image/png");
 			} else if r.starts_with(&[0xFF, 0xD8, 0xFF, 0xDB])
 				|| r.starts_with(&[0xFF, 0xD8, 0xFF, 0xE0])
-				|| r.starts_with(&[0xFF, 0xD8, 0xFF, 0xEE]) {
+				|| r.starts_with(&[0xFF, 0xD8, 0xFF, 0xEE])
+			{
 				response.content_type("image/jpeg");
 			} else if r.windows(3).any(|w| w == b"svg") {
 				response.content_type("image/svg+xml");
@@ -344,6 +384,59 @@ async fn download_cache_file(
 		HttpResponse::Ok().content_length(len).streaming(stream)
 	} else {
 		HttpResponse::NotFound().finish()
+	}
+}
+
+#[get("/transient/{key}")]
+async fn get_transient_setting(
+	state: web::Data<Arc<State>>, data: web::Path<String>,
+) -> impl Responder {
+	let transient_values = state.transient_settings.read().unwrap();
+	let req = data.as_str();
+	if req == "*" {
+		HttpResponse::Ok().json(&*transient_values)
+	} else if let Some(value) = transient_values.fields.get(req) {
+		HttpResponse::Ok().json(value)
+	} else {
+		HttpResponse::NotFound().body("Unknown key".to_string())
+	}
+}
+
+#[put("/transient/{key}")]
+async fn set_transient_setting(
+	state: web::Data<Arc<State>>, data: web::Path<String>, body: web::Json<Value>,
+) -> impl Responder {
+	let req = data.as_str();
+	if req == "*" && !body.0.is_object() {
+		HttpResponse::Forbidden().body("*-assign must be an object".to_string())
+	} else {
+		state.modify_transient_settings(|transient_values| {
+			if req == "*" {
+				if let Value::Object(obj) = body.0 {
+					for (k, v) in obj.into_iter() {
+						transient_values.set(k, v);
+					}
+				} else {
+					panic!("Should be object (see 'if' check above)");
+				}
+			} else {
+				transient_values.set(req.to_string(), body.0);
+			}
+		});
+		HttpResponse::Ok().finish()
+	}
+}
+
+fn merge_json(a: &mut Value, b: &Value) {
+	match (a, b) {
+		(&mut Value::Object(ref mut a), &Value::Object(ref b)) => {
+			for (k, v) in b {
+				merge_json(a.entry(k.clone()).or_insert(Value::Null), &v);
+			}
+		}
+		(a, b) => {
+			*a = b.clone();
+		}
 	}
 }
 
@@ -386,13 +479,14 @@ async fn main() -> Result<()> {
 		}
 	};
 
-	let transient_settings = match fs::read_to_string(&config_path.join(TRANSIENT_SETTINGS_FILENAME)) {
-		Ok(r) => toml::from_str(&r)?,
-		Err(e) => {
-			info!(logger, "Failed to read transient settings, using defaults"; "error" => %e);
-			TransientSettings::default()
-		}
-	};
+	let transient_settings =
+		match fs::read_to_string(&config_path.join(TRANSIENT_SETTINGS_FILENAME)) {
+			Ok(r) => toml::from_str(&r)?,
+			Err(e) => {
+				info!(logger, "Failed to read transient settings, using defaults"; "error" => %e);
+				TransientSettings::default()
+			}
+		};
 
 	// Load secret key
 	let key_path = config_path.join("secret.key");
@@ -443,16 +537,16 @@ async fn main() -> Result<()> {
 	let shortcuts = shortcut::Shortcuts::new(shortcut_config)?;
 	let addr = settings.listen_address.clone();
 
-	if let Some(threshold) = transient_settings.loudness_threshold {
+	if let Some(threshold) = transient_settings.get_loudness_threshold() {
 		let logger = logger.clone();
 		actix::spawn(
-			audio_data.a2ts.send(
-				audio::audio_to_ts::SetLoudnessThreshouldMsg(threshold))
-			.map(move |r| {
-				if let Err(e) = r {
-					error!(logger, "Failed to apply loudness threshold"; "error" => %e);
-				}
-			})
+			audio_data.a2ts.send(audio::audio_to_ts::SetLoudnessThresholdMsg(threshold)).map(
+				move |r| {
+					if let Err(e) = r {
+						error!(logger, "Failed to apply loudness threshold"; "error" => %e);
+					}
+				},
+			),
 		);
 	}
 
@@ -485,6 +579,8 @@ async fn main() -> Result<()> {
 			.service(get_plugin)
 			.service(download_file)
 			.service(download_cache_file)
+			.service(get_transient_setting)
+			.service(set_transient_setting)
 			.service(db::graphql::db_graphql)
 			.service(db::graphql::graphiql)
 			.service(Files::new("", "../frontend/public/").index_file("index.html"))

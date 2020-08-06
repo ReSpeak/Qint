@@ -24,7 +24,7 @@ pub(crate) struct AddLoudnessListenerMsg(pub Addr<Ws>);
 pub(crate) struct RemoveLoudnessListenerMsg(pub Addr<Ws>);
 /// An audio packet and `true` if this is the last packet.
 pub(crate) struct PlayPacketMsg(Option<(OutPacket, bool)>, Option<f64>);
-pub(crate) struct SetLoudnessThreshouldMsg(pub f64);
+pub(crate) struct SetLoudnessThresholdMsg(pub f64);
 pub(crate) struct ResetMsg;
 
 /// Threshold for voice activation detection.
@@ -108,7 +108,7 @@ impl Message for RemoveLoudnessListenerMsg {
 impl Message for PlayPacketMsg {
 	type Result = ();
 }
-impl Message for SetLoudnessThreshouldMsg {
+impl Message for SetLoudnessThresholdMsg {
 	type Result = ();
 }
 impl Message for ResetMsg {
@@ -209,9 +209,9 @@ impl Handler<PlayPacketMsg> for AudioToTs {
 	}
 }
 
-impl Handler<SetLoudnessThreshouldMsg> for AudioToTs {
+impl Handler<SetLoudnessThresholdMsg> for AudioToTs {
 	type Result = ();
-	fn handle(&mut self, SetLoudnessThreshouldMsg(thres): SetLoudnessThreshouldMsg,
+	fn handle(&mut self, SetLoudnessThresholdMsg(thres): SetLoudnessThresholdMsg,
 		_: &mut Self::Context) -> Self::Result {
 		self.loudness_threshold.store(thres.to_bits(), Ordering::Relaxed);
 	}

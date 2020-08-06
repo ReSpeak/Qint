@@ -1,10 +1,28 @@
 <script lang="typescript">
 	import { assert } from "../util";
+	import { createEventDispatcher, onMount } from "svelte";
 	export let items: any[];
 	export let selected: any;
 	export let display: (item: any) => string = displayFn;
-	let selectedIndex!: number;
+	let dd: HTMLSelectElement;
+	const dispatch = createEventDispatcher();
 	assert(Array.isArray(items), "items must be set to an array");
+
+	$: selectedToIndex(selected);
+
+	function selectedToIndex(selected: any) {
+		if (dd === undefined) return;
+		const newIndex = items.findIndex(i => i === selected);
+		if (newIndex !== -1) {
+			dd.selectedIndex = newIndex;
+		}
+	}
+
+	function indexToSelected() {
+		if (dd === undefined) return;
+		selected = items[dd.selectedIndex];
+		dispatch("change", { value: selected });
+	}
 
 	function displayFn(item: any): string {
 		if (typeof item === "string") {
@@ -16,16 +34,15 @@
 		}
 	}
 
-	function changed() {
-		selected = items[selectedIndex];
-		console.log("onchanged");
-	}
+	onMount(() => {
+		selectedToIndex(selected);
+	});
 </script>
 
 <svelte:options immutable={true} />
 <div class="select is-fullwidth">
 	<!-- svelte-ignore a11y-no-onchange -->
-	<select bind:value={selectedIndex} on:change={changed}>
+	<select bind:this={dd} on:change={indexToSelected}>
 		{#each items as item, index}
 			<option value={index}>{display(item)}</option>
 		{/each}

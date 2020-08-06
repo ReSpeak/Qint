@@ -400,18 +400,15 @@ impl Ws {
 				}
 			}
 			MessageF2P::SetLoudnessThreshold(threshold) => {
-				{
-					// Save in settings
-					let mut settings = self.state.transient_settings.write().unwrap();
-					settings.loudness_threshold = Some(threshold);
-					if let Err(e) = settings.save(&self.state.settings.read().unwrap().config_path) {
-						error!(self.logger, "Failed to save transient settings"; "error" => %e);
-					}
-				}
+				// Save in settings
+				self.state.modify_transient_settings(|settings| {
+					settings.set_loudness_threshold(Some(threshold));
+				});
+
 				let logger = self.logger.clone();
 				actix::spawn(
 					self.state.audio_data.a2ts.send(
-						audio::audio_to_ts::SetLoudnessThreshouldMsg(threshold))
+						audio::audio_to_ts::SetLoudnessThresholdMsg(threshold))
 					.map(move |r| {
 						if let Err(e) = r {
 							error!(logger, "Failed to apply loudness threshold"; "error" => %e);

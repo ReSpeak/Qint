@@ -38,7 +38,7 @@
 
 	onMount(async () => {
 		usernameInput.focus();
-		let recent = await Bookmark.getRecent();
+		const recent = await Bookmark.getRecent();
 		if (recent) {
 			if (data.username === "") {
 				data.username = recent.username ?? "";

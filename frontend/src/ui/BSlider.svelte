@@ -24,6 +24,7 @@
 		{max}
 		bind:value
 		{step}
+		on:change
 		on:input />
 	{#if tooltip}
 		<output style="left:calc({tooltip_left}px + 0.5rem);">{display(value)}</output>

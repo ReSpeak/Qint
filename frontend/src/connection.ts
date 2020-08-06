@@ -25,6 +25,7 @@ export class Connection {
 
 	constructor() {
 		loadPlugins();
+		this.transientSettings.read_from_proxy();
 	}
 
 	public reset() {

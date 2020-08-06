@@ -26,6 +26,10 @@
 		}, 100);
 	}
 
+	function syncSettings() {
+		connection.transientSettings.sync_to_proxy();
+	}
+
 	// Text-to-Speech
 	const synth = window.speechSynthesis;
 	const synthSett = connection.transientSettings.synth;
@@ -63,13 +67,29 @@
 
 		<BTabSlot title="TTS">
 			<BKeyValue label="Voice">
-				<BDropDown items={voices} display={(v) => v.name} bind:selected={synthSett.voice} />
+				<BDropDown
+					items={voices}
+					display={(v) => v.name}
+					bind:selected={synthSett.voice}
+					on:change={syncSettings} />
 			</BKeyValue>
 			<BKeyValue label="Speed">
-				<BSlider min={0.1} max={3} step={0.1} bind:value={synthSett.speed} tooltip={true} />
+				<BSlider
+					min={0.1}
+					max={3}
+					step={0.1}
+					bind:value={synthSett.speed}
+					tooltip={true}
+					on:change={syncSettings} />
 			</BKeyValue>
 			<BKeyValue label="Volume">
-				<BSlider min={0} max={1} step={0.05} bind:value={synthSett.volume} tooltip={true} />
+				<BSlider
+					min={0}
+					max={1}
+					step={0.05}
+					bind:value={synthSett.volume}
+					tooltip={true}
+					on:change={syncSettings} />
 			</BKeyValue>
 			<BKeyValue label="Preview" narrow={false}>
 				<div class="is-horizontal field">
