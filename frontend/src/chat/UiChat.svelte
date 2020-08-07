@@ -4,7 +4,7 @@
 	import { get } from "svelte/store";
 	import UiMessage from "./UiMessage.svelte";
 	import { Chat, Message } from "./chat";
-	import ClientIcon from "../ui/ClientIcon.svelte";
+	import TsIcon from "../ui/TsIcon.svelte";
 	import ClientName from "../ui/ClientName.svelte";
 	import LazyList from "../ui/LazyList.svelte";
 	import { ListFetchDir } from "../ui/lazyList";
@@ -93,7 +93,7 @@
 			{#if item.displayGroupHeader}
 				<div class="invoker-row">
 					<div class="invoker-icon chat-left-col">
-						<ClientIcon client={item.invoker} {connection} />
+						<TsIcon type="client" source={item.invoker} {connection} />
 					</div>
 					<div class="invoker-name has-text-weight-bold">
 						<ClientName client={item.invoker} />

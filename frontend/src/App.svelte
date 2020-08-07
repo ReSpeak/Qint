@@ -38,49 +38,5 @@
 	@import "bulma-slider/src/sass/index";
 	@import "bulmaswatch/cyborg/overrides";
 
-	:root {
-		--channel-tree-width: 20em;
-	}
-	* {
-		margin: 0;
-	}
-	html {
-		overflow: auto;
-		background-color: $background;
-		scrollbar-color: gray transparent;
-	}
-
-	.hover.menu {
-		position: fixed;
-		z-index: 3;
-		border: solid 1px $border;
-		border-radius: 0.5em;
-		background: $background;
-		padding: 0.5em;
-	}
-
-	.hover.menu .corner {
-		position: absolute;
-		transform: rotate(45deg);
-		left: -0.3em;
-		top: 0.8em;
-		width: 0.5em;
-		height: 0.5em;
-		border-left: solid 1px $border;
-		border-bottom: solid 1px $border;
-		background: $background;
-	}
-
-	.update-flash {
-		color: rgba(255, 62, 0, 1) !important;
-		background-color: rgba(255, 62, 0, 0.2) !important;
-	}
-	.update-flash-fade {
-		transition: color 1s, background 1s;
-	}
-
-	.button:focus {
-		box-shadow: none !important;
-		color: $text-strong !important;
-	}
+	@import "./global";
 </style>

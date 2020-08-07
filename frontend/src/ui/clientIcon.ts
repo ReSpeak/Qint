@@ -3,7 +3,7 @@ import { BASE_ADDRESS } from "../util";
 import { writable, Writable } from "svelte/store";
 
 export type IconSource = { icon_id: number | undefined } | undefined;
-type IconSourceLike = {
+export type IconSourceLike = {
 	icon_id: number | undefined
 	avatar_hash?: string
 	uid?: number[],
@@ -57,7 +57,7 @@ export function getIconPath(source: IconSource, connection?: Connection, server?
 		console.error("ClientIcon needs either connection or server");
 		return;
 	}
-	if (!source || source.icon_id === 0)
+	if (!source || source.icon_id === undefined || source.icon_id === 0)
 		return;
 
 	const i = source.icon_id;
@@ -68,9 +68,9 @@ export function getIconPath(source: IconSource, connection?: Connection, server?
 	else if (i === 600) return "alpha-v-circle-outline";
 
 	if (connection) {
-		return `${BASE_ADDRESS}/con/${connection.guid}/file/0/icon_${source.icon_id}`;
+		return `${BASE_ADDRESS}/con/${connection.guid}/file/0/icon_${i}`;
 	} else if (server) {
-		return `${BASE_ADDRESS}/filecache/${server}/0/icon_${source.icon_id}`;
+		return `${BASE_ADDRESS}/filecache/${server}/0/icon_${i}`;
 	}
 	return;
 }
