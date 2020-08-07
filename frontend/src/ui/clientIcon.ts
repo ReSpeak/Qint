@@ -23,12 +23,12 @@ export function getClientIconPath(client: IconSourceLike, connection?: Connectio
 	if (connection) {
 		if (client.avatar_hash !== "" && client.uid)
 			return `${BASE_ADDRESS}/con/${connection.guid}/file/0/avatar_${client.getAvatarUid!()}?hash=${client.avatar_hash}`;
-		else if (client.icon_id !== 0)
+		else if (client.icon_id)
 			return `${BASE_ADDRESS}/con/${connection.guid}/file/0/icon_${client.icon_id}`;
 	} else if (server) {
 		if (client.avatar_hash !== "" && client.uid)
 			return `${BASE_ADDRESS}/filecache/${server}/0/avatar_${client.getAvatarUid!()}`;
-		else if (client.icon_id !== 0)
+		else if (client.icon_id)
 			return `${BASE_ADDRESS}/filecache/${server}/0/icon_${client.icon_id}`;
 	}
 	return;
@@ -57,7 +57,7 @@ export function getIconPath(source: IconSource, connection?: Connection, server?
 		console.error("ClientIcon needs either connection or server");
 		return;
 	}
-	if (!source || source.icon_id === undefined || source.icon_id === 0)
+	if (!source || !source.icon_id)
 		return;
 
 	const i = source.icon_id;

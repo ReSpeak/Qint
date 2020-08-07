@@ -1,7 +1,8 @@
 <script lang="typescript">
 	import Icon from "./Icon.svelte";
 	import { Connection } from "../connection";
-	import { getClientIconPath, IconSource, IconSourceLike } from "./clientIcon";
+	import { getClientIconPath } from "./clientIcon";
+	import type { IconSourceLike } from "./clientIcon";
 
 	// Either connection or server has to be set to fetch the icon
 	export let connection: Connection | undefined = undefined;
