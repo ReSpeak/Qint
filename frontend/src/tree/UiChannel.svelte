@@ -1,7 +1,7 @@
 <script lang="typescript">
 	import { get } from "svelte/store";
 	import Icon from "../ui/Icon.svelte";
-	import ChannelIcon from "../ui/ChannelIcon.svelte";
+	import TsIcon from "../ui/TsIcon.svelte";
 	import FilterString from "../ui/FilterString.svelte";
 	import { Channel, Client } from "./book";
 	import type { ITreeNode } from "./book";
@@ -136,7 +136,7 @@
 				on:click={() => (collapsed = !collapsed)}
 				class:haschildren={$children.length !== 0}>
 				<Icon name="chevron-right{collapsed ? '' : ' mdi-rotate-90'}" />
-				<ChannelIcon {channel} {connection} />
+				<TsIcon type="channel" source={channel} {connection} />
 			</button>
 			<span class="nameBox" on:click={setChat}>
 				<FilterString {filter} content={channel.name} />

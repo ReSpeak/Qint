@@ -1,6 +1,6 @@
 <script lang="typescript">
 	import UiServer from "../tree/UiServer.svelte";
-	import ServerIcon from "../ui/ServerIcon.svelte";
+	import TsIcon from "../ui/TsIcon.svelte";
 	import StickyList from "../ui/StickyList.svelte";
 	import StickySlot from "../ui/StickySlot.svelte";
 	import { Connection } from "../connection";
@@ -16,7 +16,7 @@
 	<StickyList>
 		<StickySlot styled={false} on:click={() => connection.chat.selectServer()}>
 			<div class="button" class:selectedServerChat>
-				<ServerIcon {connection} />
+				<TsIcon type="server" source={$server} {connection} />
 				<span style={$server.getColor()}>
 					{$server.name}
 				</span>

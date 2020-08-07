@@ -2,7 +2,7 @@
 	import { Connection } from "../connection";
 	import { Client } from "../tree/book";
 	import type { ITreeNode } from "../tree/book";
-	import ChannelIcon from "../ui/ChannelIcon.svelte";
+	import TsIcon from "../ui/TsIcon.svelte";
 	import StickyList from "../ui/StickyList.svelte";
 	import StickySlot from "../ui/StickySlot.svelte";
 	import { codecToName } from "../structs/ts";
@@ -26,7 +26,7 @@
 	<StickySlot>Info</StickySlot>
 	<div class="descGroup">
 		<div class="dataLine headLine">
-			<ChannelIcon {channel} {connection} />
+			<TsIcon type="channel" source={channel} {connection} />
 			<div>{channel.name}</div>
 			<div style="flex: 1;" />
 			<span class="tag is-primary is-rounded">{channel.channel_type}</span>

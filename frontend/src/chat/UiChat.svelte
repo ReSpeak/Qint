@@ -1,10 +1,10 @@
 <script lang="typescript">
 	// TODO Use scroll-anchoring https://blog.eqrion.net/pin-to-bottom/
-	import { onMount } from "svelte";
+	import { onMount, tick } from "svelte";
 	import { get } from "svelte/store";
 	import UiMessage from "./UiMessage.svelte";
 	import { Chat, Message } from "./chat";
-	import ClientIcon from "../ui/ClientIcon.svelte";
+	import TsIcon from "../ui/TsIcon.svelte";
 	import ClientName from "../ui/ClientName.svelte";
 	import LazyList from "../ui/LazyList.svelte";
 	import { ListFetchDir } from "../ui/lazyList";
@@ -21,16 +21,20 @@
 	let canChatHere = true;
 
 	chat.selectedChat.subscribe((c) => {
-		console.log("switch chat");
 		if (chatList) {
 			chatList.sourceChanged(ListFetchDir.New, ListFetchDir.After);
 		}
-		if (messageInput) messageInput.focus();
 
 		if ("Server" in c || "Client" in c) {
 			canChatHere = true;
 		} else if ("Channel" in c) {
 			canChatHere = c.Channel === get(connection.ownClient)!.channel;
+		}
+
+		if (canChatHere) afterSwitchRefresh();
+		async function afterSwitchRefresh() {
+			await tick();
+			if (messageInput) messageInput.focus();
 		}
 	});
 
@@ -55,7 +59,6 @@
 	async function fetchElements(idFrom: Message | undefined, dir: ListFetchDir) {
 		messagesError = undefined;
 		try {
-			console.log("fetching data");
 			return chat.getMessages(idFrom, dir);
 		} catch (err) {
 			console.error("Failed to load messages", err);
@@ -93,7 +96,7 @@
 			{#if item.displayGroupHeader}
 				<div class="invoker-row">
 					<div class="invoker-icon chat-left-col">
-						<ClientIcon client={item.invoker} {connection} />
+						<TsIcon type="client" source={item.invoker} {connection} />
 					</div>
 					<div class="invoker-name has-text-weight-bold">
 						<ClientName client={item.invoker} />
@@ -103,15 +106,10 @@
 			<UiMessage message={item} />
 		</LazyList>
 	{/if}
-	{#if canChatHere}
-		<form class="chat-form" on:submit|preventDefault={sendMessage}>
-			<BInput
-				bind:this={messageInput}
-				bind:value={chat.composing}
-				on:keydown={onChatKeyDown} />
-			<button class="button" name="send" type="submit" style="height: auto;">Send</button>
-		</form>
-	{/if}
+	<form class="chat-form" class:hidden={!canChatHere} on:submit|preventDefault={sendMessage}>
+		<BInput bind:this={messageInput} bind:value={chat.composing} on:keydown={onChatKeyDown} />
+		<button class="button" name="send" type="submit" style="height: auto;">Send</button>
+	</form>
 </div>
 
 <style lang="scss">

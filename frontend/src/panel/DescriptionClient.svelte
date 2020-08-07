@@ -4,7 +4,7 @@
 	//import { Moment } from "moment";
 	import Icon from "../ui/Icon.svelte";
 	import PlatformIcon from "../ui/PlatformIcon.svelte";
-	import ClientIcon from "../ui/ClientIcon.svelte";
+	import TsIcon from "../ui/TsIcon.svelte";
 	import ClientName from "../ui/ClientName.svelte";
 	import StickyList from "../ui/StickyList.svelte";
 	import StickySlot from "../ui/StickySlot.svelte";
@@ -27,7 +27,7 @@
 	<StickySlot>Info</StickySlot>
 	<div class="descGroup">
 		<div class="dataLine headLine">
-			<ClientIcon {client} {connection} />
+			<TsIcon type="client" source={client} {connection} />
 			<ClientName {client} />
 			<div style="flex: 1;" />
 			<div>

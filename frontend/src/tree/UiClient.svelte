@@ -1,5 +1,5 @@
 <script lang="typescript">
-	import ClientIcon from "../ui/ClientIcon.svelte";
+	import TsIcon from "../ui/TsIcon.svelte";
 	import ClientVolume from "../controls/ClientVolume.svelte";
 	import ServerGroupIcon from "../ui/ServerGroupIcon.svelte";
 	import FilterString from "../ui/FilterString.svelte";
@@ -85,7 +85,7 @@
 			data-type="client"
 			data-key={client.id}>
 			<div class:talking={client.talking !== undefined} class="talkWave" />
-			<ClientIcon {client} {connection} />
+			<TsIcon type="client" source={client} {connection} />
 			<span class="nameBox" style={client.getColor()}>
 				<FilterString {filter} content={client.name} />
 			</span>
