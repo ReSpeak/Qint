@@ -115,8 +115,10 @@
 
 		// Overwrite bulma default
 		:global(pre) {
+			position: relative;
 			padding: 0;
 			margin: 1em 1em 1em 0;
+			border-radius: 7px;
 
 			tab-size: 4;
 			-moz-tab-size: 4;
@@ -187,18 +189,19 @@
 		padding: 0.5em;
 
 		position: relative;
-		border-radius: 7px;
 	}
 
-	:global(pre code[rel]::before) {
+	:global([data-codelang]::before) {
 		font-size: 0.8em;
-		content: attr(rel);
+		content: attr(data-codelang);
 		position: absolute;
+		z-index: 5;
 		bottom: 0;
 		right: 3px;
 		color: $orange;
 		font-weight: bold;
 		font-family: Sans-Serif;
 		text-transform: uppercase;
+		pointer-events: none;
 	}
 </style>

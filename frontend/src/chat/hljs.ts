@@ -1,4 +1,4 @@
-import hljs from 'highlight.js';
+import hljs from "highlight.js";
 
 export function hljsHighlight(elem: HTMLElement) {
 	const lang = elem.getAttribute('data-lang');
@@ -16,6 +16,13 @@ export function hljsHighlight(elem: HTMLElement) {
 		if (res.language !== undefined) {
 			// Add the language name to the ovarlay if a language was found
 			elem.setAttribute("rel", res.language);
+			try {
+				if (elem.parentElement) {
+					elem.parentElement.dataset["codelang"] = res.language;
+				}
+			} catch(e) {
+				console.log("atrt", e);
+			}
 			// Add the class for language specific highlighting
 			elem.classList.add("lang-" + res.language);
 		}

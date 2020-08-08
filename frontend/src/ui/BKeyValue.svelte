@@ -4,6 +4,7 @@
 </script>
 
 <svelte:options immutable="{true}" />
+<!-- svelte-ignore a11y-label-has-associated-control -->
 <div class="field is-horizontal">
 	<div class="field-label is-normal">
 		<label class="label">{label}</label>
