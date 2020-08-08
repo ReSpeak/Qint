@@ -178,3 +178,5 @@ export function soft_merge(obj: any, merge: any) {
 		}
 	}
 }
+
+export function on(..._: any[]) { }

@@ -10,6 +10,7 @@
 	import { ListFetchDir } from "../ui/lazyList";
 	import { Connection } from "../connection";
 	import BInput from "../ui/BInput.svelte";
+	import { on } from "../util";
 
 	export let connection: Connection;
 	let chat = connection.chat;
@@ -20,11 +21,29 @@
 
 	let canChatHere = true;
 
-	chat.selectedChat.subscribe((c) => {
+	$: selectedChat = chat.selectedChat;
+	$: unreadCount = chat.unreadCount;
+	$: ownClient = connection.ownClient;
+
+	$: on($selectedChat, chatChanged());
+	$: on($ownClient, chatBoxRecheck());
+	$: on($unreadCount, chatEndChanged());
+
+	function chatChanged() {
 		if (chatList) {
 			chatList.sourceChanged(ListFetchDir.New, ListFetchDir.After);
 		}
+		chatBoxRecheck();
+	}
 
+	function chatEndChanged() {
+		if (chatList) {
+			chatList.sourceChanged(ListFetchDir.After, ListFetchDir.After);
+		}
+	}
+
+	function chatBoxRecheck() {
+		let c = $selectedChat;
 		if ("Server" in c || "Client" in c) {
 			canChatHere = true;
 		} else if ("Channel" in c) {
@@ -36,11 +55,7 @@
 			await tick();
 			if (messageInput) messageInput.focus();
 		}
-	});
-
-	chat.unreadCount.subscribe((_) => {
-		if (chatList) chatList.sourceChanged(ListFetchDir.After, ListFetchDir.After);
-	});
+	}
 
 	function sendMessage() {
 		if (!chat.composing) return;
@@ -68,8 +83,7 @@
 	}
 
 	onMount(() => {
-		chatList.sourceChanged(ListFetchDir.New, ListFetchDir.After);
-		messageInput.focus();
+		chatChanged();
 	});
 </script>
 
