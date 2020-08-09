@@ -1,6 +1,7 @@
 <script lang="typescript">
 	import { onDestroy } from "svelte";
 	import { Connection } from "../connection";
+	import { transientSettings } from "../transientSettings";
 	import BTabList from "../ui/BTabList.svelte";
 	import BTabSlot from "../ui/BTabSlot.svelte";
 	import BDropDown from "../ui/BDropDown.svelte";
@@ -18,7 +19,7 @@
 	connection.sendMessage({ SubscribeLoudness: true });
 
 	function updateLoudness() {
-		if (loudnessTimer) return;
+		if (loudnessTimer !== undefined) return;
 		// Update every few ms
 		loudnessTimer = setTimeout(() => {
 			loudnessTimer = undefined;
@@ -27,12 +28,12 @@
 	}
 
 	function syncSettings() {
-		connection.transientSettings.sync_to_proxy();
+		transientSettings.sync_to_proxy();
 	}
 
 	// Text-to-Speech
 	const synth = window.speechSynthesis;
-	const synthSett = connection.transientSettings.synth;
+	const synthSett = transientSettings.synth;
 	console.log(synthSett);
 	let voices = synth.getVoices();
 	let previewText!: HTMLInputElement;

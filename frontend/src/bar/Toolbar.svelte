@@ -1,14 +1,12 @@
 <script lang="typescript">
+	import Icon from "../ui/Icon.svelte";
 	import { Connection } from "../connection";
-	import Icon from '../ui/Icon.svelte';
+	import { DisplayPanel } from "../panel/panel";
 
 	export let connection: Connection;
 	export let showSidebar: boolean;
-	export let showChat: boolean;
 	export let showDescription: boolean;
-	export let showGlobalSettings: boolean;
-	let dropdownActive = false;
-	let dropdown!: HTMLElement;
+	export let displayPanel: DisplayPanel;
 
 	let ownClient = connection.ownClient;
 	$: input_muted = $ownClient?.input_muted;
@@ -18,75 +16,63 @@
 	function changeOwnClient(change: any) {
 		connection.sendMessage({
 			Change: {
-				ClientUpdate: change
-			}
+				ClientUpdate: change,
+			},
 		});
-	}
-
-	function handleFocus(event: FocusEvent) {
-		// Check of the target lies within the dropdown
-		if (event.relatedTarget && event.relatedTarget instanceof HTMLElement) {
-			if (!dropdown.contains(event.relatedTarget)) {
-				dropdownActive = false;
-			}
-		} else {
-			dropdownActive = false;
-		}
 	}
 </script>
 
 <div class="toolbar">
 	<div class="leftButtons">
-		<button class="button toolbutton" class:active={showSidebar} on:click={() => showSidebar = !showSidebar}>
+		<button
+			class="button toolbutton"
+			class:active={showSidebar}
+			on:click={() => (showSidebar = !showSidebar)}>
 			<Icon name="file-tree" />
 		</button>
-		<button class="button toolbutton" class:active={showChat} on:click={() => showChat = !showChat}>
+	</div>
+	<div class="spacer spacerCLeft" />
+	<div class="centerButtons">
+		<button
+			class="button toolbutton"
+			class:active={displayPanel === DisplayPanel.Main}
+			on:click={() => (displayPanel = DisplayPanel.Main)}>
 			<Icon name="chat-outline" />
 		</button>
-		<button class="button toolbutton" class:active={showDescription} on:click={() => showDescription = !showDescription}>
-			<Icon name="information-outline" />
+		<button
+			class="button toolbutton"
+			class:active={displayPanel === DisplayPanel.Settings}
+			on:click={() => (displayPanel = DisplayPanel.Settings)}>
+			<Icon name="cog" />
 		</button>
 	</div>
+	<div class="spacer spacerCRight" />
 	<div class="rightButtons">
-		<button class="button toolbutton" class:active={input_muted} on:click={() => changeOwnClient({ input_muted: !input_muted })}>
-			<Icon name={input_muted ? "microphone-off" : "microphone"} />
+		<button
+			class="button toolbutton"
+			class:active={input_muted}
+			on:click={() => changeOwnClient({ input_muted: !input_muted })}>
+			<Icon name={input_muted ? 'microphone-off' : 'microphone'} />
 		</button>
-		<button class="button toolbutton" class:active={output_muted} on:click={() => changeOwnClient({ output_muted: !output_muted })}>
-			<Icon name={output_muted ? "volume-off" : "volume-high"} />
+		<button
+			class="button toolbutton"
+			class:active={output_muted}
+			on:click={() => changeOwnClient({ output_muted: !output_muted })}>
+			<Icon name={output_muted ? 'volume-off' : 'volume-high'} />
 		</button>
-		<button class="button toolbutton" class:active={isAway} on:click={() => changeOwnClient({ away: isAway ? null : "" })}>
-			<Icon name={isAway ? "sleep" : "sleep-off"} />
+		<button
+			class="button toolbutton"
+			class:active={isAway}
+			on:click={() => changeOwnClient({ away: isAway ? null : '' })}>
+			<Icon name={isAway ? 'sleep' : 'sleep-off'} />
 		</button>
-
-		<div class="dropdown is-right" bind:this={dropdown} class:is-active={dropdownActive} on:focusout={handleFocus}>
-			<div class="dropdown-trigger">
-				<button
-					class="button toolbutton"
-					aria-haspopup="true"
-					aria-controls="dropdown-menu"
-					on:click={() => dropdownActive = !dropdownActive}
-				>
-					<p class="image is-32x32">
-						<img
-							class="round"
-							src="/128x128.png"
-							alt="Home icon"
-						/>
-					</p>
-				</button>
-			</div>
-			<div class="dropdown-menu" id="dropdown-menu3" role="menu" on:click={() => dropdownActive = false}>
-				<div class="dropdown-content">
-					<button class="button dropdown-item" on:click={() => showGlobalSettings = true}>
-						Settings
-					</button>
-					<hr class="dropdown-divider" />
-					<button class="button dropdown-item" on:click={() => connection.disconnect()}>
-						Disconnect
-					</button>
-				</div>
-			</div>
-		</div>
+		<div style="width: 2em;" />
+		<button
+			class="button toolbutton"
+			class:active={showDescription}
+			on:click={() => (showDescription = !showDescription)}>
+			<Icon name="information-outline" />
+		</button>
 	</div>
 </div>
 
@@ -94,43 +80,65 @@
 	.toolbar {
 		background-color: $box-background-color;
 		padding: 0.5em;
+		display: flex;
 	}
 
-	.leftButtons {
-		float: left;
+	.spacer {
+		flex: 1;
 	}
 
+	.centerButtons,
+	.leftButtons,
 	.rightButtons {
-		float: right;
+		display: inline-flex;
 	}
 
-	.button.toolbutton {
+	.spacerCLeft,
+	.spacerCRight {
+		margin: 0 0 -0.5em 0;
+		background: #363636;
+
+		&::before {
+			background-color: #242424;
+			margin: 0 0 -1em 0;
+			width: 100%;
+			height: 100%;
+			content: "";
+			display: block;
+		}
+	}
+
+	$border-rad: 15px;
+	.spacerCLeft {
+		&::before {
+			border-radius: 0 0 $border-rad 0;
+		}
+	}
+	.spacerCRight {
+		&::before {
+			border-radius: 0 0 0 $border-rad;
+		}
+	}
+
+	.centerButtons {
+		background-color: #363636;
+		padding: 0.25em 0.5em 0 0.5em;
+		border-radius: 10px 10px 0 0;
+		margin-bottom: -0.5em;
+	}
+
+	.toolbutton {
 		background-color: #444444;
 		border-radius: 100%;
-	}
-	.button {
-		background: none;
 		border: none;
 		margin: 0.2em;
-	}
-	.button.dropdown-item:hover {
-		background: none;
-	}
-	.button:focus {
-		box-shadow: none;
-	}
 
-	.toolbutton.active {
-		background-color: #888888;
-	}
+		&:focus {
+			box-shadow: none;
+		}
 
-	.round {
-		border-radius: 100%;
-	}
-
-	.dropdown-trigger button {
-		margin-right: 0.5em;
-		padding: 0;
-		height: auto;
+		&.active {
+			background-color: #888888;
+		}
 	}
 </style>

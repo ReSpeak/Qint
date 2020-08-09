@@ -2,6 +2,7 @@ import { get } from "svelte/store";
 import { Book, Channel, Client, Server } from "./tree/book";
 import { InBookMsg, InMsg, Invoker, Reason } from "./structs/ws";
 import { Connection, ConnectionState } from "./connection";
+import { transientSettings } from "./transientSettings";
 
 type NotificationArg = Book | Channel | Client | Invoker | Server | string | null | undefined;
 
@@ -354,7 +355,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 }
 
 function textToSpeechNotification(con: Connection, _e: InMsg | InBookMsg, no: TsNotification) {
-	const utter = con.transientSettings.synth.getNewUtter();
+	const utter = transientSettings.synth.getNewUtter();
 	utter.text = no.toString(con);
 	synth.cancel();
 	synth.speak(utter);

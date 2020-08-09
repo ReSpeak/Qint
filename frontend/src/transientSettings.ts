@@ -1,7 +1,16 @@
-import { BASE_ADDRESS, soft_merge } from "../util";
+import { BASE_ADDRESS, soft_merge } from "./util";
+
+type FilterFlags<Base, Condition> = {
+	[Key in keyof Base]: Base[Key] extends Condition ? never : Key
+};
+type AllowedNames<Base, Condition> = FilterFlags<Base, Condition>[keyof Base];
+type SubType<Base, Condition> = Pick<Base, AllowedNames<Base, Condition>>;
+type SettGroup = NonNullable<keyof SubType<TransientSettings, Function>>;
 
 export class TransientSettings {
+	private _syncDebounceTimer: number | undefined;
 	public synth = new TransientSettingsSynth();
+	public ui = new TransientSettingsUi();
 
 	public async read_from_proxy() {
 		const resp = await fetch(`${BASE_ADDRESS}/transient/*`);
@@ -9,11 +18,29 @@ export class TransientSettings {
 		soft_merge(this, data);
 	}
 
-	public async sync_to_proxy() {
-		await fetch(`${BASE_ADDRESS}/transient/*`, {
+	public sync_to_proxy() {
+		if (this._syncDebounceTimer === undefined) {
+			this._syncDebounceTimer = setTimeout(() => this.sync_to_proxy_async(), 5000);
+		}
+	}
+
+	public flush() {
+		if (this._syncDebounceTimer !== undefined) {
+			this.sync_to_proxy_async();
+		}
+	}
+
+	private async sync_to_proxy_async(group?: SettGroup) {
+		this._syncDebounceTimer = undefined;
+
+		let [path, obj] = group !== undefined
+			? [group, this[group]]
+			: ["*", this];
+
+		await fetch(`${BASE_ADDRESS}/transient/${path}`, {
 			method: 'PUT',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(this, (k, v) => k.startsWith('_') ? undefined : v)
+			body: JSON.stringify(obj, (k, v) => k.startsWith('_') ? undefined : v)
 		});
 	}
 }
@@ -52,3 +79,11 @@ export class TransientSettingsSynth {
 		return utter;
 	}
 }
+
+class TransientSettingsUi {
+	public showSidebar: boolean = true;
+	public showChat: boolean = true;
+	public showDescription: boolean = true;
+}
+
+export const transientSettings: TransientSettings = new TransientSettings();

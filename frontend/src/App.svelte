@@ -4,12 +4,16 @@
 	import Connected from "./Connected.svelte";
 	import { ConnectionState, Connection } from "./connection";
 	import { BUILD_ENV, BUILD_DAT } from "./util";
+	import { transientSettings } from "./transientSettings";
+
 	console.log("BUILD", BUILD_ENV, BUILD_DAT);
 
 	export let connection: Connection;
 	$: state = connection.state;
 
-	window.onbeforeunload = function(e: any) {
+	window.onbeforeunload = function (e: any) {
+		transientSettings.flush();
+
 		let s = get(state);
 		// For debugging puproses ?
 		window.speechSynthesis.speak(new SpeechSynthesisUtterance("Goodbye"));
@@ -33,7 +37,7 @@
 	@import "@mdi/font/css/materialdesignicons";
 	@import "katex/dist/katex.min";
 	@import "highlight.js/styles/vs2015";
-	
+
 	@import "bulma/bulma";
 	@import "bulma-slider/src/sass/index";
 	@import "bulmaswatch/cyborg/overrides";

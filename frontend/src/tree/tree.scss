@@ -2,10 +2,6 @@
 	font-weight: bold;
 }
 
-.isSelected {
-	background-color: mix($background, $text, 80%);
-}
-
 @mixin noBut {
 	background: none;
 	border: none;
@@ -69,6 +65,10 @@
 	:global(span.icon) {
 		margin: 0 !important;
 	}	
+}
+
+.isSelected {
+	background-color: mix($background, $text, 80%);
 }
 
 .hover {

@@ -182,6 +182,8 @@
 	:global(code.hljs) {
 		display: inline-block;
 		padding: 0.1em;
+
+		overflow-x: scroll;
 	}
 
 	:global(pre code.hljs) {
@@ -192,7 +194,7 @@
 	}
 
 	:global([data-codelang]::before) {
-		font-size: 0.8em;
+		font-size: 0.85em;
 		content: attr(data-codelang);
 		position: absolute;
 		z-index: 5;

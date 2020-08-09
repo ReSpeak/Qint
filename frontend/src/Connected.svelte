@@ -6,18 +6,24 @@
 	import Toolbar from "./bar/Toolbar.svelte";
 	import Description from "./panel/Description.svelte";
 	import { Connection } from "./connection";
+	import { DisplayPanel } from "./panel/panel";
+	import { transientSettings } from "./transientSettings";
 
 	export let connection: Connection;
 	let filter: string = "";
 
-	let showSidebar = true;
-	let showChat = true;
-	let showDescription = true;
-	let showGlobalSettings = false;
+	const ui = transientSettings.ui;
+
+	let showSidebar = ui.showSidebar;
+	let showDescription = ui.showDescription;
+	let displayPanel = DisplayPanel.Main;
 	let columnStyle = "";
 
-	$: globalSettingsChanged(showGlobalSettings);
-	$: chatChanged(showChat, showDescription);
+	$: {
+		ui.showSidebar = showSidebar;
+		ui.showDescription = showDescription;
+		transientSettings.sync_to_proxy();
+	}
 
 	$: {
 		columnStyle = "";
@@ -25,41 +31,22 @@
 		else columnStyle += " 0";
 		columnStyle += " 1fr";
 	}
-
-	function globalSettingsChanged(showGlobalSettings: boolean) {
-		if (showGlobalSettings) {
-			showChat = false;
-			showDescription = false;
-		}
-	}
-
-	function chatChanged(showChat: boolean, showDescription: boolean) {
-		if (showChat || showDescription) {
-			showGlobalSettings = false;
-		}
-	}
 </script>
 
 <div class="connected-container" style="grid-template-columns: {columnStyle}">
-	<Toolbar
-		{connection}
-		bind:showSidebar
-		bind:showChat
-		bind:showGlobalSettings
-		bind:showDescription />
+	<Toolbar {connection} bind:showSidebar bind:showDescription bind:displayPanel />
 	{#if showSidebar}
 		<Searchbar bind:filter />
 		<Sidebar {connection} {filter} />
 	{/if}
 	<div class="panel">
-		{#if showGlobalSettings}
-			<UiGlobalSettings {connection} />
-		{/if}
-		{#if showChat}
+		{#if displayPanel === DisplayPanel.Main}
 			<UiChat {connection} />
-		{/if}
-		{#if showDescription}
-			<Description {connection} />
+			{#if showDescription}
+				<Description {connection} />
+			{/if}
+		{:else if displayPanel === DisplayPanel.Settings}
+			<UiGlobalSettings {connection} />
 		{/if}
 	</div>
 </div>
