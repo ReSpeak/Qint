@@ -166,6 +166,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 				} else if ("Client" in msg.PropertyChanged.prop && "Client" in msg.PropertyChanged.id) {
 					const client = con.book.getClient(msg.PropertyChanged.id.Client)!;
 					const newC = msg.PropertyChanged.prop.Client;
+					const inOwnChannel = client.channel === ownChannelId;
 
 					if ("channel" in newC) {
 						const reason = msg.PropertyChanged.extra.reason;
@@ -251,7 +252,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 								handler(con, msg, notif`muted`);
 							else
 								handler(con, msg, notif`unmuted`);
-						} else {
+						} else if (inOwnChannel) {
 							if (newC.input_muted)
 								handler(con, msg, notif`${client} is muted`);
 							else
@@ -259,14 +260,14 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 						}
 					}
 
-					if ("output_muted" in newC) {
+					if ("output_muted" in newC && (client.id === ownClientId || inOwnChannel)) {
 						if (newC.output_muted)
 							handler(con, msg, notif`${client} is deaf`);
 						else
 							handler(con, msg, notif`${client} is listening`);
 					}
 
-					if ("input_hardware_enabled" in newC) {
+					if ("input_hardware_enabled" in newC && (client.id === ownClientId || inOwnChannel)) {
 						if (newC.input_hardware_enabled)
 							handler(con, msg, notif`${client} can talk`);
 						else
