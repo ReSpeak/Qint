@@ -31,7 +31,7 @@
 			<Icon name="file-tree" />
 		</button>
 	</div>
-	<div class="spacer spacerCLeft" />
+	<div class="spacer" />
 	<div class="centerButtons">
 		<button
 			class="button toolbutton"
@@ -46,7 +46,7 @@
 			<Icon name="cog" />
 		</button>
 	</div>
-	<div class="spacer spacerCRight" />
+	<div class="spacer" />
 	<div class="rightButtons">
 		<button
 			class="button toolbutton"
@@ -91,40 +91,6 @@
 	.leftButtons,
 	.rightButtons {
 		display: inline-flex;
-	}
-
-	.spacerCLeft,
-	.spacerCRight {
-		margin: 0 0 -0.5em 0;
-		background: #363636;
-
-		&::before {
-			background-color: #242424;
-			margin: 0 0 -1em 0;
-			width: 100%;
-			height: 100%;
-			content: "";
-			display: block;
-		}
-	}
-
-	$border-rad: 15px;
-	.spacerCLeft {
-		&::before {
-			border-radius: 0 0 $border-rad 0;
-		}
-	}
-	.spacerCRight {
-		&::before {
-			border-radius: 0 0 0 $border-rad;
-		}
-	}
-
-	.centerButtons {
-		background-color: #363636;
-		padding: 0.25em 0.5em 0 0.5em;
-		border-radius: 10px 10px 0 0;
-		margin-bottom: -0.5em;
 	}
 
 	.toolbutton {
