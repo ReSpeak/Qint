@@ -12,12 +12,14 @@ use std::sync::{Arc, Mutex, RwLock};
 use actix::*;
 use actix_cors::Cors;
 use actix_files::Files;
+use actix_web::dev::Service;
 use actix_web::*;
 use actix_web_actors::ws;
 use anyhow::{bail, Result};
 use futures::prelude::*;
+use http::{header::CACHE_CONTROL, header::ETAG, HeaderValue};
 use serde::{Deserialize, Serialize};
-use serde_json::{ Map, Value};
+use serde_json::{Map, Value};
 use slog::{debug, error, info, o, warn, Drain, Logger};
 use structopt::StructOpt;
 use tokio::time::{self, Duration};
@@ -38,7 +40,6 @@ mod websocket;
 use filecache::FileCache;
 use secret::Secret;
 use websocket::Ws;
-
 const DIR_ORGANIZATION: &str = "ReSpeak";
 const DIR_PROJECT: &str = "Qint";
 const SETTINGS_FILENAME: &str = "config.toml";
@@ -445,7 +446,6 @@ fn merge_json(a: &mut Value, b: &Value) {
 	}
 }
 
-
 #[actix_rt::main]
 async fn main() -> Result<()> {
 	let logger = {
@@ -590,6 +590,17 @@ async fn main() -> Result<()> {
 			.service(db::graphql::db_graphql)
 			.service(db::graphql::graphiql)
 			.service(Files::new("", "../frontend/public/").index_file("index.html"))
+			.wrap_fn(|req, srv| {
+				let fut = srv.call(req);
+				async {
+					let mut res = fut.await?;
+					let headers = res.headers_mut();
+					if headers.contains_key(ETAG) {
+						headers.insert(CACHE_CONTROL, HeaderValue::from_static("no-cache,must-revalidate"));
+					}
+					Ok(res)
+				}
+			})
 	})
 	.bind(addr)?
 	.run()
