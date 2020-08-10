@@ -1,5 +1,5 @@
 <script lang="typescript">
-	import { onMount } from "svelte";
+	import { onMount, tick } from "svelte";
 	export let value: string;
 	let setValue: string | undefined;
 	let self!: HTMLElement;
@@ -8,7 +8,13 @@
 		applyValue(value);
 	}
 
-	export function focus() {
+	export async function focus() {
+		const range = document.createRange();
+		range.selectNodeContents(self);
+		const sel = window.getSelection()!;
+		sel.removeAllRanges();
+		sel.addRange(range);
+		await tick();
 		self.focus();
 	}
 

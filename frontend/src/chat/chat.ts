@@ -10,7 +10,6 @@ import { ListFetchDir, FetchResult } from "../ui/lazyList";
 export class Chat {
 	public readonly selectedChat: Writable<MessageTarget> = writable(MessageTarget.ToServer());
 	public readonly unreadCount: Writable<number> = writable(0);
-	public composing: string = "";
 	public static readonly EmptyFetch: FetchResult<Message> = {
 		items: [],
 		canLoadBeforeStart: false,
@@ -24,7 +23,6 @@ export class Chat {
 	public reset() {
 		this.selectedChat.set(MessageTarget.ToServer());
 		this.unreadCount.set(0);
-		this.composing = "";
 	}
 
 	public selectChannel(channel: Channel) {
@@ -149,12 +147,12 @@ export class Chat {
 		}
 	}
 
-	public sendMessage() {
+	public sendMessage(message: string) {
 		const target = MessageTarget.toWs(get(this.selectedChat));
 		this.connection.sendMessage({
 			SendMessage: {
 				target,
-				message: this.composing,
+				message,
 			}
 		});
 	}

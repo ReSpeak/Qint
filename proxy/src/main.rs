@@ -17,7 +17,7 @@ use actix_web_actors::ws;
 use anyhow::{bail, Result};
 use futures::prelude::*;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{ Map, Value};
 use slog::{debug, error, info, o, warn, Drain, Logger};
 use structopt::StructOpt;
 use tokio::time::{self, Duration};
@@ -88,7 +88,7 @@ struct Args {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct TransientSettings {
 	#[serde(flatten, serialize_with = "toml::ser::tables_last")]
-	fields: HashMap<String, Value>,
+	fields: Map<String, Value>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -183,13 +183,6 @@ impl State {
 			error!(self.logger, "Failed to save transient settings"; "error" => %e);
 		}
 	}
-
-	fn save_transient_settings(&self) {
-		let settings = self.transient_settings.read().unwrap();
-		if let Err(e) = settings.save(&self.settings.read().unwrap().config_path) {
-			error!(self.logger, "Failed to save transient settings"; "error" => %e);
-		}
-	}
 }
 
 impl Tristate {
@@ -215,7 +208,9 @@ impl TransientSettings {
 		} else if let Some(value) = self.fields.get_mut(&k) {
 			merge_json(value, &v);
 		} else {
-			self.fields.insert(k, v);
+			let mut new_obj = Value::Object(Map::<_, _>::new());
+			merge_json(&mut new_obj, &v);
+			self.fields.insert(k, new_obj);
 		}
 	}
 
@@ -431,14 +426,25 @@ fn merge_json(a: &mut Value, b: &Value) {
 	match (a, b) {
 		(&mut Value::Object(ref mut a), &Value::Object(ref b)) => {
 			for (k, v) in b {
-				merge_json(a.entry(k.clone()).or_insert(Value::Null), &v);
+				if v.is_null() {
+					a.remove(k);
+				} else {
+					merge_json(a.entry(k).or_insert(Value::Null), &v);
+				}
 			}
 		}
 		(a, b) => {
-			*a = b.clone();
+			if b.is_object() {
+				let mut new_a = Value::Object(Map::<_, _>::new());
+				merge_json(&mut new_a, b);
+				*a = new_a;
+			} else {
+				*a = b.clone();
+			}
 		}
 	}
 }
+
 
 #[actix_rt::main]
 async fn main() -> Result<()> {

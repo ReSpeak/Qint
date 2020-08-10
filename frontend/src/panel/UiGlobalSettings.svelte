@@ -34,7 +34,6 @@
 	// Text-to-Speech
 	const synth = window.speechSynthesis;
 	const synthSett = transientSettings.synth;
-	console.log(synthSett);
 	let voices = synth.getVoices();
 	let previewText!: HTMLInputElement;
 	function previewVoice() {

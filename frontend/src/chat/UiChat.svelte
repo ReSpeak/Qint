@@ -11,29 +11,49 @@
 	import { Connection } from "../connection";
 	import BInput from "../ui/BInput.svelte";
 	import { on } from "../util";
+	import { transientSettings } from "../transientSettings";
+	import { MessageTarget } from "../structs/ts";
 
 	export let connection: Connection;
 	let chat = connection.chat;
+	let chatStore = transientSettings.chat;
 
 	let chatList: LazyList;
 	let messagesError: unknown | undefined;
 	let messageInput: BInput;
+	let text = "";
 
 	let canChatHere = true;
 
+	let oldSelectedChat: MessageTarget | undefined = undefined;
 	$: selectedChat = chat.selectedChat;
 	$: unreadCount = chat.unreadCount;
 	$: ownClient = connection.ownClient;
 
 	$: on($selectedChat, chatChanged());
-	$: on($ownClient, chatBoxRecheck());
 	$: on($unreadCount, chatEndChanged());
+	let oldOwnChannel: number | undefined;
+	$: {
+		const ownChannel = $ownClient?.channel;
+		if (ownChannel !== oldOwnChannel) {
+			oldOwnChannel = ownChannel;
+			chatBoxRecheck();
+		}
+	}
 
 	function chatChanged() {
-		if (chatList) {
-			chatList.sourceChanged(ListFetchDir.New, ListFetchDir.After);
+		if (oldSelectedChat !== undefined) chatStore.set(text, oldSelectedChat, connection);
+		text = chatStore.get($selectedChat, connection) ?? "";
+
+		if ($selectedChat !== oldSelectedChat) {
+			oldSelectedChat = $selectedChat;
+
+			if (chatList) {
+				chatList.sourceChanged(ListFetchDir.New, ListFetchDir.After);
+			}
+
+			chatBoxRecheck();
 		}
-		chatBoxRecheck();
 	}
 
 	function chatEndChanged() {
@@ -43,24 +63,28 @@
 	}
 
 	function chatBoxRecheck() {
-		let c = $selectedChat;
+		const ownChannel = $ownClient?.channel;
+		const c = $selectedChat;
+
 		if ("Server" in c || "Client" in c) {
 			canChatHere = true;
 		} else if ("Channel" in c) {
-			canChatHere = c.Channel === get(connection.ownClient)!.channel;
+			canChatHere = ownChannel === undefined || c.Channel === ownChannel;
 		}
-
-		if (canChatHere) afterSwitchRefresh();
-		async function afterSwitchRefresh() {
-			await tick();
-			if (messageInput) messageInput.focus();
+		if (canChatHere) {
+			(async () => {
+				await tick();
+				if (messageInput) {
+					messageInput.focus();
+				}
+			})();
 		}
 	}
 
 	function sendMessage() {
-		if (!chat.composing) return;
-		chat.sendMessage();
-		chat.composing = "";
+		if (!text) return;
+		chat.sendMessage(text);
+		text = "";
 		messageInput.focus();
 	}
 
@@ -121,7 +145,7 @@
 		</LazyList>
 	{/if}
 	<form class="chat-form" class:hidden={!canChatHere} on:submit|preventDefault={sendMessage}>
-		<BInput bind:this={messageInput} bind:value={chat.composing} on:keydown={onChatKeyDown} />
+		<BInput bind:this={messageInput} bind:value={text} on:keydown={onChatKeyDown} />
 		<button class="button" name="send" type="submit" style="height: auto;">Send</button>
 	</form>
 </div>

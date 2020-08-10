@@ -1,4 +1,6 @@
 import { BASE_ADDRESS, soft_merge } from "./util";
+import { MessageTarget } from "./structs/ts";
+import { Connection } from "./connection";
 
 type FilterFlags<Base, Condition> = {
 	[Key in keyof Base]: Base[Key] extends Condition ? never : Key
@@ -9,8 +11,10 @@ type SettGroup = NonNullable<keyof SubType<TransientSettings, Function>>;
 
 export class TransientSettings {
 	private _syncDebounceTimer: number | undefined;
+	private _syncDebounceGroup: SettGroup | undefined;
 	public synth = new TransientSettingsSynth();
 	public ui = new TransientSettingsUi();
+	public chat = new TransientSettingsChat(this);
 
 	public async read_from_proxy() {
 		const resp = await fetch(`${BASE_ADDRESS}/transient/*`);
@@ -18,9 +22,12 @@ export class TransientSettings {
 		soft_merge(this, data);
 	}
 
-	public sync_to_proxy() {
+	public sync_to_proxy(group?: SettGroup) {
 		if (this._syncDebounceTimer === undefined) {
+			this._syncDebounceGroup = group;
 			this._syncDebounceTimer = setTimeout(() => this.sync_to_proxy_async(), 5000);
+		} else if (this._syncDebounceGroup !== group) {
+			this._syncDebounceGroup = undefined;
 		}
 	}
 
@@ -30,8 +37,9 @@ export class TransientSettings {
 		}
 	}
 
-	private async sync_to_proxy_async(group?: SettGroup) {
+	private async sync_to_proxy_async() {
 		this._syncDebounceTimer = undefined;
+		const group = this._syncDebounceGroup;
 
 		let [path, obj] = group !== undefined
 			? [group, this[group]]
@@ -80,10 +88,35 @@ export class TransientSettingsSynth {
 	}
 }
 
-class TransientSettingsUi {
+export class TransientSettingsUi {
 	public showSidebar: boolean = true;
 	public showChat: boolean = true;
 	public showDescription: boolean = true;
+}
+
+export class TransientSettingsChat {
+	private _parent: TransientSettings;
+
+	constructor(parent: TransientSettings) {
+		this._parent = parent;
+	}
+
+	public set(text: string | undefined, target: MessageTarget, con: Connection) {
+		const key = MessageTarget.toUniqueString(target, con);
+		if (key === undefined) return;
+		const oldVal = (this as any)[key];
+		const storeText = !text ? null : text;
+		if (storeText !== oldVal) {
+			(this as any)[key] = storeText;
+			this._parent.sync_to_proxy("chat");
+		}
+	}
+
+	public get(target: MessageTarget, con: Connection): string | undefined {
+		const key = MessageTarget.toUniqueString(target, con);
+		if (key === undefined) return undefined;
+		return (this as any)[key] ?? undefined;
+	}
 }
 
 export const transientSettings: TransientSettings = new TransientSettings();

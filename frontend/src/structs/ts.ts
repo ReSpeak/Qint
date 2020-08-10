@@ -6,7 +6,7 @@ export type ChannelId = number;
 export type ClientId = number;
 
 export type MessageTarget =
-	{ Server: null}
+	{ Server: null }
 	| { Channel: number }
 	| { Client: number }
 	| { Poke: number };
@@ -48,6 +48,22 @@ export const MessageTarget = {
 			return { Client: target.Client };
 		} else if ("Poke" in target) {
 			return { Poke: target.Poke };
+		} else {
+			throw "Invalid message target type";
+		}
+	},
+
+	toUniqueString(target: MessageTarget, con: Connection): string | undefined {
+		if ("Server" in target) {
+			return `SERVER,${con.server}`;
+		} else if ("Channel" in target) {
+			return `CHANNEL,${con.server},${target.Channel}`;
+		} else if ("Client" in target) {
+			const uid = get(con.book.clients).get(target.Client)?.uidStr;
+			if (uid === undefined) return undefined;
+			return `CLIENT,${uid}`;
+		} else if ("Poke" in target) {
+			return `POKE,${target.Poke}`;
 		} else {
 			throw "Invalid message target type";
 		}

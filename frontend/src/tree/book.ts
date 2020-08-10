@@ -366,9 +366,12 @@ export class GraphQlClient {
 	public avatar_hash!: string;
 	private _clientColor: Lazy<string>;
 	public get clientColor() { return this._clientColor.get(); }
+	private _uidStr: Lazy<string>;
+	public get uidStr() { return this._uidStr.get(); }
 
 	protected constructor() {
 		this._clientColor = new Lazy(() => getDataColor(this.uid));
+		this._uidStr = new Lazy(() => this.getUid());
 	}
 
 	public static fromGraphqlInvoker(obj: any): GraphQlClient {
@@ -384,9 +387,7 @@ export class GraphQlClient {
 		return c;
 	}
 
-	public getUid(): string | undefined {
-		if (!this.uid)
-			return;
+	private getUid(): string {
 		let res = "";
 		for (let i = 0; i < this.uid.length; i++) {
 			res += String.fromCharCode(this.uid[i]);
@@ -451,7 +452,6 @@ export class Client extends GraphQlClient implements ITreeNode {
 	public talk_power!: number;
 	public talk_power_granted!: boolean;
 	public talk_power_request!: string | null;
-	public uid!: number[];
 	public unread_messages!: number;
 
 	public volume: Writable<number> = writable(0);
@@ -488,7 +488,7 @@ export class Client extends GraphQlClient implements ITreeNode {
 			setClientVolume(connection: $connection, client: $client, volume: $volume) { void }
 		}`, {
 			connection: connection.guid,
-			client: this.getUid(),
+			client: this.uidStr,
 			volume,
 		});
 	}
@@ -497,7 +497,7 @@ export class Client extends GraphQlClient implements ITreeNode {
 		const res = await graphql(`query GetClientVolume($client: ID!) {
 			client(uid: $client) { volume }
 		}`, {
-			client: this.getUid(),
+			client: this.uidStr,
 		});
 		if (res.data) {
 			const volume = res.data.client.volume;
