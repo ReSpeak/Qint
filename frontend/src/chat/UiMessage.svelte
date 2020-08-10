@@ -182,15 +182,13 @@
 	:global(code.hljs) {
 		display: inline-block;
 		padding: 0.1em;
-
-		overflow-x: scroll;
 	}
 
 	:global(pre code.hljs) {
 		display: block;
 		padding: 0.5em;
-
 		position: relative;
+		overflow-x: scroll;
 	}
 
 	:global([data-codelang]::before) {
