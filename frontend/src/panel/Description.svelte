@@ -22,6 +22,8 @@
 	.description {
 		overflow-y: hidden;
 		overflow-x: hidden;
+		background-color: #242424;
+		box-shadow: -3px 0 3px #0005;
 
 		:global(.dataLine) {
 			display: flex;

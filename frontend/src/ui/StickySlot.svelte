@@ -17,6 +17,7 @@
 		background-color: $background;
 		border-radius: 0;
 		box-shadow: 0 0.3em 0.3em #0005;
-		border-top: 1px solid $blue;
+		border-top: 2px solid #425575;
+		font-weight: bold;
 	}
 </style>

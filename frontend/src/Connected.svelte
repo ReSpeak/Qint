@@ -90,10 +90,6 @@
 
 		> :global(*) {
 			flex: 1;
-
-			&:not(:last-child) {
-				border-right: rgb(179, 179, 179) 2px solid;
-			}
 		}
 	}
 </style>

@@ -157,6 +157,7 @@
 		flex-direction: column;
 		justify-content: flex-end;
 		line-height: 1.2;
+		border-right: none;
 
 		// The LazyList
 		> :global(.lazyList) {

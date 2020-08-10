@@ -56,12 +56,12 @@
 		display: inline-flex;
 		flex-direction: column;
 		background-color: $box-background-color;
-		border-right: rgb(179, 179, 179) 2px solid;
+		box-shadow: 3px 0 3px #0006;
 		overflow-y: auto;
 	}
 
 	.selectedServerChat {
-		background-color: mix($background, $text, 80%);
+		background-color: mix($background, $text, 95%);
 	}
 
 	.sidebar > .menu .menu-list li {
