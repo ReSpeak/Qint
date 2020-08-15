@@ -261,12 +261,8 @@ async fn create_ws(
 async fn run_shortcut(
 	state: web::Data<Arc<State>>, action: web::Json<shortcut::Action>,
 ) -> impl Responder {
-	if let Err(e) = action.run(&state).await {
-		error!(state.logger, "Failed to run action"; "action" => ?action, "error" => %e);
-		HttpResponse::InternalServerError()
-	} else {
-		HttpResponse::Ok()
-	}
+	action.run(&state).await;
+	HttpResponse::Ok()
 }
 
 #[post("/audio/reset")]

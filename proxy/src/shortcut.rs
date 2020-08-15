@@ -1,5 +1,6 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use slog::warn;
 
 use crate::{websocket, Tristate};
 use imp::*;
@@ -24,24 +25,26 @@ pub enum Action {
 	OutputMute(Tristate),
 }
 
-async fn h<T: Clone + Send + 'static>(state: &crate::State, t: T) -> Result<()>
+async fn h<T: Clone + Send + 'static>(state: &crate::State, t: T)
 	where websocket::Ws: actix::Handler<T>, T: actix::Message<Result = Result<()>>
 {
 	let cons = state.connections.lock().unwrap().values().cloned().collect::<Vec<_>>();
 	for c in cons {
-		c.send(t.clone()).await??;
+		match c.send(t.clone()).await {
+			Err(e) => warn!(state.logger, "Failed to run action"; "error" => %e),
+			Ok(Err(e)) => warn!(state.logger, "Failed to run action"; "error" => %e),
+			_ => {}
+		}
 	}
-	Ok(())
 }
 
 impl Action {
-	pub async fn run(&self, state: &crate::State) -> Result<()> {
+	pub async fn run(&self, state: &crate::State) {
 		match self {
-			Self::InputMute(b) => h(state, websocket::SetInputMutedMsg(*b)).await?,
-			Self::OutputMute(b) => h(state, websocket::SetOutputMutedMsg(*b)).await?,
-			Self::Away(b) => h(state, websocket::SetAwayMsg(*b)).await?,
+			Self::InputMute(b) => h(state, websocket::SetInputMutedMsg(*b)).await,
+			Self::OutputMute(b) => h(state, websocket::SetOutputMutedMsg(*b)).await,
+			Self::Away(b) => h(state, websocket::SetAwayMsg(*b)).await,
 		}
-		Ok(())
 	}
 }
 
