@@ -55,7 +55,6 @@ mod imp {
 	use anyhow::Result;
 	use tokio::runtime::Handle;
 	use livesplit_hotkey::*;
-	use slog::error;
 
 	use crate::State;
 	use super::ShortcutConfig;
@@ -67,7 +66,7 @@ mod imp {
 		hook: Hook,
 	}
 
-	pub fn key_list() -> Vec<String> {
+	pub fn _key_list() -> Vec<String> {
 		// https://github.com/LiveSplit/livesplit-core/blob/master/crates/livesplit-hotkey/src/windows/key_code.rs
 		[
 			"LButton", "RButton", "Cancel", "MButton", "XButton1", "XButton2", "Back", "Tab",
@@ -108,11 +107,8 @@ mod imp {
 				let handle = Handle::current();
 				self.hook.register(a.keycode, move || {
 					let state = state.clone();
-					let logger = logger.clone();
 					handle.spawn(async move {
-						if let Err(e) = action.run(&state).await {
-							error!(logger, "Failed to run shortcut action"; "error" => %e);
-						}
+						action.run(&state).await;
 					});
 				})?;
 			}

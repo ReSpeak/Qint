@@ -1,7 +1,6 @@
 <script lang="typescript">
 	// TODO Use scroll-anchoring https://blog.eqrion.net/pin-to-bottom/
 	import { onMount, tick } from "svelte";
-	import { get } from "svelte/store";
 	import UiMessage from "./UiMessage.svelte";
 	import { Chat, Message } from "./chat";
 	import TsIcon from "../ui/TsIcon.svelte";

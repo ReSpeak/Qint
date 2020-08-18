@@ -32,6 +32,19 @@
 		}
 	}
 
+	function handlePaste(e: ClipboardEvent) {
+		e.stopPropagation();
+		e.preventDefault();
+		const clipboardData = e.clipboardData || ((window as any).clipboardData as DataTransfer);
+		console.log(clipboardData, clipboardData.items, clipboardData.types);
+		const pastedData = clipboardData.getData("Text");
+		const range = window.getSelection()!.getRangeAt(0);
+		const textNode = document.createTextNode(pastedData);
+		range.deleteContents();
+		range.insertNode(textNode);
+		range.collapse(false);
+	}
+
 	onMount(() => {
 		setValue = undefined;
 		applyValue(value);
@@ -42,6 +55,7 @@
 	bind:this={self}
 	on:keydown
 	on:input={textChanged}
+	on:paste={handlePaste}
 	class="input chatTextBox"
 	name="message"
 	contenteditable="true" />
