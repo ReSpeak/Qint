@@ -289,7 +289,7 @@ pub struct <#= e.msg.name #> {
 }
 
 impl <#= e.msg.name #> {
-	pub fn to_packet(self, con: &Connection) -> Result<OutCommand> {
+	pub fn to_packet(&self, con: &Connection) -> Result<OutCommand> {
 		<# get_struct(_fmt, e.book_struct.name.as_str())?; #>
 
 		let<# if !e.rules.is_empty() { #> mut<# } #> packet = s.<#= change_name.to_snake_case() #>(<#= set_all_id_arguments(e) #>);
@@ -330,7 +330,7 @@ pub struct <#= struct_name #> {
 }
 
 impl <#= struct_name #> {
-	pub fn to_packet(self, con: &Connection) -> Result<OutCommand> {
+	pub fn to_packet(&self, con: &Connection) -> Result<OutCommand> {
 		<# get_struct(_fmt, e.book_struct.name.as_str())?; #>
 		Ok(s.remove<#= name_add #>(<#= set_all_id_arguments(e) #>).to_packet())
 	}
@@ -355,7 +355,7 @@ pub struct <#= struct_name #> {
 }
 
 impl <#= struct_name #> {
-	pub fn to_packet(self, con: &Connection) -> Result<OutCommand> {
+	pub fn to_packet(&self, con: &Connection) -> Result<OutCommand> {
 		<# get_struct(_fmt, e.book_struct.name.as_str())?; #>
 		Ok(s.remove<#= name_add #>(<#= set_all_arguments(e, Some(r)) #>).to_packet())
 	}
@@ -385,7 +385,7 @@ pub struct <#= struct_name #> {
 }
 
 impl <#= struct_name #> {
-	pub fn to_packet(self, con: &Connection) -> Result<OutCommand> {
+	pub fn to_packet(&self, con: &Connection) -> Result<OutCommand> {
 		<# get_struct(_fmt, e.book_struct.name.as_str())?; #>
 		Ok(s.add_<#= r.from_name_singular().to_snake_case() #>(<#= set_all_arguments(e, Some(r)) #>).to_packet())
 	}
@@ -403,7 +403,7 @@ pub enum JsM2B {
 }
 
 impl JsM2B {
-	pub fn to_packet(self, con: &Connection) -> Result<OutCommand> {
+	pub fn to_packet(&self, con: &Connection) -> Result<OutCommand> {
 		match self {
 		<# for setter in &setter_structs { #>
 			JsM2B::<#= setter #>(s) => s.to_packet(con),

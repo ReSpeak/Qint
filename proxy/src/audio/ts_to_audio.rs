@@ -82,7 +82,7 @@ impl TsToAudio {
 		let logger = logger.new(o!("pipeline" => "ts-to-audio"));
 		let data = Arc::new(Mutex::new(AudioHandler::new(logger.clone())));
 
-		Ok(Self { logger, audio_subsystem, device: None, data: data.clone(), connections })
+		Ok(Self { logger, audio_subsystem, device: None, data, connections })
 	}
 
 	fn open_playback(&mut self) {

@@ -449,22 +449,18 @@ impl DbHandler {
 	pub fn handle_events(
 		db: &Addr<Self>, logger: &Logger, con: &TsConnection, data: &TsData, events: &[Event],
 		connected_msg: Option<ConnectedMsg>,
-	) -> Result<()> {
+	) -> Result<()>
+	{
 		let handler = EventHandler::new(db, logger, con, data);
 
 		for e in events {
-			// Only add clients to database when we interact with them:
-			// We receive or write a message to them, we are modified with them
-			// as invoker or they are modified with us as invoker.
-			let mut changed_client = None;
-
 			let r = match e {
 				Event::PropertyAdded { id, .. } => {
 					match id {
 						PropertyId::Server => handler.handle_connected(),
 						PropertyId::Client(id) => {
 							if let Some(client) = data.clients.get(id) {
-								changed_client = Some(client);
+								Self::register_client(logger, &handler, e, data, Some(client));
 								// Update servers_clients if we know this client
 								handler.handle_add_client(client, false)
 							} else {
@@ -481,17 +477,17 @@ impl DbHandler {
 						PropertyId::ServerIconId => handler.handle_server_icon(),
 
 						PropertyId::ClientAvatarHash(id) => {
-							changed_client = data.clients.get(id);
+							Self::register_client(logger, &handler, e, data, data.clients.get(id));
 							handler.handle_client_avatar(*id)
 						}
 						PropertyId::ClientIconId(id) => {
-							changed_client = data.clients.get(id);
+							Self::register_client(logger, &handler, e, data, data.clients.get(id));
 							handler.handle_client_icon(*id)
 						}
 						PropertyId::ClientName(id) => handler.handle_client_name(*id),
-						// TODO Set changed_client for other changes
+						// TODO register_client for other changes
 						PropertyId::ClientChannel(id) => {
-							changed_client = data.clients.get(id);
+							Self::register_client(logger, &handler, e, data, data.clients.get(id));
 							Ok(())
 						}
 
@@ -508,44 +504,38 @@ impl DbHandler {
 							PropertyValue::Client(client) => client,
 							_ => panic!("Property value should be a client but wasn't"),
 						};
-						changed_client = Some(client);
+						Self::register_client(logger, &handler, e, data, Some(client));
 						handler.handle_remove_client(client)
 					}
 					PropertyId::Channel(id) => handler.handle_remove_channel(*id),
 					_ => Ok(()),
 				},
 				Event::Message { target, invoker, message } => {
-					changed_client = data.clients.get(&data.own_client);
 					if let MessageTarget::Client(id) = target {
 						if id != &data.own_client {
-							changed_client = data.clients.get(id);
+							Self::register_client(logger, &handler, e, data, data.clients.get(id));
+						} else {
+							Self::register_client(
+								logger,
+								&handler,
+								e,
+								data,
+								data.clients.get(&data.own_client),
+							);
 						}
+					} else {
+						Self::register_client(
+							logger,
+							&handler,
+							e,
+							data,
+							data.clients.get(&data.own_client),
+						);
 					}
 					handler.handle_message(*target, invoker, message)
 				}
 				Event::ChannelListFinished => handler.handle_channellistfinished(),
 			};
-
-			// TODO
-			// We interacted with another client, make sure he is in the
-			// database.
-			if let Some(c) = changed_client {
-				if let Some(i) = e.get_invoker() {
-					if c.id != i.id {
-						let r = if c.id == data.own_client {
-							handler.handle_add_invoker(i)
-						} else if i.id == data.own_client {
-							handler.handle_add_client(c, true)
-						} else {
-							Ok(())
-						};
-
-						if let Err(e) = r {
-							error!(logger, "Failed to handle event for database"; "error" => %e);
-						}
-					}
-				}
-			}
 
 			if let Err(e) = r {
 				error!(logger, "Failed to handle event for database"; "error" => %e);
@@ -557,7 +547,7 @@ impl DbHandler {
 			actix::spawn(db.send(msg).map(move |r| match r {
 				Err(e) => warn!(logger, "Failed to save connection in database"; "error" => %e),
 				Ok(Err(e)) => warn!(logger, "Failed to save connection in database"; "error" => %e),
-			_ => {}
+				_ => {}
 			}));
 		}
 
@@ -569,6 +559,31 @@ impl DbHandler {
 	) -> Result<()> {
 		let handler = EventHandler::new(db, logger, con, data);
 		handler.handle_add_client(client, true)
+	}
+
+	/// Only add clients to database when we interact with them:
+	/// We receive or write a message to them, we are modified with them
+	/// as invoker or they are modified with us as invoker.
+	fn register_client(
+		logger: &Logger, handler: &EventHandler, e: &Event, data: &TsData, client: Option<&Client>,
+	) {
+		if let Some(c) = client {
+			if let Some(i) = e.get_invoker() {
+				if c.id != i.id {
+					let r = if c.id == data.own_client {
+						handler.handle_add_invoker(i)
+					} else if i.id == data.own_client {
+						handler.handle_add_client(c, true)
+					} else {
+						Ok(())
+					};
+
+					if let Err(e) = r {
+						error!(logger, "Failed to handle event for database"; "error" => %e);
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -1120,7 +1135,7 @@ impl<'a> EventHandler<'a> {
 					}
 				}
 
-				let invoker_uid = invoker_uid.as_ref().map(|s| s.as_slice());
+				let invoker_uid = invoker_uid.as_deref();
 				if own_message {
 					// Check if the message is already in the database
 					let cmp = messages::chat
@@ -1146,7 +1161,7 @@ impl<'a> EventHandler<'a> {
 				let message = models::MessageInsert {
 					chat,
 					invoker: invoker_uid,
-					invoker_name: invoker_name.as_ref().map(|s| s.as_str()),
+					invoker_name: invoker_name.as_deref(),
 					content: &message,
 					status: MessageStatus::Success,
 					time: &utc_time,

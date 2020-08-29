@@ -165,7 +165,7 @@ impl fmt::Display for VTag {
 
 impl TextKind {
 	fn is_none(&self) -> bool { *self == TextKind::None }
-	fn is_latex(&self) -> bool { if let TextKind::Latex(_) = self { true } else { false } }
+	fn is_latex(&self) -> bool { matches!(self, TextKind::Latex(_)) }
 	fn when_none(&self, alt: TextKind) -> TextKind { if self.is_none() { alt } else { *self } }
 }
 
@@ -478,8 +478,8 @@ impl RenderMd {
 }
 
 fn is_textlike(ev: &Event) -> bool { is_text(ev) || is_html(ev) }
-fn is_text(ev: &Event) -> bool { if let Event::Text(_) = ev { true } else { false } }
-fn is_html(ev: &Event) -> bool { if let Event::Html(_) = ev { true } else { false } }
+fn is_text(ev: &Event) -> bool { matches!(ev, Event::Text(_)) }
+fn is_html(ev: &Event) -> bool { matches!(ev, Event::Html(_)) }
 
 // inline Mini-BB
 
@@ -491,7 +491,7 @@ enum BBSegment<'a> {
 }
 
 impl<'a> BBSegment<'a> {
-	fn is_text(&self) -> bool { if let BBSegment::Text(_) = self { true } else { false } }
+	fn is_text(&self) -> bool { matches!(self, BBSegment::Text(_)) }
 }
 
 #[derive(Debug, Eq, PartialEq)]

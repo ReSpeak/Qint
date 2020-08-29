@@ -65,7 +65,7 @@ impl FileCache {
 			Err(e) => {
 				error!(state.logger, "Failed to create cache file";
 					"error" => %e);
-				return file.left_stream();
+				file.left_stream()
 			}
 		}
 	}

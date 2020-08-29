@@ -194,7 +194,6 @@ impl Ws {
 								);
 
 								// Save in database
-								let logger = self.logger.clone();
 								let opts = self.connect_options.as_ref().unwrap();
 								let id = self.state.settings.read().unwrap().default_identity;
 								connected_msg = Some(db::ConnectedMsg {

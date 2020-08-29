@@ -135,7 +135,7 @@ mod imp {
 		config: ShortcutConfig,
 	}
 
-	pub fn key_list() -> Vec<String> {
+	pub fn _key_list() -> Vec<String> {
 		Vec::new()
 	}
 

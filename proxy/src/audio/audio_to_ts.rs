@@ -145,7 +145,7 @@ impl Handler<RemoveListenerMsg> for AudioToTs {
 impl Handler<AddLoudnessListenerMsg> for AudioToTs {
 	type Result = ();
 	fn handle(&mut self, msg: AddLoudnessListenerMsg, _: &mut Self::Context) -> Self::Result {
-		self.loudness_cons.insert(msg.0.clone());
+		self.loudness_cons.insert(msg.0);
 		self.update_device_state();
 	}
 }
