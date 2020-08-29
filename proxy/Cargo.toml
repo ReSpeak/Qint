@@ -29,6 +29,7 @@ juniper = { git = "https://github.com/graphql-rust/juniper" }
 lazy_static = "1"
 libsqlite3-sys = { version = "0.18", features = ["bundled"] }
 livesplit-hotkey = "0.5"
+open = "1"
 nnnoiseless = "0.3"
 nom = "5"
 pulldown-cmark = "0.7"

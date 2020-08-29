@@ -5,6 +5,7 @@ extern crate diesel_migrations;
 
 use std::collections::HashMap;
 use std::fs;
+use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::{Arc, Mutex, RwLock};
@@ -53,7 +54,7 @@ pub struct ConnectionId(pub Uuid);
 struct Args {
 	/// The address where the server listens
 	#[structopt(short = "l", long)]
-	listen_address: Option<String>,
+	listen_address: Option<SocketAddr>,
 	/// The id of the identity that is used by default
 	#[structopt(short = "i", long)]
 	default_identity: Option<u64>,
@@ -82,6 +83,9 @@ struct Args {
 	// single thread, which does not work well with parallel tests.
 	#[structopt(long)]
 	no_audio: bool,
+	/// Open the frontend in the browser on start.
+	#[structopt(long)]
+	no_open: bool,
 	/// How much log output do you want?
 	///
 	/// 0. Print nothing
@@ -92,17 +96,26 @@ struct Args {
 	verbosity: u8,
 }
 
+/// The settings in this struct are saved to the transient settings file.
+///
+/// Settings in this struct are meant to be save the little convenient things like size of the
+/// sidebar, which panes were last visible, the last entered, unsent text from the message field,
+/// etc. In general, settings that change often.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct TransientSettings {
 	#[serde(flatten, serialize_with = "toml::ser::tables_last")]
 	fields: Map<String, Value>,
 }
 
+/// The settings in this struct are saved to the main settings file.
+///
+/// All settings here are meant to be edited by hand, e.g. for the case that a user wants to have
+/// this settings file read-only.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Settings {
 	#[serde(default = "default_listen_address")]
-	listen_address: String,
+	listen_address: SocketAddr,
 	#[serde(skip)]
 	config_path: PathBuf,
 	#[serde(default = "default_cache_path")]
@@ -111,9 +124,10 @@ struct Settings {
 	plugin_path: PathBuf,
 	#[serde(default)]
 	default_identity: u64,
-	/// Do not capture and play audio.
 	#[serde(default)]
 	no_audio: bool,
+	#[serde(default)]
+	no_open: bool,
 	/// How much log output do you want?
 	///
 	/// 0. Print nothing
@@ -159,7 +173,7 @@ struct WsOptions {
 
 struct App;
 
-fn default_listen_address() -> String { "127.0.0.1:4422".into() }
+fn default_listen_address() -> SocketAddr { "127.0.0.1:4422".parse().unwrap() }
 
 fn default_cache_path() -> PathBuf {
 	let proj_dirs = match directories::ProjectDirs::from("", DIR_ORGANIZATION, DIR_PROJECT) {
@@ -180,6 +194,7 @@ impl Default for Settings {
 			plugin_path: Default::default(),
 			default_identity: Default::default(),
 			no_audio: Default::default(),
+			no_open: Default::default(),
 			verbosity: Default::default(),
 			shortcuts: Default::default(),
 		}
@@ -528,6 +543,9 @@ impl App {
 		if args.no_audio {
 			settings.no_audio = true;
 		}
+		if args.no_open {
+			settings.no_open = true;
+		}
 		if args.verbosity > settings.verbosity {
 			settings.verbosity = args.verbosity;
 		}
@@ -550,6 +568,7 @@ impl App {
 		let shortcut_config = settings.shortcuts.clone();
 		let shortcuts = shortcut::Shortcuts::new(shortcut_config)?;
 		let addr = settings.listen_address.clone();
+		let no_open = settings.no_open;
 
 		if let Some(threshold) = transient_settings.get_loudness_threshold() {
 			let logger = logger.clone();
@@ -580,6 +599,17 @@ impl App {
 		});
 
 		state.shortcuts.apply_config(&state)?;
+
+		if !no_open {
+			// Open browser
+			let port = addr.port();
+			let logger = state.logger.clone();
+			actix::spawn(async move {
+				if let Err(e) = open::that(format!("http://localhost:{}", port)) {
+					error!(logger, "Failed to open frontend in browser"; "error" => %e);
+				}
+			});
+		}
 
 		let state2 = state.clone();
 		HttpServer::new(move || {
@@ -867,6 +897,7 @@ mod tests {
 					cache_path: Some(dir.path().join("cache")),
 					plugin_path: None,
 					no_audio: true,
+					open_browser: false,
 					verbosity: 1,
 				};
 				App::run(logger, args).await?;
