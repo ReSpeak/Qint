@@ -97,7 +97,7 @@ impl Bookmark {
 	/// The internal id.
 	fn id(&self) -> ID { ID::new(self.0.id.to_string()) }
 	/// The name of the bookmark if it has a custom name.
-	fn name(&self) -> Option<&str> { self.0.name.as_ref().map(|s| s.as_str()) }
+	fn name(&self) -> Option<&str> { self.0.name.as_deref() }
 	/// The name that was used to connect.
 	fn username(&self) -> &str { &self.0.username }
 	/// The server address.
@@ -305,7 +305,7 @@ impl Client {
 		self.0.public_key.as_ref().map(|p| base64::encode(&p))
 	}
 	/// The custom name of the client if we assigned one.
-	fn custom_name(&self) -> Option<&str> { self.0.custom_name.as_ref().map(|s| s.as_str()) }
+	fn custom_name(&self) -> Option<&str> { self.0.custom_name.as_deref() }
 	fn volume(&self) -> f64 { self.0.volume as f64 }
 
 	/// The chat with this client on the specified server.
@@ -436,7 +436,7 @@ impl Message {
 	fn rendered(&self) -> String { crate::markdown::markdown(&self.0.content) }
 
 	/// Name of the invoker if we don't have their uid.
-	fn invoker_name(&self) -> Option<&str> { self.0.invoker_name.as_ref().map(|s| s.as_str()) }
+	fn invoker_name(&self) -> Option<&str> { self.0.invoker_name.as_deref() }
 	fn content(&self) -> &str { &self.0.content }
 	fn status(&self) -> MessageStatus { self.0.status }
 	fn time(&self) -> &NaiveDateTime { &self.0.time }
@@ -547,7 +547,7 @@ impl ServerClient {
 	/// The icon of this client on this server.
 	fn icon(&self) -> Option<ID> { self.0.icon.map(|i| ID::new((i as u32).to_string())) }
 	/// The avatar of this client on this server.
-	fn avatar(&self) -> Option<&str> { self.0.avatar.as_ref().map(|s| s.as_str()) }
+	fn avatar(&self) -> Option<&str> { self.0.avatar.as_deref() }
 	/// When we saw this client last on this server
 	fn last_seen(&self) -> &NaiveDateTime { &self.0.last_seen }
 	fn timezone(&self) -> i32 { self.0.timezone }
@@ -716,7 +716,8 @@ impl Mutation {
 					let server = if let Some(s) = server {
 						s
 					} else {
-						Err(format_err!("Cannot set channel: Bookmark needs a server"))?
+						return Err(format_err!("Cannot set channel: Bookmark needs a server")
+							.into());
 					};
 
 					// Search channel
@@ -726,7 +727,7 @@ impl Mutation {
 						.select(diesel::dsl::count_star())
 						.execute(&db.con)?;
 					if res == 0 {
-						Err(format_err!("Cannot set channel: Does not exist"))?;
+						return Err(format_err!("Cannot set channel: Does not exist").into());
 					}
 
 					Some(ch_id)
@@ -750,7 +751,7 @@ impl Mutation {
 			.await??;
 
 		if res == 0 {
-			Err(format_err!("Bookmark not found"))?;
+			return Err(format_err!("Bookmark not found").into());
 		}
 
 		Ok(Void::new())
@@ -796,7 +797,7 @@ impl Mutation {
 			.await??;
 
 		if res == 0 {
-			Err(format_err!("Client not found"))?;
+			return Err(format_err!("Client not found").into());
 		}
 
 		Ok(Void::new())

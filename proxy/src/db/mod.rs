@@ -9,7 +9,7 @@ use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use futures::prelude::*;
-use slog::{error, info, Logger};
+use slog::{error, info, warn, Logger};
 use tsclientlib::data::Client;
 use tsclientlib::data::Connection as TsData;
 use tsclientlib::events::{Event, PropertyId, PropertyValue};
@@ -357,6 +357,7 @@ impl Handler<WriteMessageMsg> for DbHandler {
 
 impl Handler<ConnectedMsg> for DbHandler {
 	type Result = Result<()>;
+	/// Has to be called after the server was added in handle_connected.
 	fn handle(&mut self, msg: ConnectedMsg, _: &mut Self::Context) -> Self::Result {
 		use diesel::dsl::not;
 		use schema::{bookmarks, identities};
@@ -408,8 +409,6 @@ impl Handler<ConnectedMsg> for DbHandler {
 			})
 			.transpose()?;
 
-		// TODO We need to know the server here (added in handle_connected)
-
 		let (utc_time, utc_to_local_offset) = EventHandler::get_now();
 		if let Some(id) = id {
 			// Update
@@ -449,6 +448,7 @@ impl Handler<RunMsg> for DbHandler {
 impl DbHandler {
 	pub fn handle_events(
 		db: &Addr<Self>, logger: &Logger, con: &TsConnection, data: &TsData, events: &[Event],
+		connected_msg: Option<ConnectedMsg>,
 	) -> Result<()> {
 		let handler = EventHandler::new(db, logger, con, data);
 
@@ -526,6 +526,7 @@ impl DbHandler {
 				Event::ChannelListFinished => handler.handle_channellistfinished(),
 			};
 
+			// TODO
 			// We interacted with another client, make sure he is in the
 			// database.
 			if let Some(c) = changed_client {
@@ -550,6 +551,16 @@ impl DbHandler {
 				error!(logger, "Failed to handle event for database"; "error" => %e);
 			}
 		}
+
+		if let Some(msg) = connected_msg {
+			let logger = logger.clone();
+			actix::spawn(db.send(msg).map(move |r| match r {
+				Err(e) => warn!(logger, "Failed to save connection in database"; "error" => %e),
+				Ok(Err(e)) => warn!(logger, "Failed to save connection in database"; "error" => %e),
+			_ => {}
+			}));
+		}
+
 		Ok(())
 	}
 

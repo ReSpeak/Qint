@@ -63,19 +63,25 @@ struct Args {
 	/// If no value is given, the configuration path depends on the operating
 	/// system.
 	#[structopt(short = "c", long)]
-	config_path: Option<String>,
+	config_path: Option<PathBuf>,
 	/// The path for cached files. This is used for the `FileCache`.
 	///
 	/// If no value is given, the configuration path depends on the operating
 	/// system.
 	#[structopt(long)]
-	cache_path: Option<String>,
+	cache_path: Option<PathBuf>,
 	/// The path for plugins.
 	///
 	/// If no value is given, this is the path of the config file plus
 	/// `plugins/`.
 	#[structopt(long)]
 	plugin_path: Option<String>,
+	/// Do not capture and play audio.
+	// This is used for testing, which cannot initialize SDL.
+	// SDL must only be initialized once per process, at the same time, it can only be used from a
+	// single thread, which does not work well with parallel tests.
+	#[structopt(long)]
+	no_audio: bool,
 	/// How much log output do you want?
 	///
 	/// 0. Print nothing
@@ -105,6 +111,9 @@ struct Settings {
 	plugin_path: PathBuf,
 	#[serde(default)]
 	default_identity: u64,
+	/// Do not capture and play audio.
+	#[serde(default)]
+	no_audio: bool,
 	/// How much log output do you want?
 	///
 	/// 0. Print nothing
@@ -121,7 +130,7 @@ pub struct State {
 	logger: Logger,
 	/// The list of all currently existing connections
 	connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
-	audio_data: audio::AudioData,
+	audio_data: Option<audio::AudioData>,
 	shortcuts: shortcut::Shortcuts,
 	settings: RwLock<Settings>,
 	transient_settings: RwLock<TransientSettings>,
@@ -148,6 +157,8 @@ struct WsOptions {
 	format: WsFormat,
 }
 
+struct App;
+
 fn default_listen_address() -> String { "127.0.0.1:4422".into() }
 
 fn default_cache_path() -> PathBuf {
@@ -168,6 +179,7 @@ impl Default for Settings {
 			cache_path: default_cache_path(),
 			plugin_path: Default::default(),
 			default_identity: Default::default(),
+			no_audio: Default::default(),
 			verbosity: Default::default(),
 			shortcuts: Default::default(),
 		}
@@ -267,16 +279,18 @@ async fn run_shortcut(
 
 #[post("/audio/reset")]
 async fn audio_reset(state: web::Data<Arc<State>>) -> impl Responder {
-	if state.audio_data.a2ts.send(audio::audio_to_ts::ResetMsg).await.is_err() {
-		error!(state.logger, "Failed to reset audio pipeline");
-		HttpResponse::InternalServerError()
-	} else {
-		if state.audio_data.ts2a.send(audio::ts_to_audio::ResetMsg).await.is_err() {
+	if let Some(ad) = &state.audio_data {
+		if ad.a2ts.send(audio::audio_to_ts::ResetMsg).await.is_err() {
+			error!(state.logger, "Failed to reset audio pipeline");
+			HttpResponse::InternalServerError()
+		} else if ad.ts2a.send(audio::ts_to_audio::ResetMsg).await.is_err() {
 			error!(state.logger, "Failed to reset audio pipeline");
 			HttpResponse::InternalServerError()
 		} else {
 			HttpResponse::Ok()
 		}
+	} else {
+		HttpResponse::Ok()
 	}
 }
 
@@ -442,6 +456,189 @@ fn merge_json(a: &mut Value, b: &Value) {
 	}
 }
 
+impl App {
+	async fn run(logger: Logger, args: Args) -> Result<()> {
+		let _scope_guard = slog_scope::set_global_logger(logger.clone());
+		// Ignore errors if a logger has already been set
+		let _ = slog_stdlog::init();
+
+		let config_path: PathBuf = if let Some(p) = args.config_path {
+			p
+		} else {
+			let proj_dirs = match directories::ProjectDirs::from("", DIR_ORGANIZATION, DIR_PROJECT)
+			{
+				Some(r) => r,
+				None => bail!("Failed to get project directory"),
+			};
+			proj_dirs.config_dir().into()
+		};
+
+		// Load settings
+		let mut settings = match fs::read_to_string(&config_path.join(SETTINGS_FILENAME)) {
+			Ok(r) => toml::from_str(&r)?,
+			Err(e) => {
+				// Only a soft error
+				info!(logger, "Failed to read settings, using defaults"; "error" => %e);
+				// Create settings directory
+				fs::create_dir_all(&config_path)?;
+
+				Settings::default()
+			}
+		};
+
+		let transient_settings =
+			match fs::read_to_string(&config_path.join(TRANSIENT_SETTINGS_FILENAME)) {
+				Ok(r) => toml::from_str(&r)?,
+				Err(e) => {
+					info!(logger, "Failed to read transient settings, using defaults"; "error" => %e);
+					TransientSettings::default()
+				}
+			};
+
+		// Load secret key
+		let key_path = config_path.join("secret.key");
+		let secret = match fs::read(&key_path) {
+			Ok(r) => Secret(r),
+			Err(e) => {
+				warn!(logger, "Failed to read secret key, all your current \
+					identities cannot be used anymore, creating new secret";
+					"error" => %e);
+
+				let secret = Secret::new()?;
+				fs::write(&key_path, &secret.0)?;
+
+				secret
+			}
+		};
+
+		settings.config_path = config_path;
+		// Override settings with args
+		if let Some(a) = args.cache_path {
+			settings.cache_path = a;
+		}
+		if let Some(a) = args.plugin_path {
+			settings.plugin_path = a.into();
+		}
+		if let Some(a) = args.listen_address {
+			settings.listen_address = a;
+		}
+		if let Some(a) = args.default_identity {
+			settings.default_identity = a;
+		}
+		if args.no_audio {
+			settings.no_audio = true;
+		}
+		if args.verbosity > settings.verbosity {
+			settings.verbosity = args.verbosity;
+		}
+
+		if settings.plugin_path.to_str() == Some("") {
+			settings.plugin_path = settings.config_path.join("plugins");
+		}
+
+		// Open database
+		let database = db::DbHandler::new(logger.clone(), &settings, secret.clone())?.start();
+
+		let connections = Arc::new(Mutex::new(HashMap::new()));
+
+		// Start sound
+		let audio_data = if settings.no_audio { None }
+		else { Some(audio::start(logger.clone(), connections.clone())?) };
+		let shortcut_config = settings.shortcuts.clone();
+		let shortcuts = shortcut::Shortcuts::new(shortcut_config)?;
+		let addr = settings.listen_address.clone();
+
+		if let Some(threshold) = transient_settings.get_loudness_threshold() {
+			let logger = logger.clone();
+			if let Some(ad) = &audio_data {
+				actix::spawn(
+					ad.a2ts.send(audio::audio_to_ts::SetLoudnessThresholdMsg(threshold)).map(
+						move |r| {
+							if let Err(e) = r {
+								error!(logger, "Failed to apply loudness threshold"; "error" => %e);
+							}
+						},
+					),
+				);
+			}
+		}
+
+		let graphql_schema = db::graphql::create_schema();
+		let state = Arc::new(State {
+			logger,
+			connections,
+			audio_data,
+			shortcuts,
+			settings: RwLock::new(settings),
+			transient_settings: RwLock::new(transient_settings),
+			database,
+			graphql_schema,
+			secret,
+		});
+
+		state.shortcuts.apply_config(&state)?;
+
+		let state2 = state.clone();
+		HttpServer::new(move || {
+			let state = state2.clone();
+			actix_web::App::new()
+				.wrap(Cors::new().max_age(3600).finish())
+				.data(state)
+				.service(create_ws)
+				.service(run_shortcut)
+				.service(audio_reset)
+				.service(list_plugins)
+				.service(get_plugin)
+				.service(download_file)
+				.service(download_cache_file)
+				.service(get_transient_setting)
+				.service(set_transient_setting)
+				.service(db::graphql::db_graphql)
+				.service(db::graphql::graphiql)
+				.service(Files::new("", "../frontend/public/").index_file("index.html"))
+				.wrap_fn(|req, srv| {
+					let fut = srv.call(req);
+					async {
+						let mut res = fut.await?;
+						let headers = res.headers_mut();
+						if headers.contains_key(ETAG) {
+							headers.insert(
+								CACHE_CONTROL,
+								HeaderValue::from_static("no-cache,must-revalidate"),
+							);
+						}
+						Ok(res)
+					}
+				})
+		})
+		.bind(addr)?
+		.run()
+		.await?;
+
+		// Quit all connections
+		info!(state.logger, "Closing remaining connections");
+		{
+			let cons = state.connections.lock().unwrap();
+			for con in cons.values() {
+				actix::spawn(con.send(websocket::DisconnectMsg).map(|_| ()));
+			}
+		}
+
+		// Wait at max a second and poll
+		for _ in 0u8..10 {
+			{
+				let cons = state.connections.lock().unwrap();
+				if cons.is_empty() {
+					break;
+				}
+			}
+			time::delay_for(Duration::from_millis(10)).await;
+		}
+
+		Ok(())
+	}
+}
+
 #[actix_rt::main]
 async fn main() -> Result<()> {
 	let logger = {
@@ -452,173 +649,302 @@ async fn main() -> Result<()> {
 
 		slog::Logger::root(drain, o!())
 	};
-	let _scope_guard = slog_scope::set_global_logger(logger.clone());
-	slog_stdlog::init().unwrap();
 
 	// Parse command line options
 	let args = Args::from_args();
 
-	let config_path: PathBuf = if let Some(p) = args.config_path {
-		p.into()
-	} else {
-		let proj_dirs = match directories::ProjectDirs::from("", DIR_ORGANIZATION, DIR_PROJECT) {
-			Some(r) => r,
-			None => bail!("Failed to get project directory"),
-		};
-		proj_dirs.config_dir().into()
-	};
+	App::run(logger, args).await
+}
 
-	// Load settings
-	let mut settings = match fs::read_to_string(&config_path.join(SETTINGS_FILENAME)) {
-		Ok(r) => toml::from_str(&r)?,
-		Err(e) => {
-			// Only a soft error
-			info!(logger, "Failed to read settings, using defaults"; "error" => %e);
-			// Create settings directory
-			fs::create_dir_all(&config_path)?;
+/// Tests need a running TeamSpeak server on localhost.
+#[cfg(test)]
+mod tests {
+	use anyhow::format_err;
+	use awc::ws;
+	use rand::Rng;
 
-			Settings::default()
+	use juniper::http::GraphQLRequest;
+	use tsclientlib::Version;
+
+	use super::*;
+	use messages::{ConnectOptions, MessageF2P, MessageP2F};
+
+	struct TestProxy {
+		logger: Logger,
+		port: u16,
+	}
+
+	struct Connection {
+		logger: Logger,
+		port: u16,
+		id: Uuid,
+		socket: actix_codec::Framed<awc::BoxedSocket, ws::Codec>,
+	}
+
+	#[derive(Deserialize)]
+	struct GraphQLResponse<T> {
+		data: T,
+	}
+
+	#[derive(Deserialize)]
+	struct ClientServerKey {
+		/// Public key of the server.
+		server: String,
+		/// Uid of the own identity.
+		client: String,
+	}
+
+	impl TestProxy {
+		fn new() -> Self {
+			let logger = create_logger();
+			let mut rng = rand::thread_rng();
+			Self { logger, port: rng.gen_range(1025, 65535) }
 		}
-	};
 
-	let transient_settings =
-		match fs::read_to_string(&config_path.join(TRANSIENT_SETTINGS_FILENAME)) {
-			Ok(r) => toml::from_str(&r)?,
-			Err(e) => {
-				info!(logger, "Failed to read transient settings, using defaults"; "error" => %e);
-				TransientSettings::default()
+		async fn create_connection(&self) -> Result<Connection> {
+			let client = awc::Client::default();
+			let id = Uuid::new_v4();
+			let url = format!("ws://127.0.0.1:{}/con/{}/ws?format=Msgpack", self.port, id);
+			info!(self.logger, "Connecting to proxy"; "url" => &url);
+			let (_resp, socket) = client
+				.ws(url)
+				.connect()
+				.await
+				.map_err(|e| format_err!("Websocket client error: {:?}", e))?;
+			Ok(Connection { logger: self.logger.clone(), port: self.port, id, socket })
+		}
+
+		async fn graphql<T>(&self, request: &GraphQLRequest) -> Result<T>
+		where for<'a> T: Deserialize<'a> {
+			let client = awc::Client::default();
+			let url = format!("http://127.0.0.1:{}/db", self.port);
+			let mut resp = client
+				.post(url)
+				.send_json(request)
+				.await
+				.map_err(|_| format_err!("GraphQL failed"))?;
+			if !resp.status().is_success() {
+				bail!("GraphQL request failed");
 			}
-		};
-
-	// Load secret key
-	let key_path = config_path.join("secret.key");
-	let secret = match fs::read(&key_path) {
-		Ok(r) => Secret(r),
-		Err(e) => {
-			warn!(logger, "Failed to read secret key, all your current \
-				identities cannot be used anymore, creating new secret";
-				"error" => %e);
-
-			let secret = Secret::new()?;
-			fs::write(&key_path, &secret.0)?;
-
-			secret
+			let resp: GraphQLResponse<T> =
+				resp.json().await.map_err(|_| format_err!("Failed to decode json"))?;
+			Ok(resp.data)
 		}
-	};
 
-	settings.config_path = config_path;
-	// Override settings with args
-	if let Some(a) = args.cache_path {
-		settings.cache_path = a.into();
-	}
-	if let Some(a) = args.plugin_path {
-		settings.plugin_path = a.into();
-	}
-	if let Some(a) = args.listen_address {
-		settings.listen_address = a;
-	}
-	if let Some(a) = args.default_identity {
-		settings.default_identity = a;
-	}
-	if args.verbosity > settings.verbosity {
-		settings.verbosity = args.verbosity;
-	}
+		async fn get_client_server_key(&self) -> Result<ClientServerKey> {
+			#![allow(non_snake_case)]
 
-	if settings.plugin_path.to_str() == Some("") {
-		settings.plugin_path = settings.config_path.join("plugins");
-	}
+			#[derive(Deserialize)]
+			struct Server {
+				publicKey: String,
+			}
+			#[derive(Deserialize)]
+			struct Client {
+				uid: String,
+			}
+			#[derive(Deserialize)]
+			struct Identity {
+				client: Client,
+			}
+			#[derive(Deserialize)]
+			struct Bookmark {
+				server: Server,
+				identity: Identity,
+			}
+			#[derive(Deserialize)]
+			struct RecentBookmark {
+				mostRecentBookmark: Bookmark,
+			}
 
-	// Open database
-	let database = db::DbHandler::new(logger.clone(), &settings, secret.clone())?.start();
-
-	let connections = Arc::new(Mutex::new(HashMap::new()));
-
-	// Start sound
-	let audio_data = audio::start(logger.clone(), connections.clone())?;
-	let shortcut_config = settings.shortcuts.clone();
-	let shortcuts = shortcut::Shortcuts::new(shortcut_config)?;
-	let addr = settings.listen_address.clone();
-
-	if let Some(threshold) = transient_settings.get_loudness_threshold() {
-		let logger = logger.clone();
-		actix::spawn(
-			audio_data.a2ts.send(audio::audio_to_ts::SetLoudnessThresholdMsg(threshold)).map(
-				move |r| {
-					if let Err(e) = r {
-						error!(logger, "Failed to apply loudness threshold"; "error" => %e);
+			let resp: RecentBookmark = self
+				.graphql(&GraphQLRequest::new(
+					"{
+					mostRecentBookmark {
+						server {
+							publicKey
+						}
+						identity {
+							client {
+								uid
+							}
+						}
 					}
-				},
-			),
-		);
-	}
-
-	let graphql_schema = db::graphql::create_schema();
-	let state = Arc::new(State {
-		logger,
-		connections,
-		audio_data,
-		shortcuts,
-		settings: RwLock::new(settings),
-		transient_settings: RwLock::new(transient_settings),
-		database,
-		graphql_schema,
-		secret,
-	});
-
-	state.shortcuts.apply_config(&state)?;
-
-	let state2 = state.clone();
-	HttpServer::new(move || {
-		let state = state2.clone();
-		App::new()
-			//.wrap(middleware::Logger::default())
-			.wrap(Cors::new().max_age(3600).finish())
-			.data(state)
-			.service(create_ws)
-			.service(run_shortcut)
-			.service(audio_reset)
-			.service(list_plugins)
-			.service(get_plugin)
-			.service(download_file)
-			.service(download_cache_file)
-			.service(get_transient_setting)
-			.service(set_transient_setting)
-			.service(db::graphql::db_graphql)
-			.service(db::graphql::graphiql)
-			.service(Files::new("", "../frontend/public/").index_file("index.html"))
-			.wrap_fn(|req, srv| {
-				let fut = srv.call(req);
-				async {
-					let mut res = fut.await?;
-					let headers = res.headers_mut();
-					if headers.contains_key(ETAG) {
-						headers.insert(CACHE_CONTROL, HeaderValue::from_static("no-cache,must-revalidate"));
-					}
-					Ok(res)
-				}
+				}"
+					.into(),
+					None,
+					None,
+				))
+				.await?;
+			Ok(ClientServerKey {
+				client: resp.mostRecentBookmark.identity.client.uid,
+				server: resp.mostRecentBookmark.server.publicKey,
 			})
-	})
-	.bind(addr)?
-	.run()
-	.await?;
+		}
 
-	// Quit all connections
-	info!(state.logger, "Closing remaining connections");
-	{
-		let cons = state.connections.lock().unwrap();
-		for con in cons.values() {
-			actix::spawn(con.send(websocket::DisconnectMsg).map(|_| ()));
+		fn run(&self) -> impl Future<Output = Result<()>> {
+			let logger = self.logger.clone();
+			let port = self.port;
+			async move {
+				let dir = tempfile::Builder::new().prefix("qint-proxy").tempdir()?;
+				info!(logger, "Using config directory"; "dir" => dir.path().display());
+				let args = Args {
+					listen_address: Some(format!("127.0.0.1:{}", port)),
+					default_identity: None,
+					config_path: Some(dir.path().join("config")),
+					cache_path: Some(dir.path().join("cache")),
+					plugin_path: None,
+					no_audio: true,
+					verbosity: 1,
+				};
+				App::run(logger, args).await?;
+				dir.close()?;
+				Ok(())
+			}
+		}
+
+		fn run_log_errors(&self) -> impl Future<Output = ()> {
+			let fut = self.run();
+			let logger = self.logger.clone();
+			async move {
+				if let Err(e) = fut.await {
+					error!(logger, "Proxy encountered an error"; "error" => %e);
+				}
+			}
 		}
 	}
 
-	// Wait at max a second and poll
-	for _ in 0u8..10 {
-		let cons = state.connections.lock().unwrap();
-		if cons.is_empty() {
-			break;
+	impl Connection {
+		async fn connect(&mut self) -> Result<()> {
+			self.send(&MessageF2P::Connect(ConnectOptions {
+				address: "localhost".to_string(),
+				name: "Test".to_string(),
+				version: Version::Linux_3_X_X,
+				log_commands: false,
+				log_packets: false,
+				log_udp_packets: false,
+			}))
+			.await?;
+			while {
+				let msg = self.recv().await?;
+				if let MessageP2F::Connected { .. } = msg { false } else { true }
+			} {}
+			Ok(())
 		}
-		time::delay_for(Duration::from_millis(10)).await;
+
+		async fn send(&mut self, msg: &MessageF2P) -> Result<()> {
+			self.socket
+				.send(ws::Message::Binary(rmp_serde::to_vec(msg)?.into()))
+				.await
+				.map_err(|e| format_err!("Websocket client protocol error: {:?}", e))?;
+			Ok(())
+		}
+
+		async fn recv(&mut self) -> Result<MessageP2F> {
+			match self.socket.next().await {
+				Some(Ok(ws::Frame::Binary(msg))) => Ok(rmp_serde::from_read_ref(msg.as_ref())?),
+				f => bail!("Websocket client received unexpected packet: {:?}", f),
+			}
+		}
 	}
 
-	Ok(())
+	fn create_logger() -> Logger {
+		let decorator = slog_term::PlainDecorator::new(slog_term::TestStdoutWriter);
+		let drain = Mutex::new(slog_term::FullFormat::new(decorator).build()).fuse();
+
+		slog::Logger::root(drain, o!())
+	}
+
+	/// Check that connecting to a server adds this server to the recent connections and updates
+	/// it when reconnecting.
+	#[actix_rt::test]
+	async fn test_save_server() -> Result<()> {
+		let proxy = TestProxy::new();
+		actix::spawn(proxy.run_log_errors());
+		// Wait for server to come up
+		time::delay_for(Duration::from_millis(100)).await;
+		let mut con = proxy.create_connection().await?;
+		con.connect().await?;
+		// Wait for saving the connection in the database
+		time::delay_for(Duration::from_millis(100)).await;
+		drop(con);
+
+		#[derive(Deserialize)]
+		struct ServerServer {
+			#[allow(non_snake_case)]
+			publicKey: String,
+		}
+		#[derive(Deserialize)]
+		struct ServerBookmark {
+			server: ServerServer,
+		}
+		#[derive(Deserialize)]
+		struct ServerResponse {
+			bookmarks: Vec<ServerBookmark>,
+		}
+
+		// Check for the server in the database
+		let response: ServerResponse = proxy
+			.graphql(&GraphQLRequest::new(
+				"{
+				bookmarks {
+					server {
+						publicKey
+					}
+				}
+			}"
+				.into(),
+				None,
+				None,
+			))
+			.await?;
+		assert_eq!(response.bookmarks.len(), 1, "Should have one recent connection");
+		Ok(())
+	}
+
+	/// Check that getting or sending a message from a client saves the other client and the
+	/// message.
+	#[actix_rt::test]
+	async fn test_save_client() -> Result<()> {
+		let proxy = TestProxy::new();
+		actix::spawn(proxy.run_log_errors());
+		// Wait for server to come up
+		time::delay_for(Duration::from_millis(100)).await;
+		let mut con = proxy.create_connection().await?;
+		con.connect().await?;
+		// Wait for saving the connection in the database
+		time::delay_for(Duration::from_millis(100)).await;
+		drop(con);
+
+		#[derive(Deserialize)]
+		struct ServerServer {
+			#[allow(non_snake_case)]
+			publicKey: String,
+		}
+		#[derive(Deserialize)]
+		struct ServerBookmark {
+			server: ServerServer,
+		}
+		#[derive(Deserialize)]
+		struct ServerResponse {
+			bookmarks: Vec<ServerBookmark>,
+		}
+
+		// Check for the server in the database
+		let response: ServerResponse = proxy
+			.graphql(&GraphQLRequest::new(
+				"{
+				bookmarks {
+					server {
+						publicKey
+					}
+				}
+			}"
+				.into(),
+				None,
+				None,
+			))
+			.await?;
+		assert_eq!(response.bookmarks.len(), 1, "Should have one recent connection");
+		Ok(())
+	}
 }

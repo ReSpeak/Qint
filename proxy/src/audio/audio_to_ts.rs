@@ -56,7 +56,7 @@ struct SdlCallback {
 	logger: Logger,
 	channels: audiopus::Channels,
 	encoder: Option<Encoder>,
-	denoise: Box<DenoiseState>,
+	denoise: Box<DenoiseState<'static>>,
 	denoise_buffer: [f32; DenoiseState::FRAME_SIZE],
 	loudness: Option<EbuR128>,
 	loudness_threshold: Arc<AtomicU64>,

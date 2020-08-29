@@ -186,7 +186,7 @@ impl<TStack> Render<TStack> {
 
 	fn finalize_to_html(mut self) -> VNode {
 		assert_eq!(self.spine.len(), 0);
-		if self.elems.len() == 0 {
+		if self.elems.is_empty() {
 			String::new().into()
 		} else if self.elems.len() == 1 {
 			self.elems.pop().unwrap()
@@ -233,7 +233,7 @@ impl<TStack> Render<TStack> {
 	}
 
 	fn make_link() -> VTag {
-		let mut el = VTag::new("a".into());
+		let mut el = VTag::new("a");
 		el.add_attribute("target", "_blank");
 		el
 	}
@@ -449,7 +449,7 @@ impl RenderMd {
 				}
 
 				let mut pre = VTag::new("pre");
-				pre.add_child(child.unwrap_or(top.into()));
+				pre.add_child(child.unwrap_or_else(|| top.into()));
 				top = pre;
 			}
 			Tag::Table(aligns) => {
