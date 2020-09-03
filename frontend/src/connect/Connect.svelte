@@ -14,7 +14,7 @@
 	let data = new self(connection);
 	let username = writable(data.username);
 	let address = writable(data.address);
-	let usernameInput!: HTMLInputElement;
+	let addressInput!: HTMLInputElement;
 
 	function onConnect() {
 		if (get(state) === ConnectionState.Disconnected) {
@@ -37,7 +37,7 @@
 	}
 
 	onMount(async () => {
-		usernameInput.focus();
+		addressInput.focus();
 		const recent = await Bookmark.getRecent();
 		if (recent) {
 			if (data.username === "") {
@@ -68,7 +68,6 @@
 			<div>
 				<p class="control has-icons-left">
 					<input
-						bind:this={usernameInput}
 						bind:value={$username}
 						name="username"
 						id="username"
@@ -82,6 +81,7 @@
 			<div>
 				<p class="control has-icons-left">
 					<input
+						bind:this={addressInput}
 						bind:value={$address}
 						name="server"
 						id="server"

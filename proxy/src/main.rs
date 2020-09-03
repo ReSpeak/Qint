@@ -567,7 +567,7 @@ impl App {
 		};
 		let shortcut_config = settings.shortcuts.clone();
 		let shortcuts = shortcut::Shortcuts::new(shortcut_config)?;
-		let addr = settings.listen_address.clone();
+		let addr = settings.listen_address;
 		let no_open = settings.no_open;
 
 		if let Some(threshold) = transient_settings.get_loudness_threshold() {
@@ -891,13 +891,13 @@ mod tests {
 				let dir = tempfile::Builder::new().prefix("qint-proxy").tempdir()?;
 				info!(logger, "Using config directory"; "dir" => dir.path().display());
 				let args = Args {
-					listen_address: Some(format!("127.0.0.1:{}", port)),
+					listen_address: Some(format!("127.0.0.1:{}", port).parse().unwrap()),
 					default_identity: None,
 					config_path: Some(dir.path().join("config")),
 					cache_path: Some(dir.path().join("cache")),
 					plugin_path: None,
 					no_audio: true,
-					open_browser: false,
+					no_open: true,
 					verbosity: 1,
 				};
 				App::run(logger, args).await?;
