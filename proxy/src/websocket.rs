@@ -155,17 +155,43 @@ impl Ws {
 		self.send_message(&MessageP2F::TalkersChanged(Vec::new()), ctx);
 	}
 
-	fn send_to_audio<T: Message<Result = Result<()>> + Send + 'static>(&self, msg: T)
+	fn send_to_ts2a<T: Message<Result = Result<()>> + Send + 'static>(&self, msg: T)
 	where audio::ts_to_audio::TsToAudio: Handler<T> {
 		if let Some(ad) = &self.state.audio_data {
 			let logger = self.logger.clone();
 			actix::spawn(ad.ts2a.send(msg).map(move |r| match r {
 				Ok(Ok(())) => {}
 				Ok(Err(e)) => {
-					debug!(logger, "Audio error"; "error" => %e);
+					debug!(logger, "Audio output error"; "error" => %e);
 				}
 				Err(_) => {
+					warn!(logger, "Failed to send message to audio output handler");
+				}
+			}));
+		}
+	}
+
+	fn send_to_a2ts<T: Message<Result = ()> + Send + 'static>(&self, msg: T)
+	where audio::audio_to_ts::AudioToTs: Handler<T> {
+		if let Some(ad) = &self.state.audio_data {
+			let logger = self.logger.clone();
+			actix::spawn(ad.a2ts.send(msg).map(move |r| match r {
+				Ok(()) => {}
+				Err(_) => {
 					warn!(logger, "Failed to send audio to handler");
+				}
+			}));
+		}
+	}
+
+	fn send_to_a2ts_r<R: Send + 'static, T: Message<Result = R> + Send + 'static>(&self, msg: T)
+	where audio::audio_to_ts::AudioToTs: Handler<T> {
+		if let Some(ad) = &self.state.audio_data {
+			let logger = self.logger.clone();
+			actix::spawn(ad.a2ts.send(msg).map(move |r| match r {
+				Ok(_) => {}
+				Err(_) => {
+					warn!(logger, "Failed to send message to audio input handler");
 				}
 			}));
 		}
@@ -178,7 +204,7 @@ impl Ws {
 				for e in &events {
 					if let TsEvent::PropertyAdded { id: events::PropertyId::Server, .. } = e {
 						// Connected
-						self.activate_audio(ctx);
+						self.set_audio_input_active(ctx, true);
 
 						match self.connection.as_ref().and_then(|c| {
 							c.get_server_key()
@@ -253,7 +279,7 @@ impl Ws {
 					_ => panic!("Can only handle S2C packets but got a C2S packet"),
 				});
 				let id = (self.id, from);
-				self.send_to_audio(audio::ts_to_audio::PlayMsg(id, audio));
+				self.send_to_ts2a(audio::ts_to_audio::PlayMsg(id, audio));
 			}
 			TsStreamItem::IdentityLevelIncreased => {
 				if let Some(con) = &self.connection {
@@ -272,7 +298,7 @@ impl Ws {
 				}
 			}
 			TsStreamItem::DisconnectedTemporarily => {
-				self.deactivate_audio(ctx);
+				self.set_audio_input_active(ctx, false);
 				self.send_message(&MessageP2F::DisconnectedTemporarily(), ctx);
 				self.talkers.clear();
 				self.update_talkers(ctx);
@@ -287,47 +313,27 @@ impl Ws {
 					let _ = transfer.send(Err(e.into()));
 				}
 			}
+			TsStreamItem::NetworkStatsUpdated => {
+				if let Some(con) = &self.connection {
+					if let Ok(stats) = con.get_network_stats() {
+						self.send_to_a2ts(audio::audio_to_ts::SetPacketlossMsg(stats.get_packetloss()));
+					}
+				}
+			}
 			_ => {}
 		}
 	}
 
-	fn set_audio_active(active: bool, logger: Logger, a2ts: Addr<audio::audio_to_ts::AudioToTs>,
-		ctx: &mut <Self as Actor>::Context) {
+	fn set_audio_input_active(&mut self, ctx: &mut <Self as Actor>::Context, active: bool) {
 		if active {
-			actix::spawn(
-				a2ts.send(audio::audio_to_ts::AddListenerMsg(ctx.address()))
-				.map(move |r| {
-					if let Err(e) = r {
-						error!(logger, "Failed to add audio listener"; "error" => %e);
-					}
-				})
-			);
+			self.send_to_a2ts(audio::audio_to_ts::AddListenerMsg(ctx.address()))
 		} else {
-			actix::spawn(
-				a2ts.send(audio::audio_to_ts::RemoveListenerMsg(ctx.address()))
-				.map(move |r| {
-					if let Err(e) = r {
-						error!(logger, "Failed to remove audio listener"; "error" => %e);
-					}
-				}),
-			);
-		}
-	}
-
-	fn activate_audio(&mut self, ctx: &mut <Self as Actor>::Context) {
-		if let Some(ad) = &self.state.audio_data {
-			Self::set_audio_active(true, self.logger.clone(), ad.a2ts.clone(), ctx);
-		}
-	}
-
-	fn deactivate_audio(&mut self, ctx: &mut <Self as Actor>::Context) {
-		if let Some(ad) = &self.state.audio_data {
-			Self::set_audio_active(false, self.logger.clone(), ad.a2ts.clone(), ctx);
+			self.send_to_a2ts_r(audio::audio_to_ts::RemoveListenerMsg(ctx.address()))
 		}
 	}
 
 	fn disconnect(&mut self, ctx: &mut <Self as Actor>::Context) {
-		self.deactivate_audio(ctx);
+		self.set_audio_input_active(ctx, false);
 		self.talkers.clear();
 		if let Some(con) = &mut self.connection {
 			if let Err(e) = con.disconnect(DisconnectOptions::new()) {
@@ -399,43 +405,13 @@ impl Ws {
 					settings.set_loudness_threshold(Some(threshold));
 				});
 
-				let logger = self.logger.clone();
-				if let Some(ad) = &self.state.audio_data {
-					actix::spawn(
-						ad.a2ts.send(
-							audio::audio_to_ts::SetLoudnessThresholdMsg(threshold))
-						.map(move |r| {
-							if let Err(e) = r {
-								error!(logger, "Failed to apply loudness threshold"; "error" => %e);
-							}
-						})
-					);
-				}
+				self.send_to_a2ts(audio::audio_to_ts::SetLoudnessThresholdMsg(threshold));
 			}
 			MessageF2P::SubscribeLoudness(subscribe) => {
-				if let Some(ad) = &self.state.audio_data {
-					let logger = self.logger.clone();
-					if subscribe {
-						actix::spawn(
-							ad.a2ts.send(
-								audio::audio_to_ts::AddLoudnessListenerMsg(ctx.address()))
-							.map(move |r| {
-								if let Err(e) = r {
-									error!(logger, "Failed to add loudness listener"; "error" => %e);
-								}
-							})
-						);
-					} else {
-						actix::spawn(
-							ad.a2ts.send(
-								audio::audio_to_ts::RemoveLoudnessListenerMsg(ctx.address()))
-							.map(move |r| {
-								if let Err(e) = r {
-									error!(logger, "Failed to remove loudness listener"; "error" => %e);
-								}
-							})
-						);
-					}
+				if subscribe {
+					self.send_to_a2ts(audio::audio_to_ts::AddLoudnessListenerMsg(ctx.address()));
+				} else {
+					self.send_to_a2ts_r(audio::audio_to_ts::RemoveLoudnessListenerMsg(ctx.address()));
 				}
 			}
 			MessageF2P::SendMessage { target, message } => {
@@ -448,6 +424,7 @@ impl Ws {
 							error!(self.logger, "Failed to get state"; "error" => %e);
 						}
 						Ok(state) => {
+							let mut audio_active = None;
 							if let JsM2B::ClientUpdate(ClientUpdate { input_muted, output_muted, away, .. }) = &change {
 								if input_muted.is_some() || output_muted.is_some() || away.is_some() {
 									if let Some(client) = state.clients.get(&state.own_client) {
@@ -457,13 +434,7 @@ impl Ws {
 										let is_away = away.as_ref().map(|a| a.is_some())
 											.unwrap_or_else(|| client.away_message.is_some());
 
-										let audio_active = !input_muted && !output_muted && !is_away;
-										if let Some(ad) = &self.state.audio_data {
-											Self::set_audio_active(audio_active,
-												self.logger.clone(),
-												ad.a2ts.clone(),
-												ctx);
-										}
+										audio_active = Some(!input_muted && !output_muted && !is_away);
 									}
 								}
 							}
@@ -471,6 +442,9 @@ impl Ws {
 							if let Err(e) = change.to_packet(state)
 								.and_then(|p| p.send(con).map_err(|e| e.into())) {
 								error!(self.logger, "Failed to send change"; "error" => %e);
+							}
+							if let Some(active) = audio_active {
+								self.set_audio_input_active(ctx, active);
 							}
 						}
 					}
@@ -731,7 +705,7 @@ impl Handler<SetVolumeMsg> for Ws {
 				for c in state.clients.values() {
 					if c.uid.as_ref() == Some(&client) {
 						let id = (self.id, c.id);
-						self.send_to_audio(audio::ts_to_audio::SetVolumeMsg(id, volume));
+						self.send_to_ts2a(audio::ts_to_audio::SetVolumeMsg(id, volume));
 					}
 				}
 			} else {
@@ -756,12 +730,7 @@ impl Handler<SetInputMutedMsg> for Ws {
 			};
 			let new_input_muted = new.get_value(old);
 			state.client_update().set_input_muted(new_input_muted).send(con)?;
-			if let Some(ad) = &self.state.audio_data {
-				Self::set_audio_active(!new_input_muted,
-					self.logger.clone(),
-					ad.a2ts.clone(),
-					ctx);
-			}
+			self.set_audio_input_active(ctx, !new_input_muted);
 		} else {
 			bail!("Connection does not exist");
 		}

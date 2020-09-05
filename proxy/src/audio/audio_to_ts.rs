@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 use std::time::Duration;
 
 use actix::*;
@@ -22,6 +22,7 @@ pub(crate) struct AddListenerMsg(pub Addr<Ws>);
 pub(crate) struct RemoveListenerMsg(pub Addr<Ws>);
 pub(crate) struct AddLoudnessListenerMsg(pub Addr<Ws>);
 pub(crate) struct RemoveLoudnessListenerMsg(pub Addr<Ws>);
+pub(crate) struct SetPacketlossMsg(pub f32);
 /// An audio packet and `true` if this is the last packet.
 pub(crate) struct PlayPacketMsg(Option<(OutPacket, bool)>, Option<f64>);
 pub(crate) struct SetLoudnessThresholdMsg(pub f64);
@@ -46,6 +47,8 @@ pub struct AudioToTs {
 	///
 	/// This is actually a `f64`, there is no `AtomicF64` though.
 	loudness_threshold: Arc<AtomicU64>,
+	/// Packet loss in percent, 0-100.
+	packet_loss: Arc<AtomicU8>,
 
 	device: Option<AudioDevice<SdlCallback>>,
 	/// If we are actually talking and sending audio
@@ -60,6 +63,7 @@ struct SdlCallback {
 	denoise_buffer: [f32; DenoiseState::FRAME_SIZE],
 	loudness: Option<EbuR128>,
 	loudness_threshold: Arc<AtomicU64>,
+	packet_loss: Arc<AtomicU8>,
 	opus_output: [u8; MAX_OPUS_FRAME_SIZE],
 	/// The last captured buffer if we are not talking.
 	///
@@ -104,6 +108,9 @@ impl Message for AddLoudnessListenerMsg {
 impl Message for RemoveLoudnessListenerMsg {
 	/// `true` if there was a listener registered before, `false` if not.
 	type Result = bool;
+}
+impl Message for SetPacketlossMsg {
+	type Result = ();
 }
 impl Message for PlayPacketMsg {
 	type Result = ();
@@ -156,6 +163,13 @@ impl Handler<RemoveLoudnessListenerMsg> for AudioToTs {
 		let r = self.loudness_cons.remove(&msg.0);
 		self.update_device_state();
 		r
+	}
+}
+
+impl Handler<SetPacketlossMsg> for AudioToTs {
+	type Result = ();
+	fn handle(&mut self, msg: SetPacketlossMsg, _: &mut Self::Context) -> Self::Result {
+		self.packet_loss.store((msg.0 * 100.0) as u8, Ordering::Relaxed);
 	}
 }
 
@@ -237,6 +251,7 @@ impl AudioToTs {
 			connections: Default::default(),
 			loudness_cons: Default::default(),
 			loudness_threshold: Arc::new(AtomicU64::new(DEFAULT_LOUDNESS_THRESHOLD.to_bits())),
+			packet_loss: Arc::new(AtomicU8::new(0)),
 
 			device: None,
 			is_talking: false,
@@ -266,7 +281,7 @@ impl AudioToTs {
 				};
 
 				SdlCallback::new(self.logger.clone(), channels, spawn_send,
-					self.loudness_threshold.clone())
+					self.loudness_threshold.clone(), self.packet_loss.clone())
 			})
 			.map_err(|e| format_err!("SDL error: {}", e))
 		{
@@ -301,7 +316,7 @@ impl AudioToTs {
 impl SdlCallback {
 	fn new(
 		logger: Logger, channels: audiopus::Channels, spawn_send: mpsc::Sender<PlayPacketMsg>,
-		loudness_threshold: Arc<AtomicU64>,
+		loudness_threshold: Arc<AtomicU64>, packet_loss: Arc<AtomicU8>,
 	) -> Self {
 		let loudness = match EbuR128::new(1, super::SAMPLE_RATE as u32, ebur128::Mode::M) {
 			Ok(r) => Some(r),
@@ -318,6 +333,7 @@ impl SdlCallback {
 			denoise_buffer: [0.0; DenoiseState::FRAME_SIZE],
 			loudness,
 			loudness_threshold,
+			packet_loss,
 			opus_output: [0; MAX_OPUS_FRAME_SIZE],
 			last_buffer: Default::default(),
 			is_talking: 0,
@@ -338,8 +354,7 @@ impl SdlCallback {
 
 	fn send_packet(&mut self, packet: Option<(OutPacket, bool)>, loudness: Option<f64>) {
 		if let Err(e) = self.spawn_send.try_send(PlayPacketMsg(packet, loudness)) {
-			warn!(self.logger, "Failed to send audio packet";
-				"error" => %e);
+			warn!(self.logger, "Failed to send audio packet"; "error" => %e);
 		}
 	}
 }
@@ -428,6 +443,22 @@ impl AudioCallback for SdlCallback {
 			return;
 		}
 
+		// Update packet loss
+		let loss = self.packet_loss.load(Ordering::Relaxed);
+		let encoder = self.encoder.as_mut().unwrap();
+		if loss == 0 {
+			if let Err(e) = encoder.set_inband_fec(false) {
+				warn!(self.logger, "Failed to disable opus inband fec"; "error" => %e);
+			}
+		} else {
+			if let Err(e) = encoder.set_packet_loss_perc(loss) {
+				warn!(self.logger, "Failed to set opus packet loss"; "error" => %e, "loss" => loss);
+			}
+			if let Err(e) = encoder.set_inband_fec(true) {
+				warn!(self.logger, "Failed to enable opus inband fec"; "error" => %e);
+			}
+		}
+
 		if !did_talk {
 			// Send cached last buffer if there was one
 			if !self.last_buffer.is_empty() {
@@ -435,11 +466,7 @@ impl AudioCallback for SdlCallback {
 				for d in &mut self.last_buffer {
 					*d /= i16::max_value() as f32;
 				}
-				match self
-					.encoder
-					.as_ref()
-					.unwrap()
-					.encode_float(&self.last_buffer, &mut self.opus_output[..])
+				match encoder.encode_float(&self.last_buffer, &mut self.opus_output[..])
 				{
 					Err(e) => {
 						warn!(self.logger, "Failed to encode opus"; "error" => %e);
@@ -451,7 +478,7 @@ impl AudioCallback for SdlCallback {
 							codec,
 							data: &self.opus_output[..len],
 						});
-						packet_end = Some((packet, false));
+						self.send_packet(Some((packet, false)), loudness);
 					}
 				}
 				self.last_buffer.clear();
