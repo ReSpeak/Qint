@@ -1,6 +1,6 @@
 <script lang="typescript">
 	import type { Writable } from "svelte/store";
-	import { BOOKMARK_OFF, BOOKMARK_ON, SERVER_ICON } from "../util";
+	import { BOOKMARK_OFF, BOOKMARK_ON, EDIT_ICON, SERVER_ICON } from "../util";
 	import { Bookmark } from "./bookmark";
 	import Self from "./connect";
 
@@ -18,13 +18,17 @@
 		}
 	}
 
-	function toggle() {
+	function toggleBookmark() {
 		error = undefined;
 		bookmark.bookmark = !bookmark.bookmark;
 		bookmark.update().catch((err) => {
 			console.log("Failed to update bookmark", err);
 			error = "Failed to update bookmark";
 		});
+	}
+
+	function toggleEdit() {
+		// TODO
 	}
 
 	function hover() {
@@ -43,18 +47,21 @@
 	class:bookmark={bookmark.bookmark}
 	on:mouseover={hover}
 	on:mouseout={leave}>
-	<button class="button innerBookmarkItem" on:click={doConnect}>
+	<button class="button innerBookmarkItem" on:click={doConnect} title={bookmark.server.name}>
 		<div class="bookmarkIcon">
 			<i class="mdi mdi-{SERVER_ICON} mdi-24px" />
 		</div>
 		<div class="bookmarkName">{bookmark.name || bookmark.server.name}</div>
 		{#if bookmark.lastUsed}
 			<div class="bookmarkInfo" title={bookmark.lastUsed.format() ?? ''}>
-				Last connected on {bookmark.lastUsed.format('lll') ?? '?'}
+				Last connection {bookmark.lastUsed.format('lll') ?? '?'}
 			</div>
 		{/if}
 	</button>
-	<button class="button bookmarkStar" on:click={toggle}>
+	<button class="button bookmarkEdit" on:click={toggleEdit}>
+		<i class="mdi mdi-{EDIT_ICON} mdi-24px" />
+	</button>
+	<button class="button bookmarkStar" on:click={toggleBookmark}>
 		<i class="mdi mdi-{BOOKMARK_ON} mdi-24px bookmarkOn" />
 		<i class="mdi mdi-{BOOKMARK_OFF} mdi-24px bookmarkOff" />
 	</button>
@@ -70,7 +77,7 @@
 		margin: 0.5em;
 		display: grid;
 		justify-content: stretch;
-		grid-template-columns: auto 2.5em;
+		grid-template-columns: auto 2.5em 2.5em;;
 		width: 100%;
 		height: 100%;
 	}
@@ -81,6 +88,7 @@
 		background: none;
 		box-shadow: none;
 		display: grid;
+		grid-template-columns: 2.5em auto;
 		justify-content: stretch;
 		width: 100%;
 		height: 100%;
@@ -104,6 +112,9 @@
 	.bookmarkName,
 	.bookmarkInfo {
 		justify-self: start;
+		max-width: 100%;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.bookmarkName {
@@ -118,8 +129,18 @@
 		font-size: 0.85em;
 	}
 
-	.bookmarkStar {
+	.bookmarkEdit {
 		grid-column: 2;
+		height: 100%;
+		text-align: center;
+		background: none;
+		border: none;
+		box-shadow: none;
+		display: none; // TODO Remove when ready
+	}
+
+	.bookmarkStar {
+		grid-column: 3;
 		height: 100%;
 		text-align: center;
 		color: $yellow;
@@ -129,7 +150,7 @@
 	}
 
 	.bookmarkStar:hover {
-		color: scale-color($yellow, $lightness: +5%);
+		color: scale-color($yellow, $lightness: +60%);
 	}
 
 	.bookmarkStar .bookmarkOn {
@@ -145,11 +166,12 @@
 	}
 
 	// Display always on touch screens
-	@media (pointer: coarse) {
+	//@media (pointer: coarse) {
+		// TODO Show or not show?
 		.bookmarkOff {
 			display: inherit;
 		}
-	}
+	//}
 
 	.bookmarkItem:hover .bookmarkStar .bookmarkOff {
 		display: inherit;

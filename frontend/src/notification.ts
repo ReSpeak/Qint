@@ -27,12 +27,12 @@ class TsNotification {
 					else
 						res += a.name.split(' ', 2)[0];
 				} else if (a instanceof Client) {
-					if (a.phonetic_name.length > 0)
+					if (a.phonetic_name && a.phonetic_name.length > 0)
 						res += a.phonetic_name;
 					else
 						res += a.name.split(' ', 2)[0];
 				} else if (a instanceof Server) {
-					if (a.phonetic_name.length > 0)
+					if (a.phonetic_name && a.phonetic_name.length > 0)
 						res += a.phonetic_name;
 					else
 						res += a.name.split(' ', 2)[0];
@@ -125,7 +125,6 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 				} else if ("Client" in prop) {
 					const reason = msg.PropertyAdded.extra.reason;
 					const client = Client.fromJson(prop.Client);
-					console.log(reason);
 					if (reason === Reason.None || (reason === Reason.Subscription && client.id === ownClientId)) {
 						if (client.id === ownClientId) {
 							handler(con, msg, notif`Connected to ${con.book.getServer()}`);
@@ -147,7 +146,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 								handler(con, msg, notif`${client} was moved to ${con.book.getChannel(client.channel)} and appeared`);
 						}
 					}
-				} else if ("ClientServerGroup" in msg.PropertyAdded.id) {
+				} else if ("ServerGroupId" in prop && "ClientServerGroup" in msg.PropertyAdded.id) {
 					const client = con.book.getClient(msg.PropertyAdded.id.ClientServerGroup[0]);
 					const group = con.book.getServerGroup(msg.PropertyAdded.id.ClientServerGroup[1]);
 					if (invoker !== null)

@@ -5,6 +5,7 @@ export const CHANNEL_ICON = "chat-outline";
 export const CLIENT_ICON = "account-outline";
 export const BOOKMARK_ON = "star";
 export const BOOKMARK_OFF = "star-outline";
+export const EDIT_ICON = "pencil-outline";
 
 // @ts-ignore
 export const BASE_ADDRESS = ""; //"__buildEnv__" === "development" ? "http://localhost:4422" : "";

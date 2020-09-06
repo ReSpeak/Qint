@@ -21,7 +21,6 @@
 	overflow: hidden;
 	justify-content: start;
 	position: relative;
-	z-index: 1;
 	display: inline-flex;
 
 	// Copied from button
@@ -64,7 +63,7 @@
 
 	:global(span.icon) {
 		margin: 0 !important;
-	}	
+	}
 }
 
 .isSelected {

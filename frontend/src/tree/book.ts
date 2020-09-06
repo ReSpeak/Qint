@@ -33,7 +33,6 @@ export class Book {
 			} else if (e instanceof Channel) {
 				res += `(${e.name}, ${e.id}, ${e.order}), `;
 			} else {
-				console.log(e);
 				res += `${e}, `;
 			}
 		}
@@ -41,7 +40,6 @@ export class Book {
 	}
 
 	private static addChannelSorted(list: ITreeNode[], elem: Channel): ITreeNode[] {
-		//console.log("before", Book.listString(list));
 		let start = Book.findChannelStart(list);
 		if (elem.order === 0) {
 			list.splice(start, 0, elem);
@@ -96,7 +94,6 @@ export class Book {
 			if (inserted === undefined)
 				list.splice(list.length, 0, ...elems);
 		}
-		//console.log("after", Book.listString(list));
 		return list;
 	}
 
@@ -152,7 +149,6 @@ export class Book {
 	}
 
 	private static addClientSorted(list: ITreeNode[], elem: Client): ITreeNode[] {
-		//console.log("before", Book.listString(list));
 		let end = Book.findChannelStart(list);
 		let i = binarySearchBy(list, t => {
 			let c = t as Client;
@@ -167,7 +163,6 @@ export class Book {
 			return elem.id - c.id;
 		}, 0, end).index;
 		list.splice(i, 0, elem);
-		//console.log("after", Book.listString(list));
 		return list;
 	}
 
@@ -348,13 +343,13 @@ export class Book {
 				this.addChannelGroup(ChannelGroup.fromJson(prop.ChannelGroup));
 			} else if ("Client" in prop) {
 				this.addClient(Client.fromJson(prop.Client));
-			} else if ("ClientServerGroup" in msg.PropertyAdded.id) {
+			} else if ("ServerGroupId" in prop && "ClientServerGroup" in msg.PropertyAdded.id) {
 				this.addClientServerGroup(msg.PropertyAdded.id.ClientServerGroup[0],
 					msg.PropertyAdded.id.ClientServerGroup[1]);
 			} else if ("Server" in prop) {
 				this.updateServer(prop.Server);
 				document.title = get(this.server).name + " – Qint";
-			} else if ("ServerIp" in msg.PropertyAdded.id) {
+			} else if ("IpAddr" in prop && "ServerIp" in msg.PropertyAdded.id) {
 				this.addServerIp(msg.PropertyAdded.id.ServerIp[0]);
 			} else if ("ServerGroup" in prop) {
 				this.addServerGroup(ServerGroup.fromJson(prop.ServerGroup));
