@@ -1,7 +1,7 @@
 // tslint:disable: interface-name
 
-import { Channel, Client, Server, ServerGroup } from "../tree/book";
-import { ChannelId, ChannelType, ClientId, Codec } from "./ts";
+import { Channel, ChannelGroup, Client, Server, ServerGroup } from "../tree/book";
+import { ChannelId, ChannelGroupId, ChannelType, ClientId, Codec, ServerGroupId } from "./ts";
 
 export type WsMessageTarget =
 	"Server"
@@ -62,7 +62,7 @@ interface OMsgSubscribeLoudness {
 
 interface OMsgChange {
 	Change: ChangeChannelEdit | ChangeChannelMove | ChangeClientEdit | ChangeClientUpdate
-		| ChangeClientMove;
+		| ChangeClientMove | ChangeClientAddServerGroup | ChangeClientRemoveServerGroup;
 }
 
 interface ChangeChannelEdit {
@@ -119,6 +119,20 @@ interface ChangeClientMove {
 	}
 }
 
+interface ChangeClientAddServerGroup {
+	ClientAddServerGroup: {
+		id : ClientId,
+		server_group: ServerGroupId,
+	}
+}
+
+interface ChangeClientRemoveServerGroup {
+	ClientRemoveServerGroup: {
+		id : ClientId,
+		server_group: ServerGroupId,
+	}
+}
+
 
 // In Messages
 export type InMsg = InMsgConnected | InDisconnectedTemporarily | InDisconnected | InMsgError | InTalkersChanged | InMsgEvents | InLoudness;
@@ -158,30 +172,40 @@ interface InLoudness {
 //#region PropertyId
 
 interface IMsgPropertyIdChannel {
-	Channel: number;
+	Channel: ChannelId;
+}
+
+interface IMsgPropertyIdChannelGroup {
+	ChannelGroup: ChannelGroupId;
 }
 
 interface IMsgPropertyIdClient {
-	Client: number;
+	Client: ClientId;
 }
 
 interface IMsgPropertyIdClientServerGroup {
-	ClientServerGroup: [number, number];
+	ClientServerGroup: [ClientId, ServerGroupId];
 }
 
 interface IMsgPropertyIdServer {
 	Server: {};
 }
 
+interface IMsgPropertyIdServerIp {
+	ServerIp: string;
+}
+
 interface IMsgPropertyIdServerGroup {
-	ServerGroup: number;
+	ServerGroup: ServerGroupId;
 }
 
 type PropertyId =
 	IMsgPropertyIdChannel |
+	IMsgPropertyIdChannelGroup |
 	IMsgPropertyIdClient |
 	IMsgPropertyIdClientServerGroup |
 	IMsgPropertyIdServer |
+	IMsgPropertyIdServerIp |
 	IMsgPropertyIdServerGroup;
 
 //#endregion
@@ -192,6 +216,10 @@ interface IMsgPropertyValueChannel {
 	Channel: Partial<Channel>;
 }
 
+interface IMsgPropertyValueChannelGroup {
+	ChannelGroup: Partial<ChannelGroup>;
+}
+
 interface IMsgPropertyValueClient {
 	Client: Partial<Client>;
 }
@@ -200,15 +228,26 @@ interface IMsgPropertyValueServer {
 	Server: Partial<Server>;
 }
 
+interface IMsgPropertyValueIpAddr {
+	IpAddr: string;
+}
+
 interface IMsgPropertyValueServerGroup {
 	ServerGroup: Partial<ServerGroup>;
 }
 
+interface IMsgPropertyValueServerGroupId {
+	ServerGroupId: ServerGroupId;
+}
+
 type PropertyValue =
 	IMsgPropertyValueChannel |
+	IMsgPropertyValueChannelGroup |
 	IMsgPropertyValueClient |
 	IMsgPropertyValueServer |
-	IMsgPropertyValueServerGroup;
+	IMsgPropertyValueIpAddr |
+	IMsgPropertyValueServerGroup |
+	IMsgPropertyValueServerGroupId;
 
 //#endregion
 
@@ -224,7 +263,7 @@ export interface ExtraInfo {
 
 type PropertyMod = {
 	id: PropertyId;
-	prop: PropertyValue;
+	prop: PropertyValue | undefined;
 	invoker: Invoker | null;
 	extra: ExtraInfo;
 };

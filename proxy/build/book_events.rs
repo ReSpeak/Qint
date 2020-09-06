@@ -1,10 +1,11 @@
 use std::default::Default;
+use std::fmt::Write;
 use std::ops::Deref;
 
 use heck::*;
 use t4rust_derive::Template;
 use tsproto_structs::book::*;
-use tsproto_structs::book_to_messages::{self, BookToMessagesDeclarations};
+use tsproto_structs::book_to_messages::{self, BookToMessagesDeclarations, Event, RuleKind, RuleOp};
 use tsproto_structs::messages_to_book::{self, MessagesToBookDeclarations};
 
 #[derive(Template)]
@@ -23,13 +24,13 @@ impl Default for BookEvents<'static> {
 		JsStructs::default()) }
 }
 
-// TODO Migrate all code generation in BookEvents.tt to this
 #[derive(Debug)]
 struct JsStruct {
-	name: String,
-	ids: Vec<(String, String)>,
+	name: &'static str,
+	/// Each id is a tuple of name and type.
+	ids: Vec<(&'static str, &'static str)>,
 	/// book structs that are aggregated in this js struct.
-	parts: Vec<String>,
+	parts: Vec<&'static str>,
 }
 
 #[derive(Debug)]
@@ -39,31 +40,36 @@ impl Default for JsStructs {
 	fn default() -> Self {
 		JsStructs(vec![
 			JsStruct {
-				name: "Channel".into(),
-				ids: vec![("Id".into(), "ChannelId".into())],
-				parts: vec!["Channel".into(), "OptionalChannelData".into()],
+				name: "Channel",
+				ids: vec![("Id", "ChannelId")],
+				parts: vec!["Channel", "OptionalChannelData"],
 			},
 			JsStruct {
-				name: "Client".into(),
-				ids: vec![("Id".into(), "ClientId".into())],
-				parts: vec!["Client".into(), "OptionalClientData".into(),
-					"ConnectionClientData".into()],
+				name: "Client",
+				ids: vec![("Id", "ClientId")],
+				parts: vec!["Client", "OptionalClientData",
+					"ConnectionClientData"],
 			},
 			JsStruct {
-				name: "Server".into(),
+				name: "ClientServerGroup",
+				ids: vec![("Client", "ClientId"), ("Group", "ServerGroupId")],
+				parts: vec![],
+			},
+			JsStruct {
+				name: "Server",
 				ids: vec![],
-				parts: vec!["Server".into(), "OptionalServerData".into(),
-					"ConnectionServerData".into()],
+				parts: vec!["Server", "OptionalServerData",
+					"Connection", "ConnectionServerData"],
 			},
 			JsStruct {
-				name: "ServerGroup".into(),
-				ids: vec![("Id".into(), "ServerGroupId".into())],
-				parts: vec!["ServerGroup".into()],
+				name: "ServerGroup",
+				ids: vec![("Id", "ServerGroupId")],
+				parts: vec!["ServerGroup"],
 			},
 			JsStruct {
-				name: "ChannelGroup".into(),
-				ids: vec![("Id".into(), "ChannelGroupId".into())],
-				parts: vec!["ChannelGroup".into()],
+				name: "ChannelGroup",
+				ids: vec![("Id", "ChannelGroupId")],
+				parts: vec!["ChannelGroup"],
 			},
 		])
 	}
@@ -105,7 +111,98 @@ fn get_to_owned(p: &Property) -> String {
 	};
 	if to_owned.is_empty() {
 		"val".into()
+	} else if p.opt {
+		format!("val.as_ref().map(|val| {})", to_owned)
 	} else {
-		if p.opt { format!("val.as_ref().map(|val| {})", to_owned) } else { to_owned.into() }
+		to_owned.into()
+	}
+}
+
+fn get_all_arguments<'a>(e: &'a Event<'a>, r: Option<&'a RuleKind<'a>>) -> String {
+	let mut args = String::new();
+	for r in e.ids.iter().chain(r.iter().cloned()) {
+		match r {
+			RuleKind::ArgumentMap { .. } |
+			RuleKind::ArgumentFunction { .. } => {
+				let arg = r.get_argument();
+				if !arg.is_empty() {
+					args.push_str("pub ");
+					args.push_str(&arg);
+					args.push_str(", ");
+				}
+			}
+			_ => {}
+		}
+	}
+	args
+}
+
+fn set_all_arguments<'a>(e: &'a Event<'a>, r: Option<&'a RuleKind<'a>>) -> String {
+	let mut args = String::new();
+	for r in e.ids.iter().chain(r.iter().cloned()) {
+		match r {
+			RuleKind::ArgumentMap { .. } |
+			RuleKind::ArgumentFunction { .. } => {
+				args.push_str("self.");
+				args.push_str(&r.from_name().to_snake_case());
+				args.push_str(", ");
+			}
+			_ => {}
+		}
+	}
+	args
+}
+
+fn set_all_id_arguments<'a>(e: &'a Event<'a>) -> String {
+	let mut args = String::new();
+	for r in &e.ids {
+		match r {
+			RuleKind::ArgumentMap { .. } |
+			RuleKind::ArgumentFunction { .. } => {
+				args.push_str("self.");
+				args.push_str(&r.from_name().to_snake_case());
+				args.push_str(", ");
+			}
+			_ => {}
+		}
+	}
+	args
+}
+
+fn get_id_args(num: usize, name: bool) -> String {
+	if num == 0 {
+		String::new()
+	} else {
+		let mut res = String::from("(");
+		for i in 0..num {
+			if name {
+				write!(&mut res, "i{}", i).unwrap();
+			} else {
+				res.push_str("_");
+			}
+			if i != num - 1 {
+				res.push_str(", ");
+			}
+		}
+		res.push(')');
+		res
+	}
+}
+
+impl JsStructs {
+	fn get_struct_ids(&self, mut name: &str) -> String {
+		if name == "Connection" {
+			name = "Server";
+		}
+		let struc = self.get_struct(name).unwrap_or_else(|| panic!("Did not find struct '{}'", name));
+		let mut ids = String::new();
+		for i in &struc.ids {
+			ids.push_str("pub ");
+			ids.push_str(&i.0.to_snake_case());
+			ids.push_str(": ");
+			ids.push_str(&i.1);
+			ids.push_str(", ");
+		}
+		ids
 	}
 }

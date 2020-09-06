@@ -28,6 +28,7 @@ pub enum JsPropertyId {
 	Client(ClientId),
 	ClientServerGroup(ClientId, ServerGroupId),
 	Server,
+	ServerIp(IpAddr),
 	ServerGroup(ServerGroupId),
 }
 
@@ -37,7 +38,9 @@ pub enum JsProperty {
 	ChannelGroup(JsChannelGroup),
 	Client(JsClient),
 	Server(JsServer),
+	IpAddr(IpAddr),
 	ServerGroup(JsServerGroup),
+	ServerGroupId(ServerGroupId),
 }
 
 // Any value that is present is considered Some value, including null.

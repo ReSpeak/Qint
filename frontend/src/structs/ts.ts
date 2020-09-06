@@ -3,7 +3,9 @@ import { Connection } from "../connection";
 import { WsMessageTarget } from "./ws";
 
 export type ChannelId = number;
+export type ChannelGroupId = number;
 export type ClientId = number;
+export type ServerGroupId = number;
 
 export type MessageTarget =
 	{ Server: null }

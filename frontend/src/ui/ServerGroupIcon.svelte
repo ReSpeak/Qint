@@ -2,6 +2,7 @@
 	import Icon from "./Icon.svelte";
 	import { Connection } from "../connection";
 	import { getIconPath, DummyStore } from "./clientIcon";
+	import { ServerGroup } from "../tree/book";
 
 	export let id: number;
 	// Either connection or server has to be set to fetch the icon
@@ -11,9 +12,19 @@
 	const sgs = connection.book.serverGroups;
 	$: seg = $sgs.get(id) ?? DummyStore;
 	$: iconPath = getIconPath($seg, connection, server) ?? "";
+	let name: string | undefined;
+	$: {
+		const group = $seg;
+		if (group && group instanceof ServerGroup) {
+			name = group.name;
+		} else {
+			name = undefined;
+		}
+	}
 </script>
 
 {#if iconPath}
+<span title={name}>
 	{#if iconPath.startsWith('alpha')}
 		<Icon name={iconPath} />
 	{:else}
@@ -21,6 +32,7 @@
 			<img src={iconPath} alt="" />
 		</span>
 	{/if}
+</span>
 {/if}
 
 <style>

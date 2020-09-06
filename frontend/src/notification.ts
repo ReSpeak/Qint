@@ -1,10 +1,10 @@
 import { get } from "svelte/store";
-import { Book, Channel, Client, Server } from "./tree/book";
+import { Book, Channel, Client, Server, ServerGroup } from "./tree/book";
 import { InBookMsg, InMsg, Invoker, Reason } from "./structs/ws";
 import { Connection, ConnectionState } from "./connection";
 import { transientSettings } from "./transientSettings";
 
-type NotificationArg = Book | Channel | Client | Invoker | Server | string | null | undefined;
+type NotificationArg = Book | Channel | Client | Invoker | Server | ServerGroup | string | null | undefined;
 
 class TsNotification {
 	constructor(
@@ -36,6 +36,8 @@ class TsNotification {
 						res += a.phonetic_name;
 					else
 						res += a.name.split(' ', 2)[0];
+				} else if (a instanceof ServerGroup) {
+					res += a.name;
 				} else if (typeof a === 'string' || a instanceof String) {
 					res += a;
 				} else if ("name" in a) {
@@ -115,12 +117,14 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 		} else {
 			if ("PropertyAdded" in msg) {
 				const invoker = msg.PropertyAdded.invoker;
-				if ("Channel" in msg.PropertyAdded.prop) {
+				const prop = msg.PropertyAdded.prop!;
+				if ("Channel" in prop) {
 					if (con.getState() === ConnectionState.ChannelListFinished) {
+						// TODO Channel added
 					}
-				} else if ("Client" in msg.PropertyAdded.prop) {
+				} else if ("Client" in prop) {
 					const reason = msg.PropertyAdded.extra.reason;
-					const client = Client.fromJson(msg.PropertyAdded.prop.Client);
+					const client = Client.fromJson(prop.Client);
 					console.log(reason);
 					if (reason === Reason.None || (reason === Reason.Subscription && client.id === ownClientId)) {
 						if (client.id === ownClientId) {
@@ -128,7 +132,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 						} else if (client.channel === ownChannelId) {
 							handler(con, msg, notif`${client} connected`);
 						} else {
-							handler(con, msg, notif`${client} connected to ${con.book.getChannel(client.channel)!}`);
+							handler(con, msg, notif`${client} connected to ${con.book.getChannel(client.channel)}`);
 						}
 					} else if (reason === Reason.Moved) {
 						if (client.channel === ownChannelId) {
@@ -138,18 +142,25 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 								handler(con, msg, notif`${client} was moved in and appeared`);
 						} else {
 							if (invoker !== null)
-								handler(con, msg, notif`${client} was moved to ${con.book.getChannel(client.channel)!} by ${invoker} and appeared`);
+								handler(con, msg, notif`${client} was moved to ${con.book.getChannel(client.channel)} by ${invoker} and appeared`);
 							else
-								handler(con, msg, notif`${client} was moved to ${con.book.getChannel(client.channel)!} and appeared`);
+								handler(con, msg, notif`${client} was moved to ${con.book.getChannel(client.channel)} and appeared`);
 						}
 					}
-				} else if ("Server" in msg.PropertyAdded.prop) {
+				} else if ("ClientServerGroup" in msg.PropertyAdded.id) {
+					const client = con.book.getClient(msg.PropertyAdded.id.ClientServerGroup[0]);
+					const group = con.book.getServerGroup(msg.PropertyAdded.id.ClientServerGroup[1]);
+					if (invoker !== null)
+						handler(con, msg, notif`${invoker} added ${client} to group ${group}`);
+					else
+						handler(con, msg, notif`${client} was added to group ${group}`);
 				}
 			} else if ("PropertyChanged" in msg) {
 				const invoker = msg.PropertyChanged.invoker;
-				if ("Channel" in msg.PropertyChanged.prop && "Channel" in msg.PropertyChanged.id) {
+				const prop = msg.PropertyChanged.prop!;
+				if ("Channel" in prop && "Channel" in msg.PropertyChanged.id) {
 					var isInteresting = false;
-					for (var k in msg.PropertyChanged.prop.Channel) {
+					for (var k in prop.Channel) {
 						if (k !== "subscribed") {
 							isInteresting = true;
 							break;
@@ -163,9 +174,9 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 							handler(con, msg, notif`${channel} was edited`);
 						}
 					}
-				} else if ("Client" in msg.PropertyChanged.prop && "Client" in msg.PropertyChanged.id) {
+				} else if ("Client" in prop && "Client" in msg.PropertyChanged.id) {
 					const client = con.book.getClient(msg.PropertyChanged.id.Client)!;
-					const newC = msg.PropertyChanged.prop.Client;
+					const newC = prop.Client;
 					const inOwnChannel = client.channel === ownChannelId;
 
 					if ("channel" in newC) {
@@ -273,7 +284,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 						else
 							handler(con, msg, notif`${client} is silent`);
 					}
-				} else if ("Server" in msg.PropertyChanged.prop) {
+				} else if ("Server" in prop) {
 					if (invoker !== null) {
 						handler(con, msg, notif`${invoker} edited the server`);
 					} else {
@@ -347,6 +358,13 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 					} else if ((reason === Reason.ClientdisconnectServerShutdown || reason === Reason.Serverstop) && client.id === ownClientId) {
 						handler(con, msg, notif`Disconnected, server ${con.book.getServer()} shut down`);
 					}
+				} else if ("ClientServerGroup" in msg.PropertyRemoved.id) {
+					const client = con.book.getClient(msg.PropertyRemoved.id.ClientServerGroup[0]);
+					const group = con.book.getServerGroup(msg.PropertyRemoved.id.ClientServerGroup[1]);
+					if (invoker !== null)
+						handler(con, msg, notif`${invoker} removed ${client} from group ${group}`);
+					else
+						handler(con, msg, notif`${client} was removed from group ${group}`);
 				}
 			}
 		}

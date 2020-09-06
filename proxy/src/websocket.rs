@@ -264,7 +264,15 @@ impl Ws {
 							&MessageP2F::Events(
 								events
 									.into_iter()
-									.filter_map(|e| book_events::convert_event(data, &e))
+									.filter_map(|e| {
+										if let Some(e) = book_events::convert_event(data, &e) {
+											Some(e)
+										} else {
+											warn!(self.logger, "Event could not be converted for \
+												frontend"; "event" => ?e);
+											None
+										}
+									})
 									.collect(),
 							),
 							ctx,
@@ -316,7 +324,9 @@ impl Ws {
 			TsStreamItem::NetworkStatsUpdated => {
 				if let Some(con) = &self.connection {
 					if let Ok(stats) = con.get_network_stats() {
-						self.send_to_a2ts(audio::audio_to_ts::SetPacketlossMsg(stats.get_packetloss()));
+						self.send_to_a2ts(audio::audio_to_ts::SetPacketlossMsg(
+							stats.get_packetloss(),
+						));
 					}
 				}
 			}
@@ -371,9 +381,7 @@ impl Ws {
 								.logger(actor.logger.clone())
 								.log_commands(o.log_commands || settings.verbosity > 0)
 								.log_packets(o.log_packets || settings.verbosity > 1)
-								.log_udp_packets(
-									o.log_udp_packets || settings.verbosity > 2,
-								);
+								.log_udp_packets(o.log_udp_packets || settings.verbosity > 2);
 
 							actor.connect_options = Some(o);
 							actor.connection = Some(Connection::new(options)?);
@@ -411,7 +419,9 @@ impl Ws {
 				if subscribe {
 					self.send_to_a2ts(audio::audio_to_ts::AddLoudnessListenerMsg(ctx.address()));
 				} else {
-					self.send_to_a2ts_r(audio::audio_to_ts::RemoveLoudnessListenerMsg(ctx.address()));
+					self.send_to_a2ts_r(audio::audio_to_ts::RemoveLoudnessListenerMsg(
+						ctx.address(),
+					));
 				}
 			}
 			MessageF2P::SendMessage { target, message } => {
@@ -425,22 +435,35 @@ impl Ws {
 						}
 						Ok(state) => {
 							let mut audio_active = None;
-							if let JsM2B::ClientUpdate(ClientUpdate { input_muted, output_muted, away, .. }) = &change {
-								if input_muted.is_some() || output_muted.is_some() || away.is_some() {
+							if let JsM2B::ClientUpdate(ClientUpdate {
+								input_muted,
+								output_muted,
+								away,
+								..
+							}) = &change
+							{
+								if input_muted.is_some() || output_muted.is_some() || away.is_some()
+								{
 									if let Some(client) = state.clients.get(&state.own_client) {
-
-										let input_muted = input_muted.unwrap_or_else(|| client.input_muted);
-										let output_muted = output_muted.unwrap_or_else(|| client.output_muted);
-										let is_away = away.as_ref().map(|a| a.is_some())
+										let input_muted =
+											input_muted.unwrap_or_else(|| client.input_muted);
+										let output_muted =
+											output_muted.unwrap_or_else(|| client.output_muted);
+										let is_away = away
+											.as_ref()
+											.map(|a| a.is_some())
 											.unwrap_or_else(|| client.away_message.is_some());
 
-										audio_active = Some(!input_muted && !output_muted && !is_away);
+										audio_active =
+											Some(!input_muted && !output_muted && !is_away);
 									}
 								}
 							}
 
-							if let Err(e) = change.to_packet(state)
-								.and_then(|p| p.send(con).map_err(|e| e.into())) {
+							if let Err(e) = change
+								.to_packet(state)
+								.and_then(|p| p.send(con).map_err(|e| e.into()))
+							{
 								error!(self.logger, "Failed to send change"; "error" => %e);
 							}
 							if let Some(active) = audio_active {
@@ -719,7 +742,9 @@ impl Handler<SetVolumeMsg> for Ws {
 
 impl Handler<SetInputMutedMsg> for Ws {
 	type Result = Result<()>;
-	fn handle(&mut self, SetInputMutedMsg(new): SetInputMutedMsg, ctx: &mut Self::Context) -> Self::Result {
+	fn handle(
+		&mut self, SetInputMutedMsg(new): SetInputMutedMsg, ctx: &mut Self::Context,
+	) -> Self::Result {
 		if let Some(con) = &mut self.connection {
 			let state = con.get_state()?;
 			let own_client = state.own_client;
@@ -740,7 +765,9 @@ impl Handler<SetInputMutedMsg> for Ws {
 
 impl Handler<SetOutputMutedMsg> for Ws {
 	type Result = Result<()>;
-	fn handle(&mut self, SetOutputMutedMsg(new): SetOutputMutedMsg, _: &mut Self::Context) -> Self::Result {
+	fn handle(
+		&mut self, SetOutputMutedMsg(new): SetOutputMutedMsg, _: &mut Self::Context,
+	) -> Self::Result {
 		if let Some(con) = &mut self.connection {
 			let state = con.get_state()?;
 			let own_client = state.own_client;
@@ -768,7 +795,10 @@ impl Handler<SetAwayMsg> for Ws {
 			} else {
 				bail!("Failed to get own client");
 			};
-			state.client_update().set_away(if new.get_value(old) { Some("") } else { None }).send(con)?;
+			state
+				.client_update()
+				.set_away(if new.get_value(old) { Some("") } else { None })
+				.send(con)?;
 		} else {
 			bail!("Connection does not exist");
 		}

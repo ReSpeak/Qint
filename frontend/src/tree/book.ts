@@ -4,12 +4,13 @@ import { graphql } from "../graphql";
 import { Connection } from "../connection";
 import { binarySearchBy, binarySearchByKey, getDataColor, arraysEqual, Lazy } from "../util";
 import "../extensions";
-import { ChannelId, Codec, ChannelType } from "../structs/ts";
+import { ChannelId, ChannelType, ClientId, Codec, ServerGroupId } from "../structs/ts";
 
 export class Book {
 	public server: Writable<Server> = writable(new Server());
 	public clients: Writable<Map<number, Client>> = writable(new Map());
 	public channels: Writable<Map<number, Channel>> = writable(new Map());
+	public channelGroups: Writable<Map<number, Writable<ChannelGroup>>> = writable(new Map());
 	public serverGroups: Writable<Map<number, Writable<ServerGroup>>> = writable(new Map());
 	private currentTalkers: [number, boolean][] = [];
 
@@ -181,7 +182,7 @@ export class Book {
 		});
 	}
 
-	public updateClient(id: number, obj: Partial<Client>) {
+	public updateClient(id: ClientId, obj: Partial<Client>) {
 		this.clients.update(clients => {
 			const client = this.getClient(id);
 			if (client === undefined) {
@@ -210,7 +211,7 @@ export class Book {
 		});
 	}
 
-	public removeClient(id: number): void {
+	public removeClient(id: ClientId): void {
 		const client = this.getClient(id);
 		if (client === undefined) return;
 		const parent = this.getChannel(client.channel);
@@ -223,10 +224,69 @@ export class Book {
 		});
 	}
 
+	public addClientServerGroup(id: ClientId, group: ServerGroupId) {
+		this.clients.update(clients => {
+			const client = this.getClient(id);
+			if (client === undefined) {
+				console.error(`Cannot update non-existant client ${id}`);
+				return clients;
+			}
+			client.server_groups.push(group);
+			return clients;
+		});
+	}
+
+	public removeClientServerGroup(id: ClientId, group: ServerGroupId) {
+		this.clients.update(clients => {
+			const client = this.getClient(id);
+			if (client === undefined) {
+				console.error(`Cannot update non-existant client ${id}`);
+				return clients;
+			}
+			client.server_groups.remove_item(group);
+			return clients;
+		});
+	}
+
 	public updateServer(obj: Partial<Server>) {
 		this.server.update(s => {
 			s.update(obj);
 			return s;
+		});
+	}
+
+	public addServerIp(ip: string) {
+		this.server.update(s => {
+			s.ips.push(ip);
+			return s;
+		})
+	}
+
+	public removeServerIp(ip: string) {
+		this.server.update(s => {
+			s.ips.remove_item(ip);
+			return s;
+		})
+	}
+
+	public addChannelGroup(channelGroup: ChannelGroup) {
+		this.channelGroups.update(channelGroups => {
+			channelGroups.set(channelGroup.id, writable(channelGroup));
+			return channelGroups;
+		});
+	}
+
+	public updateChannelGroup(id: number, obj: Partial<ChannelGroup>) {
+		const channelGroup = get(this.channelGroups).get(id);
+		if (channelGroup === undefined)
+			return;
+		channelGroup.update((sg: ChannelGroup) => sg.update(obj));
+	}
+
+	public removeChannelGroup(id: number) {
+		this.channelGroups.update(channelGroups => {
+			channelGroups.delete(id);
+			return channelGroups;
 		});
 	}
 
@@ -281,31 +341,49 @@ export class Book {
 
 	public messageHandler(msg: InBookChangeMsg) {
 		if ("PropertyAdded" in msg) {
-			if ("Channel" in msg.PropertyAdded.prop) {
-				this.addChannel(Channel.fromJson(msg.PropertyAdded.prop.Channel));
-			} else if ("Client" in msg.PropertyAdded.prop) {
-				this.addClient(Client.fromJson(msg.PropertyAdded.prop.Client));
-			} else if ("Server" in msg.PropertyAdded.prop) {
-				this.updateServer(msg.PropertyAdded.prop.Server);
+			const prop = msg.PropertyAdded.prop!;
+			if ("Channel" in prop) {
+				this.addChannel(Channel.fromJson(prop.Channel));
+			} else if ("ChannelGroup" in prop) {
+				this.addChannelGroup(ChannelGroup.fromJson(prop.ChannelGroup));
+			} else if ("Client" in prop) {
+				this.addClient(Client.fromJson(prop.Client));
+			} else if ("ClientServerGroup" in msg.PropertyAdded.id) {
+				this.addClientServerGroup(msg.PropertyAdded.id.ClientServerGroup[0],
+					msg.PropertyAdded.id.ClientServerGroup[1]);
+			} else if ("Server" in prop) {
+				this.updateServer(prop.Server);
 				document.title = get(this.server).name + " – Qint";
-			} else if ("ServerGroup" in msg.PropertyAdded.prop) {
-				this.addServerGroup(ServerGroup.fromJson(msg.PropertyAdded.prop.ServerGroup));
+			} else if ("ServerIp" in msg.PropertyAdded.id) {
+				this.addServerIp(msg.PropertyAdded.id.ServerIp[0]);
+			} else if ("ServerGroup" in prop) {
+				this.addServerGroup(ServerGroup.fromJson(prop.ServerGroup));
 			}
 		} else if ("PropertyChanged" in msg) {
-			if ("Channel" in msg.PropertyChanged.prop && "Channel" in msg.PropertyChanged.id) {
-				this.updateChannel(msg.PropertyChanged.id.Channel, msg.PropertyChanged.prop.Channel);
-			} else if ("Client" in msg.PropertyChanged.prop && "Client" in msg.PropertyChanged.id) {
-				this.updateClient(msg.PropertyChanged.id.Client, msg.PropertyChanged.prop.Client);
-			} else if ("Server" in msg.PropertyChanged.prop) {
-				this.updateServer(msg.PropertyChanged.prop.Server);
-			} else if ("ServerGroup" in msg.PropertyChanged.prop && "ServerGroup" in msg.PropertyChanged.id) {
-				this.updateServerGroup(msg.PropertyChanged.id.ServerGroup, msg.PropertyChanged.prop.ServerGroup);
+			const prop = msg.PropertyChanged.prop!;
+			if ("Channel" in prop && "Channel" in msg.PropertyChanged.id) {
+				this.updateChannel(msg.PropertyChanged.id.Channel, prop.Channel);
+			} else if ("ChannelGroup" in prop && "ChannelGroup" in msg.PropertyChanged.id) {
+				this.updateChannelGroup(msg.PropertyChanged.id.ChannelGroup, prop.ChannelGroup);
+			} else if ("Client" in prop && "Client" in msg.PropertyChanged.id) {
+				this.updateClient(msg.PropertyChanged.id.Client, prop.Client);
+			} else if ("Server" in prop) {
+				this.updateServer(prop.Server);
+			} else if ("ServerGroup" in prop && "ServerGroup" in msg.PropertyChanged.id) {
+				this.updateServerGroup(msg.PropertyChanged.id.ServerGroup, prop.ServerGroup);
 			}
 		} else if ("PropertyRemoved" in msg) {
 			if ("Channel" in msg.PropertyRemoved.id) {
 				this.removeChannel(msg.PropertyRemoved.id.Channel);
+			} else if ("ChannelGroup" in msg.PropertyRemoved.id) {
+				this.removeChannelGroup(msg.PropertyRemoved.id.ChannelGroup);
 			} else if ("Client" in msg.PropertyRemoved.id) {
 				this.removeClient(msg.PropertyRemoved.id.Client);
+			} else if ("ClientServerGroup" in msg.PropertyRemoved.id) {
+				this.removeClientServerGroup(msg.PropertyRemoved.id.ClientServerGroup[0],
+					msg.PropertyRemoved.id.ClientServerGroup[1]);
+			} else if ("ServerIp" in msg.PropertyRemoved.id) {
+				this.removeServerIp(msg.PropertyRemoved.id.ServerIp[0]);
 			} else if ("ServerGroup" in msg.PropertyRemoved.id) {
 				this.removeServerGroup(msg.PropertyRemoved.id.ServerGroup);
 			}
@@ -559,6 +637,7 @@ export class Server implements ITreeParent {
 	public public_key?: number[];
 	// Base64 encoded, result from graphql
 	public publicKey?: string;
+	public ips!: string[];
 
 	// ITreeParent
 	public children: Writable<ITreeNode[]> = writable([]);
