@@ -36,13 +36,14 @@
 		e.stopPropagation();
 		e.preventDefault();
 		const clipboardData = e.clipboardData || ((window as any).clipboardData as DataTransfer);
-		console.log(clipboardData, clipboardData.items, clipboardData.types);
+		//console.log(clipboardData, clipboardData.items, clipboardData.types);
 		const pastedData = clipboardData.getData("Text");
 		const range = window.getSelection()!.getRangeAt(0);
 		const textNode = document.createTextNode(pastedData);
 		range.deleteContents();
 		range.insertNode(textNode);
 		range.collapse(false);
+		textChanged();
 	}
 
 	onMount(() => {
