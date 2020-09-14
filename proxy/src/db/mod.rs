@@ -59,10 +59,18 @@ pub struct ConnectedMsg {
 	pub server_key: EccKeyPubP256,
 }
 
+pub struct ClientData {
+	pub name: String,
+	pub uid: Vec<u8>,
+	pub icon: Option<i32>,
+	pub avatar: Option<String>,
+}
+
 pub struct WriteMessageMsg {
 	pub message: String,
 	pub invoker_uid: Vec<u8>,
 	pub chat: ChatId,
+	pub client_data: Option<ClientData>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -335,6 +343,11 @@ impl Handler<WriteMessageMsg> for DbHandler {
 
 		let (utc_time, utc_to_local_offset) = EventHandler::get_now();
 
+		if let Some(client) = &message.client_data {
+			// Register client
+			self.add_client_internal(true, &message.chat.server, client)?;
+		}
+
 		let chat = self.get_or_create_chat(&message.chat)?;
 		self.last_message_id = self.con.transaction::<_, diesel::result::Error, _>(|| {
 			// Insert message
@@ -460,7 +473,7 @@ impl DbHandler {
 						PropertyId::Server => handler.handle_connected(),
 						PropertyId::Client(id) => {
 							if let Some(client) = data.clients.get(id) {
-								Self::register_client(logger, &handler, e, data, Some(client));
+								Self::register_client(&handler, e, data, Some(client));
 								// Update servers_clients if we know this client
 								handler.handle_add_client(client, false)
 							} else {
@@ -477,17 +490,17 @@ impl DbHandler {
 						PropertyId::ServerIconId => handler.handle_server_icon(),
 
 						PropertyId::ClientAvatarHash(id) => {
-							Self::register_client(logger, &handler, e, data, data.clients.get(id));
+							Self::register_client(&handler, e, data, data.clients.get(id));
 							handler.handle_client_avatar(*id)
 						}
 						PropertyId::ClientIconId(id) => {
-							Self::register_client(logger, &handler, e, data, data.clients.get(id));
+							Self::register_client(&handler, e, data, data.clients.get(id));
 							handler.handle_client_icon(*id)
 						}
 						PropertyId::ClientName(id) => handler.handle_client_name(*id),
 						// TODO register_client for other changes
 						PropertyId::ClientChannel(id) => {
-							Self::register_client(logger, &handler, e, data, data.clients.get(id));
+							Self::register_client(&handler, e, data, data.clients.get(id));
 							Ok(())
 						}
 
@@ -504,7 +517,7 @@ impl DbHandler {
 							PropertyValue::Client(client) => client,
 							_ => panic!("Property value should be a client but wasn't"),
 						};
-						Self::register_client(logger, &handler, e, data, Some(client));
+						Self::register_client(&handler, e, data, Some(client));
 						handler.handle_remove_client(client)
 					}
 					PropertyId::Channel(id) => handler.handle_remove_channel(*id),
@@ -513,10 +526,9 @@ impl DbHandler {
 				Event::Message { target, invoker, message } => {
 					if let MessageTarget::Client(id) = target {
 						if id != &data.own_client {
-							Self::register_client(logger, &handler, e, data, data.clients.get(id));
+							Self::register_client(&handler, e, data, data.clients.get(id));
 						} else {
 							Self::register_client(
-								logger,
 								&handler,
 								e,
 								data,
@@ -525,7 +537,6 @@ impl DbHandler {
 						}
 					} else {
 						Self::register_client(
-							logger,
 							&handler,
 							e,
 							data,
@@ -565,7 +576,7 @@ impl DbHandler {
 	/// We receive or write a message to them, we are modified with them
 	/// as invoker or they are modified with us as invoker.
 	fn register_client(
-		logger: &Logger, handler: &EventHandler, e: &Event, data: &TsData, client: Option<&Client>,
+		handler: &EventHandler, e: &Event, data: &TsData, client: Option<&Client>,
 	) {
 		if let Some(c) = client {
 			if let Some(i) = e.get_invoker() {
@@ -579,11 +590,50 @@ impl DbHandler {
 					};
 
 					if let Err(e) = r {
-						error!(logger, "Failed to handle event for database"; "error" => %e);
+						error!(handler.logger, "Failed to handle event for database"; "error" => %e);
 					}
 				}
 			}
 		}
+	}
+
+	fn add_client_internal(&self, create: bool, server: &[u8], client: &ClientData) -> Result<()> {
+		use schema::clients::dsl::*;
+		use schema::servers_clients;
+
+		// Check if we already know this client
+		if diesel::select(diesel::dsl::exists(clients.filter(uid.eq(&client.uid))))
+			.get_result(&self.con)?
+		{
+			// Update
+			diesel::update(clients.filter(uid.eq(&client.uid)))
+				.set(name.eq(&client.name))
+				.execute(&self.con)?;
+		} else {
+			if !create {
+				return Ok(());
+			}
+
+			let client = models::ClientInsert {
+				uid: &client.uid,
+				name: &client.name,
+				public_key: None,
+				custom_name: None,
+			};
+			diesel::insert_into(schema::clients::table).values(&client).execute(&self.con)?;
+		}
+
+		let (utc_time, utc_to_local_offset) = EventHandler::get_now();
+		let server_client = models::ServersClientsInsert {
+			server,
+			client: &client.uid,
+			icon: client.icon,
+			avatar: client.avatar.as_deref(),
+			last_seen: utc_time,
+			timezone: utc_to_local_offset,
+		};
+		diesel::replace_into(servers_clients::table).values(&server_client).execute(&self.con)?;
+		Ok(())
 	}
 }
 
@@ -697,10 +747,12 @@ impl<'a> EventHandler<'a> {
 				if let Some(uid) = &invoker.uid {
 					self.handle_add_client_internal(
 						true,
-						invoker.name.clone(),
-						uid.0.clone(),
-						None,
-						None,
+						ClientData {
+							name: invoker.name.clone(),
+							uid: uid.0.clone(),
+							icon: None,
+							avatar: None,
+						},
 					)
 				} else {
 					Ok(())
@@ -718,54 +770,20 @@ impl<'a> EventHandler<'a> {
 		let icon = if client.icon_id.0 == 0 { None } else { Some(client.icon_id.0 as i32) };
 		let avatar =
 			if client.avatar_hash.is_empty() { None } else { Some(client.avatar_hash.clone()) };
-		let client_name = client.name.clone();
-		self.handle_add_client_internal(create, client_name, client_uid, icon, avatar)
+		self.handle_add_client_internal(create, ClientData {
+			name: client.name.clone(),
+			uid: client_uid,
+			icon,
+			avatar,
+		})
 	}
 
 	fn handle_add_client_internal(
-		&self, create: bool, client_name: String, client_uid: Vec<u8>, icon: Option<i32>,
-		avatar: Option<String>,
+		&self, create: bool, client: ClientData,
 	) -> Result<()>
 	{
 		let server = self.get_server_key()?;
-		self.run(move |db, _| {
-			use schema::clients::dsl::*;
-			use schema::servers_clients;
-
-			// Check if we already know this client
-			if diesel::select(diesel::dsl::exists(clients.filter(uid.eq(&client_uid))))
-				.get_result(&db.con)?
-			{
-				// Update
-				diesel::update(clients.filter(uid.eq(&client_uid)))
-					.set(name.eq(&client_name))
-					.execute(&db.con)?;
-			} else {
-				if !create {
-					return Ok(());
-				}
-
-				let client = models::ClientInsert {
-					uid: &client_uid,
-					name: &client_name,
-					public_key: None,
-					custom_name: None,
-				};
-				diesel::insert_into(schema::clients::table).values(&client).execute(&db.con)?;
-			}
-
-			let (utc_time, utc_to_local_offset) = Self::get_now();
-			let server_client = models::ServersClientsInsert {
-				server: &server,
-				client: &client_uid,
-				icon,
-				avatar: avatar.as_deref(),
-				last_seen: utc_time,
-				timezone: utc_to_local_offset,
-			};
-			diesel::replace_into(servers_clients::table).values(&server_client).execute(&db.con)?;
-			Ok(())
-		});
+		self.run(move |db, _| db.add_client_internal(create, &server, &client));
 		Ok(())
 	}
 

@@ -194,6 +194,7 @@ export class Connection {
 					console.log(tsevt);
 					if (tsevt === "ChannelListFinished") {
 						this.state.set(ConnectionState.ChannelListFinished);
+						// TODO Get unread counts for channels and clients
 					} else if ("Message" in tsevt) {
 						this.chat.unreadCount.update(c => c + 1);
 					} else {

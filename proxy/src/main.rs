@@ -698,7 +698,7 @@ mod tests {
 	use rand::Rng;
 
 	use juniper::http::GraphQLRequest;
-	use tsclientlib::{MessageTarget, Version};
+	use tsclientlib::{ClientId, MessageTarget, Version};
 
 	use super::*;
 	use messages::{ConnectOptions, MessageF2P, MessageP2F};
@@ -817,8 +817,8 @@ mod tests {
 		}
 
 		/// Returns uid and name of the client and messages.
-		async fn get_channel_messages(
-			&self, server: String, channel: u64,
+		async fn get_messages(
+			&self, server: &str, type_s: &str, id: &str,
 		) -> Result<Vec<(String, String, String)>> {
 			#![allow(non_snake_case)]
 
@@ -845,7 +845,7 @@ mod tests {
 				chat: Chat,
 			}
 
-			let vars = vec![("server", server), ("channel", channel.to_string())];
+			let vars = vec![("typ", type_s), ("server", server), ("id", id)];
 			let vars = juniper::InputValue::Object(
 				vars.into_iter()
 					.map(|(k, v)| {
@@ -858,8 +858,8 @@ mod tests {
 			);
 			let resp: Query = self
 				.graphql(&GraphQLRequest::new(
-					"query ($server: ID!, $channel: ID!) {
-					chat(typ: CHANNEL, server: $server, id: $channel) {
+					"query ($typ: GMessageTarget!, $server: ID!, $id: ID!) {
+					chat(typ: $typ, server: $server, id: $id) {
 						messages {
 							invoker {
 								client {
@@ -918,7 +918,7 @@ mod tests {
 	}
 
 	impl Connection {
-		async fn connect(&mut self) -> Result<()> {
+		async fn connect(&mut self) -> Result<ClientId> {
 			self.send(&MessageF2P::Connect(ConnectOptions {
 				address: "localhost".to_string(),
 				name: "Test".to_string(),
@@ -928,8 +928,11 @@ mod tests {
 				log_udp_packets: false,
 			}))
 			.await?;
-			while !matches!(self.recv().await?, MessageP2F::Connected { .. }) {}
-			Ok(())
+			loop {
+				if let MessageP2F::Connected { own_client, .. } = self.recv().await? {
+					return Ok(own_client);
+				}
+			}
 		}
 
 		async fn send(&mut self, msg: &MessageF2P) -> Result<()> {
@@ -1017,12 +1020,12 @@ mod tests {
 		let mut con0 = proxy0.create_connection().await?;
 		con0.connect().await?;
 		let mut con1 = proxy1.create_connection().await?;
-		con1.connect().await?;
+		let con1_id = con1.connect().await?;
 
 		// con0 sends a message to con1
 		let msg = "Hello 1";
 		con0.send(&MessageF2P::SendMessage {
-			target: MessageTarget::Channel,
+			target: MessageTarget::Client(con1_id),
 			message: msg.to_string(),
 		})
 		.await?;
@@ -1033,9 +1036,17 @@ mod tests {
 		drop(con1);
 
 		let key0 = proxy0.get_client_server_key().await?;
+		let key1 = proxy1.get_client_server_key().await?;
+
+		// Check for the message in the database of con0
+		let msgs = proxy0.get_messages(&key0.server, "CLIENT", &key1.client).await?;
+		assert_eq!(msgs.len(), 1, "Message not saved in the database");
+		assert_eq!(msgs[0].0, key0.client, "Sender uid is wrong");
+		assert_eq!(msgs[0].2, msg, "Message is wrong");
+		assert!(msgs[0].1.starts_with("Test"), "Client name has to start with 'Test'");
 
 		// Check for the message in the database of con1
-		let msgs = proxy1.get_channel_messages(key0.server, 1).await?;
+		let msgs = proxy1.get_messages(&key0.server, "CLIENT", &key0.client).await?;
 		assert_eq!(msgs.len(), 1, "Message not saved in the database");
 		assert_eq!(msgs[0].0, key0.client, "Sender uid is wrong");
 		assert_eq!(msgs[0].2, msg, "Message is wrong");

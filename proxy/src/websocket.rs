@@ -523,11 +523,29 @@ impl Ws {
 					}
 				};
 
+				let mut client_data = None;
 				let chat_type = match target {
 					MessageTarget::Server => ChatType::Server,
 					MessageTarget::Channel => ChatType::Channel(own_channel),
 					MessageTarget::Client(id) | MessageTarget::Poke(id) => {
-						let uid = &state.clients.get(&id).and_then(|c| c.uid.as_ref());
+						let client = state.clients.get(&id);
+						let uid = client.and_then(|c| c.uid.as_ref());
+						client_data = uid.map(|uid| {
+							let c = client.unwrap();
+							let icon =
+								if c.icon_id.0 == 0 { None } else { Some(c.icon_id.0 as i32) };
+							let avatar = if c.avatar_hash.is_empty() {
+								None
+							} else {
+								Some(c.avatar_hash.clone())
+							};
+							db::ClientData {
+								name: c.name.clone(),
+								uid: uid.0.clone(),
+								icon,
+								avatar,
+							}
+						});
 						if let Some(uid) = uid {
 							if let MessageTarget::Client(_) = target {
 								ChatType::Client(uid.0.clone())
@@ -545,6 +563,7 @@ impl Ws {
 					message,
 					invoker_uid,
 					chat: ChatId { server, chat_type },
+					client_data,
 				};
 				let logger = self.logger.clone();
 				actix::spawn(self.state.database.send(msg).map(move |r| match r {
