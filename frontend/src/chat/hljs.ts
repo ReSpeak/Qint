@@ -14,8 +14,8 @@ export function hljsHighlight(elem: HTMLElement) {
 			res = hljs.highlightAuto(code);
 		}
 		if (res.language !== undefined) {
-			// Add the language name to the ovarlay if a language was found
-			if (elem.parentElement && elem.tagName === "PRE") {
+			// Add the language name to the overlay if a language was found
+			if (elem.parentElement && elem.parentElement.tagName === "PRE") {
 				elem.parentElement.dataset["codelang"] = res.language;
 			}
 			// Add the class for language specific highlighting

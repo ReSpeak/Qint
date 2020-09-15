@@ -134,7 +134,6 @@
 		right: 0;
 		bottom: 0;
 		left: 0;
-		z-index: -1;
 
 		background-image: url("/talking.svg");
 		background-size: 100% auto;

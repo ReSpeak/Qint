@@ -44,6 +44,7 @@ pub(crate) struct Ws {
 /// Polls the connection for events.
 struct ConnectionPoller;
 
+pub(crate) struct GetUidMsg;
 pub(crate) struct GetClientVolumeMsg(pub ClientId);
 /// Audio detection tells us if we are talking.
 pub(crate) struct SetSelfTalkingMsg(pub bool);
@@ -85,6 +86,9 @@ impl Actor for Ws {
 	}
 }
 
+impl Message for GetUidMsg {
+	type Result = Result<Uid>;
+}
 impl Message for GetClientVolumeMsg {
 	type Result = Result<f32>;
 }
@@ -618,6 +622,26 @@ impl Handler<DownloadFile> for Ws {
 			}))
 		} else {
 			Box::pin(futures::future::err(format_err!("Connection does not exist")))
+		}
+	}
+}
+
+impl Handler<GetUidMsg> for Ws {
+	type Result = Result<Uid>;
+	fn handle(
+		&mut self, _: GetUidMsg, _: &mut Self::Context,
+	) -> Self::Result {
+		if let Some(con) = &self.connection {
+			match con
+				.get_server_key()
+				.map_err(Error::from)
+				.and_then(|k| k.get_uid_no_base64().map_err(|e| e.into()))
+			{
+				Ok(k) => Ok(Uid(k)),
+				Err(e) => Err(e),
+			}
+		} else {
+			Err(format_err!("Connection does not exist"))
 		}
 	}
 }

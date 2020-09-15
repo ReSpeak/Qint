@@ -42,5 +42,7 @@
 		object-fit: scale-down;
 		height: 1.5em;
 		width: 1.5em;
+		/* If the icon is not found and the alt text is displayed */
+		overflow: hidden;
 	}
 </style>

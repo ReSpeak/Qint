@@ -195,7 +195,7 @@
 		font-size: 0.85em;
 		content: attr(data-codelang);
 		position: absolute;
-		z-index: 5;
+		z-index: 2;
 		bottom: 0;
 		right: 3px;
 		color: $orange;

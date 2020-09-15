@@ -25,6 +25,7 @@ use slog::{debug, error, info, o, warn, Drain, Logger};
 use structopt::StructOpt;
 use tokio::time::{self, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
+use tsclientlib::Error as TsError;
 use tsclientlib::{ChannelId, Uid};
 use uuid::Uuid;
 
@@ -343,6 +344,25 @@ async fn download_file(
 	let cons = state.connections.lock().unwrap();
 	if let Some(con) = cons.get(&ConnectionId(data.0)).cloned() {
 		drop(cons);
+
+		// Lookup in cache
+		let server = match con.send(websocket::GetUidMsg).await {
+			Ok(Ok(r)) => r,
+			Ok(Err(e)) => {
+				error!(state.logger, "Failed to get server uid"; "error" => %e);
+				return HttpResponse::Gone().finish();
+			}
+			Err(_) => {
+				return HttpResponse::Gone().finish();
+			}
+		};
+		if let Some((len, stream)) =
+			FileCache::get_cached_file(&*state, server, channel, &data.2).await
+		{
+			// TODO Guess content type
+			return HttpResponse::Ok().content_length(len).streaming(stream);
+		}
+
 		debug!(state.logger, "Downloading file"; "channel" => data.1,
 			"path" => &data.2);
 		let (len, file_stream, server) =
@@ -351,9 +371,16 @@ async fn download_file(
 					return HttpResponse::Gone().finish();
 				}
 				Ok(Err(e)) => {
-					error!(state.logger, "File download failed"; "error" => %e);
-					return HttpResponse::InternalServerError()
-						.body(format!("Failed to download file: {}", e));
+					if let Some(TsError::CommandError(tsclientlib::TsError::FileInvalidPath)) =
+						e.downcast_ref::<TsError>()
+					{
+						debug!(state.logger, "File not found"; "path" => &data.2);
+						return HttpResponse::NotFound().finish();
+					} else {
+						error!(state.logger, "File download failed"; "error" => %e, "path" => &data.2);
+						return HttpResponse::InternalServerError()
+							.body(format!("Failed to download file: {}", e));
+					}
 				}
 				Ok(Ok(r)) => r,
 			};
@@ -402,6 +429,7 @@ async fn download_cache_file(
 	let channel = ChannelId(data.1);
 	if let Some((len, stream)) = FileCache::get_cached_file(&*state, server, channel, &data.2).await
 	{
+		// TODO Guess content type
 		HttpResponse::Ok().content_length(len).streaming(stream)
 	} else {
 		HttpResponse::NotFound().finish()

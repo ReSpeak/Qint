@@ -24,7 +24,7 @@
 </script>
 
 {#if iconPath}
-<span title={name}>
+<span title={name} class="serverGroupIcon">
 	{#if iconPath.startsWith('alpha')}
 		<Icon name={iconPath} />
 	{:else}
@@ -40,5 +40,10 @@
 		object-fit: scale-down;
 		height: 1.5em;
 		width: 1.5em;
+	}
+
+	.serverGroupIcon {
+		/* Otherwise the hight is more than it needs to be */
+		display: flex;
 	}
 </style>
