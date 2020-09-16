@@ -1,8 +1,8 @@
 use anyhow::{format_err, Result};
-use ring::aead::CHACHA20_POLY1305 as ALG;
-use ring::aead::*;
-use ring::error::Unspecified;
-use ring::rand::{SecureRandom, SystemRandom};
+use flakebi_ring::aead::CHACHA20_POLY1305 as ALG;
+use flakebi_ring::aead::*;
+use flakebi_ring::error::Unspecified;
+use flakebi_ring::rand::{SecureRandom, SystemRandom};
 
 #[derive(Clone)]
 pub struct Secret(pub Vec<u8>);
