@@ -5,8 +5,8 @@
 	import Self from "./connect";
 
 	export let connect: Self;
-	export let username: Writable<string | undefined>;
-	export let address: Writable<string | undefined>;
+	export let username: Writable<string>;
+	export let address: Writable<string>;
 	export let bookmark: Bookmark;
 	let error: string | undefined = undefined;
 
@@ -32,8 +32,10 @@
 	}
 
 	function hover() {
-		username.set(bookmark.username);
-		address.set(bookmark.address);
+		connect.username = $username;
+		connect.address = $address;
+		username.set(bookmark.username ?? "");
+		address.set(bookmark.address ?? "");
 	}
 
 	function leave() {
