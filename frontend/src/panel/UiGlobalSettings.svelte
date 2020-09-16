@@ -16,6 +16,9 @@
 	let loudnessThreshold = minLoudnessThreshold;
 	let loudnessTimer: number | undefined;
 
+	// Unique part for ids
+	const idUid = Math.random().toString().slice(2);
+
 	connection.sendMessage({ SubscribeLoudness: true });
 
 	function updateLoudness() {
@@ -52,9 +55,10 @@
 <div class="settings">
 	<BTabList>
 		<BTabSlot title="Audio">
-			<BKeyValue label="Volume trigger">
+			<BKeyValue label="Volume trigger" forLabel="{idUid}-loudness">
 				<div>Loudness: {$loudness}</div>
 				<input
+					id="{idUid}-loudness"
 					type="range"
 					min={minLoudnessThreshold}
 					max={maxLoudnessThreshold}
@@ -66,15 +70,17 @@
 		</BTabSlot>
 
 		<BTabSlot title="TTS">
-			<BKeyValue label="Voice">
+			<BKeyValue label="Voice" forLabel="{idUid}-ttsVoice">
 				<BDropDown
+					id="{idUid}-ttsVoice"
 					items={voices}
 					display={(v) => v.name}
 					bind:selected={synthSett.voice}
 					on:change={syncSettings} />
 			</BKeyValue>
-			<BKeyValue label="Speed">
+			<BKeyValue label="Speed" forLabel="{idUid}-ttsSpeed">
 				<BSlider
+					id="{idUid}-ttsSpeed"
 					min={0.1}
 					max={3}
 					step={0.1}
@@ -82,8 +88,9 @@
 					tooltip={true}
 					on:change={syncSettings} />
 			</BKeyValue>
-			<BKeyValue label="Volume">
+			<BKeyValue label="Volume" forLabel="{idUid}-ttsVolume">
 				<BSlider
+					id="{idUid}-ttsVolume"
 					min={0}
 					max={1}
 					step={0.05}
@@ -91,11 +98,12 @@
 					tooltip={true}
 					on:change={syncSettings} />
 			</BKeyValue>
-			<BKeyValue label="Preview" narrow={false}>
+			<BKeyValue label="Preview" narrow={false} forLabel="{idUid}-ttsPreview">
 				<div class="is-horizontal field">
 					<div class="control" style="flex: 1;">
 						<input
 							bind:this={previewText}
+							id="{idUid}-ttsPreview"
 							class="input"
 							value="Mit Qwint wird alles besser" />
 					</div>
