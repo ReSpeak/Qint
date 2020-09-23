@@ -180,7 +180,7 @@
 	}
 
 	:global(code.hljs) {
-		display: inline-block;
+		display: inline;
 		padding: 0.1em;
 	}
 
