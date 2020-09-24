@@ -29,6 +29,6 @@
 
 	:global(.innerContainer.dragStyle) {
 		background-color: #6040c080 !important;
-		z-index: 3;
+		z-index: 3 !important;
 	}
 </style>

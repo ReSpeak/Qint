@@ -137,11 +137,12 @@
 
 		background-image: url("/talking.svg");
 		background-size: 100% auto;
-		-webkit-mask-image: radial-gradient(rgba(0, 0, 0, 1), rgba(0, 0, 0, 0));
-		mask-image: radial-gradient(rgba(0, 0, 0, 1), rgba(0, 0, 0, 0));
+		//-webkit-mask-image: radial-gradient(rgba(0, 0, 0, 1), rgba(0, 0, 0, 0));
+		//mask-image: radial-gradient(rgba(0, 0, 0, 1), rgba(0, 0, 0, 0));
 
 		opacity: 0;
 		height: 50%;
+		z-index: -1;
 	}
 
 	.talkWave.talking {
