@@ -1,4 +1,6 @@
+import chroma from "chroma-js";
 export const debug: boolean = true;
+
 
 export const SERVER_ICON = "server";
 export const CHANNEL_ICON = "chat-outline";
@@ -36,18 +38,22 @@ export function assert(condition: any, message: string, ...data: any[]): asserts
 	console.assert(condition, message, ...data);
 	if (!condition) debugger;
 }
-export function getDataColor(data: number[] | string) {
-	if (data.length < 4) {
-		return "";
+
+export function getDataColor(data: number[] | string, lightBackground: boolean = false) {
+	if (data.length < 3) {
+		return lightBackground ? "color: black;" : "color: white;";
 	}
 	if (typeof data === "string") {
-		data = [0, 1, 2, 3, 4].map(i => (data as string).charCodeAt(i))
+		const dataTmp = [0, 0, 0];
+		for (let i = 0; i < data.length; i++)
+			dataTmp[i % 3] = (dataTmp[i % 3] + data.charCodeAt(i)) % 256;
+		data = dataTmp;
 	}
 
-	let varH = ((data[0] << 8) | data[1]) % 360;
-	let varS = 60 + data[2] % 40; // = 80 ± 20 => [60-100]
-	let varL = 30 + data[3] % 30; // = 45 ± 15 => [30- 60]
-	return `color: hsl(${varH}, ${varS}%, ${varL}%);`;
+	let color = chroma(data[0], data[1], data[2], 'rgb');
+	const setLum = lightBackground ? 35 : 65;
+	color = color.set("lab.l", setLum);
+	return `color: ${color.css()};`;
 }
 
 export function arraysEqual<T>(a: ArrayLike<T>, b: ArrayLike<T>): boolean {
