@@ -186,7 +186,7 @@
 			transition: all 0.1s;
 			grid-row: 1;
 			grid-column: 1;
-			margin: 0;
+			margin: 0 !important;
 		}
 
 		> :global(*) {
