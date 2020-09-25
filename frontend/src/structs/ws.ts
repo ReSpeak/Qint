@@ -12,14 +12,17 @@ export type WsMessageTarget =
 // Out Messages
 export type OutMsg = OMsgConnect | OMsgDisconnect | OMsgSendMessage | OMsgSetLoudnessThreshold | OMsgSubscribeLoudness | OMsgChange;
 
-interface OMsgConnect {
+export interface OMsgConnect {
 	Connect: {
+		bookmark: number | undefined;
 		address: string;
 		name: string;
+		channel: string | undefined;
+		version: string;
+		ignore_identity_mismatch: boolean;
 		log_commands: boolean;
 		log_packets: boolean;
 		log_udp_packets: boolean;
-		version: string;
 	};
 }
 

@@ -44,9 +44,14 @@ pub enum MessageP2F {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ConnectOptions {
+	/// Id of the bookmark
+	pub bookmark: Option<i64>,
 	pub address: String,
 	pub name: String,
+	pub channel: Option<String>,
 	pub version: Version,
+	/// Ignore if the identity of the server changed.
+	pub ignore_identity_mismatch: bool,
 	pub log_commands: bool,
 	pub log_packets: bool,
 	pub log_udp_packets: bool,

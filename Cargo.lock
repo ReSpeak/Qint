@@ -2378,6 +2378,7 @@ dependencies = [
  "ebur128",
  "flakebi-ring",
  "futures",
+ "git-testament",
  "heck",
  "juniper",
  "lazy_static",

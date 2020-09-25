@@ -681,6 +681,24 @@ impl Query {
 		Ok(res)
 	}
 
+	async fn server_by_address(state: &State, address: String) -> GResult<Option<Server>> {
+		let res = state
+			.database
+			.send(RunOnDbMsg(move |db| {
+				use schema::{bookmarks, servers};
+
+				let query = servers::table.filter(
+					servers::public_key.nullable().eq(bookmarks::table
+						.filter(bookmarks::address.eq(&address))
+						.select(bookmarks::server)
+						.single_value()),
+				);
+				GResult::Ok(query.first::<models::Server>(&db.con).optional()?.map(Server))
+			}))
+			.await??;
+		Ok(res)
+	}
+
 	async fn client(state: &State, uid: ID) -> GResult<Client> {
 		let client = base64::decode(uid.as_bytes())?;
 		let res = state
@@ -716,8 +734,9 @@ impl Mutation {
 					let server = if let Some(s) = server {
 						s
 					} else {
-						return Err(format_err!("Cannot set channel: Bookmark needs a server")
-							.into());
+						return Err(
+							format_err!("Cannot set channel: Bookmark needs a server").into()
+						);
 					};
 
 					// Search channel

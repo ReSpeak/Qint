@@ -226,7 +226,8 @@ export class Book {
 				console.error(`Cannot update non-existant client ${id}`);
 				return clients;
 			}
-			client.server_groups.push(group);
+			if (!client.server_groups.includes(group))
+				client.server_groups.push(group);
 			return clients;
 		});
 	}

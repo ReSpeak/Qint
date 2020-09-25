@@ -1,6 +1,15 @@
 import { Moment } from "moment";
 import { graphql, toDatetime } from "../graphql";
 
+interface BookmarkChannel {
+	id: string;
+	name: string;
+}
+
+interface BookmarkServer {
+	name: string;
+}
+
 export class Bookmark {
 	public id: string | undefined;
 	public name: string | undefined;
@@ -8,7 +17,8 @@ export class Bookmark {
 	public address: string | undefined;
 	public bookmark: boolean | undefined;
 	public lastUsed: Moment | undefined;
-	public server: any;
+	public channel: BookmarkChannel | null = null;
+	public server: BookmarkServer | null = null;
 
 	constructor(content: any) {
 		Object.assign(this, content);
@@ -39,6 +49,10 @@ export class Bookmark {
 				bookmark
 				lastUsed
 				timezone
+				channel {
+					id
+					name
+				}
 				server {
 					name
 				}
@@ -51,8 +65,20 @@ export class Bookmark {
 		try {
 			return new Bookmark((await graphql(`query GetRecentBookmark {
 			mostRecentBookmark {
+				id
+				name
 				username
 				address
+				bookmark
+				lastUsed
+				timezone
+				channel {
+					id
+					name
+				}
+				server {
+					name
+				}
 			}
 		}`)).data.mostRecentBookmark);
 		} catch (err) {

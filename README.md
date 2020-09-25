@@ -16,8 +16,6 @@ At the moment, tsclientlib is needed beside the Qint folder.
 ```bash
 git clone https://github.com/ReSpeak/tsclientlib.git --recurse-submodules
 git clone https://github.com/Flakebi/Qint.git
-cd tsclientlib
-git checkout develop
 ```
 
 ## Download SDL2 on Windows

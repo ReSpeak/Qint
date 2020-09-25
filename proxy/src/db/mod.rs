@@ -2,19 +2,19 @@ use std::fs;
 use std::result;
 
 use actix::*;
-use anyhow::{bail, Result};
+use anyhow::{bail, format_err, Result};
 use chrono::offset::{FixedOffset, TimeZone};
 use chrono::{Duration, Local, NaiveDateTime, Utc};
 use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use futures::prelude::*;
-use slog::{error, info, warn, Logger};
+use slog::{error, info, trace, warn, Logger};
 use tsclientlib::data::Client;
 use tsclientlib::data::Connection as TsData;
 use tsclientlib::events::{Event, PropertyId, PropertyValue};
 use tsclientlib::Connection as TsConnection;
-use tsclientlib::{ChannelId, ClientId, Identity, Invoker, MessageTarget};
+use tsclientlib::{ChannelId, ClientId, Identity, Invoker, MessageTarget, Uid};
 use tsproto_types::crypto::EccKeyPubP256;
 
 use crate::secret::Secret;
@@ -30,6 +30,7 @@ type DieselResult<T> = std::result::Result<T, diesel::result::Error>;
 diesel_migrations::embed_migrations!();
 
 pub struct DbHandler {
+	logger: Logger,
 	secret: Secret,
 	con: SqliteConnection,
 	last_message_id: i64,
@@ -44,19 +45,32 @@ struct EventHandler<'a> {
 
 /// Identity id, `true` will create a new identity if this id does not exist.
 #[derive(Clone, Debug)]
-pub struct GetIdentityMsg(pub u64, pub bool);
+pub struct GetIdentityAndServerMsg {
+	pub id: u64,
+	pub create: bool,
+	pub address: String,
+}
 #[derive(Clone, Debug)]
 pub struct GetClientVolumeMsg(pub Vec<u8>);
 pub struct UpdateIdentityMsg(pub Identity);
 struct RunOnDbMsg<I: 'static, E: 'static, F: FnOnce(&mut DbHandler) -> result::Result<I, E>>(F);
 
+/// After we connected successfully to a server.
 pub struct ConnectedMsg {
 	pub bookmark: Option<i64>,
 	pub username: String,
 	pub address: String,
-	pub channel: Option<i64>,
+	pub channel: Option<String>,
 	pub identity: i64,
 	pub server_key: EccKeyPubP256,
+}
+
+/// After all channels are available.
+pub enum ChannelListMsg {
+	/// Create the bookmark with the right channel reference.
+	CreateBookmark(ConnectedMsg),
+	/// Set the channel reference of the bookmark.
+	UpdateChannel { bookmark: i64, server: Vec<u8>, channel: String },
 }
 
 pub struct ClientData {
@@ -99,8 +113,8 @@ impl Actor for DbHandler {
 	type Context = Context<Self>;
 }
 
-impl Message for GetIdentityMsg {
-	type Result = Result<Identity>;
+impl Message for GetIdentityAndServerMsg {
+	type Result = Result<(Identity, Option<Uid>)>;
 }
 impl Message for GetClientVolumeMsg {
 	type Result = Result<Option<f32>>;
@@ -117,6 +131,9 @@ impl Message for WriteMessageMsg {
 	type Result = Result<()>;
 }
 impl Message for ConnectedMsg {
+	type Result = Result<Option<ChannelListMsg>>;
+}
+impl Message for ChannelListMsg {
 	type Result = Result<()>;
 }
 impl Message for RunMsg {
@@ -142,7 +159,7 @@ impl DbHandler {
 			info!(logger, "Run database migrations"; "output" => s);
 		}
 
-		Ok(Self { secret, con, last_message_id: 0 })
+		Ok(Self { logger, secret, con, last_message_id: 0 })
 	}
 
 	/// Create a new chat entry in the database and returns the id.
@@ -263,19 +280,77 @@ impl DbHandler {
 			}
 		}
 	}
+
+	/// Name can be an id if it starts with `/`, otherwise a path to a channel, separated by `/`.
+	fn find_channel(&self, server: &[u8], channel: &str) -> Result<i64> {
+		use diesel::dsl::{exists, select};
+		use schema::channels;
+
+		if channel.starts_with('/') {
+			let id: u64 = channel[1..].parse()?;
+			let id = id as i64;
+			// Check if we know this channel
+			if select(exists(
+				channels::table.filter(channels::server.eq(&server).and(channels::id.eq(id))),
+			))
+			.get_result(&self.con)?
+			{
+				Ok(id)
+			} else {
+				Err(format_err!("Channel not found"))
+			}
+		} else {
+			// Traverse the channel tree
+			let mut parent: Option<i64> = None;
+			for part in channel.split('/') {
+				let cmp = channels::server.eq(&server).and(channels::name.eq(part));
+				if let Some(p) = parent {
+					parent = Some(
+						channels::table
+							.filter(cmp.and(channels::parent.eq(p)))
+							.select(channels::id)
+							.first::<i64>(&self.con)?,
+					);
+				} else {
+					parent = Some(
+						channels::table
+							.filter(cmp.and(channels::parent.is_null()))
+							.select(channels::id)
+							.first::<i64>(&self.con)?,
+					);
+				}
+			}
+			parent.ok_or_else(|| format_err!("Failed to find channel"))
+		}
+	}
 }
 
-impl Handler<GetIdentityMsg> for DbHandler {
-	type Result = Result<Identity>;
-	fn handle(&mut self, msg: GetIdentityMsg, _: &mut Self::Context) -> Self::Result {
+impl Handler<GetIdentityAndServerMsg> for DbHandler {
+	type Result = Result<(Identity, Option<Uid>)>;
+	fn handle(&mut self, msg: GetIdentityAndServerMsg, _: &mut Self::Context) -> Self::Result {
+		use schema::bookmarks;
 		use schema::identities::dsl::*;
 
-		match identities.find(msg.0 as i64).first::<models::Identity>(&self.con) {
-			Ok(r) => r.into_identity(&self.secret),
+		// Search server
+		let server = bookmarks::table
+			.filter(bookmarks::address.eq(&msg.address))
+			.select(bookmarks::server)
+			.first::<Option<Vec<u8>>>(&self.con)
+			.optional()?
+			.flatten()
+			.map(|key| EccKeyPubP256::from_short(key).get_uid_no_base64().map(Uid))
+			.transpose()?;
+
+		// Search identity
+		match identities.find(msg.id as i64).first::<models::Identity>(&self.con) {
+			Ok(r) => r.into_identity(&self.secret).map(|i| (i, server)),
 			Err(_) => {
 				// Pick an existing identity if one exists
 				if let Ok(r) = identities.order(id).first::<models::Identity>(&self.con) {
-					return r.into_identity(&self.secret);
+					return r.into_identity(&self.secret).map(|i| (i, server));
+				}
+				if !msg.create {
+					bail!("No identity found");
 				}
 
 				// Create new identity
@@ -294,7 +369,7 @@ impl Handler<GetIdentityMsg> for DbHandler {
 				let new_identity = models::NewIdentity::new(&identity, &uid, &self.secret)?;
 				diesel::insert_into(identities).values(&new_identity).execute(&self.con)?;
 
-				Ok(identity)
+				Ok((identity, server))
 			}
 		}
 	}
@@ -326,12 +401,14 @@ impl Handler<UpdateIdentityMsg> for DbHandler {
 
 		let pub_key = identity.key().to_pub();
 		let uid = pub_key.get_uid_no_base64()?;
-		diesel::update(identities.filter(client.eq(uid)))
+		if diesel::update(identities.filter(client.eq(uid)))
 			.set((
 				counter.eq(identity.counter() as i64),
 				max_counter.eq(identity.max_counter() as i64),
 			))
-			.execute(&self.con)?;
+			.execute(&self.con)? != 1 {
+			bail!("Identity not found");
+		}
 		Ok(())
 	}
 }
@@ -369,83 +446,203 @@ impl Handler<WriteMessageMsg> for DbHandler {
 }
 
 impl Handler<ConnectedMsg> for DbHandler {
-	type Result = Result<()>;
+	type Result = Result<Option<ChannelListMsg>>;
 	/// Has to be called after the server was added in handle_connected.
+	///
+	/// Returns the id of a bookmark/recent connection if it should be updated later with the
+	/// correct channel reference.
 	fn handle(&mut self, msg: ConnectedMsg, _: &mut Self::Context) -> Self::Result {
-		use diesel::dsl::not;
 		use schema::{bookmarks, identities};
 		let server = msg.server_key.to_short();
-
-		// Find identity
-		let identity = match identities::table
-			.find(msg.identity as i64)
-			.select(identities::id)
-			.first::<i64>(&self.con)
-		{
-			Ok(r) => r,
-			Err(_) => {
-				// Pick an existing identity
-				identities::table
-					.order(identities::id)
-					.select(identities::id)
-					.first::<i64>(&self.con)?
-			}
-		};
-
-		// Compare channel: bookmarks::channel == msg.channel
-		// But with null == null
-		//
-		// https://stackoverflow.com/questions/10416789/how-to-rewrite-is-distinct-from-and-is-not-distinct-from
-		// a IS NOT DISTINCT FROM b can be rewritten as:
-		// (NOT (a <> b OR a IS NULL OR b IS NULL) OR (a IS NULL AND b IS NULL))
-		let cmp = not(bookmarks::channel
-			.ne(msg.channel)
-			.or(bookmarks::channel.is_null())
-			.or(msg.channel.is_none()))
-		.or(bookmarks::channel.is_null().and(msg.channel.is_none()));
-
-		// Check if we already know that address
-		let id = msg
-			.bookmark
-			.map(Ok)
-			.or_else(|| {
-				bookmarks::table
-					.filter(
-						cmp.and(bookmarks::address.eq(&msg.address))
-							.and(bookmarks::username.eq(&msg.username))
-							.and(bookmarks::identity.eq(identity)),
-					)
-					.select(bookmarks::id)
-					.first::<i64>(&self.con)
-					.optional()
-					.transpose()
-			})
-			.transpose()?;
-
 		let (utc_time, utc_to_local_offset) = EventHandler::get_now();
-		if let Some(id) = id {
+
+		if let Some(id) = msg.bookmark {
+			trace!(self.logger, "Connected: Update used bookmark"; "bookmark" => id);
 			// Update
-			diesel::update(bookmarks::table.filter(bookmarks::id.eq(id)))
+			if diesel::update(bookmarks::table.filter(bookmarks::id.eq(id)))
 				.set((
-					bookmarks::username.eq(&msg.username),
-					bookmarks::server.eq(&server),
 					bookmarks::last_used.eq(Some(utc_time)),
 					bookmarks::timezone.eq(utc_to_local_offset),
 				))
-				.execute(&self.con)?;
+				.execute(&self.con)? != 1 {
+				bail!("Failed to update time of bookmark {}, not found", id);
+			}
+			Ok(None)
 		} else {
-			let bookmark = models::BookmarkInsert {
-				name: None,
-				username: &msg.username,
-				address: &msg.address,
-				channel: msg.channel,
-				identity,
-				bookmark: false,
-				last_used: Some(utc_time),
-				timezone: utc_to_local_offset,
-				server: Some(&server),
+			// Find identity
+			let identity = match identities::table
+				.find(msg.identity as i64)
+				.select(identities::id)
+				.first::<i64>(&self.con)
+			{
+				Ok(r) => r,
+				Err(_) => {
+					// Pick an existing identity
+					identities::table
+						.order(identities::id)
+						.select(identities::id)
+						.first::<i64>(&self.con)?
+				}
 			};
-			diesel::insert_into(bookmarks::table).values(&bookmark).execute(&self.con)?;
+
+			let cmp = bookmarks::address
+				.eq(&msg.address)
+				.and(bookmarks::username.eq(&msg.username))
+				.and(bookmarks::identity.eq(identity));
+
+			let mut channel_id = None;
+			let bookmark_id = if let Some(channel) = &msg.channel {
+				match self.find_channel(&server, channel) {
+					Ok(id) => {
+						channel_id = Some(id);
+						trace!(self.logger, "Connected: Found channel for bookmark";
+							"channel" => id);
+						bookmarks::table
+							.filter(cmp.and(bookmarks::channel.eq(id)))
+							.select(bookmarks::id)
+							.first::<i64>(&self.con)
+							.optional()?
+					}
+					// Ignore missing channels, create a new bookmark for now
+					Err(_) => {
+						// Check if there exists a bookmark for the server without a channel
+						if let Some(id) = bookmarks::table
+							.filter(cmp.and(bookmarks::channel.is_null()))
+							.select(bookmarks::id)
+							.first::<i64>(&self.con)
+							.optional()?
+						{
+							trace!(self.logger, "Connected: Did not find channel for bookmark, \
+								but found bookmark without channel, updating later";
+								"other_bookmark" => id);
+							// Create or update later
+							let mut msg = msg;
+							msg.identity = identity;
+							msg.bookmark = Some(id);
+							return Ok(Some(ChannelListMsg::CreateBookmark(msg)));
+						} else {
+							trace!(self.logger, "Connected: Did not find channel for bookmark, \
+								creating without channel");
+							// Create without channel and update later
+							None
+						}
+					}
+				}
+			} else {
+				bookmarks::table
+					.filter(cmp.and(bookmarks::channel.is_null()))
+					.select(bookmarks::id)
+					.first::<i64>(&self.con)
+					.optional()?
+			};
+
+			if let Some(id) = bookmark_id {
+				// Update
+				trace!(self.logger, "Connected: Update existing bookmark"; "bookmark" => id);
+				if diesel::update(bookmarks::table.filter(bookmarks::id.eq(id)))
+					.set((
+						bookmarks::last_used.eq(Some(utc_time)),
+						bookmarks::timezone.eq(utc_to_local_offset),
+					))
+					.execute(&self.con)? != 1 {
+					bail!("Failed to update time of bookmark {}, not found", id);
+				}
+				Ok(None)
+			} else {
+				let bookmark = models::BookmarkInsert {
+					name: None,
+					username: &msg.username,
+					address: &msg.address,
+					channel: channel_id,
+					identity,
+					bookmark: false,
+					last_used: Some(utc_time),
+					timezone: utc_to_local_offset,
+					server: Some(&server),
+				};
+				let id = self.con.transaction::<_, diesel::result::Error, _>(|| {
+					diesel::insert_into(bookmarks::table).values(&bookmark).execute(&self.con)?;
+					bookmarks::table
+						.order(bookmarks::id.desc())
+						.select(bookmarks::id)
+						.first::<i64>(&self.con)
+				})?;
+				trace!(self.logger, "Connected: Created new bookmark"; "bookmark" => id,
+					"channel_id" => ?channel_id, "channel" => ?msg.channel.as_ref());
+				if msg.channel.is_some() && channel_id.is_none() {
+					Ok(Some(ChannelListMsg::UpdateChannel {
+						bookmark: id,
+						server: server.to_vec(),
+						channel: msg.channel.unwrap(),
+					}))
+				} else {
+					Ok(None)
+				}
+			}
+		}
+	}
+}
+
+impl Handler<ChannelListMsg> for DbHandler {
+	type Result = Result<()>;
+	fn handle(&mut self, msg: ChannelListMsg, _: &mut Self::Context) -> Self::Result {
+		use schema::bookmarks;
+
+		match msg {
+			ChannelListMsg::CreateBookmark(data) => {
+				let server = data.server_key.to_short();
+				let (utc_time, utc_to_local_offset) = EventHandler::get_now();
+				if let Some(channel) = &data.channel {
+					match self.find_channel(&server, channel) {
+						Ok(channel) => {
+							// Create new bookmark with channel
+							trace!(self.logger, "ChannelList: Create new bookmark";
+								"channel" => channel);
+							let bookmark = models::BookmarkInsert {
+								name: None,
+								username: &data.username,
+								address: &data.address,
+								channel: Some(channel),
+								identity: data.identity,
+								bookmark: false,
+								last_used: Some(utc_time),
+								timezone: utc_to_local_offset,
+								server: Some(&server),
+							};
+							diesel::insert_into(bookmarks::table).values(&bookmark)
+								.execute(&self.con)?;
+						}
+						Err(_) => {
+							if let Some(id) = data.bookmark {
+								// Update existing bookmark without channel
+								trace!(self.logger, "ChannelList: Update bookmark without channel";
+									"bookmark" => id, "channel" => channel);
+								if diesel::update(bookmarks::table.filter(bookmarks::id.eq(id)))
+									.set((
+										bookmarks::last_used.eq(Some(utc_time)),
+										bookmarks::timezone.eq(utc_to_local_offset),
+									))
+									.execute(&self.con)? != 1 {
+									bail!("Failed to update time of bookmark {}, not found", id);
+								}
+							} else {
+								bail!("Bookmarks that are created after channellistfinished need \
+									an id");
+							}
+						}
+					}
+				} else {
+					bail!("Bookmarks that are created after channellistfinished need a channel");
+				}
+			}
+			ChannelListMsg::UpdateChannel { bookmark, server, channel } => {
+				let channel = self.find_channel(&server, &channel)?;
+				if diesel::update(bookmarks::table.filter(bookmarks::id.eq(bookmark)))
+					.set(bookmarks::channel.eq(channel))
+					.execute(&self.con)? != 1 {
+					bail!("Failed to update channel of bookmark {}, not found", bookmark);
+				}
+			}
 		}
 		Ok(())
 	}
@@ -459,9 +656,9 @@ impl Handler<RunMsg> for DbHandler {
 }
 
 impl DbHandler {
-	pub fn handle_events(
+	pub(crate) fn handle_events(
 		db: &Addr<Self>, logger: &Logger, con: &TsConnection, data: &TsData, events: &[Event],
-		connected_msg: Option<ConnectedMsg>,
+		connected_msg: Option<ConnectedMsg>, ws: Addr<crate::websocket::Ws>,
 	) -> Result<()>
 	{
 		let handler = EventHandler::new(db, logger, con, data);
@@ -558,7 +755,16 @@ impl DbHandler {
 			actix::spawn(db.send(msg).map(move |r| match r {
 				Err(e) => warn!(logger, "Failed to save connection in database"; "error" => %e),
 				Ok(Err(e)) => warn!(logger, "Failed to save connection in database"; "error" => %e),
-				_ => {}
+				Ok(Ok(Some(msg))) => {
+					actix::spawn(ws.send(crate::websocket::SetChannelListMsgMsg(msg)).map(
+						move |r| match r {
+							Err(e) => warn!(logger, "Failed to set update bookmark message";
+							"error" => %e),
+							Ok(()) => {}
+						},
+					));
+				}
+				Ok(Ok(None)) => {}
 			}));
 		}
 
@@ -575,9 +781,7 @@ impl DbHandler {
 	/// Only add clients to database when we interact with them:
 	/// We receive or write a message to them, we are modified with them
 	/// as invoker or they are modified with us as invoker.
-	fn register_client(
-		handler: &EventHandler, e: &Event, data: &TsData, client: Option<&Client>,
-	) {
+	fn register_client(handler: &EventHandler, e: &Event, data: &TsData, client: Option<&Client>) {
 		if let Some(c) = client {
 			if let Some(i) = e.get_invoker() {
 				if c.id != i.id {
@@ -601,15 +805,11 @@ impl DbHandler {
 		use schema::clients::dsl::*;
 		use schema::servers_clients;
 
-		// Check if we already know this client
-		if diesel::select(diesel::dsl::exists(clients.filter(uid.eq(&client.uid))))
-			.get_result(&self.con)?
-		{
-			// Update
-			diesel::update(clients.filter(uid.eq(&client.uid)))
+		// Check if we already know this client, the update will return 1 changed row on success
+		if diesel::update(clients.filter(uid.eq(&client.uid)))
 				.set(name.eq(&client.name))
-				.execute(&self.con)?;
-		} else {
+				.execute(&self.con)? != 1
+		{
 			if !create {
 				return Ok(());
 			}
@@ -688,15 +888,11 @@ impl<'a> EventHandler<'a> {
 		self.run(move |db, _| {
 			use schema::servers::dsl::*;
 
-			// Check if we already know that server
-			if diesel::select(diesel::dsl::exists(servers.filter(public_key.eq(&key))))
-				.get_result(&db.con)?
-			{
-				// Update
-				diesel::update(servers.filter(public_key.eq(&key)))
+			// Check if we already know that server, the update will return 1 changed row on success
+			if diesel::update(servers.filter(public_key.eq(&key)))
 					.set((name.eq(&server_name), address.eq(&addr), icon.eq(&icon_id)))
-					.execute(&db.con)?;
-			} else {
+					.execute(&db.con)? != 1
+			{
 				let server = models::ServerInsert {
 					public_key: &key,
 					name: &server_name,
@@ -715,9 +911,12 @@ impl<'a> EventHandler<'a> {
 		let server_name = self.data.server.name.clone();
 		self.run(move |db, _| {
 			use schema::servers::dsl::*;
-			diesel::update(servers.filter(public_key.eq(&key)))
+			if diesel::update(servers.filter(public_key.eq(&key)))
 				.set(name.eq(&server_name))
-				.execute(&db.con)?;
+				.execute(&db.con)? != 1 {
+				bail!("Failed to update server name to {:?}, server {:?} not found", server_name,
+					key);
+			}
 			Ok(())
 		});
 		Ok(())
@@ -732,9 +931,11 @@ impl<'a> EventHandler<'a> {
 		};
 		self.run(move |db, _| {
 			use schema::servers::dsl::*;
-			diesel::update(servers.filter(public_key.eq(&key)))
+			if diesel::update(servers.filter(public_key.eq(&key)))
 				.set(icon.eq(&icon_id))
-				.execute(&db.con)?;
+				.execute(&db.con)? != 1 {
+				bail!("Failed to update server icon to {:?}, server {:?} not found", icon_id, key);
+			}
 			Ok(())
 		});
 		Ok(())
@@ -745,15 +946,12 @@ impl<'a> EventHandler<'a> {
 			Some(client) => self.handle_add_client(client, true),
 			None => {
 				if let Some(uid) = &invoker.uid {
-					self.handle_add_client_internal(
-						true,
-						ClientData {
-							name: invoker.name.clone(),
-							uid: uid.0.clone(),
-							icon: None,
-							avatar: None,
-						},
-					)
+					self.handle_add_client_internal(true, ClientData {
+						name: invoker.name.clone(),
+						uid: uid.0.clone(),
+						icon: None,
+						avatar: None,
+					})
 				} else {
 					Ok(())
 				}
@@ -778,10 +976,7 @@ impl<'a> EventHandler<'a> {
 		})
 	}
 
-	fn handle_add_client_internal(
-		&self, create: bool, client: ClientData,
-	) -> Result<()>
-	{
+	fn handle_add_client_internal(&self, create: bool, client: ClientData) -> Result<()> {
 		let server = self.get_server_key()?;
 		self.run(move |db, _| db.add_client_internal(create, &server, &client));
 		Ok(())
@@ -938,14 +1133,9 @@ impl<'a> EventHandler<'a> {
 		self.run(move |db, _| {
 			use schema::channels::dsl::*;
 
-			// Check if we already know this channel
-			if diesel::select(diesel::dsl::exists(
-				channels.filter(server.eq(&ch_server)).filter(id.eq(ch_id.0 as i64)),
-			))
-			.get_result(&db.con)?
-			{
-				// Update
-				diesel::update(
+			// Check if we already know this channel, the update will return 1 changed row on
+			// success
+			if diesel::update(
 					channels.filter(server.eq(&ch_server)).filter(id.eq(ch_id.0 as i64)),
 				)
 				.set((
@@ -955,8 +1145,8 @@ impl<'a> EventHandler<'a> {
 					icon.eq(&ch_icon),
 					deleted.eq(false),
 				))
-				.execute(&db.con)?;
-			} else {
+				.execute(&db.con)? != 1
+			{
 				let channel = models::ChannelInsert {
 					server: &ch_server,
 					id: ch_id.0 as i64,
@@ -980,9 +1170,12 @@ impl<'a> EventHandler<'a> {
 			use schema::channels::dsl::*;
 
 			// Mark channel as deleted
-			diesel::update(channels.filter(server.eq(&ch_server).and(id.eq(ch_id.0 as i64))))
+			if diesel::update(channels.filter(server.eq(&ch_server).and(id.eq(ch_id.0 as i64))))
 				.set(deleted.eq(true))
-				.execute(&db.con)?;
+				.execute(&db.con)? != 1 {
+				bail!("Failed to mark channel as deleted, channel ({:?}, {}) not found", ch_server,
+					ch_id.0);
+			}
 			Ok(())
 		});
 		Ok(())

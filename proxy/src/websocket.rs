@@ -22,7 +22,7 @@ use tsproto::resend::PacketId;
 use tsproto_packets::packets::{AudioData, OutPacket};
 
 use crate::book_events::{ClientUpdate, JsM2B};
-use crate::db::{ChatId, ChatType};
+use crate::db::{ChannelListMsg, ChatId, ChatType};
 use crate::messages::{self, MessageF2P, MessageP2F};
 use crate::{audio, book_events, db, ConnectionId, State, Tristate, WsFormat, WsOptions};
 
@@ -34,6 +34,7 @@ pub(crate) struct Ws {
 	id: ConnectionId,
 	connection: Option<Connection>,
 	connect_options: Option<messages::ConnectOptions>,
+	channel_list_finished_msg: Option<ChannelListMsg>,
 	file_downloads: HashMap<FileTransferHandle, oneshot::Sender<Result<FileDownloadResult>>>,
 
 	websocket_closed: bool,
@@ -60,6 +61,7 @@ pub(crate) struct SetOutputMutedMsg(pub Tristate);
 #[derive(Clone)]
 pub(crate) struct SetAwayMsg(pub Tristate);
 pub(crate) struct DisconnectMsg;
+pub(crate) struct SetChannelListMsgMsg(pub ChannelListMsg);
 
 pub(crate) struct DownloadFile {
 	pub channel: ChannelId,
@@ -122,6 +124,9 @@ impl Message for SetAwayMsg {
 impl Message for DisconnectMsg {
 	type Result = ();
 }
+impl Message for SetChannelListMsgMsg {
+	type Result = ();
+}
 impl Message for DownloadFile {
 	/// The size of the file and the stream
 	type Result = Result<(u64, TcpStream, Uid)>;
@@ -137,6 +142,7 @@ impl Ws {
 			id,
 			connection: None,
 			connect_options: None,
+			channel_list_finished_msg: None,
 			file_downloads: Default::default(),
 
 			websocket_closed: false,
@@ -227,10 +233,10 @@ impl Ws {
 								let opts = self.connect_options.as_ref().unwrap();
 								let id = self.state.settings.read().unwrap().default_identity;
 								connected_msg = Some(db::ConnectedMsg {
-									bookmark: None,
+									bookmark: opts.bookmark,
 									username: opts.name.clone(),
 									address: opts.address.clone(),
-									channel: None,
+									channel: opts.channel.clone(),
 									identity: id as i64,
 									server_key,
 								});
@@ -238,12 +244,26 @@ impl Ws {
 							None => error!(self.logger, "Failed to get server key"),
 						}
 					} else if let TsEvent::ChannelListFinished = e {
+						// Tell the database that all channels are now available
+						if let Some(msg) = self.channel_list_finished_msg.take() {
+							let logger = self.logger.clone();
+							actix::spawn(self.state.database.send(msg).map(move |r| match r {
+								Ok(Ok(())) => {}
+								Ok(Err(e)) => {
+									debug!(logger, "Failed to update bookmark"; "error" => %e);
+								}
+								Err(_) => {
+									warn!(logger, "Failed to send message to database");
+								}
+							}))
+						}
+
 						// Subscribe to all channels
 						if let Some(con) = &mut self.connection {
 							if let Ok(data) = con.get_state() {
 								if let Err(e) = data.server.set_subscribed(true).send(con) {
-									error!(self.logger, "Failed to subscribe \
-										to server"; "error" => %e);
+									error!(self.logger, "Failed to subscribe to server";
+										"error" => %e);
 								}
 							}
 						}
@@ -259,6 +279,7 @@ impl Ws {
 							data,
 							&events,
 							connected_msg,
+							ctx.address(),
 						) {
 							error!(self.logger, "Database failed to handle \
 								events"; "error" => %e);
@@ -372,13 +393,17 @@ impl Ws {
 					wrap_future(
 						self.state
 							.database
-							.send(db::GetIdentityMsg(id, true))
+							.send(db::GetIdentityAndServerMsg {
+								id,
+								create: true,
+								address: o.address.clone(),
+							})
 							.map(|r| r.map_err(|e| e.into()).and_then(|r| r)),
 					)
-					.map(move |identity, actor: &mut Self, ctx| {
-						identity.and_then(|id| {
+					.map(move |res, actor: &mut Self, ctx| {
+						res.and_then(|(id, server)| {
 							let settings = actor.state.settings.read().unwrap();
-							let options = tsclientlib::ConnectOptions::new(o.address.clone())
+							let mut options = tsclientlib::Connection::build(o.address.clone())
 								.name(o.name.clone())
 								.identity(id)
 								.version(o.version.clone())
@@ -387,8 +412,18 @@ impl Ws {
 								.log_packets(o.log_packets || settings.verbosity > 1)
 								.log_udp_packets(o.log_udp_packets || settings.verbosity > 2);
 
+							if let Some(c) = &o.channel {
+								options = options.channel(c.clone());
+							}
+
+							if !o.ignore_identity_mismatch {
+								if let Some(server) = server {
+									options = options.server(server);
+								}
+							}
+
 							actor.connect_options = Some(o);
-							actor.connection = Some(Connection::new(options)?);
+							actor.connection = Some(options.connect()?);
 							ctx.spawn(ConnectionPoller);
 							Ok(())
 						})
@@ -853,6 +888,13 @@ impl Handler<DisconnectMsg> for Ws {
 	type Result = ();
 	fn handle(&mut self, _: DisconnectMsg, ctx: &mut Self::Context) -> Self::Result {
 		self.disconnect(ctx);
+	}
+}
+
+impl Handler<SetChannelListMsgMsg> for Ws {
+	type Result = ();
+	fn handle(&mut self, msg: SetChannelListMsgMsg, _: &mut Self::Context) -> Self::Result {
+		self.channel_list_finished_msg = Some(msg.0);
 	}
 }
 

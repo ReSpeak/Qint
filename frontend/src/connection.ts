@@ -1,5 +1,5 @@
 import { Chat } from "./chat/chat";
-import { OutMsg, InMsg, Reason } from "./structs/ws";
+import { OutMsg, OMsgConnect, InMsg, Reason } from "./structs/ws";
 import { derived, get, writable, Readable, Writable } from "svelte/store";
 import { Book, Channel, Client } from "./tree/book";
 import { plugins, loadPlugins } from "./plugins";
@@ -49,7 +49,7 @@ export class Connection {
 		return this.muted;
 	}
 
-	public connect(opt: IConnectOptions) {
+	public connect(opt: OMsgConnect) {
 		this.error.set(undefined);
 		this.guid = Connection.createUuidV4();
 		let path = BASE_ADDRESS;
@@ -62,31 +62,7 @@ export class Connection {
 
 		this.socket = new WebSocket(`ws${path}/con/${this.guid}/ws?format=Json`);
 		this.socket.onopen = () => {
-			let version;
-			let platform = ((window.navigator as any).oscpu ?? window.navigator.userAgent).toLowerCase();
-			if (platform.includes("windows")) {
-				version = "Windows_3_X_X__1";
-			} else if (platform.includes("linux")) {
-				version = "Linux_3_X_X";
-			} else if (platform.includes("android")) {
-				version = "Android_3_X_X";
-			} else if (platform.includes("ios")) {
-				version = "iOS_3_X_X";
-			} else if (platform.includes("mac")) {
-				version = "OS_X_3_X_X";
-			} else {
-				version = "Windows_3_X_X__2";
-			}
-			this.sendMessage({
-				Connect: {
-					address: opt.address,
-					name: opt.name,
-					log_commands: false,
-					log_packets: false,
-					log_udp_packets: false,
-					version,
-				}
-			});
+			this.sendMessage(opt);
 		};
 		this.socket.onerror = (error) => {
 			this.error.set("Connection failed, is Qint running?");

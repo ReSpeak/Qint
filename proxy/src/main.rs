@@ -47,6 +47,9 @@ const DIR_PROJECT: &str = "Qint";
 const SETTINGS_FILENAME: &str = "config.toml";
 const TRANSIENT_SETTINGS_FILENAME: &str = "transient.toml";
 
+// The build environment of qint.
+git_testament::git_testament!(TESTAMENT);
+
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct ConnectionId(pub Uuid);
 
@@ -504,6 +507,16 @@ impl App {
 		let _scope_guard = slog_scope::set_global_logger(logger.clone());
 		// Ignore errors if a logger has already been set
 		let _ = slog_stdlog::init();
+
+		#[cfg(debug_assertions)]
+		let profile = "Debug";
+		#[cfg(not(debug_assertions))]
+		let profile = "Release";
+
+		info!(logger, "qint";
+			"version" => git_testament::render_testament!(TESTAMENT),
+			"profile" => profile,
+		);
 
 		let config_path: PathBuf = if let Some(p) = args.config_path {
 			p

@@ -6,6 +6,7 @@
 	import { ConnectionState, Connection } from "../connection";
 	import Icon from "../ui/Icon.svelte";
 	import UiBookmark from "./UiBookmark.svelte";
+	import { graphql } from "../graphql";
 	import { SERVER_ICON, CLIENT_ICON } from "../util";
 
 	export let connection: Connection;
@@ -23,6 +24,48 @@
 			data.connect();
 		} else {
 			data.reset();
+		}
+	}
+
+	function onNameChange() {
+		data.bookmark = undefined;
+	}
+
+	async function onAddressChange() {
+		data.bookmark = undefined;
+		data.channelId = undefined;
+		const sep = $address.indexOf("/");
+		if (sep !== -1 && addressInput.selectionStart !== null && addressInput.selectionStart >= sep) {
+			// Show channel popup
+			const channels = await loadChannels($address.substr(0, sep));
+		}
+
+		// Filter bookmarks
+	}
+
+	async function loadChannels(address: string) {
+		// That's not dynamic, but we currently have no pagination
+		try {
+			const server = await graphql(`query GetChannels($address: String!) {
+				serverByAddress(address: $address) {
+					channels(includeDeleted: false) {
+						id
+						parent
+						orderId
+						name
+						icon
+					}
+				}
+			}`, {
+				address,
+			});
+			if (server.data.serverByAddress !== null) {
+				console.log(server.data.serverByAddress.channels);
+				return server.data.serverByAddress.channels;
+			}
+		} catch (err) {
+			console.error("Failed to load channels", err);
+			throw err;
 		}
 	}
 
@@ -46,7 +89,11 @@
 			}
 			if (data.address === "") {
 				data.address = recent.address ?? "";
+				if (recent.channel !== null) {
+					data.address += "/" + recent.channel.name;
+				}
 				address.set(data.address);
+				data.bookmark = Number(recent.id);
 			}
 		}
 	});
@@ -69,6 +116,7 @@
 				<p class="control has-icons-left">
 					<input
 						bind:value={$username}
+						on:input={onNameChange}
 						name="username"
 						id="username"
 						class="input"
@@ -83,6 +131,7 @@
 					<input
 						bind:this={addressInput}
 						bind:value={$address}
+						on:input={onAddressChange}
 						name="server"
 						id="server"
 						class="input"

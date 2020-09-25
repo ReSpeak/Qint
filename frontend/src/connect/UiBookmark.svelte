@@ -12,8 +12,14 @@
 
 	function doConnect() {
 		if (bookmark.username !== undefined && bookmark.address !== undefined) {
+			connect.bookmark = Number(bookmark.id);
 			connect.username = bookmark.username;
 			connect.address = bookmark.address;
+			if (bookmark.channel !== null) {
+				connect.channelId = Number(bookmark.channel.id);
+			} else {
+				connect.channelId = undefined;
+			}
 			connect.connect();
 		}
 	}
@@ -35,7 +41,11 @@
 		connect.username = $username;
 		connect.address = $address;
 		username.set(bookmark.username ?? "");
-		address.set(bookmark.address ?? "");
+		let addr = bookmark.address ?? "";
+		if (bookmark.channel !== null) {
+			addr += "/" + bookmark.channel.name;
+		}
+		address.set(addr);
 	}
 
 	function leave() {
@@ -49,11 +59,11 @@
 	class:bookmark={bookmark.bookmark}
 	on:mouseover={hover}
 	on:mouseout={leave}>
-	<button class="button innerBookmarkItem" on:click={doConnect} title={bookmark.server.name}>
+	<button class="button innerBookmarkItem" on:click={doConnect} title={bookmark.server?.name}>
 		<div class="bookmarkIcon">
 			<i class="mdi mdi-{SERVER_ICON} mdi-24px" />
 		</div>
-		<div class="bookmarkName">{bookmark.name || bookmark.server.name}</div>
+		<div class="bookmarkName">{bookmark.name || bookmark.server?.name}</div>
 		{#if bookmark.lastUsed}
 			<div class="bookmarkInfo" title={bookmark.lastUsed.format() ?? ''}>
 				Last connection {bookmark.lastUsed.format('lll') ?? '?'}
