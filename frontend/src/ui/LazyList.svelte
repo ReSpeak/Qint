@@ -7,7 +7,7 @@
 
 	// Dummy class to have nice typing for our 'generic' parameter T which
 	// represents the element type.
-	class T {}
+	type T = any;
 
 	// *** State+Export variables ***
 

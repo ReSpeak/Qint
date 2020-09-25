@@ -1,13 +1,18 @@
 :root {
 	--channel-tree-width: 20em;
 }
-* {
-	margin: 0;
-}
+
 html {
 	overflow: auto;
 	background-color: $background;
 	scrollbar-color: gray transparent;
+}
+
+a {
+	color: #57a4e8;
+	&:hover {
+		text-decoration: underline;
+	}
 }
 
 .hover.menu {
@@ -36,7 +41,7 @@ html {
 	background-color: rgba(255, 62, 0, 0.2) !important;
 }
 .update-flash-fade {
-	transition: color 1s, background 1s;
+	transition: color 1s, $background 1s;
 }
 
 .button:focus {
