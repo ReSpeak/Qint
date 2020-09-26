@@ -1,6 +1,7 @@
 <script lang="typescript">
 	import type { Writable } from "svelte/store";
-	import { BOOKMARK_OFF, BOOKMARK_ON, EDIT_ICON, SERVER_ICON } from "../util";
+	import { BOOKMARK_OFF, BOOKMARK_ON, EDIT_ICON } from "../util";
+	import TsIcon from "../ui/TsIcon.svelte";
 	import { Bookmark } from "./bookmark";
 	import Self from "./connect";
 
@@ -61,7 +62,7 @@
 	on:mouseout={leave}>
 	<button class="button innerBookmarkItem" on:click={doConnect} title={bookmark.server?.name}>
 		<div class="bookmarkIcon">
-			<i class="mdi mdi-{SERVER_ICON} mdi-24px" />
+			<TsIcon type="server" source={{icon_id: bookmark.server?.icon_id}} server={bookmark.server?.uid} />
 		</div>
 		<div class="bookmarkName">{bookmark.name || bookmark.server?.name}</div>
 		{#if bookmark.lastUsed}

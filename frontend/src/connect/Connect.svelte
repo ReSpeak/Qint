@@ -10,7 +10,7 @@
 	import { Book, Channel } from "../tree/book";
 	import UiChannel from "../tree/UiChannel.svelte";
 	import type { ChannelId } from "../structs/ts";
-	import { SERVER_ICON, CLIENT_ICON } from "../util";
+	import { SERVER_ICON, CLIENT_ICON, base64Decode, hexEncode } from "../util";
 
 	export let connection: Connection;
 	let state = connection.state;
@@ -54,13 +54,10 @@
 			}
 			if (channelPart !== $address.substr(sep + 1))
 				channelPart = $address.substr(sep + 1);
-			// TODO Filter channels in popup
 		} else {
 			if (channelPart !== "")
 				channelPart = "";
 		}
-
-		// Filter bookmarks
 	}
 
 	async function loadChannels(address: string): Promise<Channel[]> {
@@ -80,7 +77,8 @@
 				address,
 			});
 			if (query.data.serverByAddress !== null) {
-				server = query.data.serverByAddress.uid;
+				console.log(base64Decode(query.data.serverByAddress.uid), hexEncode(base64Decode(query.data.serverByAddress.uid)));
+				server = hexEncode(base64Decode(query.data.serverByAddress.uid));
 				let channels: Map<ChannelId, Channel> = new Map(query.data.serverByAddress.channels
 					.map((c: any) => {
 						let channel = Channel.fromGraphql(c);

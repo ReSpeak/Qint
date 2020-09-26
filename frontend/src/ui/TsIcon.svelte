@@ -7,7 +7,7 @@
 	// Either connection or server has to be set to fetch the icon
 	export let connection: Connection | undefined = undefined;
 	export let server: string | undefined = undefined;
-	export let source: IconSourceLike;
+	export let source: IconSourceLike | null | undefined;
 	export let type: "server" | "channel" | "client";
 
 	let fallback: string;
@@ -31,7 +31,7 @@
 
 {#if iconPath}
 	<span class="icon">
-		<img src={iconPath} alt="{type} icon" />
+		<img src={iconPath} alt="{type} icon" on:error={() => iconPath = undefined} />
 	</span>
 {:else if fallback}
 	<Icon name={fallback} />

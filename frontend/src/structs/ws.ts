@@ -65,7 +65,8 @@ interface OMsgSubscribeLoudness {
 
 interface OMsgChange {
 	Change: ChangeChannelEdit | ChangeChannelMove | ChangeClientEdit | ChangeClientUpdate
-		| ChangeClientMove | ChangeClientAddServerGroup | ChangeClientRemoveServerGroup;
+		| ChangeClientMove | ChangeClientAddServerGroup | ChangeClientRemoveServerGroup
+		| ChangeClientKick;
 }
 
 interface ChangeChannelEdit {
@@ -116,7 +117,7 @@ interface ChangeClientUpdate {
 
 interface ChangeClientMove {
 	ClientMove: {
-		id : ClientId,
+		id: ClientId,
 		channel: ChannelId,
 		password?: string;
 	}
@@ -124,15 +125,23 @@ interface ChangeClientMove {
 
 interface ChangeClientAddServerGroup {
 	ClientAddServerGroup: {
-		id : ClientId,
+		id: ClientId,
 		server_group: ServerGroupId,
 	}
 }
 
 interface ChangeClientRemoveServerGroup {
 	ClientRemoveServerGroup: {
-		id : ClientId,
+		id: ClientId,
 		server_group: ServerGroupId,
+	}
+}
+
+interface ChangeClientKick {
+	ClientKick: {
+		id: ClientId,
+		reason: Reason,
+		reason_message?: string,
 	}
 }
 

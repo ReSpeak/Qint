@@ -175,18 +175,30 @@ export function findParent(elem: HTMLElement, selector: string): HTMLElement | u
 export function base64Decode(s: string): number[] {
 	let res = [];
 	const b = atob(s);
-	for (let i = 0; i < b.length; i++) {
+	for (let i = 0; i < b.length; i++)
 		res.push(b.charCodeAt(i));
-	}
 	return res;
 }
 
 export function base64Encode(data: number[]): string {
 	let res = "";
-	for (let i = 0; i < data.length; i++) {
+	for (let i = 0; i < data.length; i++)
 		res += String.fromCharCode(data[i]);
-	}
 	return btoa(res);
+}
+
+export function hexDecode(s: string): number[] {
+	let res = [];
+	for (let i = 0; i < s.length; i += 2)
+		res.push(parseInt(s.substr(i, i + 2), 16));
+	return res;
+}
+
+export function hexEncode(data: number[]): string {
+	let res = "";
+	for (let i = 0; i < data.length; i++)
+		res += data[i].toString(16).padStart(2, "0");
+	return res;
 }
 
 /**

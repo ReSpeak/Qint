@@ -423,7 +423,7 @@ async fn download_file(
 async fn download_cache_file(
 	state: web::Data<Arc<State>>, data: web::Path<(String, u64, String)>,
 ) -> impl Responder {
-	let server = match base64::decode(&data.0) {
+	let server = match hex::decode(&data.0) {
 		Err(e) => {
 			return HttpResponse::BadRequest().body(format!("Not a valid server uid: {}", e));
 		}

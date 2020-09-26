@@ -174,6 +174,15 @@ export class Connection {
 					} else if ("Message" in tsevt) {
 						this.chat.unreadCount.update(c => c + 1);
 					} else {
+						if ("PropertyRemoved" in tsevt) {
+							if ("Client" in tsevt.PropertyRemoved.id) {
+								if (tsevt.PropertyRemoved.id.Client === this.ownClientId) {
+									this.reset();
+									return;
+								}
+							}
+						}
+
 						this.book.messageHandler(tsevt);
 					}
 				} catch (err) {

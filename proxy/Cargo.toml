@@ -26,6 +26,7 @@ ebur128 = "0.1"
 flakebi-ring = "0.16.9"
 futures = "0.3"
 git-testament = "0.1"
+hex = "0.4"
 juniper = { git = "https://github.com/graphql-rust/juniper" }
 lazy_static = "1"
 libsqlite3-sys = { version = "0.18", features = ["bundled"] }
@@ -63,11 +64,10 @@ features = ["max_level_info", "release_max_level_info"]
 version = "2"
 features = ["max_level_trace", "release_max_level_debug"]
 
-# Don't cross-compile openssl
 [target.'cfg(target_arch = "aarch64")'.dependencies]
-audiopus_sys = { version = "0.1", features = ["static"] }
-reqwest = { version = "0.10", default-features = false, features = ["rustls-tls"] }
 # TODO The bundled feature gets also activated for x86
+#audiopus_sys = { version = "0.1", features = ["static"] }
+#reqwest = { version = "0.10", default-features = false, features = ["rustls-tls"] }
 #sdl2 = { version = "0.34", features = ["bundled"] }
 
 [build-dependencies]

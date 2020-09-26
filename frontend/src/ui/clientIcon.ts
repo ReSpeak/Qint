@@ -12,7 +12,7 @@ export type IconSourceLike = {
 
 export const DummyStore: Writable<IconSource> = writable(undefined);
 
-export function getClientIconPath(client: IconSourceLike, connection?: Connection, server?: string): string | undefined {
+export function getClientIconPath(client: IconSourceLike | null | undefined, connection?: Connection, server?: string): string | undefined {
 	if (!connection && !server) {
 		console.error("ClientIcon needs either connection or server");
 		return;
@@ -21,12 +21,12 @@ export function getClientIconPath(client: IconSourceLike, connection?: Connectio
 		return;
 
 	if (connection) {
-		if (client.avatar_hash !== "" && client.uid)
+		if (client.avatar_hash && client.avatar_hash !== "" && client.uid)
 			return `${BASE_ADDRESS}/con/${connection.guid}/file/0/avatar_${client.getAvatarUid!()}?hash=${client.avatar_hash}`;
 		else if (client.icon_id)
 			return `${BASE_ADDRESS}/con/${connection.guid}/file/0/icon_${client.icon_id}`;
 	} else if (server) {
-		if (client.avatar_hash !== "" && client.uid)
+		if (client.avatar_hash && client.avatar_hash !== "" && client.uid)
 			return `${BASE_ADDRESS}/filecache/${server}/0/avatar_${client.getAvatarUid!()}`;
 		else if (client.icon_id)
 			return `${BASE_ADDRESS}/filecache/${server}/0/icon_${client.icon_id}`;
@@ -34,7 +34,7 @@ export function getClientIconPath(client: IconSourceLike, connection?: Connectio
 	return;
 }
 
-export function getClientAvatarPath(client: IconSourceLike, connection?: Connection, server?: string): string | undefined {
+export function getClientAvatarPath(client: IconSourceLike | null | undefined, connection?: Connection, server?: string): string | undefined {
 	if (!connection && !server) {
 		console.error("ClientIcon needs either connection or server");
 		return;

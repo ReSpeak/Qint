@@ -12,6 +12,7 @@
 	import StickySlot from "../ui/StickySlot.svelte";
 	import ClientVolume from "../controls/ClientVolume.svelte";
 	import { getClientAvatarPath } from "../ui/clientIcon";
+	import { Reason } from "../structs/ws";
 
 	export let connection: Connection;
 	export let clientId: number;
@@ -74,13 +75,35 @@
 			});
 		}
 	}
+
+	function kickFromChannel() {
+		connection.sendMessage({
+			Change: {
+				ClientKick: {
+					id: clientId,
+					reason: Reason.KickChannel,
+				}
+			}
+		});
+	}
+
+	function kickFromServer() {
+		connection.sendMessage({
+			Change: {
+				ClientKick: {
+					id: clientId,
+					reason: Reason.KickServer,
+				}
+			}
+		});
+	}
 </script>
 
 <StickyList>
 	<StickySlot>Info</StickySlot>
 	<div class="descGroup">
 		<div class="dataLine headLine">
-			<TsIcon type="client" source={client} {connection} />
+			<TsIcon type="client" source={{icon_id: client.icon_id}} {connection} />
 			<ClientName {client} />
 			<div style="flex: 1;" />
 			<div>
@@ -124,11 +147,11 @@
 	<StickySlot>Actions</StickySlot>
 	<div class="descGroup">
 		<p class="buttons">
-			<button class="button is-small is-warning">
+			<button class="button is-small is-warning" on:click={kickFromChannel}>
 				<Icon name="shoe-formal" />
 				<span>Kick Channel</span>
 			</button>
-			<button class="button is-small is-danger">
+			<button class="button is-small is-danger" on:click={kickFromServer}>
 				<Icon name="shoe-formal" />
 				<span>Kick Server</span>
 			</button>
