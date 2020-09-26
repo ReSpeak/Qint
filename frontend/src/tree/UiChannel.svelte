@@ -176,7 +176,7 @@
 			class="innerContainer"
 			class:ownClient
 			class:isSelected
-			use:draggable
+			use:draggable={!!connection}
 			on:svddrag={dragStart}
 			on:svddrop={dragDrop}
 			data-type="channel"

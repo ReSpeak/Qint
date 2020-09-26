@@ -101,7 +101,7 @@
 			class:isSelected
 			class="innerContainer"
 			on:click={setChat}
-			use:draggable
+			use:draggable={!!connection}
 			on:svddrag={dragStart}
 			on:svddrop={dragDrop}
 			data-type="client"

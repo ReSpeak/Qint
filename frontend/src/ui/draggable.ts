@@ -13,14 +13,16 @@ export class DragData {
 	public customData: any | undefined;
 
 	constructor(
-		public dragNode: HTMLElement
+		public dragNode: HTMLElement,
+		public enabled: boolean
 	) { }
 }
 
-export function draggable(node: HTMLElement) {
-	let dd = new DragData(node);
+export function draggable(node: HTMLElement, enabled: boolean = true) {
+	let dd = new DragData(node, enabled);
 
 	function handleMousedown(event: MouseEvent) {
+		if (!dd.enabled) return;
 		dd.x = event.clientX;
 		dd.y = event.clientY;
 		dd.hasTriggered = false;
@@ -58,13 +60,17 @@ export function draggable(node: HTMLElement) {
 
 	function handleMouseup(event: MouseEvent) {
 		dd.mouseEvent = event;
-		if (dd.hasTriggered) {
-			node.style.transform = `translate(0,0)`;
-			node.style.pointerEvents = "unset";
-			node.dispatchEvent(new CustomEvent('svddrop', { detail: dd }));
-		}
+		stopDrag();
+	}
+
+	function stopDrag() {
 		window.removeEventListener('mousemove', handleMousemove);
 		window.removeEventListener('mouseup', handleMouseup);
+		if (dd.hasTriggered) {
+			node.style.transform = null!;
+			node.style.pointerEvents = null!;
+			node.dispatchEvent(new CustomEvent('svddrop', { detail: dd }));
+		}
 	}
 
 	node.addEventListener('mousedown', handleMousedown);
@@ -72,6 +78,12 @@ export function draggable(node: HTMLElement) {
 	return {
 		destroy() {
 			node.removeEventListener('mousedown', handleMousedown);
+			stopDrag();
+		},
+		update(enabled: boolean) {
+			dd.enabled = enabled;
+			if (!enabled)
+				stopDrag();
 		}
 	};
 }
