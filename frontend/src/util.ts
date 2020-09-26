@@ -172,6 +172,23 @@ export function findParent(elem: HTMLElement, selector: string): HTMLElement | u
 	return undefined;
 }
 
+export function base64Decode(s: string): number[] {
+	let res = [];
+	const b = atob(s);
+	for (let i = 0; i < b.length; i++) {
+		res.push(b.charCodeAt(i));
+	}
+	return res;
+}
+
+export function base64Encode(data: number[]): string {
+	let res = "";
+	for (let i = 0; i < data.length; i++) {
+		res += String.fromCharCode(data[i]);
+	}
+	return btoa(res);
+}
+
 /**
  * Works similar to Object.assign except that it doesn't overwrite existing
  * object structures. But instead merges them recursively

@@ -16,6 +16,8 @@
 	let selectedChat = connection.chat.selectedChat;
 	let hovered = false;
 	let newHover = false;
+	let showId = false;
+	let thisFilter = "";
 
 	let isSelected: boolean = false;
 	$: filterShow = applyFilter(filter, client);
@@ -31,7 +33,27 @@
 	}
 
 	function applyFilter(filter: string, client: Client) {
-		return filter === "" || client.name.toLowerCase().includes(filter.toLowerCase());
+		if (filter === "") {
+			if (showId)
+				showId = false;
+			if (thisFilter !== filter)
+				thisFilter = filter;
+			return true;
+		}
+		const filterById = filter[0] === "/";
+		if (filterById) {
+			if (!showId)
+				showId = true;
+			if (thisFilter !== filter.substr(1))
+				thisFilter = filter.substr(1);
+			return client.id.toString().includes(filter.substr(1));
+		} else {
+			if (showId)
+				showId = false;
+			if (thisFilter !== filter)
+				thisFilter = filter;
+			return client.name.toLowerCase().includes(filter.toLowerCase());
+		}
 	}
 
 	function hover() {
@@ -87,7 +109,10 @@
 			<div class:talking={client.talking !== undefined} class="talkWave" />
 			<TsIcon type="client" source={client} {connection} />
 			<span class="nameBox" style={client.getColor()}>
-				<FilterString {filter} content={client.name} />
+				{#if showId}
+					[<FilterString filter={thisFilter} content={client.id.toString()} />]
+				{/if}
+				<FilterString filter={showId ? "" : thisFilter} content={client.name} />
 			</span>
 			<span class="icons">
 				{#if client.input_muted}

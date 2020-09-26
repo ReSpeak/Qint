@@ -7,6 +7,9 @@
 	import Icon from "../ui/Icon.svelte";
 	import UiBookmark from "./UiBookmark.svelte";
 	import { graphql } from "../graphql";
+	import { Book, Channel } from "../tree/book";
+	import UiChannel from "../tree/UiChannel.svelte";
+	import type { ChannelId } from "../structs/ts";
 	import { SERVER_ICON, CLIENT_ICON } from "../util";
 
 	export let connection: Connection;
@@ -16,6 +19,13 @@
 	let username = writable(data.username);
 	let address = writable(data.address);
 	let addressInput!: HTMLInputElement;
+	// The channel part of the address, if empty, the channel popup will be hidden
+	let channelPart = "";
+	// The address used to load the channels.
+	let channelsAddress = "";
+	let server: string | undefined = undefined;
+	// The channels directly under the server, sub-channels are stored as children.
+	let channels: Channel[] = [];
 
 	function onConnect() {
 		if (get(state) === ConnectionState.Disconnected) {
@@ -37,17 +47,27 @@
 		const sep = $address.indexOf("/");
 		if (sep !== -1 && addressInput.selectionStart !== null && addressInput.selectionStart >= sep) {
 			// Show channel popup
-			const channels = await loadChannels($address.substr(0, sep));
+			const addr = $address.substr(0, sep);
+			if (addr !== channelsAddress) {
+				channels = await loadChannels($address.substr(0, sep));
+				channelsAddress = addr;
+			}
+			if (channelPart !== $address.substr(sep + 1))
+				channelPart = $address.substr(sep + 1);
+			// TODO Filter channels in popup
+		} else {
+			if (channelPart !== "")
+				channelPart = "";
 		}
 
 		// Filter bookmarks
 	}
 
-	async function loadChannels(address: string) {
-		// That's not dynamic, but we currently have no pagination
+	async function loadChannels(address: string): Promise<Channel[]> {
 		try {
-			const server = await graphql(`query GetChannels($address: String!) {
+			const query = await graphql(`query GetChannels($address: String!) {
 				serverByAddress(address: $address) {
+					uid
 					channels(includeDeleted: false) {
 						id
 						parent
@@ -59,10 +79,30 @@
 			}`, {
 				address,
 			});
-			if (server.data.serverByAddress !== null) {
-				console.log(server.data.serverByAddress.channels);
-				return server.data.serverByAddress.channels;
+			if (query.data.serverByAddress !== null) {
+				server = query.data.serverByAddress.uid;
+				let channels: Map<ChannelId, Channel> = new Map(query.data.serverByAddress.channels
+					.map((c: any) => {
+						let channel = Channel.fromGraphql(c);
+						return [channel.id, channel];
+					}));
+				let topChannels: Channel[] = [];
+				// Get into tree form
+				for (let c of channels.values()) {
+					// Add to parent
+					if (c.parent !== 0) {
+						let children = channels.get(c.parent)!.children;
+						children.update(cs => {
+							Book.addChannelSorted(cs, c);
+							return cs;
+						});
+					} else {
+						Book.addChannelSorted(topChannels, c);
+					}
+				}
+				return topChannels;
 			}
+			return [];
 		} catch (err) {
 			console.error("Failed to load channels", err);
 			throw err;
@@ -90,7 +130,7 @@
 			if (data.address === "") {
 				data.address = recent.address ?? "";
 				if (recent.channel !== null) {
-					data.address += "/" + recent.channel.name;
+					data.address += "/" + recent.channel.fullPath;
 				}
 				address.set(data.address);
 				data.bookmark = Number(recent.id);
@@ -152,6 +192,19 @@
 				</button>
 			</div>
 		</form>
+		{#if channelPart !== ""}
+			<div class="menu channel-list">
+				<ul class="menu-list">
+					{#each channels as channel (channel.key)}
+						{#if channel instanceof Channel}
+							<UiChannel {server} filter={channelPart} filterStartFromRoot={true} {channel} />
+						{:else}
+							{@debug channel}
+						{/if}
+					{/each}
+				</ul>
+			</div>
+		{/if}
 	</div>
 
 	<div class="bookmark-container">

@@ -1128,7 +1128,6 @@ impl<'a> EventHandler<'a> {
 		let icon_id = channel.icon_id.and_then(|i| if i.0 == 0 { None } else { Some(i.0 as i32) });
 		let ch_name = channel.name.clone();
 		let ch_order = if channel.order.0 == 0 { None } else { Some(channel.order.0 as i64) };
-		let ch_icon = channel.icon_id.map(|i| i.0 as i32);
 
 		self.run(move |db, _| {
 			use schema::channels::dsl::*;
@@ -1142,7 +1141,7 @@ impl<'a> EventHandler<'a> {
 					parent.eq(ch_parent),
 					name.eq(&ch_name),
 					order_id.eq(&ch_order),
-					icon.eq(&ch_icon),
+					icon.eq(&icon_id),
 					deleted.eq(false),
 				))
 				.execute(&db.con)? != 1

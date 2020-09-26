@@ -10,27 +10,36 @@
 	import { draggable, DragData } from "../ui/draggable";
 	import { findParent, assert } from "../util";
 
-	export let connection: Connection;
+	export let connection: Connection | undefined = undefined;
+	export let server: string | undefined = undefined;
 	export let filter: string;
 	export let filterShow: boolean = true;
+	export let filterStartFromRoot: boolean;
 	export let channel: Channel;
-	let selectedChat = connection.chat.selectedChat;
+	let selectedChat = connection?.chat.selectedChat;
 
 	let collapsed = false;
 	let hovered = false;
+	let showId = false;
+	let thisFilter = "";
+	let childrenFilter = "";
 
 	let isSelected: boolean = false;
 	$: children = channel.children;
-	$: filterShow = applyFilter(filter, channel, $children);
+	$: filterShow = applyFilter(filter, filterStartFromRoot, channel, $children);
 	// Update if a client moves in or out
 	$: ownClient = updateOwnClient($children);
 	$: {
-		const sc = $selectedChat;
-		isSelected = "Channel" in sc && sc.Channel === channel.id;
+		if (selectedChat !== undefined) {
+			const sc = $selectedChat;
+			isSelected = "Channel" in sc && sc.Channel === channel.id;
+		}
 	}
 	let div!: HTMLElement;
 
 	function updateOwnClient(_children: ITreeNode[]) {
+		if (connection === undefined)
+			return false;
 		let isOwn = false;
 		let client = get(connection.ownClient);
 		if (client !== undefined) {
@@ -39,21 +48,62 @@
 		return isOwn;
 	}
 
-	function applyFilter(filter: string, channel: Channel, children: ITreeNode[]) {
-		assert(filter != null, "fil");
-		return (
-			filter === "" ||
-			channel.name.toLowerCase().includes(filter.toLowerCase()) ||
-			children.some((c) => c.filterShow)
-		);
+	function applyFilter(filter: string, filterStartFromRoot: boolean, channel: Channel, children: ITreeNode[]) {
+		assert(filter != null, "filter is null");
+		if (filter === "") {
+			if (showId)
+				showId = false;
+			if (childrenFilter !== filter)
+				childrenFilter = filter;
+			if (thisFilter !== filter)
+				thisFilter = filter;
+			return true;
+		}
+		const filterById = filter[0] === "/";
+		if (filterById) {
+			// Ignore filterStartFromRoot when matching by id
+			const matches = channel.id.toString().includes(filter.substr(1));
+			if (!showId)
+				showId = true;
+			if (childrenFilter !== filter)
+				childrenFilter = filter;
+			if (thisFilter !== filter.substr(1))
+				thisFilter = filter.substr(1);
+			return matches || children.some(c => c.filterShow);
+		} else {
+			if (showId)
+				showId = false;
+			const index = filter.indexOf("/");
+			const newThisFilter = index === -1 ? filter : filter.substr(0, index);
+			if (thisFilter !== newThisFilter)
+				thisFilter = newThisFilter;
+			const matches = channel.name.toLowerCase().includes(thisFilter.toLowerCase());
+			if (filterStartFromRoot) {
+				let newChildrenFilter = "";
+				if (index !== -1)
+					newChildrenFilter = filter.substr(index + 1);
+				if (childrenFilter !== newChildrenFilter)
+					childrenFilter = newChildrenFilter;
+				return matches && (childrenFilter === "" || children.some(c => c.filterShow));
+			}
+			if (childrenFilter !== filter)
+				childrenFilter = filter;
+			return matches || children.some(c => c.filterShow);
+		}
 	}
 
 	function switchChannel() {
-		connection.switchChannel(channel);
+		connection?.switchChannel(channel);
 	}
 
 	function setChat() {
-		connection.chat.selectChannel(channel);
+		connection?.chat.selectChannel(channel);
+	}
+
+	function hover() {
+		if (connection === undefined)
+			return;
+		hovered = true;
 	}
 
 	function leave(event: MouseEvent) {
@@ -81,7 +131,7 @@
 		].reverse();
 		const dropTarget = hoverOpt.find((x) => x.dataset.type === "channel");
 		console.log(hoverOpt, dropTarget);
-		if (dropTarget !== undefined) {
+		if (dropTarget !== undefined && connection !== undefined) {
 			const rect = dropTarget.getBoundingClientRect();
 			let clickY = ev.detail.mouseEvent.clientY - rect.top;
 			let clickPerc = clickY / (rect.bottom - rect.top);
@@ -119,7 +169,7 @@
 <li class="container" class:hidden={!filterShow} class:collapsed>
 	<div
 		bind:this={div}
-		on:mouseover={() => (hovered = true)}
+		on:mouseover={hover}
 		on:mouseout={leave}
 		class="hoverDummy">
 		<div
@@ -136,16 +186,21 @@
 				on:click={() => (collapsed = !collapsed)}
 				class:haschildren={$children.length !== 0}>
 				<Icon name="chevron-right{collapsed ? '' : ' mdi-rotate-90'}" />
-				<TsIcon type="channel" source={channel} {connection} />
+				<TsIcon type="channel" source={channel} {connection} {server} />
 			</button>
 			<span class="nameBox" on:click={setChat}>
-				<FilterString {filter} content={channel.name} />
+				{#if showId}
+					[<FilterString filter={thisFilter} content={channel.id.toString()} />]
+				{/if}
+				<FilterString filter={showId ? "" : thisFilter} content={channel.name} />
 			</span>
-			<span class="icons">
-				<button class="button noBut" on:click={switchChannel}>
-					<Icon name="shoe-print" />
-				</button>
-			</span>
+			{#if connection !== undefined}
+				<span class="icons">
+					<button class="button noBut" on:click={switchChannel}>
+						<Icon name="shoe-print" />
+					</button>
+				</span>
+			{/if}
 		</div>
 		{#if hovered}
 			<div class="hover menu" style="top: {div.getBoundingClientRect().top}px;">
@@ -159,11 +214,13 @@
 			{#if child instanceof Channel}
 				<svelte:self
 					{connection}
-					{filter}
+					{server}
+					filter={childrenFilter}
+					{filterStartFromRoot}
 					channel={child}
 					bind:filterShow={child.filterShow} />
-			{:else if child instanceof Client}
-				<UiClient {connection} {filter} client={child} bind:filterShow={child.filterShow} />
+			{:else if child instanceof Client && connection !== undefined}
+				<UiClient {connection} filter={childrenFilter} client={child} bind:filterShow={child.filterShow} />
 			{:else}
 				{@debug child}
 			{/if}

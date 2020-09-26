@@ -2,7 +2,7 @@ import { Writable, writable, get } from "svelte/store";
 import { InBookChangeMsg } from "../structs/ws";
 import { graphql } from "../graphql";
 import { Connection } from "../connection";
-import { binarySearchBy, binarySearchByKey, getDataColor, arraysEqual, Lazy } from "../util";
+import { binarySearchBy, binarySearchByKey, getDataColor, arraysEqual, Lazy, base64Decode, base64Encode } from "../util";
 import "../extensions";
 import { ChannelId, ChannelType, ClientId, Codec, ServerGroupId } from "../structs/ts";
 
@@ -39,7 +39,7 @@ export class Book {
 		return res;
 	}
 
-	private static addChannelSorted(list: ITreeNode[], elem: Channel): ITreeNode[] {
+	public static addChannelSorted(list: ITreeNode[], elem: Channel): ITreeNode[] {
 		let start = Book.findChannelStart(list);
 		if (elem.order === 0) {
 			list.splice(start, 0, elem);
@@ -450,11 +450,7 @@ export class GraphQlClient {
 
 	public static fromGraphqlInvoker(obj: any): GraphQlClient {
 		const c = new GraphQlClient();
-		c.uid = [];
-		const b = atob(obj.client.uid);
-		for (let i = 0; i < b.length; i++) {
-			c.uid.push(b.charCodeAt(i));
-		}
+		c.uid = base64Decode(obj.client.uid);
 		c.name = obj.client.customName ?? obj.client.name;
 		c.icon_id = obj.icon ?? 0;
 		c.avatar_hash = obj.avatar ?? "";
@@ -462,11 +458,7 @@ export class GraphQlClient {
 	}
 
 	private getUid(): string {
-		let res = "";
-		for (let i = 0; i < this.uid.length; i++) {
-			res += String.fromCharCode(this.uid[i]);
-		}
-		return btoa(res);
+		return base64Encode(this.uid);
 	}
 
 	/**
@@ -619,6 +611,16 @@ export class Channel implements ITreeParent, ITreeNode {
 
 	public static fromJson(obj: Partial<Channel>): Channel {
 		return new Channel().update(obj);
+	}
+
+	public static fromGraphql(obj: any): Channel {
+		const c = new Channel();
+		c.id = Number(obj.id);
+		c.parent = Number(obj.parent);
+		c.name = obj.name;
+		c.order = obj.orderId;
+		c.icon_id = obj.icon;
+		return c;
 	}
 
 	public update(obj: Partial<this>): this {

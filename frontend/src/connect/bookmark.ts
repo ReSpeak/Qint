@@ -3,7 +3,7 @@ import { graphql, toDatetime } from "../graphql";
 
 interface BookmarkChannel {
 	id: string;
-	name: string;
+	fullPath: string;
 }
 
 interface BookmarkServer {
@@ -51,7 +51,7 @@ export class Bookmark {
 				timezone
 				channel {
 					id
-					name
+					fullPath
 				}
 				server {
 					name
@@ -74,7 +74,7 @@ export class Bookmark {
 				timezone
 				channel {
 					id
-					name
+					fullPath
 				}
 				server {
 					name

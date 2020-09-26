@@ -8,13 +8,14 @@
 	let book = connection.book;
 	let server = book.server;
 	let children = $server.children;
+	$: filterStartFromRoot = filter.includes("/");
 </script>
 
 <div class="menu channel-list">
 	<ul class="menu-list">
 		{#each $children as channel (channel.key)}
 			{#if channel instanceof Channel}
-				<UiChannel {connection} {filter} {channel} />
+				<UiChannel {connection} {filter} {filterStartFromRoot} {channel} />
 			{:else}
 				{@debug channel}
 			{/if}

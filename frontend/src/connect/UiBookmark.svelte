@@ -43,7 +43,7 @@
 		username.set(bookmark.username ?? "");
 		let addr = bookmark.address ?? "";
 		if (bookmark.channel !== null) {
-			addr += "/" + bookmark.channel.name;
+			addr += "/" + bookmark.channel.fullPath;
 		}
 		address.set(addr);
 	}
@@ -172,18 +172,6 @@
 	.bookmark .bookmarkStar .bookmarkOn {
 		display: inherit;
 	}
-
-	.bookmarkOff {
-		display: none;
-	}
-
-	// Display always on touch screens
-	//@media (pointer: coarse) {
-		// TODO Show or not show?
-		.bookmarkOff {
-			display: inherit;
-		}
-	//}
 
 	.bookmarkItem:hover .bookmarkStar .bookmarkOff {
 		display: inherit;

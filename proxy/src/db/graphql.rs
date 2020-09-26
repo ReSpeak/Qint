@@ -14,6 +14,7 @@ use juniper::http::GraphQLRequest;
 use juniper::{EmptySubscription, FieldError, RootNode, ID};
 use slog::error;
 use tsclientlib::Uid;
+use tsproto_types::crypto::EccKeyPubP256;
 
 use super::models::MessageStatus;
 use super::schema::bookmarks;
@@ -204,6 +205,29 @@ impl Channel {
 					.inner_join(chats::table)
 					.select(chats::all_columns);
 				GResult::Ok(query.first::<models::Chat>(&db.con).optional()?.map(Chat))
+			}))
+			.await??;
+		Ok(res)
+	}
+
+	/// The full path of the channel on the server, starting at the root
+	async fn full_path(&self, state: &State) -> GResult<String> {
+		let id = self.0.server.clone();
+		let mut path = self.0.name.clone();
+		let mut parent = self.0.parent;
+		let res = state
+			.database
+			.send(RunOnDbMsg(move |db| {
+				use schema::channels;
+
+				while let Some(parent_id) = parent {
+					let (name, new_parent) = channels::table.find((&id, parent_id))
+						.select((channels::name, channels::parent))
+						.first::<(String, Option<i64>)>(&db.con)?;
+					parent = new_parent;
+					path = format!("{}/{}", name, path);
+				}
+				GResult::Ok(path)
 			}))
 			.await??;
 		Ok(res)
@@ -447,6 +471,10 @@ impl Message {
 impl Server {
 	/// The public key of the server, base64 encoded.
 	fn public_key(&self) -> ID { ID::new(base64::encode(&self.0.public_key)) }
+	fn uid(&self) -> GResult<String> {
+		let key = EccKeyPubP256::from_short(self.0.public_key.clone());
+		Ok(key.get_uid()?)
+	}
 	fn name(&self) -> &str { &self.0.name }
 	/// The last used address to connect to this server.
 	fn address(&self) -> &str { &self.0.address }
