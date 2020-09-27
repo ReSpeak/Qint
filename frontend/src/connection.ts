@@ -3,7 +3,7 @@ import { OutMsg, OMsgConnect, InMsg, Reason } from "./structs/ws";
 import { derived, get, writable, Readable, Writable } from "svelte/store";
 import { Book, Channel, Client } from "./tree/book";
 import { plugins, loadPlugins } from "./plugins";
-import { BASE_ADDRESS } from "./util";
+import { BASE_ADDRESS, getStringFromConnect } from "./util";
 import { handleMessage } from "./notification";
 import { transientSettings } from "./transientSettings";
 
@@ -18,6 +18,7 @@ export class Connection {
 	public ownClient: Readable<Client | undefined> = derived(this.book.clients,
 		cls => this.ownClientId !== undefined ? cls.get(this.ownClientId) : undefined);
 	private socket?: WebSocket;
+	private connectOptions: OMsgConnect | undefined;
 	public guid?: string;
 	private muted: boolean = false;
 	public loudness: Writable<number> = writable(0);
@@ -52,6 +53,7 @@ export class Connection {
 	public connect(opt: OMsgConnect) {
 		this.error.set(undefined);
 		this.guid = Connection.createUuidV4();
+		this.connectOptions = opt;
 		let path = BASE_ADDRESS;
 		if (!path.startsWith("http"))
 			path = window.location.origin;
@@ -170,6 +172,7 @@ export class Connection {
 					console.log(tsevt);
 					if (tsevt === "ChannelListFinished") {
 						this.state.set(ConnectionState.ChannelListFinished);
+						location.hash = getStringFromConnect(this.connectOptions!);
 						// TODO Get unread counts for channels and clients
 					} else if ("Message" in tsevt) {
 						this.chat.unreadCount.update(c => c + 1);

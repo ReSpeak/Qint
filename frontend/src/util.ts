@@ -1,4 +1,5 @@
 import chroma from "chroma-js";
+import { OMsgConnect } from "./structs/ws";
 export const debug: boolean = true;
 
 
@@ -170,6 +171,101 @@ export function findParent(elem: HTMLElement, selector: string): HTMLElement | u
 		elem = elem.parentElement!;
 	}
 	return undefined;
+}
+
+export function getDefaultVersion(): string {
+	let platform = ((window.navigator as any).oscpu ?? window.navigator.userAgent).toLowerCase();
+	if (platform.includes("windows")) {
+		return "Windows_3_X_X__1";
+	} else if (platform.includes("linux")) {
+		return "Linux_3_X_X";
+	} else if (platform.includes("android")) {
+		return "Android_3_X_X";
+	} else if (platform.includes("ios")) {
+		return "iOS_3_X_X";
+	} else if (platform.includes("mac")) {
+		return "OS_X_3_X_X";
+	} else {
+		return "Windows_3_X_X__2";
+	}
+}
+
+export function getConnectFromString(loc: string): OMsgConnect {
+	if (loc.startsWith("{")) {
+		// Parse json
+		console.log(loc);
+		let data = JSON.parse(loc);
+		assert("address" in data, "connection data needs an address");
+		if (!("name" in data))
+			data.name = "TeamSpeakUser";
+		if (!("version" in data))
+			data.version = getDefaultVersion();
+		if (!("ignore_identity_mismatch" in data))
+			data.ignore_identity_mismatch = false;
+		if (!("log_commands" in data))
+			data.log_commands = false;
+		if (!("log_packets" in data))
+			data.log_packets = false;
+		if (!("log_udp_packets" in data))
+			data.log_udp_packets = false;
+		return { Connect: data };
+	} else {
+		let start = loc.indexOf("@");
+		let name = start === -1 ? "TeamSpeakUser" : loc.substr(0, start);
+		start += 1;
+		let end = loc.indexOf("/");
+		let channel = end === -1 ? "" : loc.substr(end + 1);
+		let address = loc.substr(start, end === -1 ? undefined : end);
+		return {
+			Connect: {
+				bookmark: undefined,
+				address,
+				name,
+				channel,
+				version: getDefaultVersion(),
+				ignore_identity_mismatch: false,
+				log_commands: false,
+				log_packets: false,
+				log_udp_packets: false,
+			}
+		};
+	}
+}
+
+export function getStringFromConnect(connect: OMsgConnect): string {
+	const c: any = connect.Connect;
+	let hasDefaults = c.bookmark === undefined;
+	if (c.version === getDefaultVersion())
+		c.version = undefined;
+	else
+		hasDefaults = false;
+	if (!c.ignore_identity_mismatch)
+		c.ignore_identity_mismatch = undefined;
+	else
+		hasDefaults = false;
+	if (!c.log_commands)
+		c.log_commands = undefined;
+	else
+		hasDefaults = false;
+	if (!c.log_packets)
+		c.log_packets = undefined;
+	else
+		hasDefaults = false;
+	if (!c.log_udp_packets)
+		c.log_udp_packets = undefined;
+	else
+		hasDefaults = false;
+	if (hasDefaults) {
+		let s = "";
+		if (c.name !== "TeamSpeakUser")
+			s = c.name + "@";
+		s += c.address;
+		if (c.channel !== undefined)
+			s += "/" + c.channel;
+		return s;
+	} else {
+		return JSON.stringify(c);
+	}
 }
 
 export function base64Decode(s: string): number[] {

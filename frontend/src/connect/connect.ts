@@ -1,4 +1,5 @@
 import { Connection } from "../connection";
+import { getDefaultVersion } from "../util";
 
 export default class Self {
 	public username: string = "";
@@ -11,22 +12,6 @@ export default class Self {
 	) { }
 
 	public connect() {
-		let version;
-		let platform = ((window.navigator as any).oscpu ?? window.navigator.userAgent).toLowerCase();
-		if (platform.includes("windows")) {
-			version = "Windows_3_X_X__1";
-		} else if (platform.includes("linux")) {
-			version = "Linux_3_X_X";
-		} else if (platform.includes("android")) {
-			version = "Android_3_X_X";
-		} else if (platform.includes("ios")) {
-			version = "iOS_3_X_X";
-		} else if (platform.includes("mac")) {
-			version = "OS_X_3_X_X";
-		} else {
-			version = "Windows_3_X_X__2";
-		}
-
 		const sep = this.address.indexOf("/");
 		let address = this.address;
 		let channel = this.channelId === undefined ? undefined : "/" + this.channelId;
@@ -40,7 +25,7 @@ export default class Self {
 				address,
 				name: this.username,
 				channel,
-				version,
+				version: getDefaultVersion(),
 				ignore_identity_mismatch: false,
 				log_commands: false,
 				log_packets: false,

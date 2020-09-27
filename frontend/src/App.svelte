@@ -3,7 +3,7 @@
 	import Connect from "./connect/Connect.svelte";
 	import Connected from "./Connected.svelte";
 	import { ConnectionState, Connection } from "./connection";
-	import { BUILD_ENV, BUILD_DAT } from "./util";
+	import { BUILD_ENV, BUILD_DAT, getConnectFromString } from "./util";
 	import { transientSettings } from "./transientSettings";
 
 	console.log("BUILD", BUILD_ENV, BUILD_DAT);
@@ -25,6 +25,16 @@
 		}
 		return;
 	};
+
+	const loc = location.hash;
+	if (loc && loc !== "" && loc !== "#") {
+		try {
+			// Starts with #
+			connection.connect(getConnectFromString(decodeURIComponent(loc.substr(1))));
+		} catch(e) {
+			console.error("Failed to connect to previous connection", e);
+		}
+	}
 </script>
 
 {#if $state !== ConnectionState.Connected && $state !== ConnectionState.ChannelListFinished}
