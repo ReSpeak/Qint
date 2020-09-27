@@ -1,11 +1,12 @@
 import { Chat } from "./chat/chat";
-import { OutMsg, OMsgConnect, InMsg, Reason } from "./structs/ws";
+import { OutMsg, OMsgConnect, InMsg, Reason } from "./backend/ws";
 import { derived, get, writable, Readable, Writable } from "svelte/store";
-import { Book, Channel, Client } from "./tree/book";
+import { Book, Channel, Client } from "./book";
 import { plugins, loadPlugins } from "./plugins";
-import { BASE_ADDRESS, getStringFromConnect } from "./util";
+import { getStringFromConnect } from "./util";
 import { handleMessage } from "./notification";
 import { transientSettings } from "./transientSettings";
+import { backend, IBackendConnction } from "./backend/backend";
 
 export class Connection {
 	public readonly state = writable(ConnectionState.Disconnected);
@@ -17,13 +18,15 @@ export class Connection {
 	public ownClientId?: number;
 	public ownClient: Readable<Client | undefined> = derived(this.book.clients,
 		cls => this.ownClientId !== undefined ? cls.get(this.ownClientId) : undefined);
-	private socket?: WebSocket;
+	public backend: IBackendConnction;
 	private connectOptions: OMsgConnect | undefined;
-	public guid?: string;
+	
 	private muted: boolean = false;
 	public loudness: Writable<number> = writable(0);
 
 	constructor() {
+		this.backend = backend.createNewConnection();
+		this.book.server.subscribe(s => backend.setTitle(s.name + " – Qint"));
 		loadPlugins();
 		transientSettings.read_from_proxy();
 	}
@@ -34,12 +37,9 @@ export class Connection {
 		this.chat.reset();
 		this.server = undefined;
 		this.ownClientId = undefined;
-		this.guid = undefined;
-		if (this.socket)
-			this.socket.close();
-		this.socket = undefined;
+		this.backend.close();
 		this.muted = false;
-		document.title = "Qint";
+		backend.setTitle("Qint");
 	}
 
 	public getState(): ConnectionState {
@@ -52,63 +52,31 @@ export class Connection {
 
 	public connect(opt: OMsgConnect) {
 		this.error.set(undefined);
-		this.guid = Connection.createUuidV4();
 		this.connectOptions = opt;
-		let path = BASE_ADDRESS;
-		if (!path.startsWith("http"))
-			path = window.location.origin;
-		if (!path.startsWith("http"))
-			throw Error("Failed to get websocket path");
-		// Replace http by ws, so https gets wss
-		path = path.slice(4);
-
-		this.socket = new WebSocket(`ws${path}/con/${this.guid}/ws?format=Json`);
-		this.socket.onopen = () => {
-			this.sendMessage(opt);
-		};
-		this.socket.onerror = (error) => {
-			this.error.set("Connection failed, is Qint running?");
-		};
-		this.socket.onclose = () => {
-			// Plugins
-			for (const plugin of plugins) {
-				try {
-					if ("handleEvent" in plugin) {
-						plugin.handleEvent(this, { Disconnected: null });
-					}
-				} catch (e) {
-					console.error("Failed to handle event in plugin:", e);
-				}
-			}
-			this.reset();
-		};
-		this.socket.onmessage = (evt) => this.messageHandler(evt);
 		this.state.set(ConnectionState.Connecting);
-	}
-
-	// See https://jsperf.com/node-uuid-performance/64 about how to generate a uuid fast
-	private static createUuidV4(): string {
-		var d2h: string[] = [], vals = new Array(16);
-		for (var i = 0; i < 256; ++i) d2h.push((0x100 + i).toString(16).substr(1));
-
-		for (var i = 0; i < 16; ++i) vals[i] = Math.random() * 256 | 0;
-		vals[6] = vals[6] & 0x0f | 0x40;
-		vals[8] = vals[8] & 0x3f | 0x80;
-		return d2h[vals[0]] + d2h[vals[1]] + d2h[vals[2]] + d2h[vals[3]] +
-			'-' + d2h[vals[4]] + d2h[vals[5]] +
-			'-' + d2h[vals[6]] + d2h[vals[7]] +
-			'-' + d2h[vals[8]] + d2h[vals[9]] +
-			'-' + d2h[vals[10]] + d2h[vals[11]] + d2h[vals[12]] + d2h[vals[13]] + d2h[vals[14]] + d2h[vals[15]];
+		this.backend.connect(
+			(msg) => { this.messageHandler(msg) },
+			(err) => { this.error.set(`Connection failed, is Qint running? (${err})`); },
+			() => {
+				// Plugins
+				for (const plugin of plugins) {
+					try {
+						if ("handleEvent" in plugin) {
+							plugin.handleEvent(this, { Disconnected: null });
+						}
+					} catch (e) {
+						console.error("Failed to handle event in plugin:", e);
+					}
+				}
+				this.reset();
+			},
+		).then(() => {
+			this.backend.send(opt)
+		});
 	}
 
 	public sendMessage(data: OutMsg) {
-		if (this.socket)
-			this.socket.send(JSON.stringify(data));
-	}
-
-	public sendRawMessage(data: string) {
-		if (this.socket)
-			this.socket.send(data);
+		this.backend.send(data);
 	}
 
 	public disconnect(reason?: Reason, message?: string) {
@@ -142,8 +110,7 @@ export class Connection {
 		});
 	}
 
-	private messageHandler(evt: MessageEvent) {
-		const msg = JSON.parse(evt.data) as InMsg;
+	private messageHandler(msg: InMsg) {
 		// Plugins
 		for (const plugin of plugins) {
 			try {
@@ -197,8 +164,7 @@ export class Connection {
 		} else if ("Error" in msg) {
 			console.warn("Con Error:", msg.Error);
 			if (get(this.state) === ConnectionState.Connecting) {
-				if (this.socket)
-					this.socket.close();
+				this.backend.close();
 				this.error.set(msg.Error);
 			}
 		} else if ("Loudness" in msg) {
@@ -214,10 +180,4 @@ export enum ConnectionState {
 	Connecting,
 	Connected,
 	ChannelListFinished,
-}
-
-interface IConnectOptions {
-	address: string;
-	name: string;
-	// ...
 }

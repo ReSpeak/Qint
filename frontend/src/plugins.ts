@@ -1,19 +1,31 @@
 import { BASE_ADDRESS } from "./util";
+import { importModule } from "@uupaa/dynamic-import-polyfill";
+import { backend } from "./backend/backend";
 
 export let plugins: any[] = [];
+
+const importFunc = genImportFunc();
+
+function genImportFunc() {
+	try {
+		return new Function("url", `return import("${BASE_ADDRESS}/plugins/" + url);`);
+	} catch (err) {
+		return (url: string) => importModule(`${BASE_ADDRESS}/plugins/${url}`);
+	}
+}
 
 export async function loadPlugins() {
 	plugins = [];
 	let list: string[];
 	try {
-		list = await (await fetch(`${BASE_ADDRESS}/plugins`)).json();
+		list = await (await backend.fetch(`/plugins`)).json();
 	} catch (err) {
 		console.log("Failed to load plugins list", err);
 		return;
 	}
 	for (let i = 0; i < list.length; i++) {
 		try {
-			const mod = await import(`${BASE_ADDRESS}/plugins/${list[i]}`);
+			const mod = await importFunc(list[i]);
 			plugins.push(mod);
 		} catch (err) {
 			console.error(`Failed to load plugin ${list[i]}`);

@@ -1,6 +1,6 @@
+import "./extensions";
 import App from "./App.svelte";
 //import App from "./UiPlayground.svelte";
-import "./extensions";
 import { Connection } from "./connection";
 import { get } from "svelte/store";
 

@@ -1,6 +1,6 @@
 import { Connection } from "../connection";
-import { BASE_ADDRESS } from "../util";
 import { writable, Writable } from "svelte/store";
+import { backend } from "../backend/backend";
 
 export type IconSource = { icon_id: number | undefined } | undefined;
 export type IconSourceLike = {
@@ -12,6 +12,8 @@ export type IconSourceLike = {
 
 export const DummyStore: Writable<IconSource> = writable(undefined);
 
+// TODO Rework 'serverFileSrc' and 'cacheFileSrc' once we understand how tauri works.
+
 export function getClientIconPath(client: IconSourceLike | null | undefined, connection?: Connection, server?: string): string | undefined {
 	if (!connection && !server) {
 		console.error("ClientIcon needs either connection or server");
@@ -22,14 +24,14 @@ export function getClientIconPath(client: IconSourceLike | null | undefined, con
 
 	if (connection) {
 		if (client.avatar_hash && client.avatar_hash !== "" && client.uid)
-			return `${BASE_ADDRESS}/con/${connection.guid}/file/0/avatar_${client.getAvatarUid!()}?hash=${client.avatar_hash}`;
+			return `${connection.backend.serverFileSrc}/file/0/avatar_${client.getAvatarUid!()}?hash=${client.avatar_hash}`;
 		else if (client.icon_id)
-			return `${BASE_ADDRESS}/con/${connection.guid}/file/0/icon_${client.icon_id}`;
+			return `${connection.backend.serverFileSrc}/file/0/icon_${client.icon_id}`;
 	} else if (server) {
 		if (client.avatar_hash && client.avatar_hash !== "" && client.uid)
-			return `${BASE_ADDRESS}/filecache/${server}/0/avatar_${client.getAvatarUid!()}`;
+			return `${backend.cacheFileSrc}/${server}/0/avatar_${client.getAvatarUid!()}`;
 		else if (client.icon_id)
-			return `${BASE_ADDRESS}/filecache/${server}/0/icon_${client.icon_id}`;
+			return `${backend.cacheFileSrc}/${server}/0/icon_${client.icon_id}`;
 	}
 	return;
 }
@@ -44,10 +46,10 @@ export function getClientAvatarPath(client: IconSourceLike | null | undefined, c
 
 	if (connection) {
 		if (client.avatar_hash !== "" && client.uid)
-			return `${BASE_ADDRESS}/con/${connection.guid}/file/0/avatar_${client.getAvatarUid!()}?hash=${client.avatar_hash}`;
+			return `${connection.backend.serverFileSrc}/file/0/avatar_${client.getAvatarUid!()}?hash=${client.avatar_hash}`;
 	} else if (server) {
 		if (client.avatar_hash !== "" && client.uid)
-			return `${BASE_ADDRESS}/filecache/${server}/0/avatar_${client.getAvatarUid!()}`;
+			return `${backend.cacheFileSrc}/${server}/0/avatar_${client.getAvatarUid!()}`;
 	}
 	return;
 }
@@ -68,9 +70,9 @@ export function getIconPath(source: IconSource, connection?: Connection, server?
 	else if (i === 600) return "alpha-v-circle-outline";
 
 	if (connection) {
-		return `${BASE_ADDRESS}/con/${connection.guid}/file/0/icon_${i}`;
+		return `${connection.backend.serverFileSrc}/file/0/icon_${i}`;
 	} else if (server) {
-		return `${BASE_ADDRESS}/filecache/${server}/0/icon_${i}`;
+		return `${backend.cacheFileSrc}/${server}/0/icon_${i}`;
 	}
 	return;
 }

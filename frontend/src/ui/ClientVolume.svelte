@@ -1,9 +1,9 @@
 <script lang="typescript">
 	import { onMount } from "svelte";
 	import { Connection } from "../connection";
-	import { Client } from "../tree/book";
-	import BSlider from "../ui/BSlider.svelte";
-	import Icon from "../ui/Icon.svelte";
+	import { Client } from "../book";
+	import BSlider from "./BSlider.svelte";
+	import Icon from "./Icon.svelte";
 
 	export let connection: Connection;
 	export let client: Client;

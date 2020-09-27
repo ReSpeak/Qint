@@ -1,10 +1,10 @@
 import { Writable, writable, get } from "svelte/store";
-import { InBookChangeMsg } from "../structs/ws";
-import { graphql } from "../graphql";
-import { Connection } from "../connection";
-import { binarySearchBy, binarySearchByKey, getDataColor, arraysEqual, Lazy, base64Decode, base64Encode } from "../util";
-import "../extensions";
-import { ChannelId, ChannelType, ClientId, Codec, ServerGroupId } from "../structs/ts";
+import { InBookChangeMsg } from "./backend/ws";
+import { graphql } from "./graphql";
+import { Connection } from "./connection";
+import { binarySearchBy, binarySearchByKey, getDataColor, arraysEqual, Lazy, base64Decode, base64Encode } from "./util";
+import "./extensions";
+import { ChannelId, ChannelType, ClientId, Codec, ServerGroupId } from "./ts";
 
 export class Book {
 	public server: Writable<Server> = writable(new Server());
@@ -349,7 +349,6 @@ export class Book {
 					msg.PropertyAdded.id.ClientServerGroup[1]);
 			} else if ("Server" in prop) {
 				this.updateServer(prop.Server);
-				document.title = get(this.server).name + " – Qint";
 			} else if ("IpAddr" in prop && "ServerIp" in msg.PropertyAdded.id) {
 				this.addServerIp(msg.PropertyAdded.id.ServerIp[0]);
 			} else if ("ServerGroup" in prop) {
@@ -527,7 +526,7 @@ export class Client extends GraphQlClient implements ITreeNode {
 	// ITreeParent
 	public children: Writable<ITreeNode[]> = writable([]);
 
-	// ITeeeNode
+	// ITreeNode
 	public filterShow: boolean = true;
 	public get key() { return `u${this.id}`; }
 
@@ -553,7 +552,7 @@ export class Client extends GraphQlClient implements ITreeNode {
 		await graphql(`mutation SetClientVolume($connection: ID!, $client: ID!, $volume: Float!) {
 			setClientVolume(connection: $connection, client: $client, volume: $volume) { void }
 		}`, {
-			connection: connection.guid,
+			connection: connection.backend?.getGuidTmpHack(),
 			client: this.uidStr,
 			volume,
 		});
@@ -603,7 +602,7 @@ export class Channel implements ITreeParent, ITreeNode {
 	// ITreeParent
 	public children: Writable<ITreeNode[]> = writable([]);
 
-	// ITeeeNode
+	// ITreeNode
 	public filterShow: boolean = true;
 	public get key() { return `c${this.id}`; }
 

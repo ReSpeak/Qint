@@ -6,16 +6,19 @@ import livereload from "rollup-plugin-livereload";
 import { terser } from "rollup-plugin-terser";
 import copy from 'rollup-plugin-copy';
 import typescript from '@rollup/plugin-typescript';
+import babel from "@rollup/plugin-babel";
 
 const svelteOptions = require("./svelte.config");
 
-const production = !process.env.ROLLUP_WATCH;
+//console.log(process.env);
+const start_liveserver = (process.env.ROLLUP_WATCH ?? "false").toLowerCase() === "true";
+const production = false;
 
 export default {
 	input: "src/main.ts",
 	output: {
 		sourcemap: true,
-		format: "iife",
+		format: "umd",
 		name: "app",
 		file: "public/bundle.js"
 	},
@@ -42,6 +45,11 @@ export default {
 				importee === "svelte" || importee.startsWith("svelte/")
 		}),
 		commonjs(),
+		babel({
+			extensions: ['.js', '.mjs', '.html', '.svelte'],
+			include: ['src/**', 'node_modules/svelte/**'],
+			babelHelpers: 'bundled'
+		}),
 		typeCheck(),
 		typescript({ sourceMap: !production }),
 		copy({
@@ -53,7 +61,7 @@ export default {
 
 		// Watch the `public` directory and refresh the
 		// browser on changes when not in production
-		!production && livereload("public"),
+		start_liveserver && livereload("public"),
 
 		// If we're building for production (npm run build
 		// instead of npm run dev), minify

@@ -1,7 +1,7 @@
 <script lang="typescript">
 	import { get } from "svelte/store";
 	import { Connection } from "../connection";
-	import type { ServerGroupId } from "../structs/ts";
+	import type { ServerGroupId } from "../ts";
 	//import { Moment } from "moment";
 	import Icon from "../ui/Icon.svelte";
 	import PlatformIcon from "../ui/PlatformIcon.svelte";
@@ -10,9 +10,9 @@
 	import ClientName from "../ui/ClientName.svelte";
 	import StickyList from "../ui/StickyList.svelte";
 	import StickySlot from "../ui/StickySlot.svelte";
-	import ClientVolume from "../controls/ClientVolume.svelte";
+	import ClientVolume from "../ui/ClientVolume.svelte";
 	import { getClientAvatarPath } from "../ui/clientIcon";
-	import { Reason } from "../structs/ws";
+	import { Reason } from "../backend/ws";
 
 	export let connection: Connection;
 	export let clientId: number;

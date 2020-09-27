@@ -1,5 +1,5 @@
 import chroma from "chroma-js";
-import { OMsgConnect } from "./structs/ws";
+import { OMsgConnect } from "./backend/ws";
 export const debug: boolean = true;
 
 

@@ -23,7 +23,7 @@
 	}
 
 	onMount(() => {
-		stickyChildren = stickyList.querySelectorAll<HTMLElement>(":scope > .stickySlot");
+		stickyChildren = Array(...stickyList.children).filter(c => c.matches(".stickySlot")) as HTMLElement[];
 		stickySizes = Array(stickyChildren.length);
 		stickyAcc = Array(stickyChildren.length);
 		let obs = new ResizeObserver(() => updateChildSize());

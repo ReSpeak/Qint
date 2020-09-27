@@ -1,7 +1,7 @@
 // tslint:disable: interface-name
 
-import { Channel, ChannelGroup, Client, Server, ServerGroup } from "../tree/book";
-import { ChannelId, ChannelGroupId, ChannelType, ClientId, Codec, ServerGroupId } from "./ts";
+import { Channel, ChannelGroup, Client, Server, ServerGroup } from "../book";
+import { ChannelId, ChannelGroupId, ChannelType, ClientId, Codec, ServerGroupId } from "../ts";
 
 export type WsMessageTarget =
 	"Server"
@@ -65,8 +65,8 @@ interface OMsgSubscribeLoudness {
 
 interface OMsgChange {
 	Change: ChangeChannelEdit | ChangeChannelMove | ChangeClientEdit | ChangeClientUpdate
-		| ChangeClientMove | ChangeClientAddServerGroup | ChangeClientRemoveServerGroup
-		| ChangeClientKick;
+	| ChangeClientMove | ChangeClientAddServerGroup | ChangeClientRemoveServerGroup
+	| ChangeClientKick;
 }
 
 interface ChangeChannelEdit {

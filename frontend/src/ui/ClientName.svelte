@@ -1,5 +1,5 @@
 <script lang="typescript">
-	import { GraphQlClient } from "../tree/book";
+	import { GraphQlClient } from "../book";
 	import { Message } from "../chat/chat";
 	import { getDataColor } from "../util";
 

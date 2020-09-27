@@ -1,6 +1,6 @@
 <script lang="typescript">
 	import UiChannel from "./UiChannel.svelte";
-	import { Channel } from "./book";
+	import { Channel } from "../book";
 	import { Connection } from "../connection";
 
 	export let connection: Connection;

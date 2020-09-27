@@ -11,7 +11,7 @@
 	import BInput from "../ui/BInput.svelte";
 	import { on } from "../util";
 	import { transientSettings } from "../transientSettings";
-	import { MessageTarget } from "../structs/ts";
+	import { MessageTarget } from "../ts";
 
 	export let connection: Connection;
 	let chat = connection.chat;

@@ -7,9 +7,9 @@
 	import Icon from "../ui/Icon.svelte";
 	import UiBookmark from "./UiBookmark.svelte";
 	import { graphql } from "../graphql";
-	import { Book, Channel } from "../tree/book";
+	import { Book, Channel } from "../book";
 	import UiChannel from "../tree/UiChannel.svelte";
-	import type { ChannelId } from "../structs/ts";
+	import type { ChannelId } from "../ts";
 	import { SERVER_ICON, CLIENT_ICON, base64Decode, hexEncode } from "../util";
 
 	export let connection: Connection;

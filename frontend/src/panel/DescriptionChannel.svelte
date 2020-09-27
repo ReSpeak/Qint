@@ -1,11 +1,11 @@
 <script lang="typescript">
 	import { Connection } from "../connection";
-	import { Client } from "../tree/book";
-	import type { ITreeNode } from "../tree/book";
+	import { Client } from "../book";
+	import type { ITreeNode } from "../book";
 	import TsIcon from "../ui/TsIcon.svelte";
 	import StickyList from "../ui/StickyList.svelte";
 	import StickySlot from "../ui/StickySlot.svelte";
-	import { codecToName } from "../structs/ts";
+	import { codecToName } from "../ts";
 
 	export let connection: Connection;
 	export let channelId: number;

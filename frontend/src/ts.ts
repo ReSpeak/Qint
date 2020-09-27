@@ -1,6 +1,6 @@
 import { get } from "svelte/store";
-import { Connection } from "../connection";
-import { WsMessageTarget } from "./ws";
+import { Connection } from "./connection";
+import { WsMessageTarget } from "./backend/ws";
 
 export type ChannelId = number;
 export type ChannelGroupId = number;

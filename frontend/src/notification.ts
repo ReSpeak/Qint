@@ -1,6 +1,6 @@
 import { get } from "svelte/store";
-import { Book, Channel, Client, Server, ServerGroup } from "./tree/book";
-import { InBookMsg, InMsg, Invoker, Reason } from "./structs/ws";
+import { Book, Channel, Client, Server, ServerGroup } from "./book";
+import { InBookMsg, InMsg, Invoker, Reason } from "./backend/ws";
 import { Connection, ConnectionState } from "./connection";
 import { transientSettings } from "./transientSettings";
 

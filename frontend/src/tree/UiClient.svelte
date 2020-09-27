@@ -1,11 +1,11 @@
 <script lang="typescript">
 	import TsIcon from "../ui/TsIcon.svelte";
-	import ClientVolume from "../controls/ClientVolume.svelte";
+	import ClientVolume from "../ui/ClientVolume.svelte";
 	import ServerGroupIcon from "../ui/ServerGroupIcon.svelte";
 	import FilterString from "../ui/FilterString.svelte";
 	import Icon from "../ui/Icon.svelte";
 	import { Connection } from "../connection";
-	import { Client } from "./book";
+	import { Client } from "../book";
 	import { draggable, DragData } from "../ui/draggable";
 	import { findParent } from "../util";
 

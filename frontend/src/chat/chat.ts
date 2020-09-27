@@ -2,8 +2,8 @@ import { get, writable, Writable } from "svelte/store";
 import type { Moment } from "moment";
 import { Connection } from "../connection";
 import { graphql, toDatetime } from "../graphql";
-import { MessageTarget } from "../structs/ts";
-import { Channel, Client, GraphQlClient } from "../tree/book";
+import { MessageTarget } from "../ts";
+import { Channel, Client, GraphQlClient } from "../book";
 import { getDataColor, assert, Lazy } from "../util";
 import { ListFetchDir, FetchResult } from "../ui/lazyList";
 

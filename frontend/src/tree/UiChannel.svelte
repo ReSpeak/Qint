@@ -3,8 +3,8 @@
 	import Icon from "../ui/Icon.svelte";
 	import TsIcon from "../ui/TsIcon.svelte";
 	import FilterString from "../ui/FilterString.svelte";
-	import { Channel, Client } from "./book";
-	import type { ITreeNode } from "./book";
+	import { Channel, Client } from "../book";
+	import type { ITreeNode } from "../book";
 	import UiClient from "./UiClient.svelte";
 	import { Connection } from "../connection";
 	import { draggable, DragData } from "../ui/draggable";

@@ -1,6 +1,7 @@
-import { BASE_ADDRESS, soft_merge } from "./util";
-import { MessageTarget } from "./structs/ts";
+import { soft_merge } from "./util";
+import { MessageTarget } from "./ts";
 import { Connection } from "./connection";
+import { backend } from "./backend/backend";
 
 type FilterFlags<Base, Condition> = {
 	[Key in keyof Base]: Base[Key] extends Condition ? never : Key
@@ -17,7 +18,7 @@ export class TransientSettings {
 	public chat = new TransientSettingsChat(this);
 
 	public async read_from_proxy() {
-		const resp = await fetch(`${BASE_ADDRESS}/transient/*`);
+		const resp = await backend.fetch(`/transient/*`);
 		const data = await resp.json();
 		soft_merge(this, data);
 	}
@@ -45,7 +46,7 @@ export class TransientSettings {
 			? [group, this[group]]
 			: ["*", this];
 
-		await fetch(`${BASE_ADDRESS}/transient/${path}`, {
+		await backend.fetch(`/transient/${path}`, {
 			method: 'PUT',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(obj, (k, v) => k.startsWith('_') ? undefined : v)
