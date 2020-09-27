@@ -341,11 +341,11 @@ async fn get_plugin(state: web::Data<Arc<State>>, data: web::Path<String>) -> im
 
 #[get("/con/{id}/file/{channel}/{path:.*}")]
 async fn download_file(
-	state: web::Data<Arc<State>>, data: web::Path<(Uuid, u64, String)>,
+	state: web::Data<Arc<State>>, web::Path((id, channel, path)): web::Path<(Uuid, u64, String)>,
 ) -> impl Responder {
-	let channel = ChannelId(data.1);
+	let channel = ChannelId(channel);
 	let cons = state.connections.lock().unwrap();
-	if let Some(con) = cons.get(&ConnectionId(data.0)).cloned() {
+	if let Some(con) = cons.get(&ConnectionId(id)).cloned() {
 		drop(cons);
 
 		// Lookup in cache
@@ -359,17 +359,15 @@ async fn download_file(
 				return HttpResponse::Gone().finish();
 			}
 		};
-		if let Some((len, stream)) =
-			FileCache::get_cached_file(&*state, server, channel, &data.2).await
+		if let Some((_, stream)) = FileCache::get_cached_file(&*state, server, channel, &path).await
 		{
 			// TODO Guess content type
-			return HttpResponse::Ok().content_length(len).streaming(stream);
+			return HttpResponse::Ok().streaming(stream);
 		}
 
-		debug!(state.logger, "Downloading file"; "channel" => data.1,
-			"path" => &data.2);
-		let (len, file_stream, server) =
-			match con.send(websocket::DownloadFile { channel, path: data.2.clone() }).await {
+		debug!(state.logger, "Downloading file"; "channel" => channel.0, "path" => &path);
+		let (_, file_stream, server) =
+			match con.send(websocket::DownloadFile { channel, path: path.clone() }).await {
 				Err(_) => {
 					return HttpResponse::Gone().finish();
 				}
@@ -377,10 +375,11 @@ async fn download_file(
 					if let Some(TsError::CommandError(tsclientlib::TsError::FileInvalidPath)) =
 						e.downcast_ref::<TsError>()
 					{
-						debug!(state.logger, "File not found"; "path" => &data.2);
+						debug!(state.logger, "File not found"; "path" => &path);
 						return HttpResponse::NotFound().finish();
 					} else {
-						error!(state.logger, "File download failed"; "error" => %e, "path" => &data.2);
+						error!(state.logger, "File download failed"; "error" => %e,
+							"path" => &path);
 						return HttpResponse::InternalServerError()
 							.body(format!("Failed to download file: {}", e));
 					}
@@ -407,11 +406,11 @@ async fn download_file(
 		}
 
 		// Cache icons and avatars for offline usage
-		if channel.0 == 0 && (data.2.starts_with("icon_") || data.2.starts_with("avatar_")) {
-			let stream = FileCache::cache_file(&*state, server, channel, &data.2, stream).await;
-			response.content_length(len).streaming(stream)
+		if channel.0 == 0 && (path.starts_with("icon_") || path.starts_with("avatar_")) {
+			let stream = FileCache::cache_file(&*state, server, channel, &path, stream).await;
+			response.streaming(stream)
 		} else {
-			response.content_length(len).streaming(stream)
+			response.streaming(stream)
 		}
 	} else {
 		HttpResponse::Gone().finish()
@@ -421,19 +420,18 @@ async fn download_file(
 /// Get a cached file by server id, channel and path.
 #[get("/filecache/{id}/{channel}/{path:.*}")]
 async fn download_cache_file(
-	state: web::Data<Arc<State>>, data: web::Path<(String, u64, String)>,
+	state: web::Data<Arc<State>>, web::Path((id, channel, path)): web::Path<(String, u64, String)>,
 ) -> impl Responder {
-	let server = match hex::decode(&data.0) {
+	let server = match hex::decode(&id) {
 		Err(e) => {
 			return HttpResponse::BadRequest().body(format!("Not a valid server uid: {}", e));
 		}
 		Ok(uid) => Uid(uid),
 	};
-	let channel = ChannelId(data.1);
-	if let Some((len, stream)) = FileCache::get_cached_file(&*state, server, channel, &data.2).await
-	{
+	let channel = ChannelId(channel);
+	if let Some((_, stream)) = FileCache::get_cached_file(&*state, server, channel, &path).await {
 		// TODO Guess content type
-		HttpResponse::Ok().content_length(len).streaming(stream)
+		HttpResponse::Ok().streaming(stream)
 	} else {
 		HttpResponse::NotFound().finish()
 	}

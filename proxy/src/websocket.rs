@@ -663,9 +663,7 @@ impl Handler<DownloadFile> for Ws {
 
 impl Handler<GetUidMsg> for Ws {
 	type Result = Result<Uid>;
-	fn handle(
-		&mut self, _: GetUidMsg, _: &mut Self::Context,
-	) -> Self::Result {
+	fn handle(&mut self, _: GetUidMsg, _: &mut Self::Context) -> Self::Result {
 		if let Some(con) = &self.connection {
 			match con
 				.get_server_key()
@@ -689,7 +687,9 @@ impl Handler<GetClientVolumeMsg> for Ws {
 		if let Some(con) = &self.connection {
 			match con.get_state() {
 				Ok(state) => {
-					let uid_fut: Box<dyn ActorFuture<Actor = Self, Output = Result<Vec<u8>>>>;
+					let uid_fut: Box<
+						dyn ActorFuture<Actor = Self, Output = Result<Vec<u8>>> + Unpin,
+					>;
 					if let Some(client) = state.clients.get(&client) {
 						uid_fut = Box::new(wrap_future(future::ready(
 							client
