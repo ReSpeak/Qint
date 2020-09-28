@@ -20,13 +20,18 @@ export class Connection {
 		cls => this.ownClientId !== undefined ? cls.get(this.ownClientId) : undefined);
 	public backend: IBackendConnction;
 	private connectOptions: OMsgConnect | undefined;
-	
+
 	private muted: boolean = false;
 	public loudness: Writable<number> = writable(0);
 
 	constructor() {
 		this.backend = backend.createNewConnection();
-		this.book.server.subscribe(s => backend.setTitle(s.name + " – Qint"));
+		this.book.server.subscribe(s => {
+			if (s === undefined || s.name === undefined)
+				backend.setTitle("Qint")
+			else
+				backend.setTitle(s.name + " – Qint")
+		});
 		loadPlugins();
 		transientSettings.read_from_proxy();
 	}

@@ -11,7 +11,7 @@ import babel from "@rollup/plugin-babel";
 const svelteOptions = require("./svelte.config");
 
 //console.log(process.env);
-const start_liveserver = (process.env.ROLLUP_WATCH ?? "false").toLowerCase() === "true";
+const start_liveserver = (process.env.ROLLUP_WATCH || "false").toLowerCase() === "true";
 const production = false;
 
 export default {
