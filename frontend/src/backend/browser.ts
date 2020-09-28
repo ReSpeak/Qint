@@ -39,7 +39,7 @@ export class BrowserBackendConnection implements IBackendConnction {
 			this.socket.send(JSON.stringify(data));
 	}
 	public connect(onMsg: msgFn, onError: errorFn, onClose: closedFn): Promise<void> {
-		close();
+		this.close();
 
 		this.guid = BrowserBackendConnection.createUuidV4();
 		this.serverFileSrc = `${BASE_ADDRESS}/con/${this.guid}`;

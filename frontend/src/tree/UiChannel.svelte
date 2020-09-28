@@ -215,8 +215,7 @@
 				class="nameBox"
 				on:click={setChat}>
 				{#if showId}
-					[
-					<FilterString filter={thisFilter} content={channel.id.toString()} />]
+					[<FilterString filter={thisFilter} content={channel.id.toString()} />]
 				{/if}
 				<FilterString filter={showId ? '' : thisFilter} content={displayName} />
 			</span>
@@ -287,11 +286,13 @@
 			opacity: 0;
 		}
 		&.spacer {
-			> :global(*:first-child) {
-				opacity: 1;
-			}
 			> :global(*:last-child) {
 				opacity: 0;
+			}
+		}
+		&.spacer.haschildren {
+			> :global(*:first-child) {
+				opacity: 1;
 			}
 		}
 		&.haschildren:hover {
