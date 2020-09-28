@@ -3,7 +3,7 @@
 	import { Message } from "../chat/chat";
 	import { getDataColor } from "../util";
 
-	export let client!: GraphQlClient | Message;
+	export let client: GraphQlClient | Message;
 
 	let color: string = "";
 	let name: string = "";

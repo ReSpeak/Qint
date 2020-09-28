@@ -432,6 +432,13 @@ export class Book {
 	}
 }
 
+type MaxClients = "Inherited" | "Unlimited" | { Limited: number };
+type GroupNamingMode = any;
+type IconHash = number | undefined;
+type GroupType = any;
+export type RustDateTimeOffset = [number, number, number, number];
+
+
 export class GraphQlClient {
 	public uid!: number[];
 	public name!: string;
@@ -469,11 +476,12 @@ export class GraphQlClient {
 	public getAvatarUid(): string | undefined {
 		if (this.avatar_hash === "")
 			return;
+		const a0 = 'a'.charCodeAt(0);
 		let res = "";
 		for (let i = 0; i < this.uid.length; i++) {
 			const c = this.uid[i];
-			res += String.fromCharCode('a'.charCodeAt(0) + (c >> 4));
-			res += String.fromCharCode('a'.charCodeAt(0) + (c & 0xf));
+			res += String.fromCharCode(a0 + (c >> 4));
+			res += String.fromCharCode(a0 + (c & 0xf));
 		}
 		return res;
 	}
@@ -572,8 +580,6 @@ export class Client extends GraphQlClient implements ITreeNode {
 	}
 }
 
-type MaxClients = "Inherited" | "Unlimited" | { Limited: number };
-
 export class Channel implements ITreeParent, ITreeNode {
 	public id!: ChannelId;
 	public parent!: ChannelId;
@@ -635,6 +641,13 @@ export class Server implements ITreeParent {
 	// Base64 encoded, result from graphql
 	public publicKey?: string;
 	public ips!: string[];
+	public license!: string; // TODO enum
+	public created!: RustDateTimeOffset;
+	public max_clients!: number;
+	public nickname!: string;
+	public platform!: string;
+	public version!: string;
+	public welcome_message!: string;
 
 	// ITreeParent
 	public children: Writable<ITreeNode[]> = writable([]);
@@ -653,10 +666,6 @@ export class Server implements ITreeParent {
 		}
 	}
 }
-
-type GroupNamingMode = any;
-type IconHash = number | undefined;
-type GroupType = any;
 
 export class Group {
 	id!: number;

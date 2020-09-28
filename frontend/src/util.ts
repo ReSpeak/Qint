@@ -1,5 +1,8 @@
 import chroma from "chroma-js";
+import moment from "moment";
+import { Moment } from "moment";
 import { OMsgConnect } from "./backend/ws";
+import { RustDateTimeOffset } from "./book";
 export const debug: boolean = true;
 
 
@@ -312,3 +315,18 @@ export function soft_merge(obj: any, merge: any) {
 }
 
 export function on(..._: any[]) { }
+
+export function parse_rust_datetime(rust_date: RustDateTimeOffset | undefined): Moment {
+	//[DATE: ( Year, DayOfYear ), TIME: (Seconds, Nanoseconds) ]
+	if (rust_date === undefined) {
+		return moment.unix(0);
+	}
+
+	const total_seconds = rust_date[2];
+	const h = Math.floor(total_seconds / 3600);
+	const h_rest = total_seconds % 3600;
+	const m = Math.floor(h_rest / 60);
+	const s = h_rest % 60;
+
+	return moment(`${rust_date[0]}-${rust_date[1]}-${h}-${m}-${s}`, "YYYY-DDD-HH-mm-ss");
+}

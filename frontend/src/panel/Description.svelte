@@ -2,6 +2,7 @@
 	import { Connection } from "../connection";
 	import DescriptionClient from "./DescriptionClient.svelte";
 	import DescriptionChannel from "./DescriptionChannel.svelte";
+	import DescriptionServer from "./DescriptionServer.svelte";
 
 	export let connection: Connection;
 	let selected = connection.chat.selectedChat;
@@ -14,7 +15,7 @@
 	{:else if 'Channel' in s}
 		<DescriptionChannel {connection} channelId={s.Channel} />
 	{:else if 'Server' in s}
-		<div>Server here</div>
+		<DescriptionServer {connection} />
 	{/if}
 </div>
 
