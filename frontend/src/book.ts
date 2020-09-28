@@ -436,7 +436,7 @@ type MaxClients = "Inherited" | "Unlimited" | { Limited: number };
 type GroupNamingMode = any;
 type IconHash = number | undefined;
 type GroupType = any;
-export type RustDateTimeOffset = [number, number, number, number];
+export type OffsetDateTime = [number, number];
 
 
 export class GraphQlClient {
@@ -642,7 +642,7 @@ export class Server implements ITreeParent {
 	public publicKey?: string;
 	public ips!: string[];
 	public license!: string; // TODO enum
-	public created!: RustDateTimeOffset;
+	public created!: OffsetDateTime;
 	public max_clients!: number;
 	public nickname!: string;
 	public platform!: string;

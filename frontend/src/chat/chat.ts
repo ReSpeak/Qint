@@ -1,10 +1,10 @@
 import { get, writable, Writable } from "svelte/store";
 import type { Moment } from "moment";
 import { Connection } from "../connection";
-import { graphql, toDatetime } from "../graphql";
+import { graphql } from "../graphql";
 import { MessageTarget } from "../ts";
 import { Channel, Client, GraphQlClient } from "../book";
-import { getDataColor, assert, Lazy } from "../util";
+import { datetimeDeserialize, getDataColor, assert, Lazy } from "../util";
 import { ListFetchDir, FetchResult } from "../ui/lazyList";
 
 export class Chat {
@@ -130,7 +130,7 @@ export class Chat {
 					client = GraphQlClient.fromGraphqlInvoker(msg.invoker);
 				}
 				msgs.push(new Message(msg.id, client, msg.invokerName,
-					msg.content, msg.rendered, toDatetime(msg.time, msg.timezone)));
+					msg.content, msg.rendered, datetimeDeserialize([msg.time, msg.timezone])));
 			});
 			console.log("Fetching messages " + (load_at_beginning ? "before" : "after"), [start_time, start_id], "; got", msgs);
 

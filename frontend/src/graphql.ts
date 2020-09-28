@@ -11,7 +11,3 @@ export async function graphql(query: string, variables: any = undefined): Promis
 	});
 	return await val.json();
 }
-
-export function toDatetime(timestamp: number, timezone: number): Moment {
-	return moment.unix(timestamp)/*.utcOffset(timezone / 60)*/;
-}

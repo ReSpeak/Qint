@@ -2,7 +2,7 @@ import chroma from "chroma-js";
 import moment from "moment";
 import { Moment } from "moment";
 import { OMsgConnect } from "./backend/ws";
-import { RustDateTimeOffset } from "./book";
+import { OffsetDateTime } from "./book";
 export const debug: boolean = true;
 
 
@@ -17,6 +17,7 @@ export const EDIT_ICON = "pencil-outline";
 export const BASE_ADDRESS = ""; //"__buildEnv__" === "development" ? "http://localhost:4422" : "";
 export const BUILD_ENV = "__buildEnv__";
 export const BUILD_DAT = "__buildDat__";
+export const LONG_DATETIME = "dddd, MMMM Do YYYY, HH:mm:ss UTCZ";
 
 export async function sleep(timeout: number): Promise<void> {
 	return new Promise(resolve => setTimeout(resolve, timeout));
@@ -300,10 +301,14 @@ export function hexEncode(data: number[]): string {
 	return res;
 }
 
+export function datetimeDeserialize(rust_date: OffsetDateTime): Moment {
+	return moment.unix(rust_date[0]).utcOffset(rust_date[1] / 60);
+}
+
 /**
  * Works similar to Object.assign except that it doesn't overwrite existing
  * object structures. But instead merges them recursively
-*/
+ */
 export function soft_merge(obj: any, merge: any) {
 	for (const [key, value] of Object.entries(merge)) {
 		if (typeof obj[key] === "object") {
@@ -315,18 +320,3 @@ export function soft_merge(obj: any, merge: any) {
 }
 
 export function on(..._: any[]) { }
-
-export function parse_rust_datetime(rust_date: RustDateTimeOffset | undefined): Moment {
-	//[DATE: ( Year, DayOfYear ), TIME: (Seconds, Nanoseconds) ]
-	if (rust_date === undefined) {
-		return moment.unix(0);
-	}
-
-	const total_seconds = rust_date[2];
-	const h = Math.floor(total_seconds / 3600);
-	const h_rest = total_seconds % 3600;
-	const m = Math.floor(h_rest / 60);
-	const s = h_rest % 60;
-
-	return moment(`${rust_date[0]}-${rust_date[1]}-${h}-${m}-${s}`, "YYYY-DDD-HH-mm-ss");
-}

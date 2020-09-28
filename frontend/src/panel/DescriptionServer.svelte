@@ -1,8 +1,9 @@
 <script lang="typescript">
 	import { Connection } from "../connection";
 	import { Server } from "../book";
+	import moment from "moment";
 	import { Moment } from "moment";
-	import { parse_rust_datetime } from "../util";
+	import { datetimeDeserialize, LONG_DATETIME } from "../util";
 	import Icon from "../ui/Icon.svelte";
 	import PlatformIcon from "../ui/PlatformIcon.svelte";
 	import ServerName from "../ui/ServerName.svelte";
@@ -16,7 +17,7 @@
 	let create_date: Moment;
 	$: {
 		server = $serverStore;
-		create_date = parse_rust_datetime(server.created);
+		create_date = server.created !== undefined ? datetimeDeserialize(server.created) : moment.unix(0);
 	}
 
 	function disconnect() {
@@ -51,7 +52,7 @@
 		</div>
 		<div class="dataLine">
 			<div>Created:</div>
-			<div>{create_date.format('LLLL')}</div>
+			<div>{create_date.format(LONG_DATETIME)}</div>
 		</div>
 		<div class="dataLine">
 			<div>Current Clients:</div>

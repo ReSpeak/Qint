@@ -119,9 +119,15 @@ for struc in &self.3.0 {
 	} #>
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct Js<#= struc.name #> {
-	<# for p in get_all_properties(&self.structs, &struc.parts) { #>
+	<# for p in get_all_properties(&self.structs, &struc.parts) {
+		let type_s = p.get_rust_type(false);
+		if type_s == "OffsetDateTime" { #>
+	#[serde(default, deserialize_with = "deserialize_some_date_time", serialize_with = "serialize_some_date_time", skip_serializing_if = "Option::is_none")]
+	pub <#= p.name.to_snake_case() #>: Option<<#= type_s #>>,
+		<# } else { #>
 	#[serde(default, deserialize_with = "deserialize_some", skip_serializing_if = "Option::is_none")]
-	pub <#= p.name.to_snake_case() #>: Option<<#= p.get_rust_type(false) #>>,
+	pub <#= p.name.to_snake_case() #>: Option<<#= type_s #>>,
+		<# } #>
 	<# } #>
 }
 

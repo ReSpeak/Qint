@@ -45,6 +45,7 @@ export class Connection {
 		this.backend.close();
 		this.muted = false;
 		backend.setTitle("Qint");
+		location.hash = "";
 	}
 
 	public getState(): ConnectionState {

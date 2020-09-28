@@ -1,6 +1,6 @@
 import { Moment } from "moment";
-import { graphql, toDatetime } from "../graphql";
-import { hexEncode, base64Decode } from "../util";
+import { graphql } from "../graphql";
+import { datetimeDeserialize, hexEncode, base64Decode } from "../util";
 
 interface BookmarkChannel {
 	id: string;
@@ -26,7 +26,7 @@ export class Bookmark {
 	constructor(content: any) {
 		Object.assign(this, content);
 		if (this.lastUsed)
-			this.lastUsed = toDatetime(content.lastUsed, content.timezone);
+			this.lastUsed = datetimeDeserialize([content.lastUsed, content.timezone]);
 		if (this.server !== null) {
 			if (content.server?.icon !== undefined)
 				this.server.icon_id = Number(content.server.icon);

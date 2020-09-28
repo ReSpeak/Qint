@@ -4,6 +4,7 @@
 	import { onMount } from "svelte";
 	import Icon from "../ui/Icon.svelte";
 	import { Message } from "./chat";
+	import { LONG_DATETIME } from "../util";
 
 	export let message: Message;
 
@@ -51,7 +52,7 @@
 <svelte:options immutable />
 <div class="message-row">
 	<div class="message-time chat-left-col">
-		<span title={message.date.format('dddd, MMMM Do YYYY, HH:mm:ss')}>
+		<span title={message.date.format(LONG_DATETIME)}>
 			{message.date.format('HH:mm')}
 		</span>
 	</div>
