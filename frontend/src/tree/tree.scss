@@ -51,7 +51,6 @@
 .nameBox {
 	@extend %unselectable;
 	flex: 1;
-	text-align: left;
 
 	&:hover {
 		color: $link-hover;

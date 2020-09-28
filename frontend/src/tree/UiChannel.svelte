@@ -9,6 +9,8 @@
 	import { Connection } from "../connection";
 	import { draggable, DragData } from "../ui/draggable";
 	import { findParent, assert } from "../util";
+	import { SpacerType } from "./tree";
+	import { ChannelType } from "../ts";
 
 	export let connection: Connection | undefined = undefined;
 	export let server: string | undefined = undefined;
@@ -35,11 +37,19 @@
 			isSelected = "Channel" in sc && sc.Channel === channel.id;
 		}
 	}
+
+	let spacerType: SpacerType;
+	let displayName: string;
+	$: {
+		let chanData = getDisplayName(channel);
+		spacerType = chanData.type;
+		displayName = chanData.name;
+	}
+
 	let div!: HTMLElement;
 
 	function updateOwnClient(_children: ITreeNode[]) {
-		if (connection === undefined)
-			return false;
+		if (connection === undefined) return false;
 		let isOwn = false;
 		let client = get(connection.ownClient);
 		if (client !== undefined) {
@@ -48,47 +58,41 @@
 		return isOwn;
 	}
 
-	function applyFilter(filter: string, filterStartFromRoot: boolean, channel: Channel, children: ITreeNode[]) {
+	function applyFilter(
+		filter: string,
+		filterStartFromRoot: boolean,
+		channel: Channel,
+		children: ITreeNode[]
+	) {
 		assert(filter != null, "filter is null");
 		if (filter === "") {
-			if (showId)
-				showId = false;
-			if (childrenFilter !== filter)
-				childrenFilter = filter;
-			if (thisFilter !== filter)
-				thisFilter = filter;
+			if (showId) showId = false;
+			if (childrenFilter !== filter) childrenFilter = filter;
+			if (thisFilter !== filter) thisFilter = filter;
 			return true;
 		}
 		const filterById = filter[0] === "/";
 		if (filterById) {
 			// Ignore filterStartFromRoot when matching by id
 			const matches = channel.id.toString().includes(filter.substr(1));
-			if (!showId)
-				showId = true;
-			if (childrenFilter !== filter)
-				childrenFilter = filter;
-			if (thisFilter !== filter.substr(1))
-				thisFilter = filter.substr(1);
-			return matches || children.some(c => c.filterShow);
+			if (!showId) showId = true;
+			if (childrenFilter !== filter) childrenFilter = filter;
+			if (thisFilter !== filter.substr(1)) thisFilter = filter.substr(1);
+			return matches || children.some((c) => c.filterShow);
 		} else {
-			if (showId)
-				showId = false;
+			if (showId) showId = false;
 			const index = filter.indexOf("/");
 			const newThisFilter = index === -1 ? filter : filter.substr(0, index);
-			if (thisFilter !== newThisFilter)
-				thisFilter = newThisFilter;
+			if (thisFilter !== newThisFilter) thisFilter = newThisFilter;
 			const matches = channel.name.toLowerCase().includes(thisFilter.toLowerCase());
 			if (filterStartFromRoot) {
 				let newChildrenFilter = "";
-				if (index !== -1)
-					newChildrenFilter = filter.substr(index + 1);
-				if (childrenFilter !== newChildrenFilter)
-					childrenFilter = newChildrenFilter;
-				return matches && (childrenFilter === "" || children.some(c => c.filterShow));
+				if (index !== -1) newChildrenFilter = filter.substr(index + 1);
+				if (childrenFilter !== newChildrenFilter) childrenFilter = newChildrenFilter;
+				return matches && (childrenFilter === "" || children.some((c) => c.filterShow));
 			}
-			if (childrenFilter !== filter)
-				childrenFilter = filter;
-			return matches || children.some(c => c.filterShow);
+			if (childrenFilter !== filter) childrenFilter = filter;
+			return matches || children.some((c) => c.filterShow);
 		}
 	}
 
@@ -101,8 +105,7 @@
 	}
 
 	function hover() {
-		if (connection === undefined)
-			return;
+		if (connection === undefined) return;
 		hovered = true;
 	}
 
@@ -164,14 +167,30 @@
 			console.log("Would drop", channel.id, "to", dropTarget.dataset.key, "at", clickPerc);
 		}
 	}
+
+	function getDisplayName(c: Channel) {
+		// TODO consider special names [*spacer] --- ... -.- ___ -..
+		let data = { type: SpacerType.None, name: c.name };
+		if (c.parent !== 0 || c.channel_type !== ChannelType.Permanent) return data;
+		const match = /^\[(c|l|r|\*|)spacer[^\]]*\](.*)$/.exec(c.name);
+		if (match == null) return data;
+		data.name = match[2];
+		if (match[1] === "*") {
+			data.type = SpacerType.StarSpacer;
+			data.name = match[2].repeat(50 / match[2].length);
+		} else if (match[1] === "c") {
+			data.type = SpacerType.CSpacer;
+		} else if (match[1] === "l") {
+			data.type = SpacerType.LSpacer;
+		} else if (match[1] === "r") {
+			data.type = SpacerType.RSpacer;
+		}
+		return data;
+	}
 </script>
 
 <li class="container" class:hidden={!filterShow} class:collapsed>
-	<div
-		bind:this={div}
-		on:mouseover={hover}
-		on:mouseout={leave}
-		class="hoverDummy">
+	<div bind:this={div} on:mouseover={hover} on:mouseout={leave} class="hoverDummy">
 		<div
 			class="innerContainer"
 			class:ownClient
@@ -183,16 +202,23 @@
 			data-key={channel.id}>
 			<button
 				class="button collapseButton noBut"
-				on:click={() => (collapsed = !collapsed)}
-				class:haschildren={$children.length !== 0}>
+				class:haschildren={$children.length !== 0}
+				class:spacer={spacerType !== SpacerType.None}
+				on:click={() => (collapsed = !collapsed)}>
 				<Icon name="chevron-right{collapsed ? '' : ' mdi-rotate-90'}" />
 				<TsIcon type="channel" source={channel} {connection} {server} />
 			</button>
-			<span class="nameBox" on:click={setChat}>
+			<span
+				class:spacerC={spacerType === SpacerType.CSpacer || spacerType === SpacerType.StarSpacer}
+				class:spacerL={spacerType === SpacerType.LSpacer}
+				class:spacerR={spacerType === SpacerType.RSpacer}
+				class="nameBox"
+				on:click={setChat}>
 				{#if showId}
-					[<FilterString filter={thisFilter} content={channel.id.toString()} />]
+					[
+					<FilterString filter={thisFilter} content={channel.id.toString()} />]
 				{/if}
-				<FilterString filter={showId ? "" : thisFilter} content={channel.name} />
+				<FilterString filter={showId ? '' : thisFilter} content={displayName} />
 			</span>
 			{#if connection !== undefined}
 				<span class="icons">
@@ -220,7 +246,11 @@
 					channel={child}
 					bind:filterShow={child.filterShow} />
 			{:else if child instanceof Client && connection !== undefined}
-				<UiClient {connection} filter={childrenFilter} client={child} bind:filterShow={child.filterShow} />
+				<UiClient
+					{connection}
+					filter={childrenFilter}
+					client={child}
+					bind:filterShow={child.filterShow} />
 			{:else}
 				{@debug child}
 			{/if}
@@ -252,14 +282,26 @@
 		}
 	}
 
-	.collapseButton > :global(*:first-child) {
-		opacity: 0;
-	}
-	.collapseButton.haschildren:hover > :global(*:first-child) {
-		opacity: 1;
-	}
-	.collapseButton.haschildren:hover > :global(*:last-child) {
-		opacity: 0;
+	.collapseButton {
+		> :global(*:first-child) {
+			opacity: 0;
+		}
+		&.spacer {
+			> :global(*:first-child) {
+				opacity: 1;
+			}
+			> :global(*:last-child) {
+				opacity: 0;
+			}
+		}
+		&.haschildren:hover {
+			> :global(*:first-child) {
+				opacity: 1;
+			}
+			> :global(*:last-child) {
+				opacity: 0;
+			}
+		}
 	}
 
 	.menu-list li ul {
@@ -273,5 +315,22 @@
 
 	.collapsed .innerContainer .nameBox {
 		color: mix($text, $background, 60%);
+	}
+
+	@mixin spacer {
+		text-overflow: clip;
+	}
+
+	.spacerL {
+		@include spacer;
+		text-align: start;
+	}
+	.spacerC {
+		@include spacer;
+		text-align: center;
+	}
+	.spacerR {
+		@include spacer;
+		text-align: end;
 	}
 </style>
