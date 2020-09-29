@@ -8,7 +8,7 @@
 	export let showDescription: boolean;
 	export let displayPanel: DisplayPanel;
 
-	let ownClient = connection.ownClient;
+	let ownClient = connection.book.ownClient;
 	$: input_muted = $ownClient?.input_muted;
 	$: output_muted = $ownClient?.output_muted;
 	$: isAway = $ownClient?.away_message !== null;

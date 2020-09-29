@@ -199,6 +199,9 @@ interface IMsgPropertyIdClientServerGroup {
 	ClientServerGroup: [ClientId, ServerGroupId];
 }
 
+// TODO: This declaration is wrong
+// it should be "Server", but then typescript complanins
+// that we can't use 'in' on the union any more
 interface IMsgPropertyIdServer {
 	Server: {};
 }

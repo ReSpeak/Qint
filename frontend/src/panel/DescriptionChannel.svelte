@@ -1,7 +1,5 @@
 <script lang="typescript">
 	import { Connection } from "../connection";
-	import { Client } from "../book";
-	import type { ITreeNode } from "../book";
 	import TsIcon from "../ui/TsIcon.svelte";
 	import StickyList from "../ui/StickyList.svelte";
 	import StickySlot from "../ui/StickySlot.svelte";
@@ -10,9 +8,10 @@
 	export let connection: Connection;
 	export let channelId: number;
 
-	$: channel = connection.book.getChannel(channelId)!;
-	$: children = channel.children;
-	$: clientCount = $children.filter((c: ITreeNode) => c instanceof Client).length;
+	$: channelRaw = connection.book.getChannel(channelId)!;
+	$: channel = $channelRaw;
+	$: clients = channelRaw.clients;
+	$: clientCount = $clients.length;
 	let formatMaxClients: string | number = 0;
 	$: {
 		// TODO: calculate inheritance?
@@ -51,5 +50,4 @@
 </StickyList>
 
 <style>
-
 </style>

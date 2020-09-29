@@ -30,6 +30,7 @@ export class BrowserBackendConnection implements IBackendConnction {
 	constructor() {
 		this.serverFileSrc = "";
 	}
+
 	getGuidTmpHack(): string {
 		return this.guid!;
 	}
@@ -38,6 +39,7 @@ export class BrowserBackendConnection implements IBackendConnction {
 		if (this.socket)
 			this.socket.send(JSON.stringify(data));
 	}
+
 	public connect(onMsg: msgFn, onError: errorFn, onClose: closedFn): Promise<void> {
 		this.close();
 
@@ -60,6 +62,7 @@ export class BrowserBackendConnection implements IBackendConnction {
 			this.socket!.onopen = () => { resolve() };
 		});
 	}
+
 	public close(): void {
 		if (this.socket)
 			this.socket.close();
@@ -69,10 +72,10 @@ export class BrowserBackendConnection implements IBackendConnction {
 
 	// See https://jsperf.com/node-uuid-performance/64 about how to generate a uuid fast
 	private static createUuidV4(): string {
-		var d2h: string[] = [], vals = new Array(16);
-		for (var i = 0; i < 256; ++i) d2h.push((0x100 + i).toString(16).substr(1));
+		const d2h: string[] = [], vals = new Array(16);
+		for (let i = 0; i < 256; ++i) d2h.push((0x100 + i).toString(16).substr(1));
 
-		for (var i = 0; i < 16; ++i) vals[i] = Math.random() * 256 | 0;
+		for (let i = 0; i < 16; ++i) vals[i] = Math.random() * 256 | 0;
 		vals[6] = vals[6] & 0x0f | 0x40;
 		vals[8] = vals[8] & 0x3f | 0x80;
 		return d2h[vals[0]] + d2h[vals[1]] + d2h[vals[2]] + d2h[vals[3]] +

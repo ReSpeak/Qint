@@ -3,11 +3,12 @@ import type { Moment } from "moment";
 import { Connection } from "../connection";
 import { graphql } from "../graphql";
 import { MessageTarget } from "../ts";
-import { Channel, Client, GraphQlClient } from "../book";
+import { Channel, Client, GraphQlClient, ITreeNode, Server } from "../book";
 import { datetimeDeserialize, getDataColor, assert, Lazy } from "../util";
 import { ListFetchDir, FetchResult } from "../ui/lazyList";
 
 export class Chat {
+	private selectedNode: ITreeNode | undefined = undefined;
 	public readonly selectedChat: Writable<MessageTarget> = writable(MessageTarget.ToServer());
 	public readonly unreadCount: Writable<number> = writable(0);
 	public static readonly EmptyFetch: FetchResult<Message> = {
@@ -21,20 +22,32 @@ export class Chat {
 	) { }
 
 	public reset() {
+		this.selectedNode = undefined;
 		this.selectedChat.set(MessageTarget.ToServer());
 		this.unreadCount.set(0);
 	}
 
 	public selectChannel(channel: Channel) {
 		this.selectedChat.set(MessageTarget.ToChannel(channel.id));
+		this.selectNode(channel);
 	}
 
 	public selectClient(client: Client) {
 		this.selectedChat.set(MessageTarget.ToClient(client.id));
+		this.selectNode(client);
 	}
 
-	public selectServer() {
+	public selectServer(server: Server) {
 		this.selectedChat.set(MessageTarget.ToServer());
+		this.selectNode(server);
+	}
+
+	private selectNode(node: ITreeNode) {
+		if (this.selectedNode !== undefined) {
+			this.selectedNode.update({ isSelected: false });
+		}
+		node.update({ isSelected: true });
+		this.selectedNode = node;
 	}
 
 	private static groupMessages(messages: Message[], lastEntry: Message | undefined, dir: ListFetchDir): void {

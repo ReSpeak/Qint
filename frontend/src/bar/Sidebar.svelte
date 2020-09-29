@@ -9,13 +9,12 @@
 	export let connection: Connection;
 	export let filter: string;
 	let server = connection.book.server;
-	let selectedChat = connection.chat.selectedChat;
-	$: selectedServerChat = "Server" in $selectedChat;
+	$: selectedServerChat = $server.isSelected;
 </script>
 
 <aside class="sidebar">
 	<StickyList>
-		<StickySlot styled={false} on:click={() => connection.chat.selectServer()}>
+		<StickySlot styled={false} on:click={() => connection.chat.selectServer(server)}>
 			<div class="button" class:selectedServerChat>
 				<TsIcon type="server" source={$server} {connection} />
 				<ServerName server={$server} />

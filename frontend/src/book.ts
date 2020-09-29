@@ -1,28 +1,29 @@
-import { Writable, writable, get } from "svelte/store";
+import { Writable, writable, get, Readable } from "svelte/store";
 import { InBookChangeMsg } from "./backend/ws";
 import { graphql } from "./graphql";
 import { Connection } from "./connection";
-import { binarySearchBy, binarySearchByKey, getDataColor, arraysEqual, Lazy, base64Decode, base64Encode } from "./util";
-import "./extensions";
+import { binarySearchBy, getDataColor, arraysEqual, Lazy, base64Decode, base64Encode } from "./util";
 import { ChannelId, ChannelType, ClientId, Codec, ServerGroupId } from "./ts";
 
 export class Book {
-	public server: Writable<Server> = writable(new Server());
-	public clients: Writable<Map<number, Client>> = writable(new Map());
-	public channels: Writable<Map<number, Channel>> = writable(new Map());
+	public server: Server = new Server();
+	public clients: Map<number, Client> = new Map();
+	public channels: Map<number, Channel> = new Map();
 	public channelGroups: Writable<Map<number, Writable<ChannelGroup>>> = writable(new Map());
 	public serverGroups: Writable<Map<number, Writable<ServerGroup>>> = writable(new Map());
 	private currentTalkers: [number, boolean][] = [];
+	public ownClientId?: number;
+	public ownClient: Writable<Client | undefined> = writable(undefined);
 
 	public reset() {
-		this.server.set(new Server());
-		this.clients.set(new Map());
-		this.channels.set(new Map());
+		this.server = new Server();
+		this.clients.clear();
+		this.channels.clear();
+		this.channelGroups.set(new Map());
+		this.serverGroups.set(new Map());
 		this.currentTalkers = [];
-	}
-
-	private static findChannelStart(list: ArrayLike<ITreeNode>): number {
-		return binarySearchByKey(list, 1, e => e instanceof Client ? 0 : 2).index;
+		this.ownClientId = undefined;
+		this.ownClient.set(undefined);
 	}
 
 	private static listString(list: ITreeNode[]): string {
@@ -39,8 +40,8 @@ export class Book {
 		return res;
 	}
 
-	public static addChannelSorted(list: ITreeNode[], elem: Channel): ITreeNode[] {
-		let start = Book.findChannelStart(list);
+	public static addChannelSorted(list: Channel[], elem: Channel): Channel[] {
+		let start = 0;
 		if (elem.order === 0) {
 			list.splice(start, 0, elem);
 			let lastElem = elem;
@@ -98,41 +99,35 @@ export class Book {
 	}
 
 	public addChannel(channel: Channel) {
-		this.channels.update(channels => {
-			if (channels.has(channel.id)) throw Error(`Channel ${channel.id} already exists`);
-			channels.set(channel.id, channel);
-			let parent: ITreeParent | undefined;
-			if (channel.parent === 0) parent = get(this.server);
-			else parent = channels.get(channel.parent);
-			if (parent) {
-				parent.children.update(pch => Book.addChannelSorted(pch, channel));
-			}
-			return channels;
-		});
+		if (this.channels.has(channel.id)) throw Error(`Channel ${channel.id} already exists`);
+		this.channels.set(channel.id, channel);
+		let parent: ITreeParent | undefined;
+		if (channel.parent === 0) parent = this.server;
+		else parent = this.channels.get(channel.parent);
+		if (parent !== undefined) {
+			parent.channels.update(pch => Book.addChannelSorted(pch, channel));
+		}
 	}
 
 	public updateChannel(id: number, obj: Partial<Channel>) {
-		this.channels.update(channels => {
-			const channel = channels.get(id);
-			if (channel === undefined) {
-				console.error(`Cannot update non-existant channel ${id}`);
-				return channels;
+		const channel = this.channels.get(id);
+		if (channel === undefined) {
+			console.error(`Cannot update non-existant channel ${id}`);
+			return;
+		}
+		const oldParent = channel.parent;
+		channel.update(obj);
+		// Update node in channel tree
+		if (channel.parent !== oldParent || "order" in obj) {
+			let parent = this.getChannel(oldParent);
+			if (parent !== undefined) {
+				parent.channels.update(pch => { pch.remove_item(channel); return pch; });
 			}
-			const oldParent = channel.parent;
-			channel.update(obj);
-			// Update node in channel tree
-			if ("parent" in obj || "order" in obj) {
-				let parent = this.getChannel(oldParent);
-				if (parent !== undefined) {
-					parent.children.update(pch => { pch.remove_item(channel); return pch; });
-				}
-				parent = this.getChannel(channel.parent);
-				if (parent !== undefined) {
-					parent.children.update(pch => Book.addChannelSorted(pch, channel));
-				}
+			parent = this.getChannel(channel.parent);
+			if (parent !== undefined) {
+				parent.channels.update(pch => Book.addChannelSorted(pch, channel));
 			}
-			return channels;
-		});
+		}
 	}
 
 	public removeChannel(id: number): void {
@@ -140,16 +135,12 @@ export class Book {
 		if (channel === undefined) return;
 		const parent = this.getNode(channel.parent);
 		if (parent !== undefined) {
-			parent.children.update(c => { c.remove_item(channel); return c; });
+			parent.channels.update(c => { c.remove_item(channel); return c; });
 		}
-		this.channels.update(channels => {
-			channels.delete(id);
-			return channels;
-		});
+		this.channels.delete(id);
 	}
 
-	private static addClientSorted(list: ITreeNode[], elem: Client): ITreeNode[] {
-		let end = Book.findChannelStart(list);
+	private static addClientSorted(list: Client[], elem: Client): Client[] {
 		let i = binarySearchBy(list, t => {
 			let c = t as Client;
 			if (elem.talk_power < c.talk_power)
@@ -161,49 +152,39 @@ export class Book {
 			if (elem.name > c.name)
 				return -1;
 			return elem.id - c.id;
-		}, 0, end).index;
+		}).index;
 		list.splice(i, 0, elem);
 		return list;
 	}
 
-	public addClient(client: Client) {
-		this.clients.update(clients => {
-			if (clients.has(client.id)) throw Error(`Client ${client.id} already exists`);
-			clients.set(client.id, client);
-			let parent: ITreeParent | undefined = get(this.channels).get(client.channel);
-			if (parent !== undefined)
-				parent.children.update(pch => Book.addClientSorted(pch, client));
-			return clients;
-		});
+	public addClient(obj: Partial<Client>) {
+		const client = Client.fromJson(obj, (obj.id === this.ownClientId) ? this.ownClient : undefined);
+		if (this.clients.has(client.id)) throw Error(`Client ${client.id} already exists`);
+		this.clients.set(client.id, client);
+		let parent = this.channels.get(client.channel);
+		if (parent !== undefined)
+			parent.clients.update(pch => Book.addClientSorted(pch, client));
 	}
 
 	public updateClient(id: ClientId, obj: Partial<Client>) {
-		this.clients.update(clients => {
-			const client = this.getClient(id);
-			if (client === undefined) {
-				console.error(`Cannot update non-existant client ${id}`);
-				return clients;
+		const client = this.getClient(id);
+		if (client === undefined) {
+			console.error(`Cannot update non-existant client ${id}`);
+			return;
+		}
+		const oldChannel = client.channel;
+		client.update(obj);
+		// Update node in channel tree
+		if (client.channel !== oldChannel || "talk_power" in obj || "name" in obj) {
+			let parent = this.getChannel(oldChannel);
+			if (parent !== undefined) {
+				parent.clients.update(pch => { pch.remove_item(client); return pch; });
 			}
-			const oldChannel = client.channel;
-			client.update(obj);
-			// Update node in channel tree
-			if ("channel" in obj || "talk_power" in obj || "name" in obj) {
-				let parent = this.getChannel(oldChannel);
-				if (parent !== undefined) {
-					parent.children.update(pch => { pch.remove_item(client); return pch; });
-				}
-				parent = this.getChannel(client.channel);
-				if (parent !== undefined) {
-					parent.children.update(pch => Book.addClientSorted(pch, client));
-				}
-			} else {
-				const parent = this.getChannel(client.channel);
-				if (parent !== undefined) {
-					parent.children.update(pch => pch);
-				}
+			parent = this.getChannel(client.channel);
+			if (parent !== undefined) {
+				parent.clients.update(pch => Book.addClientSorted(pch, client));
 			}
-			return clients;
-		});
+		}
 	}
 
 	public removeClient(id: ClientId): void {
@@ -211,58 +192,45 @@ export class Book {
 		if (client === undefined) return;
 		const parent = this.getChannel(client.channel);
 		if (parent !== undefined) {
-			parent.children.update(pch => { pch.remove_item(client); return pch; });
+			parent.clients.update(pch => { pch.remove_item(client); return pch; });
 		}
-		this.clients.update(clients => {
-			clients.delete(id);
-			return clients;
-		});
+		this.clients.delete(id);
 	}
 
 	public addClientServerGroup(id: ClientId, group: ServerGroupId) {
-		this.clients.update(clients => {
-			const client = this.getClient(id);
-			if (client === undefined) {
-				console.error(`Cannot update non-existant client ${id}`);
-				return clients;
-			}
-			if (!client.server_groups.includes(group))
-				client.server_groups.push(group);
-			return clients;
-		});
+		const client = this.getClient(id);
+		if (client === undefined) {
+			console.error(`Cannot update non-existant client ${id}`);
+			return;
+		}
+		if (!client.server_groups.includes(group)) {
+			client.server_groups.push(group);
+			client.update({}); // TODO nicer?
+		}
 	}
 
 	public removeClientServerGroup(id: ClientId, group: ServerGroupId) {
-		this.clients.update(clients => {
-			const client = this.getClient(id);
-			if (client === undefined) {
-				console.error(`Cannot update non-existant client ${id}`);
-				return clients;
-			}
-			client.server_groups.remove_item(group);
-			return clients;
-		});
+		const client = this.getClient(id);
+		if (client === undefined) {
+			console.error(`Cannot update non-existant client ${id}`);
+			return;
+		}
+		client.server_groups.remove_item(group);
+		client.update({}); // TODO nicer?
 	}
 
 	public updateServer(obj: Partial<Server>) {
-		this.server.update(s => {
-			s.update(obj);
-			return s;
-		});
+		this.server.update(obj);
 	}
 
 	public addServerIp(ip: string) {
-		this.server.update(s => {
-			s.ips.push(ip);
-			return s;
-		})
+		this.server.ips.push(ip);
+		this.server.update({}); // TODO nicer
 	}
 
 	public removeServerIp(ip: string) {
-		this.server.update(s => {
-			s.ips.remove_item(ip);
-			return s;
-		})
+		this.server.ips.remove_item(ip);
+		this.server.update({}); // TODO nicer
 	}
 
 	public addChannelGroup(channelGroup: ChannelGroup) {
@@ -307,26 +275,22 @@ export class Book {
 		});
 	}
 
-	public getServer(): Server {
-		return get(this.server);
-	}
-
 	public getNode(id: number): Server | Channel | undefined {
 		if (id === 0)
-			return get(this.server);
+			return this.server;
 		else
-			return get(this.channels).get(id);
+			return this.channels.get(id);
 	}
 
 	public getChannel(id: number): Channel | undefined {
 		if (id === 0)
-			return;
+			return undefined;
 		else
-			return get(this.channels).get(id);
+			return this.channels.get(id);
 	}
 
 	public getClient(id: number): Client | undefined {
-		return get(this.clients).get(id);
+		return this.clients.get(id);
 	}
 
 	public getServerGroup(id: number): ServerGroup | undefined {
@@ -343,7 +307,7 @@ export class Book {
 			} else if ("ChannelGroup" in prop) {
 				this.addChannelGroup(ChannelGroup.fromJson(prop.ChannelGroup));
 			} else if ("Client" in prop) {
-				this.addClient(Client.fromJson(prop.Client));
+				this.addClient(prop.Client);
 			} else if ("ServerGroupId" in prop && "ClientServerGroup" in msg.PropertyAdded.id) {
 				this.addClientServerGroup(msg.PropertyAdded.id.ClientServerGroup[0],
 					msg.PropertyAdded.id.ClientServerGroup[1]);
@@ -387,24 +351,16 @@ export class Book {
 
 	public talkersHandler(talkers: [number, boolean][]) {
 		let oldTalkers = this.currentTalkers;
-		for (var talker of talkers) {
-			const id = talker[0];
+		for (const [id, isWhispering] of talkers) {
 			const i = oldTalkers.findIndex(t => t[0] === id);
 
-			if (i === -1 || oldTalkers[i][1] !== talker[1]) {
-				this.clients.update(clients => {
-					const client = this.getClient(id);
-					if (client === undefined) {
-						console.error(`Cannot update non-existant client ${id}`);
-						return clients;
-					}
-					client.talking = talker[1];
-					const parent = this.getChannel(client.channel);
-					if (parent !== undefined) {
-						parent.children.update(pch => pch);
-					}
-					return clients;
-				});
+			if (i === -1 || oldTalkers[i][1] !== isWhispering) {
+				const client = this.getClient(id);
+				if (client === undefined) {
+					console.error(`Cannot update non-existant client ${id}`);
+					continue;
+				}
+				client.update({ talking: isWhispering ? TalkState.Whisper : TalkState.Voice });
 			}
 
 			if (i !== -1)
@@ -412,21 +368,13 @@ export class Book {
 		}
 
 		// Remove old talkers
-		for (var talker of oldTalkers) {
-			const id = talker[0];
-			this.clients.update(clients => {
-				const client = this.getClient(id);
-				if (client === undefined) {
-					console.error(`Cannot update non-existant client ${id}`);
-					return clients;
-				}
-				client.talking = undefined;
-				const parent = this.getChannel(client.channel);
-				if (parent !== undefined) {
-					parent.children.update(pch => pch);
-				}
-				return clients;
-			});
+		for (const [id,] of oldTalkers) {
+			const client = this.getClient(id);
+			if (client === undefined) {
+				console.error(`Cannot update non-existant client ${id}`);
+				continue;
+			}
+			client.update({ talking: TalkState.Off });
 		}
 		this.currentTalkers = talkers;
 	}
@@ -495,57 +443,64 @@ export class GraphQlClient {
 	}
 }
 
-export class Client extends GraphQlClient implements ITreeNode {
-	public avatar_hash!: string;
-	public away_message!: string | null;
-	public badges!: string;
-	public channel!: number;
-	public channel_group!: number;
-	public server_groups!: number[];
-	public client_type!: string;
-	public country_code!: string;
-	public database_id!: number;
-	public description!: string
-	//public icon_id!: IconHash; // inherited from GraphQlClient
-	public id!: number;
-	public inherited_channel_group_from_channel!: number;
-	public input_hardware_enabled!: boolean;
-	public input_muted!: boolean;
-	public is_channel_commander!: boolean;
-	public is_priority_speaker!: boolean;
-	public is_recording!: boolean;
-	public metadata!: string
-	public name!: string;
-	public needed_serverquery_view_power!: number;
-	public output_hardware_enabled!: boolean;
-	public output_muted!: boolean;
-	public output_only_muted!: boolean;
-	public permission_hints!: string | null;
-	public phonetic_name!: string;
-	public talk_power!: number;
-	public talk_power_granted!: boolean;
-	public talk_power_request!: string | null;
-	public unread_messages!: number;
+export class Client extends GraphQlClient implements ITreeNode, Readable<Client> {
+	private _store: Writable<this>;
+	public readonly avatar_hash!: string;
+	public readonly away_message!: string | null;
+	public readonly badges!: string;
+	public readonly channel!: number;
+	public readonly channel_group!: number;
+	public readonly server_groups!: number[];
+	public readonly client_type!: string;
+	public readonly country_code!: string;
+	public readonly database_id!: number;
+	public readonly description!: string
+	//public readonly icon_id!: IconHash; // inherited from GraphQlClient
+	public readonly id!: number;
+	public readonly inherited_channel_group_from_channel!: number;
+	public readonly input_hardware_enabled!: boolean;
+	public readonly input_muted!: boolean;
+	public readonly is_channel_commander!: boolean;
+	public readonly is_priority_speaker!: boolean;
+	public readonly is_recording!: boolean;
+	public readonly metadata!: string
+	public readonly name!: string;
+	public readonly needed_serverquery_view_power!: number;
+	public readonly output_hardware_enabled!: boolean;
+	public readonly output_muted!: boolean;
+	public readonly output_only_muted!: boolean;
+	public readonly permission_hints!: string | null;
+	public readonly phonetic_name!: string;
+	public readonly talk_power!: number;
+	public readonly talk_power_granted!: boolean;
+	public readonly talk_power_request!: string | null;
+	public readonly unread_messages!: number;
 
-	public volume: Writable<number> = writable(0);
-	/// true if whispering, false if talking, undefined if silent
-	public talking?: boolean;
-
-	// ITreeParent
-	public children: Writable<ITreeNode[]> = writable([]);
+	public volume: Writable<number> = writable(0); // TODO store probably not needed anymore
+	public readonly talking: TalkState = TalkState.Off;
 
 	// ITreeNode
 	public filterShow: boolean = true;
-	public get key() { return `u${this.id}`; }
+	public isSelected: boolean = false;
 
-	protected constructor() { super(); }
+	protected constructor(store?: Writable<Client | undefined>) {
+		super();
+		this._store = (store ?? writable(undefined)) as Writable<this>;
+	}
 
-	public static fromJson(obj: Partial<Client>): Client {
-		return new Client().update(obj);
+	public static fromJson(obj: Partial<Client>, store?: Writable<Client | undefined>): Client {
+		return new Client(store).update(obj);
 	}
 
 	public update(obj: Partial<this>): this {
-		return Object.assign(this, obj);
+		Object.assign(this, obj);
+		this._store.set(this);
+		return this;
+	}
+
+	public subscribe(run: (c: this) => any): () => void {
+		console.log("Subscribe to ", this.name);
+		return this._store.subscribe(run);
 	}
 
 	public getColor() {
@@ -580,80 +535,110 @@ export class Client extends GraphQlClient implements ITreeNode {
 	}
 }
 
-export class Channel implements ITreeParent, ITreeNode {
-	public id!: ChannelId;
-	public parent!: ChannelId;
-	public name!: string;
-	public topic!: string | null;
-	public codec!: Codec;
-	public codec_quality!: number | null;
-	public max_clients!: MaxClients;
-	public max_family_clients!: MaxClients | null;
-	public order!: ChannelId;
-	public channel_type!: ChannelType; // Why is this called 'channel_' ?
-	public is_default!: boolean | null;
-	public has_password!: boolean | null;
-	public codec_latency_factor!: number | null;
-	public is_unencrypted!: boolean | null;
-	public delete_delay!: any | null;
-	public needed_talk_power!: number | null;
-	public forced_silence!: boolean | null;
-	public phonetic_name!: string | null;
-	public icon_id!: IconHash;
-	public is_private!: boolean | null;
-	public subscribed!: boolean;
-	public permission_hints!: any | null;
-	public optional_data!: any | null;
+export enum TalkState {
+	Off,
+	Voice,
+	Whisper
+}
 
+export class Channel implements ITreeParent, ITreeNode, Readable<Channel> {
+	public _store: Writable<this>;
+	public readonly id!: ChannelId;
+	public readonly parent!: ChannelId;
+	public readonly name!: string;
+	public readonly topic!: string | null;
+	public readonly codec!: Codec;
+	public readonly codec_quality!: number | null;
+	public readonly max_clients!: MaxClients;
+	public readonly max_family_clients!: MaxClients | null;
+	public readonly order!: ChannelId;
+	public readonly channel_type!: ChannelType; // Why is this called 'channel_' ?
+	public readonly is_default!: boolean | null;
+	public readonly has_password!: boolean | null;
+	public readonly codec_latency_factor!: number | null;
+	public readonly is_unencrypted!: boolean | null;
+	public readonly delete_delay!: any | null;
+	public readonly needed_talk_power!: number | null;
+	public readonly forced_silence!: boolean | null;
+	public readonly phonetic_name!: string | null;
+	public readonly icon_id!: IconHash;
+	public readonly is_private!: boolean | null;
+	public readonly subscribed!: boolean;
+	public readonly permission_hints!: any | null;
+	public readonly optional_data!: any | null;
+
+	public readonly clients: Writable<Client[]> = writable([]);
 	// ITreeParent
-	public children: Writable<ITreeNode[]> = writable([]);
+	public readonly channels: Writable<Channel[]> = writable([]);
 
 	// ITreeNode
 	public filterShow: boolean = true;
-	public get key() { return `c${this.id}`; }
+	public isSelected: boolean = false;
 
-	private constructor() { }
+	private constructor() {
+		this._store = writable(this);
+	}
 
 	public static fromJson(obj: Partial<Channel>): Channel {
 		return new Channel().update(obj);
 	}
 
 	public static fromGraphql(obj: any): Channel {
-		const c = new Channel();
-		c.id = Number(obj.id);
-		c.parent = Number(obj.parent);
-		c.name = obj.name;
-		c.order = obj.orderId;
-		c.icon_id = obj.icon;
-		return c;
+		return new Channel().update({
+			id: obj.id,
+			parent: obj.parent,
+			name: obj.name,
+			order: obj.orderId,
+			icon_id: obj.icon
+		});
 	}
 
 	public update(obj: Partial<this>): this {
-		return Object.assign(this, obj);
+		Object.assign(this, obj);
+		this._store.set(this);
+		return this;
+	}
+
+	public subscribe(run: (c: this) => any): () => void {
+		return this._store.subscribe(run);
 	}
 }
 
-export class Server implements ITreeParent {
-	public name!: string;
-	public phonetic_name!: string;
-	public icon_id!: IconHash;
-	public public_key?: number[];
+export class Server implements ITreeParent, ITreeNode, Readable<Server> {
+	public _store: Writable<this>;
+	public readonly name!: string;
+	public readonly phonetic_name!: string;
+	public readonly icon_id!: IconHash;
+	public readonly public_key?: number[];
 	// Base64 encoded, result from graphql
-	public publicKey?: string;
-	public ips!: string[];
-	public license!: string; // TODO enum
-	public created!: OffsetDateTime;
-	public max_clients!: number;
-	public nickname!: string;
-	public platform!: string;
-	public version!: string;
-	public welcome_message!: string;
+	public readonly publicKey?: string;
+	public readonly ips!: string[];
+	public readonly license!: string; // TODO enum
+	public readonly created!: OffsetDateTime;
+	public readonly max_clients!: number;
+	public readonly nickname!: string;
+	public readonly platform!: string;
+	public readonly version!: string;
+	public readonly welcome_message!: string;
+
+	public filterShow: boolean = true;
+	public isSelected: boolean = false;
+
+	constructor() {
+		this._store = writable(this);
+	}
 
 	// ITreeParent
-	public children: Writable<ITreeNode[]> = writable([]);
+	public channels: Writable<Channel[]> = writable([]);
 
 	public update(obj: Partial<this>): this {
-		return Object.assign(this, obj);
+		Object.assign(this, obj);
+		this._store.set(this);
+		return this;
+	}
+
+	public subscribe(run: (c: this) => any): () => void {
+		return this._store.subscribe(run);
 	}
 
 	public getColor() {
@@ -696,10 +681,11 @@ export class ChannelGroup extends Group {
 };
 
 export interface ITreeParent {
-	children: Writable<ITreeNode[]>;
+	channels: Writable<Channel[]>;
 }
 
 export interface ITreeNode {
 	filterShow: boolean;
-	key: any;
+	isSelected: boolean;
+	update(obj: Partial<this>): this;
 }

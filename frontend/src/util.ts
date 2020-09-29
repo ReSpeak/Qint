@@ -23,6 +23,7 @@ export async function sleep(timeout: number): Promise<void> {
 	return new Promise(resolve => setTimeout(resolve, timeout));
 }
 export function flash(element: HTMLElement) {
+	if (!element) return;
 	requestAnimationFrame(() => {
 		element.classList.remove("update-flash-fade");
 		element.classList.add("update-flash");
@@ -66,7 +67,7 @@ export function arraysEqual<T>(a: ArrayLike<T>, b: ArrayLike<T>): boolean {
 	if (a == null || b == null || a.length !== b.length)
 		return false;
 
-	for (var i = 0; i < a.length; ++i) {
+	for (let i = 0; i < a.length; ++i) {
 		if (a[i] !== b[i])
 			return false;
 	}

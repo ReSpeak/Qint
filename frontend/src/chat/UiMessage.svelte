@@ -13,7 +13,7 @@
 	$: renderedObj = render(message.rendered);
 
 	function render(html: string) {
-		var obj = document.createElement("div");
+		const obj = document.createElement("div");
 		obj.innerHTML = html;
 		// Apply highlight.js
 		for (let elem of obj.getElementsByTagName("code")) {

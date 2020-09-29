@@ -1,16 +1,19 @@
 <script lang="typescript">
+	import { afterUpdate } from "svelte";
 	import { get } from "svelte/store";
 	import Icon from "../ui/Icon.svelte";
 	import TsIcon from "../ui/TsIcon.svelte";
 	import FilterString from "../ui/FilterString.svelte";
-	import { Channel, Client } from "../book";
+	import { Channel } from "../book";
 	import type { ITreeNode } from "../book";
 	import UiClient from "./UiClient.svelte";
 	import { Connection } from "../connection";
 	import { draggable, DragData } from "../ui/draggable";
-	import { findParent, assert } from "../util";
+	import { findParent, assert, flash } from "../util";
 	import { SpacerType } from "./tree";
 	import { ChannelType } from "../ts";
+
+	afterUpdate(() => flash(div));
 
 	export let connection: Connection | undefined = undefined;
 	export let server: string | undefined = undefined;
@@ -18,7 +21,6 @@
 	export let filterShow: boolean = true;
 	export let filterStartFromRoot: boolean;
 	export let channel: Channel;
-	let selectedChat = connection?.chat.selectedChat;
 
 	let collapsed = false;
 	let hovered = false;
@@ -26,36 +28,28 @@
 	let thisFilter = "";
 	let childrenFilter = "";
 
-	let isSelected: boolean = false;
-	$: children = channel.children;
-	$: filterShow = applyFilter(filter, filterStartFromRoot, channel, $children);
+	$: isSelected = $channel.isSelected;
+	$: channels = channel.channels;
+	$: clients = channel.clients;
+	$: filterShow = applyFilter(filter, filterStartFromRoot, $channel, $channels);
 	// Update if a client moves in or out
-	$: ownClient = updateOwnClient($children);
-	$: {
-		if (selectedChat !== undefined) {
-			const sc = $selectedChat;
-			isSelected = "Channel" in sc && sc.Channel === channel.id;
-		}
-	}
+	$: ownClient = updateOwnClient($clients);
 
 	let spacerType: SpacerType;
 	let displayName: string;
 	$: {
-		let chanData = getDisplayName(channel);
+		let chanData = getDisplayName($channel);
 		spacerType = chanData.type;
 		displayName = chanData.name;
 	}
 
-	let div!: HTMLElement;
+	let div: HTMLElement;
 
 	function updateOwnClient(_children: ITreeNode[]) {
 		if (connection === undefined) return false;
-		let isOwn = false;
-		let client = get(connection.ownClient);
-		if (client !== undefined) {
-			isOwn = client.channel === channel.id;
-		}
-		return isOwn;
+		let client = get(connection.book.ownClient);
+		if (client === undefined) return false;
+		return client.channel === channel.id;
 	}
 
 	function applyFilter(
@@ -153,7 +147,7 @@
 				connection.moveChannel(channel.id, target.id, 0);
 			} else {
 				// Dropped BOTTOM
-				if (get(target.children).length > 0) {
+				if (get(target.channels).length > 0) {
 					// Case C: Channel HAS child
 					//      => Same as middle
 					connection.moveChannel(channel.id, target.id, 0);
@@ -202,11 +196,11 @@
 			data-key={channel.id}>
 			<button
 				class="button collapseButton noBut"
-				class:haschildren={$children.length !== 0}
+				class:haschildren={$channels.length !== 0}
 				class:spacer={spacerType !== SpacerType.None}
 				on:click={() => (collapsed = !collapsed)}>
 				<Icon name="chevron-right{collapsed ? '' : ' mdi-rotate-90'}" />
-				<TsIcon type="channel" source={channel} {connection} {server} />
+				<TsIcon type="channel" source={$channel} {connection} {server} />
 			</button>
 			<span
 				class:spacerC={spacerType === SpacerType.CSpacer || spacerType === SpacerType.StarSpacer}
@@ -215,7 +209,8 @@
 				class="nameBox"
 				on:click={setChat}>
 				{#if showId}
-					[<FilterString filter={thisFilter} content={channel.id.toString()} />]
+					[
+					<FilterString filter={thisFilter} content={channel.id.toString()} />]
 				{/if}
 				<FilterString filter={showId ? '' : thisFilter} content={displayName} />
 			</span>
@@ -230,29 +225,28 @@
 		{#if hovered}
 			<div class="hover menu" style="top: {div.getBoundingClientRect().top}px;">
 				<div class="corner" />
-				{channel.name}
+				{$channel.name}
 			</div>
 		{/if}
 	</div>
 	<ul class="menu-list">
-		{#each $children as child (child.key)}
-			{#if child instanceof Channel}
-				<svelte:self
-					{connection}
-					{server}
-					filter={childrenFilter}
-					{filterStartFromRoot}
-					channel={child}
-					bind:filterShow={child.filterShow} />
-			{:else if child instanceof Client && connection !== undefined}
+		{#if connection !== undefined}
+			{#each $clients as client (client.id)}
 				<UiClient
 					{connection}
 					filter={childrenFilter}
-					client={child}
-					bind:filterShow={child.filterShow} />
-			{:else}
-				{@debug child}
-			{/if}
+					{client}
+					bind:filterShow={client.filterShow} />
+			{/each}
+		{/if}
+		{#each $channels as channel (channel.id)}
+			<svelte:self
+				{connection}
+				{server}
+				filter={childrenFilter}
+				{filterStartFromRoot}
+				{channel}
+				bind:filterShow={channel.filterShow} />
 		{/each}
 	</ul>
 </li>

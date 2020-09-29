@@ -1,6 +1,3 @@
-import moment from "moment";
-import { Moment } from "moment";
-import { BASE_ADDRESS } from "./util";
 import { backend } from "./backend/backend";
 
 export async function graphql(query: string, variables: any = undefined): Promise<any> {

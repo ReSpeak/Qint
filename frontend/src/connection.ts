@@ -1,7 +1,7 @@
 import { Chat } from "./chat/chat";
 import { OutMsg, OMsgConnect, InMsg, Reason } from "./backend/ws";
-import { derived, get, writable, Readable, Writable } from "svelte/store";
-import { Book, Channel, Client } from "./book";
+import { get, writable, Writable } from "svelte/store";
+import { Book, Channel } from "./book";
 import { plugins, loadPlugins } from "./plugins";
 import { getStringFromConnect } from "./util";
 import { handleMessage } from "./notification";
@@ -15,9 +15,6 @@ export class Connection {
 	public readonly book: Book = new Book();
 	public readonly chat: Chat = new Chat(this);
 	public server?: string;
-	public ownClientId?: number;
-	public ownClient: Readable<Client | undefined> = derived(this.book.clients,
-		cls => this.ownClientId !== undefined ? cls.get(this.ownClientId) : undefined);
 	public backend: IBackendConnction;
 	private connectOptions: OMsgConnect | undefined;
 
@@ -27,11 +24,12 @@ export class Connection {
 	constructor() {
 		this.backend = backend.createNewConnection();
 		this.book.server.subscribe(s => {
-			if (s === undefined || s.name === undefined)
+			if (s?.name === undefined)
 				backend.setTitle("Qint")
 			else
 				backend.setTitle(s.name + " – Qint")
 		});
+		// TODO UNSUBSCRIBE
 		loadPlugins();
 		transientSettings.read_from_proxy();
 	}
@@ -41,7 +39,6 @@ export class Connection {
 		this.book.reset();
 		this.chat.reset();
 		this.server = undefined;
-		this.ownClientId = undefined;
 		this.backend.close();
 		this.muted = false;
 		backend.setTitle("Qint");
@@ -90,7 +87,7 @@ export class Connection {
 	}
 
 	public switchChannel(channel: Channel) {
-		this.moveClient(this.ownClientId!, channel.id);
+		this.moveClient(this.book.ownClientId!, channel.id);
 	}
 
 	public moveClient(clientId: number, channelId: number) {
@@ -130,15 +127,13 @@ export class Connection {
 
 		handleMessage(this, msg, plugins);
 		if ("Connected" in msg) {
-			this.state.set(ConnectionState.Connected);
 			this.server = msg.Connected.server;
-			this.ownClientId = msg.Connected.own_client;
+			this.book.ownClientId = msg.Connected.own_client;
 		} else if ("DisconnectedTemporarily" in msg) {
 			this.state.set(ConnectionState.Connecting);
 			this.book.reset();
 			this.chat.reset();
 			this.server = undefined;
-			this.ownClientId = undefined;
 		} else if ("Events" in msg) {
 			for (const tsevt of msg.Events) {
 				try {
@@ -152,14 +147,19 @@ export class Connection {
 					} else {
 						if ("PropertyRemoved" in tsevt) {
 							if ("Client" in tsevt.PropertyRemoved.id) {
-								if (tsevt.PropertyRemoved.id.Client === this.ownClientId) {
+								if (tsevt.PropertyRemoved.id.Client === this.book.ownClientId) {
 									this.reset();
 									return;
 								}
 							}
 						}
-
 						this.book.messageHandler(tsevt);
+						if ("PropertyAdded" in tsevt) {
+							if (tsevt.PropertyAdded.prop !== undefined &&
+								"Server" in tsevt.PropertyAdded.prop) {
+								this.state.set(ConnectionState.Connected);
+							}
+						}
 					}
 				} catch (err) {
 					console.error("Failed to handle event", tsevt, err);

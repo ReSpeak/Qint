@@ -18,9 +18,9 @@
 	export let clientId: number;
 
 	const sgs = connection.book.serverGroups;
-	const clients = connection.book.clients;
-	$: client = $clients.get(clientId)!;
-	$: avatarPath = getClientAvatarPath(client, connection);
+	$: clientRaw = connection.book.clients.get(clientId)!;
+	$: client = $clientRaw;
+	$: avatarPath = getClientAvatarPath($client, connection);
 	//let onlineSince: Moment; TODO
 
 	interface ExtendedGroup {
@@ -103,8 +103,8 @@
 	<StickySlot>Info</StickySlot>
 	<div class="descGroup">
 		<div class="dataLine headLine">
-			<TsIcon type="client" source={{icon_id: client.icon_id}} {connection} />
-			<ClientName {client} />
+			<TsIcon type="client" source={{icon_id: $client.icon_id}} {connection} />
+			<ClientName client={$client} />
 			<div style="flex: 1;" />
 			<div>
 				{'Version'}
@@ -113,7 +113,7 @@
 		</div>
 		<div class="dataLine">
 			<div>Description:</div>
-			<div>{client.description}</div>
+			<div>{$client.description}</div>
 		</div>
 		<div class="dataLine">
 			<div>Online since:</div>

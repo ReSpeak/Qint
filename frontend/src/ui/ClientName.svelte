@@ -11,7 +11,7 @@
 	function refreshClient(cl: GraphQlClient | Message) {
 		let data, name;
 		if (cl instanceof GraphQlClient) {
-			data = cl.uid;
+			data = cl.uid ?? cl.name;
 			name = cl.name;
 		} else {
 			data = cl.invoker?.uid ?? cl.invokerName ?? cl.displayName;

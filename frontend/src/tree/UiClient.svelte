@@ -1,32 +1,31 @@
 <script lang="typescript">
 	import TsIcon from "../ui/TsIcon.svelte";
 	import ClientVolume from "../ui/ClientVolume.svelte";
+	import ClientName from "../ui/ClientName.svelte";
 	import ServerGroupIcon from "../ui/ServerGroupIcon.svelte";
 	import FilterString from "../ui/FilterString.svelte";
 	import Icon from "../ui/Icon.svelte";
 	import { Connection } from "../connection";
-	import { Client } from "../book";
+	import { Client, TalkState } from "../book";
 	import { draggable, DragData } from "../ui/draggable";
-	import { findParent } from "../util";
+	import { findParent, flash } from "../util";
+	import { afterUpdate } from "svelte";
+
+	afterUpdate(() => flash(div));
 
 	export let connection: Connection;
 	export let client: Client;
 	export let filter: string;
 	export let filterShow: boolean = true;
-	let selectedChat = connection.chat.selectedChat;
 	let hovered = false;
 	let newHover = false;
 	let showId = false;
 	let thisFilter = "";
 
-	let isSelected: boolean = false;
-	$: filterShow = applyFilter(filter, client);
-	$: ownClient = client.id === connection.ownClientId;
-	$: {
-		const sc = $selectedChat;
-		isSelected = "Client" in sc && sc.Client === client.id;
-	}
-	let div!: HTMLElement;
+	$: isSelected = $client.isSelected;
+	$: filterShow = applyFilter(filter, $client);
+	let ownClient = client.id === connection.book.ownClientId;
+	let div: HTMLElement;
 
 	function setChat() {
 		connection.chat.selectClient(client);
@@ -34,24 +33,18 @@
 
 	function applyFilter(filter: string, client: Client) {
 		if (filter === "") {
-			if (showId)
-				showId = false;
-			if (thisFilter !== filter)
-				thisFilter = filter;
+			if (showId) showId = false;
+			if (thisFilter !== filter) thisFilter = filter;
 			return true;
 		}
 		const filterById = filter[0] === "/";
 		if (filterById) {
-			if (!showId)
-				showId = true;
-			if (thisFilter !== filter.substr(1))
-				thisFilter = filter.substr(1);
+			if (!showId) showId = true;
+			if (thisFilter !== filter.substr(1)) thisFilter = filter.substr(1);
 			return client.id.toString().includes(filter.substr(1));
 		} else {
-			if (showId)
-				showId = false;
-			if (thisFilter !== filter)
-				thisFilter = filter;
+			if (showId) showId = false;
+			if (thisFilter !== filter) thisFilter = filter;
 			return client.name.toLowerCase().includes(filter.toLowerCase());
 		}
 	}
@@ -106,25 +99,26 @@
 			on:svddrop={dragDrop}
 			data-type="client"
 			data-key={client.id}>
-			<div class:talking={client.talking !== undefined} class="talkWave" />
+			<div class:talking={$client.talking !== TalkState.Off} class="talkWave" />
 			<TsIcon type="client" source={client} {connection} />
 			<span class="nameBox" style={client.getColor()}>
 				{#if showId}
-					[<FilterString filter={thisFilter} content={client.id.toString()} />]
+					[
+					<FilterString filter={thisFilter} content={client.id.toString()} />]
 				{/if}
-				<FilterString filter={showId ? "" : thisFilter} content={client.name} />
+				<FilterString filter={showId ? '' : thisFilter} content={$client.name} />
 			</span>
 			<span class="icons">
-				{#if client.input_muted}
+				{#if $client.input_muted}
 					<Icon name="microphone-off" style="color: red;" />
 				{/if}
-				{#if client.output_muted}
+				{#if $client.output_muted}
 					<Icon name="volume-off" style="color: red;" />
 				{/if}
-				{#if client.away_message !== null}
+				{#if $client.away_message !== null}
 					<Icon name="sleep" style="color: rgb(70,180,255);" />
 				{/if}
-				{#each client.server_groups as grp (grp)}
+				{#each $client.server_groups as grp (grp)}
 					<ServerGroupIcon id={grp} {connection} />
 				{/each}
 			</span>
@@ -133,12 +127,12 @@
 			<div class="hover menu" style="top: {div.getBoundingClientRect().top}px;">
 				<div class="corner" />
 				<div class="name">
-					<span style={client.getColor()}>{client.name}</span>
+					<ClientName client={$client} />
 					{#if client.away_message !== null && client.away_message.length !== 0}
 						({client.away_message})
 					{/if}
 				</div>
-				<ClientVolume {client} {connection} />
+				<ClientVolume client={$client} {connection} />
 			</div>
 		{/if}
 	</div>

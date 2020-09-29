@@ -89,7 +89,7 @@
 				for (let c of channels.values()) {
 					// Add to parent
 					if (c.parent !== 0) {
-						let children = channels.get(c.parent)!.children;
+						let children = channels.get(c.parent)!.channels;
 						children.update(cs => {
 							Book.addChannelSorted(cs, c);
 							return cs;
@@ -193,12 +193,8 @@
 		{#if channelPart !== ""}
 			<div class="menu channel-list">
 				<ul class="menu-list">
-					{#each channels as channel (channel.key)}
-						{#if channel instanceof Channel}
-							<UiChannel {server} filter={channelPart} filterStartFromRoot={true} {channel} />
-						{:else}
-							{@debug channel}
-						{/if}
+					{#each channels as channel (channel.id)}
+						<UiChannel {server} filter={channelPart} filterStartFromRoot={true} {channel} />
 					{/each}
 				</ul>
 			</div>

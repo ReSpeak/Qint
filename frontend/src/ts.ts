@@ -61,7 +61,7 @@ export const MessageTarget = {
 		} else if ("Channel" in target) {
 			return `CHANNEL,${con.server},${target.Channel}`;
 		} else if ("Client" in target) {
-			const uid = get(con.book.clients).get(target.Client)?.uidStr;
+			const uid = con.book.clients.get(target.Client)?.uidStr;
 			if (uid === undefined) return undefined;
 			return `CLIENT,${uid}`;
 		} else if ("Poke" in target) {
@@ -76,7 +76,7 @@ export const MessageTarget = {
 			return target.Channel.toString();
 		} else if ("Client" in target) {
 			// TODO Should be uid
-			const uid = get(connection.book.clients).get(target.Client)?.uid ?? [];
+			const uid = connection.book.clients.get(target.Client)?.uid ?? [];
 			let uidStr = "";
 			uid.forEach((c: number) => {
 				uidStr += String.fromCharCode(c);

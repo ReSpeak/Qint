@@ -1,8 +1,6 @@
 <script lang="typescript">
 	import { Connection } from "../connection";
-	import { Server } from "../book";
 	import moment from "moment";
-	import { Moment } from "moment";
 	import { datetimeDeserialize, LONG_DATETIME } from "../util";
 	import Icon from "../ui/Icon.svelte";
 	import PlatformIcon from "../ui/PlatformIcon.svelte";
@@ -12,13 +10,10 @@
 	import StickySlot from "../ui/StickySlot.svelte";
 
 	export let connection: Connection;
-	const serverStore = connection.book.server;
-	let server: Server;
-	let create_date: Moment;
-	$: {
-		server = $serverStore;
-		create_date = server.created !== undefined ? datetimeDeserialize(server.created) : moment.unix(0);
-	}
+	const serverRaw = connection.book.server;
+	$: server = $serverRaw;
+	$: create_date =
+		$server.created !== undefined ? datetimeDeserialize($server.created) : moment.unix(0);
 
 	function disconnect() {
 		connection.disconnect();

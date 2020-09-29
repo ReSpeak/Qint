@@ -1,24 +1,23 @@
 <script lang="typescript">
 	import UiChannel from "./UiChannel.svelte";
-	import { Channel } from "../book";
 	import { Connection } from "../connection";
+	import { flash } from "../util";
+	import { afterUpdate } from "svelte";
+
+	let div: HTMLElement;
+	afterUpdate(() => flash(div));
 
 	export let connection: Connection;
 	export let filter: string;
 	let book = connection.book;
-	let server = book.server;
-	let children = $server.children;
+	let channels = book.server.channels;
 	$: filterStartFromRoot = filter.includes("/");
 </script>
 
 <div class="menu channel-list">
 	<ul class="menu-list">
-		{#each $children as channel (channel.key)}
-			{#if channel instanceof Channel}
-				<UiChannel {connection} {filter} {filterStartFromRoot} {channel} />
-			{:else}
-				{@debug channel}
-			{/if}
+		{#each $channels as channel (channel.id)}
+			<UiChannel {connection} {filter} {filterStartFromRoot} {channel} />
 		{/each}
 	</ul>
 </div>

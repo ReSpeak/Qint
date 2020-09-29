@@ -25,9 +25,9 @@
 	let canChatHere = true;
 
 	let oldSelectedChat: MessageTarget | undefined = undefined;
-	$: selectedChat = chat.selectedChat;
-	$: unreadCount = chat.unreadCount;
-	$: ownClient = connection.ownClient;
+	let selectedChat = chat.selectedChat;
+	let unreadCount = chat.unreadCount;
+	let ownClient = connection.book.ownClient;
 
 	$: on($selectedChat, chatChanged());
 	$: on($unreadCount, chatEndChanged());

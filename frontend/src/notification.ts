@@ -16,7 +16,7 @@ class TsNotification {
 
 	public toString(con: Connection): string {
 		let res = "";
-		for (var i = 0; i < this.pieces.length; i++) {
+		for (let i = 0; i < this.pieces.length; i++) {
 			res += this.pieces[i];
 			if (i < this.args.length) {
 				const a = this.args[i];
@@ -65,7 +65,7 @@ function notif(strings: TemplateStringsArray, ...keys: NotificationArg[]): TsNot
 let synth = window.speechSynthesis;
 
 function getHandler(plugins: any[]): (con: Connection, e: InMsg | InBookMsg, no: TsNotification) => void {
-	for (var p of plugins) {
+	for (let p of plugins) {
 		if ("handleNotification" in p) {
 			return p.handleNotification;
 		}
@@ -75,7 +75,7 @@ function getHandler(plugins: any[]): (con: Connection, e: InMsg | InBookMsg, no:
 
 export function handleMessage(con: Connection, msg: InMsg, plugins: any[]) {
 	try {
-		var handler = getHandler(plugins);
+		const handler = getHandler(plugins);
 		if ("Connected" in msg) {
 		} else if ("DisconnectedTemporarily" in msg) {
 			handler(con, msg, notif`Timed out`);
@@ -96,8 +96,8 @@ export function handleMessage(con: Connection, msg: InMsg, plugins: any[]) {
 
 function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection, e: InMsg | InBookMsg, no: TsNotification) => void) {
 	try {
-		const ownClientId = con.ownClientId!;
-		const ownClient = get(con.ownClient);
+		const ownClientId = con.book.ownClientId!;
+		const ownClient = get(con.book.ownClient);
 		const ownChannelId = ownClient !== undefined ? ownClient.channel : 0;
 
 		if (msg === "ChannelListFinished") {
@@ -127,7 +127,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 					const client = Client.fromJson(prop.Client);
 					if (reason === Reason.None || (reason === Reason.Subscription && client.id === ownClientId)) {
 						if (client.id === ownClientId) {
-							handler(con, msg, notif`Connected to ${con.book.getServer()}`);
+							handler(con, msg, notif`Connected to ${con.book.server}`);
 						} else if (client.channel === ownChannelId) {
 							handler(con, msg, notif`${client} connected`);
 						} else {
@@ -158,8 +158,8 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 				const invoker = msg.PropertyChanged.invoker;
 				const prop = msg.PropertyChanged.prop!;
 				if ("Channel" in prop && "Channel" in msg.PropertyChanged.id) {
-					var isInteresting = false;
-					for (var k in prop.Channel) {
+					let isInteresting = false;
+					for (let k in prop.Channel) { // TODO ?????????????????????????????
 						if (k !== "subscribed") {
 							isInteresting = true;
 							break;
@@ -298,12 +298,12 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 					const client = con.book.getClient(msg.PropertyRemoved.id.Client)!;
 					if (reason === null || reason === Reason.None || reason === Reason.Clientdisconnect) {
 						if (client.id === ownClientId)
-							handler(con, msg, notif`Disconnected from ${con.book.getServer()}`);
+							handler(con, msg, notif`Disconnected from ${con.book.server}`);
 						else
 							handler(con, msg, notif`${client} disconnected`);
 					} else if (reason === Reason.LostConnection) {
 						if (client.id === ownClientId)
-							handler(con, msg, notif`Timed out from ${con.book.getServer()}`);
+							handler(con, msg, notif`Timed out from ${con.book.server}`);
 						else
 							handler(con, msg, notif`${client} timed out`);
 					} else if (reason === Reason.Moved) {
@@ -355,7 +355,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 								handler(con, msg, notif`${client} was banned from the server`);
 						}
 					} else if ((reason === Reason.ClientdisconnectServerShutdown || reason === Reason.Serverstop) && client.id === ownClientId) {
-						handler(con, msg, notif`Disconnected, server ${con.book.getServer()} shut down`);
+						handler(con, msg, notif`Disconnected, server ${con.book.server} shut down`);
 					}
 				} else if ("ClientServerGroup" in msg.PropertyRemoved.id) {
 					const client = con.book.getClient(msg.PropertyRemoved.id.ClientServerGroup[0]);
