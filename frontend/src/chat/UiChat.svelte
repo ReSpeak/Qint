@@ -3,6 +3,7 @@
 	import { onMount, tick } from "svelte";
 	import UiMessage from "./UiMessage.svelte";
 	import { Chat, Message } from "./chat";
+	import Icon from "../ui/Icon.svelte";
 	import TsIcon from "../ui/TsIcon.svelte";
 	import ClientName from "../ui/ClientName.svelte";
 	import LazyList from "../ui/LazyList.svelte";
@@ -122,7 +123,11 @@
 		</div>
 	{:else}
 		<LazyList bind:this={chatList} {fetchElements} suggestJumpEnd={true} let:item>
-			<div slot="loading" class="loader" />
+			<div slot="loading" class="chatFiller">
+				<span>Loading ...</span>
+				<Icon name="loading mdi-spin" size={72} />
+			</div>
+			<div slot="empty" class="chatFiller">Chat history empty ¯\_(ツ)_/¯</div>
 			{#if item.displayDateSeparator}
 				<div title={item.date.format('L')} class="chat-date">
 					<div class="chat-date-line" />
@@ -230,6 +235,17 @@
 		text-align: center;
 	}
 
-	// .invoker-name {
-	// }
+	.chatFiller {
+		@extend %unselectable;
+		width: 100%;
+		height: 100%;
+		padding: 0 1em 3em 1em;
+		display: flex;
+		flex-direction: column;
+		justify-content: flex-end;
+		align-items: center;
+		color: gray;
+		font-size: xx-large;
+		white-space: nowrap;
+	}
 </style>

@@ -6,16 +6,21 @@
 	export let style: string = "";
 </script>
 
-<span class="icon {isLeft ? 'is-left' : ''}">
+<span class="icon {isLeft ? 'is-left' : ''}" style="font-size:{size}px;">
 	{#if raw}
 		{raw}
 	{:else}
-		<i class="mdi mdi-{name ?? 'dummy'} mdi-{size}px" {style} />
+		<i class="mdi mdi-{name ?? 'dummy'}" {style} />
 	{/if}
 </span>
 
 <style>
 	.mdi-dummy::before {
 		content: "";
+	}
+
+	.icon {
+		height: 1.5em;
+		width: 1.5em;
 	}
 </style>

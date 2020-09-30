@@ -3,7 +3,7 @@
 	import { assert, binarySearchByKey } from "../util";
 	import { tick, onMount, onDestroy } from "svelte";
 	import type { FetchResult } from "./lazyList";
-	import ResizeObserver from 'resize-observer-polyfill';
+	import ResizeObserver from "resize-observer-polyfill";
 
 	// Dummy class to have nice typing for our 'generic' parameter T which
 	// represents the element type.
@@ -391,21 +391,30 @@
 	});
 </script>
 
-<svelte:options accessors />
 <div class="lazyList">
 	<button class="arrow-up" class:showJumpStart on:click={() => jumpTo(ListFetchDir.Before)}>
 		<div />
 	</button>
 	<div class="lazyListView" bind:this={pan} on:scroll={handle_scroll}>
-		<div class="scrollPane" bind:this={scrollPane}>
-			{#each elems as item (item)}
-				<div class="lazyListElement">
-					<slot {item} />
-				</div>
-			{/each}
-		</div>
-		{#if loadAnchored === ListFetchDir.After}
-			<div id="anchor" />
+		{#if elems.length > 0}
+			<div class="scrollPane" bind:this={scrollPane}>
+				{#each elems as item (item)}
+					<div class="lazyListElement">
+						<slot {item} />
+					</div>
+				{/each}
+			</div>
+			{#if loadAnchored === ListFetchDir.After}
+				<div id="anchor" />
+			{/if}
+		{:else}
+			<div class="filler">
+				{#if fetchTask !== undefined}
+					<slot name="loading" />
+				{:else}
+					<slot name="empty" />
+				{/if}
+			</div>
 		{/if}
 	</div>
 	<button class="arrow-down" class:showJumpEnd on:click={() => jumpTo(ListFetchDir.After)}>
@@ -489,5 +498,10 @@
 		overflow-anchor: auto;
 		/* anchor nodes are required to have non-zero area */
 		height: 1px;
+	}
+
+	.filler {
+		width: 100%;
+		height: 100%;
 	}
 </style>
