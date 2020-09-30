@@ -6,7 +6,7 @@
 	import FilterString from "../ui/FilterString.svelte";
 	import { Channel } from "../book";
 	import type { ITreeNode } from "../book";
-	import UiClient from "./UiClient.svelte";
+	import UiClient from "./UiClientWrap.svelte";
 	import UiChannel from "./UiChannelWrap.svelte";
 	import { Connection } from "../connection";
 	import { draggable, DragData } from "../ui/draggable";
@@ -210,8 +210,7 @@
 				class="nameBox"
 				on:click={setChat}>
 				{#if showId}
-					[
-					<FilterString filter={thisFilter} content={$channel.id.toString()} />]
+					[<FilterString filter={thisFilter} content={$channel.id.toString()} />]
 				{/if}
 				<FilterString filter={showId ? '' : thisFilter} content={displayName} />
 			</span>

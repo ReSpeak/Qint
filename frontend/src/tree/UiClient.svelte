@@ -98,13 +98,12 @@
 			on:svddrag={dragStart}
 			on:svddrop={dragDrop}
 			data-type="client"
-			data-key={client.id}>
+			data-key={$client.id}>
 			<div class:talking={$client.talking !== TalkState.Off} class="talkWave" />
-			<TsIcon type="client" source={client} {connection} />
-			<span class="nameBox" style={client.getColor()}>
+			<TsIcon type="client" source={$client} {connection} />
+			<span class="nameBox" style={$client.getColor()}>
 				{#if showId}
-					[
-					<FilterString filter={thisFilter} content={client.id.toString()} />]
+					[<FilterString filter={thisFilter} content={$client.id.toString()} />]
 				{/if}
 				<FilterString filter={showId ? '' : thisFilter} content={$client.name} />
 			</span>

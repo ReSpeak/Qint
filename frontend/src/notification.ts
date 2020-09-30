@@ -159,7 +159,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection
 				const prop = msg.PropertyChanged.prop!;
 				if ("Channel" in prop && "Channel" in msg.PropertyChanged.id) {
 					let isInteresting = false;
-					for (let k in prop.Channel) { // TODO ?????????????????????????????
+					for (let k in prop.Channel) {
 						if (k !== "subscribed") {
 							isInteresting = true;
 							break;
