@@ -82,7 +82,7 @@ interface ChangeChannelEdit {
 		codec?: Codec;
 		codec_quality?: number;
 		needed_talk_power?: number;
-		icon_id?: number;
+		icon?: number;
 		codec_latency_factor?: number;
 		is_unencrypted?: boolean;
 		delete_delay?: any;

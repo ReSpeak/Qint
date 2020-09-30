@@ -2,9 +2,9 @@ import { Connection } from "../connection";
 import { writable, Writable } from "svelte/store";
 import { backend } from "../backend/backend";
 
-export type IconSource = { icon_id: number | undefined } | undefined;
+export type IconSource = { icon: number | undefined } | undefined;
 export type IconSourceLike = {
-	icon_id: number | undefined
+	icon: number | undefined
 	avatar_hash?: string
 	uid?: number[],
 	getAvatarUid?: () => string | undefined,
@@ -25,13 +25,13 @@ export function getClientIconPath(client: IconSourceLike | null | undefined, con
 	if (connection) {
 		if (client.avatar_hash && client.avatar_hash !== "" && client.uid)
 			return `${connection.backend.serverFileSrc}/file/0/avatar_${client.getAvatarUid!()}?hash=${client.avatar_hash}`;
-		else if (client.icon_id)
-			return `${connection.backend.serverFileSrc}/file/0/icon_${client.icon_id}`;
+		else if (client.icon)
+			return `${connection.backend.serverFileSrc}/file/0/icon_${client.icon}`;
 	} else if (server) {
 		if (client.avatar_hash && client.avatar_hash !== "" && client.uid)
 			return `${backend.cacheFileSrc}/${server}/0/avatar_${client.getAvatarUid!()}`;
-		else if (client.icon_id)
-			return `${backend.cacheFileSrc}/${server}/0/icon_${client.icon_id}`;
+		else if (client.icon)
+			return `${backend.cacheFileSrc}/${server}/0/icon_${client.icon}`;
 	}
 	return;
 }
@@ -59,10 +59,10 @@ export function getIconPath(source: IconSource, connection?: Connection, server?
 		console.error("ClientIcon needs either connection or server");
 		return;
 	}
-	if (!source || !source.icon_id)
+	if (!source || !source.icon)
 		return;
 
-	const i = source.icon_id;
+	const i = source.icon;
 	/**/ if (i === 100) return "alpha-c-circle-outline";
 	else if (i === 200) return "alpha-o-circle-outline";
 	else if (i === 300) return "alpha-s-circle-outline";

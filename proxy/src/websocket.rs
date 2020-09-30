@@ -572,7 +572,7 @@ impl Ws {
 						client_data = uid.map(|uid| {
 							let c = client.unwrap();
 							let icon =
-								if c.icon_id.0 == 0 { None } else { Some(c.icon_id.0 as i32) };
+								if c.icon.0 == 0 { None } else { Some(c.icon.0 as i32) };
 							let avatar = if c.avatar_hash.is_empty() {
 								None
 							} else {

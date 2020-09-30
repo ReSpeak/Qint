@@ -684,13 +684,13 @@ impl DbHandler {
 				Event::PropertyChanged { id, .. } => {
 					match id {
 						PropertyId::ServerName => handler.handle_server_name(),
-						PropertyId::ServerIconId => handler.handle_server_icon(),
+						PropertyId::ServerIcon => handler.handle_server_icon(),
 
 						PropertyId::ClientAvatarHash(id) => {
 							Self::register_client(&handler, e, data, data.clients.get(id));
 							handler.handle_client_avatar(*id)
 						}
-						PropertyId::ClientIconId(id) => {
+						PropertyId::ClientIcon(id) => {
 							Self::register_client(&handler, e, data, data.clients.get(id));
 							handler.handle_client_icon(*id)
 						}
@@ -704,7 +704,7 @@ impl DbHandler {
 						PropertyId::ChannelParent(id) => handler.handle_channel_parent(*id),
 						PropertyId::ChannelOrder(id) => handler.handle_channel_order(*id),
 						PropertyId::ChannelName(id) => handler.handle_channel_name(*id),
-						PropertyId::ChannelIconId(id) => handler.handle_channel_icon(*id),
+						PropertyId::ChannelIcon(id) => handler.handle_channel_icon(*id),
 						_ => Ok(()),
 					}
 				}
@@ -877,8 +877,8 @@ impl<'a> EventHandler<'a> {
 
 	fn handle_connected(&self) -> Result<()> {
 		let key = self.get_server_key()?;
-		let icon_id = if self.data.server.icon_id.0 != 0 {
-			Some(self.data.server.icon_id.0 as i32)
+		let icon_id = if self.data.server.icon.0 != 0 {
+			Some(self.data.server.icon.0 as i32)
 		} else {
 			None
 		};
@@ -924,8 +924,8 @@ impl<'a> EventHandler<'a> {
 
 	fn handle_server_icon(&self) -> Result<()> {
 		let key = self.get_server_key()?;
-		let icon_id = if self.data.server.icon_id.0 != 0 {
-			Some(self.data.server.icon_id.0 as i32)
+		let icon_id = if self.data.server.icon.0 != 0 {
+			Some(self.data.server.icon.0 as i32)
 		} else {
 			None
 		};
@@ -965,7 +965,7 @@ impl<'a> EventHandler<'a> {
 			None => bail!("Client has no uid"),
 		};
 
-		let icon = if client.icon_id.0 == 0 { None } else { Some(client.icon_id.0 as i32) };
+		let icon = if client.icon.0 == 0 { None } else { Some(client.icon.0 as i32) };
 		let avatar =
 			if client.avatar_hash.is_empty() { None } else { Some(client.avatar_hash.clone()) };
 		self.handle_add_client_internal(create, ClientData {
@@ -1081,7 +1081,7 @@ impl<'a> EventHandler<'a> {
 			None => bail!("Client has no uid"),
 		};
 
-		let client_icon = if client.icon_id.0 == 0 { None } else { Some(client.icon_id.0 as i32) };
+		let client_icon = if client.icon.0 == 0 { None } else { Some(client.icon.0 as i32) };
 		self.run(move |db, _| {
 			use schema::servers_clients::dsl::*;
 			// Update, ignored if not exists
@@ -1125,7 +1125,7 @@ impl<'a> EventHandler<'a> {
 			None => bail!("Failed to find channel"),
 		};
 		let ch_parent = if channel.parent.0 == 0 { None } else { Some(channel.parent.0 as i64) };
-		let icon_id = channel.icon_id.and_then(|i| if i.0 == 0 { None } else { Some(i.0 as i32) });
+		let icon_id = channel.icon.and_then(|i| if i.0 == 0 { None } else { Some(i.0 as i32) });
 		let ch_name = channel.name.clone();
 		let ch_order = if channel.order.0 == 0 { None } else { Some(channel.order.0 as i64) };
 
@@ -1244,7 +1244,7 @@ impl<'a> EventHandler<'a> {
 		} else {
 			bail!("Channel not found");
 		};
-		let ch_icon = channel.icon_id.and_then(|i| if i.0 == 0 { None } else { Some(i.0 as i32) });
+		let ch_icon = channel.icon.and_then(|i| if i.0 == 0 { None } else { Some(i.0 as i32) });
 		self.run(move |db, _| {
 			use schema::channels::dsl::*;
 			// Update, ignored if not exists

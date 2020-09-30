@@ -390,7 +390,7 @@ export type OffsetDateTime = [number, number];
 export class GraphQlClient {
 	public uid!: number[];
 	public name!: string;
-	public icon_id!: IconHash;
+	public icon!: IconHash;
 	public avatar_hash!: string;
 	private _clientColor: Lazy<string>;
 	public get clientColor() { return this._clientColor.get(); }
@@ -406,7 +406,7 @@ export class GraphQlClient {
 		const c = new GraphQlClient();
 		c.uid = base64Decode(obj.client.uid);
 		c.name = obj.client.customName ?? obj.client.name;
-		c.icon_id = obj.icon ?? 0;
+		c.icon = obj.icon ?? 0;
 		c.avatar_hash = obj.avatar ?? "";
 		return c;
 	}
@@ -455,7 +455,7 @@ export class Client extends GraphQlClient implements ITreeNode, Readable<Client>
 	public readonly country_code!: string;
 	public readonly database_id!: number;
 	public readonly description!: string
-	//public readonly icon_id!: IconHash; // inherited from GraphQlClient
+	//public readonly icon!: IconHash; // inherited from GraphQlClient
 	public readonly id!: number;
 	public readonly inherited_channel_group_from_channel!: number;
 	public readonly input_hardware_enabled!: boolean;
@@ -560,7 +560,7 @@ export class Channel implements ITreeParent, ITreeNode, Readable<Channel> {
 	public readonly needed_talk_power!: number | null;
 	public readonly forced_silence!: boolean | null;
 	public readonly phonetic_name!: string | null;
-	public readonly icon_id!: IconHash;
+	public readonly icon!: IconHash;
 	public readonly is_private!: boolean | null;
 	public readonly subscribed!: boolean;
 	public readonly permission_hints!: any | null;
@@ -588,7 +588,7 @@ export class Channel implements ITreeParent, ITreeNode, Readable<Channel> {
 			parent: obj.parent,
 			name: obj.name,
 			order: obj.orderId,
-			icon_id: obj.icon
+			icon: obj.icon
 		});
 	}
 
@@ -607,7 +607,7 @@ export class Server implements ITreeParent, ITreeNode, Readable<Server> {
 	public _store: Writable<this>;
 	public readonly name!: string;
 	public readonly phonetic_name!: string;
-	public readonly icon_id!: IconHash;
+	public readonly icon!: IconHash;
 	public readonly public_key?: number[];
 	// Base64 encoded, result from graphql
 	public readonly publicKey?: string;
@@ -655,7 +655,7 @@ export class Group {
 	id!: number;
 	name!: string;
 	group_type!: GroupType;
-	icon_id!: IconHash;
+	icon!: IconHash;
 	is_permanent!: boolean;
 	sort_id!: number;
 	naming_mode!: GroupNamingMode;

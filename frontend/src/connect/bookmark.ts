@@ -10,7 +10,7 @@ interface BookmarkChannel {
 interface BookmarkServer {
 	name: string;
 	uid: string;
-	icon_id: number | undefined;
+	icon: number | undefined;
 }
 
 export class Bookmark {
@@ -29,7 +29,7 @@ export class Bookmark {
 			this.lastUsed = datetimeDeserialize([content.lastUsed, content.timezone]);
 		if (this.server !== null) {
 			if (content.server?.icon !== undefined)
-				this.server.icon_id = Number(content.server.icon);
+				this.server.icon = Number(content.server.icon);
 			this.server.uid = hexEncode(base64Decode(this.server.uid));
 		}
 	}

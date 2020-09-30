@@ -103,7 +103,7 @@
 	<StickySlot>Info</StickySlot>
 	<div class="descGroup">
 		<div class="dataLine headLine">
-			<TsIcon type="client" source={{icon_id: $client.icon_id}} {connection} />
+			<TsIcon type="client" source={{icon: $client.icon}} {connection} />
 			<ClientName client={$client} />
 			<div style="flex: 1;" />
 			<div>

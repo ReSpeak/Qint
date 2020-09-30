@@ -103,7 +103,6 @@ mod imp {
 			for a in &self.config.actions {
 				let action = a.action;
 				let state = state.clone();
-				let logger = state.logger.clone();
 				let handle = Handle::current();
 				self.hook.register(a.keycode, move || {
 					let state = state.clone();
