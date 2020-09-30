@@ -17,6 +17,7 @@ export const EDIT_ICON = "pencil-outline";
 export const BASE_ADDRESS = ""; //"__buildEnv__" === "development" ? "http://localhost:4422" : "";
 export const BUILD_ENV = "__buildEnv__";
 export const BUILD_DAT = "__buildDat__";
+export const IS_TAURI = "__TAURI_INVOKE_HANDLER__" in window;
 export const LONG_DATETIME = "dddd, MMMM Do YYYY, HH:mm:ss UTCZ";
 
 export async function sleep(timeout: number): Promise<void> {

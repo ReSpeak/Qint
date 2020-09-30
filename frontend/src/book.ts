@@ -499,7 +499,6 @@ export class Client extends GraphQlClient implements ITreeNode, Readable<Client>
 	}
 
 	public subscribe(run: (c: this) => any): () => void {
-		console.log("Subscribe to ", this.name);
 		return this._store.subscribe(run);
 	}
 

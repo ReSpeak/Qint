@@ -1,8 +1,9 @@
 <script lang="typescript">
 	export let filter: string;
+	export let visible: boolean;
 </script>
 
-<aside class="searchbar">
+<aside class="searchbar" class:hidden={!visible}>
 	<div class="media-content">
 		<p class="control has-icons-right">
 			<input class="input" type="text" placeholder="Search" bind:value={filter} />

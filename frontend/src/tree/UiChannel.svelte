@@ -7,6 +7,7 @@
 	import { Channel } from "../book";
 	import type { ITreeNode } from "../book";
 	import UiClient from "./UiClient.svelte";
+	import UiChannel from "./UiChannelWrap.svelte";
 	import { Connection } from "../connection";
 	import { draggable, DragData } from "../ui/draggable";
 	import { findParent, assert, flash } from "../util";
@@ -193,7 +194,7 @@
 			on:svddrag={dragStart}
 			on:svddrop={dragDrop}
 			data-type="channel"
-			data-key={channel.id}>
+			data-key={$channel.id}>
 			<button
 				class="button collapseButton noBut"
 				class:haschildren={$channels.length !== 0}
@@ -210,7 +211,7 @@
 				on:click={setChat}>
 				{#if showId}
 					[
-					<FilterString filter={thisFilter} content={channel.id.toString()} />]
+					<FilterString filter={thisFilter} content={$channel.id.toString()} />]
 				{/if}
 				<FilterString filter={showId ? '' : thisFilter} content={displayName} />
 			</span>
@@ -239,14 +240,14 @@
 					bind:filterShow={client.filterShow} />
 			{/each}
 		{/if}
-		{#each $channels as channel (channel.id)}
-			<svelte:self
+		{#each $channels as c (c.id)}
+			<UiChannel
 				{connection}
 				{server}
 				filter={childrenFilter}
 				{filterStartFromRoot}
-				{channel}
-				bind:filterShow={channel.filterShow} />
+				channel={c}
+				bind:filterShow={c.filterShow} />
 		{/each}
 	</ul>
 </li>

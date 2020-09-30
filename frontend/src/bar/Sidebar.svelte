@@ -8,11 +8,12 @@
 
 	export let connection: Connection;
 	export let filter: string;
+	export let visible: boolean;
 	let server = connection.book.server;
 	$: selectedServerChat = $server.isSelected;
 </script>
 
-<aside class="sidebar">
+<aside class="sidebar" class:hidden={!visible}>
 	<StickyList>
 		<StickySlot styled={false} on:click={() => connection.chat.selectServer(server)}>
 			<div class="button" class:selectedServerChat>

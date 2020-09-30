@@ -1,5 +1,5 @@
 <script lang="typescript">
-	import UiChannel from "./UiChannel.svelte";
+	import UiChannel from "./UiChannelWrap.svelte";
 	import { Connection } from "../connection";
 	import { flash } from "../util";
 	import { afterUpdate } from "svelte";

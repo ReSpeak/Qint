@@ -35,10 +35,8 @@
 
 <div class="connected-container" style="grid-template-columns: {columnStyle}">
 	<Toolbar {connection} bind:showSidebar bind:showDescription bind:displayPanel />
-	{#if showSidebar}
-		<Searchbar bind:filter />
-		<Sidebar {connection} {filter} />
-	{/if}
+	<Searchbar bind:filter visible={showSidebar} />
+	<Sidebar {connection} {filter} visible={showSidebar} />
 	<div class="panel">
 		{#if displayPanel === DisplayPanel.Main}
 			<UiChat {connection} />
