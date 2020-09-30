@@ -1,16 +1,17 @@
+<svelte:options immutable />
 <script lang="typescript">
 	export let raw: string | undefined = undefined;
-	export let size: number = 18;
+	export let size: number | string = "1.2em";
 	export let name: string | undefined = undefined;
 	export let isLeft: boolean = false;
 	export let style: string = "";
 </script>
 
-<span class="icon {isLeft ? 'is-left' : ''}" style="font-size:{size}px;">
+<span class="icon {isLeft ? 'is-left' : ''}" >
 	{#if raw}
 		{raw}
 	{:else}
-		<i class="mdi mdi-{name ?? 'dummy'}" {style} />
+		<i class="mdi mdi-{name ?? 'dummy'}" style="font-size:{(typeof size === "number" ? size + "px" : size)};{style}" />
 	{/if}
 </span>
 

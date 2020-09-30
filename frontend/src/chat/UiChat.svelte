@@ -125,7 +125,7 @@
 		<LazyList bind:this={chatList} {fetchElements} suggestJumpEnd={true} let:item>
 			<div slot="loading" class="chatFiller">
 				<span>Loading ...</span>
-				<Icon name="loading mdi-spin" size={72} />
+				<Icon name="orbit mdi-spin" />
 			</div>
 			<div slot="empty" class="chatFiller">Chat history empty ¯\_(ツ)_/¯</div>
 			{#if item.displayDateSeparator}
@@ -247,5 +247,9 @@
 		color: gray;
 		font-size: xx-large;
 		white-space: nowrap;
+
+		:global(.icon) {
+			font-size: 72px;
+		}
 	}
 </style>
