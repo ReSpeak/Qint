@@ -1,28 +1,23 @@
 <script lang="typescript">
-	import type { Writable } from "svelte/store";
 	import { BOOKMARK_OFF, BOOKMARK_ON, EDIT_ICON } from "../util";
 	import TsIcon from "../ui/TsIcon.svelte";
 	import { Bookmark } from "./bookmark";
-	import Self from "./connect";
+	import { ConnectData } from "./connect";
+	import { app } from "../app";
 
-	export let connect: Self;
-	export let username: Writable<string>;
-	export let address: Writable<string>;
 	export let bookmark: Bookmark;
 	let error: string | undefined = undefined;
+	let fullAddress: string;
+	$: {
+		fullAddress = bookmark.address ?? "";
+		if (bookmark.channel !== null)
+			fullAddress += "/" + bookmark.channel.fullPath;
+	}
 
 	function doConnect() {
-		if (bookmark.username !== undefined && bookmark.address !== undefined) {
-			connect.bookmark = Number(bookmark.id);
-			connect.username = bookmark.username;
-			connect.address = bookmark.address;
-			if (bookmark.channel !== null) {
-				connect.channelId = Number(bookmark.channel.id);
-			} else {
-				connect.channelId = undefined;
-			}
-			connect.connect();
-		}
+		const channel = bookmark.channel !== null ? Number(bookmark.channel.id) : undefined;
+		if (bookmark.username !== undefined && bookmark.address !== undefined && bookmark.id !== undefined)
+			app.connect(new ConnectData(bookmark.username, bookmark.address, Number(bookmark.id), channel).toConnectMsg());
 	}
 
 	function toggleBookmark() {
@@ -37,29 +32,11 @@
 	function toggleEdit() {
 		// TODO
 	}
-
-	function hover() {
-		connect.username = $username;
-		connect.address = $address;
-		username.set(bookmark.username ?? "");
-		let addr = bookmark.address ?? "";
-		if (bookmark.channel !== null) {
-			addr += "/" + bookmark.channel.fullPath;
-		}
-		address.set(addr);
-	}
-
-	function leave() {
-		username.set(connect.username);
-		address.set(connect.address);
-	}
 </script>
 
 <div
 	class="bookmarkItem"
-	class:bookmark={bookmark.bookmark}
-	on:mouseover={hover}
-	on:mouseout={leave}>
+	class:bookmark={bookmark.bookmark}>
 	<button class="button innerBookmarkItem" on:click={doConnect} title={bookmark.server?.name}>
 		<div class="bookmarkIcon">
 			<TsIcon type="server" source={{icon: bookmark.server?.icon}} server={bookmark.server?.uid} />
@@ -67,7 +44,7 @@
 		<div class="bookmarkName">{bookmark.name || bookmark.server?.name}</div>
 		{#if bookmark.lastUsed}
 			<div class="bookmarkInfo" title={bookmark.lastUsed.format() ?? ''}>
-				Last connection {bookmark.lastUsed.format('lll') ?? '?'}
+				{fullAddress}
 			</div>
 		{/if}
 	</button>

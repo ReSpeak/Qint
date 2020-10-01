@@ -1,17 +1,14 @@
-import { Connection } from "../connection";
 import { getDefaultVersion } from "../util";
+import { OMsgConnect } from "../backend/ws";
 
-export default class Self {
-	public username: string = "";
-	public address: string = "";
-	public bookmark: number | undefined;
-	public channelId: number | undefined;
-
+export class ConnectData {
 	constructor(
-		private connection: Connection
-	) { }
+		public readonly username: string,
+		public readonly address: string,
+		public readonly bookmark?: number,
+		public readonly channelId?: number) { }
 
-	public connect() {
+	public toConnectMsg(): OMsgConnect {
 		const sep = this.address.indexOf("/");
 		let address = this.address;
 		let channel = this.channelId === undefined ? undefined : "/" + this.channelId;
@@ -19,7 +16,7 @@ export default class Self {
 			address = this.address.slice(0, sep);
 			channel = this.address.slice(sep + 1);
 		}
-		this.connection.connect({
+		return {
 			Connect: {
 				bookmark: this.bookmark,
 				address,
@@ -31,10 +28,6 @@ export default class Self {
 				log_packets: false,
 				log_udp_packets: false,
 			}
-		});
-	}
-
-	public reset() {
-		this.connection.reset();
+		};
 	}
 }

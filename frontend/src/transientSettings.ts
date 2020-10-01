@@ -17,16 +17,16 @@ export class TransientSettings {
 	public ui = new TransientSettingsUi();
 	public chat = new TransientSettingsChat(this);
 
-	public async read_from_proxy() {
+	public async loadAsync() {
 		const resp = await backend.fetch(`/transient/*`);
 		const data = await resp.json();
 		soft_merge(this, data);
 	}
 
-	public sync_to_proxy(group?: SettGroup) {
+	public save(group?: SettGroup) {
 		if (this._syncDebounceTimer === undefined) {
 			this._syncDebounceGroup = group;
-			this._syncDebounceTimer = setTimeout(() => this.sync_to_proxy_async(), 5000);
+			this._syncDebounceTimer = setTimeout(() => this.saveAsync(), 5000);
 		} else if (this._syncDebounceGroup !== group) {
 			this._syncDebounceGroup = undefined;
 		}
@@ -34,11 +34,11 @@ export class TransientSettings {
 
 	public flush() {
 		if (this._syncDebounceTimer !== undefined) {
-			this.sync_to_proxy_async();
+			this.saveAsync();
 		}
 	}
 
-	private async sync_to_proxy_async() {
+	private async saveAsync() {
 		this._syncDebounceTimer = undefined;
 		const group = this._syncDebounceGroup;
 
@@ -109,7 +109,7 @@ export class TransientSettingsChat {
 		const storeText = !text ? null : text;
 		if (storeText !== oldVal) {
 			(this as any)[key] = storeText;
-			this._parent.sync_to_proxy("chat");
+			this._parent.save("chat");
 		}
 	}
 
@@ -119,5 +119,3 @@ export class TransientSettingsChat {
 		return (this as any)[key] ?? undefined;
 	}
 }
-
-export const transientSettings: TransientSettings = new TransientSettings();

@@ -11,12 +11,16 @@
 	import { Connection } from "../connection";
 	import BInput from "../ui/BInput.svelte";
 	import { on } from "../util";
-	import { transientSettings } from "../transientSettings";
+	import { app } from "../app";
 	import { MessageTarget } from "../ts";
+	import { Client } from "../book";
+	import { writable } from "svelte/store";
+	import type { Writable } from "svelte/store";
 
-	export let connection: Connection;
-	let chat = connection.chat;
-	let chatStore = transientSettings.chat;
+	export let chat: Chat;
+
+	const selected = chat.selectedChat;
+	let chatStore = app.transientSettings.chat;
 
 	let chatList: LazyList;
 	let messagesError: unknown | undefined;
@@ -26,27 +30,37 @@
 	let canChatHere = true;
 
 	let oldSelectedChat: MessageTarget | undefined = undefined;
-	let selectedChat = chat.selectedChat;
 	let unreadCount = chat.unreadCount;
-	let ownClient = connection.book.ownClient;
+	let connection: Connection | undefined;
+	let ownClient: Writable<Client | undefined>;
+	$: {
+		connection = $selected?.connection;
+		ownClient = connection?.book.ownClient ?? writable(undefined);
+	}
 
-	$: on($selectedChat, chatChanged());
+	$: on($selected, chatChanged());
 	$: on($unreadCount, chatEndChanged());
 	let oldOwnChannel: number | undefined;
+	let oldCon: string | undefined;
 	$: {
 		const ownChannel = $ownClient?.channel;
-		if (ownChannel !== oldOwnChannel) {
+		const con = connection?.backend.id;
+		if (ownChannel !== oldOwnChannel || con !== oldCon) {
 			oldOwnChannel = ownChannel;
+			oldCon = con;
 			chatBoxRecheck();
 		}
 	}
 
 	function chatChanged() {
+		const sel = $selected;
+		if (sel === undefined) return;
+		let { connection, target } = sel;
 		if (oldSelectedChat !== undefined) chatStore.set(text, oldSelectedChat, connection);
-		text = chatStore.get($selectedChat, connection) ?? "";
+		text = chatStore.get(target, connection) ?? "";
 
-		if ($selectedChat !== oldSelectedChat) {
-			oldSelectedChat = $selectedChat;
+		if (target !== oldSelectedChat) {
+			oldSelectedChat = target;
 
 			if (chatList) {
 				chatList.sourceChanged(ListFetchDir.New, ListFetchDir.After);
@@ -64,12 +78,17 @@
 
 	function chatBoxRecheck() {
 		const ownChannel = $ownClient?.channel;
-		const c = $selectedChat;
+		const sel = $selected;
+		if (sel === undefined) {
+			canChatHere = false;
+			return;
+		}
+		let { target } = sel;
 
-		if ("Server" in c || "Client" in c) {
+		if ("Server" in target || "Client" in target) {
 			canChatHere = true;
-		} else if ("Channel" in c) {
-			canChatHere = ownChannel === undefined || c.Channel === ownChannel;
+		} else if ("Channel" in target) {
+			canChatHere = ownChannel === undefined || target.Channel === ownChannel;
 		}
 		if (canChatHere) {
 			(async () => {

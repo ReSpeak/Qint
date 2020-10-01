@@ -1,6 +1,6 @@
 import { InMsg, OutMsg } from "./ws";
 import { BASE_ADDRESS } from "../util";
-import { closedFn, errorFn, IBackend, IBackendConnction, IFetchLike, msgFn } from "./backend";
+import { closedFn, errorFn, IBackend, IBackendConnection, IFetchLike, msgFn } from "./backend";
 
 export class BrowserBackend implements IBackend {
 	public cacheFileSrc: string;
@@ -9,7 +9,7 @@ export class BrowserBackend implements IBackend {
 		this.cacheFileSrc = `${BASE_ADDRESS}/filecache`;
 	}
 
-	createNewConnection(): IBackendConnction {
+	createNewConnection(): IBackendConnection {
 		return new BrowserBackendConnection();
 	}
 
@@ -22,17 +22,18 @@ export class BrowserBackend implements IBackend {
 	}
 }
 
-export class BrowserBackendConnection implements IBackendConnction {
+export class BrowserBackendConnection implements IBackendConnection {
 	public serverFileSrc: string;
-	private guid?: string;
+	public id: string;
 	private socket?: WebSocket;
 
 	constructor() {
 		this.serverFileSrc = "";
+		this.id = BrowserBackendConnection.createUuidV4();
 	}
 
 	getGuidTmpHack(): string {
-		return this.guid!;
+		return this.id;
 	}
 
 	public send(data: OutMsg): void {
@@ -43,8 +44,7 @@ export class BrowserBackendConnection implements IBackendConnction {
 	public connect(onMsg: msgFn, onError: errorFn, onClose: closedFn): Promise<void> {
 		this.close();
 
-		this.guid = BrowserBackendConnection.createUuidV4();
-		this.serverFileSrc = `${BASE_ADDRESS}/con/${this.guid}`;
+		this.serverFileSrc = `${BASE_ADDRESS}/con/${this.id}`;
 
 		let path = BASE_ADDRESS;
 		if (!path.startsWith("http"))
@@ -54,7 +54,7 @@ export class BrowserBackendConnection implements IBackendConnction {
 		// Replace http by ws, so https gets wss
 		path = path.slice(4);
 
-		this.socket = new WebSocket(`ws${path}/con/${this.guid}/ws?format=Json`);
+		this.socket = new WebSocket(`ws${path}/con/${this.id}/ws?format=Json`);
 		this.socket.onerror = (error) => onError(String(error));
 		this.socket.onclose = onClose;
 		this.socket.onmessage = (evt) => { onMsg(JSON.parse(evt.data) as InMsg); };
@@ -66,7 +66,7 @@ export class BrowserBackendConnection implements IBackendConnction {
 	public close(): void {
 		if (this.socket)
 			this.socket.close();
-		this.guid = undefined;
+		this.id = BrowserBackendConnection.createUuidV4();
 		this.socket = undefined;
 	}
 

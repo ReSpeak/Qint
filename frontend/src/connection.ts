@@ -2,42 +2,41 @@ import { Chat } from "./chat/chat";
 import { OutMsg, OMsgConnect, InMsg, Reason } from "./backend/ws";
 import { get, writable, Writable } from "svelte/store";
 import { Book, Channel } from "./book";
-import { plugins, loadPlugins } from "./plugins";
 import { getStringFromConnect } from "./util";
 import { handleMessage } from "./notification";
-import { transientSettings } from "./transientSettings";
-import { backend, IBackendConnction } from "./backend/backend";
+import { backend, IBackendConnection } from "./backend/backend";
+import { app } from "./app";
 
 export class Connection {
 	public readonly state = writable(ConnectionState.Disconnected);
 	public readonly error: Writable<string | undefined> = writable(undefined);
 
 	public readonly book: Book = new Book();
-	public readonly chat: Chat = new Chat(this);
+	public chat: Chat | undefined;
 	public server?: string;
-	public backend: IBackendConnction;
-	private connectOptions: OMsgConnect | undefined;
+	public backend: IBackendConnection;
 
 	private muted: boolean = false;
 	public loudness: Writable<number> = writable(0);
+	private connectOptions: OMsgConnect;
 
-	constructor() {
+	constructor(connectOptions: OMsgConnect) {
+		this.connectOptions = connectOptions;
 		this.backend = backend.createNewConnection();
-		this.book.server.subscribe(s => {
-			if (s?.name === undefined)
-				backend.setTitle("Qint")
-			else
-				backend.setTitle(s.name + " – Qint")
+		this.error.set(undefined);
+		this.state.set(ConnectionState.Connecting);
+		this.backend.connect(
+			(msg) => { this.messageHandler(msg) },
+			(err) => { this.error.set(`Connection failed, is Qint running? (${err})`); },
+			() => this.onClose(),
+		).then(() => {
+			this.backend.send(this.connectOptions);
 		});
-		// TODO UNSUBSCRIBE
-		loadPlugins();
-		transientSettings.read_from_proxy();
 	}
 
 	public reset() {
 		this.state.set(ConnectionState.Disconnected);
 		this.book.reset();
-		this.chat.reset();
 		this.server = undefined;
 		this.backend.close();
 		this.muted = false;
@@ -53,29 +52,19 @@ export class Connection {
 		return this.muted;
 	}
 
-	public connect(opt: OMsgConnect) {
-		this.error.set(undefined);
-		this.connectOptions = opt;
-		this.state.set(ConnectionState.Connecting);
-		this.backend.connect(
-			(msg) => { this.messageHandler(msg) },
-			(err) => { this.error.set(`Connection failed, is Qint running? (${err})`); },
-			() => {
-				// Plugins
-				for (const plugin of plugins) {
-					try {
-						if ("handleEvent" in plugin) {
-							plugin.handleEvent(this, { Disconnected: null });
-						}
-					} catch (e) {
-						console.error("Failed to handle event in plugin:", e);
-					}
+	public onClose() {
+		// Plugins
+		for (const plugin of app.plugins) {
+			try {
+				if ("handleEvent" in plugin) {
+					plugin.handleEvent(this, { Disconnected: null });
 				}
-				this.reset();
-			},
-		).then(() => {
-			this.backend.send(opt)
-		});
+			} catch (e) {
+				console.error("Failed to handle event in plugin:", e);
+			}
+		}
+
+		this.reset();
 	}
 
 	public sendMessage(data: OutMsg) {
@@ -115,7 +104,7 @@ export class Connection {
 
 	private messageHandler(msg: InMsg) {
 		// Plugins
-		for (const plugin of plugins) {
+		for (const plugin of app.plugins) {
 			try {
 				if ("handleEvent" in plugin) {
 					plugin.handleEvent(this, msg);
@@ -125,14 +114,13 @@ export class Connection {
 			}
 		}
 
-		handleMessage(this, msg, plugins);
+		handleMessage(this, msg, app.plugins);
 		if ("Connected" in msg) {
 			this.server = msg.Connected.server;
 			this.book.ownClientId = msg.Connected.own_client;
 		} else if ("DisconnectedTemporarily" in msg) {
 			this.state.set(ConnectionState.Connecting);
 			this.book.reset();
-			this.chat.reset();
 			this.server = undefined;
 		} else if ("Events" in msg) {
 			for (const tsevt of msg.Events) {
@@ -143,7 +131,7 @@ export class Connection {
 						location.hash = getStringFromConnect(this.connectOptions!);
 						// TODO Get unread counts for channels and clients
 					} else if ("Message" in tsevt) {
-						this.chat.unreadCount.update(c => c + 1);
+						this.chat?.unreadCount.update(c => c + 1);
 					} else {
 						if ("PropertyRemoved" in tsevt) {
 							if ("Client" in tsevt.PropertyRemoved.id) {

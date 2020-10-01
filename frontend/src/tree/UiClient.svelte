@@ -10,6 +10,7 @@
 	import { draggable, DragData } from "../ui/draggable";
 	import { findParent, flash } from "../util";
 	import { afterUpdate } from "svelte";
+	import { app } from "../app";
 
 	afterUpdate(() => flash(div));
 
@@ -28,7 +29,7 @@
 	let div: HTMLElement;
 
 	function setChat() {
-		connection.chat.selectClient(client);
+		app.select(connection, client);
 	}
 
 	function applyFilter(filter: string, client: Client) {

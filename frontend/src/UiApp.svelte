@@ -1,28 +1,35 @@
 <script lang="typescript">
-	import { get } from "svelte/store";
-	import Connect from "./connect/Connect.svelte";
+	import { derived } from "svelte/store";
+	import type { Writable } from "svelte/store";
 	import Connected from "./Connected.svelte";
-	import { ConnectionState, Connection } from "./connection";
-	import { BUILD_ENV, BUILD_DAT, getConnectFromString } from "./util";
-	import { transientSettings } from "./transientSettings";
+	import { ConnectionState } from "./connection";
+	import { BUILD_ENV, BUILD_DAT } from "./util";
+	import { app } from "./app";
 
 	console.log("BUILD", BUILD_ENV, BUILD_DAT);
 
-	export let connection: Connection;
-	$: state = connection.state;
+	let connections = app.connections;
+	$: hasConnected = derived(
+		$connections.map((c) => c.state) as [Writable<ConnectionState>],
+		(states) =>
+			states.some(
+				(s) => s === ConnectionState.Connected || s === ConnectionState.ChannelListFinished
+			)
+	);
+
+	(window as any).con = connections; // DEBUG
 
 	window.onbeforeunload = function (e: any) {
-		transientSettings.flush();
+		app.transientSettings.flush();
 
-		let s = get(state);
-		// For debugging puproses ?
-		window.speechSynthesis.speak(new SpeechSynthesisUtterance("Goodbye"));
-		if (s === ConnectionState.Connected || s === ConnectionState.ChannelListFinished) {
+		// For debugging purposes
+		if ($hasConnected) {
 			if (e) {
 				e.returnValue = true;
 			}
 			return true;
 		}
+		window.speechSynthesis.speak(new SpeechSynthesisUtterance("Goodbye"));
 		return;
 	};
 
@@ -30,18 +37,15 @@
 	if (loc && loc !== "" && loc !== "#") {
 		try {
 			// Starts with #
-			connection.connect(getConnectFromString(decodeURIComponent(loc.substr(1))));
-		} catch(e) {
+			// TODO Add new connection
+			//connection.connect(getConnectFromString(decodeURIComponent(loc.substr(1))));
+		} catch (e) {
 			console.error("Failed to connect to previous connection", e);
 		}
 	}
 </script>
 
-{#if $state !== ConnectionState.Connected && $state !== ConnectionState.ChannelListFinished}
-	<Connect {connection} />
-{:else}
-	<Connected {connection} />
-{/if}
+<Connected {connections} hasConnected={$hasConnected} />
 
 <style lang="scss" global>
 	@import "@mdi/font/css/materialdesignicons";

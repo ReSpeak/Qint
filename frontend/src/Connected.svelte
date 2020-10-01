@@ -1,4 +1,5 @@
 <script lang="typescript">
+	import type { Writable } from "svelte/store";
 	import UiChat from "./chat/UiChat.svelte";
 	import UiGlobalSettings from "./panel/UiGlobalSettings.svelte";
 	import Searchbar from "./bar/Searchbar.svelte";
@@ -7,22 +8,26 @@
 	import Description from "./panel/Description.svelte";
 	import { Connection } from "./connection";
 	import { DisplayPanel } from "./panel/panel";
-	import { transientSettings } from "./transientSettings";
+	import { app } from "./app";
+	import Connect from "./connect/Connect.svelte";
 
-	export let connection: Connection;
+	export let connections: Writable<Connection[]>;
+	export let hasConnected: boolean;
 	let filter: string = "";
 
-	const ui = transientSettings.ui;
+	const chat = app.chat;
+	const selected = app.selectedNode;
+	const ui = app.transientSettings.ui;
 
 	let showSidebar = ui.showSidebar;
 	let showDescription = ui.showDescription;
-	let displayPanel = DisplayPanel.Main;
+	let displayPanel = hasConnected ? DisplayPanel.Main : DisplayPanel.Connect;
 	let columnStyle = "";
 
 	$: {
 		ui.showSidebar = showSidebar;
 		ui.showDescription = showDescription;
-		transientSettings.sync_to_proxy();
+		app.transientSettings.save();
 	}
 
 	$: {
@@ -34,17 +39,21 @@
 </script>
 
 <div class="connected-container" style="grid-template-columns: {columnStyle}">
-	<Toolbar {connection} bind:showSidebar bind:showDescription bind:displayPanel />
+	<!-- TODO Toolbar does not need connection -->
+	<Toolbar bind:showSidebar bind:showDescription bind:displayPanel />
 	<Searchbar bind:filter visible={showSidebar} />
-	<Sidebar {connection} {filter} visible={showSidebar} />
+	<Sidebar {connections} {filter} visible={showSidebar} />
 	<div class="panel">
 		{#if displayPanel === DisplayPanel.Main}
-			<UiChat {connection} />
+			<UiChat {chat} />
 			{#if showDescription}
-				<Description {connection} />
+				<Description selected={$selected} />
 			{/if}
-		{:else if displayPanel === DisplayPanel.Settings}
-			<UiGlobalSettings {connection} />
+		{:else if displayPanel === DisplayPanel.Settings && $connections.length !== 0}
+			<!-- TODO consider something better ? -->
+			<UiGlobalSettings connection={$connections[0]} />
+		{:else if displayPanel === DisplayPanel.Connect}
+			<Connect />
 		{/if}
 	</div>
 </div>

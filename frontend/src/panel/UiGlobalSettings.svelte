@@ -1,7 +1,7 @@
 <script lang="typescript">
 	import { onDestroy } from "svelte";
 	import { Connection } from "../connection";
-	import { transientSettings } from "../transientSettings";
+	import { app } from "../app";
 	import BTabList from "../ui/BTabList.svelte";
 	import BTabSlot from "../ui/BTabSlot.svelte";
 	import BDropDown from "../ui/BDropDown.svelte";
@@ -31,12 +31,12 @@
 	}
 
 	function syncSettings() {
-		transientSettings.sync_to_proxy();
+		app.transientSettings.save();
 	}
 
 	// Text-to-Speech
 	const synth = window.speechSynthesis;
-	const synthSett = transientSettings.synth;
+	const synthSett = app.transientSettings.synth;
 	let voices = synth.getVoices();
 	let previewText!: HTMLInputElement;
 	function previewVoice() {

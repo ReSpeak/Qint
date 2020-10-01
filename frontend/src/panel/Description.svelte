@@ -1,21 +1,21 @@
 <script lang="typescript">
-	import { Connection } from "../connection";
 	import DescriptionClient from "./DescriptionClient.svelte";
 	import DescriptionChannel from "./DescriptionChannel.svelte";
 	import DescriptionServer from "./DescriptionServer.svelte";
+	import { NodeSelection } from "../app";
 
-	export let connection: Connection;
-	let selected = connection.chat.selectedChat;
-	$: s = $selected;
+	export let selected: NodeSelection | undefined;
 </script>
 
 <div class="description">
-	{#if 'Client' in s}
-		<DescriptionClient {connection} clientId={s.Client} />
-	{:else if 'Channel' in s}
-		<DescriptionChannel {connection} channelId={s.Channel} />
-	{:else if 'Server' in s}
-		<DescriptionServer {connection} />
+	{#if selected !== undefined}
+		{#if 'Client' in selected.target}
+			<DescriptionClient connection={selected.connection} clientId={selected.target.Client} />
+		{:else if 'Channel' in selected.target}
+			<DescriptionChannel connection={selected.connection} channelId={selected.target.Channel} />
+		{:else if 'Server' in selected.target}
+			<DescriptionServer connection={selected.connection} />
+		{/if}
 	{/if}
 </div>
 

@@ -1,5 +1,11 @@
 <script lang="typescript">
+	import { onMount, onDestroy } from "svelte";
+	import { getContext } from 'svelte';
 	export let styled: boolean = true;
+
+	const stickyChanged = getContext('stickyChanged') as () => void;
+	onMount(stickyChanged);
+	onDestroy(stickyChanged);
 </script>
 
 <div on:click class:button={styled} class="stickySlot">

@@ -7,12 +7,13 @@ export type closedFn = () => void;
 
 export interface IBackend {
 	cacheFileSrc: string;
-	createNewConnection(): IBackendConnction;
+	createNewConnection(): IBackendConnection;
 	fetch(cmd: string, data?: RequestInit): Promise<IFetchLike>;
 	setTitle(name: string): void;
 }
 
-export interface IBackendConnction {
+export interface IBackendConnection {
+	id: string;
 	serverFileSrc: string;
 	send(data: OutMsg): void;
 	connect(

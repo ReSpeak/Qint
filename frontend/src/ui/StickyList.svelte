@@ -1,11 +1,13 @@
 <script lang="typescript">
-	import { onMount } from "svelte";
+	import { onMount, onDestroy } from "svelte";
 	import ResizeObserver from 'resize-observer-polyfill';
+	import { setContext } from 'svelte';
 
 	let stickyList!: HTMLElement;
 	let stickyChildren: ArrayLike<HTMLElement> = [];
 	let stickySizes = [] as number[];
 	let stickyAcc = [] as number[];
+	let obs: ResizeObserver | undefined = undefined;
 
 	function updateChildSize() {
 		let topOff = 0;
@@ -22,11 +24,12 @@
 		}
 	}
 
-	onMount(() => {
+	function stickyChanged() {
 		stickyChildren = Array(...stickyList.children).filter(c => c.matches(".stickySlot")) as HTMLElement[];
 		stickySizes = Array(stickyChildren.length);
 		stickyAcc = Array(stickyChildren.length);
-		let obs = new ResizeObserver(() => updateChildSize());
+		obs?.disconnect();
+		obs = new ResizeObserver(() => updateChildSize());
 		for (let i = 0; i < stickyChildren.length; i++) {
 			stickyChildren[i].onclick = () => {
 				let nextElement = stickyChildren[i].nextElementSibling! as HTMLElement;
@@ -37,7 +40,12 @@
 		}
 
 		updateChildSize();
-	});
+	}
+
+	setContext('stickyChanged', stickyChanged);
+
+	onDestroy(() => { obs?.disconnect(); });
+	//onMount();
 </script>
 
 <div bind:this={stickyList} class="stickyList">

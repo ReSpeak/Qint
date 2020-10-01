@@ -3,7 +3,7 @@ import { InBookChangeMsg } from "./backend/ws";
 import { graphql } from "./graphql";
 import { Connection } from "./connection";
 import { binarySearchBy, getDataColor, arraysEqual, Lazy, base64Decode, base64Encode } from "./util";
-import { ChannelId, ChannelType, ClientId, Codec, ServerGroupId } from "./ts";
+import { ChannelId, ChannelType, ClientId, Codec, ServerGroupId, MessageTarget } from "./ts";
 
 export class Book {
 	public server: Server = new Server();
@@ -498,6 +498,10 @@ export class Client extends GraphQlClient implements ITreeNode, Readable<Client>
 		return this;
 	}
 
+	public toTarget(): MessageTarget {
+		return MessageTarget.ToClient(this.id);
+	}
+
 	public subscribe(run: (c: this) => any): () => void {
 		return this._store.subscribe(run);
 	}
@@ -598,6 +602,10 @@ export class Channel implements ITreeParent, ITreeNode, Readable<Channel> {
 		return this;
 	}
 
+	public toTarget(): MessageTarget {
+		return MessageTarget.ToChannel(this.id);
+	}
+
 	public subscribe(run: (c: this) => any): () => void {
 		return this._store.subscribe(run);
 	}
@@ -626,7 +634,6 @@ export class Server implements ITreeParent, ITreeNode, Readable<Server> {
 	constructor() {
 		this._store = writable(this);
 	}
-
 	// ITreeParent
 	public channels: Writable<Channel[]> = writable([]);
 
@@ -634,6 +641,10 @@ export class Server implements ITreeParent, ITreeNode, Readable<Server> {
 		Object.assign(this, obj);
 		this._store.set(this);
 		return this;
+	}
+
+	public toTarget(): MessageTarget {
+		return MessageTarget.ToServer();
 	}
 
 	public subscribe(run: (c: this) => any): () => void {
@@ -687,4 +698,5 @@ export interface ITreeNode {
 	filterShow: boolean;
 	isSelected: boolean;
 	update(obj: Partial<this>): this;
+	toTarget(): MessageTarget;
 }

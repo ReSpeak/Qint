@@ -1,15 +1,13 @@
 import { get, writable, Writable } from "svelte/store";
 import type { Moment } from "moment";
-import { Connection } from "../connection";
 import { graphql } from "../graphql";
 import { MessageTarget } from "../ts";
-import { Channel, Client, GraphQlClient, ITreeNode, Server } from "../book";
+import { GraphQlClient } from "../book";
 import { datetimeDeserialize, getDataColor, assert, Lazy } from "../util";
 import { ListFetchDir, FetchResult } from "../ui/lazyList";
+import { NodeSelection } from "../app";
 
 export class Chat {
-	private selectedNode: ITreeNode | undefined = undefined;
-	public readonly selectedChat: Writable<MessageTarget> = writable(MessageTarget.ToServer());
 	public readonly unreadCount: Writable<number> = writable(0);
 	public static readonly EmptyFetch: FetchResult<Message> = {
 		items: [],
@@ -17,38 +15,8 @@ export class Chat {
 		canLoadAfterEnd: false
 	};
 
-	constructor(
-		private connection: Connection
-	) { }
-
-	public reset() {
-		this.selectedNode = undefined;
-		this.selectedChat.set(MessageTarget.ToServer());
-		this.unreadCount.set(0);
-	}
-
-	public selectChannel(channel: Channel) {
-		this.selectedChat.set(MessageTarget.ToChannel(channel.id));
-		this.selectNode(channel);
-	}
-
-	public selectClient(client: Client) {
-		this.selectedChat.set(MessageTarget.ToClient(client.id));
-		this.selectNode(client);
-	}
-
-	public selectServer(server: Server) {
-		this.selectedChat.set(MessageTarget.ToServer());
-		this.selectNode(server);
-	}
-
-	private selectNode(node: ITreeNode) {
-		if (this.selectedNode !== undefined) {
-			this.selectedNode.update({ isSelected: false });
-		}
-		node.update({ isSelected: true });
-		this.selectedNode = node;
-	}
+	public constructor(
+		readonly selectedChat: Writable<NodeSelection | undefined>) { }
 
 	private static groupMessages(messages: Message[], lastEntry: Message | undefined, dir: ListFetchDir): void {
 		let previousMessage: Message | undefined;
@@ -77,7 +45,10 @@ export class Chat {
 	}
 
 	public async getMessages(idFrom: Message | undefined, dir: ListFetchDir): Promise<FetchResult<Message>> {
-		if (this.connection.server === undefined) {
+		const selected = get(this.selectedChat);
+		if (selected === undefined) return Chat.EmptyFetch;
+		let { connection, target } = selected;
+		if (connection.server === undefined) {
 			console.error("Cannot get messages for a non-existant connection");
 			return Chat.EmptyFetch;
 		}
@@ -122,9 +93,9 @@ export class Chat {
 					}
 				}
 			}`, {
-			chat_type: MessageTarget.getType(get(this.selectedChat)),
-			server: this.connection.server,
-			chat_id: MessageTarget.getId(get(this.selectedChat), this.connection),
+			chat_type: MessageTarget.getType(target),
+			server: connection.server,
+			chat_id: MessageTarget.getId(target, connection),
 			start_time,
 			start_id,
 			load_at_beginning: load_at_beginning,
@@ -161,10 +132,13 @@ export class Chat {
 	}
 
 	public sendMessage(message: string) {
-		const target = MessageTarget.toWs(get(this.selectedChat));
-		this.connection.sendMessage({
+		const selected = get(this.selectedChat);
+		if (selected === undefined) return;
+		let { connection, target } = selected;
+		const targetWs = MessageTarget.toWs(target);
+		connection.sendMessage({
 			SendMessage: {
-				target,
+				target: targetWs,
 				message,
 			}
 		});

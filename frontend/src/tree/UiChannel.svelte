@@ -13,6 +13,7 @@
 	import { findParent, assert, flash } from "../util";
 	import { SpacerType } from "./tree";
 	import { ChannelType } from "../ts";
+	import { app } from "../app";
 
 	afterUpdate(() => flash(div));
 
@@ -96,7 +97,7 @@
 	}
 
 	function setChat() {
-		connection?.chat.selectChannel(channel);
+		if (connection !== undefined) app.select(connection, channel);
 	}
 
 	function hover() {
@@ -210,7 +211,8 @@
 				class="nameBox"
 				on:click={setChat}>
 				{#if showId}
-					[<FilterString filter={thisFilter} content={$channel.id.toString()} />]
+					[
+					<FilterString filter={thisFilter} content={$channel.id.toString()} />]
 				{/if}
 				<FilterString filter={showId ? '' : thisFilter} content={displayName} />
 			</span>
