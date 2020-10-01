@@ -45,10 +45,6 @@
 		z-index: 3 !important;
 	}
 
-	.selectedServerChat {
-		background-color: mix($background, $text, 95%);
-	}
-
 	.button {
 		background: transparent;
 		border: none;
@@ -58,6 +54,10 @@
 
 		&:focus {
 			box-shadow: none;
+		}
+
+		&.selectedServerChat {
+			background-color: mix($background, $text, 95%);
 		}
 	}
 </style>

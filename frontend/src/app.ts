@@ -1,7 +1,7 @@
 import { Writable, writable, get } from "svelte/store";
 import { Chat } from "./chat/chat";
 import { ITreeNode} from "./book";
-import { Connection } from "./connection";
+import { Connection, ConnectionState } from "./connection";
 import { TransientSettings } from "./transientSettings";
 import { loadPlugins, IPlugin } from "./plugins";
 import { OMsgConnect } from "./backend/ws";
@@ -50,6 +50,15 @@ export class App {
 
 	public connect(options: OMsgConnect): Connection {
 		const con = new Connection(options);
+		let unsub = con.state.subscribe(s => {
+			if (s === ConnectionState.Disconnected) {
+				unsub();
+				this.connections.update(cs => {
+					cs.remove_item(con);
+					return cs;
+				});
+			}
+		});
 		this.connections.update(cs => {
 			cs.push(con);
 			return cs;

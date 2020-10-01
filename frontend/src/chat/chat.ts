@@ -1,4 +1,4 @@
-import { get, writable, Writable } from "svelte/store";
+import { get, writable, Writable, Readable } from "svelte/store";
 import type { Moment } from "moment";
 import { graphql } from "../graphql";
 import { MessageTarget } from "../ts";
@@ -16,7 +16,7 @@ export class Chat {
 	};
 
 	public constructor(
-		readonly selectedChat: Writable<NodeSelection | undefined>) { }
+		private readonly selectedChat: Readable<NodeSelection | undefined>) { }
 
 	private static groupMessages(messages: Message[], lastEntry: Message | undefined, dir: ListFetchDir): void {
 		let previousMessage: Message | undefined;

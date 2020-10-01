@@ -12,7 +12,6 @@ export class Connection {
 	public readonly error: Writable<string | undefined> = writable(undefined);
 
 	public readonly book: Book = new Book();
-	public chat: Chat | undefined;
 	public server?: string;
 	public backend: IBackendConnection;
 
@@ -34,22 +33,18 @@ export class Connection {
 		});
 	}
 
-	public reset() {
-		this.state.set(ConnectionState.Disconnected);
-		this.book.reset();
-		this.server = undefined;
-		this.backend.close();
-		this.muted = false;
-		backend.setTitle("Qint");
-		location.hash = "";
-	}
-
 	public getState(): ConnectionState {
 		return get(this.state);
 	}
 
 	public isMuted(): boolean {
 		return this.muted;
+	}
+
+	// TODO recheck for sanity close -> onClose, or onClose -> close
+	public close() {
+		this.backend.close();
+		this.state.set(ConnectionState.Disconnected);
 	}
 
 	public onClose() {
@@ -61,8 +56,9 @@ export class Connection {
 				console.error("Failed to handle event in plugin:", e);
 			}
 		}
-
-		this.reset();
+		location.hash = "";
+		// Reset chat if the selected node is from this connection.
+		app.selectedNode.update(n => n?.connection === this ? undefined : n);
 	}
 
 	public sendMessage(data: OutMsg) {
@@ -127,12 +123,12 @@ export class Connection {
 						location.hash = getStringFromConnect(this.connectOptions!);
 						// TODO Get unread counts for channels and clients
 					} else if ("Message" in tsevt) {
-						this.chat?.unreadCount.update(c => c + 1);
+						app.chat.unreadCount.update(c => c + 1);
 					} else {
 						if ("PropertyRemoved" in tsevt) {
 							if ("Client" in tsevt.PropertyRemoved.id) {
 								if (tsevt.PropertyRemoved.id.Client === this.book.ownClientId) {
-									this.reset();
+									this.close();
 									return;
 								}
 							}

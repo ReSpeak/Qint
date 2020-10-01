@@ -19,7 +19,7 @@
 
 	export let chat: Chat;
 
-	const selected = chat.selectedChat;
+	const selected = app.selectedNode;
 	let chatStore = app.transientSettings.chat;
 
 	let chatList: LazyList;
@@ -54,7 +54,12 @@
 
 	function chatChanged() {
 		const sel = $selected;
-		if (sel === undefined) return;
+		if (sel === undefined) {
+			oldSelectedChat = undefined;
+			chatList.clear();
+			canChatHere = false;
+			return;
+		}
 		let { connection, target } = sel;
 		if (oldSelectedChat !== undefined) chatStore.set(text, oldSelectedChat, connection);
 		text = chatStore.get(target, connection) ?? "";

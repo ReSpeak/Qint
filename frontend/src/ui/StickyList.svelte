@@ -1,5 +1,5 @@
 <script lang="typescript">
-	import { onMount, onDestroy } from "svelte";
+	import { onDestroy } from "svelte";
 	import ResizeObserver from 'resize-observer-polyfill';
 	import { setContext } from 'svelte';
 
