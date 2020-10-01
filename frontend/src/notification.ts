@@ -123,7 +123,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHand
 				const invoker = msg.PropertyAdded.invoker;
 				const prop = msg.PropertyAdded.prop!;
 				if ("Channel" in prop) {
-					if (con.getState() === ConnectionState.ChannelListFinished) {
+					if (con.getState().channelListFinished) {
 						// TODO Channel added
 					}
 				} else if ("Client" in prop) {

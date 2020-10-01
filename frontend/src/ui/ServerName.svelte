@@ -1,8 +1,17 @@
 <script lang="typescript">
-	import { Server } from "../book";
-	export let server: Server;
+	import { Connection } from "../connection";
+
+	export let connection: Connection;
+	const state = connection.state;
+	const server = connection.book.server;
 </script>
 
-<span style={server.getColor()}>
-	{server.name}
-</span>
+{#if !$state.connected}
+	<span>
+		{connection.connectOptions.Connect.address}
+	</span>
+{:else}
+	<span style={$server.getColor()}>
+		{$server.name}
+	</span>
+{/if}

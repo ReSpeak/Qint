@@ -1,14 +1,20 @@
-import { Writable, writable, get } from "svelte/store";
+import { Writable, writable, get, Readable } from "svelte/store";
 import { Chat } from "./chat/chat";
 import { ITreeNode} from "./book";
-import { Connection, ConnectionState } from "./connection";
+import { Connection } from "./connection";
 import { TransientSettings } from "./transientSettings";
 import { loadPlugins, IPlugin } from "./plugins";
 import { OMsgConnect } from "./backend/ws";
 import { backend } from "./backend/backend";
+import { oneshot } from "./util";
 
 export class App {
 	public readonly connections: Writable<Connection[]> = writable([]);
+	// $: hasConnected = derived(
+	// 	$connections.map((c) => c.state) as [Readable<ConnectionState>],
+	// 	(states) => states.some((s) => s.connected)
+	// );
+	public get hasConnected() { return get(this.connections).some(s => get(s.state).connected); }
 	public readonly selectedNode: Writable<NodeSelection | undefined> = writable(undefined);
 
 	public readonly chat: Chat = new Chat(this.selectedNode);
@@ -50,14 +56,11 @@ export class App {
 
 	public connect(options: OMsgConnect): Connection {
 		const con = new Connection(options);
-		let unsub = con.state.subscribe(s => {
-			if (s === ConnectionState.Disconnected) {
-				unsub();
-				this.connections.update(cs => {
-					cs.remove_item(con);
-					return cs;
-				});
-			}
+		oneshot(con.state, s => s.closed, () => {
+			this.connections.update(cs => {
+				cs.remove_item(con);
+				return cs;
+			});
 		});
 		this.connections.update(cs => {
 			cs.push(con);

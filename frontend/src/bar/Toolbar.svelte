@@ -2,7 +2,7 @@
 	import Icon from "../ui/Icon.svelte";
 	import { DisplayPanel } from "../panel/panel";
 	import { SERVER_ICON } from "../util";
-	import { app } from "../app";
+	import { app, NodeSelection } from "../app";
 	import type { Writable } from "svelte/store";
 	import { Client } from "../book";
 
@@ -14,10 +14,15 @@
 	let outputMuted = false;
 	let isAway = false;
 
+	let showDescriptionButton = false;
+
 	const cons = app.connections;
 	let ownClient: Writable<Client | undefined> | undefined;
 	$: {
 		const consVal = $cons;
+		showDescriptionButton = consVal.length > 0;
+		if (!showDescriptionButton) showDescription = false;
+
 		const connection = consVal.length > 0 ? consVal[0] : undefined;
 		if (connection !== undefined) {
 			ownClient = connection.book.ownClient;
@@ -35,6 +40,22 @@
 				},
 			});
 		}
+	}
+
+	$: displayPanelChanged(displayPanel);
+	function displayPanelChanged(pan: DisplayPanel) {
+		if (pan !== DisplayPanel.Main) showDescription = false;
+	}
+
+	$: showDescriptionChanged(showDescription);
+	function showDescriptionChanged(to: boolean) {
+		if (to) displayPanel = DisplayPanel.Main;
+	}
+
+	const selectedNode = app.selectedNode;
+	$: selectedNodeChanged($selectedNode);
+	function selectedNodeChanged(node: NodeSelection | undefined) {
+		if (node !== undefined) displayPanel = DisplayPanel.Main;
 	}
 </script>
 
@@ -69,7 +90,7 @@
 		</button>
 	</div>
 	<div class="spacer" />
-	<div class="rightButtons">
+	<div class="rightButtons" class:invisible={!showDescriptionButton}>
 		<button
 			class="button toolbutton"
 			class:active={inputMuted}

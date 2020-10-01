@@ -1,50 +1,52 @@
-import { Chat } from "./chat/chat";
 import { OutMsg, OMsgConnect, InMsg, Reason } from "./backend/ws";
-import { get, writable, Writable } from "svelte/store";
+import { get, writable, Writable, Readable } from "svelte/store";
 import { Book, Channel } from "./book";
-import { getStringFromConnect } from "./util";
+import { getStringFromConnect, oneshot } from "./util";
 import { handleMessage } from "./notification";
 import { backend, IBackendConnection } from "./backend/backend";
 import { app } from "./app";
 
 export class Connection {
-	public readonly state = writable(ConnectionState.Disconnected);
-	public readonly error: Writable<string | undefined> = writable(undefined);
+	private readonly _state = writable(new ConnectionState());
+	public get state(): Readable<ConnectionState> { return this._state; };
 
 	public readonly book: Book = new Book();
 	public server?: string;
 	public backend: IBackendConnection;
 
-	private muted: boolean = false;
 	public loudness: Writable<number> = writable(0);
-	private connectOptions: OMsgConnect;
+	public connectOptions: OMsgConnect;
 
 	constructor(connectOptions: OMsgConnect) {
 		this.connectOptions = connectOptions;
 		this.backend = backend.createNewConnection();
-		this.error.set(undefined);
-		this.state.set(ConnectionState.Connecting);
+		this._state.update(s => s.setConnecting());
 		this.backend.connect(
 			(msg) => { this.messageHandler(msg) },
-			(err) => { this.error.set(`Connection failed, is Qint running? (${err})`); },
+			(err) => {
+				this._state.update(s => s.setError(`Connection failed, is Qint running? (${err})`));
+			},
 			() => this.onClose(),
 		).then(() => {
 			this.backend.send(this.connectOptions);
+			oneshot(this.state, s => s.channelListFinished, () => {
+				const ownClient = get(this.book.ownClient);
+				if (ownClient === undefined) return;
+				const ownChannel = this.book.getChannel(ownClient.channel);
+				if (ownChannel === undefined) return;
+				app.select(this, ownChannel);
+			})
 		});
 	}
 
-	public getState(): ConnectionState {
+	public getState(): Readonly<ConnectionState> {
 		return get(this.state);
-	}
-
-	public isMuted(): boolean {
-		return this.muted;
 	}
 
 	// TODO recheck for sanity close -> onClose, or onClose -> close
 	public close() {
 		this.backend.close();
-		this.state.set(ConnectionState.Disconnected);
+		this._state.update(s => s.setDisconnected());
 	}
 
 	public onClose() {
@@ -111,7 +113,7 @@ export class Connection {
 			this.server = msg.Connected.server;
 			this.book.ownClientId = msg.Connected.own_client;
 		} else if ("DisconnectedTemporarily" in msg) {
-			this.state.set(ConnectionState.Connecting);
+			this._state.update(s => s.setConnecting());
 			this.book.reset();
 			this.server = undefined;
 		} else if ("Events" in msg) {
@@ -119,7 +121,7 @@ export class Connection {
 				try {
 					console.log(tsevt);
 					if (tsevt === "ChannelListFinished") {
-						this.state.set(ConnectionState.ChannelListFinished);
+						this._state.update(s => s.setChannelListFinished());
 						location.hash = getStringFromConnect(this.connectOptions!);
 						// TODO Get unread counts for channels and clients
 					} else if ("Message" in tsevt) {
@@ -137,7 +139,7 @@ export class Connection {
 						if ("PropertyAdded" in tsevt) {
 							if (tsevt.PropertyAdded.prop !== undefined &&
 								"Server" in tsevt.PropertyAdded.prop) {
-								this.state.set(ConnectionState.Connected);
+								this._state.update(s => s.setConnected());
 							}
 						}
 					}
@@ -149,21 +151,76 @@ export class Connection {
 			this.book.talkersHandler(msg.TalkersChanged);
 		} else if ("Error" in msg) {
 			console.warn("Con Error:", msg.Error);
-			if (get(this.state) === ConnectionState.Connecting) {
-				this.backend.close();
-				this.error.set(msg.Error);
+			if (this.getState().connecting) {
+				this.backend.close(); // TODO call general close
+				this._state.update(s => s.setError(msg.Error));
 			}
 		} else if ("Loudness" in msg) {
-			this.loudness.update(_ => msg.Loudness);
+			this.loudness.set(msg.Loudness);
 		} else {
 			console.error("Unknown message", msg);
 		}
 	}
 }
 
-export enum ConnectionState {
-	Disconnected,
+export enum ConnectionStateEnum {
+	Uninitialized,
 	Connecting,
 	Connected,
 	ChannelListFinished,
+	Disconnected,
+	Errored,
+}
+
+export class ConnectionState {
+	public rawState: ConnectionStateEnum = ConnectionStateEnum.Uninitialized;
+	public error: string | undefined;
+	public get channelListFinished() { return this.rawState === ConnectionStateEnum.ChannelListFinished; }
+	public get connecting() { return this.rawState === ConnectionStateEnum.Connecting; }
+	public get connected() {
+		return this.rawState === ConnectionStateEnum.Connected ||
+			this.rawState === ConnectionStateEnum.ChannelListFinished;
+	}
+	public get errored() { return this.rawState === ConnectionStateEnum.Errored; }
+	public get closed() { return this.rawState === ConnectionStateEnum.Disconnected; }
+
+	public setConnecting(): this {
+		if (this.rawState !== ConnectionStateEnum.Uninitialized
+			&& this.rawState !== ConnectionStateEnum.Connected
+			&& this.rawState !== ConnectionStateEnum.ChannelListFinished)
+			this.throwTransition(ConnectionStateEnum.Connecting);
+		this.rawState = ConnectionStateEnum.Connecting;
+		return this;
+	}
+
+	public setConnected(): this {
+		if (this.rawState !== ConnectionStateEnum.Connecting)
+			this.throwTransition(ConnectionStateEnum.Connected);
+		this.rawState = ConnectionStateEnum.Connected;
+		return this;
+	}
+
+	public setChannelListFinished(): this {
+		if (this.rawState !== ConnectionStateEnum.Connected)
+			this.throwTransition(ConnectionStateEnum.ChannelListFinished);
+		this.rawState = ConnectionStateEnum.ChannelListFinished;
+		return this;
+	}
+
+	public setDisconnected(): this {
+		this.rawState = ConnectionStateEnum.Disconnected;
+		return this;
+	}
+
+	public setError(msg: string): this {
+		this.rawState = ConnectionStateEnum.Errored;
+		this.error = msg;
+		return this;
+	}
+
+	private throwTransition(newState: ConnectionStateEnum): never {
+		throw Error(`Cannot transition this connection from '${
+			ConnectionStateEnum[this.rawState]}' to ${
+			ConnectionStateEnum[newState]}`);
+	}
 }

@@ -3,8 +3,9 @@ import moment from "moment";
 import { Moment } from "moment";
 import { OMsgConnect } from "./backend/ws";
 import { OffsetDateTime } from "./book";
+import { Readable } from "svelte/store";
 export const debug: boolean = true;
-
+export const render_updates: boolean = false;
 
 export const SERVER_ICON = "server";
 export const CHANNEL_ICON = "chat-outline";
@@ -322,3 +323,15 @@ export function soft_merge(obj: any, merge: any) {
 }
 
 export function on(..._: any[]) { }
+
+export function oneshot<T>(
+	store: Readable<T>,
+	when: (t: T) => boolean,
+	action: (t: T) => void) {
+	let unsub = store.subscribe(x => {
+		if (when(x)) {
+			unsub();
+			action(x);
+		}
+	});
+}

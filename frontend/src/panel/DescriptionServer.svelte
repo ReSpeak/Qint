@@ -25,7 +25,7 @@
 	<div class="descGroup">
 		<div class="dataLine headLine">
 			<TsIcon type="server" source={server} {connection} />
-			<ServerName {server} />
+			<ServerName {connection} />
 		</div>
 		<div class="dataLine">
 			<div>IPs:</div>

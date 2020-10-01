@@ -10,12 +10,12 @@
 	import UiChannel from "./UiChannelWrap.svelte";
 	import { Connection } from "../connection";
 	import { draggable, DragData } from "../ui/draggable";
-	import { findParent, assert, flash } from "../util";
+	import { findParent, assert, flash, render_updates } from "../util";
 	import { SpacerType } from "./tree";
 	import { ChannelType } from "../ts";
 	import { app } from "../app";
 
-	afterUpdate(() => flash(div));
+	if (render_updates) afterUpdate(() => flash(div));
 
 	export let connection: Connection | undefined = undefined;
 	export let server: string | undefined = undefined;

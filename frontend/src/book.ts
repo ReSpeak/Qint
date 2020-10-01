@@ -618,7 +618,7 @@ export class Server implements ITreeParent, ITreeNode, Readable<Server> {
 	public readonly icon!: IconHash;
 	public readonly public_key?: number[];
 	// Base64 encoded, result from graphql
-	public readonly publicKey?: string;
+	public readonly publicKey?: string; // TODO change name in graphql ?
 	public readonly ips!: string[];
 	public readonly license!: string; // TODO enum
 	public readonly created!: OffsetDateTime;

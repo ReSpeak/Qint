@@ -8,11 +8,11 @@
 	import { Connection } from "../connection";
 	import { Client, TalkState } from "../book";
 	import { draggable, DragData } from "../ui/draggable";
-	import { findParent, flash } from "../util";
+	import { findParent, flash, render_updates } from "../util";
 	import { afterUpdate } from "svelte";
 	import { app } from "../app";
 
-	afterUpdate(() => flash(div));
+	if (render_updates) afterUpdate(() => flash(div));
 
 	export let connection: Connection;
 	export let client: Client;
