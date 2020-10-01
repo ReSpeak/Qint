@@ -33,7 +33,7 @@
 	$: isSelected = $channel.isSelected;
 	$: channels = channel.channels;
 	$: clients = channel.clients;
-	$: filterShow = applyFilter(filter, filterStartFromRoot, $channel, $channels);
+	$: filterShow = applyFilter(filter, filterStartFromRoot, $channel, $channels, $clients);
 	// Update if a client moves in or out
 	$: ownClient = updateOwnClient($clients);
 
@@ -58,8 +58,10 @@
 		filter: string,
 		filterStartFromRoot: boolean,
 		channel: Channel,
-		children: ITreeNode[]
+		channels: ITreeNode[],
+		clients: ITreeNode[],
 	) {
+		const children = channels.concat(clients);
 		assert(filter != null, "filter is null");
 		if (filter === "") {
 			if (showId) showId = false;

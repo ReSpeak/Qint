@@ -22,12 +22,12 @@
 	const selected = app.selectedNode;
 	let chatStore = app.transientSettings.chat;
 
-	let chatList: LazyList;
+	let chatList: LazyList | undefined;
 	let messagesError: unknown | undefined;
 	let messageInput: BInput;
 	let text = "";
 
-	let canChatHere = true;
+	let canChatHere = false;
 
 	let oldSelectedChat: MessageTarget | undefined = undefined;
 	let unreadCount = chat.unreadCount;
@@ -56,7 +56,7 @@
 		const sel = $selected;
 		if (sel === undefined) {
 			oldSelectedChat = undefined;
-			chatList.clear();
+			chatList?.clear();
 			canChatHere = false;
 			return;
 		}
@@ -145,6 +145,8 @@
 				<div class="message-body">Failed to fetch messages</div>
 			</article>
 		</div>
+	{:else if $selected === undefined}
+		<div class="chatFiller">No chat selected</div>
 	{:else}
 		<LazyList bind:this={chatList} {fetchElements} suggestJumpEnd={true} let:item>
 			<div slot="loading" class="chatFiller">
