@@ -1,3 +1,6 @@
+// Don't show terminal
+#![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
+
 #[macro_use]
 extern crate diesel;
 #[macro_use]
@@ -62,23 +65,20 @@ struct Args {
 	/// The id of the identity that is used by default
 	#[structopt(short = "i", long)]
 	default_identity: Option<u64>,
-	/// The path for all the settings files. This makes only senses as a command
-	/// line argument, it is ignored in the settings file.
+	/// The path for all the settings files. This makes only senses as a command line argument, it
+	/// is ignored in the settings file.
 	///
-	/// If no value is given, the configuration path depends on the operating
-	/// system.
+	/// If no value is given, the configuration path depends on the operating system.
 	#[structopt(short = "c", long)]
 	config_path: Option<PathBuf>,
 	/// The path for cached files. This is used for the `FileCache`.
 	///
-	/// If no value is given, the configuration path depends on the operating
-	/// system.
+	/// If no value is given, the configuration path depends on the operating system.
 	#[structopt(long)]
 	cache_path: Option<PathBuf>,
 	/// The path for plugins.
 	///
-	/// If no value is given, this is the path of the config file plus
-	/// `plugins/`.
+	/// If no value is given, this is the path of the config file plus `plugins/`.
 	#[structopt(long)]
 	plugin_path: Option<String>,
 	/// Do not capture and play audio.
@@ -90,6 +90,9 @@ struct Args {
 	/// Open the frontend in the browser on start.
 	#[structopt(long)]
 	no_open: bool,
+	/// Start tauri.
+	#[structopt(short, long)]
+	tauri: bool,
 	/// How much log output do you want?
 	///
 	/// 0. Print nothing
@@ -648,6 +651,43 @@ impl App {
 					error!(logger, "Failed to open frontend in browser"; "error" => %e);
 				}
 			});
+		}
+
+		if !args.tauri {
+			tauri::AppBuilder::new()
+				.setup(|webview, _source| {
+					let mut webview = webview.as_mut();
+					tauri::event::listen(String::from("get_motd"), move |msg| {
+						println!("got js-event with message '{:?}'", msg);
+						let reply = "something else".to_string();
+
+						tauri::event::emit(&mut webview, String::from("get_motd"), Some(reply))
+							.expect("failed to emit");
+					});
+				})
+				.invoke_handler(|_webview, arg| {
+					#[derive(Deserialize)]
+					#[serde(tag = "cmd", rename_all = "camelCase")]
+					pub enum Cmd {
+						// note that rename_all = "camelCase": you need to use "myCustomCommand" on JS
+						MyCustomCommand { argument: String },
+					}
+					match serde_json::from_str(arg) {
+						Err(e) => Err(e.to_string()),
+						Ok(command) => {
+							match command {
+								// Definitions for your custom commands from Cmd here
+								Cmd::MyCustomCommand { argument } => {
+									//  your command code
+									println!("{}", argument);
+								}
+							}
+							Ok(())
+						}
+					}
+				})
+				.build()
+				.run();
 		}
 
 		let state2 = state.clone();

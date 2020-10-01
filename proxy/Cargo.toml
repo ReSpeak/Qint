@@ -1,7 +1,7 @@
 [package]
 name = "qint-proxy"
 version = "0.1.0"
-authors = ["Flakebi <flakebi@t-online.de>"]
+authors = [ "Flakebi <flakebi@t-online.de>" ]
 edition = "2018"
 build = "build/build.rs"
 description = "Qint is a TeamSpeak client"
@@ -17,9 +17,9 @@ anyhow = "1"
 audiopus = "0.2"
 base32 = "0.4"
 base64 = "0.12"
-chrono = { version = "0.4", features = ["serde"] }
-diesel = { version = "1.4", features = ["chrono", "sqlite"] }
-diesel-derive-enum = { version = "1", features = ["sqlite"] }
+chrono = { version = "0.4", features = [ "serde" ] }
+diesel = { version = "1.4", features = [ "chrono", "sqlite" ] }
+diesel-derive-enum = { version = "1", features = [ "sqlite" ] }
 diesel_migrations = "1.4"
 directories = "3"
 ebur128 = "0.1"
@@ -29,7 +29,7 @@ git-testament = "0.1"
 hex = "0.4"
 juniper = { git = "https://github.com/graphql-rust/juniper" }
 lazy_static = "1"
-libsqlite3-sys = { version = "0.18", features = ["bundled"] }
+libsqlite3-sys = { version = "0.18", features = [ "bundled" ] }
 livesplit-hotkey = "0.5"
 open = "1"
 nnnoiseless = "0.3"
@@ -38,7 +38,7 @@ pulldown-cmark = "0.8"
 regex = "1"
 rmp-serde = "0.14"
 sdl2 = "0.34"
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1", features = [ "derive" ] }
 serde_json = "1"
 slog-async = "2"
 slog-envlogger = "2"
@@ -46,29 +46,27 @@ slog-scope = "4"
 slog-stdlog = "4"
 slog-term = "2"
 structopt = { version = "0.3", default-features = false }
+tauri = { version = "0.9", features = [ "all-api" ] }
 time = "0.2"
 toml = "0.5"
-tokio = { version = "0.2", features = ["fs"] }
-tokio-util = { version = "0.3", features = ["codec"] }
-tsclientlib = { path = "../../tsclientlib/tsclientlib", features = ["unstable"] }
+tokio = { version = "0.2", features = [ "fs" ] }
+tokio-util = { version = "0.3", features = [ "codec" ] }
+tsclientlib = { path = "../../tsclientlib/tsclientlib", features = [ "unstable" ] }
 tsproto = { path = "../../tsclientlib/tsproto" }
 tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }
 tsproto-types = { path = "../../tsclientlib/utils/tsproto-types" }
-uuid = { version = "0.8", features = ["serde"] }
+uuid = { version = "0.8", features = [ "serde" ] }
 
-[dependencies.log]
-version = "0.4"
-features = ["max_level_info", "release_max_level_info"]
+  [dependencies.log]
+  version = "0.4"
+  features = [ "max_level_info", "release_max_level_info" ]
 
-[dependencies.slog]
-version = "2"
-features = ["max_level_trace", "release_max_level_debug"]
+  [dependencies.slog]
+  version = "2"
+  features = [ "max_level_trace", "release_max_level_debug" ]
 
-[target.'cfg(target_arch = "aarch64")'.dependencies]
-# TODO The bundled feature gets also activated for x86
-#audiopus_sys = { version = "0.1", features = ["static"] }
-#reqwest = { version = "0.10", default-features = false, features = ["rustls-tls"] }
-#sdl2 = { version = "0.34", features = ["bundled"] }
+[target."cfg(target_arch = \"aarch64\")"]
+dependencies = { }
 
 [build-dependencies]
 heck = "0.3"
@@ -80,4 +78,8 @@ actix-codec = "0.3"
 awc = "2"
 rand = "0.7"
 tempfile = "3"
-uuid = { version = "0.8", features = ["v4"] }
+uuid = { version = "0.8", features = [ "v4" ] }
+
+[features]
+embedded-server = [ "tauri/embedded-server" ]
+no-server = [ "tauri/no-server" ]
