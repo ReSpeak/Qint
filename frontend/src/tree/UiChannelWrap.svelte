@@ -13,4 +13,4 @@
 	export let channel: Channel;
 </script>
 
-<UiChannel {connection} {server} {filter} {filterShow} {filterStartFromRoot} {channel} />
+<UiChannel {connection} {server} {filter} bind:filterShow={filterShow} {filterStartFromRoot} {channel} />

@@ -11,4 +11,4 @@
 	export let filterShow: boolean = true;
 </script>
 
-<UiClient {connection} {client} {filter} {filterShow} />
+<UiClient {connection} {client} {filter} bind:filterShow={filterShow} />

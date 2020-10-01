@@ -304,8 +304,8 @@
 	}
 
 	.menu-list li ul {
-		margin: 0 0 0 0.5em;
-		padding-left: 0.5em;
+		margin: 0 0 0 0.9em;
+		padding-left: 0.1em;
 	}
 
 	.collapsed .menu-list {
