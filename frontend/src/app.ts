@@ -3,7 +3,7 @@ import { Chat } from "./chat/chat";
 import { ITreeNode} from "./book";
 import { Connection } from "./connection";
 import { TransientSettings } from "./transientSettings";
-import { loadPlugins } from "./plugins";
+import { loadPlugins, IPlugin } from "./plugins";
 import { OMsgConnect } from "./backend/ws";
 import { backend } from "./backend/backend";
 
@@ -13,10 +13,10 @@ export class App {
 
 	public readonly chat: Chat = new Chat(this.selectedNode);
 	public readonly transientSettings: TransientSettings = new TransientSettings();
-	public plugins: any[] = [];
+	public plugins: IPlugin[] = [];
 
 	constructor() {
-		loadPlugins();
+		loadPlugins().then(x => this.plugins = x);
 		this.transientSettings.loadAsync(); // Async !!!!
 
 		this.selectedNode.subscribe(s => {

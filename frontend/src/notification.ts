@@ -4,10 +4,11 @@ import { Book, Channel, Client, Server, ServerGroup } from "./book";
 import { InBookMsg, InMsg, Invoker, Reason } from "./backend/ws";
 import { Connection, ConnectionState } from "./connection";
 import { app } from "./app";
+import { IPlugin } from "./plugins";
 
 type NotificationArg = Book | Channel | Client | Invoker | Server | ServerGroup | string | null | undefined;
 
-class TsNotification {
+export class TsNotification {
 	constructor(
 		/** The string pieces */
 		public pieces: TemplateStringsArray,
@@ -65,16 +66,18 @@ function notif(strings: TemplateStringsArray, ...keys: NotificationArg[]): TsNot
 
 let synth = window.speechSynthesis;
 
-function getHandler(plugins: any[]): (con: Connection, e: InMsg | InBookMsg, no: TsNotification) => void {
+export type NotificationHandler = (con: Connection, e: InMsg | InBookMsg, no: TsNotification) => void;
+
+function getHandler(plugins: IPlugin[]): NotificationHandler {
 	for (let p of plugins) {
-		if ("handleNotification" in p) {
+		if (p.handleNotification !== undefined) {
 			return p.handleNotification;
 		}
 	}
 	return textToSpeechNotification;
 }
 
-export function handleMessage(con: Connection, msg: InMsg, plugins: any[]) {
+export function handleMessage(con: Connection, msg: InMsg, plugins: IPlugin[]) {
 	try {
 		const handler = getHandler(plugins);
 		if ("Connected" in msg) {
@@ -95,7 +98,7 @@ export function handleMessage(con: Connection, msg: InMsg, plugins: any[]) {
 	}
 }
 
-function handleEvents(con: Connection, msg: InBookMsg, handler: (con: Connection, e: InMsg | InBookMsg, no: TsNotification) => void) {
+function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHandler) {
 	try {
 		const ownClientId = con.book.ownClientId!;
 		const ownClient = get(con.book.ownClient);

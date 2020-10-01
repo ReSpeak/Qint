@@ -56,9 +56,7 @@ export class Connection {
 		// Plugins
 		for (const plugin of app.plugins) {
 			try {
-				if ("handleEvent" in plugin) {
-					plugin.handleEvent(this, { Disconnected: null });
-				}
+				plugin.handleEvent?.(this, { Disconnected: null });
 			} catch (e) {
 				console.error("Failed to handle event in plugin:", e);
 			}
@@ -106,9 +104,7 @@ export class Connection {
 		// Plugins
 		for (const plugin of app.plugins) {
 			try {
-				if ("handleEvent" in plugin) {
-					plugin.handleEvent(this, msg);
-				}
+				plugin.handleEvent?.(this, msg);
 			} catch (e) {
 				console.error("Failed to handle event in plugin:", e);
 			}

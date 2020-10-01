@@ -1,9 +1,16 @@
 import { BASE_ADDRESS } from "./util";
 import { importModule } from "@uupaa/dynamic-import-polyfill";
 import { backend } from "./backend/backend";
-import { app } from "./app";
+import { Connection } from "./connection";
+import { InMsg } from "./backend/ws";
+import { NotificationHandler } from "./notification";
 
 const importFunc = genImportFunc();
+
+export interface IPlugin {
+	handleEvent?: (con: Connection, evt: InMsg) => any;
+	handleNotification?: NotificationHandler;
+}
 
 function genImportFunc() {
 	try {
@@ -13,21 +20,22 @@ function genImportFunc() {
 	}
 }
 
-export async function loadPlugins() {
-	app.plugins = [];
+export async function loadPlugins(): Promise<IPlugin[]> {
+	let plugins: IPlugin[] = [];
 	let list: string[];
 	try {
 		list = await (await backend.fetch(`/plugins`)).json();
 	} catch (err) {
 		console.log("Failed to load plugins list", err);
-		return;
+		return plugins;
 	}
 	for (let i = 0; i < list.length; i++) {
 		try {
 			const mod = await importFunc(list[i]);
-			app.plugins.push(mod);
+			plugins.push(mod);
 		} catch (err) {
 			console.error(`Failed to load plugin ${list[i]}`);
 		}
 	}
+	return plugins;
 }
