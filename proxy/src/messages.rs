@@ -27,8 +27,8 @@ pub enum MessageP2F {
 	Error(String),
 	/// We are successfully connected to the server.
 	Connected {
-		/// The id of the server.
-		server: String,
+		/// The uid of the server.
+		server: Vec<u8>,
 		/// The id of our own client.
 		own_client: ClientId,
 	},

@@ -3,7 +3,7 @@ import type { Moment } from "moment";
 import { graphql } from "../graphql";
 import { MessageTarget } from "../ts";
 import { GraphQlClient } from "../book";
-import { datetimeDeserialize, getDataColor, assert, Lazy } from "../util";
+import { datetimeDeserialize, getDataColor, assert, Lazy, base64Encode } from "../util";
 import { ListFetchDir, FetchResult } from "../ui/lazyList";
 import { NodeSelection } from "../app";
 
@@ -48,7 +48,7 @@ export class Chat {
 		const selected = get(this.selectedChat);
 		if (selected === undefined) return Chat.EmptyFetch;
 		let { connection, target } = selected;
-		if (connection.server === undefined) {
+		if (connection.book.server.public_key === undefined) {
 			console.error("Cannot get messages for a non-existant connection");
 			return Chat.EmptyFetch;
 		}
@@ -94,7 +94,7 @@ export class Chat {
 				}
 			}`, {
 			chat_type: MessageTarget.getType(target),
-			server: connection.server,
+			server: base64Encode(connection.book.server.public_key),
 			chat_id: MessageTarget.getId(target, connection),
 			start_time,
 			start_id,

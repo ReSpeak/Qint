@@ -222,12 +222,19 @@ impl Ws {
 								.and_then(|s| c.get_state().map(|c| (s, c.own_client)).ok())
 						}) {
 							Some((server_key, own_client)) => {
-								// Send server id
-								let server = base64::encode(&server_key.to_short());
-								self.send_message(
-									&MessageP2F::Connected { server, own_client },
-									ctx,
-								);
+								// Send server uid and own client id
+								match server_key.get_uid_no_base64() {
+									Ok(server) => {
+										self.send_message(
+											&MessageP2F::Connected { server, own_client },
+											ctx,
+										);
+									}
+									Err(e) => {
+										error!(self.logger, "Failed to get server uid";
+											"error" => %e);
+									}
+								}
 
 								// Save in database
 								let opts = self.connect_options.as_ref().unwrap();

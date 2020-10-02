@@ -151,7 +151,7 @@ export type InMsg = InMsgConnected | InDisconnectedTemporarily | InDisconnected 
 
 interface InMsgConnected {
 	Connected: {
-		server: string;
+		server: number[];
 		own_client: number,
 	};
 }

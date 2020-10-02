@@ -57,9 +57,9 @@ export const MessageTarget = {
 
 	toUniqueString(target: MessageTarget, con: Connection): string | undefined {
 		if ("Server" in target) {
-			return `SERVER,${con.server}`;
+			return `SERVER,${con.book.server.uidStr}`;
 		} else if ("Channel" in target) {
-			return `CHANNEL,${con.server},${target.Channel}`;
+			return `CHANNEL,${con.book.server.uidStr},${target.Channel}`;
 		} else if ("Client" in target) {
 			const uid = con.book.clients.get(target.Client)?.uidStr;
 			if (uid === undefined) return undefined;

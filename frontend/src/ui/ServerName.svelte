@@ -11,7 +11,7 @@
 		{connection.connectOptions.Connect.address}
 	</span>
 {:else}
-	<span style={$server.getColor()}>
+	<span style={$server.color}>
 		{$server.name}
 	</span>
 {/if}

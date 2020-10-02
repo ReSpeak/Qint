@@ -186,7 +186,7 @@ impl Channel {
 	fn parent(&self) -> Option<ID> { self.0.parent.map(|i| ID::new(i.to_string())) }
 	/// References the channel above this one (zero if this is the first
 	/// channel).
-	fn order_id(&self) -> Option<ID> { self.0.order_id.map(|i| ID::new(i.to_string())) }
+	fn order(&self) -> Option<ID> { self.0.order_id.map(|i| ID::new(i.to_string())) }
 	fn name(&self) -> &str { &self.0.name }
 	fn icon(&self) -> Option<ID> { self.0.icon.map(|i| ID::new((i as u32).to_string())) }
 	fn deleted(&self) -> bool { self.0.deleted }

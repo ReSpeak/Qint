@@ -382,33 +382,32 @@ export class Book {
 
 type MaxClients = "Inherited" | "Unlimited" | { Limited: number };
 type GroupNamingMode = any;
-type IconHash = number | undefined;
+type IconId = number | undefined;
 type GroupType = any;
 export type OffsetDateTime = [number, number];
 
 
 export class GraphQlClient {
-	public uid!: number[];
-	public name!: string;
-	public icon!: IconHash;
-	public avatar_hash!: string;
-	private _clientColor: Lazy<string>;
-	public get clientColor() { return this._clientColor.get(); }
+	public readonly uid!: number[];
+	public readonly name!: string;
+	public readonly icon!: IconId;
+	public readonly avatar_hash!: string;
+	private _color: Lazy<string>;
+	public get color() { return this._color.get(); }
 	private _uidStr: Lazy<string>;
 	public get uidStr() { return this._uidStr.get(); }
 
-	protected constructor() {
-		this._clientColor = new Lazy(() => getDataColor(this.uid));
+	protected constructor(uid?: number[], name?: string, icon?: IconId, avatar_hash?: string) {
+		this._color = new Lazy(() => getDataColor(this.uid));
 		this._uidStr = new Lazy(() => this.getUid());
+		if (uid !== undefined) this.uid = uid;
+		if (name !== undefined) this.name = name;
+		if (icon !== undefined) this.icon = icon;
+		if (avatar_hash !== undefined) this.avatar_hash = avatar_hash;
 	}
 
 	public static fromGraphqlInvoker(obj: any): GraphQlClient {
-		const c = new GraphQlClient();
-		c.uid = base64Decode(obj.client.uid);
-		c.name = obj.client.customName ?? obj.client.name;
-		c.icon = obj.icon ?? 0;
-		c.avatar_hash = obj.avatar ?? "";
-		return c;
+		return new GraphQlClient(base64Decode(obj.client.uid), obj.client.customName ?? obj.client.name, obj.icon ?? 0, obj.avatar ?? "");
 	}
 
 	private getUid(): string {
@@ -455,7 +454,6 @@ export class Client extends GraphQlClient implements ITreeNode, Readable<Client>
 	public readonly country_code!: string;
 	public readonly database_id!: number;
 	public readonly description!: string
-	//public readonly icon!: IconHash; // inherited from GraphQlClient
 	public readonly id!: number;
 	public readonly inherited_channel_group_from_channel!: number;
 	public readonly input_hardware_enabled!: boolean;
@@ -564,7 +562,7 @@ export class Channel implements ITreeParent, ITreeNode, Readable<Channel> {
 	public readonly needed_talk_power!: number | null;
 	public readonly forced_silence!: boolean | null;
 	public readonly phonetic_name!: string | null;
-	public readonly icon!: IconHash;
+	public readonly icon!: IconId;
 	public readonly is_private!: boolean | null;
 	public readonly subscribed!: boolean;
 	public readonly permission_hints!: any | null;
@@ -611,14 +609,37 @@ export class Channel implements ITreeParent, ITreeNode, Readable<Channel> {
 	}
 }
 
-export class Server implements ITreeParent, ITreeNode, Readable<Server> {
-	public _store: Writable<this>;
-	public readonly name!: string;
-	public readonly phonetic_name!: string;
-	public readonly icon!: IconHash;
+export class GraphQlServer {
 	public readonly public_key?: number[];
-	// Base64 encoded, result from graphql
-	public readonly publicKey?: string; // TODO change name in graphql ?
+	public readonly uid!: number[];
+	public readonly name!: string;
+	public readonly icon!: IconId;
+	private _color: Lazy<string>;
+	public get color() { return this._color.get(); }
+	private _uidStr: Lazy<string>;
+	public get uidStr() { return this._uidStr.get(); }
+
+	protected constructor(public_key?: number[] | undefined, uid?: number[], name?: string, icon?: IconId) {
+		this._color = new Lazy(() => getDataColor(this.uid));
+		this._uidStr = new Lazy(() => this.getUid());
+		this.public_key = public_key;
+		if (uid !== undefined) this.uid = uid;
+		if (name !== undefined) this.name = name;
+		if (icon !== undefined) this.icon = icon;
+	}
+
+	public static fromGraphql(obj: any): GraphQlServer {
+		return new GraphQlServer(base64Decode(obj.server.publicKey), base64Decode(obj.server.uid), obj.server.name, obj.server.icon);
+	}
+
+	private getUid(): string {
+		return base64Encode(this.uid);
+	}
+}
+
+export class Server extends GraphQlServer implements ITreeParent, ITreeNode, Readable<Server> {
+	public _store: Writable<this>;
+	public readonly phonetic_name!: string;
 	public readonly ips!: string[];
 	public readonly license!: string; // TODO enum
 	public readonly created!: OffsetDateTime;
@@ -632,6 +653,7 @@ export class Server implements ITreeParent, ITreeNode, Readable<Server> {
 	public isSelected: boolean = false;
 
 	constructor() {
+		super();
 		this._store = writable(this);
 	}
 	// ITreeParent
@@ -650,23 +672,13 @@ export class Server implements ITreeParent, ITreeNode, Readable<Server> {
 	public subscribe(run: (c: this) => any): () => void {
 		return this._store.subscribe(run);
 	}
-
-	public getColor() {
-		if (this.public_key) {
-			return getDataColor(this.public_key)
-		} else if (this.publicKey) {
-			return getDataColor(atob(this.publicKey))
-		} else {
-			return getDataColor(this.name ?? "");
-		}
-	}
 }
 
 export class Group {
 	id!: number;
 	name!: string;
 	group_type!: GroupType;
-	icon!: IconHash;
+	icon!: IconId;
 	is_permanent!: boolean;
 	sort_id!: number;
 	naming_mode!: GroupNamingMode;

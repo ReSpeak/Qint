@@ -11,7 +11,6 @@ export class Connection {
 	public get state(): Readable<ConnectionState> { return this._state; };
 
 	public readonly book: Book = new Book();
-	public server?: string;
 	public backend: IBackendConnection;
 
 	public loudness: Writable<number> = writable(0);
@@ -26,7 +25,7 @@ export class Connection {
 			(err) => {
 				this._state.update(s => s.setError(`Connection failed, is Qint running? (${err})`));
 			},
-			() => this.onClose(),
+			() => this.close(),
 		).then(() => {
 			this.backend.send(this.connectOptions);
 			oneshot(this.state, s => s.channelListFinished, () => {
@@ -43,13 +42,9 @@ export class Connection {
 		return get(this.state);
 	}
 
-	// TODO recheck for sanity close -> onClose, or onClose -> close
 	public close() {
 		this.backend.close();
 		this._state.update(s => s.setDisconnected());
-	}
-
-	public onClose() {
 		// Plugins
 		for (const plugin of app.plugins) {
 			try {
@@ -110,12 +105,11 @@ export class Connection {
 
 		handleMessage(this, msg, app.plugins);
 		if ("Connected" in msg) {
-			this.server = msg.Connected.server;
+			this.book.server.update({ uid: msg.Connected.server });
 			this.book.ownClientId = msg.Connected.own_client;
 		} else if ("DisconnectedTemporarily" in msg) {
 			this._state.update(s => s.setConnecting());
 			this.book.reset();
-			this.server = undefined;
 		} else if ("Events" in msg) {
 			for (const tsevt of msg.Events) {
 				try {
