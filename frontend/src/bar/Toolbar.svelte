@@ -28,7 +28,8 @@
 			ownClient = connection.book.ownClient;
 			inputMuted = $ownClient?.input_muted ?? false;
 			outputMuted = $ownClient?.output_muted ?? false;
-			isAway = $ownClient?.away_message !== null ?? false;
+			const awayMessage = $ownClient?.away_message;
+			isAway = awayMessage !== undefined && awayMessage !== null;
 		}
 	}
 

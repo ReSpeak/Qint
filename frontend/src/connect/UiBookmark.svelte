@@ -39,7 +39,7 @@
 	class:bookmark={bookmark.bookmark}>
 	<button class="button innerBookmarkItem" on:click={doConnect} title={bookmark.server?.name}>
 		<div class="bookmarkIcon">
-			<TsIcon type="server" source={{icon: bookmark.server?.icon}} server={bookmark.server?.uid} />
+			<TsIcon type="server" source={{icon: bookmark.server?.icon}} server={bookmark.server?.hexUid} />
 		</div>
 		<div class="bookmarkName">{bookmark.name || bookmark.server?.name}</div>
 		{#if bookmark.lastUsed}

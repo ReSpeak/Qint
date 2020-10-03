@@ -200,7 +200,6 @@ export function getDefaultVersion(): string {
 export function getConnectFromString(loc: string): OMsgConnect {
 	if (loc.startsWith("{")) {
 		// Parse json
-		console.log(loc);
 		let data = JSON.parse(loc);
 		assert("address" in data, "connection data needs an address");
 		if (!("name" in data))

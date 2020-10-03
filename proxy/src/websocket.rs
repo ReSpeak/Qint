@@ -337,7 +337,7 @@ impl Ws {
 					}));
 				}
 			}
-			TsStreamItem::DisconnectedTemporarily => {
+			TsStreamItem::DisconnectedTemporarily(_) => {
 				self.set_audio_input_active(ctx, false);
 				self.send_message(&MessageP2F::DisconnectedTemporarily(), ctx);
 				self.talkers.clear();

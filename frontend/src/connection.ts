@@ -25,7 +25,7 @@ export class Connection {
 			(err) => {
 				this._state.update(s => s.setError(`Connection failed, is Qint running? (${err})`));
 			},
-			() => this.close(),
+			() => this.onClose(),
 		).then(() => {
 			this.backend.send(this.connectOptions);
 			oneshot(this.state, s => s.channelListFinished, () => {
@@ -45,6 +45,9 @@ export class Connection {
 	public close() {
 		this.backend.close();
 		this._state.update(s => s.setDisconnected());
+	}
+
+	private onClose() {
 		// Plugins
 		for (const plugin of app.plugins) {
 			try {
@@ -129,11 +132,23 @@ export class Connection {
 								}
 							}
 						}
+
 						this.book.messageHandler(tsevt);
+
 						if ("PropertyAdded" in tsevt) {
 							if (tsevt.PropertyAdded.prop !== undefined &&
 								"Server" in tsevt.PropertyAdded.prop) {
 								this._state.update(s => s.setConnected());
+							}
+						} else if ("PropertyChanged" in tsevt) {
+							const prop = tsevt.PropertyChanged.prop!;
+							if ("Client" in prop && "Client" in tsevt.PropertyChanged.id
+								&& tsevt.PropertyChanged.id.Client === this.book.ownClientId
+								&& "channel" in prop.Client) {
+								// Update selected node
+								const curTarget = get(app.selectedNode);
+								if (curTarget === undefined || curTarget.node.qlType === "CHANNEL")
+									app.select(this, this.book.getChannel(prop.Client.channel!)!);
 							}
 						}
 					}

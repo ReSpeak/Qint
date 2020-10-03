@@ -321,20 +321,20 @@ impl Chat {
 
 #[juniper::graphql_object(Context = State)]
 impl Client {
-	/// The uid of the client.
-	fn uid(&self) -> ID { ID::new(base64::encode(&self.0.uid)) }
+	/// The uid of the client as a byte array.
+	fn uid(&self) -> Vec<i32> { self.0.uid.iter().map(|i| *i as i32).collect() }
 	fn name(&self) -> &str { &self.0.name }
-	/// The base64 encoded public key of the client if we have it.
-	fn public_key(&self) -> Option<String> {
-		self.0.public_key.as_ref().map(|p| base64::encode(&p))
+	/// The public key of the client as a byte array if we have it.
+	fn public_key(&self) -> Option<Vec<i32>> {
+		self.0.public_key.as_ref().map(|p| p.iter().map(|i| *i as i32).collect())
 	}
 	/// The custom name of the client if we assigned one.
 	fn custom_name(&self) -> Option<&str> { self.0.custom_name.as_deref() }
 	fn volume(&self) -> f64 { self.0.volume as f64 }
 
 	/// The chat with this client on the specified server.
-	async fn chat(&self, state: &State, server: ID) -> GResult<Option<Chat>> {
-		let server = base64::decode(server.as_bytes())?;
+	async fn chat(&self, state: &State, server: Vec<i32>) -> GResult<Option<Chat>> {
+		let server = server.into_iter().map(|i| i as u8).collect::<Vec<_>>();
 		let id = self.0.uid.clone();
 		let res = state
 			.database
@@ -352,8 +352,8 @@ impl Client {
 	}
 
 	/// The chat with this client on the specified server.
-	async fn pokes(&self, state: &State, server: ID) -> GResult<Option<Chat>> {
-		let server = base64::decode(server.as_bytes())?;
+	async fn pokes(&self, state: &State, server: Vec<i32>) -> GResult<Option<Chat>> {
+		let server = server.into_iter().map(|i| i as u8).collect::<Vec<_>>();
 		let id = self.0.uid.clone();
 		let res = state
 			.database
@@ -469,11 +469,11 @@ impl Message {
 
 #[juniper::graphql_object(Context = State)]
 impl Server {
-	/// The public key of the server, base64 encoded.
-	fn public_key(&self) -> ID { ID::new(base64::encode(&self.0.public_key)) }
-	fn uid(&self) -> GResult<String> {
+	/// The public key of the server as a byte array.
+	fn public_key(&self) -> Vec<i32> { self.0.public_key.iter().map(|i| *i as i32).collect() }
+	fn uid(&self) -> GResult<Vec<i32>> {
 		let key = EccKeyPubP256::from_short(self.0.public_key.clone());
-		Ok(key.get_uid()?)
+		Ok(key.get_uid_no_base64()?.into_iter().map(|i| i as i32).collect())
 	}
 	fn name(&self) -> &str { &self.0.name }
 	/// The last used address to connect to this server.
@@ -626,9 +626,9 @@ impl Query {
 	}
 
 	async fn chat(
-		state: &State, typ: GMessageTarget, server: ID, id: Option<ID>,
+		state: &State, typ: GMessageTarget, server: Vec<i32>, id: Option<ID>,
 	) -> GResult<Option<Chat>> {
-		let server = base64::decode(server.as_bytes())?;
+		let server = server.into_iter().map(|i| i as u8).collect::<Vec<_>>();
 		let res = state
 			.database
 			.send(RunOnDbMsg(move |db| {
@@ -695,8 +695,8 @@ impl Query {
 		Ok(res)
 	}
 
-	async fn server(state: &State, server: ID) -> GResult<Server> {
-		let server = base64::decode(server.as_bytes())?;
+	async fn server(state: &State, server: Vec<i32>) -> GResult<Server> {
+		let server = server.into_iter().map(|i| i as u8).collect::<Vec<_>>();
 		let res = state
 			.database
 			.send(RunOnDbMsg(|db| {
@@ -727,8 +727,8 @@ impl Query {
 		Ok(res)
 	}
 
-	async fn client(state: &State, uid: ID) -> GResult<Client> {
-		let client = base64::decode(uid.as_bytes())?;
+	async fn client(state: &State, uid: Vec<i32>) -> GResult<Client> {
+		let client = uid.into_iter().map(|i| i as u8).collect::<Vec<_>>();
 		let res = state
 			.database
 			.send(RunOnDbMsg(|db| {
@@ -806,10 +806,10 @@ impl Mutation {
 
 	/// Connection is the websocket uuid, client is the client uid.
 	async fn set_client_volume(
-		state: &State, connection: ID, client: ID, volume: f64,
+		state: &State, connection: ID, client: Vec<i32>, volume: f64,
 	) -> GResult<Void> {
 		let connection = connection.parse()?;
-		let client = base64::decode(client.as_bytes())?;
+		let client = client.into_iter().map(|i| i as u8).collect::<Vec<_>>();
 		let uid = Uid(client.clone());
 		let volume = volume as f32;
 

@@ -9,7 +9,8 @@ interface BookmarkChannel {
 
 interface BookmarkServer {
 	name: string;
-	uid: string;
+	uid: number[];
+	hexUid: string;
 	icon: number | undefined;
 }
 
@@ -30,7 +31,7 @@ export class Bookmark {
 		if (this.server !== null) {
 			if (content.server?.icon !== undefined)
 				this.server.icon = Number(content.server.icon);
-			this.server.uid = hexEncode(base64Decode(this.server.uid));
+			this.server.hexUid = hexEncode(this.server.uid);
 		}
 	}
 

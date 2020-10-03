@@ -2,7 +2,7 @@ import { Writable, writable, get, Readable } from "svelte/store";
 import { InBookChangeMsg, WsMessageTarget } from "./backend/ws";
 import { graphql } from "./graphql";
 import { Connection } from "./connection";
-import { binarySearchBy, getDataColor, arraysEqual, Lazy, base64Decode, base64Encode } from "./util";
+import { binarySearchBy, getDataColor, arraysEqual, Lazy, base64Encode } from "./util";
 import { ChannelId, ChannelType, ClientId, Codec, ServerGroupId } from "./ts";
 
 export class Book {
@@ -16,7 +16,7 @@ export class Book {
 	public ownClient: Writable<Client | undefined> = writable(undefined);
 
 	public reset() {
-		this.server = new Server();
+		this.server.reset();
 		this.clients.clear();
 		this.channels.clear();
 		this.channelGroups.set(new Map());
@@ -407,7 +407,7 @@ export class GraphQlClient {
 	}
 
 	public static fromGraphqlInvoker(obj: any): GraphQlClient {
-		return new GraphQlClient(base64Decode(obj.client.uid), obj.client.customName ?? obj.client.name, obj.icon ?? 0, obj.avatar ?? "");
+		return new GraphQlClient(obj.client.uid, obj.client.customName ?? obj.client.name, obj.icon ?? 0, obj.avatar ?? "");
 	}
 
 	/**
@@ -501,28 +501,24 @@ export class Client extends GraphQlClient implements ITreeNode, Readable<Client>
 	}
 
 	public getColor() {
-		if (this.uid) {
-			return getDataColor(this.uid)
-		} else {
-			return getDataColor(this.name);
-		}
+		return getDataColor(this.uid)
 	}
 
 	public async updateVolume(connection: Connection, volume: number): Promise<void> {
-		await graphql(`mutation SetClientVolume($connection: ID!, $client: ID!, $volume: Float!) {
+		await graphql(`mutation SetClientVolume($connection: [Int!]!, $client: [Int!]!, $volume: Float!) {
 			setClientVolume(connection: $connection, client: $client, volume: $volume) { void }
 		}`, {
 			connection: connection.backend?.getGuidTmpHack(),
-			client: this.uidStr,
+			client: this.uid,
 			volume,
 		});
 	}
 
 	public async loadVolume() {
-		const res = await graphql(`query GetClientVolume($client: ID!) {
+		const res = await graphql(`query GetClientVolume($client: [Int!]!) {
 			client(uid: $client) { volume }
 		}`, {
-			client: this.uidStr,
+			client: this.uid,
 		});
 		if (res.data) {
 			const volume = res.data.client.volume;
@@ -606,7 +602,7 @@ export class Channel implements ITreeParent, ITreeNode, Readable<Channel> {
 }
 
 export class GraphQlServer {
-	public readonly public_key?: number[];
+	public readonly public_key!: number[];
 	public readonly uid!: number[];
 	public readonly name!: string;
 	public readonly icon!: IconId;
@@ -618,14 +614,19 @@ export class GraphQlServer {
 	protected constructor(public_key?: number[] | undefined, uid?: number[], name?: string, icon?: IconId) {
 		this._color = new Lazy(() => getDataColor(this.uid));
 		this._uidStr = new Lazy(() => this.getUid());
-		this.public_key = public_key;
+		if (public_key !== undefined) this.public_key = public_key;
 		if (uid !== undefined) this.uid = uid;
 		if (name !== undefined) this.name = name;
 		if (icon !== undefined) this.icon = icon;
 	}
 
+	protected reset() {
+		this._color = new Lazy(() => getDataColor(this.uid));
+		this._uidStr = new Lazy(() => this.getUid());
+	}
+
 	public static fromGraphql(obj: any): GraphQlServer {
-		return new GraphQlServer(base64Decode(obj.server.publicKey), base64Decode(obj.server.uid), obj.server.name, obj.server.icon);
+		return new GraphQlServer(obj.server.publicKey, obj.server.uid, obj.server.name, obj.server.icon);
 	}
 
 	private getUid(): string {
@@ -659,6 +660,13 @@ export class Server extends GraphQlServer implements ITreeParent, ITreeNode, Rea
 		Object.assign(this, obj);
 		this._store.set(this);
 		return this;
+	}
+
+	public reset() {
+		super.reset();
+		this.channels.set([]);
+		this.filterShow = true;
+		this.isSelected = false;
 	}
 
 	public readonly qlType = "SERVER";

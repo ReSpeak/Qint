@@ -67,7 +67,7 @@ export class Chat {
 			start_id = idFrom.id;
 		}
 
-		const res = await graphql(`query GetMessages($chat_type: GMessageTarget!, $server: ID!, $chat_id: ID,
+		const res = await graphql(`query GetMessages($chat_type: GMessageTarget!, $server: [Int!]!, $chat_id: ID,
 					$start_time: NaiveDateTime, $start_id: ID, $load_at_beginning: Boolean) {
 				chat(typ: $chat_type, server: $server, id: $chat_id) {
 					lastRead
@@ -93,7 +93,7 @@ export class Chat {
 				}
 			}`, {
 			chat_type: selected.node.qlType,
-			server: base64Encode(public_key),
+			server: public_key,
 			chat_id: selected.node.qlId,
 			start_time,
 			start_id,

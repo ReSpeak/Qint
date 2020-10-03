@@ -24,28 +24,22 @@
 	function cancel() {
 		connection.close();
 	}
-
-	function retry() {}
 </script>
 
 <StickySlot styled={false} on:click={() => app.select(connection, server)}>
 	<div bind:this={div} class="button serverHeader" class:selectedServerChat>
 		<TsIcon type="server" source={$server} {connection} />
 		<ServerName {connection} />
+		<div class="buttons">
+			{#if !$state.connected}
+				<button class="button is-danger is-small" on:click|stopPropagation={cancel}>Cancel</button>
+			{/if}
+		</div>
 	</div>
 </StickySlot>
 
 {#if !$state.connected}
 	<div class="statusField">
-		<div class="buttons">
-			<div class="button is-danger" style="flex: 1;" on:click={cancel}>Cancel</div>
-			<div
-				class="button is-info"
-				style="flex: 1;visibility: {$state.errored ? 'visible' : 'hidden'};"
-				on:click={retry}>
-				Retry
-			</div>
-		</div>
 		<div class="notification" class:is-danger={$state.errored}>
 			{#if $state.errored}
 				{$state.error}
@@ -80,6 +74,7 @@
 		border-radius: 0;
 		width: 100%;
 		justify-content: flex-start;
+		display: flex;
 
 		&:focus {
 			box-shadow: none;
@@ -88,6 +83,12 @@
 		&.selectedServerChat {
 			background-color: mix($background, $text, 95%);
 		}
+	}
+
+	// Server name
+	.serverHeader :global():nth-child(2) {
+		flex: 1;
+		text-align: start;
 	}
 
 	.statusField {
