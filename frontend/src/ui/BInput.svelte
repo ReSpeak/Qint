@@ -52,17 +52,33 @@
 	});
 </script>
 
-<div
-	bind:this={self}
-	on:keydown
-	on:input={textChanged}
-	on:paste={handlePaste}
-	class="input chatTextBox"
-	name="message"
-	contenteditable="true" />
+<div class="bInput">
+	<div class="input placeholder" class:invisible={value.length > 0}>
+		<slot name="placeholder" />
+	</div>
+	<div
+		bind:this={self}
+		on:keydown
+		on:input={textChanged}
+		on:paste={handlePaste}
+		class="input textBox"
+		name="message"
+		contenteditable="true" />
+</div>
 
 <style lang="scss">
-	.chatTextBox {
+	.bInput {
+		width: 100%;
+		position: relative;
+	}
+
+	.input.placeholder {
+		position: absolute;
+		background: unset;
+		color: mix($text, $background, 60%);
+	}
+
+	.textBox {
 		-moz-appearance: textfield;
 		-webkit-appearance: textfield;
 		height: auto;

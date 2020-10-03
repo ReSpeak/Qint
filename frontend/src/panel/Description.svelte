@@ -3,17 +3,18 @@
 	import DescriptionChannel from "./DescriptionChannel.svelte";
 	import DescriptionServer from "./DescriptionServer.svelte";
 	import { NodeSelection } from "../app";
+	import { Channel, Client, Server } from "../book";
 
 	export let selected: NodeSelection | undefined;
 </script>
 
 <div class="description">
 	{#if selected !== undefined}
-		{#if 'Client' in selected.target}
-			<DescriptionClient connection={selected.connection} clientId={selected.target.Client} />
-		{:else if 'Channel' in selected.target}
-			<DescriptionChannel connection={selected.connection} channelId={selected.target.Channel} />
-		{:else if 'Server' in selected.target}
+		{#if selected.node instanceof Client}
+			<DescriptionClient connection={selected.connection} clientId={selected.node.id} />
+		{:else if selected.node instanceof Channel}
+			<DescriptionChannel connection={selected.connection} channelId={selected.node.id} />
+		{:else if selected.node instanceof Server}
 			<DescriptionServer connection={selected.connection} />
 		{/if}
 	{/if}

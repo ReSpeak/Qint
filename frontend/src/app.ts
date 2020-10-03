@@ -72,9 +72,12 @@ export class App {
 
 export class NodeSelection {
 	constructor(
-		public connection: Connection,
-		public node: ITreeNode) { }
-	public get target() { return this.node.toTarget(); }
+		public readonly connection: Connection,
+		public readonly node: ITreeNode) { }
+
+	public get uniqueStr(): string { 
+		return `${this.node.qlType},${this.connection.book.server.uidStr},${this.node.qlId}`;
+	}
 }
 
 export const app = new App();

@@ -1,7 +1,6 @@
 import { soft_merge } from "./util";
-import { MessageTarget } from "./ts";
-import { Connection } from "./connection";
 import { backend } from "./backend/backend";
+import { NodeSelection } from "./app";
 
 type FilterFlags<Base, Condition> = {
 	[Key in keyof Base]: Base[Key] extends Condition ? never : Key
@@ -102,8 +101,8 @@ export class TransientSettingsChat {
 		this._parent = parent;
 	}
 
-	public set(text: string | undefined, target: MessageTarget, con: Connection) {
-		const key = MessageTarget.toUniqueString(target, con);
+	public set(text: string | undefined, selection: NodeSelection) {
+		const key = selection.uniqueStr;
 		if (key === undefined) return;
 		const oldVal = (this as any)[key];
 		const storeText = !text ? null : text;
@@ -113,8 +112,8 @@ export class TransientSettingsChat {
 		}
 	}
 
-	public get(target: MessageTarget, con: Connection): string | undefined {
-		const key = MessageTarget.toUniqueString(target, con);
+	public get(selection: NodeSelection): string | undefined {
+		const key = selection.uniqueStr;
 		if (key === undefined) return undefined;
 		return (this as any)[key] ?? undefined;
 	}

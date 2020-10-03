@@ -11,11 +11,11 @@
 	import { Connection } from "../connection";
 	import BInput from "../ui/BInput.svelte";
 	import { on } from "../util";
-	import { app } from "../app";
-	import { MessageTarget } from "../ts";
-	import { Client } from "../book";
+	import { app, NodeSelection } from "../app";
+	import { Channel, Client, Server } from "../book";
 	import { writable } from "svelte/store";
 	import type { Writable } from "svelte/store";
+import ServerName from "../ui/ServerName.svelte";
 
 	export let chat: Chat;
 
@@ -29,7 +29,7 @@
 
 	let canChatHere = false;
 
-	let oldSelectedChat: MessageTarget | undefined = undefined;
+	let oldSelection: NodeSelection | undefined = undefined;
 	let unreadCount = chat.unreadCount;
 	let connection: Connection | undefined;
 	let ownClient: Writable<Client | undefined>;
@@ -38,7 +38,6 @@
 		ownClient = connection?.book.ownClient ?? writable(undefined);
 	}
 
-	$: on($selected, chatChanged());
 	$: on($unreadCount, chatEndChanged());
 	let oldOwnChannel: number | undefined;
 	let oldCon: string | undefined;
@@ -52,20 +51,23 @@
 		}
 	}
 
+	let sel: NodeSelection | undefined;
+	$: {
+		sel = $selected;
+		chatChanged();
+	}
 	function chatChanged() {
-		const sel = $selected;
 		if (sel === undefined) {
-			oldSelectedChat = undefined;
+			oldSelection = undefined;
 			chatList?.clear();
 			canChatHere = false;
 			return;
 		}
-		let { connection, target } = sel;
-		if (oldSelectedChat !== undefined) chatStore.set(text, oldSelectedChat, connection);
-		text = chatStore.get(target, connection) ?? "";
+		if (oldSelection !== undefined) chatStore.set(text, oldSelection);
+		text = chatStore.get(sel) ?? "";
 
-		if (target !== oldSelectedChat) {
-			oldSelectedChat = target;
+		if (sel !== oldSelection) {
+			oldSelection = sel;
 
 			if (chatList) {
 				chatList.sourceChanged(ListFetchDir.New, ListFetchDir.After);
@@ -82,18 +84,18 @@
 	}
 
 	function chatBoxRecheck() {
-		const ownChannel = $ownClient?.channel;
 		const sel = $selected;
 		if (sel === undefined) {
 			canChatHere = false;
 			return;
 		}
-		let { target } = sel;
+		const ownChannel = $ownClient?.channel;
 
-		if ("Server" in target || "Client" in target) {
+		let type = sel.node.qlType;
+		if (type === "SERVER" || type === "CLIENT") {
 			canChatHere = true;
-		} else if ("Channel" in target) {
-			canChatHere = ownChannel === undefined || target.Channel === ownChannel;
+		} else if (type === "CHANNEL" && sel.node instanceof Channel) {
+			canChatHere = ownChannel === undefined || sel.node.id === ownChannel;
 		}
 		if (canChatHere) {
 			(async () => {
@@ -145,9 +147,7 @@
 				<div class="message-body">Failed to fetch messages</div>
 			</article>
 		</div>
-	{:else if $selected === undefined}
-		<div class="chatFiller">No chat selected</div>
-	{:else}
+	{:else if sel !== undefined}
 		<LazyList bind:this={chatList} {fetchElements} suggestJumpEnd={true} let:item>
 			<div slot="loading" class="chatFiller">
 				<span>Loading ...</span>
@@ -173,11 +173,24 @@
 			{/if}
 			<UiMessage message={item} />
 		</LazyList>
+		<form class="chat-form" class:hidden={!canChatHere} on:submit|preventDefault={sendMessage}>
+			<BInput bind:this={messageInput} bind:value={text} on:keydown={onChatKeyDown}>
+				<div slot="placeholder">
+					<span>Send to</span>
+					{#if sel.node instanceof Client}
+						<ClientName client={sel.node} />
+					{:else if sel.node instanceof Channel}
+						<span> your Channel</span>
+					{:else if sel.node instanceof Server}
+						<ServerName connection={sel.connection} />
+					{/if}
+				</div>
+			</BInput>
+			<button class="button" name="send" type="submit" style="height: auto;">Send</button>
+		</form>
+	{:else}
+		<div class="chatFiller">No chat selected</div>
 	{/if}
-	<form class="chat-form" class:hidden={!canChatHere} on:submit|preventDefault={sendMessage}>
-		<BInput bind:this={messageInput} bind:value={text} on:keydown={onChatKeyDown} />
-		<button class="button" name="send" type="submit" style="height: auto;">Send</button>
-	</form>
 </div>
 
 <style lang="scss">

@@ -1,7 +1,6 @@
 import { get, writable, Writable, Readable } from "svelte/store";
 import type { Moment } from "moment";
 import { graphql } from "../graphql";
-import { MessageTarget } from "../ts";
 import { GraphQlClient } from "../book";
 import { datetimeDeserialize, getDataColor, assert, Lazy, base64Encode } from "../util";
 import { ListFetchDir, FetchResult } from "../ui/lazyList";
@@ -47,8 +46,8 @@ export class Chat {
 	public async getMessages(idFrom: Message | undefined, dir: ListFetchDir): Promise<FetchResult<Message>> {
 		const selected = get(this.selectedChat);
 		if (selected === undefined) return Chat.EmptyFetch;
-		let { connection, target } = selected;
-		if (connection.book.server.public_key === undefined) {
+		let public_key = selected.connection.book.server.public_key;
+		if (public_key === undefined) {
 			console.error("Cannot get messages for a non-existant connection");
 			return Chat.EmptyFetch;
 		}
@@ -93,9 +92,9 @@ export class Chat {
 					}
 				}
 			}`, {
-			chat_type: MessageTarget.getType(target),
-			server: base64Encode(connection.book.server.public_key),
-			chat_id: MessageTarget.getId(target, connection),
+			chat_type: selected.node.qlType,
+			server: base64Encode(public_key),
+			chat_id: selected.node.qlId,
 			start_time,
 			start_id,
 			load_at_beginning: load_at_beginning,
@@ -134,11 +133,9 @@ export class Chat {
 	public sendMessage(message: string) {
 		const selected = get(this.selectedChat);
 		if (selected === undefined) return;
-		let { connection, target } = selected;
-		const targetWs = MessageTarget.toWs(target);
-		connection.sendMessage({
+		selected.connection.sendMessage({
 			SendMessage: {
-				target: targetWs,
+				target: selected.node.wsTarget,
 				message,
 			}
 		});

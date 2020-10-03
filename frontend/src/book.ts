@@ -1,9 +1,9 @@
 import { Writable, writable, get, Readable } from "svelte/store";
-import { InBookChangeMsg } from "./backend/ws";
+import { InBookChangeMsg, WsMessageTarget } from "./backend/ws";
 import { graphql } from "./graphql";
 import { Connection } from "./connection";
 import { binarySearchBy, getDataColor, arraysEqual, Lazy, base64Decode, base64Encode } from "./util";
-import { ChannelId, ChannelType, ClientId, Codec, ServerGroupId, MessageTarget } from "./ts";
+import { ChannelId, ChannelType, ClientId, Codec, ServerGroupId } from "./ts";
 
 export class Book {
 	public server: Server = new Server();
@@ -399,7 +399,7 @@ export class GraphQlClient {
 
 	protected constructor(uid?: number[], name?: string, icon?: IconId, avatar_hash?: string) {
 		this._color = new Lazy(() => getDataColor(this.uid));
-		this._uidStr = new Lazy(() => this.getUid());
+		this._uidStr = new Lazy(() => base64Encode(this.uid));
 		if (uid !== undefined) this.uid = uid;
 		if (name !== undefined) this.name = name;
 		if (icon !== undefined) this.icon = icon;
@@ -408,10 +408,6 @@ export class GraphQlClient {
 
 	public static fromGraphqlInvoker(obj: any): GraphQlClient {
 		return new GraphQlClient(base64Decode(obj.client.uid), obj.client.customName ?? obj.client.name, obj.icon ?? 0, obj.avatar ?? "");
-	}
-
-	private getUid(): string {
-		return base64Encode(this.uid);
 	}
 
 	/**
@@ -496,9 +492,9 @@ export class Client extends GraphQlClient implements ITreeNode, Readable<Client>
 		return this;
 	}
 
-	public toTarget(): MessageTarget {
-		return MessageTarget.ToClient(this.id);
-	}
+	public readonly qlType = "CLIENT";
+	public get qlId() { return this.uidStr; }
+	public get wsTarget() { return { Client: this.id }; }
 
 	public subscribe(run: (c: this) => any): () => void {
 		return this._store.subscribe(run);
@@ -600,9 +596,9 @@ export class Channel implements ITreeParent, ITreeNode, Readable<Channel> {
 		return this;
 	}
 
-	public toTarget(): MessageTarget {
-		return MessageTarget.ToChannel(this.id);
-	}
+	public readonly qlType = "CHANNEL";
+	public get qlId() { return this.id.toString() };
+	public readonly wsTarget = "Channel";
 
 	public subscribe(run: (c: this) => any): () => void {
 		return this._store.subscribe(run);
@@ -665,9 +661,9 @@ export class Server extends GraphQlServer implements ITreeParent, ITreeNode, Rea
 		return this;
 	}
 
-	public toTarget(): MessageTarget {
-		return MessageTarget.ToServer();
-	}
+	public readonly qlType = "SERVER";
+	public readonly qlId = undefined;
+	public readonly wsTarget = "Server";
 
 	public subscribe(run: (c: this) => any): () => void {
 		return this._store.subscribe(run);
@@ -706,9 +702,13 @@ export interface ITreeParent {
 	channels: Writable<Channel[]>;
 }
 
+export type GQLMessageTarget = "SERVER" | "CHANNEL" | "CLIENT" | "POKE";
 export interface ITreeNode {
 	filterShow: boolean;
 	isSelected: boolean;
 	update(obj: Partial<this>): this;
-	toTarget(): MessageTarget;
+
+	readonly qlType: GQLMessageTarget;
+	readonly qlId: string | undefined;
+	readonly wsTarget: WsMessageTarget;
 }

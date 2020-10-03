@@ -13,7 +13,7 @@
 	const serverRaw = connection.book.server;
 	$: server = $serverRaw;
 	$: create_date =
-		$server.created !== undefined ? datetimeDeserialize($server.created) : moment.unix(0);
+		server.created !== undefined ? datetimeDeserialize(server.created) : moment.unix(0);
 
 	function disconnect() {
 		connection.disconnect();
