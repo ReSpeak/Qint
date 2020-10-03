@@ -27,7 +27,7 @@ export class App {
 
 		this.selectedNode.subscribe(s => {
 			if (s !== undefined) {
-				backend.setTitle(get(s.connection.book.server).name + " – Qint");
+				backend.setTitle(s.connection.book.server.name + " – Qint");
 			} else {
 				backend.setTitle("Qint");
 			}

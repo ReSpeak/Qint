@@ -143,7 +143,7 @@ export class Chat {
 }
 
 export class Message {
-	private _clientColor: Lazy<string>;
+	private readonly _clientColor: Lazy<string>;
 	public displayDateSeparator: boolean = false;
 	public displayGroupHeader: boolean = false;
 

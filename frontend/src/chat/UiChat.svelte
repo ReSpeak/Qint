@@ -1,21 +1,21 @@
 <script lang="typescript">
 	// TODO Use scroll-anchoring https://blog.eqrion.net/pin-to-bottom/
-	import { onMount, tick } from "svelte";
 	import UiMessage from "./UiMessage.svelte";
-	import { Chat, Message } from "./chat";
 	import Icon from "../ui/Icon.svelte";
 	import TsIcon from "../ui/TsIcon.svelte";
 	import ClientName from "../ui/ClientName.svelte";
+	import ServerName from "../ui/ServerName.svelte";
 	import LazyList from "../ui/LazyList.svelte";
+	import BInput from "../ui/BInput.svelte";
+	import { onMount, tick } from "svelte";
+	import { Chat, Message } from "./chat";
 	import { ListFetchDir } from "../ui/lazyList";
 	import { Connection } from "../connection";
-	import BInput from "../ui/BInput.svelte";
 	import { on } from "../util";
 	import { app, NodeSelection } from "../app";
 	import { Channel, Client, Server } from "../book";
 	import { writable } from "svelte/store";
 	import type { Writable } from "svelte/store";
-import ServerName from "../ui/ServerName.svelte";
 
 	export let chat: Chat;
 
@@ -63,8 +63,8 @@ import ServerName from "../ui/ServerName.svelte";
 			canChatHere = false;
 			return;
 		}
-		if (oldSelection !== undefined) chatStore.set(text, oldSelection);
-		text = chatStore.get(sel) ?? "";
+		if (oldSelection !== undefined) chatStore.save(text, oldSelection);
+		text = chatStore.load(sel) ?? "";
 
 		if (sel !== oldSelection) {
 			oldSelection = sel;

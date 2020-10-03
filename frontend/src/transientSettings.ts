@@ -101,7 +101,7 @@ export class TransientSettingsChat {
 		this._parent = parent;
 	}
 
-	public set(text: string | undefined, selection: NodeSelection) {
+	public save(text: string | undefined, selection: NodeSelection) {
 		const key = selection.uniqueStr;
 		if (key === undefined) return;
 		const oldVal = (this as any)[key];
@@ -112,7 +112,7 @@ export class TransientSettingsChat {
 		}
 	}
 
-	public get(selection: NodeSelection): string | undefined {
+	public load(selection: NodeSelection): string | undefined {
 		const key = selection.uniqueStr;
 		if (key === undefined) return undefined;
 		return (this as any)[key] ?? undefined;

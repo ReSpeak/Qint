@@ -163,13 +163,25 @@ export class Lazy<T> {
 	}
 }
 
-export async function wrap_async<T>(f: () => T): Promise<T> {
-	return new Promise((resolve, _) => {
-		setTimeout(() => {
-			const val = f();
-			resolve(val);
-		});
-	});
+export class Cached<TSrc, TDst> {
+	private oldSource: TSrc = (Number.NaN as any);
+	private value: TDst | undefined;
+
+	constructor(
+		private source: () => TSrc,
+		private transform: (src: TSrc) => TDst
+	) {
+		this.oldSource = source();
+	}
+
+	public get(): TDst {
+		const curSource = this.source();
+		if (curSource !== this.oldSource) {
+			this.oldSource = curSource;
+			this.value = this.transform(curSource);
+		}
+		return this.value!;
+	}
 }
 
 export function findParent(elem: HTMLElement, selector: string): HTMLElement | undefined {

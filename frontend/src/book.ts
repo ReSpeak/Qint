@@ -2,7 +2,7 @@ import { Writable, writable, get, Readable } from "svelte/store";
 import { InBookChangeMsg, WsMessageTarget } from "./backend/ws";
 import { graphql } from "./graphql";
 import { Connection } from "./connection";
-import { binarySearchBy, getDataColor, arraysEqual, Lazy, base64Encode } from "./util";
+import { binarySearchBy, getDataColor, arraysEqual, base64Encode, Cached } from "./util";
 import { ChannelId, ChannelType, ClientId, Codec, ServerGroupId } from "./ts";
 
 export class Book {
@@ -24,20 +24,6 @@ export class Book {
 		this.currentTalkers = [];
 		this.ownClientId = undefined;
 		this.ownClient.set(undefined);
-	}
-
-	private static listString(list: ITreeNode[]): string {
-		let res = "";
-		for (let e of list) {
-			if (e instanceof Client) {
-				res += `${e.name}, `;
-			} else if (e instanceof Channel) {
-				res += `(${e.name}, ${e.id}, ${e.order}), `;
-			} else {
-				res += `${e}, `;
-			}
-		}
-		return res;
 	}
 
 	public static addChannelSorted(list: Channel[], elem: Channel): Channel[] {
@@ -392,14 +378,14 @@ export class GraphQlClient {
 	public readonly name!: string;
 	public readonly icon!: IconId;
 	public readonly avatar_hash!: string;
-	private _color: Lazy<string>;
+	private readonly _color: Cached<number[], string>;
 	public get color() { return this._color.get(); }
-	private _uidStr: Lazy<string>;
+	private readonly _uidStr: Cached<number[], string>;
 	public get uidStr() { return this._uidStr.get(); }
 
 	protected constructor(uid?: number[], name?: string, icon?: IconId, avatar_hash?: string) {
-		this._color = new Lazy(() => getDataColor(this.uid));
-		this._uidStr = new Lazy(() => base64Encode(this.uid));
+		this._color = new Cached(() => this.uid, u => getDataColor(u));
+		this._uidStr = new Cached(() => this.uid, u => base64Encode(u));
 		if (uid !== undefined) this.uid = uid;
 		if (name !== undefined) this.name = name;
 		if (icon !== undefined) this.icon = icon;
@@ -606,31 +592,22 @@ export class GraphQlServer {
 	public readonly uid!: number[];
 	public readonly name!: string;
 	public readonly icon!: IconId;
-	private _color: Lazy<string>;
+	private readonly _color: Cached<number[], string>;
 	public get color() { return this._color.get(); }
-	private _uidStr: Lazy<string>;
+	private readonly _uidStr: Cached<number[], string>;
 	public get uidStr() { return this._uidStr.get(); }
 
 	protected constructor(public_key?: number[] | undefined, uid?: number[], name?: string, icon?: IconId) {
-		this._color = new Lazy(() => getDataColor(this.uid));
-		this._uidStr = new Lazy(() => this.getUid());
+		this._color = new Cached(() => this.uid, u => getDataColor(u));
+		this._uidStr = new Cached(() => this.uid, u => base64Encode(u));
 		if (public_key !== undefined) this.public_key = public_key;
 		if (uid !== undefined) this.uid = uid;
 		if (name !== undefined) this.name = name;
 		if (icon !== undefined) this.icon = icon;
 	}
 
-	protected reset() {
-		this._color = new Lazy(() => getDataColor(this.uid));
-		this._uidStr = new Lazy(() => this.getUid());
-	}
-
 	public static fromGraphql(obj: any): GraphQlServer {
 		return new GraphQlServer(obj.server.publicKey, obj.server.uid, obj.server.name, obj.server.icon);
-	}
-
-	private getUid(): string {
-		return base64Encode(this.uid);
 	}
 }
 
@@ -663,7 +640,6 @@ export class Server extends GraphQlServer implements ITreeParent, ITreeNode, Rea
 	}
 
 	public reset() {
-		super.reset();
 		this.channels.set([]);
 		this.filterShow = true;
 		this.isSelected = false;
