@@ -817,9 +817,9 @@ mod tests {
 	#[derive(Deserialize)]
 	struct ClientServerKey {
 		/// Public key of the server.
-		server: String,
+		server: Vec<u8>,
 		/// Uid of the own identity.
-		client: String,
+		client: Vec<u8>,
 	}
 
 	impl TestProxy {
@@ -864,15 +864,14 @@ mod tests {
 		}
 
 		async fn get_client_server_key(&self) -> Result<ClientServerKey> {
-			#![allow(non_snake_case)]
-
 			#[derive(Deserialize)]
+			#[serde(rename_all = "camelCase")]
 			struct Server {
-				publicKey: String,
+				public_key: Vec<u8>,
 			}
 			#[derive(Deserialize)]
 			struct Client {
-				uid: String,
+				uid: Vec<u8>,
 			}
 			#[derive(Deserialize)]
 			struct Identity {
@@ -884,8 +883,9 @@ mod tests {
 				identity: Identity,
 			}
 			#[derive(Deserialize)]
+			#[serde(rename_all = "camelCase")]
 			struct Query {
-				mostRecentBookmark: Bookmark,
+				most_recent_bookmark: Bookmark,
 			}
 
 			let resp: Query = self
@@ -908,20 +908,20 @@ mod tests {
 				))
 				.await?;
 			Ok(ClientServerKey {
-				client: resp.mostRecentBookmark.identity.client.uid,
-				server: resp.mostRecentBookmark.server.publicKey,
+				client: resp.most_recent_bookmark.identity.client.uid,
+				server: resp.most_recent_bookmark.server.public_key,
 			})
 		}
 
 		/// Returns uid and name of the client and messages.
 		async fn get_messages(
-			&self, server: &str, type_s: &str, id: &str,
-		) -> Result<Vec<(String, String, String)>> {
+			&self, server: &[u8], type_s: &str, id: &str,
+		) -> Result<Vec<(Vec<u8>, String, String)>> {
 			#![allow(non_snake_case)]
 
 			#[derive(Deserialize)]
 			struct Client {
-				uid: String,
+				uid: Vec<u8>,
 				name: String,
 			}
 			#[derive(Deserialize)]
@@ -942,20 +942,28 @@ mod tests {
 				chat: Chat,
 			}
 
-			let vars = vec![("typ", type_s), ("server", server), ("id", id)];
-			let vars = juniper::InputValue::Object(
-				vars.into_iter()
+			let vars = vec![("typ", type_s), ("id", id)];
+			let vars = juniper::InputValue::Object({
+				let mut vars: Vec<_> = vars
+					.into_iter()
 					.map(|(k, v)| {
 						(
 							juniper::parser::Spanning::unlocated(k.to_string()),
 							juniper::parser::Spanning::unlocated(juniper::InputValue::scalar(v)),
 						)
 					})
-					.collect(),
-			);
+					.collect();
+				vars.push((
+					juniper::parser::Spanning::unlocated("server".to_string()),
+					juniper::parser::Spanning::unlocated(juniper::InputValue::list(
+						server.iter().map(|b| juniper::InputValue::scalar(*b as i32)).collect(),
+					)),
+				));
+				vars
+			});
 			let resp: Query = self
 				.graphql(&GraphQLRequest::new(
-					"query ($typ: GMessageTarget!, $server: ID!, $id: ID!) {
+					"query ($typ: GMessageTarget!, $server: [Int!]!, $id: ID!) {
 					chat(typ: $typ, server: $server, id: $id) {
 						messages {
 							invoker {
@@ -995,6 +1003,7 @@ mod tests {
 					plugin_path: None,
 					no_audio: true,
 					no_open: true,
+					tauri: true,
 					verbosity: 1,
 				};
 				App::run(logger, args).await?;
@@ -1020,6 +1029,9 @@ mod tests {
 				address: "localhost".to_string(),
 				name: "Test".to_string(),
 				version: Version::Linux_3_X_X,
+				bookmark: None,
+				channel: None,
+				ignore_identity_mismatch: false,
 				log_commands: false,
 				log_packets: false,
 				log_udp_packets: false,
@@ -1070,9 +1082,10 @@ mod tests {
 		drop(con);
 
 		#[derive(Deserialize)]
+		#[serde(rename_all = "camelCase")]
 		struct ServerServer {
-			#[allow(non_snake_case, dead_code)]
-			publicKey: String,
+			#[allow(dead_code)]
+			public_key: Vec<u8>,
 		}
 		#[derive(Deserialize)]
 		struct ServerBookmark {
@@ -1136,14 +1149,16 @@ mod tests {
 		let key1 = proxy1.get_client_server_key().await?;
 
 		// Check for the message in the database of con0
-		let msgs = proxy0.get_messages(&key0.server, "CLIENT", &key1.client).await?;
+		let msgs =
+			proxy0.get_messages(&key0.server, "CLIENT", &base64::encode(&key1.client)).await?;
 		assert_eq!(msgs.len(), 1, "Message not saved in the database");
 		assert_eq!(msgs[0].0, key0.client, "Sender uid is wrong");
 		assert_eq!(msgs[0].2, msg, "Message is wrong");
 		assert!(msgs[0].1.starts_with("Test"), "Client name has to start with 'Test'");
 
 		// Check for the message in the database of con1
-		let msgs = proxy1.get_messages(&key0.server, "CLIENT", &key0.client).await?;
+		let msgs =
+			proxy1.get_messages(&key0.server, "CLIENT", &base64::encode(&key0.client)).await?;
 		assert_eq!(msgs.len(), 1, "Message not saved in the database");
 		assert_eq!(msgs[0].0, key0.client, "Sender uid is wrong");
 		assert_eq!(msgs[0].2, msg, "Message is wrong");
