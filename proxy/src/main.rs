@@ -16,11 +16,13 @@ use std::sync::{Arc, Mutex, RwLock};
 use actix::*;
 use actix_cors::Cors;
 use actix_files::Files;
-use actix_web::dev::Service;
+use actix_web::dev::{HttpResponseBuilder, Service};
+use actix_web::web::Bytes;
 use actix_web::*;
 use actix_web_actors::ws;
 use anyhow::{bail, Result};
 use futures::prelude::*;
+use futures::stream::Peekable;
 use http::{header::CACHE_CONTROL, header::ETAG, HeaderValue};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -28,8 +30,9 @@ use slog::{debug, error, info, o, warn, Drain, Logger};
 use structopt::StructOpt;
 use tokio::time::{self, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
+use tsclientlib::ChannelId;
 use tsclientlib::Error as TsError;
-use tsclientlib::{ChannelId, Uid};
+use tsproto_types::crypto::EccKeyPubP256;
 use uuid::Uuid;
 
 mod audio;
@@ -157,6 +160,7 @@ pub struct State {
 	transient_settings: RwLock<TransientSettings>,
 	database: Addr<db::DbHandler>,
 	graphql_schema: Arc<db::graphql::Schema>,
+	file_cache: Arc<FileCache>,
 	secret: Secret,
 }
 
@@ -261,6 +265,30 @@ impl TransientSettings {
 	}
 }
 
+async fn guess_content_type<
+	E: Into<Error> + 'static,
+	S: Stream<Item = Result<Bytes, E>> + Unpin + 'static,
+>(
+	stream: S,
+) -> (Peekable<S>, HttpResponseBuilder) {
+	let mut stream = stream.peekable();
+	let mut response = HttpResponse::Ok();
+	if let Some(Ok(r)) = Pin::new(&mut stream).peek().await {
+		// https://en.wikipedia.org/wiki/List_of_file_signatures
+		if r.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
+			response.content_type("image/png");
+		} else if r.starts_with(&[0xFF, 0xD8, 0xFF, 0xDB])
+			|| r.starts_with(&[0xFF, 0xD8, 0xFF, 0xE0])
+			|| r.starts_with(&[0xFF, 0xD8, 0xFF, 0xEE])
+		{
+			response.content_type("image/jpeg");
+		} else if r.windows(3).any(|w| w == b"svg") {
+			response.content_type("image/svg+xml");
+		}
+	}
+	(stream, response)
+}
+
 #[get("/con/{id}/ws")]
 async fn create_ws(
 	state: web::Data<Arc<State>>, uuid: web::Path<Uuid>, options: web::Query<WsOptions>,
@@ -352,20 +380,19 @@ async fn download_file(
 		drop(cons);
 
 		// Lookup in cache
-		let server = match con.send(websocket::GetUidMsg).await {
+		let server = match con.send(websocket::GetPublicKeyMsg).await {
 			Ok(Ok(r)) => r,
 			Ok(Err(e)) => {
-				error!(state.logger, "Failed to get server uid"; "error" => %e);
+				error!(state.logger, "Failed to get server public key"; "error" => %e);
 				return HttpResponse::Gone().finish();
 			}
 			Err(_) => {
 				return HttpResponse::Gone().finish();
 			}
 		};
-		if let Some((_, stream)) = FileCache::get_cached_file(&*state, server, channel, &path).await
-		{
-			// TODO Guess content type
-			return HttpResponse::Ok().streaming(stream);
+		if let Some((_, stream)) = state.file_cache.get_cached_file(&server, channel, &path).await {
+			let (stream, mut response) = guess_content_type(stream).await;
+			return response.streaming(stream);
 		}
 
 		debug!(state.logger, "Downloading file"; "channel" => channel.0, "path" => &path);
@@ -392,25 +419,11 @@ async fn download_file(
 
 		let stream =
 			FramedRead::new(file_stream, BytesCodec::new()).map(|r| r.map(web::BytesMut::freeze));
-		let mut stream = stream.peekable();
-		let mut response = HttpResponse::Ok();
-		if let Some(Ok(r)) = Pin::new(&mut stream).peek().await {
-			// https://en.wikipedia.org/wiki/List_of_file_signatures
-			if r.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
-				response.content_type("image/png");
-			} else if r.starts_with(&[0xFF, 0xD8, 0xFF, 0xDB])
-				|| r.starts_with(&[0xFF, 0xD8, 0xFF, 0xE0])
-				|| r.starts_with(&[0xFF, 0xD8, 0xFF, 0xEE])
-			{
-				response.content_type("image/jpeg");
-			} else if r.windows(3).any(|w| w == b"svg") {
-				response.content_type("image/svg+xml");
-			}
-		}
+		let (stream, mut response) = guess_content_type(stream).await;
 
 		// Cache icons and avatars for offline usage
 		if channel.0 == 0 && (path.starts_with("icon_") || path.starts_with("avatar_")) {
-			let stream = FileCache::cache_file(&*state, server, channel, &path, stream).await;
+			let stream = state.file_cache.cache_file(&server, channel, &path, stream).await;
 			response.streaming(stream)
 		} else {
 			response.streaming(stream)
@@ -427,14 +440,14 @@ async fn download_cache_file(
 ) -> impl Responder {
 	let server = match hex::decode(&id) {
 		Err(e) => {
-			return HttpResponse::BadRequest().body(format!("Not a valid server uid: {}", e));
+			return HttpResponse::BadRequest().body(format!("Not a valid server id: {}", e));
 		}
-		Ok(uid) => Uid(uid),
+		Ok(id) => EccKeyPubP256::from_short(id),
 	};
 	let channel = ChannelId(channel);
-	if let Some((_, stream)) = FileCache::get_cached_file(&*state, server, channel, &path).await {
-		// TODO Guess content type
-		HttpResponse::Ok().streaming(stream)
+	if let Some((_, stream)) = state.file_cache.get_cached_file(&server, channel, &path).await {
+		let (stream, mut response) = guess_content_type(stream).await;
+		response.streaming(stream)
 	} else {
 		HttpResponse::NotFound().finish()
 	}
@@ -596,8 +609,12 @@ impl App {
 			settings.plugin_path = settings.config_path.join("plugins");
 		}
 
+		let file_cache = Arc::new(FileCache::new(logger.clone(), settings.cache_path.clone()));
+
 		// Open database
-		let database = db::DbHandler::new(logger.clone(), &settings, secret.clone())?.start();
+		let database =
+			db::DbHandler::new(logger.clone(), file_cache.clone(), &settings, secret.clone())?
+				.start();
 
 		let connections = Arc::new(Mutex::new(HashMap::new()));
 
@@ -637,6 +654,7 @@ impl App {
 			transient_settings: RwLock::new(transient_settings),
 			database,
 			graphql_schema,
+			file_cache,
 			secret,
 		});
 

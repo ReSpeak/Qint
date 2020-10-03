@@ -20,6 +20,7 @@ use tsclientlib::{
 };
 use tsproto::resend::PacketId;
 use tsproto_packets::packets::{AudioData, OutPacket};
+use tsproto_types::crypto::EccKeyPubP256;
 
 use crate::book_events::{ClientUpdate, JsM2B};
 use crate::db::{ChannelListMsg, ChatId, ChatType};
@@ -45,7 +46,7 @@ pub(crate) struct Ws {
 /// Polls the connection for events.
 struct ConnectionPoller;
 
-pub(crate) struct GetUidMsg;
+pub(crate) struct GetPublicKeyMsg;
 pub(crate) struct GetClientVolumeMsg(pub ClientId);
 /// Audio detection tells us if we are talking.
 pub(crate) struct SetSelfTalkingMsg(pub bool);
@@ -88,8 +89,8 @@ impl Actor for Ws {
 	}
 }
 
-impl Message for GetUidMsg {
-	type Result = Result<Uid>;
+impl Message for GetPublicKeyMsg {
+	type Result = Result<EccKeyPubP256>;
 }
 impl Message for GetClientVolumeMsg {
 	type Result = Result<f32>;
@@ -129,7 +130,7 @@ impl Message for SetChannelListMsgMsg {
 }
 impl Message for DownloadFile {
 	/// The size of the file and the stream
-	type Result = Result<(u64, TcpStream, Uid)>;
+	type Result = Result<(u64, TcpStream, EccKeyPubP256)>;
 }
 
 impl Ws {
@@ -280,8 +281,8 @@ impl Ws {
 				if let Some(con) = &self.connection {
 					if let Ok(data) = con.get_state() {
 						if let Err(e) = db::DbHandler::handle_events(
-							&self.state.database,
 							&self.logger,
+							&self.state,
 							con,
 							data,
 							&events,
@@ -552,13 +553,12 @@ impl Ws {
 			};
 
 			if let Ok(state) = con.get_state() {
-				let server = server.to_short().to_vec();
 				let own_channel;
 				let invoker_uid = {
 					if let Some(own_client) = state.clients.get(&state.own_client) {
 						own_channel = own_client.channel.0;
 						if let Some(uid) = own_client.uid.as_ref() {
-							uid.0.clone()
+							uid.clone()
 						} else {
 							error!(self.logger, "Failed to get own client uid");
 							return;
@@ -578,19 +578,13 @@ impl Ws {
 						let uid = client.and_then(|c| c.uid.as_ref());
 						client_data = uid.map(|uid| {
 							let c = client.unwrap();
-							let icon =
-								if c.icon.0 == 0 { None } else { Some(c.icon.0 as i32) };
+							let icon = if c.icon.0 == 0 { None } else { Some(c.icon.0 as i32) };
 							let avatar = if c.avatar_hash.is_empty() {
 								None
 							} else {
 								Some(c.avatar_hash.clone())
 							};
-							db::ClientData {
-								name: c.name.clone(),
-								uid: uid.0.clone(),
-								icon,
-								avatar,
-							}
+							db::ClientData { name: c.name.clone(), uid: uid.clone(), icon, avatar }
 						});
 						if let Some(uid) = uid {
 							if let MessageTarget::Client(_) = target {
@@ -631,15 +625,11 @@ impl Ws {
 }
 
 impl Handler<DownloadFile> for Ws {
-	type Result = ResponseFuture<Result<(u64, TcpStream, Uid)>>;
+	type Result = ResponseFuture<Result<(u64, TcpStream, EccKeyPubP256)>>;
 	fn handle(&mut self, msg: DownloadFile, _: &mut Self::Context) -> Self::Result {
 		if let Some(con) = &mut self.connection {
-			let uid = match con
-				.get_server_key()
-				.map_err(Error::from)
-				.and_then(|k| k.get_uid_no_base64().map_err(|e| e.into()))
-			{
-				Ok(k) => Uid(k),
+			let public_key = match con.get_server_key().map_err(Error::from) {
+				Ok(k) => k,
 				Err(e) => {
 					return Box::pin(futures::future::err(format_err!("Failed to get uid: {}", e)));
 				}
@@ -658,7 +648,7 @@ impl Handler<DownloadFile> for Ws {
 			let (send, recv) = oneshot::channel();
 			self.file_downloads.insert(handle, send);
 			Box::pin(recv.map(|r| match r {
-				Ok(Ok(r)) => Ok((r.size, r.stream, uid)),
+				Ok(Ok(r)) => Ok((r.size, r.stream, public_key)),
 				Ok(Err(e)) => Err(e),
 				Err(e) => Err(e.into()),
 			}))
@@ -668,18 +658,11 @@ impl Handler<DownloadFile> for Ws {
 	}
 }
 
-impl Handler<GetUidMsg> for Ws {
-	type Result = Result<Uid>;
-	fn handle(&mut self, _: GetUidMsg, _: &mut Self::Context) -> Self::Result {
+impl Handler<GetPublicKeyMsg> for Ws {
+	type Result = Result<EccKeyPubP256>;
+	fn handle(&mut self, _: GetPublicKeyMsg, _: &mut Self::Context) -> Self::Result {
 		if let Some(con) = &self.connection {
-			match con
-				.get_server_key()
-				.map_err(Error::from)
-				.and_then(|k| k.get_uid_no_base64().map_err(|e| e.into()))
-			{
-				Ok(k) => Ok(Uid(k)),
-				Err(e) => Err(e),
-			}
+			Ok(con.get_server_key()?)
 		} else {
 			Err(format_err!("Connection does not exist"))
 		}
@@ -771,7 +754,7 @@ impl Handler<SaveClientMsg> for Ws {
 		if let Some(con) = &mut self.connection {
 			let state = con.get_state()?;
 			if let Some(client) = state.clients.values().find(|c| c.uid.as_ref() == Some(&uid)) {
-				db::DbHandler::create_client(&self.state.database, &self.logger, con, state, client)
+				db::DbHandler::create_client(&self.logger, &self.state, con, state, client)
 			} else {
 				bail!("Client not found")
 			}

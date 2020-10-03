@@ -1,5 +1,6 @@
 use std::fs;
 use std::result;
+use std::sync::Arc;
 
 use actix::*;
 use anyhow::{bail, format_err, Result};
@@ -17,8 +18,9 @@ use tsclientlib::Connection as TsConnection;
 use tsclientlib::{ChannelId, ClientId, Identity, Invoker, MessageTarget, Uid};
 use tsproto_types::crypto::EccKeyPubP256;
 
+use crate::filecache::FileCache;
 use crate::secret::Secret;
-use crate::Settings;
+use crate::{Settings, State};
 use models::MessageStatus;
 
 pub(crate) mod graphql;
@@ -31,14 +33,15 @@ diesel_migrations::embed_migrations!();
 
 pub struct DbHandler {
 	logger: Logger,
+	file_cache: Arc<FileCache>,
 	secret: Secret,
 	con: SqliteConnection,
 	last_message_id: i64,
 }
 
 struct EventHandler<'a> {
-	db: &'a Addr<DbHandler>,
 	logger: &'a Logger,
+	state: &'a State,
 	con: &'a TsConnection,
 	data: &'a TsData,
 }
@@ -75,14 +78,14 @@ pub enum ChannelListMsg {
 
 pub struct ClientData {
 	pub name: String,
-	pub uid: Vec<u8>,
+	pub uid: Uid,
 	pub icon: Option<i32>,
 	pub avatar: Option<String>,
 }
 
 pub struct WriteMessageMsg {
 	pub message: String,
-	pub invoker_uid: Vec<u8>,
+	pub invoker_uid: Uid,
 	pub chat: ChatId,
 	pub client_data: Option<ClientData>,
 }
@@ -90,7 +93,7 @@ pub struct WriteMessageMsg {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ChatId {
 	/// The public key of the server.
-	pub server: Vec<u8>,
+	pub server: EccKeyPubP256,
 	pub chat_type: ChatType,
 }
 
@@ -141,7 +144,9 @@ impl Message for RunMsg {
 }
 
 impl DbHandler {
-	pub(crate) fn new(logger: Logger, settings: &Settings, secret: Secret) -> Result<Self> {
+	pub(crate) fn new(
+		logger: Logger, file_cache: Arc<FileCache>, settings: &Settings, secret: Secret,
+	) -> Result<Self> {
 		let database_url = settings.config_path.join("storage.sqlite");
 		let con = SqliteConnection::establish(database_url.to_str().unwrap())?;
 
@@ -159,7 +164,7 @@ impl DbHandler {
 			info!(logger, "Run database migrations"; "output" => s);
 		}
 
-		Ok(Self { logger, secret, con, last_message_id: 0 })
+		Ok(Self { logger, file_cache, secret, con, last_message_id: 0 })
 	}
 
 	/// Create a new chat entry in the database and returns the id.
@@ -186,7 +191,7 @@ impl DbHandler {
 			ChatType::Server => {
 				self.con.transaction::<_, diesel::result::Error, _>(|| {
 					if let Some(chat) = server_chats::table
-						.find(&id.server)
+						.find(id.server.to_short())
 						.select(server_chats::chat)
 						.first::<i64>(&self.con)
 						.optional()?
@@ -198,7 +203,7 @@ impl DbHandler {
 
 						diesel::insert_into(server_chats::table)
 							.values(&(
-								server_chats::server.eq(&id.server),
+								server_chats::server.eq(id.server.to_short()),
 								server_chats::chat.eq(chat),
 							))
 							.execute(&self.con)?;
@@ -209,7 +214,7 @@ impl DbHandler {
 			ChatType::Channel(channel) => {
 				self.con.transaction::<_, diesel::result::Error, _>(|| {
 					if let Some(chat) = channel_chats::table
-						.find((&id.server, *channel as i64))
+						.find((id.server.to_short(), *channel as i64))
 						.select(channel_chats::chat)
 						.first::<i64>(&self.con)
 						.optional()?
@@ -221,7 +226,7 @@ impl DbHandler {
 
 						diesel::insert_into(channel_chats::table)
 							.values(&(
-								channel_chats::server.eq(&id.server),
+								channel_chats::server.eq(id.server.to_short()),
 								channel_chats::channel.eq(*channel as i64),
 								channel_chats::chat.eq(chat),
 							))
@@ -233,7 +238,7 @@ impl DbHandler {
 			ChatType::Client(client) => {
 				self.con.transaction::<_, diesel::result::Error, _>(|| {
 					if let Some(chat) = client_chats::table
-						.find((&id.server, &client))
+						.find((id.server.to_short(), &client))
 						.select(client_chats::chat)
 						.first::<i64>(&self.con)
 						.optional()?
@@ -245,7 +250,7 @@ impl DbHandler {
 
 						diesel::insert_into(client_chats::table)
 							.values(&(
-								client_chats::server.eq(&id.server),
+								client_chats::server.eq(id.server.to_short()),
 								client_chats::client.eq(&client),
 								client_chats::chat.eq(chat),
 							))
@@ -257,7 +262,7 @@ impl DbHandler {
 			ChatType::Poke(client) => {
 				self.con.transaction::<_, diesel::result::Error, _>(|| {
 					if let Some(chat) = client_pokes::table
-						.find((&id.server, &client))
+						.find((id.server.to_short(), &client))
 						.select(client_pokes::chat)
 						.first::<i64>(&self.con)
 						.optional()?
@@ -269,7 +274,7 @@ impl DbHandler {
 
 						diesel::insert_into(client_pokes::table)
 							.values(&(
-								client_pokes::server.eq(&id.server),
+								client_pokes::server.eq(id.server.to_short()),
 								client_pokes::client.eq(&client),
 								client_pokes::chat.eq(chat),
 							))
@@ -406,7 +411,9 @@ impl Handler<UpdateIdentityMsg> for DbHandler {
 				counter.eq(identity.counter() as i64),
 				max_counter.eq(identity.max_counter() as i64),
 			))
-			.execute(&self.con)? != 1 {
+			.execute(&self.con)?
+			!= 1
+		{
 			bail!("Identity not found");
 		}
 		Ok(())
@@ -430,7 +437,7 @@ impl Handler<WriteMessageMsg> for DbHandler {
 			// Insert message
 			let message = models::MessageInsert {
 				chat,
-				invoker: Some(&message.invoker_uid),
+				invoker: Some(&message.invoker_uid.0),
 				invoker_name: None,
 				content: &message.message,
 				status: MessageStatus::Sending,
@@ -464,7 +471,9 @@ impl Handler<ConnectedMsg> for DbHandler {
 					bookmarks::last_used.eq(Some(utc_time)),
 					bookmarks::timezone.eq(utc_to_local_offset),
 				))
-				.execute(&self.con)? != 1 {
+				.execute(&self.con)?
+				!= 1
+			{
 				bail!("Failed to update time of bookmark {}, not found", id);
 			}
 			Ok(None)
@@ -512,8 +521,8 @@ impl Handler<ConnectedMsg> for DbHandler {
 							.first::<i64>(&self.con)
 							.optional()?
 						{
-							trace!(self.logger, "Connected: Did not find channel for bookmark, \
-								but found bookmark without channel, updating later";
+							trace!(self.logger, "Connected: Did not find channel for \
+								bookmark, but found bookmark without channel, updating later";
 								"other_bookmark" => id);
 							// Create or update later
 							let mut msg = msg;
@@ -521,8 +530,11 @@ impl Handler<ConnectedMsg> for DbHandler {
 							msg.bookmark = Some(id);
 							return Ok(Some(ChannelListMsg::CreateBookmark(msg)));
 						} else {
-							trace!(self.logger, "Connected: Did not find channel for bookmark, \
-								creating without channel");
+							trace!(
+								self.logger,
+								"Connected: Did not find channel for bookmark, creating without \
+								 channel"
+							);
 							// Create without channel and update later
 							None
 						}
@@ -544,7 +556,8 @@ impl Handler<ConnectedMsg> for DbHandler {
 						bookmarks::last_used.eq(Some(utc_time)),
 						bookmarks::timezone.eq(utc_to_local_offset),
 					))
-					.execute(&self.con)? != 1 {
+					.execute(&self.con)? != 1
+				{
 					bail!("Failed to update time of bookmark {}, not found", id);
 				}
 				Ok(None)
@@ -609,25 +622,30 @@ impl Handler<ChannelListMsg> for DbHandler {
 								timezone: utc_to_local_offset,
 								server: Some(&server),
 							};
-							diesel::insert_into(bookmarks::table).values(&bookmark)
+							diesel::insert_into(bookmarks::table)
+								.values(&bookmark)
 								.execute(&self.con)?;
 						}
 						Err(_) => {
 							if let Some(id) = data.bookmark {
 								// Update existing bookmark without channel
-								trace!(self.logger, "ChannelList: Update bookmark without channel";
+								trace!(self.logger, "ChannelList: Update bookmark without \
+									channel";
 									"bookmark" => id, "channel" => channel);
 								if diesel::update(bookmarks::table.filter(bookmarks::id.eq(id)))
 									.set((
 										bookmarks::last_used.eq(Some(utc_time)),
 										bookmarks::timezone.eq(utc_to_local_offset),
 									))
-									.execute(&self.con)? != 1 {
+									.execute(&self.con)? != 1
+								{
 									bail!("Failed to update time of bookmark {}, not found", id);
 								}
 							} else {
-								bail!("Bookmarks that are created after channellistfinished need \
-									an id");
+								bail!(
+									"Bookmarks that are created after channellistfinished need an \
+									 id"
+								);
 							}
 						}
 					}
@@ -639,7 +657,8 @@ impl Handler<ChannelListMsg> for DbHandler {
 				let channel = self.find_channel(&server, &channel)?;
 				if diesel::update(bookmarks::table.filter(bookmarks::id.eq(bookmark)))
 					.set(bookmarks::channel.eq(channel))
-					.execute(&self.con)? != 1 {
+					.execute(&self.con)? != 1
+				{
 					bail!("Failed to update channel of bookmark {}, not found", bookmark);
 				}
 			}
@@ -657,11 +676,11 @@ impl Handler<RunMsg> for DbHandler {
 
 impl DbHandler {
 	pub(crate) fn handle_events(
-		db: &Addr<Self>, logger: &Logger, con: &TsConnection, data: &TsData, events: &[Event],
+		logger: &Logger, state: &State, con: &TsConnection, data: &TsData, events: &[Event],
 		connected_msg: Option<ConnectedMsg>, ws: Addr<crate::websocket::Ws>,
 	) -> Result<()>
 	{
-		let handler = EventHandler::new(db, logger, con, data);
+		let handler = EventHandler::new(logger, state, con, data);
 
 		for e in events {
 			let r = match e {
@@ -752,7 +771,7 @@ impl DbHandler {
 
 		if let Some(msg) = connected_msg {
 			let logger = logger.clone();
-			actix::spawn(db.send(msg).map(move |r| match r {
+			actix::spawn(state.database.send(msg).map(move |r| match r {
 				Err(e) => warn!(logger, "Failed to save connection in database"; "error" => %e),
 				Ok(Err(e)) => warn!(logger, "Failed to save connection in database"; "error" => %e),
 				Ok(Ok(Some(msg))) => {
@@ -772,9 +791,9 @@ impl DbHandler {
 	}
 
 	pub fn create_client(
-		db: &Addr<Self>, logger: &Logger, con: &TsConnection, data: &TsData, client: &Client,
+		logger: &Logger, state: &State, con: &TsConnection, data: &TsData, client: &Client,
 	) -> Result<()> {
-		let handler = EventHandler::new(db, logger, con, data);
+		let handler = EventHandler::new(logger, state, con, data);
 		handler.handle_add_client(client, true)
 	}
 
@@ -794,28 +813,32 @@ impl DbHandler {
 					};
 
 					if let Err(e) = r {
-						error!(handler.logger, "Failed to handle event for database"; "error" => %e);
+						error!(handler.logger, "Failed to handle event for database";
+							"error" => %e);
 					}
 				}
 			}
 		}
 	}
 
-	fn add_client_internal(&self, create: bool, server: &[u8], client: &ClientData) -> Result<()> {
+	fn add_client_internal(
+		&self, create: bool, server: &EccKeyPubP256, client: &ClientData,
+	) -> Result<()> {
 		use schema::clients::dsl::*;
 		use schema::servers_clients;
 
 		// Check if we already know this client, the update will return 1 changed row on success
-		if diesel::update(clients.filter(uid.eq(&client.uid)))
-				.set(name.eq(&client.name))
-				.execute(&self.con)? != 1
+		if diesel::update(clients.filter(uid.eq(&client.uid.0)))
+			.set(name.eq(&client.name))
+			.execute(&self.con)?
+			!= 1
 		{
 			if !create {
 				return Ok(());
 			}
 
 			let client = models::ClientInsert {
-				uid: &client.uid,
+				uid: &client.uid.0,
 				name: &client.name,
 				public_key: None,
 				custom_name: None,
@@ -825,23 +848,46 @@ impl DbHandler {
 
 		let (utc_time, utc_to_local_offset) = EventHandler::get_now();
 		let server_client = models::ServersClientsInsert {
-			server,
-			client: &client.uid,
+			server: server.to_short(),
+			client: &client.uid.0,
 			icon: client.icon,
 			avatar: client.avatar.as_deref(),
 			last_seen: utc_time,
 			timezone: utc_to_local_offset,
 		};
+
+		// Check if the avatar changed
+		let prev_avatar = servers_clients::table
+			.filter(
+				servers_clients::server
+					.eq(server.to_short())
+					.and(servers_clients::client.eq(&client.uid.0)),
+			)
+			.select(servers_clients::avatar)
+			.first::<Option<String>>(&self.con)
+			.optional()?;
+
+		if let Some(prev_avatar) = prev_avatar {
+			if prev_avatar != client.avatar {
+				// Remove cached avatar
+				if let Err(e) = self.file_cache.delete_file(
+					server,
+					ChannelId(0),
+					&format!("avatar_{}", client.uid.as_avatar()),
+				) {
+					warn!(self.logger, "Failed to delete cached file"; "error" => %e);
+				}
+			}
+		}
+
 		diesel::replace_into(servers_clients::table).values(&server_client).execute(&self.con)?;
 		Ok(())
 	}
 }
 
 impl<'a> EventHandler<'a> {
-	fn new(
-		db: &'a Addr<DbHandler>, logger: &'a Logger, con: &'a TsConnection, data: &'a TsData,
-	) -> Self {
-		Self { db, logger, con, data }
+	fn new(logger: &'a Logger, state: &'a State, con: &'a TsConnection, data: &'a TsData) -> Self {
+		Self { logger, state, con, data }
 	}
 
 	fn run<
@@ -850,7 +896,7 @@ impl<'a> EventHandler<'a> {
 		&self, f: F,
 	) {
 		let logger = self.logger.clone();
-		actix::spawn(self.db.send(RunMsg(Box::new(f))).map(move |r| match r {
+		actix::spawn(self.state.database.send(RunMsg(Box::new(f))).map(move |r| match r {
 			Err(e) => {
 				error!(logger, "Failed to send to database"; "error" => %e);
 			}
@@ -859,11 +905,6 @@ impl<'a> EventHandler<'a> {
 			}
 			_ => {}
 		}))
-	}
-
-	fn get_server_key(&self) -> Result<Vec<u8>> {
-		let key = self.con.get_server_key()?;
-		Ok(key.to_short().to_vec())
 	}
 
 	/// Returns the current time in utc and the offset.
@@ -876,12 +917,9 @@ impl<'a> EventHandler<'a> {
 	}
 
 	fn handle_connected(&self) -> Result<()> {
-		let key = self.get_server_key()?;
-		let icon_id = if self.data.server.icon.0 != 0 {
-			Some(self.data.server.icon.0 as i32)
-		} else {
-			None
-		};
+		let key = self.con.get_server_key()?;
+		let icon_id =
+			if self.data.server.icon.0 != 0 { Some(self.data.server.icon.0 as i32) } else { None };
 		let server_name = self.data.server.name.clone();
 		let addr = self.con.get_options().get_address().to_string();
 
@@ -889,12 +927,13 @@ impl<'a> EventHandler<'a> {
 			use schema::servers::dsl::*;
 
 			// Check if we already know that server, the update will return 1 changed row on success
-			if diesel::update(servers.filter(public_key.eq(&key)))
-					.set((name.eq(&server_name), address.eq(&addr), icon.eq(&icon_id)))
-					.execute(&db.con)? != 1
+			if diesel::update(servers.filter(public_key.eq(key.to_short())))
+				.set((name.eq(&server_name), address.eq(&addr), icon.eq(&icon_id)))
+				.execute(&db.con)?
+				!= 1
 			{
 				let server = models::ServerInsert {
-					public_key: &key,
+					public_key: key.to_short(),
 					name: &server_name,
 					address: &addr,
 					icon: icon_id,
@@ -907,15 +946,20 @@ impl<'a> EventHandler<'a> {
 	}
 
 	fn handle_server_name(&self) -> Result<()> {
-		let key = self.get_server_key()?;
+		let key = self.con.get_server_key()?;
 		let server_name = self.data.server.name.clone();
 		self.run(move |db, _| {
 			use schema::servers::dsl::*;
-			if diesel::update(servers.filter(public_key.eq(&key)))
+			if diesel::update(servers.filter(public_key.eq(key.to_short())))
 				.set(name.eq(&server_name))
-				.execute(&db.con)? != 1 {
-				bail!("Failed to update server name to {:?}, server {:?} not found", server_name,
-					key);
+				.execute(&db.con)?
+				!= 1
+			{
+				bail!(
+					"Failed to update server name to {:?}, server {:?} not found",
+					server_name,
+					key
+				);
 			}
 			Ok(())
 		});
@@ -923,17 +967,16 @@ impl<'a> EventHandler<'a> {
 	}
 
 	fn handle_server_icon(&self) -> Result<()> {
-		let key = self.get_server_key()?;
-		let icon_id = if self.data.server.icon.0 != 0 {
-			Some(self.data.server.icon.0 as i32)
-		} else {
-			None
-		};
+		let key = self.con.get_server_key()?;
+		let icon_id =
+			if self.data.server.icon.0 != 0 { Some(self.data.server.icon.0 as i32) } else { None };
 		self.run(move |db, _| {
 			use schema::servers::dsl::*;
-			if diesel::update(servers.filter(public_key.eq(&key)))
+			if diesel::update(servers.filter(public_key.eq(key.to_short())))
 				.set(icon.eq(&icon_id))
-				.execute(&db.con)? != 1 {
+				.execute(&db.con)?
+				!= 1
+			{
 				bail!("Failed to update server icon to {:?}, server {:?} not found", icon_id, key);
 			}
 			Ok(())
@@ -948,7 +991,7 @@ impl<'a> EventHandler<'a> {
 				if let Some(uid) = &invoker.uid {
 					self.handle_add_client_internal(true, ClientData {
 						name: invoker.name.clone(),
-						uid: uid.0.clone(),
+						uid: uid.clone(),
 						icon: None,
 						avatar: None,
 					})
@@ -961,7 +1004,7 @@ impl<'a> EventHandler<'a> {
 
 	pub fn handle_add_client(&self, client: &Client, create: bool) -> Result<()> {
 		let client_uid = match &client.uid {
-			Some(client_uid) => client_uid.0.clone(),
+			Some(client_uid) => client_uid.clone(),
 			None => bail!("Client has no uid"),
 		};
 
@@ -977,7 +1020,7 @@ impl<'a> EventHandler<'a> {
 	}
 
 	fn handle_add_client_internal(&self, create: bool, client: ClientData) -> Result<()> {
-		let server = self.get_server_key()?;
+		let server = self.con.get_server_key()?;
 		self.run(move |db, _| db.add_client_internal(create, &server, &client));
 		Ok(())
 	}
@@ -988,7 +1031,7 @@ impl<'a> EventHandler<'a> {
 			self.handle_disconnect()?;
 		}
 
-		let server = self.get_server_key()?;
+		let server = self.con.get_server_key()?;
 		let client_uid = match &client.uid {
 			Some(uid) => uid.0.clone(),
 			None => bail!("Client has no uid"),
@@ -1000,9 +1043,13 @@ impl<'a> EventHandler<'a> {
 			// Update last seen
 			let (utc_time, utc_to_local_offset) = Self::get_now();
 
-			diesel::update(servers_clients::table.filter(
-				servers_clients::server.eq(server).and(servers_clients::client.eq(&client_uid)),
-			))
+			diesel::update(
+				servers_clients::table.filter(
+					servers_clients::server
+						.eq(server.to_short())
+						.and(servers_clients::client.eq(&client_uid)),
+				),
+			)
 			.set((
 				servers_clients::last_seen.eq(utc_time),
 				servers_clients::timezone.eq(utc_to_local_offset),
@@ -1015,7 +1062,7 @@ impl<'a> EventHandler<'a> {
 
 	/// Update last seen for all clients.
 	fn handle_disconnect(&self) -> Result<()> {
-		let server = self.get_server_key()?;
+		let server = self.con.get_server_key()?;
 		let uids = self
 			.data
 			.clients
@@ -1029,9 +1076,13 @@ impl<'a> EventHandler<'a> {
 			// Update last seen
 			let (utc_time, utc_to_local_offset) = Self::get_now();
 
-			diesel::update(servers_clients::table.filter(
-				servers_clients::server.eq(server).and(servers_clients::client.eq_any(&uids)),
-			))
+			diesel::update(
+				servers_clients::table.filter(
+					servers_clients::server
+						.eq(server.to_short())
+						.and(servers_clients::client.eq_any(&uids)),
+				),
+			)
 			.set((
 				servers_clients::last_seen.eq(utc_time),
 				servers_clients::timezone.eq(utc_to_local_offset),
@@ -1043,16 +1094,25 @@ impl<'a> EventHandler<'a> {
 	}
 
 	fn handle_client_avatar(&self, id: ClientId) -> Result<()> {
-		let server_id = self.get_server_key()?;
+		let server_id = self.con.get_server_key()?;
 		let client = if let Some(r) = self.data.clients.get(&id) {
 			r
 		} else {
 			bail!("Client not found");
 		};
 		let client_uid = match &client.uid {
-			Some(client_uid) => client_uid.0.clone(),
+			Some(client_uid) => client_uid.clone(),
 			None => bail!("Client has no uid"),
 		};
+
+		// Remove cached avatar
+		if let Err(e) = self.state.file_cache.delete_file(
+			&server_id,
+			ChannelId(0),
+			&format!("avatar_{}", client_uid.as_avatar()),
+		) {
+			warn!(self.logger, "Failed to delete cached file"; "error" => %e);
+		}
 
 		let client_avatar =
 			if client.avatar_hash.is_empty() { None } else { Some(client.avatar_hash.clone()) };
@@ -1060,7 +1120,8 @@ impl<'a> EventHandler<'a> {
 			use schema::servers_clients::dsl::*;
 			// Update, ignored if not exists
 			diesel::update(
-				servers_clients.filter(server.eq(&server_id).and(client.eq(&client_uid))),
+				servers_clients
+					.filter(server.eq(server_id.to_short()).and(client.eq(&client_uid.0))),
 			)
 			.set(avatar.eq(&client_avatar))
 			.execute(&db.con)?;
@@ -1070,7 +1131,7 @@ impl<'a> EventHandler<'a> {
 	}
 
 	fn handle_client_icon(&self, id: ClientId) -> Result<()> {
-		let server_id = self.get_server_key()?;
+		let server_id = self.con.get_server_key()?;
 		let client = if let Some(r) = self.data.clients.get(&id) {
 			r
 		} else {
@@ -1086,7 +1147,7 @@ impl<'a> EventHandler<'a> {
 			use schema::servers_clients::dsl::*;
 			// Update, ignored if not exists
 			diesel::update(
-				servers_clients.filter(server.eq(&server_id).and(client.eq(&client_uid))),
+				servers_clients.filter(server.eq(server_id.to_short()).and(client.eq(&client_uid))),
 			)
 			.set(icon.eq(&client_icon))
 			.execute(&db.con)?;
@@ -1119,7 +1180,7 @@ impl<'a> EventHandler<'a> {
 	}
 
 	fn handle_add_channel(&self, ch_id: ChannelId) -> Result<()> {
-		let ch_server = self.get_server_key()?;
+		let ch_server = self.con.get_server_key()?;
 		let channel = match self.data.channels.get(&ch_id) {
 			Some(c) => c,
 			None => bail!("Failed to find channel"),
@@ -1135,19 +1196,20 @@ impl<'a> EventHandler<'a> {
 			// Check if we already know this channel, the update will return 1 changed row on
 			// success
 			if diesel::update(
-					channels.filter(server.eq(&ch_server)).filter(id.eq(ch_id.0 as i64)),
-				)
-				.set((
-					parent.eq(ch_parent),
-					name.eq(&ch_name),
-					order_id.eq(&ch_order),
-					icon.eq(&icon_id),
-					deleted.eq(false),
-				))
-				.execute(&db.con)? != 1
+				channels.filter(server.eq(ch_server.to_short())).filter(id.eq(ch_id.0 as i64)),
+			)
+			.set((
+				parent.eq(ch_parent),
+				name.eq(&ch_name),
+				order_id.eq(&ch_order),
+				icon.eq(&icon_id),
+				deleted.eq(false),
+			))
+			.execute(&db.con)?
+				!= 1
 			{
 				let channel = models::ChannelInsert {
-					server: &ch_server,
+					server: ch_server.to_short(),
 					id: ch_id.0 as i64,
 					parent: ch_parent,
 					order_id: ch_order,
@@ -1163,17 +1225,24 @@ impl<'a> EventHandler<'a> {
 	}
 
 	fn handle_remove_channel(&self, ch_id: ChannelId) -> Result<()> {
-		let ch_server = self.get_server_key()?;
+		let ch_server = self.con.get_server_key()?;
 
 		self.run(move |db, _| {
 			use schema::channels::dsl::*;
 
 			// Mark channel as deleted
-			if diesel::update(channels.filter(server.eq(&ch_server).and(id.eq(ch_id.0 as i64))))
-				.set(deleted.eq(true))
-				.execute(&db.con)? != 1 {
-				bail!("Failed to mark channel as deleted, channel ({:?}, {}) not found", ch_server,
-					ch_id.0);
+			if diesel::update(
+				channels.filter(server.eq(ch_server.to_short()).and(id.eq(ch_id.0 as i64))),
+			)
+			.set(deleted.eq(true))
+			.execute(&db.con)?
+				!= 1
+			{
+				bail!(
+					"Failed to mark channel as deleted, channel ({:?}, {}) not found",
+					ch_server,
+					ch_id.0
+				);
 			}
 			Ok(())
 		});
@@ -1181,7 +1250,7 @@ impl<'a> EventHandler<'a> {
 	}
 
 	fn handle_channel_parent(&self, ch_id: ChannelId) -> Result<()> {
-		let server_id = self.get_server_key()?;
+		let server_id = self.con.get_server_key()?;
 		let channel = if let Some(r) = self.data.channels.get(&ch_id) {
 			r
 		} else {
@@ -1191,16 +1260,18 @@ impl<'a> EventHandler<'a> {
 		self.run(move |db, _| {
 			use schema::channels::dsl::*;
 			// Update, ignored if not exists
-			diesel::update(channels.filter(server.eq(&server_id).and(id.eq(ch_id.0 as i64))))
-				.set(parent.eq(ch_parent.0 as i64))
-				.execute(&db.con)?;
+			diesel::update(
+				channels.filter(server.eq(server_id.to_short()).and(id.eq(ch_id.0 as i64))),
+			)
+			.set(parent.eq(ch_parent.0 as i64))
+			.execute(&db.con)?;
 			Ok(())
 		});
 		Ok(())
 	}
 
 	fn handle_channel_order(&self, ch_id: ChannelId) -> Result<()> {
-		let server_id = self.get_server_key()?;
+		let server_id = self.con.get_server_key()?;
 		let channel = if let Some(r) = self.data.channels.get(&ch_id) {
 			r
 		} else {
@@ -1210,16 +1281,18 @@ impl<'a> EventHandler<'a> {
 		self.run(move |db, _| {
 			use schema::channels::dsl::*;
 			// Update, ignored if not exists
-			diesel::update(channels.filter(server.eq(&server_id).and(id.eq(ch_id.0 as i64))))
-				.set(order_id.eq(ch_order.0 as i64))
-				.execute(&db.con)?;
+			diesel::update(
+				channels.filter(server.eq(server_id.to_short()).and(id.eq(ch_id.0 as i64))),
+			)
+			.set(order_id.eq(ch_order.0 as i64))
+			.execute(&db.con)?;
 			Ok(())
 		});
 		Ok(())
 	}
 
 	fn handle_channel_name(&self, ch_id: ChannelId) -> Result<()> {
-		let server_id = self.get_server_key()?;
+		let server_id = self.con.get_server_key()?;
 		let channel = if let Some(r) = self.data.channels.get(&ch_id) {
 			r
 		} else {
@@ -1229,16 +1302,18 @@ impl<'a> EventHandler<'a> {
 		self.run(move |db, _| {
 			use schema::channels::dsl::*;
 			// Update, ignored if not exists
-			diesel::update(channels.filter(server.eq(&server_id).and(id.eq(ch_id.0 as i64))))
-				.set(name.eq(&ch_name))
-				.execute(&db.con)?;
+			diesel::update(
+				channels.filter(server.eq(server_id.to_short()).and(id.eq(ch_id.0 as i64))),
+			)
+			.set(name.eq(&ch_name))
+			.execute(&db.con)?;
 			Ok(())
 		});
 		Ok(())
 	}
 
 	fn handle_channel_icon(&self, ch_id: ChannelId) -> Result<()> {
-		let server_id = self.get_server_key()?;
+		let server_id = self.con.get_server_key()?;
 		let channel = if let Some(r) = self.data.channels.get(&ch_id) {
 			r
 		} else {
@@ -1248,9 +1323,11 @@ impl<'a> EventHandler<'a> {
 		self.run(move |db, _| {
 			use schema::channels::dsl::*;
 			// Update, ignored if not exists
-			diesel::update(channels.filter(server.eq(&server_id).and(id.eq(ch_id.0 as i64))))
-				.set(icon.eq(&ch_icon))
-				.execute(&db.con)?;
+			diesel::update(
+				channels.filter(server.eq(server_id.to_short()).and(id.eq(ch_id.0 as i64))),
+			)
+			.set(icon.eq(&ch_icon))
+			.execute(&db.con)?;
 			Ok(())
 		});
 		Ok(())
@@ -1259,7 +1336,7 @@ impl<'a> EventHandler<'a> {
 	fn handle_message(
 		&self, target: MessageTarget, invoker: &Invoker, message: &str,
 	) -> Result<()> {
-		let server = self.get_server_key()?;
+		let server = self.con.get_server_key()?;
 
 		let invoker_uid = if let Some(uid) = &invoker.uid { Some(uid.0.clone()) } else { None };
 		let invoker_name = if invoker_uid.is_none() { Some(invoker.name.clone()) } else { None };
@@ -1391,16 +1468,15 @@ impl<'a> EventHandler<'a> {
 	/// On channellistfinished: Mark channels as removed which are no longer
 	/// there.
 	fn handle_channellistfinished(&self) -> Result<()> {
-		let server = self.get_server_key()?;
+		let server_id = self.con.get_server_key()?;
 		let channels = self.data.channels.keys().map(|id| id.0 as i64).collect::<Vec<_>>();
 
 		self.run(move |db, _| {
 			use schema::channels;
 
-			diesel::update(
-				channels::table
-					.filter(channels::server.eq(&server).and(channels::id.ne_all(&channels))),
-			)
+			diesel::update(channels::table.filter(
+				channels::server.eq(server_id.to_short()).and(channels::id.ne_all(&channels)),
+			))
 			.set(channels::deleted.eq(true))
 			.execute(&db.con)?;
 			Ok(())

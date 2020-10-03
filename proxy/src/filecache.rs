@@ -9,18 +9,21 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use actix_web::web::{self, Bytes};
+use anyhow::Result;
 use futures::prelude::*;
-use slog::{debug, error};
+use slog::{debug, error, Logger};
 use tokio::fs;
 use tokio::io::AsyncWrite;
 use tokio_util::codec::{BytesCodec, FramedRead};
-use tsclientlib::{ChannelId, Uid};
-
-use crate::State;
+use tsclientlib::ChannelId;
+use tsproto_types::crypto::EccKeyPubP256;
 
 /// Files are stored in
 /// `<cache_path>/files/<base32 of server uid>/<channel_id>/<base32 of path>`.
-pub struct FileCache {}
+pub struct FileCache {
+	logger: Logger,
+	cache_path: PathBuf,
+}
 
 /// A struct that writes into files.
 ///
@@ -36,57 +39,80 @@ struct FileWriter<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin> {
 }
 
 impl FileCache {
+	pub fn new(logger: Logger, cache_path: PathBuf) -> Self { Self { logger, cache_path } }
+
 	fn path_encode(data: &[u8]) -> String {
 		base32::encode(base32::Alphabet::RFC4648 { padding: false }, data)
 	}
 
-	fn get_path(state: &State, server: Uid, channel: ChannelId, path: &str) -> PathBuf {
-		let mut p = state.settings.read().unwrap().cache_path.clone();
-		p.push(Self::path_encode(&server.0));
+	fn get_path(&self, server: &EccKeyPubP256, channel: ChannelId, path: &str) -> Result<PathBuf> {
+		let mut p = self.cache_path.clone();
+		p.push(Self::path_encode(&server.get_uid_no_base64()?));
 		p.push(channel.0.to_string());
 		p.push(Self::path_encode(path.as_bytes()));
-		p
+		Ok(p)
 	}
 
 	pub async fn cache_file(
-		state: &State, server: Uid, channel: ChannelId, path: &str,
+		&self, server: &EccKeyPubP256, channel: ChannelId, path: &str,
 		file: impl Stream<Item = Result<Bytes, std::io::Error>> + Unpin,
 	) -> impl Stream<Item = Result<Bytes, std::io::Error>>
 	{
-		let path = Self::get_path(state, server, channel, path);
+		let path = match self.get_path(server, channel, path) {
+			Ok(r) => r,
+			Err(e) => {
+				error!(self.logger, "Failed to get cache path"; "error" => %e);
+				return file.left_stream();
+			}
+		};
 		if let Err(e) = fs::create_dir_all(&path.parent().unwrap()).await {
-			error!(state.logger, "Failed to create cache directory";
-				"error" => %e);
+			error!(self.logger, "Failed to create cache directory"; "error" => %e);
 			return file.left_stream();
 		}
 
 		match fs::File::create(&path).await {
 			Ok(r) => FileWriter::new(file, r, path).right_stream(),
 			Err(e) => {
-				error!(state.logger, "Failed to create cache file";
-					"error" => %e);
+				error!(self.logger, "Failed to create cache file"; "error" => %e);
 				file.left_stream()
 			}
 		}
 	}
 
+	/// Deletes a file from the cache.
+	///
+	/// Returns `true` if a file was deleted or `false` if it did not exist.
+	pub fn delete_file(
+		&self, server: &EccKeyPubP256, channel: ChannelId, path: &str,
+	) -> Result<bool> {
+		let path = self.get_path(server, channel, path)?;
+		if !path.exists() {
+			return Ok(false);
+		}
+		Ok(std::fs::remove_file(path).map(|()| true)?)
+	}
+
 	/// Returns length and stream if the file is cached.
 	pub async fn get_cached_file(
-		state: &State, server: Uid, channel: ChannelId, path: &str,
+		&self, server: &EccKeyPubP256, channel: ChannelId, path: &str,
 	) -> Option<(u64, impl Stream<Item = Result<Bytes, std::io::Error>>)> {
-		let path = Self::get_path(state, server, channel, path);
+		let path = match self.get_path(server, channel, path) {
+			Ok(r) => r,
+			Err(e) => {
+				error!(self.logger, "Failed to get cache path"; "error" => %e);
+				return None;
+			}
+		};
 		let meta = match fs::metadata(&path).await {
 			Ok(r) => r,
 			Err(e) => {
-				debug!(state.logger, "File not in cache"; " path" => ?path,
-					"error" => %e);
+				debug!(self.logger, "File not in cache"; " path" => ?path, "error" => %e);
 				return None;
 			}
 		};
 		match fs::File::open(&path).await {
 			Err(e) => {
-				error!(state.logger, "Failed to open cached file";
-					"error" => %e);
+				error!(self.logger, "Failed to open cached file"; "error" => %e);
 				None
 			}
 			Ok(file) => {
