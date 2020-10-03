@@ -221,7 +221,8 @@ impl Channel {
 				use schema::channels;
 
 				while let Some(parent_id) = parent {
-					let (name, new_parent) = channels::table.find((&id, parent_id))
+					let (name, new_parent) = channels::table
+						.find((&id, parent_id))
 						.select((channels::name, channels::parent))
 						.first::<(String, Option<i64>)>(&db.con)?;
 					parent = new_parent;

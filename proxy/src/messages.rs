@@ -9,7 +9,10 @@ use crate::book_events::{JsEvent, JsM2B};
 pub enum MessageF2P {
 	Connect(ConnectOptions),
 	Disconnect(DisconnectOptions),
-	SendMessage { target: MessageTarget, message: String },
+	SendMessage {
+		target: MessageTarget,
+		message: String,
+	},
 	/// Set the loudness threshold for sending audio in LUFS
 	SetLoudnessThreshold(f64),
 	/// Ask the proxy to send loudness data or not.

@@ -1,6 +1,6 @@
 use std::collections::HashSet;
+use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 use std::time::Duration;
 
 use actix::*;
@@ -225,17 +225,16 @@ impl Handler<PlayPacketMsg> for AudioToTs {
 
 impl Handler<SetLoudnessThresholdMsg> for AudioToTs {
 	type Result = ();
-	fn handle(&mut self, SetLoudnessThresholdMsg(thres): SetLoudnessThresholdMsg,
-		_: &mut Self::Context) -> Self::Result {
+	fn handle(
+		&mut self, SetLoudnessThresholdMsg(thres): SetLoudnessThresholdMsg, _: &mut Self::Context,
+	) -> Self::Result {
 		self.loudness_threshold.store(thres.to_bits(), Ordering::Relaxed);
 	}
 }
 
 impl Handler<ResetMsg> for AudioToTs {
 	type Result = ();
-	fn handle(&mut self, _: ResetMsg, _: &mut Self::Context) -> Self::Result {
-		self.open_device();
-	}
+	fn handle(&mut self, _: ResetMsg, _: &mut Self::Context) -> Self::Result { self.open_device(); }
 }
 
 impl AudioToTs {
@@ -280,8 +279,13 @@ impl AudioToTs {
 					audiopus::Channels::Stereo
 				};
 
-				SdlCallback::new(self.logger.clone(), channels, spawn_send,
-					self.loudness_threshold.clone(), self.packet_loss.clone())
+				SdlCallback::new(
+					self.logger.clone(),
+					channels,
+					spawn_send,
+					self.loudness_threshold.clone(),
+					self.packet_loss.clone(),
+				)
 			})
 			.map_err(|e| format_err!("SDL error: {}", e))
 		{
@@ -317,7 +321,8 @@ impl SdlCallback {
 	fn new(
 		logger: Logger, channels: audiopus::Channels, spawn_send: mpsc::Sender<PlayPacketMsg>,
 		loudness_threshold: Arc<AtomicU64>, packet_loss: Arc<AtomicU8>,
-	) -> Self {
+	) -> Self
+	{
 		let loudness = match EbuR128::new(1, super::SAMPLE_RATE as u32, ebur128::Mode::M) {
 			Ok(r) => Some(r),
 			Err(e) => {
@@ -466,8 +471,7 @@ impl AudioCallback for SdlCallback {
 				for d in &mut self.last_buffer {
 					*d /= i16::max_value() as f32;
 				}
-				match encoder.encode_float(&self.last_buffer, &mut self.opus_output[..])
-				{
+				match encoder.encode_float(&self.last_buffer, &mut self.opus_output[..]) {
 					Err(e) => {
 						warn!(self.logger, "Failed to encode opus"; "error" => %e);
 					}

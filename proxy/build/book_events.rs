@@ -5,14 +5,20 @@ use std::ops::Deref;
 use heck::*;
 use t4rust_derive::Template;
 use tsproto_structs::book::*;
-use tsproto_structs::book_to_messages::{self, BookToMessagesDeclarations, Event, RuleKind, RuleOp};
+use tsproto_structs::book_to_messages::{
+	self, BookToMessagesDeclarations, Event, RuleKind, RuleOp,
+};
 use tsproto_structs::messages_to_book::{self, MessagesToBookDeclarations};
 
 #[derive(Template)]
 #[TemplatePath = "build/BookEvents.tt"]
 #[derive(Debug)]
-pub struct BookEvents<'a>(&'a BookDeclarations, &'a MessagesToBookDeclarations<'a>,
-	&'a BookToMessagesDeclarations<'a>, JsStructs);
+pub struct BookEvents<'a>(
+	&'a BookDeclarations,
+	&'a MessagesToBookDeclarations<'a>,
+	&'a BookToMessagesDeclarations<'a>,
+	JsStructs,
+);
 
 impl Deref for BookEvents<'_> {
 	type Target = BookDeclarations;
@@ -20,8 +26,9 @@ impl Deref for BookEvents<'_> {
 }
 
 impl Default for BookEvents<'static> {
-	fn default() -> Self { BookEvents(&DATA, &messages_to_book::DATA, &book_to_messages::DATA,
-		JsStructs::default()) }
+	fn default() -> Self {
+		BookEvents(&DATA, &messages_to_book::DATA, &book_to_messages::DATA, JsStructs::default())
+	}
 }
 
 #[derive(Debug)]
@@ -47,8 +54,7 @@ impl Default for JsStructs {
 			JsStruct {
 				name: "Client",
 				ids: vec![("Id", "ClientId")],
-				parts: vec!["Client", "OptionalClientData",
-					"ConnectionClientData"],
+				parts: vec!["Client", "OptionalClientData", "ConnectionClientData"],
 			},
 			JsStruct {
 				name: "ClientServerGroup",
@@ -58,8 +64,7 @@ impl Default for JsStructs {
 			JsStruct {
 				name: "Server",
 				ids: vec![],
-				parts: vec!["Server", "OptionalServerData",
-					"Connection", "ConnectionServerData"],
+				parts: vec!["Server", "OptionalServerData", "Connection", "ConnectionServerData"],
 			},
 			JsStruct {
 				name: "ServerGroup",
@@ -76,9 +81,7 @@ impl Default for JsStructs {
 }
 
 impl JsStructs {
-	fn get_struct(&self, name: &str) -> Option<&JsStruct> {
-		self.0.iter().find(|s| s.name == name)
-	}
+	fn get_struct(&self, name: &str) -> Option<&JsStruct> { self.0.iter().find(|s| s.name == name) }
 }
 
 fn get_properties<'a>(structs: &'a [Struct], s: &'a Struct) -> Vec<&'a Property> {
@@ -122,8 +125,7 @@ fn get_all_arguments<'a>(e: &'a Event<'a>, r: Option<&'a RuleKind<'a>>) -> Strin
 	let mut args = String::new();
 	for r in e.ids.iter().chain(r.iter().cloned()) {
 		match r {
-			RuleKind::ArgumentMap { .. } |
-			RuleKind::ArgumentFunction { .. } => {
+			RuleKind::ArgumentMap { .. } | RuleKind::ArgumentFunction { .. } => {
 				let arg = r.get_argument();
 				if !arg.is_empty() {
 					args.push_str("pub ");
@@ -141,8 +143,7 @@ fn set_all_arguments<'a>(e: &'a Event<'a>, r: Option<&'a RuleKind<'a>>) -> Strin
 	let mut args = String::new();
 	for r in e.ids.iter().chain(r.iter().cloned()) {
 		match r {
-			RuleKind::ArgumentMap { .. } |
-			RuleKind::ArgumentFunction { .. } => {
+			RuleKind::ArgumentMap { .. } | RuleKind::ArgumentFunction { .. } => {
 				args.push_str("self.");
 				args.push_str(&r.from_name().to_snake_case());
 				args.push_str(", ");
@@ -157,8 +158,7 @@ fn set_all_id_arguments<'a>(e: &'a Event<'a>) -> String {
 	let mut args = String::new();
 	for r in &e.ids {
 		match r {
-			RuleKind::ArgumentMap { .. } |
-			RuleKind::ArgumentFunction { .. } => {
+			RuleKind::ArgumentMap { .. } | RuleKind::ArgumentFunction { .. } => {
 				args.push_str("self.");
 				args.push_str(&r.from_name().to_snake_case());
 				args.push_str(", ");
@@ -194,7 +194,8 @@ impl JsStructs {
 		if name == "Connection" {
 			name = "Server";
 		}
-		let struc = self.get_struct(name).unwrap_or_else(|| panic!("Did not find struct '{}'", name));
+		let struc =
+			self.get_struct(name).unwrap_or_else(|| panic!("Did not find struct '{}'", name));
 		let mut ids = String::new();
 		for i in &struc.ids {
 			ids.push_str("pub ");

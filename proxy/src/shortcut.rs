@@ -26,7 +26,9 @@ pub enum Action {
 }
 
 async fn h<T: Clone + Send + 'static>(state: &crate::State, t: T)
-	where websocket::Ws: actix::Handler<T>, T: actix::Message<Result = Result<()>>
+where
+	websocket::Ws: actix::Handler<T>,
+	T: actix::Message<Result = Result<()>>,
 {
 	let cons = state.connections.lock().unwrap().values().cloned().collect::<Vec<_>>();
 	for c in cons {
@@ -53,11 +55,11 @@ mod imp {
 	use std::sync::Arc;
 
 	use anyhow::Result;
-	use tokio::runtime::Handle;
 	use livesplit_hotkey::*;
+	use tokio::runtime::Handle;
 
-	use crate::State;
 	use super::ShortcutConfig;
+	use crate::State;
 
 	pub use livesplit_hotkey::KeyCode;
 
@@ -69,34 +71,185 @@ mod imp {
 	pub fn _key_list() -> Vec<String> {
 		// https://github.com/LiveSplit/livesplit-core/blob/master/crates/livesplit-hotkey/src/windows/key_code.rs
 		[
-			"LButton", "RButton", "Cancel", "MButton", "XButton1", "XButton2", "Back", "Tab",
-			"Clear", "Return", "Shift", "Control", "Menu", "Pause", "Capital", "Kana", "Junja",
-			"Final", "Kanji", "Escape", "Convert", "NonConvert", "Accept", "ModeChange", "Space",
-			"Prior", "Next", "End", "Home", "Left", "Up", "Right", "Down", "Select", "Print",
-			"Execute", "Snapshot", "Insert", "Delete", "Help", "D0", "D1", "D2", "D3", "D4", "D5",
-			"D6", "D7", "D8", "D9", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
-			"N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "LeftWin", "RightWin",
-			"Apps", "Sleep", "NumPad0", "NumPad1", "NumPad2", "NumPad3", "NumPad4", "NumPad5",
-			"NumPad6", "NumPad7", "NumPad8", "NumPad9", "Multiply", "Add", "Separator", "Subtract",
-			"Decimal", "Divide", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11",
-			"F12", "F13", "F14", "F15", "F16", "F17", "F18", "F19", "F20", "F21", "F22", "F23",
-			"F24", "NumLock", "Scroll", "LeftShift", "RightShift", "LeftControl", "RightControl",
-			"LeftMenu", "RightMenu", "BrowserBack", "BrowserForward", "BrowserRefresh",
-			"BrowserStop", "BrowserSearch", "BrowserFavorites", "BrowserHome", "VolumeMute",
-			"VolumeDown", "VolumeUp", "MediaNextTrack", "MediaPrevTrack", "MediaStop",
-			"MediaPlayPause", "LaunchMail", "LaunchMediaSelect", "LaunchApp1", "LaunchApp2", "Oem1",
-			"OemPlus", "OemComma", "OemMinus", "OemPeriod", "Oem2", "Oem3", "Oem4", "Oem5", "Oem6",
-			"Oem7", "Oem8", "Oem102", "ProcessKey", "Packet", "Attn", "CrSel", "ExSel", "ErEof",
-			"Play", "Zoom", "NoName", "Pa1", "OemClear",
-		].iter().map(|s| s.to_string()).collect()
+			"LButton",
+			"RButton",
+			"Cancel",
+			"MButton",
+			"XButton1",
+			"XButton2",
+			"Back",
+			"Tab",
+			"Clear",
+			"Return",
+			"Shift",
+			"Control",
+			"Menu",
+			"Pause",
+			"Capital",
+			"Kana",
+			"Junja",
+			"Final",
+			"Kanji",
+			"Escape",
+			"Convert",
+			"NonConvert",
+			"Accept",
+			"ModeChange",
+			"Space",
+			"Prior",
+			"Next",
+			"End",
+			"Home",
+			"Left",
+			"Up",
+			"Right",
+			"Down",
+			"Select",
+			"Print",
+			"Execute",
+			"Snapshot",
+			"Insert",
+			"Delete",
+			"Help",
+			"D0",
+			"D1",
+			"D2",
+			"D3",
+			"D4",
+			"D5",
+			"D6",
+			"D7",
+			"D8",
+			"D9",
+			"A",
+			"B",
+			"C",
+			"D",
+			"E",
+			"F",
+			"G",
+			"H",
+			"I",
+			"J",
+			"K",
+			"L",
+			"M",
+			"N",
+			"O",
+			"P",
+			"Q",
+			"R",
+			"S",
+			"T",
+			"U",
+			"V",
+			"W",
+			"X",
+			"Y",
+			"Z",
+			"LeftWin",
+			"RightWin",
+			"Apps",
+			"Sleep",
+			"NumPad0",
+			"NumPad1",
+			"NumPad2",
+			"NumPad3",
+			"NumPad4",
+			"NumPad5",
+			"NumPad6",
+			"NumPad7",
+			"NumPad8",
+			"NumPad9",
+			"Multiply",
+			"Add",
+			"Separator",
+			"Subtract",
+			"Decimal",
+			"Divide",
+			"F1",
+			"F2",
+			"F3",
+			"F4",
+			"F5",
+			"F6",
+			"F7",
+			"F8",
+			"F9",
+			"F10",
+			"F11",
+			"F12",
+			"F13",
+			"F14",
+			"F15",
+			"F16",
+			"F17",
+			"F18",
+			"F19",
+			"F20",
+			"F21",
+			"F22",
+			"F23",
+			"F24",
+			"NumLock",
+			"Scroll",
+			"LeftShift",
+			"RightShift",
+			"LeftControl",
+			"RightControl",
+			"LeftMenu",
+			"RightMenu",
+			"BrowserBack",
+			"BrowserForward",
+			"BrowserRefresh",
+			"BrowserStop",
+			"BrowserSearch",
+			"BrowserFavorites",
+			"BrowserHome",
+			"VolumeMute",
+			"VolumeDown",
+			"VolumeUp",
+			"MediaNextTrack",
+			"MediaPrevTrack",
+			"MediaStop",
+			"MediaPlayPause",
+			"LaunchMail",
+			"LaunchMediaSelect",
+			"LaunchApp1",
+			"LaunchApp2",
+			"Oem1",
+			"OemPlus",
+			"OemComma",
+			"OemMinus",
+			"OemPeriod",
+			"Oem2",
+			"Oem3",
+			"Oem4",
+			"Oem5",
+			"Oem6",
+			"Oem7",
+			"Oem8",
+			"Oem102",
+			"ProcessKey",
+			"Packet",
+			"Attn",
+			"CrSel",
+			"ExSel",
+			"ErEof",
+			"Play",
+			"Zoom",
+			"NoName",
+			"Pa1",
+			"OemClear",
+		]
+		.iter()
+		.map(|s| s.to_string())
+		.collect()
 	}
 
 	impl Shortcuts {
 		pub fn new(config: ShortcutConfig) -> Result<Self> {
-			Ok(Self {
-				config,
-				hook: Hook::new()?,
-			})
+			Ok(Self { config, hook: Hook::new()? })
 		}
 
 		pub fn apply_config(&self, state: &Arc<State>) -> Result<()> {
@@ -123,8 +276,8 @@ mod imp {
 	use anyhow::Result;
 	use serde::{Deserialize, Serialize};
 
-	use crate::State;
 	use super::ShortcutConfig;
+	use crate::State;
 
 	#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Deserialize, Serialize)]
 	pub enum KeyCode {}
@@ -134,19 +287,11 @@ mod imp {
 		config: ShortcutConfig,
 	}
 
-	pub fn _key_list() -> Vec<String> {
-		Vec::new()
-	}
+	pub fn _key_list() -> Vec<String> { Vec::new() }
 
 	impl Shortcuts {
-		pub fn new(config: ShortcutConfig) -> Result<Self> {
-			Ok(Self {
-				config,
-			})
-		}
+		pub fn new(config: ShortcutConfig) -> Result<Self> { Ok(Self { config }) }
 
-		pub fn apply_config(&self, _: &Arc<State>) -> Result<()> {
-			Ok(())
-		}
+		pub fn apply_config(&self, _: &Arc<State>) -> Result<()> { Ok(()) }
 	}
 }

@@ -51,7 +51,7 @@ enum RenderMdMeta {
 enum TextKind {
 	None,
 	Normal(bool), // bool:code mode (when true, text wont be bb processed)
-	Latex(bool), // bool:display mode
+	Latex(bool),  // bool:display mode
 }
 
 /// Escapes a string so it can be put into html (between tags).
@@ -251,7 +251,7 @@ impl RenderMd {
 				} else {
 					self.push_node(bb(&self.text_builder))
 				}
-			},
+			}
 			TextKind::Latex(dm) => {
 				if let Some(node) = katex_render_code(&self.text_builder, dm) {
 					self.push_node(node);
