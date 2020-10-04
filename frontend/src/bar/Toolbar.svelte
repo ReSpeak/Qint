@@ -14,13 +14,15 @@
 	let outputMuted = false;
 	let isAway = false;
 
+	let showMuteButtons = false;
 	let showDescriptionButton = false;
 
 	const cons = app.connections;
 	let ownClient: Writable<Client | undefined> | undefined;
 	$: {
 		const consVal = $cons;
-		showDescriptionButton = consVal.length > 0;
+		showMuteButtons = consVal.length > 0;
+		showDescriptionButton = consVal.length > 0 || showSidebar;
 		if (!showDescriptionButton) showDescription = false;
 
 		const connection = consVal.length > 0 ? consVal[0] : undefined;
@@ -43,9 +45,24 @@
 		}
 	}
 
+	function toggleSidebar(show: boolean) {
+		showSidebar = show;
+		if ($cons.length === 0) {
+			app.transientSettings.ui.showSidebar = show;
+			app.transientSettings.save();
+		}
+	}
+
+	function toggleDescription(show: boolean) {
+		showDescription = show;
+		app.transientSettings.ui.showDescription = show;
+		app.transientSettings.save();
+	}
+
 	$: displayPanelChanged(displayPanel);
 	function displayPanelChanged(pan: DisplayPanel) {
 		if (pan !== DisplayPanel.Main) showDescription = false;
+		else showDescription = app.transientSettings.ui.showDescription;
 	}
 
 	$: showDescriptionChanged(showDescription);
@@ -56,7 +73,10 @@
 	const selectedNode = app.selectedNode;
 	$: selectedNodeChanged($selectedNode);
 	function selectedNodeChanged(node: NodeSelection | undefined) {
-		if (node !== undefined) displayPanel = DisplayPanel.Main;
+		if (node !== undefined) {
+			displayPanel = DisplayPanel.Main;
+			showDescription = app.transientSettings.ui.showDescription;
+		}
 	}
 </script>
 
@@ -65,7 +85,7 @@
 		<button
 			class="button toolbutton"
 			class:active={showSidebar}
-			on:click={() => (showSidebar = !showSidebar)}>
+			on:click={() => toggleSidebar(!showSidebar)}>
 			<Icon name="file-tree" />
 		</button>
 	</div>
@@ -74,7 +94,7 @@
 		<button
 			class="button toolbutton"
 			class:active={displayPanel === DisplayPanel.Main}
-			on:click={() => (displayPanel = DisplayPanel.Main)}>
+			on:click={() => displayPanel = DisplayPanel.Main}>
 			<Icon name="chat-outline" />
 		</button>
 		<button
@@ -91,22 +111,25 @@
 		</button>
 	</div>
 	<div class="spacer" />
-	<div class="rightButtons" class:invisible={!showDescriptionButton}>
+	<div class="rightButtons">
 		<button
 			class="button toolbutton"
 			class:active={inputMuted}
+			class:invisible={!showMuteButtons}
 			on:click={() => changeOwnClient({ input_muted: !inputMuted })}>
 			<Icon name={inputMuted ? 'microphone-off' : 'microphone'} />
 		</button>
 		<button
 			class="button toolbutton"
 			class:active={outputMuted}
+			class:invisible={!showMuteButtons}
 			on:click={() => changeOwnClient({ output_muted: !outputMuted })}>
 			<Icon name={outputMuted ? 'volume-off' : 'volume-high'} />
 		</button>
 		<button
 			class="button toolbutton"
 			class:active={isAway}
+			class:invisible={!showMuteButtons}
 			on:click={() => changeOwnClient({ away: isAway ? null : '' })}>
 			<Icon name={isAway ? 'sleep' : 'sleep-off'} />
 		</button>
@@ -114,7 +137,8 @@
 		<button
 			class="button toolbutton"
 			class:active={showDescription}
-			on:click={() => (showDescription = !showDescription)}>
+			class:invisible={!showDescriptionButton}
+			on:click={() => toggleDescription(!showDescription)}>
 			<Icon name="information-outline" />
 		</button>
 	</div>

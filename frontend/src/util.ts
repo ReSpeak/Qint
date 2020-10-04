@@ -210,24 +210,14 @@ export function getDefaultVersion(): string {
 	}
 }
 
-export function getConnectFromString(loc: string): OMsgConnect {
+export function getConnectFromString(loc: string): ConnectData {
 	if (loc.startsWith("{")) {
 		// Parse json
 		let data = JSON.parse(loc);
 		assert("address" in data, "connection data needs an address");
 		if (!("name" in data))
 			data.name = "TeamSpeakUser";
-		if (!("version" in data))
-			data.version = getDefaultVersion();
-		if (!("ignore_identity_mismatch" in data))
-			data.ignore_identity_mismatch = false;
-		if (!("log_commands" in data))
-			data.log_commands = false;
-		if (!("log_packets" in data))
-			data.log_packets = false;
-		if (!("log_udp_packets" in data))
-			data.log_udp_packets = false;
-		return { Connect: data };
+		return new ConnectData(data.name, data.address, data.bookmark, data.channel, data.channelId);
 	} else {
 		let start = loc.indexOf("@");
 		let name = start === -1 ? "TeamSpeakUser" : loc.substr(0, start);
@@ -235,55 +225,23 @@ export function getConnectFromString(loc: string): OMsgConnect {
 		let end = loc.indexOf("/");
 		let channel = end === -1 ? "" : loc.substr(end + 1);
 		let address = loc.substr(start, end === -1 ? undefined : end);
-		return {
-			Connect: {
-				bookmark: undefined,
-				address,
-				name,
-				channel,
-				version: getDefaultVersion(),
-				ignore_identity_mismatch: false,
-				log_commands: false,
-				log_packets: false,
-				log_udp_packets: false,
-			}
-		};
+		return new ConnectData(name, address, undefined, channel);
 	}
 }
 
 export function getStringFromConnect(connect: ConnectData): string {
-	const c: any = connect.Connect;
-	let hasDefaults = c.bookmark === undefined;
-	if (c.version === getDefaultVersion())
-		c.version = undefined;
-	else
-		hasDefaults = false;
-	if (!c.ignore_identity_mismatch)
-		c.ignore_identity_mismatch = undefined;
-	else
-		hasDefaults = false;
-	if (!c.log_commands)
-		c.log_commands = undefined;
-	else
-		hasDefaults = false;
-	if (!c.log_packets)
-		c.log_packets = undefined;
-	else
-		hasDefaults = false;
-	if (!c.log_udp_packets)
-		c.log_udp_packets = undefined;
-	else
-		hasDefaults = false;
-	if (hasDefaults) {
+	if (connect.bookmark === undefined) {
 		let s = "";
-		if (c.name !== "TeamSpeakUser")
-			s = c.name + "@";
-		s += c.address;
-		if (c.channel !== undefined)
-			s += "/" + c.channel;
+		if (connect.name !== "TeamSpeakUser")
+			s = connect.name + "@";
+		s += connect.address;
+		if (connect.channel !== undefined)
+			s += "/" + connect.channel;
+		else if (connect.channelId !== undefined)
+			s += "//" + connect.channelId;
 		return s;
 	} else {
-		return JSON.stringify(c);
+		return JSON.stringify(connect);
 	}
 }
 

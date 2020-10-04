@@ -25,12 +25,6 @@
 	let connectData = new ConnectData("", "");
 
 	$: {
-		ui.showSidebar = showSidebar;
-		ui.showDescription = showDescription;
-		app.transientSettings.save();
-	}
-
-	$: {
 		columnStyle = "";
 		if (showSidebar) columnStyle += " var(--channel-tree-width)";
 		else columnStyle += " 0";
