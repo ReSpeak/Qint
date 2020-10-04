@@ -9,6 +9,7 @@ use actix_web_actors::ws;
 use anyhow::{bail, format_err, Error, Result};
 use futures::prelude::*;
 use slog::{debug, error, o, warn, Logger};
+use tauri::WebviewMut;
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
 use tsclientlib::events::Event as TsEvent;
@@ -24,7 +25,7 @@ use tsproto_types::crypto::EccKeyPubP256;
 
 use crate::book_events::{ClientUpdate, JsM2B};
 use crate::db::{ChannelListMsg, ChatId, ChatType, SetClientVolumeMsg};
-use crate::messages::{self, MessageF2P, MessageP2F};
+use crate::messages::{self, MessageF2P, MessageP2F, TauriWsF2P};
 use crate::{audio, book_events, db, ConnectionId, State, Tristate, WsFormat, WsOptions};
 
 /// A websocket connection
@@ -38,6 +39,7 @@ pub(crate) struct Ws {
 	channel_list_finished_msg: Option<ChannelListMsg>,
 	file_downloads: HashMap<FileTransferHandle, oneshot::Sender<Result<FileDownloadResult>>>,
 
+	tauri: Option<WebviewMut>,
 	websocket_closed: bool,
 	self_talking: bool,
 	talkers: Vec<(ClientId, bool)>,
@@ -61,6 +63,8 @@ pub(crate) struct SetOutputMutedMsg(pub Tristate);
 pub(crate) struct SetAwayMsg(pub Tristate);
 pub(crate) struct DisconnectMsg;
 pub(crate) struct SetChannelListMsgMsg(pub ChannelListMsg);
+// Tauri
+pub(crate) struct HandleWsMessageMsg(pub TauriWsF2P);
 
 pub(crate) struct DownloadFile {
 	pub channel: ChannelId,
@@ -120,13 +124,20 @@ impl Message for DisconnectMsg {
 impl Message for SetChannelListMsgMsg {
 	type Result = ();
 }
+impl Message for HandleWsMessageMsg {
+	type Result = ();
+}
 impl Message for DownloadFile {
 	/// The size of the file and the stream
 	type Result = Result<(u64, TcpStream, EccKeyPubP256)>;
 }
 
 impl Ws {
-	pub fn new(logger: Logger, state: Arc<State>, options: WsOptions, id: ConnectionId) -> Self {
+	pub fn new(
+		logger: Logger, state: Arc<State>, options: WsOptions, id: ConnectionId,
+		tauri: Option<WebviewMut>,
+	) -> Self
+	{
 		let logger = logger.new(o!("id" => id.0.to_string()));
 		Self {
 			logger,
@@ -138,6 +149,7 @@ impl Ws {
 			channel_list_finished_msg: None,
 			file_downloads: Default::default(),
 
+			tauri,
 			websocket_closed: false,
 			self_talking: false,
 			talkers: Default::default(),
@@ -285,23 +297,21 @@ impl Ws {
 								events"; "error" => %e);
 						}
 
-						self.send_message(
-							&MessageP2F::Events(
-								events
-									.into_iter()
-									.filter_map(|e| {
-										if let Some(e) = book_events::convert_event(data, &e) {
-											Some(e)
-										} else {
-											warn!(self.logger, "Event could not be converted for \
-												frontend"; "event" => ?e);
-											None
-										}
-									})
-									.collect(),
-							),
-							ctx,
+						let msg = &MessageP2F::Events(
+							events
+								.into_iter()
+								.filter_map(|e| {
+									if let Some(e) = book_events::convert_event(data, &e) {
+										Some(e)
+									} else {
+										warn!(self.logger, "Event could not be converted for \
+											frontend"; "event" => ?e);
+										None
+									}
+								})
+								.collect(),
 						);
+						self.send_message(msg, ctx);
 					}
 				}
 			}
@@ -561,10 +571,15 @@ impl Ws {
 		}
 	}
 
-	fn send_message(&self, msg: &MessageP2F, ctx: &mut <Self as Actor>::Context) {
-		match self.options.format {
-			WsFormat::Msgpack => ctx.binary(rmp_serde::to_vec(msg).unwrap()),
-			WsFormat::Json => ctx.text(serde_json::to_string(msg).unwrap()),
+	fn send_message(&mut self, msg: &MessageP2F, ctx: &mut <Self as Actor>::Context) {
+		if let Some(tauri) = &mut self.tauri {
+			tauri::event::emit(tauri, "websocket", Some(serde_json::to_string(msg).unwrap()))
+				.expect("Failed to emit websocket message");
+		} else {
+			match self.options.format {
+				WsFormat::Msgpack => ctx.binary(rmp_serde::to_vec(msg).unwrap()),
+				WsFormat::Json => ctx.text(serde_json::to_string(msg).unwrap()),
+			}
 		}
 	}
 
@@ -715,9 +730,7 @@ impl Handler<GetClientVolumeMsg> for Ws {
 		if let Some(con) = &self.connection {
 			match con.get_state() {
 				Ok(state) => {
-					let uid_fut: Box<
-						dyn ActorFuture<Actor = Self, Output = Result<Uid>> + Unpin,
-					>;
+					let uid_fut: Box<dyn ActorFuture<Actor = Self, Output = Result<Uid>> + Unpin>;
 					if let Some(client) = state.clients.get(&client) {
 						uid_fut = Box::new(wrap_future(future::ready(
 							client
@@ -885,6 +898,19 @@ impl Handler<SetChannelListMsgMsg> for Ws {
 	type Result = ();
 	fn handle(&mut self, msg: SetChannelListMsgMsg, _: &mut Self::Context) -> Self::Result {
 		self.channel_list_finished_msg = Some(msg.0);
+	}
+}
+
+impl Handler<HandleWsMessageMsg> for Ws {
+	type Result = ();
+	fn handle(&mut self, msg: HandleWsMessageMsg, ctx: &mut Self::Context) -> Self::Result {
+		match msg.0 {
+			TauriWsF2P::Msg(msg) => self.handle_ws_message(msg, ctx),
+			TauriWsF2P::Close => {
+				self.websocket_closed = true;
+				self.disconnect(ctx);
+			}
+		}
 	}
 }
 

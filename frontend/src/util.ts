@@ -42,6 +42,21 @@ export function flash(element: HTMLElement) {
 	});
 }
 
+// See https://jsperf.com/node-uuid-performance/64 about how to generate a uuid fast
+export function createUuidV4(): string {
+	const d2h: string[] = [], vals = new Array(16);
+	for (let i = 0; i < 256; ++i) d2h.push((0x100 + i).toString(16).substr(1));
+
+	for (let i = 0; i < 16; ++i) vals[i] = Math.random() * 256 | 0;
+	vals[6] = vals[6] & 0x0f | 0x40;
+	vals[8] = vals[8] & 0x3f | 0x80;
+	return d2h[vals[0]] + d2h[vals[1]] + d2h[vals[2]] + d2h[vals[3]] +
+		'-' + d2h[vals[4]] + d2h[vals[5]] +
+		'-' + d2h[vals[6]] + d2h[vals[7]] +
+		'-' + d2h[vals[8]] + d2h[vals[9]] +
+		'-' + d2h[vals[10]] + d2h[vals[11]] + d2h[vals[12]] + d2h[vals[13]] + d2h[vals[14]] + d2h[vals[15]];
+}
+
 export function assert(condition: any, message: string, ...data: any[]): asserts condition {
 	if (debug === false) return;
 	console.assert(condition, message, ...data);

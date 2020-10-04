@@ -1,5 +1,7 @@
 import { BrowserBackend } from "./browser";
+import { TauriBackend } from "./tauri";
 import { InMsg, OutMsg } from "./ws";
+import { IS_TAURI } from "../util";
 
 export type errorFn = (err: string) => void;
 export type msgFn = (msg: InMsg) => void;
@@ -28,4 +30,4 @@ export interface IFetchLike {
 	text(): Promise<string>;
 }
 
-export const backend: IBackend = new BrowserBackend();
+export const backend: IBackend = /*IS_TAURI ? new TauriBackend() :*/ new BrowserBackend();

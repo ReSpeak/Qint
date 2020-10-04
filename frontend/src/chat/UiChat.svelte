@@ -180,7 +180,7 @@
 					{#if sel.node instanceof Client}
 						<ClientName client={sel.node} />
 					{:else if sel.node instanceof Channel}
-						<span> your Channel</span>
+						<span> your channel</span>
 					{:else if sel.node instanceof Server}
 						<ServerName connection={sel.connection} />
 					{/if}

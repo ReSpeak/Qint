@@ -11,7 +11,7 @@ use std::fs;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{mpsc, Arc, Mutex, RwLock};
 
 use actix::*;
 use actix_cors::Cors;
@@ -310,7 +310,7 @@ async fn create_ws(
 		);
 	}
 
-	let ws_con = Ws::new(state.logger.clone(), (**state).clone(), options.0, id);
+	let ws_con = Ws::new(state.logger.clone(), (**state).clone(), options.0, id, None);
 	match ws::start_with_addr(ws_con, &req, stream) {
 		Err(e) => {
 			error!(state.logger, "Failed to create websocket actor"; "error" => %e);
@@ -348,28 +348,32 @@ async fn audio_reset(state: web::Data<Arc<State>>) -> impl Responder {
 	}
 }
 
-#[get("/plugins")]
-async fn list_plugins(state: web::Data<Arc<State>>) -> impl Responder {
+fn list_plugins_intern(state: &State) -> Vec<String> {
 	let path = &state.settings.read().unwrap().plugin_path;
 	let mut res = Vec::new();
 	let dir = match path.read_dir() {
 		Ok(r) => r,
 		Err(e) => {
 			warn!(state.logger, "Failed to list plugins"; "dir" => ?path, "error" => %e);
-			return std::io::Result::<_>::Ok(web::Json(Vec::new()));
+			return Vec::new();
 		}
 	};
 	for p in dir {
-		if let Ok(p) = p?.file_name().into_string() {
+		if let Some(p) = p.ok().and_then(|p| p.file_name().into_string().ok()) {
 			res.push(p);
 		}
 	}
-	Ok(web::Json(res))
+	res
+}
+
+#[get("/plugins")]
+async fn list_plugins(state: web::Data<Arc<State>>) -> impl Responder {
+	web::Json(list_plugins_intern(&**state))
 }
 
 #[get("/plugins/{name}")]
-async fn get_plugin(state: web::Data<Arc<State>>, data: web::Path<String>) -> impl Responder {
-	let path = state.settings.read().unwrap().plugin_path.join(&*data);
+async fn get_plugin(state: web::Data<Arc<State>>, name: web::Path<String>) -> impl Responder {
+	let path = state.settings.read().unwrap().plugin_path.join(&*name);
 	fs::read_to_string(path)
 		.with_header(http::header::CONTENT_TYPE, "application/javascript; charset=utf-8")
 }
@@ -457,40 +461,58 @@ async fn download_cache_file(
 	}
 }
 
+fn get_transient_setting_internal(
+	state: &State, req: &str,
+) -> Option<Value> {
+	let transient_values = state.transient_settings.read().unwrap();
+	if req == "*" {
+		Some(serde_json::to_value(&*transient_values).unwrap())
+	} else if let Some(value) = transient_values.fields.get(req) {
+		Some(value.clone())
+	} else {
+		None
+	}
+}
+
 #[get("/transient/{key}")]
 async fn get_transient_setting(
 	state: web::Data<Arc<State>>, data: web::Path<String>,
 ) -> impl Responder {
-	let transient_values = state.transient_settings.read().unwrap();
-	let req = data.as_str();
-	if req == "*" {
-		HttpResponse::Ok().json(&*transient_values)
-	} else if let Some(value) = transient_values.fields.get(req) {
-		HttpResponse::Ok().json(value)
+	if let Some(res) = get_transient_setting_internal(&**state, data.as_str()) {
+		HttpResponse::Ok().json(res)
 	} else {
-		HttpResponse::NotFound().body("Unknown key".to_string())
+		HttpResponse::NotFound().body("Unknown key")
 	}
+}
+
+fn set_transient_setting_internal(
+	state: &State, req: &str, body: Value,
+) -> Result<()> {
+	state.modify_transient_settings(|transient_values| {
+		if req == "*" {
+			if let Value::Object(obj) = body {
+				for (k, v) in obj.into_iter() {
+					transient_values.set(k, v);
+				}
+			} else {
+				bail!("*-assign must be an object");
+			}
+		} else {
+			transient_values.set(req.to_string(), body);
+		}
+		Ok(())
+	})
 }
 
 #[put("/transient/{key}")]
 async fn set_transient_setting(
 	state: web::Data<Arc<State>>, data: web::Path<String>, body: web::Json<Value>,
 ) -> impl Responder {
-	let req = data.as_str();
-	state.modify_transient_settings(|transient_values| {
-		if req == "*" {
-			if let Value::Object(obj) = body.0 {
-				for (k, v) in obj.into_iter() {
-					transient_values.set(k, v);
-				}
-			} else {
-				return HttpResponse::BadRequest().body("*-assign must be an object".to_string());
-			}
-		} else {
-			transient_values.set(req.to_string(), body.0);
-		}
+	if let Err(e) = set_transient_setting_internal(&**state, data.as_str(), body.0) {
+		HttpResponse::BadRequest().body(e.to_string())
+	} else {
 		HttpResponse::Ok().finish()
-	})
+	}
 }
 
 fn merge_json(a: &mut Value, b: &Value) {
@@ -513,6 +535,45 @@ fn merge_json(a: &mut Value, b: &Value) {
 				*a = b.clone();
 			}
 		}
+	}
+}
+
+/// Handle http requests made through the tauri interface.
+async fn handle_tauri_request(
+	state: &Arc<State>, req: messages::TauriHttpRequest,
+) -> Result<messages::TauriHttpResponse> {
+	use messages::{TauriHttpRequest, TauriHttpResponse};
+
+	match req {
+		TauriHttpRequest::RunShortcut(action) => {
+			action.run(state).await;
+			Ok(TauriHttpResponse::Void())
+		}
+		TauriHttpRequest::ListPlugins() => {
+			Ok(TauriHttpResponse::PluginList(list_plugins_intern(&*state)))
+		}
+		TauriHttpRequest::GetPlugin(name) => {
+			let path = state.settings.read().unwrap().plugin_path.join(&name);
+			Ok(TauriHttpResponse::Plugin(fs::read_to_string(path)?))
+		}
+		TauriHttpRequest::DownloadFile { connection, channel, path } => {
+			let _ = (connection, channel, path);
+			Ok(TauriHttpResponse::Void())
+		}
+		TauriHttpRequest::DownloadCacheFile { server, channel, path } => {
+			let _ = (server, channel, path);
+			Ok(TauriHttpResponse::Void())
+		}
+		TauriHttpRequest::GetTransientSetting(name) => {
+			Ok(TauriHttpResponse::TransientSetting(get_transient_setting_internal(state, &name)))
+		}
+		TauriHttpRequest::SetTransientSetting(name, content) => {
+			set_transient_setting_internal(state, &name, content)?;
+			Ok(TauriHttpResponse::Void())
+		}
+		TauriHttpRequest::Graphql(req) => Ok(TauriHttpResponse::Graphql(serde_json::to_value(
+			db::graphql::db_graphql_intern(&*state, &req).await,
+		)?)),
 	}
 }
 
@@ -672,78 +733,128 @@ impl App {
 		}
 
 		if !args.tauri {
+			let state2 = state.clone();
+			let state3 = state.clone();
 			tauri::AppBuilder::new()
-				.setup(|webview, _source| {
-					let mut webview = webview.as_mut();
-					tauri::event::listen(String::from("get_motd"), move |msg| {
-						println!("got js-event with message '{:?}'", msg);
-						let reply = "something else".to_string();
+				.setup(move |webview, _source| {
+					let webview = webview.as_mut();
+					let state = state2.clone();
+					tauri::event::listen("websocket", move |msg| {
+						let msg = if let Some(msg) = msg {
+							msg
+						} else {
+							error!(state.logger, "No message for websocket event");
+							return;
+						};
+						let msg: messages::TauriWsEventF2P = match serde_json::from_str(&msg) {
+							Ok(r) => r,
+							Err(e) => {
+								error!(state.logger, "Failed to parse websocket event";
+									"error" => %e);
+								return;
+							}
+						};
+						if msg.connection.is_nil() {
+							error!(state.logger, "Nil uuid is not allowed as connection id");
+							return;
+						}
+						let id = ConnectionId(msg.connection);
 
-						tauri::event::emit(&mut webview, String::from("get_motd"), Some(reply))
-							.expect("failed to emit");
+						let con;
+						{
+							let mut cons = state.connections.lock().unwrap();
+							let entry = cons.entry(id.clone());
+							con = entry
+								.or_insert_with(|| {
+									// Create connection
+									let options = WsOptions { format: WsFormat::Json };
+									let con = Ws::new(
+										state.logger.clone(),
+										state.clone(),
+										options,
+										id,
+										Some(webview.clone()),
+									);
+									panic!()
+									//con.start() TODO
+								})
+								.clone();
+						}
+						let logger = state.logger.clone();
+						actix::spawn(con.send(websocket::HandleWsMessageMsg(msg.msg)).map(
+							move |r| match r {
+								Err(e) => {
+									error!(logger, "Failed to handle websocket message";
+										"error" => %e);
+								}
+								Ok(()) => {}
+							},
+						));
 					});
 				})
-				.invoke_handler(|_webview, arg| {
-					#[derive(Deserialize)]
-					#[serde(tag = "cmd", rename_all = "camelCase")]
-					pub enum Cmd {
-						// note that rename_all = "camelCase": you need to use "myCustomCommand" on JS
-						MyCustomCommand { argument: String },
-					}
-					match serde_json::from_str(arg) {
-						Err(e) => Err(e.to_string()),
+				.invoke_handler(move |webview, arg| {
+					match serde_json::from_str::<messages::TauriHttpRequestWrapper>(arg) {
+						Err(e) => Err(format!("Failed to parse message {}", e)),
 						Ok(command) => {
-							match command {
-								// Definitions for your custom commands from Cmd here
-								Cmd::MyCustomCommand { argument } => {
-									//  your command code
-									println!("{}", argument);
-								}
-							}
+							let req = command.req;
+							let state = state3.clone();
+							tauri::execute_promise(
+								webview,
+								move || {
+									let (send, recv) = mpsc::channel();
+									actix::spawn(async move {
+										let r = handle_tauri_request(&state, req).await;
+										let _ = send.send(r);
+									});
+									Ok(recv.recv()??)
+								},
+								command.callback,
+								command.error,
+							);
 							Ok(())
 						}
 					}
 				})
 				.build()
 				.run();
-		}
-
-		let state2 = state.clone();
-		HttpServer::new(move || {
-			let state = state2.clone();
-			actix_web::App::new()
-				.wrap(Cors::new().max_age(3600).finish())
-				.data(state)
-				.service(create_ws)
-				.service(run_shortcut)
-				.service(audio_reset)
-				.service(list_plugins)
-				.service(get_plugin)
-				.service(download_file)
-				.service(download_cache_file)
-				.service(get_transient_setting)
-				.service(set_transient_setting)
-				.service(db::graphql::db_graphql)
-				.service(db::graphql::graphiql)
-				.service(Files::new("", "../frontend/public/").index_file("index.html"))
-				.wrap_fn(|req, srv| {
-					let fut = srv.call(req);
-					async {
-						let mut res = fut.await?;
-						let headers = res.headers_mut();
-						if headers.contains_key(ETAG) {
-							headers.insert(
-								CACHE_CONTROL,
-								HeaderValue::from_static("no-cache,must-revalidate"),
-							);
+		} else {
+			let state2 = state.clone();
+			HttpServer::new(move || {
+				let state = state2.clone();
+				actix_web::App::new()
+					.wrap(Cors::new().max_age(3600).finish())
+					.data(state)
+					.service(create_ws)
+					.service(run_shortcut)
+					.service(audio_reset)
+					.service(list_plugins)
+					.service(get_plugin)
+					.service(download_file)
+					.service(download_cache_file)
+					.service(get_transient_setting)
+					.service(set_transient_setting)
+					.service(db::graphql::db_graphql)
+					.service(db::graphql::graphiql)
+					.service(Files::new("", "../frontend/public/").index_file("index.html"))
+					.wrap_fn(|req, srv| {
+						let fut = srv.call(req);
+						async {
+							let mut res = fut.await?;
+							let headers = res.headers_mut();
+							if headers.contains_key(ETAG) {
+								headers.insert(
+									CACHE_CONTROL,
+									HeaderValue::from_static("no-cache,must-revalidate"),
+								);
+							}
+							Ok(res)
 						}
-						Ok(res)
-					}
-				})
-		})
-		.bind(addr)?
-		.run()
-		.await?;
+					})
+			})
+			.bind(addr)?
+			.run()
+			.await?;
+		}
 
 		// Quit all connections
 		info!(state.logger, "Closing remaining connections");

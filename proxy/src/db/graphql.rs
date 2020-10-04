@@ -9,7 +9,7 @@ use anyhow::format_err;
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use juniper::http::graphiql::graphiql_source;
-use juniper::http::GraphQLRequest;
+use juniper::http::{GraphQLRequest, GraphQLResponse};
 use juniper::{EmptySubscription, FieldError, RootNode, ID};
 use tsproto_types::crypto::EccKeyPubP256;
 
@@ -74,11 +74,15 @@ pub async fn graphiql() -> impl Responder {
 	HttpResponse::Ok().content_type("text/html; charset=utf-8").body(graphiql_source("/db", None))
 }
 
+pub(crate) async fn db_graphql_intern<'a>(state: &'a State, req: &'a GraphQLRequest) -> GraphQLResponse<'a> {
+	req.execute(&state.graphql_schema, state).await
+}
+
 #[post("/db")]
 pub(crate) async fn db_graphql(
-	state: web::Data<Arc<State>>, data: web::Json<GraphQLRequest>,
+	state: web::Data<Arc<State>>, req: web::Json<GraphQLRequest>,
 ) -> Result<impl Responder> {
-	let res = data.execute(&state.graphql_schema, &*state).await;
+	let res = req.execute(&state.graphql_schema, &*state).await;
 	let json_res = serde_json::to_string(&res)?;
 	let mut resp = if res.is_ok() { HttpResponse::Ok() } else { HttpResponse::BadRequest() };
 	Ok(resp.content_type("application/json").body(json_res))
