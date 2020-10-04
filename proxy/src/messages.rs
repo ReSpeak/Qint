@@ -17,6 +17,12 @@ pub enum MessageF2P {
 	SetLoudnessThreshold(f64),
 	/// Ask the proxy to send loudness data or not.
 	SubscribeLoudness(bool),
+	/// Change the volume of a client.
+	SetClientVolume {
+		/// Client uid
+		client: Vec<u8>,
+		volume: f32,
+	},
 	/// Change something in the book.
 	Change(JsM2B),
 }

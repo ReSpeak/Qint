@@ -21,6 +21,7 @@
 	$: clientRaw = connection.book.clients.get(clientId)!;
 	$: client = $clientRaw;
 	$: avatarPath = getClientAvatarPath($client, connection);
+	$: ownClient = clientId === connection.book.ownClientId;
 	//let onlineSince: Moment; TODO
 
 	interface ExtendedGroup {
@@ -160,10 +161,12 @@
 				<span>Ban</span>
 			</button>
 		</p>
-		<div class="dataLine">
-			<div>Volume:</div>
-			<ClientVolume {client} {connection} />
-		</div>
+		{#if !ownClient}
+			<div class="dataLine">
+				<div>Volume:</div>
+				<ClientVolume {client} {connection} />
+			</div>
+		{/if}
 	</div>
 </StickyList>
 

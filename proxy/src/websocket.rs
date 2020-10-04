@@ -23,7 +23,7 @@ use tsproto_packets::packets::{AudioData, OutPacket};
 use tsproto_types::crypto::EccKeyPubP256;
 
 use crate::book_events::{ClientUpdate, JsM2B};
-use crate::db::{ChannelListMsg, ChatId, ChatType};
+use crate::db::{ChannelListMsg, ChatId, ChatType, SetClientVolumeMsg};
 use crate::messages::{self, MessageF2P, MessageP2F};
 use crate::{audio, book_events, db, ConnectionId, State, Tristate, WsFormat, WsOptions};
 
@@ -51,10 +51,8 @@ pub(crate) struct GetClientVolumeMsg(pub ClientId);
 /// Audio detection tells us if we are talking.
 pub(crate) struct SetSelfTalkingMsg(pub bool);
 pub(crate) struct TalkersChangedMsg(pub Vec<(ClientId, bool)>);
-pub(crate) struct SaveClientMsg(pub Uid);
 pub(crate) struct SendPacketMsg(pub OutPacket);
 pub(crate) struct CaptureLoudnessMsg(pub f64);
-pub(crate) struct SetVolumeMsg(pub Uid, pub f32);
 #[derive(Clone)]
 pub(crate) struct SetInputMutedMsg(pub Tristate);
 #[derive(Clone)]
@@ -101,16 +99,10 @@ impl Message for SetSelfTalkingMsg {
 impl Message for TalkersChangedMsg {
 	type Result = ();
 }
-impl Message for SaveClientMsg {
-	type Result = Result<()>;
-}
 impl Message for SendPacketMsg {
 	type Result = Result<PacketId>;
 }
 impl Message for CaptureLoudnessMsg {
-	type Result = ();
-}
-impl Message for SetVolumeMsg {
 	type Result = ();
 }
 impl Message for SetInputMutedMsg {
@@ -471,6 +463,52 @@ impl Ws {
 					));
 				}
 			}
+			MessageF2P::SetClientVolume { client, volume } => {
+				let client = Uid(client);
+
+				if let Some(con) = &self.connection {
+					if let Ok(state) = con.get_state() {
+						let mut created = false;
+						for c in state.clients.values() {
+							if c.uid.as_ref() == Some(&client) {
+								let id = (self.id, c.id);
+								self.send_to_ts2a(audio::ts_to_audio::SetVolumeMsg(id, volume));
+								if !created {
+									created = true;
+									if let Err(e) = db::DbHandler::create_client(
+										&self.logger,
+										&self.state,
+										con,
+										state,
+										c,
+									) {
+										error!(self.logger, "Failed to create client in database";
+											"error" => %e);
+									}
+								}
+							}
+						}
+					} else {
+						error!(self.logger, "Connection is not connected")
+					}
+				} else {
+					error!(self.logger, "Connection does not exist")
+				}
+
+				let logger = self.logger.clone();
+				actix::spawn(self.state.database.send(SetClientVolumeMsg(client, volume)).map(
+					move |r| match r {
+						Ok(Ok(())) => {}
+						Ok(Err(e)) => {
+							error!(logger, "Failed to update volume in database"; "error" => %e);
+						}
+						Err(e) => {
+							error!(logger, "Failed to send volume update to database";
+								"error" => %e);
+						}
+					},
+				));
+			}
 			MessageF2P::SendMessage { target, message } => {
 				self.send_chat_message(target, message);
 			}
@@ -678,14 +716,14 @@ impl Handler<GetClientVolumeMsg> for Ws {
 			match con.get_state() {
 				Ok(state) => {
 					let uid_fut: Box<
-						dyn ActorFuture<Actor = Self, Output = Result<Vec<u8>>> + Unpin,
+						dyn ActorFuture<Actor = Self, Output = Result<Uid>> + Unpin,
 					>;
 					if let Some(client) = state.clients.get(&client) {
 						uid_fut = Box::new(wrap_future(future::ready(
 							client
 								.uid
 								.as_ref()
-								.map(|u| u.0.clone())
+								.map(|u| u.clone())
 								.ok_or_else(|| format_err!("Client has no uid")),
 						)));
 					} else {
@@ -748,22 +786,6 @@ impl Handler<TalkersChangedMsg> for Ws {
 	}
 }
 
-impl Handler<SaveClientMsg> for Ws {
-	type Result = Result<()>;
-	fn handle(&mut self, SaveClientMsg(uid): SaveClientMsg, _: &mut Self::Context) -> Self::Result {
-		if let Some(con) = &mut self.connection {
-			let state = con.get_state()?;
-			if let Some(client) = state.clients.values().find(|c| c.uid.as_ref() == Some(&uid)) {
-				db::DbHandler::create_client(&self.logger, &self.state, con, state, client)
-			} else {
-				bail!("Client not found")
-			}
-		} else {
-			bail!("Connection does not exist")
-		}
-	}
-}
-
 impl Handler<CaptureLoudnessMsg> for Ws {
 	type Result = ();
 	fn handle(
@@ -782,28 +804,6 @@ impl Handler<SendPacketMsg> for Ws {
 			Ok(con.get_tsproto_client_mut()?.send_packet(packet)?)
 		} else {
 			bail!("Connection does not exist")
-		}
-	}
-}
-
-impl Handler<SetVolumeMsg> for Ws {
-	type Result = ();
-	fn handle(
-		&mut self, SetVolumeMsg(client, volume): SetVolumeMsg, _: &mut Self::Context,
-	) -> Self::Result {
-		if let Some(con) = &self.connection {
-			if let Ok(state) = con.get_state() {
-				for c in state.clients.values() {
-					if c.uid.as_ref() == Some(&client) {
-						let id = (self.id, c.id);
-						self.send_to_ts2a(audio::ts_to_audio::SetVolumeMsg(id, volume));
-					}
-				}
-			} else {
-				error!(self.logger, "Connection is not connected")
-			}
-		} else {
-			error!(self.logger, "Connection does not exist")
 		}
 	}
 }

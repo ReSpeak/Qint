@@ -215,12 +215,13 @@ impl Default for Settings {
 impl juniper::Context for State {}
 
 impl State {
-	fn modify_transient_settings<T: FnOnce(&mut TransientSettings)>(&self, f: T) {
+	fn modify_transient_settings<R, T: FnOnce(&mut TransientSettings) -> R>(&self, f: T) -> R {
 		let mut settings = self.transient_settings.write().unwrap();
-		f(&mut *settings);
+		let r = f(&mut *settings);
 		if let Err(e) = settings.save(&self.settings.read().unwrap().config_path) {
 			error!(self.logger, "Failed to save transient settings"; "error" => %e);
 		}
+		r
 	}
 }
 
@@ -241,6 +242,7 @@ impl TransientSettings {
 		fs::write(&config_path.join(TRANSIENT_SETTINGS_FILENAME), data)?;
 		Ok(())
 	}
+
 	fn set(&mut self, k: String, v: Value) {
 		if let Value::Null = v {
 			self.fields.remove(&k);
@@ -253,9 +255,11 @@ impl TransientSettings {
 		}
 	}
 
+	// TODO Should be part of the settings, not transient settings
 	fn get_loudness_threshold(&self) -> Option<f64> {
 		self.fields.get("loudness_threshold").and_then(|v| v.as_f64())
 	}
+
 	fn set_loudness_threshold(&mut self, value: Option<f64>) {
 		if let Some(value) = value {
 			self.fields.insert("loudness_threshold".into(), value.into());
@@ -473,24 +477,20 @@ async fn set_transient_setting(
 	state: web::Data<Arc<State>>, data: web::Path<String>, body: web::Json<Value>,
 ) -> impl Responder {
 	let req = data.as_str();
-	if req == "*" && !body.0.is_object() {
-		HttpResponse::Forbidden().body("*-assign must be an object".to_string())
-	} else {
-		state.modify_transient_settings(|transient_values| {
-			if req == "*" {
-				if let Value::Object(obj) = body.0 {
-					for (k, v) in obj.into_iter() {
-						transient_values.set(k, v);
-					}
-				} else {
-					panic!("Should be object (see 'if' check above)");
+	state.modify_transient_settings(|transient_values| {
+		if req == "*" {
+			if let Value::Object(obj) = body.0 {
+				for (k, v) in obj.into_iter() {
+					transient_values.set(k, v);
 				}
 			} else {
-				transient_values.set(req.to_string(), body.0);
+				return HttpResponse::BadRequest().body("*-assign must be an object".to_string());
 			}
-		});
+		} else {
+			transient_values.set(req.to_string(), body.0);
+		}
 		HttpResponse::Ok().finish()
-	}
+	})
 }
 
 fn merge_json(a: &mut Value, b: &Value) {

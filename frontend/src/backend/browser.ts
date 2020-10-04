@@ -32,10 +32,6 @@ export class BrowserBackendConnection implements IBackendConnection {
 		this.id = BrowserBackendConnection.createUuidV4();
 	}
 
-	getGuidTmpHack(): string {
-		return this.id;
-	}
-
 	public send(data: OutMsg): void {
 		if (this.socket)
 			this.socket.send(JSON.stringify(data));

@@ -21,7 +21,6 @@ export interface IBackendConnection {
 		onError: errorFn,
 		onClose: closedFn): Promise<void>;
 	close(): void;
-	getGuidTmpHack(): string;
 }
 
 export interface IFetchLike {

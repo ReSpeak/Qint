@@ -42,6 +42,8 @@ yarn run build
 ```bash
 cd Qint/proxy
 env RUST_LOG=debug cargo run -- -t
+# For release builds
+cago build --release
 ```
 
 To activate logging for audio, use e.g. `RUST_LOG=debug,qint_proxy::audio::audio_to_ts=trace`.

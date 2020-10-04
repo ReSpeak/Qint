@@ -7,7 +7,7 @@ type FilterFlags<Base, Condition> = {
 };
 type AllowedNames<Base, Condition> = FilterFlags<Base, Condition>[keyof Base];
 type SubType<Base, Condition> = Pick<Base, AllowedNames<Base, Condition>>;
-type SettGroup = NonNullable<keyof SubType<TransientSettings, Function>>;
+export type SettGroup = NonNullable<keyof SubType<TransientSettings, Function>>;
 
 export class TransientSettings {
 	private _syncDebounceTimer: number | undefined;

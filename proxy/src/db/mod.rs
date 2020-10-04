@@ -54,7 +54,9 @@ pub struct GetIdentityAndServerMsg {
 	pub address: String,
 }
 #[derive(Clone, Debug)]
-pub struct GetClientVolumeMsg(pub Vec<u8>);
+pub struct GetClientVolumeMsg(pub Uid);
+#[derive(Clone, Debug)]
+pub struct SetClientVolumeMsg(pub Uid, pub f32);
 pub struct UpdateIdentityMsg(pub Identity);
 struct RunOnDbMsg<I: 'static, E: 'static, F: FnOnce(&mut DbHandler) -> result::Result<I, E>>(F);
 
@@ -121,6 +123,9 @@ impl Message for GetIdentityAndServerMsg {
 }
 impl Message for GetClientVolumeMsg {
 	type Result = Result<Option<f32>>;
+}
+impl Message for SetClientVolumeMsg {
+	type Result = Result<()>;
 }
 impl<I: 'static, E: 'static, F: FnOnce(&mut DbHandler) -> result::Result<I, E>> Message
 	for RunOnDbMsg<I, E, F>
@@ -384,7 +389,21 @@ impl Handler<GetClientVolumeMsg> for DbHandler {
 	type Result = Result<Option<f32>>;
 	fn handle(&mut self, msg: GetClientVolumeMsg, _: &mut Self::Context) -> Self::Result {
 		use schema::clients::dsl::*;
-		Ok(clients.find(&msg.0).select(volume).first::<f32>(&self.con).optional()?)
+		Ok(clients.find(&msg.0.0).select(volume).first::<f32>(&self.con).optional()?)
+	}
+}
+
+impl Handler<SetClientVolumeMsg> for DbHandler {
+	type Result = Result<()>;
+	fn handle(&mut self, msg: SetClientVolumeMsg, _: &mut Self::Context) -> Self::Result {
+		use schema::clients::dsl::*;
+		let res = diesel::update(clients.find(&msg.0.0))
+			.set(volume.eq(msg.1))
+			.execute(&self.con)?;
+		if res != 1 {
+			bail!("Failed to find client in database");
+		}
+		Ok(())
 	}
 }
 

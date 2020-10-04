@@ -490,13 +490,12 @@ export class Client extends GraphQlClient implements ITreeNode, Readable<Client>
 		return getDataColor(this.uid)
 	}
 
-	public async updateVolume(connection: Connection, volume: number): Promise<void> {
-		await graphql(`mutation SetClientVolume($connection: [Int!]!, $client: [Int!]!, $volume: Float!) {
-			setClientVolume(connection: $connection, client: $client, volume: $volume) { void }
-		}`, {
-			connection: connection.backend?.getGuidTmpHack(),
-			client: this.uid,
-			volume,
+	public updateVolume(connection: Connection, volume: number) {
+		connection.sendMessage({
+			SetClientVolume: {
+				client: this.uid,
+				volume,
+			},
 		});
 	}
 
@@ -508,7 +507,8 @@ export class Client extends GraphQlClient implements ITreeNode, Readable<Client>
 		});
 		if (res.data) {
 			const volume = res.data.client.volume;
-			const scaledVol: number = volume === 0 ? 0 : Math.round(20 * Math.log10(volume));
+			// TODO Have a constant for the minimum volume
+			const scaledVol: number = volume === 0 ? -30 : Math.round(20 * Math.log10(volume));
 			this.volume.update(() => scaledVol);
 		}
 	}

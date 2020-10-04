@@ -24,6 +24,7 @@
 		} else {
 			$clientVolume = minVolume;
 		}
+		updateVolume();
 	}
 
 	function updateVolume() {

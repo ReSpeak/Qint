@@ -8,19 +8,15 @@ use actix_web::*;
 use anyhow::format_err;
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
-use futures::prelude::*;
 use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
 use juniper::{EmptySubscription, FieldError, RootNode, ID};
-use slog::error;
-use tsclientlib::Uid;
 use tsproto_types::crypto::EccKeyPubP256;
 
 use super::models::MessageStatus;
 use super::schema::bookmarks;
 use super::{models, schema, RunOnDbMsg};
-use crate::websocket::{SaveClientMsg, SetVolumeMsg};
-use crate::{ConnectionId, State};
+use crate::State;
 
 const BOOKMARKS_LIMIT: i64 = 20;
 const MESSAGES_LIMIT: i64 = 50;
@@ -800,52 +796,6 @@ impl Mutation {
 
 		if res == 0 {
 			return Err(format_err!("Bookmark not found").into());
-		}
-
-		Ok(Void::new())
-	}
-
-	/// Connection is the websocket uuid, client is the client uid.
-	async fn set_client_volume(
-		state: &State, connection: ID, client: Vec<i32>, volume: f64,
-	) -> GResult<Void> {
-		let connection = connection.parse()?;
-		let client = client.into_iter().map(|i| i as u8).collect::<Vec<_>>();
-		let uid = Uid(client.clone());
-		let volume = volume as f32;
-
-		let con;
-		{
-			let cons = state.connections.lock().unwrap();
-			if let Some(c) = cons.get(&ConnectionId(connection)) {
-				con = c.clone();
-			} else {
-				return Err(format_err!("Connection not found").into());
-			}
-		}
-		let logger = state.logger.clone();
-		actix::spawn(con.send(SetVolumeMsg(uid.clone(), volume)).map(move |r| {
-			if let Err(e) = r {
-				error!(logger, "Failed to set volume"; "error" => %e);
-			}
-		}));
-		con.send(SaveClientMsg(uid)).await??;
-
-		let res = state
-			.database
-			.send(RunOnDbMsg(move |db| {
-				use schema::clients;
-
-				let res = diesel::update(clients::table.filter(clients::uid.eq(&client)))
-					.set(clients::volume.eq(volume))
-					.execute(&db.con)?;
-
-				GResult::Ok(res)
-			}))
-			.await??;
-
-		if res == 0 {
-			return Err(format_err!("Client not found").into());
 		}
 
 		Ok(Void::new())

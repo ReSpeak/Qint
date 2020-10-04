@@ -7,6 +7,7 @@
 	import BDropDown from "../ui/BDropDown.svelte";
 	import BKeyValue from "../ui/BKeyValue.svelte";
 	import BSlider from "../ui/BSlider.svelte";
+	import type { SettGroup } from "../transientSettings";
 
 	export let connection: Connection;
 	let loudness = connection.loudness;
@@ -30,9 +31,12 @@
 		}, 100);
 	}
 
-	function syncSettings() {
-		app.transientSettings.save();
+	function syncSettings(group?: SettGroup) {
+		app.transientSettings.save(group);
 	}
+
+	// Reload settings
+	app.transientSettings.loadAsync();
 
 	// Text-to-Speech
 	const synth = window.speechSynthesis;
@@ -76,7 +80,7 @@
 					items={voices}
 					display={(v) => v.name}
 					bind:selected={synthSett.voice}
-					on:change={syncSettings} />
+					on:change={() => syncSettings("synth")} />
 			</BKeyValue>
 			<BKeyValue label="Speed" forLabel="{idUid}-ttsSpeed">
 				<BSlider
@@ -86,7 +90,7 @@
 					step={0.1}
 					bind:value={synthSett.speed}
 					tooltip={true}
-					on:change={syncSettings} />
+					on:change={() => syncSettings("synth")} />
 			</BKeyValue>
 			<BKeyValue label="Volume" forLabel="{idUid}-ttsVolume">
 				<BSlider
@@ -96,7 +100,7 @@
 					step={0.05}
 					bind:value={synthSett.volume}
 					tooltip={true}
-					on:change={syncSettings} />
+					on:change={() => syncSettings("synth")} />
 			</BKeyValue>
 			<BKeyValue label="Preview" narrow={false} forLabel="{idUid}-ttsPreview">
 				<div class="is-horizontal field">

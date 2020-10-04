@@ -132,7 +132,9 @@
 						({client.away_message})
 					{/if}
 				</div>
-				<ClientVolume client={$client} {connection} />
+				{#if !ownClient}
+					<ClientVolume client={$client} {connection} />
+				{/if}
 			</div>
 		{/if}
 	</div>

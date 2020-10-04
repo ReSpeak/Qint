@@ -12,9 +12,10 @@ export class ConnectData {
 		const sep = this.address.indexOf("/");
 		let address = this.address;
 		let channel = this.channelId === undefined ? undefined : "/" + this.channelId;
-		if (channel === undefined && sep !== -1) {
+		if (sep !== -1) {
 			address = this.address.slice(0, sep);
-			channel = this.address.slice(sep + 1);
+			if (channel === undefined)
+				channel = this.address.slice(sep + 1);
 		}
 		return {
 			Connect: {
