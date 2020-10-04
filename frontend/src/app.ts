@@ -7,6 +7,7 @@ import { loadPlugins, IPlugin } from "./plugins";
 import { OMsgConnect } from "./backend/ws";
 import { backend } from "./backend/backend";
 import { oneshot } from "./util";
+import { ConnectData } from "./connect/connect";
 
 export class App {
 	public readonly connections: Writable<Connection[]> = writable([]);
@@ -27,7 +28,8 @@ export class App {
 
 		this.selectedNode.subscribe(s => {
 			if (s !== undefined) {
-				backend.setTitle(s.connection.book.server.name + " – Qint");
+				const name = s.connection.book.server.name ?? s.connection.connectOptions.Connect.address;
+				backend.setTitle(name + " – Qint");
 			} else {
 				backend.setTitle("Qint");
 			}
@@ -54,7 +56,7 @@ export class App {
 		});
 	}
 
-	public connect(options: OMsgConnect): Connection {
+	public connect(options: ConnectData): Connection {
 		const con = new Connection(options);
 		oneshot(con.state, s => s.closed, () => {
 			this.connections.update(cs => {
@@ -75,7 +77,7 @@ export class NodeSelection {
 		public readonly connection: Connection,
 		public readonly node: ITreeNode) { }
 
-	public get uniqueStr(): string { 
+	public get uniqueStr(): string {
 		return `${this.node.qlType},${this.connection.book.server.uidStr},${this.node.qlId}`;
 	}
 }

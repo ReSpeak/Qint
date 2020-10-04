@@ -9,6 +9,7 @@
 	import { app } from "./app";
 	import Connect from "./connect/Connect.svelte";
 	import GlobalCss from "./GlobalCss.svelte";
+	import { ConnectData } from "./connect/connect";
 
 	const connections = app.connections;
 	let filter: string = "";
@@ -21,6 +22,7 @@
 	let showDescription = ui.showDescription;
 	let displayPanel = DisplayPanel.Connect;
 	let columnStyle = "";
+	let connectData = new ConnectData("", "");
 
 	$: {
 		ui.showSidebar = showSidebar;
@@ -34,13 +36,18 @@
 		else columnStyle += " 0";
 		columnStyle += " 1fr";
 	}
+
+	function showConnect(data: ConnectData) {
+		connectData = data;
+		displayPanel = DisplayPanel.Connect;
+	}
 </script>
 
 <div class="connected-container" style="grid-template-columns: {columnStyle}">
 	<!-- TODO Toolbar does not need connection -->
 	<Toolbar bind:showSidebar bind:showDescription bind:displayPanel />
 	<Searchbar bind:filter visible={showSidebar} />
-	<Sidebar {connections} {filter} visible={showSidebar} />
+	<Sidebar {connections} {filter} visible={showSidebar} {showConnect} />
 	<div class="panel">
 		{#if displayPanel === DisplayPanel.Main}
 			<UiChat {chat} />
@@ -51,7 +58,7 @@
 			<!-- TODO consider something better ? -->
 			<UiGlobalSettings connection={$connections[0]} />
 		{:else if displayPanel === DisplayPanel.Connect}
-			<Connect />
+			<Connect data={connectData} />
 		{/if}
 	</div>
 </div>

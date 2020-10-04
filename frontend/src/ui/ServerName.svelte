@@ -8,7 +8,7 @@
 
 {#if !$state.connected}
 	<span>
-		{connection.connectOptions.Connect.address}
+		{connection.connectOptions.address}
 	</span>
 {:else}
 	<span style={$server.color}>

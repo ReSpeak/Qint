@@ -8,13 +8,12 @@
 	import { Book, Channel } from "../book";
 	import UiChannel from "../tree/UiChannel.svelte";
 	import type { ChannelId } from "../ts";
-	import { SERVER_ICON, CLIENT_ICON, base64Decode, hexEncode } from "../util";
+	import { SERVER_ICON, CLIENT_ICON, base64Decode, hexEncode, on } from "../util";
 	import { app } from "../app";
 
-	let username = "";
-	let address = "";
-	let bookmark: number | undefined = undefined;
-	let channelId: number | undefined = undefined;
+	export let data: ConnectData;
+	$: address = data.address + (data.channel !== undefined ? "/" + data.channel :
+		(data.channelId !== undefined ? "//" + data.channelId : ""));
 	let addressInput!: HTMLInputElement;
 	// The channel part of the address, if empty, the channel popup will be hidden
 	let channelPart = "";
@@ -24,18 +23,32 @@
 	// The channels directly under the server, sub-channels are stored as children.
 	let channels: Channel[] = [];
 
+	$: on(address, changeChannels());
+
 	function onConnect() {
-		app.connect(new ConnectData(username, address, bookmark, channelId).toConnectMsg());
+		app.connect(data.clone());
 	}
 
 	function onNameChange() {
-		bookmark = undefined;
+		data.bookmark = undefined;
 	}
 
 	async function onAddressChange() {
-		bookmark = undefined;
-		channelId = undefined;
+		data.bookmark = undefined;
+		data.channelId = undefined;
+		changeChannels();
+	}
+
+	async function changeChannels() {
 		const sep = address.indexOf("/");
+		if (sep !== -1) {
+			data.address = address.slice(0, sep);
+			data.channel = address.slice(sep + 1);
+		} else {
+			data.address = address;
+			data.channel = undefined;
+		}
+
 		if (
 			sep !== -1 &&
 			addressInput.selectionStart !== null &&
@@ -75,10 +88,6 @@
 				}
 			);
 			if (query.data.serverByAddress !== null) {
-				console.log(
-					base64Decode(query.data.serverByAddress.uid),
-					hexEncode(base64Decode(query.data.serverByAddress.uid))
-				);
 				server = hexEncode(base64Decode(query.data.serverByAddress.uid));
 				let channels: Map<ChannelId, Channel> = new Map(
 					query.data.serverByAddress.channels.map((c: any) => {
@@ -123,37 +132,28 @@
 		addressInput.focus();
 		const recent = await Bookmark.getRecent();
 		if (recent) {
-			if (username === "")
-				username = recent.username ?? "";
+			if (data.name === "")
+				data.name = recent.username ?? "";
 			if (address === "") {
-				address = recent.address ?? "";
+				data.address = recent.address ?? "";
 				if (recent.channel !== null) {
-					address += "/" + recent.channel.fullPath;
-					channelId = Number(recent.channel.id);
+					data.channel = recent.channel.fullPath;
+					data.channelId = Number(recent.channel.id);
 				}
-				bookmark = Number(recent.id);
+				data.bookmark = Number(recent.id);
 			}
 		}
 	});
 </script>
 
 <div class="connect-container">
-	<!-- {#if error && $error}
-		<article class="connect-error message is-danger">
-			<div class="message-header">
-				<p>Error</p>
-				<button class="delete" aria-label="delete" on:click={() => error?.set(undefined)} />
-			</div>
-			<div class="message-body">{$error}</div>
-		</article>
-	{/if} -->
 	<div class="inner-connect-container">
 		<div class="connect-blur blur" />
 		<form class="connect-form blur-shade" on:submit|preventDefault={onConnect}>
 			<div>
 				<p class="control has-icons-left">
 					<input
-						bind:value={username}
+						bind:value={data.name}
 						on:input={onNameChange}
 						name="username"
 						id="username"

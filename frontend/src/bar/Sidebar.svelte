@@ -4,16 +4,18 @@
 	import StickyList from "../ui/StickyList.svelte";
 	import StickySlot from "../ui/StickySlot.svelte";
 	import { Connection } from "../connection";
+	import { ConnectData } from "../connect/connect";
 
 	export let connections: Writable<Connection[]>;
 	export let filter: string;
 	export let visible: boolean;
+	export let showConnect: (data: ConnectData) => void;
 </script>
 
 <aside class="sidebar" class:hidden={!visible}>
 	<StickyList>
 		{#each $connections as connection (connection.backend.id)}
-			<UiServer {connection} {filter} />
+			<UiServer {connection} {filter} {showConnect} />
 		{/each}
 
 		<StickySlot>Notifications</StickySlot>

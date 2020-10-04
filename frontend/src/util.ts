@@ -4,6 +4,7 @@ import { Moment } from "moment";
 import { OMsgConnect } from "./backend/ws";
 import { OffsetDateTime } from "./book";
 import { Readable } from "svelte/store";
+import { ConnectData } from "./connect/connect";
 export const debug: boolean = true;
 export const render_updates: boolean = false;
 
@@ -250,7 +251,7 @@ export function getConnectFromString(loc: string): OMsgConnect {
 	}
 }
 
-export function getStringFromConnect(connect: OMsgConnect): string {
+export function getStringFromConnect(connect: ConnectData): string {
 	const c: any = connect.Connect;
 	let hasDefaults = c.bookmark === undefined;
 	if (c.version === getDefaultVersion())

@@ -5,6 +5,7 @@ import { getStringFromConnect, oneshot } from "./util";
 import { handleMessage } from "./notification";
 import { backend, IBackendConnection } from "./backend/backend";
 import { app } from "./app";
+import { ConnectData } from "./connect/connect";
 
 export class Connection {
 	private readonly _state = writable(new ConnectionState());
@@ -14,9 +15,9 @@ export class Connection {
 	public backend: IBackendConnection;
 
 	public loudness: Writable<number> = writable(0);
-	public connectOptions: OMsgConnect;
+	public connectOptions: ConnectData;
 
-	constructor(connectOptions: OMsgConnect) {
+	constructor(connectOptions: ConnectData) {
 		this.connectOptions = connectOptions;
 		this.backend = backend.createNewConnection();
 		this._state.update(s => s.setConnecting());
@@ -27,7 +28,7 @@ export class Connection {
 			},
 			() => this.onClose(),
 		).then(() => {
-			this.backend.send(this.connectOptions);
+			this.backend.send(this.connectOptions.toConnectMsg());
 			oneshot(this.state, s => s.channelListFinished, () => {
 				const ownClient = get(this.book.ownClient);
 				if (ownClient === undefined) return;

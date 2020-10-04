@@ -10,14 +10,25 @@
 	let fullAddress: string;
 	$: {
 		fullAddress = bookmark.address ?? "";
-		if (bookmark.channel !== null)
-			fullAddress += "/" + bookmark.channel.fullPath;
+		if (bookmark.channel !== null) fullAddress += "/" + bookmark.channel.fullPath;
 	}
 
 	function doConnect() {
 		const channel = bookmark.channel !== null ? Number(bookmark.channel.id) : undefined;
-		if (bookmark.username !== undefined && bookmark.address !== undefined && bookmark.id !== undefined)
-			app.connect(new ConnectData(bookmark.username, bookmark.address, Number(bookmark.id), channel).toConnectMsg());
+		if (
+			bookmark.username !== undefined &&
+			bookmark.address !== undefined &&
+			bookmark.id !== undefined
+		)
+			app.connect(
+				new ConnectData(
+					bookmark.username,
+					bookmark.address,
+					Number(bookmark.id),
+					bookmark.channel?.fullPath,
+					channel
+				)
+			);
 	}
 
 	function toggleBookmark() {
@@ -34,18 +45,17 @@
 	}
 </script>
 
-<div
-	class="bookmarkItem"
-	class:bookmark={bookmark.bookmark}>
+<div class="bookmarkItem" class:bookmark={bookmark.bookmark}>
 	<button class="button innerBookmarkItem" on:click={doConnect} title={bookmark.server?.name}>
 		<div class="bookmarkIcon">
-			<TsIcon type="server" source={{icon: bookmark.server?.icon}} server={bookmark.server?.hexPublicKey} />
+			<TsIcon
+				type="server"
+				source={{ icon: bookmark.server?.icon }}
+				server={bookmark.server?.hexPublicKey} />
 		</div>
 		<div class="bookmarkName">{bookmark.name || bookmark.server?.name}</div>
 		{#if bookmark.lastUsed}
-			<div class="bookmarkInfo" title={bookmark.lastUsed.format() ?? ''}>
-				{fullAddress}
-			</div>
+			<div class="bookmarkInfo" title={bookmark.lastUsed.format() ?? ''}>{fullAddress}</div>
 		{/if}
 	</button>
 	<button class="button bookmarkEdit" on:click={toggleEdit}>
@@ -55,9 +65,7 @@
 		<i class="mdi mdi-{BOOKMARK_ON} mdi-24px bookmarkOn" />
 		<i class="mdi mdi-{BOOKMARK_OFF} mdi-24px bookmarkOff" />
 	</button>
-	{#if error}
-		<span class="bookmarkError tag is-danger">{error}</span>
-	{/if}
+	{#if error}<span class="bookmarkError tag is-danger">{error}</span>{/if}
 </div>
 
 <style lang="scss">
@@ -67,7 +75,7 @@
 		margin: 0.5em;
 		display: grid;
 		justify-content: stretch;
-		grid-template-columns: auto 2.5em 2.5em;;
+		grid-template-columns: auto 2.5em 2.5em;
 		width: 100%;
 		height: 100%;
 	}
