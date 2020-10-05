@@ -12,14 +12,14 @@ console.log("BUILD", BUILD_ENV, BUILD_DAT);
 window.onbeforeunload = function (e: any) {
 	app.transientSettings.flush();
 
-	// For debugging purposes
+	// For debugging purposes (?)
+	window.speechSynthesis.speak(new SpeechSynthesisUtterance("Goodbye"));
 	if (app.hasConnected) {
 		if (e) {
 			e.returnValue = true;
 		}
 		return true;
 	}
-	window.speechSynthesis.speak(new SpeechSynthesisUtterance("Goodbye"));
 	return;
 };
 
