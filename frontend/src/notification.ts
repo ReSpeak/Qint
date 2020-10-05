@@ -179,110 +179,110 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHand
 					}
 				} else if ("Client" in prop && "Client" in msg.PropertyChanged.id) {
 					const client = con.book.getClient(msg.PropertyChanged.id.Client)!;
-					const newC = prop.Client;
+					const newClient = prop.Client;
 					const inOwnChannel = client.channel === ownChannelId;
 
-					if ("channel" in newC) {
+					if (newClient.channel !== undefined) {
 						const reason = msg.PropertyChanged.extra.reason;
-						const channel = con.book.getChannel(newC.channel!)!;
+						const newChannel = con.book.getChannel(newClient.channel)!;
 						if (reason === Reason.None) {
 							if (client.id === ownClientId) {
-								handler(con, msg, notif`Switched to ${channel}`);
+								handler(con, msg, notif`Switched to ${newChannel}`);
 							} else {
-								if (channel.id === ownChannelId)
+								if (newChannel.id === ownChannelId)
 									handler(con, msg, notif`${client} joined`);
 								else if (client.channel === ownChannelId)
-									handler(con, msg, notif`${client} left to ${channel}`);
+									handler(con, msg, notif`${client} left to ${newChannel}`);
 								else
-									handler(con, msg, notif`${client} switched to ${channel}`);
+									handler(con, msg, notif`${client} switched to ${newChannel}`);
 							}
 						} else if (reason === Reason.Moved) {
 							if (client.id === ownClientId) {
 								if (invoker !== null)
-									handler(con, msg, notif`Moved to ${channel} by ${invoker}`);
+									handler(con, msg, notif`Moved to ${newChannel} by ${invoker}`);
 								else
-									handler(con, msg, notif`Moved to ${channel}`);
+									handler(con, msg, notif`Moved to ${newChannel}`);
 							} else {
-								if (channel.id === ownChannelId) {
+								if (newChannel.id === ownChannelId) {
 									if (invoker !== null)
 										handler(con, msg, notif`${client} was moved in by ${invoker}`);
 									else
 										handler(con, msg, notif`${client} was moved in`);
 								} else if (client.channel === ownChannelId) {
 									if (invoker !== null)
-										handler(con, msg, notif`${client} was moved out to ${channel} by ${invoker}`);
+										handler(con, msg, notif`${client} was moved out to ${newChannel} by ${invoker}`);
 									else
-										handler(con, msg, notif`${client} was moved out to ${channel}`);
+										handler(con, msg, notif`${client} was moved out to ${newChannel}`);
 								} else {
 									if (invoker !== null)
-										handler(con, msg, notif`${client} was moved to ${channel} by ${invoker}`);
+										handler(con, msg, notif`${client} was moved to ${newChannel} by ${invoker}`);
 									else
-										handler(con, msg, notif`${client} was moved to ${channel}`);
+										handler(con, msg, notif`${client} was moved to ${newChannel}`);
 								}
 							}
 						} else if (reason === Reason.KickChannel) {
 							if (client.id === ownClientId) {
 								if (invoker !== null)
-									handler(con, msg, notif`Kicked to ${channel} by ${invoker}`);
+									handler(con, msg, notif`Kicked to ${newChannel} by ${invoker}`);
 								else
-									handler(con, msg, notif`Kicked to ${channel}`);
+									handler(con, msg, notif`Kicked to ${newChannel}`);
 							} else {
-								if (channel.id === ownChannelId) {
+								if (newChannel.id === ownChannelId) {
 									if (invoker !== null)
 										handler(con, msg, notif`${client} was kicked in by ${invoker}`);
 									else
 										handler(con, msg, notif`${client} was kicked in`);
 								} else if (client.channel === ownChannelId) {
 									if (invoker !== null)
-										handler(con, msg, notif`${client} was kicked out to ${con.book.getChannel(client.channel)!} by ${invoker}`);
+										handler(con, msg, notif`${client} was kicked out to ${newChannel} by ${invoker}`);
 									else
-										handler(con, msg, notif`${client} was kicked out to ${con.book.getChannel(client.channel)!}`);
+										handler(con, msg, notif`${client} was kicked out to ${newChannel}`);
 								} else {
 									if (invoker !== null)
-										handler(con, msg, notif`${client} was kicked to ${con.book.getChannel(client.channel)!} by ${invoker}`);
+										handler(con, msg, notif`${client} was kicked to ${newChannel} by ${invoker}`);
 									else
-										handler(con, msg, notif`${client} was kicked to ${con.book.getChannel(client.channel)!}`);
+										handler(con, msg, notif`${client} was kicked to ${newChannel}`);
 								}
 							}
 						}
 					}
 
-					if ("name" in newC) {
-						handler(con, msg, notif`${client} is now known as ${newC.name}`);
+					if (newClient.name !== undefined) {
+						handler(con, msg, notif`${client} is now known as ${newClient.name}`);
 					}
 
-					if ("away_message" in newC) {
-						if (newC.away_message === null)
+					if (newClient.away_message !== undefined) {
+						if (newClient.away_message === null)
 							handler(con, msg, notif`${client} is back`);
-						else if (newC.away_message!.length === 0)
+						else if (newClient.away_message!.length === 0)
 							handler(con, msg, notif`${client} has gone`);
 						else
-							handler(con, msg, notif`${client} has gone to ${newC.away_message}`);
+							handler(con, msg, notif`${client} has gone to ${newClient.away_message}`);
 					}
 
-					if ("input_muted" in newC) {
+					if (newClient.input_muted !== undefined) {
 						if (client.id === ownClientId) {
-							if (newC.input_muted)
+							if (newClient.input_muted)
 								handler(con, msg, notif`muted`);
 							else
 								handler(con, msg, notif`unmuted`);
 						} else if (inOwnChannel) {
-							if (newC.input_muted)
+							if (newClient.input_muted)
 								handler(con, msg, notif`${client} is muted`);
 							else
 								handler(con, msg, notif`${client} is unmuted`);
 						}
 					}
 
-					if ("output_muted" in newC && (client.id === ownClientId || inOwnChannel)) {
-						if (newC.output_muted)
+					if (newClient.output_muted !== undefined && (client.id === ownClientId || inOwnChannel)) {
+						if (newClient.output_muted)
 							handler(con, msg, notif`${client} is deaf`);
 						else
 							handler(con, msg, notif`${client} is listening`);
 					}
 
-					if ("input_hardware_enabled" in newC && (client.id === ownClientId || inOwnChannel)) {
-						if (newC.input_hardware_enabled)
+					if (newClient.input_hardware_enabled !== undefined && (client.id === ownClientId || inOwnChannel)) {
+						if (newClient.input_hardware_enabled)
 							handler(con, msg, notif`${client} can talk`);
 						else
 							handler(con, msg, notif`${client} is silent`);
