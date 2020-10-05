@@ -147,21 +147,21 @@
 	</div>
 	<StickySlot>Actions</StickySlot>
 	<div class="descGroup">
-		<p class="buttons">
-			<button class="button is-small is-warning" on:click={kickFromChannel}>
-				<Icon name="shoe-formal" />
-				<span>Kick Channel</span>
-			</button>
-			<button class="button is-small is-danger" on:click={kickFromServer}>
-				<Icon name="shoe-formal" />
-				<span>Kick Server</span>
-			</button>
-			<button class="button is-small is-danger">
-				<Icon name="cancel" />
-				<span>Ban</span>
-			</button>
-		</p>
 		{#if !ownClient}
+			<p class="buttons">
+				<button class="button is-small is-warning" on:click={kickFromChannel}>
+					<Icon name="shoe-formal" />
+					<span>Kick Channel</span>
+				</button>
+				<button class="button is-small is-danger" on:click={kickFromServer}>
+					<Icon name="shoe-formal" />
+					<span>Kick Server</span>
+				</button>
+				<button class="button is-small is-danger">
+					<Icon name="cancel" />
+					<span>Ban</span>
+				</button>
+			</p>
 			<div class="dataLine">
 				<div>Volume:</div>
 				<ClientVolume {client} {connection} />
