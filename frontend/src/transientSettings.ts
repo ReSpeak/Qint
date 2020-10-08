@@ -97,7 +97,7 @@ export class TransientSettingsSynth {
 
 	public trySpeak(text: string) {
 		if (synth) {
-			const utter = new SpeechSynthesisUtterance();
+			const utter = this.getNewUtter();
 			utter.text = text;
 			synth.cancel();
 			synth.speak(utter);
