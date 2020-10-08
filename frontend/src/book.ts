@@ -415,7 +415,9 @@ export class GraphQlClient {
 		return res;
 	}
 
-	public equals(other: this | undefined): boolean { return GraphQlClient.equals(this, other); }
+	public equals(other: this | undefined): boolean {
+		return other instanceof GraphQlClient && GraphQlClient.equals(this, other);
+	}
 
 	public static equals(first: GraphQlClient | undefined, second: GraphQlClient | undefined): boolean {
 		if (first === second) return true;
@@ -479,7 +481,7 @@ export class Client extends GraphQlClient implements ITreeNode, Readable<Client>
 	}
 
 	public equals(other: this): boolean {
-		return this.id === other.id && super.equals(other);
+		return other instanceof Client && this.id === other.id && super.equals(other);
 	}
 
 	public readonly qlType = "CLIENT";
@@ -583,7 +585,7 @@ export class Channel implements ITreeParent, ITreeNode, Readable<Channel> {
 	}
 
 	public equals(other: this): boolean {
-		return this.id === other.id;
+		return other instanceof Channel && this.id === other.id;
 	}
 
 	public readonly qlType = "CHANNEL";
@@ -619,7 +621,7 @@ export class GraphQlServer {
 	}
 
 	public equals(other: this): boolean {
-		return this.uidStr === other.uidStr;
+		return other instanceof GraphQlServer && this.uidStr === other.uidStr;
 	}
 }
 
