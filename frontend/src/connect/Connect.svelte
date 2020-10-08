@@ -8,13 +8,11 @@
 	import { Book, Channel } from "../book";
 	import UiChannel from "../tree/UiChannel.svelte";
 	import type { ChannelId } from "../ts";
-	import { SERVER_ICON, CLIENT_ICON, base64Decode, hexEncode, on } from "../util";
+	import { SERVER_ICON, CLIENT_ICON, base64Decode, hexEncode } from "../util";
 	import { app } from "../app";
 
 	export let data: ConnectData;
-	$: address = data.address + (data.channel !== undefined ? "/" + data.channel :
-		(data.channelId !== undefined ? "//" + data.channelId : ""));
-	let addressInput!: HTMLInputElement;
+	let addressInput: HTMLInputElement;
 	// The channel part of the address, if empty, the channel popup will be hidden
 	let channelPart = "";
 	// The address used to load the channels.
@@ -22,8 +20,18 @@
 	let server: string | undefined = undefined;
 	// The channels directly under the server, sub-channels are stored as children.
 	let channels: Channel[] = [];
+	let address: string = "";
 
-	$: on(address, changeChannels());
+	$: {
+		address =
+			data.address +
+			(data.channel !== undefined ? "/" + data.channel
+			: data.channelId !== undefined ? "//" + data.channelId
+			: "");
+		if (addressInput !== undefined) {
+			changeChannels();
+		}
+	}
 
 	function onConnect() {
 		app.connect(data.clone());
@@ -36,7 +44,7 @@
 	async function onAddressChange() {
 		data.bookmark = undefined;
 		data.channelId = undefined;
-		changeChannels();
+		await changeChannels();
 	}
 
 	async function changeChannels() {
@@ -68,7 +76,7 @@
 
 	async function loadChannels(address: string): Promise<Channel[]> {
 		try {
-			const query = await graphql(
+			const query = await graphql<{serverByAddress:{uid:string, channels:Channel[]}}>(
 				`
 					query GetChannels($address: String!) {
 						serverByAddress(address: $address) {
@@ -76,7 +84,7 @@
 							channels(includeDeleted: false) {
 								id
 								parent
-								orderId
+								order
 								name
 								icon
 							}
@@ -159,7 +167,7 @@
 						id="username"
 						class="input"
 						type="text"
-						placeholder="Username"/>
+						placeholder="Username" />
 					<Icon name={CLIENT_ICON} isLeft />
 				</p>
 			</div>
@@ -173,7 +181,7 @@
 						id="server"
 						class="input"
 						type="text"
-						placeholder="Server"/>
+						placeholder="Server" />
 					<Icon name={SERVER_ICON} isLeft />
 				</p>
 			</div>

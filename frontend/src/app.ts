@@ -1,10 +1,9 @@
-import { Writable, writable, get, Readable } from "svelte/store";
+import { Writable, writable, get } from "svelte/store";
 import { Chat } from "./chat/chat";
 import { ITreeNode} from "./book";
 import { Connection } from "./connection";
 import { TransientSettings } from "./transientSettings";
 import { loadPlugins, IPlugin } from "./plugins";
-import { OMsgConnect } from "./backend/ws";
 import { backend } from "./backend/backend";
 import { oneshot } from "./util";
 import { ConnectData } from "./connect/connect";

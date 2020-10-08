@@ -263,23 +263,20 @@
 	}
 
 	.collapseButton {
-		justify-content: start;
-		display: grid;
-
-		> :global(.icon) {
-			transition: all 0.1s;
-			grid-row: 1;
-			grid-column: 1;
-			margin: 0 !important;
-		}
+		position: relative;
+		// This should match the icon w/h
+		width: 1.5em;
+		height: 1.5em;
 
 		> :global(*) {
+			transition: all 0.1s;
+			position: absolute;
+			margin: 0 !important;
+			
 			overflow: hidden;
 			text-overflow: ellipsis;
 		}
-	}
 
-	.collapseButton {
 		> :global(*:first-child) {
 			opacity: 0;
 		}

@@ -37,7 +37,7 @@
 	}
 </script>
 
-<div class="connected-container" style="grid-template-columns: {columnStyle}">
+<div class="appContainer" style="grid-template-columns: {columnStyle}">
 	<!-- TODO Toolbar does not need connection -->
 	<Toolbar bind:showSidebar bind:showDescription bind:displayPanel />
 	<Searchbar bind:filter visible={showSidebar} />
@@ -59,7 +59,7 @@
 <GlobalCss />
 
 <style lang="scss">
-	.connected-container {
+	.appContainer {
 		display: grid;
 		grid-template-rows: max-content 1fr;
 
@@ -68,26 +68,24 @@
 		right: 0;
 		bottom: 0;
 		left: 0;
-	}
+		height: 100%;
 
-	.connected-container > :global(.toolbar) {
-		grid-row: 1;
-		grid-column: 2;
-	}
-
-	.connected-container > :global(.searchbar) {
-		grid-row: 1;
-		grid-column: 1;
-	}
-
-	.connected-container > :global(.sidebar) {
-		grid-row: 2;
-		grid-column: 1;
-	}
-
-	.connected-container > .panel {
-		grid-row: 2;
-		grid-column: 2;
+		> :global(.toolbar) {
+			grid-row: 1;
+			grid-column: 2;
+		}
+		> :global(.searchbar) {
+			grid-row: 1;
+			grid-column: 1;
+		}
+		> :global(.sidebar) {
+			grid-row: 2;
+			grid-column: 1;
+		}
+		> .panel {
+			grid-row: 2;
+			grid-column: 2;
+		}
 	}
 
 	.panel {

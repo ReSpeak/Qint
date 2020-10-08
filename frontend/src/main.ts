@@ -13,7 +13,7 @@ window.onbeforeunload = function (e: any) {
 	app.transientSettings.flush();
 
 	// For debugging purposes (?)
-	window.speechSynthesis.speak(new SpeechSynthesisUtterance("Goodbye"));
+	app.transientSettings.synth.trySpeak("Goodbye");
 	if (app.hasConnected) {
 		if (e) {
 			e.returnValue = true;

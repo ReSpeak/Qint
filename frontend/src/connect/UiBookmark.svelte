@@ -45,23 +45,26 @@
 	}
 </script>
 
-<div class="bookmarkItem" class:bookmark={bookmark.bookmark}>
-	<button class="button innerBookmarkItem" on:click={doConnect} title={bookmark.server?.name}>
-		<div class="bookmarkIcon">
-			<TsIcon
-				type="server"
-				source={{ icon: bookmark.server?.icon }}
-				server={bookmark.server?.hexPublicKey} />
-		</div>
-		<div class="bookmarkName">{bookmark.name || bookmark.server?.name}</div>
-		{#if bookmark.lastUsed}
-			<div class="bookmarkInfo" title={bookmark.lastUsed.format() ?? ''}>{fullAddress}</div>
-		{/if}
-	</button>
-	<button class="button bookmarkEdit" on:click={toggleEdit}>
+<div
+	class="bookmarkItem"
+	on:click={doConnect}
+	title={bookmark.server?.name}
+	class:bookmark={bookmark.bookmark}>
+	<div class="bookmarkIcon">
+		<TsIcon
+			type="server"
+			source={{ icon: bookmark.server?.icon }}
+			server={bookmark.server?.hexPublicKey} />
+	</div>
+	<div class="bookmarkName">{bookmark.name || bookmark.server?.name}</div>
+	{#if bookmark.lastUsed}
+		<div class="bookmarkInfo" title={bookmark.lastUsed.format() ?? ''}>{fullAddress}</div>
+	{/if}
+
+	<button class="button bookmarkEdit" on:click|stopPropagation={toggleEdit}>
 		<i class="mdi mdi-{EDIT_ICON} mdi-24px" />
 	</button>
-	<button class="button bookmarkStar" on:click={toggleBookmark}>
+	<button class="button bookmarkStar" on:click|stopPropagation={toggleBookmark}>
 		<i class="mdi mdi-{BOOKMARK_ON} mdi-24px bookmarkOn" />
 		<i class="mdi mdi-{BOOKMARK_OFF} mdi-24px bookmarkOff" />
 	</button>
@@ -70,24 +73,14 @@
 
 <style lang="scss">
 	.bookmarkItem {
+		@extend %unselectable;
+		cursor: pointer;
 		background-color: change-color(scale-color($background, $lightness: +10%), $alpha: 0.7);
 		border-radius: 0.4em;
 		margin: 0.5em;
 		display: grid;
 		justify-content: stretch;
-		grid-template-columns: auto 2.5em 2.5em;
-		width: 100%;
-		height: 100%;
-	}
-
-	.innerBookmarkItem {
-		padding: 0.2em;
-		border: none;
-		background: none;
-		box-shadow: none;
-		display: grid;
-		grid-template-columns: 2.5em auto;
-		justify-content: stretch;
+		grid-template-columns: 2em minmax(0, 1fr) 2em;
 		width: 100%;
 		height: 100%;
 	}
@@ -103,16 +96,19 @@
 	.bookmarkIcon {
 		grid-column: 1;
 		grid-row: 1 / 3;
-		text-align: center;
 		color: $text-light;
+		display: flex;
+		justify-content: center;
+		align-items: center;
 	}
 
 	.bookmarkName,
 	.bookmarkInfo {
-		justify-self: start;
-		max-width: 100%;
+		width: 100%;
+		height: 100%;
 		overflow: hidden;
 		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.bookmarkName {
@@ -129,7 +125,6 @@
 
 	.bookmarkEdit {
 		grid-column: 2;
-		height: 100%;
 		text-align: center;
 		background: none;
 		border: none;
@@ -139,7 +134,7 @@
 
 	.bookmarkStar {
 		grid-column: 3;
-		height: 100%;
+		grid-row: 1 / 3;
 		text-align: center;
 		color: $yellow;
 		background: none;

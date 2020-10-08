@@ -1,8 +1,8 @@
 import { get } from "svelte/store";
 
 import { Book, Channel, Client, Server, ServerGroup } from "./book";
-import { InBookMsg, InMsg, Invoker, Reason } from "./backend/ws";
-import { Connection, ConnectionState } from "./connection";
+import { InBookMsg, InMsg, Invoker, Reason, WsMessageTarget } from "./backend/ws";
+import { Connection } from "./connection";
 import { app } from "./app";
 import { IPlugin } from "./plugins";
 
@@ -64,8 +64,6 @@ function notif(strings: TemplateStringsArray, ...keys: NotificationArg[]): TsNot
 	return new TsNotification(strings, keys);
 }
 
-let synth = window.speechSynthesis;
-
 export type NotificationHandler = (con: Connection, e: InMsg | InBookMsg, no: TsNotification) => void;
 
 function getHandler(plugins: IPlugin[]): NotificationHandler {
@@ -98,6 +96,10 @@ export function handleMessage(con: Connection, msg: InMsg, plugins: IPlugin[]) {
 	}
 }
 
+function isPoke(target: WsMessageTarget): target is { Poke: number } {
+	return target.hasOwnProperty("Poke");
+}
+
 function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHandler) {
 	try {
 		const ownClientId = con.book.ownClientId!;
@@ -107,7 +109,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHand
 		if (msg === "ChannelListFinished") {
 		} else if ("Message" in msg) {
 			const longMessage = msg.Message.message.length > 20 || msg.Message.message.length === 0 || msg.Message.message.includes("//");
-			if (msg.Message.target !== "Server" && msg.Message.target !== "Channel" && "Poke" in msg.Message.target) {
+			if (isPoke(msg.Message.target)) {
 				if (longMessage)
 					handler(con, msg, notif`${msg.Message.invoker} poked you`);
 				else
@@ -377,10 +379,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHand
 }
 
 function textToSpeechNotification(con: Connection, _e: InMsg | InBookMsg, no: TsNotification) {
-	const utter = app.transientSettings.synth.getNewUtter();
-	utter.text = no.toString(con);
-	synth.cancel();
-	synth.speak(utter);
+	app.transientSettings.synth.trySpeak(no.toString(con));
 }
 
 function textNotification(_c: Connection, _e: InMsg | InBookMsg, no: TsNotification) {

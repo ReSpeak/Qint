@@ -16,6 +16,7 @@
 <style lang="scss">
 	.stickySlot {
 		z-index: 15;
+		display: block;
 		position: sticky;
 		top: 0;
 		align-items: center;
@@ -25,5 +26,6 @@
 		box-shadow: 0 0.3em 0.3em #0005;
 		border-top: 2px solid #425575;
 		font-weight: bold;
+		text-align: left;
 	}
 </style>

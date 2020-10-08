@@ -53,6 +53,8 @@ export class TransientSettings {
 	}
 }
 
+const synth: SpeechSynthesis | undefined = window.speechSynthesis;
+
 export class TransientSettingsSynth {
 	public voiceId?: string;
 	public volume: number = 1;
@@ -61,9 +63,13 @@ export class TransientSettingsSynth {
 	private _voiceCache?: SpeechSynthesisVoice
 	public get voice(): SpeechSynthesisVoice | undefined {
 		if (this._voiceIdCache !== this.voiceId) {
-			this._voiceIdCache = this.voiceId;
-			const voices = window.speechSynthesis.getVoices();
-			this._voiceCache = voices.find(v => v.voiceURI === this.voiceId) ?? voices.find(_ => true);
+			if (synth) {
+				const voices = synth.getVoices();
+				this._voiceCache = voices.find(v => v.voiceURI === this.voiceId) ?? voices.find(_ => true);
+				this._voiceIdCache = this.voiceId;
+			} else {
+				this.voice = undefined;
+			}
 		}
 		return this._voiceCache;
 	}
@@ -79,12 +85,31 @@ export class TransientSettingsSynth {
 		}
 	}
 
-	public getNewUtter(): SpeechSynthesisUtterance {
+	public readonly canSpeak = synth !== undefined;
+
+	private getNewUtter(): SpeechSynthesisUtterance {
 		const utter = new SpeechSynthesisUtterance();
 		if (this.voice) utter.voice = this.voice;
 		if (this.speed !== undefined) utter.rate = this.speed;
 		if (this.volume !== undefined) utter.volume = this.volume;
 		return utter;
+	}
+
+	public trySpeak(text: string) {
+		if (synth) {
+			const utter = new SpeechSynthesisUtterance();
+			utter.text = text;
+			synth.cancel();
+			synth.speak(utter);
+		}
+	}
+
+	public getVoices(): SpeechSynthesisVoice[] {
+		if (synth) {
+			return synth.getVoices();
+		} else {
+			return [];
+		}
 	}
 }
 

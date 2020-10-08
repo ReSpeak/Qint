@@ -50,7 +50,7 @@
 		"autobuild": "rollup -c -w",
 		"dev": "run-p start:dev autobuild",
 		"start": "sirv public",
-		"start:dev": "sirv public --dev",
+		"start:dev": "sirv public --dev --host",
 		"tauri": "tauri"
 	},
 	"comments": {

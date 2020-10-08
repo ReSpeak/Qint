@@ -39,16 +39,12 @@
 	app.transientSettings.loadAsync();
 
 	// Text-to-Speech
-	const synth = window.speechSynthesis;
 	const synthSett = app.transientSettings.synth;
-	let voices = synth.getVoices();
+	const voices = synthSett.getVoices();
 	let previewText!: HTMLInputElement;
 	function previewVoice() {
 		const text = previewText.value;
-		const utter = synthSett.getNewUtter();
-		utter.text = text;
-		synth.cancel();
-		synth.speak(utter);
+		synthSett.trySpeak(text);
 	}
 
 	onDestroy(() => {
