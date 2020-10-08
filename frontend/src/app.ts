@@ -1,6 +1,6 @@
 import { Writable, writable, get } from "svelte/store";
 import { Chat } from "./chat/chat";
-import { ITreeNode} from "./book";
+import { ITreeNode } from "./book";
 import { Connection } from "./connection";
 import { TransientSettings } from "./transientSettings";
 import { loadPlugins, IPlugin } from "./plugins";
@@ -78,6 +78,13 @@ export class NodeSelection {
 
 	public get uniqueStr(): string {
 		return `${this.node.qlType},${this.connection.book.server.uidStr},${this.node.qlId}`;
+	}
+
+	public static equals(first: NodeSelection | undefined, second: NodeSelection | undefined): boolean {
+		if (first === second) return true;
+		if (first === undefined || second === undefined) return false;
+		if (first.connection !== second.connection) return false;
+		return first.node.equals(second.node);
 	}
 }
 

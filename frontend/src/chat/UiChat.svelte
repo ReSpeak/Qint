@@ -56,31 +56,31 @@
 		sel = $selected;
 		chatChanged();
 	}
+
 	function chatChanged() {
+		if (!chatList) return;
+
 		if (sel === undefined) {
 			oldSelection = undefined;
 			chatList?.clear();
 			canChatHere = false;
 			return;
 		}
-		if (oldSelection !== undefined) chatStore.save(text, oldSelection);
-		text = chatStore.load(sel) ?? "";
 
-		if (sel !== oldSelection) {
+		if (!NodeSelection.equals(sel, oldSelection)) {
+			if (oldSelection !== undefined) chatStore.save(text, oldSelection);
+			text = chatStore.load(sel) ?? "";
 			oldSelection = sel;
 
-			if (chatList) {
-				chatList.sourceChanged(ListFetchDir.New, ListFetchDir.After);
-			}
-
+			chatList.sourceChanged(ListFetchDir.New, ListFetchDir.After);
 			chatBoxRecheck();
 		}
 	}
 
 	function chatEndChanged() {
-		if (chatList) {
-			chatList.sourceChanged(ListFetchDir.After, ListFetchDir.After);
-		}
+		if (!chatList) return;
+
+		chatList.sourceChanged(ListFetchDir.After, ListFetchDir.After);
 	}
 
 	function chatBoxRecheck() {

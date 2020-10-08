@@ -12,5 +12,10 @@
 			"name": "Build Target",
 			"path": "target"
 		}
-	]
+	],
+	"settings": {
+		"files.exclude": {
+			"node_modules/": true
+		}
+	}
 }

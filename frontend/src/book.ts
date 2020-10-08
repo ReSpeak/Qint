@@ -415,7 +415,7 @@ export class GraphQlClient {
 		return res;
 	}
 
-	public equals(other: GraphQlClient | undefined): boolean { return GraphQlClient.equals(this, other); }
+	public equals(other: this | undefined): boolean { return GraphQlClient.equals(this, other); }
 
 	public static equals(first: GraphQlClient | undefined, second: GraphQlClient | undefined): boolean {
 		if (first === second) return true;
@@ -476,6 +476,10 @@ export class Client extends GraphQlClient implements ITreeNode, Readable<Client>
 		Object.assign(this, obj);
 		this._store.set(this);
 		return this;
+	}
+
+	public equals(other: this): boolean {
+		return this.id === other.id && super.equals(other);
 	}
 
 	public readonly qlType = "CLIENT";
@@ -578,6 +582,10 @@ export class Channel implements ITreeParent, ITreeNode, Readable<Channel> {
 		return this;
 	}
 
+	public equals(other: this): boolean {
+		return this.id === other.id;
+	}
+
 	public readonly qlType = "CHANNEL";
 	public get qlId() { return this.id.toString() };
 	public readonly wsTarget = "Channel";
@@ -608,6 +616,10 @@ export class GraphQlServer {
 
 	public static fromGraphql(obj: any): GraphQlServer {
 		return new GraphQlServer(obj.server.publicKey, obj.server.uid, obj.server.name, obj.server.icon);
+	}
+
+	public equals(other: this): boolean {
+		return this.uidStr === other.uidStr;
 	}
 }
 
@@ -691,6 +703,7 @@ export interface ITreeNode {
 	filterShow: boolean;
 	isSelected: boolean;
 	update(obj: Partial<this>): this;
+	equals(other: this): boolean;
 
 	readonly qlType: GQLMessageTarget;
 	readonly qlId: string | undefined;
