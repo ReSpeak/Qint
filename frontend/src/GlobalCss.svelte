@@ -7,6 +7,7 @@
 	@import "bulma/sass/components/menu";
 	@import "bulma/sass/components/tabs";
 	@import "bulma/sass/elements/button";
+	@import "bulma/sass/elements/content";
 	@import "bulma/sass/elements/icon";
 	@import "bulma/sass/elements/notification";
 	@import "bulma/sass/form/shared";
