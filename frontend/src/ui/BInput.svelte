@@ -79,8 +79,6 @@
 	}
 
 	.textBox {
-		-moz-appearance: textfield;
-		-webkit-appearance: textfield;
 		height: auto;
 		display: block;
 		white-space: pre-wrap;
