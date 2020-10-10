@@ -120,4 +120,8 @@
 	.statusField {
 		padding: 1em;
 	}
+
+	.buttons, .button {
+		margin-bottom: 0;
+	}
 </style>
