@@ -1,13 +1,12 @@
 import { get, writable, Writable, Readable } from "svelte/store";
 import type { Moment } from "moment";
 import { graphql } from "../graphql";
-import { GraphQlClient } from "../book";
-import { datetimeDeserialize, getDataColor, assert, Lazy, base64Encode } from "../util";
+import { GraphQlClient, ChatData } from "../book";
+import { datetimeDeserialize, getDataColor, assert, Lazy, base64Encode, datetimeSerialize } from "../util";
 import { ListFetchDir, FetchResult } from "../ui/lazyList";
 import { NodeSelection } from "../app";
 
 export class Chat {
-	public readonly unreadCount: Writable<number> = writable(0);
 	public static readonly EmptyFetch: FetchResult<Message> = {
 		items: [],
 		canLoadBeforeStart: false,
@@ -52,27 +51,27 @@ export class Chat {
 			return Chat.EmptyFetch;
 		}
 
-		let start_time;
-		let start_id;
-		let load_at_beginning: boolean | undefined;
+		let startTime;
+		let startId;
+		let loadAtBeginning: boolean | undefined;
 		switch (dir) {
-			case ListFetchDir.Before: load_at_beginning = true; break;
-			case ListFetchDir.New: load_at_beginning = undefined; break;
-			case ListFetchDir.After: load_at_beginning = false; break;
+			case ListFetchDir.Before: loadAtBeginning = true; break;
+			case ListFetchDir.New: loadAtBeginning = undefined; break;
+			case ListFetchDir.After: loadAtBeginning = false; break;
 			default: assert(false, "Unknown direction");
 		}
 
 		if (idFrom) {
-			start_time = idFrom.date.unix();
-			start_id = idFrom.id;
+			startTime = idFrom.date.unix();
+			startId = idFrom.id;
 		}
 
-		const res = await graphql(`query GetMessages($chat_type: GMessageTarget!, $server: [Int!]!, $chat_id: ID,
-					$start_time: NaiveDateTime, $start_id: ID, $load_at_beginning: Boolean) {
-				chat(typ: $chat_type, server: $server, id: $chat_id) {
+		const res = await graphql(`query GetMessages($chatType: GMessageTarget!, $server: [Int!]!, $chatId: ID,
+					$startTime: NaiveDateTime, $startId: ID, $loadAtBeginning: Boolean) {
+				chat(typ: $chatType, server: $server, id: $chatId) {
 					lastRead
 					timezone
-					messages(startTime: $start_time, startId: $start_id, beforeStart: $load_at_beginning) {
+					messages(startTime: $startTime, startId: $startId, beforeStart: $loadAtBeginning) {
 						id
 						invoker {
 							client {
@@ -92,12 +91,12 @@ export class Chat {
 					}
 				}
 			}`, {
-			chat_type: selected.node.qlType,
+			chatType: selected.node.qlType,
 			server: public_key,
-			chat_id: selected.node.qlId,
-			start_time,
-			start_id,
-			load_at_beginning: load_at_beginning,
+			chatId: selected.node.qlId,
+			startTime,
+			startId,
+			loadAtBeginning,
 		});
 		if ("data" in res) {
 			// We never chatted here
@@ -115,7 +114,7 @@ export class Chat {
 				msgs.push(new Message(msg.id, client, msg.invokerName,
 					msg.content, msg.rendered, datetimeDeserialize([msg.time, msg.timezone])));
 			});
-			console.log("Fetching messages " + (load_at_beginning ? "before" : "after"), [start_time, start_id], "; got", msgs);
+			console.log("Fetching messages " + (loadAtBeginning ? "before" : "after"), [startTime, startId], "; got", msgs);
 
 			Chat.groupMessages(msgs, idFrom, dir);
 
@@ -139,6 +138,26 @@ export class Chat {
 				message,
 			}
 		});
+	}
+
+	public async setLastRead(messageId: string, lastRead: Moment) {
+		const selected = get(this.selectedChat);
+		if (selected === undefined) return;
+		let public_key = selected.connection.book.server.public_key;
+		if (public_key === undefined) {
+			console.error("Cannot get messages for a non-existant connection");
+			return;
+		}
+		const res = await graphql(`mutation SetLastRead($chatType: GMessageTarget!, $server: [Int!]!, $chatId: ID,
+					$message: ID!) {
+				setLastRead(typ: $chatType, server: $server, id: $chatId, message: $message)
+			}`, {
+			chatType: selected.node.qlType,
+			server: public_key,
+			chatId: selected.node.qlId,
+			message: messageId,
+		});
+		selected.node.update({ chat: new ChatData(lastRead, res.data.setLastRead) });
 	}
 }
 

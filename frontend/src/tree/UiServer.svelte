@@ -45,6 +45,17 @@
 				<button class="button is-danger is-small" on:click|stopPropagation={cancel}>Cancel</button>
 			{/if}
 		</div>
+		<span class="icons">
+			{#if $state.connected && $server.chat.unreadCount > 0}
+				<span class="unreadCount" title={$server.chat.unreadCount.toString()}>
+					{#if $server.chat.unreadCount >= 100}
+						99+
+					{:else}
+						{$server.chat.unreadCount}
+					{/if}
+				</span>
+			{/if}
+		</span>
 	</div>
 </StickySlot>
 
@@ -69,6 +80,8 @@
 {/if}
 
 <style lang="scss">
+	@import "./tree";
+
 	ul {
 		margin: 0 0 0 0.2em;
 	}

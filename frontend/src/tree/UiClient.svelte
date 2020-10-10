@@ -121,6 +121,15 @@
 				{#each $client.server_groups as grp (grp)}
 					<ServerGroupIcon id={grp} {connection} />
 				{/each}
+				{#if $client.chat.unreadCount > 0}
+					<span class="unreadCount" title={$client.chat.unreadCount.toString()}>
+						{#if $client.chat.unreadCount >= 100}
+							99+
+						{:else}
+							{$client.chat.unreadCount}
+						{/if}
+					</span>
+				{/if}
 			</span>
 		</div>
 		{#if hovered}

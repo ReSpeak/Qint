@@ -314,22 +314,34 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHand
 							handler(con, msg, notif`${client} timed out`);
 					} else if (reason === Reason.Moved) {
 						if (client.channel === ownChannelId) {
-							if (invoker !== null)
-								handler(con, msg, notif`${client} was moved in by ${invoker} and appeared`);
-							else
-								handler(con, msg, notif`${client} was moved in and appeared`);
+							if (invoker !== null) {
+								if (invoker.id === 0) {
+									// This could be a new channel we are not subscribed to yet
+									// TODO Wait <ping> and check if we got the client again before talking
+									handler(con, msg, notif`${client} was moved out by ${invoker}`);
+								} else {
+									handler(con, msg, notif`${client} was moved out by ${invoker} and disappeared`);
+								}
+							} else
+								handler(con, msg, notif`${client} was moved out and disappeared`);
 						} else {
-							if (invoker !== null)
-								handler(con, msg, notif`${client} was moved by ${invoker} and disappeared`);
-							else
+							if (invoker !== null) {
+								if (invoker.id === 0) {
+									// This could be a new channel we are not subscribed to yet
+									// TODO Wait <ping> and check if we got the client again before talking
+									handler(con, msg, notif`${client} was moved by ${invoker}`);
+								} else {
+									handler(con, msg, notif`${client} was moved by ${invoker} and disappeared`);
+								}
+							} else
 								handler(con, msg, notif`${client} was moved and disappeared`);
 						}
 					} else if (reason === Reason.KickChannel) {
 						if (client.channel === ownChannelId) {
 							if (invoker !== null)
-								handler(con, msg, notif`${client} was kicked in by ${invoker} and disappeared`);
+								handler(con, msg, notif`${client} was kicked out by ${invoker} and disappeared`);
 							else
-								handler(con, msg, notif`${client} was kicked in and disappeared`);
+								handler(con, msg, notif`${client} was kicked out and disappeared`);
 						} else {
 							if (invoker !== null)
 								handler(con, msg, notif`${client} was kicked by ${invoker} and disappeared`);

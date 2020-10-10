@@ -768,7 +768,7 @@ impl App {
 								.or_insert_with(|| {
 									// Create connection
 									let options = WsOptions { format: WsFormat::Json };
-									let con = Ws::new(
+									let _con = Ws::new(
 										state.logger.clone(),
 										state.clone(),
 										options,

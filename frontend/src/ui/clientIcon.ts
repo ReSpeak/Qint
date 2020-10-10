@@ -4,8 +4,8 @@ import { backend } from "../backend/backend";
 
 export type IconSource = { icon: number | undefined } | undefined;
 export type IconSourceLike = {
-	icon: number | undefined
-	avatar_hash?: string
+	icon: number | undefined | null,
+	avatar_hash?: string,
 	uid?: number[],
 	getAvatarUid?: () => string | undefined,
 };

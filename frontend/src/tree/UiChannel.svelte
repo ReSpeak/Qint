@@ -218,13 +218,22 @@
 				{/if}
 				<FilterString filter={showId ? '' : thisFilter} content={displayName} />
 			</span>
-			{#if connection !== undefined}
-				<span class="icons">
-					<button class="button noBut" on:click={switchChannel}>
-						<Icon name="shoe-print" />
-					</button>
-				</span>
-			{/if}
+			<span class="icons">
+				{#if $channel.chat.unreadCount > 0}
+					<span class="unreadCount" title={$channel.chat.unreadCount.toString()}>
+						{#if $channel.chat.unreadCount >= 100}
+							99+
+						{:else}
+							{$channel.chat.unreadCount}
+						{/if}
+					</span>
+				{/if}
+				{#if connection !== undefined}
+						<button class="button noBut" on:click={switchChannel}>
+							<Icon name="shoe-print" />
+						</button>
+				{/if}
+			</span>
 		</div>
 		{#if hovered}
 			<div class="hover menu" style="top: {div.getBoundingClientRect().top}px;">
@@ -272,7 +281,7 @@
 			transition: all 0.1s;
 			position: absolute;
 			margin: 0 !important;
-			
+
 			overflow: hidden;
 			text-overflow: ellipsis;
 		}

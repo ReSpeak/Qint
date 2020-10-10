@@ -76,3 +76,17 @@
 	display: grid;
 	grid-gap: 1em;
 }
+
+.unreadCount {
+	width: 1.8em;
+	height: 1.8em;
+	justify-content: center;
+	align-items: center;
+	text-align: center;
+	display: flex;
+	border-radius: 100%;
+	background-color: $danger;
+	font-weight: normal;
+	padding: 0.1em;
+	font-size: 0.8em;
+}

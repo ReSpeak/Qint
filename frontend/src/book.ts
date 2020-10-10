@@ -1,9 +1,12 @@
-import { Writable, writable, get, Readable } from "svelte/store";
+import { Writable, writable, get, Readable, derived } from "svelte/store";
 import { InBookChangeMsg, WsMessageTarget } from "./backend/ws";
 import { graphql } from "./graphql";
 import { Connection } from "./connection";
-import { binarySearchBy, getDataColor, arraysEqual, base64Encode, Cached } from "./util";
+import { binarySearchBy, getDataColor, arraysEqual, base64Encode, Cached, datetimeDeserialize } from "./util";
 import { ChannelId, ChannelType, ClientId, Codec, ServerGroupId } from "./ts";
+import { Moment } from "moment";
+import moment from "moment";
+import { Chat } from "./chat/chat";
 
 export class Book {
 	public server: Server = new Server();
@@ -373,6 +376,24 @@ type GroupType = any;
 export type OffsetDateTime = [number, number];
 
 
+export class ChatData {
+	public readonly lastRead: Moment;
+	public readonly unreadCount: number;
+
+	public constructor(lastRead: Moment, unreadCount: number) {
+		this.lastRead = lastRead;
+		this.unreadCount = unreadCount;
+	}
+
+	public static fromGraphql(obj: any): ChatData {
+		return new ChatData(datetimeDeserialize([obj.lastRead, obj.timezone]), obj.unreadCount);
+	}
+
+	public incrementUnread(): ChatData {
+		return new ChatData(this.lastRead, this.unreadCount + 1);
+	}
+}
+
 export class GraphQlClient {
 	public readonly uid!: number[];
 	public readonly name!: string;
@@ -458,6 +479,7 @@ export class Client extends GraphQlClient implements ITreeNode, Readable<Client>
 	public readonly talk_power_request!: string | null;
 	public readonly unread_messages!: number;
 
+	public readonly chat = new ChatData(moment(), 0);
 	public volume: Writable<number> = writable(0); // TODO store probably not needed anymore
 	public readonly talking: TalkState = TalkState.Off;
 
@@ -482,6 +504,10 @@ export class Client extends GraphQlClient implements ITreeNode, Readable<Client>
 
 	public equals(other: this): boolean {
 		return other instanceof Client && this.id === other.id && super.equals(other);
+	}
+
+	public getChat(): Readable<ChatData> {
+		return derived(this, s => s.chat);
 	}
 
 	public readonly qlType = "CLIENT";
@@ -532,9 +558,9 @@ export class Channel implements ITreeParent, ITreeNode, Readable<Channel> {
 	public readonly parent!: ChannelId;
 	public readonly name!: string;
 	public readonly topic!: string | null;
-	public readonly codec!: Codec;
+	public readonly codec!: Codec | null;
 	public readonly codec_quality!: number | null;
-	public readonly max_clients!: MaxClients;
+	public readonly max_clients!: MaxClients | null;
 	public readonly max_family_clients!: MaxClients | null;
 	public readonly order!: ChannelId;
 	public readonly channel_type!: ChannelType; // Why is this called 'channel_' ?
@@ -546,11 +572,13 @@ export class Channel implements ITreeParent, ITreeNode, Readable<Channel> {
 	public readonly needed_talk_power!: number | null;
 	public readonly forced_silence!: boolean | null;
 	public readonly phonetic_name!: string | null;
-	public readonly icon!: IconId;
+	public readonly icon!: IconId | null;
 	public readonly is_private!: boolean | null;
 	public readonly subscribed!: boolean;
 	public readonly permission_hints!: any | null;
 	public readonly optional_data!: any | null;
+
+	public readonly chat = new ChatData(moment(), 0);
 
 	public readonly clients: Writable<Client[]> = writable([]);
 	// ITreeParent
@@ -586,6 +614,10 @@ export class Channel implements ITreeParent, ITreeNode, Readable<Channel> {
 
 	public equals(other: this): boolean {
 		return other instanceof Channel && this.id === other.id;
+	}
+
+	public getChat(): Readable<ChatData> {
+		return derived(this, s => s.chat);
 	}
 
 	public readonly qlType = "CHANNEL";
@@ -637,6 +669,8 @@ export class Server extends GraphQlServer implements ITreeParent, ITreeNode, Rea
 	public readonly version!: string;
 	public readonly welcome_message!: string;
 
+	public readonly chat = new ChatData(moment(), 0);
+
 	public filterShow: boolean = true;
 	public isSelected: boolean = false;
 
@@ -655,8 +689,13 @@ export class Server extends GraphQlServer implements ITreeParent, ITreeNode, Rea
 
 	public reset() {
 		this.channels.set([]);
+		Object.assign(this, { unreadCount: undefined });
 		this.filterShow = true;
 		this.isSelected = false;
+	}
+
+	public getChat(): Readable<ChatData> {
+		return derived(this, s => s.chat);
 	}
 
 	public readonly qlType = "SERVER";
@@ -704,6 +743,8 @@ export type GQLMessageTarget = "SERVER" | "CHANNEL" | "CLIENT" | "POKE";
 export interface ITreeNode {
 	filterShow: boolean;
 	isSelected: boolean;
+	chat: ChatData;
+	getChat(): Readable<ChatData>;
 	update(obj: Partial<this>): this;
 	equals(other: this): boolean;
 

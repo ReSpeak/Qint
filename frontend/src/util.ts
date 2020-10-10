@@ -289,8 +289,12 @@ export function hexEncode(data: number[]): string {
 	return res;
 }
 
-export function datetimeDeserialize(rust_date: OffsetDateTime): Moment {
-	return moment.unix(rust_date[0]).utcOffset(rust_date[1] / 60);
+export function datetimeDeserialize(rustDate: OffsetDateTime): Moment {
+	return moment.unix(rustDate[0]).utcOffset(rustDate[1] / 60);
+}
+
+export function datetimeSerialize(date: Moment): OffsetDateTime {
+	return [date.unix(), date.utcOffset() * 60];
 }
 
 /**

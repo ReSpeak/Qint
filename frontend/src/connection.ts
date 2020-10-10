@@ -1,10 +1,11 @@
 import { OutMsg, OMsgConnect, InMsg, Reason } from "./backend/ws";
 import { get, writable, Writable, Readable } from "svelte/store";
-import { Book, Channel } from "./book";
+import { Book, Channel, ChatData } from "./book";
 import { getStringFromConnect, oneshot } from "./util";
 import { handleMessage } from "./notification";
 import { backend, IBackendConnection } from "./backend/backend";
 import { app } from "./app";
+import { graphql } from "./graphql";
 import { ConnectData } from "./connect/connect";
 
 export class Connection {
@@ -97,6 +98,72 @@ export class Connection {
 		});
 	}
 
+	private async updateAllUnreadCounts() {
+		// Server
+		const serverData = await graphql(`query GetUnreadCounts($server: [Int!]!) {
+			chat(typ: SERVER, server: $server) {
+				lastRead
+				timezone
+				unreadCount
+			}
+		}`, {
+			server: this.book.server.public_key,
+		});
+		if (serverData.data.chat !== null)
+			this.book.server.update({ chat: ChatData.fromGraphql(serverData.data.chat) });
+
+
+		// Channels
+		const channelData = await graphql(`query GetUnreadCounts($server: [Int!]!) {
+			server(server: $server) {
+				channels(includeDeleted: false) {
+					id
+					chat {
+						lastRead
+						timezone
+						unreadCount
+					}
+				}
+			}
+		}`, {
+			server: this.book.server.public_key,
+		});
+		for (const channel of channelData.data.server.channels) {
+			if (channel.chat !== null)
+				this.book.channels.get(Number(channel.id))!.update({ chat: ChatData.fromGraphql(channel.chat) });
+		}
+
+		// Clients
+		for (const client of this.book.clients.values()) {
+			const clientData = await graphql(`query GetUnreadCount($server: [Int!]!, $client: ID!) {
+				chat(typ: CLIENT, server: $server, id: $client) {
+					lastRead
+					timezone
+					unreadCount
+				}
+			}`, {
+				server: this.book.server.public_key,
+				client: client.uidStr,
+			});
+			if (clientData.data.chat !== null)
+				client.update({ chat: ChatData.fromGraphql(clientData.data.chat) });
+		}
+	}
+
+	private async updateClientUnreadCount(clientId: number) {
+		const client = this.book.getClient(clientId)!;
+		const clientData = await graphql(`query GetUnreadCount($server: [Int!]!, $client: ID!) {
+			chat(typ: CLIENT, server: $server, id: $client) {
+				unreadCount
+			}
+		}`, {
+			server: this.book.server.public_key,
+			client: client.uidStr,
+		});
+		if (clientData.data.chat !== null)
+			client.update({ chat: ChatData.fromGraphql(clientData.data.chat) });
+	}
+
 	private messageHandler(msg: InMsg) {
 		// Plugins
 		for (const plugin of app.plugins) {
@@ -121,9 +188,25 @@ export class Connection {
 					if (tsevt === "ChannelListFinished") {
 						this._state.update(s => s.setChannelListFinished());
 						location.hash = getStringFromConnect(this.connectOptions!);
-						// TODO Get unread counts for channels and clients
+						this.updateAllUnreadCounts();
 					} else if ("Message" in tsevt) {
-						app.chat.unreadCount.update(c => c + 1);
+						if (tsevt.Message.target === "Server") {
+							this.book.server.update({ chat: this.book.server.chat.incrementUnread() });
+						} else if (tsevt.Message.target === "Channel") {
+							const ownClient = get(this.book.ownClient);
+							if (ownClient !== undefined) {
+								const channel = this.book.getChannel(ownClient.channel)!;
+								channel.update({ chat: channel.chat.incrementUnread() });
+							}
+						} else if ("Client" in tsevt.Message.target) {
+							const client = this.book.getClient(tsevt.Message.target.Client);
+							if (client !== undefined)
+								client.update({ chat: client.chat.incrementUnread() });
+						} else if ("Poke" in tsevt.Message.target) {
+							const client = this.book.getClient(tsevt.Message.target.Poke);
+							if (client !== undefined)
+								client.update({ chat: client.chat.incrementUnread() });
+						}
 					} else {
 						if ("PropertyRemoved" in tsevt) {
 							if ("Client" in tsevt.PropertyRemoved.id) {
@@ -140,6 +223,9 @@ export class Connection {
 							if (tsevt.PropertyAdded.prop !== undefined &&
 								"Server" in tsevt.PropertyAdded.prop) {
 								this._state.update(s => s.setConnected());
+							} else if (tsevt.PropertyAdded.prop !== undefined &&
+								"Client" in tsevt.PropertyAdded.id) {
+								this.updateClientUnreadCount(tsevt.PropertyAdded.id.Client);
 							}
 						} else if ("PropertyChanged" in tsevt) {
 							const prop = tsevt.PropertyChanged.prop!;

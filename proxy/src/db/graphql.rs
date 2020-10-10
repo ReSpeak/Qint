@@ -15,7 +15,7 @@ use tsproto_types::crypto::EccKeyPubP256;
 
 use super::models::MessageStatus;
 use super::schema::bookmarks;
-use super::{models, schema, RunOnDbMsg};
+use super::{models, schema, DbHandler, RunOnDbMsg};
 use crate::State;
 
 const BOOKMARKS_LIMIT: i64 = 20;
@@ -74,7 +74,9 @@ pub async fn graphiql() -> impl Responder {
 	HttpResponse::Ok().content_type("text/html; charset=utf-8").body(graphiql_source("/db", None))
 }
 
-pub(crate) async fn db_graphql_intern<'a>(state: &'a State, req: &'a GraphQLRequest) -> GraphQLResponse<'a> {
+pub(crate) async fn db_graphql_intern<'a>(
+	state: &'a State, req: &'a GraphQLRequest,
+) -> GraphQLResponse<'a> {
 	req.execute(&state.graphql_schema, state).await
 }
 
@@ -90,6 +92,63 @@ pub(crate) async fn db_graphql(
 
 impl Void {
 	fn new() -> Self { Self { void: true } }
+}
+
+fn get_chat_id(
+	db: &mut DbHandler, typ: GMessageTarget, server: &[u8], id: Option<ID>,
+) -> GResult<Option<i64>> {
+	use schema::{channel_chats, chats, client_chats, client_pokes, server_chats};
+
+	let res = match typ {
+		GMessageTarget::Server => {
+			if id.is_some() {
+				return Err(format_err!("Server message target needs no id").into());
+			}
+			let query = server_chats::table
+				.filter(server_chats::server.eq(server))
+				.inner_join(chats::table)
+				.select(chats::id);
+			query.first::<i64>(&db.con)
+		}
+		GMessageTarget::Channel => {
+			let id = if let Some(id) = id {
+				id.parse::<u64>()? as i64
+			} else {
+				return Err(format_err!("Channel message target needs id").into());
+			};
+			let query = channel_chats::table
+				.filter(channel_chats::server.eq(server).and(channel_chats::channel.eq(id)))
+				.inner_join(chats::table)
+				.select(chats::id);
+			query.first::<i64>(&db.con)
+		}
+		GMessageTarget::Client => {
+			let id = if let Some(id) = id {
+				base64::decode(id.as_bytes())?
+			} else {
+				return Err(format_err!("Poke message target needs id").into());
+			};
+			let query = client_chats::table
+				.filter(client_chats::server.eq(server).and(client_chats::client.eq(id)))
+				.inner_join(chats::table)
+				.select(chats::id);
+			query.first::<i64>(&db.con)
+		}
+		GMessageTarget::Poke => {
+			let id = if let Some(id) = id {
+				base64::decode(id.as_bytes())?
+			} else {
+				return Err(format_err!("Poke message target needs id").into());
+			};
+			let query = client_pokes::table
+				.filter(client_pokes::server.eq(server).and(client_pokes::client.eq(id)))
+				.inner_join(chats::table)
+				.select(chats::id);
+			query.first::<i64>(&db.con)
+		}
+	};
+
+	GResult::Ok(res.optional()?)
 }
 
 #[juniper::graphql_object(Context = State)]
@@ -500,7 +559,6 @@ impl Server {
 	}
 
 	/// The channels on this server.
-	// TODO Pagination
 	async fn channels(&self, state: &State, include_deleted: bool) -> GResult<Vec<Channel>> {
 		let id = self.0.public_key.clone();
 		let res = state
@@ -633,64 +691,19 @@ impl Query {
 		let res = state
 			.database
 			.send(RunOnDbMsg(move |db| {
-				use schema::{channel_chats, chats, client_chats, client_pokes, server_chats};
+				use schema::chats;
 
-				let res = match typ {
-					GMessageTarget::Server => {
-						if id.is_some() {
-							return Err(format_err!("Server message target needs no id").into());
-						}
-						let query = server_chats::table
-							.filter(server_chats::server.eq(server))
-							.inner_join(chats::table)
-							.select(chats::all_columns);
-						query.first::<models::Chat>(&db.con)
-					}
-					GMessageTarget::Channel => {
-						let id = if let Some(id) = id {
-							id.parse::<u64>()? as i64
-						} else {
-							return Err(format_err!("Channel message target needs id").into());
-						};
-						let query = channel_chats::table
-							.filter(
-								channel_chats::server.eq(server).and(channel_chats::channel.eq(id)),
-							)
-							.inner_join(chats::table)
-							.select(chats::all_columns);
-						query.first::<models::Chat>(&db.con)
-					}
-					GMessageTarget::Client => {
-						let id = if let Some(id) = id {
-							base64::decode(id.as_bytes())?
-						} else {
-							return Err(format_err!("Poke message target needs id").into());
-						};
-						let query = client_chats::table
-							.filter(
-								client_chats::server.eq(server).and(client_chats::client.eq(id)),
-							)
-							.inner_join(chats::table)
-							.select(chats::all_columns);
-						query.first::<models::Chat>(&db.con)
-					}
-					GMessageTarget::Poke => {
-						let id = if let Some(id) = id {
-							base64::decode(id.as_bytes())?
-						} else {
-							return Err(format_err!("Poke message target needs id").into());
-						};
-						let query = client_pokes::table
-							.filter(
-								client_pokes::server.eq(server).and(client_pokes::client.eq(id)),
-							)
-							.inner_join(chats::table)
-							.select(chats::all_columns);
-						query.first::<models::Chat>(&db.con)
-					}
-				};
-
-				GResult::Ok(res.optional()?.map(Chat))
+				let chat_id = get_chat_id(db, typ, &server, id)?;
+				if let Some(chat_id) = chat_id {
+					GResult::Ok(
+						chats::table
+							.find(chat_id)
+							.first::<models::Chat>(&db.con)
+							.map(|c| Some(Chat(c)))?,
+					)
+				} else {
+					Ok(None)
+				}
 			}))
 			.await??;
 		Ok(res)
@@ -803,6 +816,42 @@ impl Mutation {
 		}
 
 		Ok(Void::new())
+	}
+
+	/// Mark messages as read or unread and returns the current unread count.
+	async fn set_last_read(
+		state: &State, typ: GMessageTarget, server: Vec<i32>, id: Option<ID>, message: ID,
+	) -> GResult<i32>
+	{
+		let server = server.into_iter().map(|i| i as u8).collect::<Vec<_>>();
+		let message = message.parse::<u64>()? as i64;
+		let res: i64 = state
+			.database
+			.send(RunOnDbMsg(move |db| {
+				use schema::{chats, messages};
+
+				let chat_id = get_chat_id(db, typ, &server, id)?;
+				if let Some(chat_id) = chat_id {
+					let (last_read, timezone) = messages::table.find(message)
+						.select((messages::time, messages::timezone))
+						.first::<(NaiveDateTime, i32)>(&db.con)?;
+
+					diesel::update(chats::table.find(chat_id))
+						.set((chats::last_read.eq(last_read), chats::timezone.eq(timezone)))
+						.execute(&db.con)?;
+
+					let query = messages::table
+						.inner_join(chats::table)
+						.filter(chats::id.eq(chat_id).and(messages::time.gt(chats::last_read)))
+						.count();
+
+					GResult::Ok(query.get_result(&db.con)?)
+				} else {
+					GResult::Ok(0)
+				}
+			}))
+			.await??;
+		Ok(res.try_into()?)
 	}
 }
 

@@ -31,7 +31,7 @@
 	let minPxDistanceToRemove = 1500;
 	// The holding list element which has the scrollbar
 	let pan!: HTMLElement;
-	let scrollPane!: HTMLElement;
+	let scrollPane: HTMLElement | undefined | null;
 	// prevent async weirdness by only allowing one async task
 	let fetchTask: Promise<void> | undefined;
 
@@ -88,6 +88,18 @@
 		}
 	}
 
+	export function getElements(): T[] {
+		return elems;
+	}
+
+	export function getHtmlElements(): ArrayLike<HTMLElement> {
+		return !scrollPane ? [] : (scrollPane.children as any) as ArrayLike<HTMLElement>;
+	}
+
+	export function getScrollElement(): HTMLElement {
+		return pan;
+	}
+
 	type fetchFun<TL = any> = (id: TL | undefined, dir: ListFetchDir) => Promise<FetchResult<TL>>;
 	export let fetchElements: fetchFun;
 
@@ -103,9 +115,11 @@
 	// *** Private functions ***
 
 	function scrollToStart() {
+		if (!pan) return;
 		pan.scrollTop = 0;
 	}
 	function scrollToEnd() {
+		if (!pan) return;
 		pan.scrollTop = pan.scrollHeight - pan.clientHeight;
 	}
 	function getFirstElem() {
@@ -267,7 +281,7 @@
 	async function tryTrimEnd() {
 		if (elems.length <= minItemsToRemove) return;
 		await tick();
-		const childList = (scrollPane.children as any) as ArrayLike<HTMLElement>;
+		const childList = getHtmlElements();
 		assert(childList.length === elems.length, "HTML node count does not match elements count");
 
 		const distFn = (e: HTMLElement) => {
@@ -297,7 +311,7 @@
 	async function tryTrimStart() {
 		if (elems.length <= minItemsToRemove) return;
 		await tick();
-		const childList = (scrollPane.children as any) as ArrayLike<HTMLElement>;
+		const childList = getHtmlElements();
 		assert(childList.length === elems.length, "HTML node count does not match elements count");
 
 		const distFn = (e: HTMLElement) => {
