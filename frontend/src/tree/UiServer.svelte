@@ -86,11 +86,6 @@
 		margin: 0 0 0 0.2em;
 	}
 
-	:global(.innerContainer.dragStyle) {
-		background-color: #6040c080 !important;
-		z-index: 3 !important;
-	}
-
 	.serverHeader {
 		background: transparent;
 		border: none;

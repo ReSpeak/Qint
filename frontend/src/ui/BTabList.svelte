@@ -44,4 +44,9 @@
 	.tabBody {
 		padding: 0.5em;
 	}
+
+	.tabs li.is-active a {
+		color: #0dead0;
+		border-bottom-color: #0dead0;
+	}
 </style>

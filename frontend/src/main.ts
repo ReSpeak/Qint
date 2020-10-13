@@ -14,7 +14,7 @@ window.onbeforeunload = function (e: any) {
 
 	// For debugging purposes (?)
 	app.transientSettings.synth.trySpeak("Goodbye");
-	if (app.hasConnected) {
+	if (app.hasConnected && app.transientSettings.app.askBeforeClosing) {
 		if (e) {
 			e.returnValue = true;
 		}

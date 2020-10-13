@@ -15,6 +15,7 @@ export class TransientSettings {
 	public synth = new TransientSettingsSynth();
 	public ui = new TransientSettingsUi();
 	public chat = new TransientSettingsChat(this);
+	public app = new TransientSettingsApp();
 
 	public async loadAsync() {
 		const resp = await backend.fetch(`/transient/*`);
@@ -142,4 +143,8 @@ export class TransientSettingsChat {
 		if (key === undefined) return undefined;
 		return (this as any)[key] ?? undefined;
 	}
+}
+
+export class TransientSettingsApp {
+	public askBeforeClosing: boolean = true;
 }

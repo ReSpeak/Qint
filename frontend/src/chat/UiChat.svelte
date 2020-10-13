@@ -66,8 +66,7 @@
 		const scrollTop = scrollElem.scrollTop;
 		const height = scrollElem.clientHeight;
 		assert(elems.length === htmlElems.length, "HTML node count does not match message count");
-		if (elems.length === 0)
-			return [];
+		if (elems.length === 0) return [];
 
 		const distFn = (e: HTMLElement) => {
 			// The bottom of the element within our list (unscrolled)
@@ -127,13 +126,15 @@
 
 	// If unread chat messages are visible, register a mouse move handler
 	async function onChatScroll() {
-		if (chatData === undefined || chatList === undefined)
-			return;
+		if (chatData === undefined || chatList === undefined) return;
 		// Wait for html elements to update, e.g. when the chat changed
 		await tick();
 		const chat = $chatData;
 		const scrollElem = chatList.getScrollElement();
-		let displayedUnreadCount = getDisplayed().reduce((sum, msg) => sum + (msg.date > chat.lastRead ? 1 : 0), 0);
+		let displayedUnreadCount = getDisplayed().reduce(
+			(sum, msg) => sum + (msg.date > chat.lastRead ? 1 : 0),
+			0
+		);
 		if (displayedUnreadCount > 0) {
 			scrollElem.addEventListener("mousemove", onMouseMove);
 		} else {
@@ -144,8 +145,7 @@
 	// Mark all currently visible chat messages as read
 	function onMouseMove() {
 		const displayed = getDisplayed();
-		if (chatData === undefined || chatList === undefined || displayed.length === 0)
-			return;
+		if (chatData === undefined || chatList === undefined || displayed.length === 0) return;
 		const chatDat = $chatData;
 		let lastDisplayed = displayed[displayed.length - 1];
 		if (lastDisplayed.date > chatDat.lastRead) {
@@ -245,7 +245,9 @@
 					</div>
 				</div>
 			{/if}
-			<UiMessage message={item} unread={chatData !== undefined && item.date > $chatData.lastRead} />
+			<UiMessage
+				message={item}
+				unread={chatData !== undefined && item.date > $chatData.lastRead} />
 		</LazyList>
 		<form class="chat-form" class:hidden={!canChatHere} on:submit|preventDefault={sendMessage}>
 			<BInput bind:this={messageInput} bind:value={text} on:keydown={onChatKeyDown}>
@@ -279,6 +281,10 @@
 		// The LazyList
 		> :global(.lazyList) {
 			flex: 1;
+		}
+
+		:global(a:hover) {
+			text-decoration: underline;
 		}
 	}
 

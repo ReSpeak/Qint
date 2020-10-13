@@ -17,9 +17,6 @@
 	let loudnessThreshold = minLoudnessThreshold;
 	let loudnessTimer: number | undefined;
 
-	// Unique part for ids
-	const idUid = Math.random().toString().slice(2);
-
 	connection.sendMessage({ SubscribeLoudness: true });
 
 	function updateLoudness() {
@@ -54,11 +51,19 @@
 
 <div class="settings">
 	<BTabList>
+		<BTabSlot title="App">
+			<BKeyValue label="Ask before closing">
+				<input
+					type="checkbox"
+					bind:checked={app.transientSettings.app.askBeforeClosing}
+					on:change={() => syncSettings('app')} />
+			</BKeyValue>
+		</BTabSlot>
+
 		<BTabSlot title="Audio">
-			<BKeyValue label="Volume trigger" forLabel="{idUid}-loudness">
+			<BKeyValue label="Volume trigger">
 				<div>Loudness: {$loudness}</div>
 				<input
-					id="{idUid}-loudness"
 					type="range"
 					min={minLoudnessThreshold}
 					max={maxLoudnessThreshold}
@@ -70,40 +75,36 @@
 		</BTabSlot>
 
 		<BTabSlot title="TTS">
-			<BKeyValue label="Voice" forLabel="{idUid}-ttsVoice">
+			<BKeyValue label="Voice">
 				<BDropDown
-					id="{idUid}-ttsVoice"
 					items={voices}
 					display={(v) => v.name}
 					bind:selected={synthSett.voice}
-					on:change={() => syncSettings("synth")} />
+					on:change={() => syncSettings('synth')} />
 			</BKeyValue>
-			<BKeyValue label="Speed" forLabel="{idUid}-ttsSpeed">
+			<BKeyValue label="Speed">
 				<BSlider
-					id="{idUid}-ttsSpeed"
 					min={0.1}
 					max={3}
 					step={0.1}
 					bind:value={synthSett.speed}
 					tooltip={true}
-					on:change={() => syncSettings("synth")} />
+					on:change={() => syncSettings('synth')} />
 			</BKeyValue>
-			<BKeyValue label="Volume" forLabel="{idUid}-ttsVolume">
+			<BKeyValue label="Volume">
 				<BSlider
-					id="{idUid}-ttsVolume"
 					min={0}
 					max={1}
 					step={0.05}
 					bind:value={synthSett.volume}
 					tooltip={true}
-					on:change={() => syncSettings("synth")} />
+					on:change={() => syncSettings('synth')} />
 			</BKeyValue>
-			<BKeyValue label="Preview" narrow={false} forLabel="{idUid}-ttsPreview">
+			<BKeyValue label="Preview" narrow={false}>
 				<div class="is-horizontal field">
 					<div class="control" style="flex: 1;">
 						<input
 							bind:this={previewText}
-							id="{idUid}-ttsPreview"
 							class="input"
 							value="Mit Qwint wird alles besser" />
 					</div>

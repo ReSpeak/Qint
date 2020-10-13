@@ -83,7 +83,7 @@
 <div class="toolbar">
 	<div class="leftButtons">
 		<button
-			class="button toolbutton"
+			class="toolbutton"
 			class:active={showSidebar}
 			on:click={() => toggleSidebar(!showSidebar)}>
 			<Icon name="file-tree" />
@@ -92,19 +92,19 @@
 	<div class="spacer" />
 	<div class="centerButtons">
 		<button
-			class="button toolbutton"
+			class="toolbutton"
 			class:active={displayPanel === DisplayPanel.Main}
-			on:click={() => displayPanel = DisplayPanel.Main}>
+			on:click={() => (displayPanel = DisplayPanel.Main)}>
 			<Icon name="chat-outline" />
 		</button>
 		<button
-			class="button toolbutton"
+			class="toolbutton"
 			class:active={displayPanel === DisplayPanel.Settings}
 			on:click={() => (displayPanel = DisplayPanel.Settings)}>
 			<Icon name="cog" />
 		</button>
 		<button
-			class="button toolbutton"
+			class="toolbutton"
 			class:active={displayPanel === DisplayPanel.Connect}
 			on:click={() => (displayPanel = DisplayPanel.Connect)}>
 			<Icon name={SERVER_ICON} />
@@ -113,21 +113,21 @@
 	<div class="spacer" />
 	<div class="rightButtons">
 		<button
-			class="button toolbutton"
+			class="toolbutton"
 			class:active={inputMuted}
 			class:invisible={!showMuteButtons}
 			on:click={() => changeOwnClient({ input_muted: !inputMuted })}>
 			<Icon name={inputMuted ? 'microphone-off' : 'microphone'} />
 		</button>
 		<button
-			class="button toolbutton"
+			class="toolbutton"
 			class:active={outputMuted}
 			class:invisible={!showMuteButtons}
 			on:click={() => changeOwnClient({ output_muted: !outputMuted })}>
 			<Icon name={outputMuted ? 'volume-off' : 'volume-high'} />
 		</button>
 		<button
-			class="button toolbutton"
+			class="toolbutton"
 			class:active={isAway}
 			class:invisible={!showMuteButtons}
 			on:click={() => changeOwnClient({ away: isAway ? null : '' })}>
@@ -135,7 +135,7 @@
 		</button>
 		<div style="width: 2em;" />
 		<button
-			class="button toolbutton"
+			class="toolbutton"
 			class:active={showDescription}
 			class:invisible={!showDescriptionButton}
 			on:click={() => toggleDescription(!showDescription)}>
@@ -162,14 +162,22 @@
 	}
 
 	.toolbutton {
-		background-color: #444444;
+		@extend %unselectable;
+		-moz-appearance: none;
+		-webkit-appearance: none;
+
+		height: 2.5em;
 		border-radius: 100%;
 		border: none;
 		margin: 0.2em;
+		font-size: 1rem;
+		display: inline-flex;
+		align-items: center;
 
-		&:focus {
-			box-shadow: none;
-		}
+		background-color: #444444;
+		color: #fff;
+
+		cursor: pointer;
 
 		&.active {
 			background-color: #888888;

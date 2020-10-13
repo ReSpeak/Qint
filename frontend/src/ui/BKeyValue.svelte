@@ -1,17 +1,33 @@
 <script lang="typescript">
+	import { onMount } from "svelte";
+	import { getContext } from 'svelte';
+
 	export let label: string;
 	export let narrow: boolean = false;
-	export let forLabel: string | undefined = undefined;
+
+	const ctx = getContext("component_id") as any ?? "";
+	const labelId: string = label.replace(/\s/g, '-') + ctx;
+	let slot: HTMLElement | undefined;
+
+	onMount(() => {
+		if (slot) {
+			let inputField = slot.querySelector("input");
+			if (inputField) {
+				inputField.id = labelId;
+			}
+			slot = undefined;
+		}
+	});
 </script>
 
 <svelte:options immutable="{true}" />
 <!-- svelte-ignore a11y-label-has-associated-control -->
 <div class="field is-horizontal">
 	<div class="field-label is-normal">
-		<label class="label" for={forLabel}>{label}</label>
+		<label class="label" for={labelId}>{label}</label>
 	</div>
 	<div class="field-body">
-		<div class="field" class:is-narrow="{narrow}">
+		<div bind:this={slot} class="field" class:is-narrow="{narrow}">
 			<slot />
 		</div>
 	</div>
