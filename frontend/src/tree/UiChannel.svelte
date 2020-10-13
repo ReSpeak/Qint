@@ -36,6 +36,7 @@
 	$: filterShow = applyFilter(filter, filterStartFromRoot, $channel, $channels, $clients);
 	// Update if a client moves in or out
 	$: ownClient = updateOwnClient($clients);
+	$: chat = channel.chat;
 
 	let spacerType: SpacerType;
 	let displayName: string;
@@ -219,12 +220,12 @@
 				<FilterString filter={showId ? '' : thisFilter} content={displayName} />
 			</span>
 			<span class="icons">
-				{#if $channel.chat.unreadCount > 0}
-					<span class="unreadCount" title={$channel.chat.unreadCount.toString()}>
-						{#if $channel.chat.unreadCount >= 100}
+				{#if $chat.unreadCount > 0}
+					<span class="unreadCount" title={$chat.unreadCount.toString()}>
+						{#if $chat.unreadCount >= 100}
 							99+
 						{:else}
-							{$channel.chat.unreadCount}
+							{$chat.unreadCount}
 						{/if}
 					</span>
 				{/if}

@@ -1,12 +1,11 @@
-import { Writable, writable, get, Readable, derived } from "svelte/store";
+import { Writable, writable, get, Readable } from "svelte/store";
 import { InBookChangeMsg, WsMessageTarget } from "./backend/ws";
 import { graphql } from "./graphql";
 import { Connection } from "./connection";
-import { binarySearchBy, getDataColor, arraysEqual, base64Encode, Cached, datetimeDeserialize } from "./util";
+import { binarySearchBy, getDataColor, arraysEqual, base64Encode, Cached, datetimeDeserialize, assert } from "./util";
 import { ChannelId, ChannelType, ClientId, Codec, ServerGroupId } from "./ts";
 import { Moment } from "moment";
 import moment from "moment";
-import { Chat } from "./chat/chat";
 
 export class Book {
 	public server: Server = new Server();
@@ -394,7 +393,33 @@ export class ChatData {
 	}
 }
 
-export class GraphQlClient {
+export class BookNode {
+	protected readonly _store: Writable<this>;
+	public readonly chat: Writable<ChatData> = writable(new ChatData(moment(), 0));
+	public filterShow: boolean = true;
+	public isSelected: boolean = false;
+	
+
+	constructor(){
+		this._store = writable(this);
+	}
+
+	public update(obj: Partial<this>): this {
+		Object.assign(this, obj);
+		this._store.set(this);
+		return this;
+	}
+
+	public updateChat(obj: Partial<ChatData>) {
+		this.chat.update(c => Object.assign(c, obj));
+	}
+
+	public subscribe(run: (c: this) => any): () => void {
+		return this._store.subscribe(run);
+	}
+}
+
+export class GraphQlClient extends BookNode {
 	public readonly uid!: number[];
 	public readonly name!: string;
 	public readonly icon!: IconId;
@@ -405,6 +430,7 @@ export class GraphQlClient {
 	public get uidStr() { return this._uidStr.get(); }
 
 	protected constructor(uid?: number[], name?: string, icon?: IconId, avatar_hash?: string) {
+		super();
 		this._color = new Cached(() => this.uid, u => getDataColor(u));
 		this._uidStr = new Cached(() => this.uid, u => base64Encode(u));
 		if (uid !== undefined) this.uid = uid;
@@ -448,7 +474,6 @@ export class GraphQlClient {
 }
 
 export class Client extends GraphQlClient implements ITreeNode, Readable<Client> {
-	private _store: Writable<this>;
 	public readonly avatar_hash!: string;
 	public readonly away_message!: string | null;
 	public readonly badges!: string;
@@ -479,48 +504,28 @@ export class Client extends GraphQlClient implements ITreeNode, Readable<Client>
 	public readonly talk_power_request!: string | null;
 	public readonly unread_messages!: number;
 
-	public readonly chat = new ChatData(moment(), 0);
 	public volume: Writable<number> = writable(0); // TODO store probably not needed anymore
 	public readonly talking: TalkState = TalkState.Off;
 
-	// ITreeNode
-	public filterShow: boolean = true;
-	public isSelected: boolean = false;
-
-	protected constructor(store?: Writable<Client | undefined>) {
+	protected constructor() {
 		super();
-		this._store = (store ?? writable(undefined)) as Writable<this>;
 	}
 
 	public static fromJson(obj: Partial<Client>, store?: Writable<Client | undefined>): Client {
-		return new Client(store).update(obj);
-	}
-
-	public update(obj: Partial<this>): this {
-		Object.assign(this, obj);
-		this._store.set(this);
-		return this;
+		let c = new Client();
+		if (store !== undefined) {
+			(c._store as any) = store;
+		}
+		return c.update(obj);
 	}
 
 	public equals(other: this): boolean {
 		return other instanceof Client && this.id === other.id && super.equals(other);
 	}
 
-	public getChat(): Readable<ChatData> {
-		return derived(this, s => s.chat);
-	}
-
 	public readonly qlType = "CLIENT";
 	public get qlId() { return this.uidStr; }
 	public get wsTarget() { return { Client: this.id }; }
-
-	public subscribe(run: (c: this) => any): () => void {
-		return this._store.subscribe(run);
-	}
-
-	public getColor() {
-		return getDataColor(this.uid)
-	}
 
 	public updateVolume(connection: Connection, volume: number) {
 		connection.sendMessage({
@@ -552,8 +557,7 @@ export enum TalkState {
 	Whisper
 }
 
-export class Channel implements ITreeParent, ITreeNode, Readable<Channel> {
-	public _store: Writable<this>;
+export class Channel extends BookNode implements ITreeParent, ITreeNode, Readable<Channel> {
 	public readonly id!: ChannelId;
 	public readonly parent!: ChannelId;
 	public readonly name!: string;
@@ -578,18 +582,12 @@ export class Channel implements ITreeParent, ITreeNode, Readable<Channel> {
 	public readonly permission_hints!: any | null;
 	public readonly optional_data!: any | null;
 
-	public readonly chat = new ChatData(moment(), 0);
-
 	public readonly clients: Writable<Client[]> = writable([]);
 	// ITreeParent
 	public readonly channels: Writable<Channel[]> = writable([]);
 
-	// ITreeNode
-	public filterShow: boolean = true;
-	public isSelected: boolean = false;
-
 	private constructor() {
-		this._store = writable(this);
+		super();
 	}
 
 	public static fromJson(obj: Partial<Channel>): Channel {
@@ -606,30 +604,16 @@ export class Channel implements ITreeParent, ITreeNode, Readable<Channel> {
 		});
 	}
 
-	public update(obj: Partial<this>): this {
-		Object.assign(this, obj);
-		this._store.set(this);
-		return this;
-	}
-
 	public equals(other: this): boolean {
 		return other instanceof Channel && this.id === other.id;
-	}
-
-	public getChat(): Readable<ChatData> {
-		return derived(this, s => s.chat);
 	}
 
 	public readonly qlType = "CHANNEL";
 	public get qlId() { return this.id.toString() };
 	public readonly wsTarget = "Channel";
-
-	public subscribe(run: (c: this) => any): () => void {
-		return this._store.subscribe(run);
-	}
 }
 
-export class GraphQlServer {
+export class GraphQlServer extends BookNode {
 	public readonly public_key!: number[];
 	public readonly uid!: number[];
 	public readonly name!: string;
@@ -640,6 +624,7 @@ export class GraphQlServer {
 	public get uidStr() { return this._uidStr.get(); }
 
 	protected constructor(public_key?: number[] | undefined, uid?: number[], name?: string, icon?: IconId) {
+		super();
 		this._color = new Cached(() => this.uid, u => getDataColor(u));
 		this._uidStr = new Cached(() => this.uid, u => base64Encode(u));
 		if (public_key !== undefined) this.public_key = public_key;
@@ -658,7 +643,6 @@ export class GraphQlServer {
 }
 
 export class Server extends GraphQlServer implements ITreeParent, ITreeNode, Readable<Server> {
-	public _store: Writable<this>;
 	public readonly phonetic_name!: string;
 	public readonly ips!: string[];
 	public readonly license!: string; // TODO enum
@@ -669,23 +653,12 @@ export class Server extends GraphQlServer implements ITreeParent, ITreeNode, Rea
 	public readonly version!: string;
 	public readonly welcome_message!: string;
 
-	public readonly chat = new ChatData(moment(), 0);
-
-	public filterShow: boolean = true;
-	public isSelected: boolean = false;
-
 	constructor() {
 		super();
 		this._store = writable(this);
 	}
 	// ITreeParent
 	public channels: Writable<Channel[]> = writable([]);
-
-	public update(obj: Partial<this>): this {
-		Object.assign(this, obj);
-		this._store.set(this);
-		return this;
-	}
 
 	public reset() {
 		this.channels.set([]);
@@ -694,17 +667,9 @@ export class Server extends GraphQlServer implements ITreeParent, ITreeNode, Rea
 		this.isSelected = false;
 	}
 
-	public getChat(): Readable<ChatData> {
-		return derived(this, s => s.chat);
-	}
-
 	public readonly qlType = "SERVER";
 	public readonly qlId = undefined;
 	public readonly wsTarget = "Server";
-
-	public subscribe(run: (c: this) => any): () => void {
-		return this._store.subscribe(run);
-	}
 }
 
 export class Group {
@@ -740,11 +705,11 @@ export interface ITreeParent {
 }
 
 export type GQLMessageTarget = "SERVER" | "CHANNEL" | "CLIENT" | "POKE";
+
 export interface ITreeNode {
 	filterShow: boolean;
 	isSelected: boolean;
-	chat: ChatData;
-	getChat(): Readable<ChatData>;
+	readonly chat: Readable<ChatData>;
 	update(obj: Partial<this>): this;
 	equals(other: this): boolean;
 

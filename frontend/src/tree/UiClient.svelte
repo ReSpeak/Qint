@@ -24,6 +24,7 @@
 	let thisFilter = "";
 
 	$: isSelected = $client.isSelected;
+	$: chat = client.chat;
 	$: filterShow = applyFilter(filter, $client);
 	let ownClient = client.id === connection.book.ownClientId;
 	let div: HTMLElement;
@@ -102,7 +103,7 @@
 			data-key={$client.id}>
 			<div class:talking={$client.talking !== TalkState.Off} class="talkWave" />
 			<TsIcon type="client" source={$client} {connection} />
-			<span class="nameBox" style={$client.getColor()}>
+			<span class="nameBox" style={$client.color}>
 				{#if showId}
 					[<FilterString filter={thisFilter} content={$client.id.toString()} />]
 				{/if}
@@ -121,12 +122,12 @@
 				{#each $client.server_groups as grp (grp)}
 					<ServerGroupIcon id={grp} {connection} />
 				{/each}
-				{#if $client.chat.unreadCount > 0}
-					<span class="unreadCount" title={$client.chat.unreadCount.toString()}>
-						{#if $client.chat.unreadCount >= 100}
+				{#if $chat.unreadCount > 0}
+					<span class="unreadCount" title={$chat.unreadCount.toString()}>
+						{#if $chat.unreadCount >= 100}
 							99+
 						{:else}
-							{$client.chat.unreadCount}
+							{$chat.unreadCount}
 						{/if}
 					</span>
 				{/if}

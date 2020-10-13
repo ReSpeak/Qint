@@ -37,7 +37,7 @@
 		ownClient = connection?.book.ownClient ?? writable(undefined);
 	}
 
-	$: chatData = sel?.node.getChat();
+	$: chatData = sel?.node.chat;
 	$: on(chatData !== undefined && $chatData, unreadCountChanged(), checkChatScroll());
 
 	let oldOwnChannel: number | undefined;

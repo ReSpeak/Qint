@@ -20,6 +20,7 @@
 	const state = connection.state;
 	const server = connection.book.server;
 	let channels = server.channels;
+	$: chat = server.chat;
 	$: filterStartFromRoot = filter.includes("/");
 	$: selectedServerChat = $server.isSelected;
 
@@ -42,16 +43,18 @@
 		<ServerName {connection} />
 		<div class="buttons">
 			{#if !$state.connected}
-				<button class="button is-danger is-small" on:click|stopPropagation={cancel}>Cancel</button>
+				<button
+					class="button is-danger is-small"
+					on:click|stopPropagation={cancel}>Cancel</button>
 			{/if}
 		</div>
 		<span class="icons">
-			{#if $state.connected && $server.chat.unreadCount > 0}
-				<span class="unreadCount" title={$server.chat.unreadCount.toString()}>
-					{#if $server.chat.unreadCount >= 100}
+			{#if $state.connected && $chat.unreadCount > 0}
+				<span class="unreadCount" title={$chat.unreadCount.toString()}>
+					{#if $chat.unreadCount >= 100}
 						99+
 					{:else}
-						{$server.chat.unreadCount}
+						{$chat.unreadCount}
 					{/if}
 				</span>
 			{/if}
@@ -86,6 +89,11 @@
 		margin: 0 0 0 0.2em;
 	}
 
+	:global(.innerContainer.dragStyle) {
+		background-color: #6040c080 !important;
+		z-index: 3 !important;
+	}
+
 	.serverHeader {
 		background: transparent;
 		border: none;
@@ -116,7 +124,8 @@
 		padding: 1em;
 	}
 
-	.buttons, .button {
+	.buttons,
+	.button {
 		margin-bottom: 0;
 	}
 </style>

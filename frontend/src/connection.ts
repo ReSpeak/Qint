@@ -110,7 +110,7 @@ export class Connection {
 			server: this.book.server.public_key,
 		});
 		if (serverData.data.chat !== null)
-			this.book.server.update({ chat: ChatData.fromGraphql(serverData.data.chat) });
+			this.book.server.updateChat(ChatData.fromGraphql(serverData.data.chat));
 
 
 		// Channels
@@ -130,7 +130,7 @@ export class Connection {
 		});
 		for (const channel of channelData.data.server.channels) {
 			if (channel.chat !== null)
-				this.book.channels.get(Number(channel.id))!.update({ chat: ChatData.fromGraphql(channel.chat) });
+				this.book.channels.get(Number(channel.id))!.updateChat(ChatData.fromGraphql(channel.chat));
 		}
 
 		// Clients
@@ -146,7 +146,7 @@ export class Connection {
 				client: client.uidStr,
 			});
 			if (clientData.data.chat !== null)
-				client.update({ chat: ChatData.fromGraphql(clientData.data.chat) });
+				client.updateChat(ChatData.fromGraphql(clientData.data.chat));
 		}
 	}
 
@@ -161,7 +161,7 @@ export class Connection {
 			client: client.uidStr,
 		});
 		if (clientData.data.chat !== null)
-			client.update({ chat: ChatData.fromGraphql(clientData.data.chat) });
+			client.updateChat(ChatData.fromGraphql(clientData.data.chat));
 	}
 
 	private messageHandler(msg: InMsg) {
@@ -191,21 +191,21 @@ export class Connection {
 						this.updateAllUnreadCounts();
 					} else if ("Message" in tsevt) {
 						if (tsevt.Message.target === "Server") {
-							this.book.server.update({ chat: this.book.server.chat.incrementUnread() });
+							this.book.server.chat.update(c => c.incrementUnread());
 						} else if (tsevt.Message.target === "Channel") {
 							const ownClient = get(this.book.ownClient);
 							if (ownClient !== undefined) {
 								const channel = this.book.getChannel(ownClient.channel)!;
-								channel.update({ chat: channel.chat.incrementUnread() });
+								channel.chat.update(c => c.incrementUnread());
 							}
 						} else if ("Client" in tsevt.Message.target) {
 							const client = this.book.getClient(tsevt.Message.target.Client);
 							if (client !== undefined)
-								client.update({ chat: client.chat.incrementUnread() });
+								client.chat.update(c => c.incrementUnread());
 						} else if ("Poke" in tsevt.Message.target) {
 							const client = this.book.getClient(tsevt.Message.target.Poke);
 							if (client !== undefined)
-								client.update({ chat: client.chat.incrementUnread() });
+								client.chat.update(c => c.incrementUnread());
 						}
 					} else {
 						if ("PropertyRemoved" in tsevt) {

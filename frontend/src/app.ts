@@ -24,7 +24,7 @@ export class App {
 	constructor() {
 		loadPlugins().then(x => this.plugins = x);
 		this.transientSettings.loadAsync(); // Async !!!!
-
+		// TODO unsubscribe somewhere
 		this.selectedNode.subscribe(s => {
 			if (s !== undefined) {
 				const name = s.connection.book.server.name ?? s.connection.connectOptions.address;
@@ -44,6 +44,9 @@ export class App {
 	}
 
 	private selectNode(nodeSel?: NodeSelection) {
+		const checkOldNode = get(this.selectedNode);
+		if (NodeSelection.equals(checkOldNode, nodeSel))
+			return;
 		this.selectedNode.update(oldNode => {
 			if (oldNode !== undefined) {
 				oldNode.node.update({ isSelected: false });
