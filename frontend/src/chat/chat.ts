@@ -2,7 +2,7 @@ import { get, writable, Writable, Readable } from "svelte/store";
 import type { Moment } from "moment";
 import { graphql } from "../graphql";
 import { GraphQlClient, ChatData } from "../book";
-import { datetimeDeserialize, getDataColor, assert, Lazy, base64Encode, datetimeSerialize } from "../util";
+import { datetimeDeserialize, getDataColor, assert, Lazy } from "../util";
 import { ListFetchDir, FetchResult } from "../ui/lazyList";
 import { NodeSelection } from "../app";
 
@@ -157,7 +157,7 @@ export class Chat {
 			chatId: selected.node.qlId,
 			message: messageId,
 		});
-		selected.node.update({ chat: new ChatData(lastRead, res.data.setLastRead) });
+		selected.node.updateChat(new ChatData(lastRead, res.data.setLastRead));
 	}
 }
 

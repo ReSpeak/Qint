@@ -12,10 +12,10 @@
 	import { ListFetchDir } from "../ui/lazyList";
 	import { Connection } from "../connection";
 	import { app, NodeSelection } from "../app";
-	import { Channel, Client, Server } from "../book";
+	import { Channel, ChatData, Client, Server } from "../book";
 	import { writable } from "svelte/store";
 	import type { Writable } from "svelte/store";
-	import { assert, binarySearchByKey, on } from "../util";
+	import { on } from "../util";
 
 	export let chat: Chat;
 
@@ -38,7 +38,7 @@
 	}
 
 	$: chatData = sel?.node.chat;
-	$: on(chatData !== undefined && $chatData, unreadCountChanged(), checkChatScroll());
+	$: on(chatData !== undefined && unreadCountChanged($chatData));
 
 	let oldOwnChannel: number | undefined;
 	let oldCon: string | undefined;
@@ -58,36 +58,10 @@
 		chatChanged();
 	}
 
-	function getDisplayed(): Message[] {
-		if (!chatList) return [];
-		const elems = chatList.getElements();
-		const scrollElem = chatList.getScrollElement();
-		const htmlElems = chatList.getHtmlElements();
-		const scrollTop = scrollElem.scrollTop;
-		const height = scrollElem.clientHeight;
-		assert(elems.length === htmlElems.length, "HTML node count does not match message count");
-		if (elems.length === 0) return [];
-
-		const distFn = (e: HTMLElement) => {
-			// The bottom of the element within our list (unscrolled)
-			const bottomStaticOffset = e.offsetTop;
-			// The top of the element without our list (with scroll offset)
-			const bottomCurrentOffset = bottomStaticOffset - scrollTop;
-			return bottomCurrentOffset;
-		};
-
-		// Where would we need to insert an element that starts one pixel from the top
-		let res = binarySearchByKey(htmlElems, 1, distFn);
-		const start = res.index > 0 ? res.index - 1 : res.index;
-		// Where would we need to insert an element that starts at the bottom
-		res = binarySearchByKey(htmlElems, height, distFn);
-		const end = res.index;
-		return elems.slice(start, end);
-	}
-
 	function chatChanged() {
 		if (!chatList) return;
 
+		const sel = $selected;
 		if (sel === undefined) {
 			oldSelection = undefined;
 			chatList?.clear();
@@ -105,53 +79,11 @@
 		}
 	}
 
-	function unreadCountChanged() {
+	function unreadCountChanged(chatDat: ChatData) {
 		if (!chatList) return;
 
-		chatList.sourceChanged(ListFetchDir.After, ListFetchDir.After);
-	}
-
-	function checkChatScroll() {
-		if (chatData !== undefined && chatList !== undefined) {
-			const scrollElem = chatList.getScrollElement();
-			const chat = $chatData;
-			if (chat.unreadCount > 0) {
-				scrollElem.addEventListener("scroll", onChatScroll);
-				onChatScroll();
-			} else {
-				scrollElem.removeEventListener("scroll", onChatScroll);
-			}
-		}
-	}
-
-	// If unread chat messages are visible, register a mouse move handler
-	async function onChatScroll() {
-		if (chatData === undefined || chatList === undefined) return;
-		// Wait for html elements to update, e.g. when the chat changed
-		await tick();
-		const chat = $chatData;
-		const scrollElem = chatList.getScrollElement();
-		let displayedUnreadCount = getDisplayed().reduce(
-			(sum, msg) => sum + (msg.date > chat.lastRead ? 1 : 0),
-			0
-		);
-		if (displayedUnreadCount > 0) {
-			scrollElem.addEventListener("mousemove", onMouseMove);
-		} else {
-			scrollElem.removeEventListener("mousemove", onMouseMove);
-		}
-	}
-
-	// Mark all currently visible chat messages as read
-	function onMouseMove() {
-		const displayed = getDisplayed();
-		if (chatData === undefined || chatList === undefined || displayed.length === 0) return;
-		const chatDat = $chatData;
-		let lastDisplayed = displayed[displayed.length - 1];
-		if (lastDisplayed.date > chatDat.lastRead) {
-			chat.setLastRead(lastDisplayed.id, lastDisplayed.date);
-			const scrollElem = chatList.getScrollElement();
-			scrollElem.removeEventListener("mousemove", onMouseMove);
+		if (chatDat.unreadCount > 0) {
+			chatList.sourceChanged(ListFetchDir.After, ListFetchDir.After);
 		}
 	}
 
@@ -197,12 +129,20 @@
 		messagesError = undefined;
 		try {
 			const res = await chat.getMessages(idFrom, dir);
-			setTimeout(checkChatScroll);
 			return res;
 		} catch (err) {
 			console.error("Failed to load messages", err);
 			messagesError = err;
 			return Chat.EmptyFetch;
+		}
+	}
+
+	// TODO on got focus
+	async function viewchanged(ev: CustomEvent<{ first?: Message; last?: Message }>) {
+		if (chatData === undefined || ev.detail.last === undefined) return;
+		let lastDisplayed = ev.detail.last;
+		if (lastDisplayed.date > $chatData.lastRead) {
+			await chat.setLastRead(lastDisplayed.id, lastDisplayed.date);
 		}
 	}
 
@@ -222,7 +162,13 @@
 			</article>
 		</div>
 	{:else if sel !== undefined}
-		<LazyList bind:this={chatList} {fetchElements} suggestJumpEnd={true} let:item>
+		<LazyList
+			on:viewchanged={viewchanged}
+			bind:this={chatList}
+			{fetchElements}
+			suggestJumpEnd={true}
+			notifyViewChanged={chatData !== undefined && $chatData.unreadCount > 0}
+			let:item>
 			<div slot="loading" class="chatFiller">
 				<span>Loading ...</span>
 				<Icon name="orbit mdi-spin" />
@@ -253,11 +199,12 @@
 			<BInput bind:this={messageInput} bind:value={text} on:keydown={onChatKeyDown}>
 				<div slot="placeholder">
 					<span>Send to</span>
-					{#if sel.node instanceof Client}
+					<!-- TODO: Remove 'sel !== undefined' when svelte-tool understands it -->
+					{#if sel !== undefined && sel.node instanceof Client}
 						<ClientName client={sel.node} />
-					{:else if sel.node instanceof Channel}
+					{:else if sel !== undefined && sel.node instanceof Channel}
 						<span> your channel</span>
-					{:else if sel.node instanceof Server}
+					{:else if sel !== undefined && sel.node instanceof Server}
 						<ServerName connection={sel.connection} />
 					{/if}
 				</div>

@@ -246,11 +246,14 @@
 	<ul class="menu-list">
 		{#if connection !== undefined}
 			{#each $clients as client (client.id)}
-				<UiClient
-					{connection}
-					filter={childrenFilter}
-					{client}
-					bind:filterShow={client.filterShow} />
+				<!-- TODO: Remove '!== undefined' when svelte-tool understands it -->
+				{#if connection !== undefined}
+					<UiClient
+						{connection}
+						filter={childrenFilter}
+						{client}
+						bind:filterShow={client.filterShow} />
+				{/if}
 			{/each}
 		{/if}
 		{#each $channels as c (c.id)}

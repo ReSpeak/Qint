@@ -6,7 +6,7 @@
 	export let display: (item: any) => string = displayFn;
 	export let id: string | undefined = undefined;
 	let dd: HTMLSelectElement;
-	const dispatch = createEventDispatcher();
+	const dispatch = createEventDispatcher<{ change: any }>();
 	assert(Array.isArray(items), "items must be set to an array");
 
 	$: selectedToIndex(selected);
@@ -22,7 +22,7 @@
 	function indexToSelected() {
 		if (dd === undefined) return;
 		selected = items[dd.selectedIndex];
-		dispatch("change", { value: selected });
+		dispatch("change", selected);
 	}
 
 	function displayFn(item: any): string {

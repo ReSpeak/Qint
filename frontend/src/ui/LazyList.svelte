@@ -1,9 +1,10 @@
 <script lang="typescript">
 	import { ListFetchDir } from "./lazyList";
 	import { assert, binarySearchByKey } from "../util";
-	import { tick, onMount, onDestroy } from "svelte";
+	import { createEventDispatcher, tick, onMount, onDestroy } from "svelte";
 	import type { FetchResult } from "./lazyList";
 	import ResizeObserver from "resize-observer-polyfill";
+	const dispatch = createEventDispatcher<{ viewchanged: { first?: T; last?: T } }>();
 
 	// Dummy class to have nice typing for our 'generic' parameter T which
 	// represents the element type.
@@ -14,11 +15,16 @@
 	export let enableFetching: boolean = true;
 	export let suggestJumpStart: boolean = false;
 	export let suggestJumpEnd: boolean = false;
+	export let notifyViewChanged: boolean = false;
 	let canLoadBeforeStart: boolean = true;
 	let canLoadAfterEnd: boolean = true;
 	let showJumpStart: boolean;
 	let showJumpEnd: boolean;
 	let loadAnchored: ListFetchDir | undefined = undefined;
+	let lastViewStart: T | undefined;
+	let lastViewEnd: T | undefined;
+	type CacheElem = { t: T; posTop: number; posMid: number; posBot: number };
+	let lastViewSizeCache: { elems: CacheElem[]; size: number } | undefined;
 
 	// the data elements held by this list
 	let elems: T[] = [];
@@ -30,7 +36,7 @@
 	/** How far the item at index `minItemsToRemove` has to be out of view to be removed */
 	let minPxDistanceToRemove = 1500;
 	// The holding list element which has the scrollbar
-	let pan!: HTMLElement;
+	let pan: HTMLElement;
 	let scrollPane: HTMLElement | undefined | null;
 	// prevent async weirdness by only allowing one async task
 	let fetchTask: Promise<void> | undefined;
@@ -43,6 +49,13 @@
 		canLoadBeforeStart = false;
 		showJumpStart = false;
 		showJumpEnd = false;
+		lastViewStart = undefined;
+		lastViewEnd = undefined;
+		lastViewSizeCache = undefined;
+		if (currentDebounceTimer !== undefined) {
+			clearTimeout(currentDebounceTimer);
+			currentDebounceTimer = undefined;
+		}
 	}
 
 	export function sourceChanged(dir: ListFetchDir, anchor?: ListFetchDir) {
@@ -88,18 +101,6 @@
 		}
 	}
 
-	export function getElements(): T[] {
-		return elems;
-	}
-
-	export function getHtmlElements(): ArrayLike<HTMLElement> {
-		return !scrollPane ? [] : (scrollPane.children as any) as ArrayLike<HTMLElement>;
-	}
-
-	export function getScrollElement(): HTMLElement {
-		return pan;
-	}
-
 	type fetchFun<TL = any> = (id: TL | undefined, dir: ListFetchDir) => Promise<FetchResult<TL>>;
 	export let fetchElements: fetchFun;
 
@@ -137,14 +138,34 @@
 		// 	pan.offsetHeight, // container height
 		// 	pan.clientHeight, // inner view height (after subtracting border/padding)
 		// );
-		// ! ELEM.offsetTop   // is the bottom of a element measured from the top of the container
+		// ! ELEM.offsetTop   // is the top of a element measured from the top of the first position:relative parent.
 		// ! clientHeight + scrollTopMax === scrollHeight
-		scrollPanChanged();
-
 		start_fill();
 	}
 
+	function getHtmlElements(): ArrayLike<HTMLElement> {
+		assert(scrollPane, "scrollPane must be set");
+		const childList = (scrollPane.children as any) as ArrayLike<HTMLElement>;
+		assert(childList.length === elems.length, "HTML node count does not match elements count");
+		return childList;
+	}
+
+	function recheckView(contentChanged: boolean) {
+		scrollPanChanged();
+		if (contentChanged) {
+			recheckCurrentView();
+		} else {
+			checkCurrentView();
+		}
+	}
+
 	function scrollPanChanged() {
+		if (!scrollPane) {
+			showJumpStart = false;
+			showJumpEnd = false;
+			return;
+		}
+		// Update jump up/down button visibility
 		const isScrollable = pan.scrollHeight > pan.clientHeight;
 		if (suggestJumpStart) {
 			const isScrolledToStart = pan.scrollTop <= 0;
@@ -153,6 +174,68 @@
 		if (suggestJumpEnd) {
 			const isScrolledToEnd = pan.scrollTop >= pan.scrollHeight - pan.clientHeight;
 			showJumpEnd = isScrollable && (!isScrolledToEnd || canLoadAfterEnd);
+		}
+	}
+
+	function recheckCurrentView() {
+		lastViewSizeCache = undefined;
+		checkCurrentView();
+	}
+
+	const viewDebounceRate = 250;
+	let currentDebounceTimer: number | undefined;
+	function checkCurrentView() {
+		if (currentDebounceTimer === undefined) {
+			currentDebounceTimer = setTimeout(() => {
+				doCheckCurrentView();
+				currentDebounceTimer = undefined;
+			}, viewDebounceRate);
+		}
+	}
+
+	function doCheckCurrentView() {
+		if (!scrollPane) return;
+		if (notifyViewChanged) {
+			if (lastViewSizeCache === undefined || lastViewSizeCache.size !== pan.scrollHeight) {
+				const childList = getHtmlElements();
+				const cacheElems = new Array<CacheElem>(elems.length);
+				for (let i = 0; i < cacheElems.length; i++) {
+					let childElem = childList[i];
+					cacheElems[i] = {
+						t: elems[i],
+						posTop: childElem.offsetTop,
+						posMid: childElem.offsetTop + childElem.offsetHeight / 2,
+						posBot: childElem.offsetTop + childElem.offsetHeight,
+					};
+				}
+				lastViewSizeCache = {
+					elems: cacheElems,
+					size: pan.scrollHeight,
+				};
+			}
+
+			const viewStart = pan.scrollTop;
+			const topElemIndex = binarySearchByKey(
+				lastViewSizeCache.elems,
+				viewStart,
+				(cacheElem) => cacheElem.posMid
+			);
+			const topElem = lastViewSizeCache.elems[topElemIndex.index];
+
+			const viewEnd = viewStart + pan.clientHeight;
+			const botElemIndex = binarySearchByKey(
+				lastViewSizeCache.elems,
+				viewEnd,
+				(cacheElem) => cacheElem.posMid,
+				topElemIndex.index
+			);
+			const botElem = lastViewSizeCache.elems[botElemIndex.index - 1];
+
+			if (lastViewStart !== topElem.t || lastViewEnd !== botElem.t) {
+				lastViewStart = topElem.t;
+				lastViewEnd = botElem.t;
+				dispatch("viewchanged", { first: lastViewStart, last: lastViewEnd });
+			}
 		}
 	}
 
@@ -165,10 +248,13 @@
 
 	async function fill_loop() {
 		const loadMaxBeforeError = 50;
+		let hasChange = false;
 		for (let i = 0; i <= loadMaxBeforeError; i++) {
 			if (i === loadMaxBeforeError) throw Error("yah, thats a loop");
 			if (await fill_body()) break;
+			else hasChange = true;
 		}
+		recheckView(hasChange);
 		fetchTask = undefined;
 	}
 
@@ -282,11 +368,10 @@
 		if (elems.length <= minItemsToRemove) return;
 		await tick();
 		const childList = getHtmlElements();
-		assert(childList.length === elems.length, "HTML node count does not match elements count");
 
 		const distFn = (e: HTMLElement) => {
 			// The top of the element within our list (unscrolled)
-			const topStaticOffset = e.offsetTop - e.offsetHeight;
+			const topStaticOffset = e.offsetTop;
 			// The top of the element without our list (with scroll offset)
 			const topCurrentOffset = topStaticOffset - pan.scrollTop;
 			return topCurrentOffset;
@@ -312,11 +397,10 @@
 		if (elems.length <= minItemsToRemove) return;
 		await tick();
 		const childList = getHtmlElements();
-		assert(childList.length === elems.length, "HTML node count does not match elements count");
 
 		const distFn = (e: HTMLElement) => {
 			// The bottom of the element within our list (unscrolled)
-			const bottomStaticOffset = e.offsetTop;
+			const bottomStaticOffset = e.offsetTop + e.offsetHeight;
 			// The top of the element without our list (with scroll offset)
 			const bottomCurrentOffset = bottomStaticOffset - pan.scrollTop;
 			return bottomCurrentOffset;
@@ -350,7 +434,6 @@
 				// This case adds elements at the end => trim start
 				elems = [...elems, ...newElems]; // modification is at the end => safe
 				await tryTrimStart();
-				scrollPanChanged();
 				break;
 
 			case ListFetchDir.Before:
@@ -395,7 +478,7 @@
 				scroller.scrollTop = newScrollTop;
 				oldScrollTop = newScrollTop;
 				oldHeight = scroller.clientHeight;
-				scrollPanChanged();
+				recheckView(true);
 			});
 			_obs.observe(pan);
 		}
@@ -443,6 +526,9 @@
 	}
 
 	.lazyListView {
+		// The position: relative makes that getting offsetTop from child elements
+		// will use the scrollPane element as the relative parent.
+		position: relative;
 		overflow-x: hidden;
 		overflow-y: scroll;
 		height: 100%;

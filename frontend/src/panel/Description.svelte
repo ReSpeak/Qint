@@ -10,11 +10,12 @@
 
 <div class="description">
 	{#if selected !== undefined}
-		{#if selected.node instanceof Client}
+		<!-- TODO: Remove '!== undefined' when svelte-tool understands it -->
+		{#if selected !== undefined && selected.node instanceof Client}
 			<DescriptionClient connection={selected.connection} clientId={selected.node.id} />
-		{:else if selected.node instanceof Channel}
+		{:else if selected !== undefined && selected.node instanceof Channel}
 			<DescriptionChannel connection={selected.connection} channelId={selected.node.id} />
-		{:else if selected.node instanceof Server}
+		{:else if selected !== undefined && selected.node instanceof Server}
 			<DescriptionServer connection={selected.connection} />
 		{/if}
 	{/if}

@@ -655,7 +655,6 @@ export class Server extends GraphQlServer implements ITreeParent, ITreeNode, Rea
 
 	constructor() {
 		super();
-		this._store = writable(this);
 	}
 	// ITreeParent
 	public channels: Writable<Channel[]> = writable([]);
@@ -710,6 +709,7 @@ export interface ITreeNode {
 	filterShow: boolean;
 	isSelected: boolean;
 	readonly chat: Readable<ChatData>;
+	updateChat(obj: Partial<ChatData>): void;
 	update(obj: Partial<this>): this;
 	equals(other: this): boolean;
 
