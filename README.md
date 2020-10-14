@@ -11,19 +11,29 @@ Qint allows you to speak with other people over the internet.
 - [OpenSSL](https://www.openssl.org) 1.1, on linux only
 - [libopus](https://opus-codec.org), on linux only
 
+### Windows
+Run `./install_sdl.ps1`  
+ \--- OR ---  
+Download the `SDL2-devel-2.x.x-VC.zip` from [libsdl.org](https://www.libsdl.org).  
+From this file, copy `SDL2-2.x.x/lib/x64/*.lib` to `Qint/proxy/msvc/lib/64/`.  
+And copy `SDL2-2.x.x/lib/x64/*.dll` to `Qint/proxy/msvc/dll/64/` and `Qint/proxy/`.
+
+### macOS
+```bash
+brew install sdl2 opus automake
+```
+
+### Ubuntu
+```bash
+apt install libopus-dev libsdl2-dev libwebkit2gtk-4.0-dev
+```
+
 ## Clone
 At the moment, tsclientlib is needed beside the Qint folder.
 ```bash
 git clone https://github.com/ReSpeak/tsclientlib.git --recurse-submodules
 git clone https://github.com/Flakebi/Qint.git
 ```
-
-## Download SDL2 on Windows
-Run `./install_sdl.ps1`  
- \--- OR ---  
-Download the `SDL2-devel-2.x.x-VC.zip` from [libsdl.org](https://www.libsdl.org).  
-From this file, copy `SDL2-2.x.x/lib/x64/*.lib` to `Qint/proxy/msvc/lib/64/`.  
-And copy `SDL2-2.x.x/lib/x64/*.dll` to `Qint/proxy/msvc/dll/64/` and `Qint/proxy/`.
 
 ## Build and run Qint
 ### Build the frontend
