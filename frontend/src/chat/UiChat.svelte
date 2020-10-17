@@ -7,7 +7,7 @@
 	import ServerName from "../ui/ServerName.svelte";
 	import UiLazyList from "../ui/UiLazyList.svelte";
 	import BInput from "../ui/BInput.svelte";
-	import { onMount, tick } from "svelte";
+	import { onDestroy, onMount, tick } from "svelte";
 	import { Chat, Message } from "./chat";
 	import { ListFetchDir } from "../ui/lazyList";
 	import { Connection } from "../connection";
@@ -26,10 +26,11 @@
 	let messagesError: unknown | undefined;
 	let messageInput: BInput;
 	let text = "";
+	let lastDisplayed: Message | undefined;
 
 	let canChatHere = false;
 
-	let oldSelection: NodeSelection | undefined = undefined;
+	let oldSelection: NodeSelection | undefined;
 	let connection: Connection | undefined;
 	let ownClient: Writable<Client | undefined>;
 	$: {
@@ -80,7 +81,8 @@
 	}
 
 	function unreadCountChanged() {
-		if (!chatList) return;
+		// TODO Also check for sourceChanged, so hot reload with snowpack works
+		if (!chatList || !chatList.sourceChanged) return;
 
 		chatList.sourceChanged(ListFetchDir.After, ListFetchDir.After);
 	}
@@ -135,17 +137,26 @@
 		}
 	}
 
-	// TODO on got focus
-	async function viewchanged(ev: CustomEvent<{ first?: Message; last?: Message }>) {
-		if (chatData === undefined || ev.detail.last === undefined) return;
-		let lastDisplayed = ev.detail.last;
-		if (lastDisplayed.date > $chatData.lastRead) {
+	async function markRead() {
+		if (chatData === undefined || lastDisplayed === undefined) return;
+		if (document.hasFocus() && lastDisplayed.date > $chatData.lastRead) {
 			await chat.setLastRead(lastDisplayed.id, lastDisplayed.date);
 		}
 	}
 
+	async function viewchanged(ev: CustomEvent<{ first?: Message; last?: Message }>) {
+		lastDisplayed = ev.detail.last;
+		markRead();
+	}
+
 	onMount(() => {
 		chatChanged();
+		window.addEventListener("focus", markRead);
+	});
+
+	onDestroy(() => {
+		chatChanged();
+		window.removeEventListener("focus", markRead);
 	});
 </script>
 
