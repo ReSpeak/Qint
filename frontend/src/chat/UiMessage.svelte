@@ -52,33 +52,35 @@
 
 <svelte:options immutable />
 <div class="message-row" class:unread>
-	<div class="message-time chat-left-col">
-		<span title={message.date.format(LONG_DATETIME)}>
-			{message.date.format('HH:mm')}
-		</span>
-	</div>
-	<!-- msg.status === MessageStatus::Sending -->
-	<!-- msg.status === MessageStatus::Error -->
-	<div
-		class="message-content"
-		class:message-sending={false}
-		class:message-error={false}
-		class:viewRaw>
-		<div class="content message-rendered" bind:this={rendered} />
-		<div class="message-raw">
-			<pre>{message.raw}</pre>
+	<div class="hover-container">
+		<div class="message-time chat-left-col">
+			<span title={message.date.format(LONG_DATETIME)}>
+				{message.date.format('HH:mm')}
+			</span>
 		</div>
-		<div class="tool-buttons">
-			<div class="tool-buttons-wrap buttons has-addons">
-				<button class="button is-small is-rounded">
-					<Icon name="pencil" />
-				</button>
-				<button class="button is-small is-rounded">
-					<Icon name="format-quote-close" />
-				</button>
-				<button class="button is-small is-rounded" on:click={() => (viewRaw = !viewRaw)} title="It’s raw!">
-					<Icon raw="🥩" />
-				</button>
+		<!-- msg.status === MessageStatus::Sending -->
+		<!-- msg.status === MessageStatus::Error -->
+		<div
+			class="message-content"
+			class:message-sending={false}
+			class:message-error={false}
+			class:viewRaw>
+			<div class="content message-rendered" bind:this={rendered} />
+			<div class="message-raw">
+				<pre>{message.raw}</pre>
+			</div>
+			<div class="tool-buttons">
+				<div class="tool-buttons-wrap buttons has-addons">
+					<button class="button is-small is-rounded">
+						<Icon name="pencil" />
+					</button>
+					<button class="button is-small is-rounded">
+						<Icon name="format-quote-close" />
+					</button>
+					<button class="button is-small is-rounded" on:click={() => (viewRaw = !viewRaw)} title="It’s raw!">
+						<Icon raw="🥩" />
+					</button>
+				</div>
 			</div>
 		</div>
 	</div>
@@ -88,11 +90,18 @@
 	$row-pad: 0.25em;
 
 	.message-row {
+		transition: background 2s;
+
+		&.unread {
+			background-color: mix($background, $blue, 80%);
+		}
+	}
+
+	.hover-container {
 		display: grid;
 		grid-template-columns: min-content minmax(0, 1fr);
 		padding: $row-pad 0;
 		line-height: 1.1em;
-		transition: background 2s;
 
 		&:hover {
 			background-color: mix($background, $text, 90%);
@@ -101,10 +110,6 @@
 			.tool-buttons {
 				visibility: visible;
 			}
-		}
-
-		&.unread {
-			background-color: mix($background, $blue, 80%);
 		}
 	}
 

@@ -12,7 +12,7 @@
 	import { ListFetchDir } from "../ui/lazyList";
 	import { Connection } from "../connection";
 	import { app, NodeSelection } from "../app";
-	import { Channel, ChatData, Client, Server } from "../book";
+	import { Channel, Client, Server } from "../book";
 	import { writable } from "svelte/store";
 	import type { Writable } from "svelte/store";
 	import { on } from "../util";
@@ -38,7 +38,7 @@
 	}
 
 	$: chatData = sel?.node.chat;
-	$: on(chatData !== undefined && unreadCountChanged($chatData));
+	$: on(chatData !== undefined && $chatData, unreadCountChanged());
 
 	let oldOwnChannel: number | undefined;
 	let oldCon: string | undefined;
@@ -79,12 +79,10 @@
 		}
 	}
 
-	function unreadCountChanged(chatDat: ChatData) {
+	function unreadCountChanged() {
 		if (!chatList) return;
 
-		if (chatDat.unreadCount > 0) {
-			chatList.sourceChanged(ListFetchDir.After, ListFetchDir.After);
-		}
+		chatList.sourceChanged(ListFetchDir.After, ListFetchDir.After);
 	}
 
 	function chatBoxRecheck() {

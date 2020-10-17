@@ -8,7 +8,7 @@ extern crate diesel_migrations;
 
 use std::collections::HashMap;
 use std::fs;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::{mpsc, Arc, Mutex, RwLock};
@@ -93,9 +93,9 @@ struct Args {
 	/// Open the frontend in the browser on start.
 	#[structopt(long)]
 	no_open: bool,
-	/// Start tauri.
+	/// Start in browser instead of in tauri.
 	#[structopt(short, long)]
-	tauri: bool,
+	browser: bool,
 	/// How much log output do you want?
 	///
 	/// 0. Print nothing
@@ -726,13 +726,21 @@ impl App {
 			let port = addr.port();
 			let logger = state.logger.clone();
 			actix::spawn(async move {
-				if let Err(e) = open::that(format!("http://localhost:{}", port)) {
+				// Connect to localhost if == 0.0.0.0 or ::
+				let url = if addr.ip() == "0.0.0.0".parse::<IpAddr>().unwrap() ||
+					addr.ip() == "::".parse::<IpAddr>().unwrap() {
+					format!("http://localhost:{}", port)
+				} else {
+					format!("http://{}", addr)
+				};
+				debug!(logger, "Opening url"; "url" => &url);
+				if let Err(e) = open::that(url) {
 					error!(logger, "Failed to open frontend in browser"; "error" => %e);
 				}
 			});
 		}
 
-		if !args.tauri {
+		if !args.browser {
 			let state2 = state.clone();
 			let state3 = state.clone();
 			tauri::AppBuilder::new()

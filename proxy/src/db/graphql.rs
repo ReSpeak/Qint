@@ -821,8 +821,7 @@ impl Mutation {
 	/// Mark messages as read or unread and returns the current unread count.
 	async fn set_last_read(
 		state: &State, typ: GMessageTarget, server: Vec<i32>, id: Option<ID>, message: ID,
-	) -> GResult<i32>
-	{
+	) -> GResult<i32> {
 		let server = server.into_iter().map(|i| i as u8).collect::<Vec<_>>();
 		let message = message.parse::<u64>()? as i64;
 		let res: i64 = state
@@ -832,7 +831,8 @@ impl Mutation {
 
 				let chat_id = get_chat_id(db, typ, &server, id)?;
 				if let Some(chat_id) = chat_id {
-					let (last_read, timezone) = messages::table.find(message)
+					let (last_read, timezone) = messages::table
+						.find(message)
 						.select((messages::time, messages::timezone))
 						.first::<(NaiveDateTime, i32)>(&db.con)?;
 

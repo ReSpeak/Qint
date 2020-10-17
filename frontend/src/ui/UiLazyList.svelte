@@ -143,8 +143,9 @@
 		start_fill();
 	}
 
-	function getHtmlElements(): ArrayLike<HTMLElement> {
-		assert(scrollPane, "scrollPane must be set");
+	function getHtmlElements(): ArrayLike<HTMLElement> | undefined {
+		if (!scrollPane)
+			return undefined;
 		const childList = (scrollPane.children as any) as ArrayLike<HTMLElement>;
 		assert(childList.length === elems.length, "HTML node count does not match elements count");
 		return childList;
@@ -198,6 +199,8 @@
 		if (notifyViewChanged) {
 			if (lastViewSizeCache === undefined || lastViewSizeCache.size !== pan.scrollHeight) {
 				const childList = getHtmlElements();
+				if (childList === undefined)
+					return;
 				const cacheElems = new Array<CacheElem>(elems.length);
 				for (let i = 0; i < cacheElems.length; i++) {
 					let childElem = childList[i];
@@ -368,6 +371,8 @@
 		if (elems.length <= minItemsToRemove) return;
 		await tick();
 		const childList = getHtmlElements();
+		if (childList === undefined)
+			return;
 
 		const distFn = (e: HTMLElement) => {
 			// The top of the element within our list (unscrolled)
@@ -397,6 +402,8 @@
 		if (elems.length <= minItemsToRemove) return;
 		await tick();
 		const childList = getHtmlElements();
+		if (childList === undefined)
+			return;
 
 		const distFn = (e: HTMLElement) => {
 			// The bottom of the element within our list (unscrolled)

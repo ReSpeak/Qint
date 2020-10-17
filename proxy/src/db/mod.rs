@@ -158,8 +158,14 @@ impl DbHandler {
 		// The database can be opened successfully, create backup
 		fs::copy(database_url, settings.config_path.join("storage.sqlite.bak"))?;
 
-		// Enable foreign keys
-		con.batch_execute("PRAGMA foreign_keys = ON")?;
+		// Enforce foreign keys constraints
+		// Enable wal mode for more concurrency and faster writes
+		// Use busy_timeout to retry operations when the database is locked (timeout in
+		// milliseconds)
+		con.batch_execute("PRAGMA synchronous = NORMAL; \
+			PRAGMA journal_mode = WAL; \
+			PRAGMA foreign_keys = ON; \
+			PRAGMA busy_timeout = 1000")?;
 
 		// Run migrations
 		let mut s = Vec::new();
@@ -442,7 +448,7 @@ impl Handler<UpdateIdentityMsg> for DbHandler {
 impl Handler<WriteMessageMsg> for DbHandler {
 	type Result = Result<()>;
 	fn handle(&mut self, message: WriteMessageMsg, _: &mut Self::Context) -> Self::Result {
-		use schema::messages;
+		use schema::{chats, messages};
 
 		let (utc_time, utc_to_local_offset) = EventHandler::get_now();
 
@@ -452,20 +458,22 @@ impl Handler<WriteMessageMsg> for DbHandler {
 		}
 
 		let chat = self.get_or_create_chat(&message.chat)?;
-		self.last_message_id = self.con.transaction::<_, diesel::result::Error, _>(|| {
-			// Insert message
-			let message = models::MessageInsert {
-				chat,
-				invoker: Some(&message.invoker_uid.0),
-				invoker_name: None,
-				content: &message.message,
-				status: MessageStatus::Sending,
-				time: &utc_time,
-				timezone: utc_to_local_offset,
-			};
-			diesel::insert_into(messages::table).values(&message).execute(&self.con)?;
-			messages::table.order(messages::id.desc()).select(messages::id).first::<i64>(&self.con)
-		})?;
+		// Insert message
+		let message = models::MessageInsert {
+			chat,
+			invoker: Some(&message.invoker_uid.0),
+			invoker_name: None,
+			content: &message.message,
+			status: MessageStatus::Sending,
+			time: &utc_time,
+			timezone: utc_to_local_offset,
+		};
+		diesel::insert_into(messages::table).values(&message).execute(&self.con)?;
+
+		// Update last read from the chat
+		diesel::update(chats::table.find(chat))
+			.set((chats::last_read.eq(&utc_time), chats::timezone.eq(utc_to_local_offset)))
+			.execute(&self.con)?;
 
 		Ok(())
 	}
@@ -760,16 +768,7 @@ impl DbHandler {
 				},
 				Event::Message { target, invoker, message } => {
 					if let MessageTarget::Client(id) = target {
-						if id != &data.own_client {
-							Self::register_client(&handler, e, data, data.clients.get(id));
-						} else {
-							Self::register_client(
-								&handler,
-								e,
-								data,
-								data.clients.get(&data.own_client),
-							);
-						}
+						Self::register_client(&handler, e, data, data.clients.get(id));
 					} else {
 						Self::register_client(
 							&handler,
@@ -1368,14 +1367,11 @@ impl<'a> EventHandler<'a> {
 		// multiple clients which are connected to the same server.
 		// We have to make sure that only one instance of a message
 		// is inserted into the database.
-		let can_be_duplicate;
 		match target {
 			MessageTarget::Server => {
-				can_be_duplicate = true;
 				chat = ChatType::Server;
 			}
 			MessageTarget::Channel => {
-				can_be_duplicate = true;
 				let client = self.data.clients.get(&self.data.own_client);
 				let own_client = if let Some(client) = client {
 					client
@@ -1385,7 +1381,6 @@ impl<'a> EventHandler<'a> {
 				chat = ChatType::Channel(own_client.channel.0);
 			}
 			MessageTarget::Client(id) => {
-				can_be_duplicate = false;
 				let client = self.data.clients.get(&id);
 				let client_uid = if own_message {
 					client.and_then(|c| c.uid.as_ref()).map(|u| &u.0)
@@ -1401,7 +1396,6 @@ impl<'a> EventHandler<'a> {
 				chat = ChatType::Client(client_uid.clone());
 			}
 			MessageTarget::Poke(id) => {
-				can_be_duplicate = false;
 				let client = self.data.clients.get(&id);
 				let uid = client.and_then(|c| c.uid.as_ref());
 				if let Some(uid) = uid {
@@ -1414,33 +1408,13 @@ impl<'a> EventHandler<'a> {
 
 		let message = message.to_string();
 		self.run(move |db, _| {
+			use diesel::dsl::not;
 			use schema::messages;
 
 			let chat = db.get_or_create_chat(&ChatId { server, chat_type: chat })?;
 
 			let (utc_time, utc_to_local_offset) = Self::get_now();
 			db.last_message_id = db.con.transaction::<_, diesel::result::Error, _>(|| {
-				if can_be_duplicate {
-					// Check if the message is already in the database
-					let start_check_time = utc_time - Duration::seconds(1);
-					let cmp = messages::chat
-						.eq(chat)
-						.and(messages::invoker.eq(&invoker_uid))
-						.and(messages::invoker_name.eq(&invoker_name))
-						.and(messages::content.eq(&message))
-						.and(messages::time.gt(&start_check_time))
-						.and(messages::id.gt(db.last_message_id));
-					let id = messages::table
-						.filter(cmp)
-						.select(messages::id)
-						.first::<i64>(&db.con)
-						.optional()?;
-
-					if let Some(id) = id {
-						return Ok(id);
-					}
-				}
-
 				let invoker_uid = invoker_uid.as_deref();
 				if own_message {
 					// Check if the message is already in the database
@@ -1461,6 +1435,43 @@ impl<'a> EventHandler<'a> {
 							.select(messages::id)
 							.first::<i64>(&db.con);
 					}
+				}
+
+				// Check if the message is already in the database
+				let start_check_time = utc_time - Duration::seconds(1);
+
+				// Compare uid and name: messages::invoker == invoker_uid
+        		// But with null == null
+        		//
+        		// https://stackoverflow.com/questions/10416789/how-to-rewrite-is-distinct-from-and-is-not-distinct-from
+        		// a IS NOT DISTINCT FROM b can be rewritten as:
+        		// (NOT (a <> b OR a IS NULL OR b IS NULL) OR (a IS NULL AND b IS NULL))
+        		let invoker_cmp = not(messages::invoker
+            		.ne(&invoker_uid)
+            		.or(messages::invoker.is_null())
+            		.or(invoker_uid.is_none()))
+        		.or(messages::invoker.is_null().and(invoker_uid.is_none()));
+        		let name_cmp = not(messages::invoker_name
+            		.ne(&invoker_name)
+            		.or(messages::invoker_name.is_null())
+            		.or(invoker_name.is_none()))
+        		.or(messages::invoker_name.is_null().and(invoker_name.is_none()));
+
+				let cmp = messages::chat
+					.eq(chat)
+					.and(invoker_cmp)
+					.and(name_cmp)
+					.and(messages::content.eq(&message))
+					.and(messages::time.gt(&start_check_time))
+					.and(messages::id.ge(db.last_message_id));
+				let id = messages::table
+					.filter(cmp)
+					.select(messages::id)
+					.first::<i64>(&db.con)
+					.optional()?;
+
+				if let Some(id) = id {
+					return Ok(id);
 				}
 
 				// Insert message

@@ -7,6 +7,7 @@ import { backend, IBackendConnection } from "./backend/backend";
 import { app } from "./app";
 import { graphql } from "./graphql";
 import { ConnectData } from "./connect/connect";
+import moment from "moment";
 
 export class Connection {
 	private readonly _state = writable(new ConnectionState());
@@ -154,6 +155,8 @@ export class Connection {
 		const client = this.book.getClient(clientId)!;
 		const clientData = await graphql(`query GetUnreadCount($server: [Int!]!, $client: ID!) {
 			chat(typ: CLIENT, server: $server, id: $client) {
+				lastRead
+				timezone
 				unreadCount
 			}
 		}`, {
@@ -190,23 +193,32 @@ export class Connection {
 						location.hash = getStringFromConnect(this.connectOptions!);
 						this.updateAllUnreadCounts();
 					} else if ("Message" in tsevt) {
+						const fromOwnClient = tsevt.Message.invoker.id === this.book.ownClientId;
+						let chat = undefined;
 						if (tsevt.Message.target === "Server") {
-							this.book.server.chat.update(c => c.incrementUnread());
+							chat = this.book.server.chat;
 						} else if (tsevt.Message.target === "Channel") {
 							const ownClient = get(this.book.ownClient);
 							if (ownClient !== undefined) {
 								const channel = this.book.getChannel(ownClient.channel)!;
-								channel.chat.update(c => c.incrementUnread());
+								chat = channel.chat;
 							}
-						} else if ("Client" in tsevt.Message.target) {
-							const client = this.book.getClient(tsevt.Message.target.Client);
+						} else if ("Client" in tsevt.Message.target || "Poke" in tsevt.Message.target) {
+							const targetClientId = "Client" in tsevt.Message.target ? tsevt.Message.target.Client : tsevt.Message.target.Poke;
+							const chatClientId = fromOwnClient ? targetClientId : tsevt.Message.invoker.id;
+							const client = this.book.getClient(chatClientId);
 							if (client !== undefined)
-								client.chat.update(c => c.incrementUnread());
-						} else if ("Poke" in tsevt.Message.target) {
-							const client = this.book.getClient(tsevt.Message.target.Poke);
-							if (client !== undefined)
-								client.chat.update(c => c.incrementUnread());
+								chat = client.chat;
 						}
+
+						if (chat !== undefined)
+							chat.update(c => {
+								// Only increment unread count for messages from others
+								if (fromOwnClient)
+									return new ChatData(moment(), c.unreadCount);
+								else
+									return c.incrementUnread();
+							});
 					} else {
 						if ("PropertyRemoved" in tsevt) {
 							if ("Client" in tsevt.PropertyRemoved.id) {
