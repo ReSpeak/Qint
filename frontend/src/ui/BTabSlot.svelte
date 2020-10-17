@@ -1,7 +1,7 @@
 <script lang="typescript">
 	import { getContext } from "svelte";
-	import { contextKey } from "./bTabList";
-	import type { TabListContext } from "./bTabList";
+	import { contextKey } from "./tabList";
+	import type { TabListContext } from "./tabList";
 	import { assert } from "../util";
 
 	export let title: string;

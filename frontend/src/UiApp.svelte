@@ -7,7 +7,7 @@
 	import Description from "./panel/Description.svelte";
 	import { DisplayPanel } from "./panel/panel";
 	import { app } from "./app";
-	import Connect from "./connect/Connect.svelte";
+	import Connect from "./connect/UiConnect.svelte";
 	import GlobalCss from "./GlobalCss.svelte";
 	import { ConnectData } from "./connect/connect";
 

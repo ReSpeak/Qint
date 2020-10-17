@@ -474,7 +474,6 @@ export class GraphQlClient extends BookNode {
 }
 
 export class Client extends GraphQlClient implements ITreeNode, Readable<Client> {
-	public readonly avatar_hash!: string;
 	public readonly away_message!: string | null;
 	public readonly badges!: string;
 	public readonly channel!: number;
@@ -491,8 +490,7 @@ export class Client extends GraphQlClient implements ITreeNode, Readable<Client>
 	public readonly is_channel_commander!: boolean;
 	public readonly is_priority_speaker!: boolean;
 	public readonly is_recording!: boolean;
-	public readonly metadata!: string
-	public readonly name!: string;
+	public readonly metadata!: string;
 	public readonly needed_serverquery_view_power!: number;
 	public readonly output_hardware_enabled!: boolean;
 	public readonly output_muted!: boolean;

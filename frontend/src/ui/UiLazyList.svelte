@@ -1,8 +1,8 @@
 <script lang="typescript">
 	import { ListFetchDir } from "./lazyList";
+	import type { FetchResult } from "./lazyList";
 	import { assert, binarySearchByKey } from "../util";
 	import { createEventDispatcher, tick, onMount, onDestroy } from "svelte";
-	import type { FetchResult } from "./lazyList";
 	import ResizeObserver from "resize-observer-polyfill";
 	const dispatch = createEventDispatcher<{ viewchanged: { first?: T; last?: T } }>();
 

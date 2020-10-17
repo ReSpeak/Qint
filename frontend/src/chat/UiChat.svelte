@@ -5,7 +5,7 @@
 	import TsIcon from "../ui/TsIcon.svelte";
 	import ClientName from "../ui/ClientName.svelte";
 	import ServerName from "../ui/ServerName.svelte";
-	import LazyList from "../ui/LazyList.svelte";
+	import UiLazyList from "../ui/UiLazyList.svelte";
 	import BInput from "../ui/BInput.svelte";
 	import { onMount, tick } from "svelte";
 	import { Chat, Message } from "./chat";
@@ -22,7 +22,7 @@
 	const selected = app.selectedNode;
 	let chatStore = app.transientSettings.chat;
 
-	let chatList: LazyList | undefined;
+	let chatList: UiLazyList | undefined;
 	let messagesError: unknown | undefined;
 	let messageInput: BInput;
 	let text = "";
@@ -162,7 +162,7 @@
 			</article>
 		</div>
 	{:else if sel !== undefined}
-		<LazyList
+		<UiLazyList
 			on:viewchanged={viewchanged}
 			bind:this={chatList}
 			{fetchElements}
@@ -194,7 +194,7 @@
 			<UiMessage
 				message={item}
 				unread={chatData !== undefined && item.date > $chatData.lastRead} />
-		</LazyList>
+		</UiLazyList>
 		<form class="chat-form" class:hidden={!canChatHere} on:submit|preventDefault={sendMessage}>
 			<BInput bind:this={messageInput} bind:value={text} on:keydown={onChatKeyDown}>
 				<div slot="placeholder">

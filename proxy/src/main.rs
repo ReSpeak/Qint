@@ -835,7 +835,7 @@ impl App {
 					.service(set_transient_setting)
 					.service(db::graphql::db_graphql)
 					.service(db::graphql::graphiql)
-					.service(Files::new("", "../frontend/public/").index_file("index.html"))
+					.service(Files::new("", "../frontend/build/").index_file("index.html"))
 					.wrap_fn(|req, srv| {
 						let fut = srv.call(req);
 						async {

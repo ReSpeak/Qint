@@ -1,5 +1,7 @@
 .DS_Store
 node_modules
+build/
+web_modules/
 public/bundle.*
 public/bulma.css
 public/fonts

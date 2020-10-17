@@ -147,4 +147,5 @@ export class TransientSettingsChat {
 
 export class TransientSettingsApp {
 	public askBeforeClosing: boolean = true;
+	public customBackend: string = "";
 }

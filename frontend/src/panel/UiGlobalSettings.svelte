@@ -58,6 +58,12 @@
 					bind:checked={app.transientSettings.app.askBeforeClosing}
 					on:change={() => syncSettings('app')} />
 			</BKeyValue>
+			<BKeyValue label="Custom backed address">
+				<input
+					type="text"
+					bind:value={app.transientSettings.app.customBackend}
+					on:change={() => syncSettings('app')} />
+			</BKeyValue>
 		</BTabSlot>
 
 		<BTabSlot title="Audio">

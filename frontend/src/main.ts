@@ -38,3 +38,13 @@ const uiApp = new UiApp({
 });
 
 export default uiApp;
+
+// Hot Module Replacement (HMR) - Remove this snippet to remove HMR.
+// Learn more: https://www.snowpack.dev/#hot-module-replacement
+if ((import.meta as any).hot) {
+	console.log("Aww, that's hot", import.meta);
+	(import.meta as any).hot.accept();
+	(import.meta as any).hot.dispose(() => {
+		uiApp.$destroy();
+	});
+}
