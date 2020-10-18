@@ -116,8 +116,8 @@ export class TransientSettingsSynth {
 
 export class TransientSettingsUi {
 	public showSidebar: boolean = true;
-	public showChat: boolean = true;
 	public showDescription: boolean = true;
+	public developMode: boolean = false;
 }
 
 export class TransientSettingsChat {
@@ -147,5 +147,4 @@ export class TransientSettingsChat {
 
 export class TransientSettingsApp {
 	public askBeforeClosing: boolean = true;
-	public customBackend: string = "";
 }

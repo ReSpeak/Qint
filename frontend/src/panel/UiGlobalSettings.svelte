@@ -58,11 +58,11 @@
 					bind:checked={app.transientSettings.app.askBeforeClosing}
 					on:change={() => syncSettings('app')} />
 			</BKeyValue>
-			<BKeyValue label="Custom backed address">
+			<BKeyValue label="Developer Mode">
 				<input
-					type="text"
-					bind:value={app.transientSettings.app.customBackend}
-					on:change={() => syncSettings('app')} />
+					type="checkbox"
+					bind:checked={app.transientSettings.ui.developMode}
+					on:change={() => syncSettings('ui')} />
 			</BKeyValue>
 		</BTabSlot>
 

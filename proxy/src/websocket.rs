@@ -17,7 +17,7 @@ use tsclientlib::prelude::*;
 use tsclientlib::StreamItem as TsStreamItem;
 use tsclientlib::{
 	events, ChannelId, ClientId, Connection, DisconnectOptions, FileDownloadResult,
-	FileTransferHandle, MessageTarget, Uid,
+	FiletransferHandle, MessageTarget, Uid,
 };
 use tsproto::resend::PacketId;
 use tsproto_packets::packets::{AudioData, OutPacket};
@@ -37,7 +37,7 @@ pub(crate) struct Ws {
 	connection: Option<Connection>,
 	connect_options: Option<messages::ConnectOptions>,
 	channel_list_finished_msg: Option<ChannelListMsg>,
-	file_downloads: HashMap<FileTransferHandle, oneshot::Sender<Result<FileDownloadResult>>>,
+	file_downloads: HashMap<FiletransferHandle, oneshot::Sender<Result<FileDownloadResult>>>,
 
 	tauri: Option<WebviewMut>,
 	websocket_closed: bool,
@@ -351,7 +351,7 @@ impl Ws {
 					let _ = transfer.send(Ok(file));
 				}
 			}
-			TsStreamItem::FileTransferFailed(handle, e) => {
+			TsStreamItem::FiletransferFailed(handle, e) => {
 				if let Some(transfer) = self.file_downloads.remove(&handle) {
 					let _ = transfer.send(Err(e.into()));
 				}
@@ -522,6 +522,7 @@ impl Ws {
 			MessageF2P::SendMessage { target, message } => {
 				self.send_chat_message(target, message);
 			}
+			MessageF2P::SendCommand(cmd) => self.send_command(cmd),
 			MessageF2P::Change(change) => {
 				if let Some(con) = &mut self.connection {
 					match con.get_state() {
@@ -673,6 +674,20 @@ impl Ws {
 			}
 		} else {
 			// TODO Respond with error
+		}
+	}
+
+	fn send_command(&mut self, command: String) {
+		if let Some(con) = &mut self.connection {
+			let cmd = tsproto_packets::packets::OutCommand::new(
+				tsproto_packets::packets::Direction::C2S,
+				tsproto_packets::packets::Flags::empty(),
+				tsproto_packets::packets::PacketType::Command,
+				&command,
+			);
+			if let Err(e) = cmd.send(con) {
+				error!(self.logger, "Failed to send command"; "error" => %e);
+			}
 		}
 	}
 }

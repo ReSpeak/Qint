@@ -214,8 +214,7 @@
 				class="nameBox"
 				on:click={setChat}>
 				{#if showId}
-					[
-					<FilterString filter={thisFilter} content={$channel.id.toString()} />]
+					[<FilterString filter={thisFilter} content={$channel.id.toString()} />]
 				{/if}
 				<FilterString filter={showId ? '' : thisFilter} content={displayName} />
 			</span>

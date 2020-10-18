@@ -1,5 +1,5 @@
 <script lang="typescript">
-	// TODO Use scroll-anchoring https://blog.eqrion.net/pin-to-bottom/
+	// Use scroll-anchoring https://blog.eqrion.net/pin-to-bottom/
 	import UiMessage from "./UiMessage.svelte";
 	import Icon from "../ui/Icon.svelte";
 	import TsIcon from "../ui/TsIcon.svelte";
@@ -26,6 +26,7 @@
 	let messagesError: unknown | undefined;
 	let messageInput: BInput;
 	let text = "";
+	let command = "";
 	let lastDisplayed: Message | undefined;
 
 	let canChatHere = false;
@@ -38,7 +39,7 @@
 		ownClient = connection?.book.ownClient ?? writable(undefined);
 	}
 
-	$: chatData = sel?.node.chat;
+	$: chatData = $selected?.node.chat;
 	$: on(chatData !== undefined && $chatData, unreadCountChanged());
 
 	let oldOwnChannel: number | undefined;
@@ -60,7 +61,7 @@
 	}
 
 	function chatChanged() {
-		if (!chatList) return;
+		if (!chatList || !chatList.clear) return;
 
 		const sel = $selected;
 		if (sel === undefined) {
@@ -118,6 +119,14 @@
 		messageInput.focus();
 	}
 
+	function sendCommand() {
+		if (!command || !connection) return;
+		connection.sendMessage({
+			SendCommand: command,
+		});
+		command = "";
+	}
+
 	function onChatKeyDown(e: any) {
 		if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey) {
 			sendMessage();
@@ -170,7 +179,7 @@
 				<div class="message-body">Failed to fetch messages</div>
 			</article>
 		</div>
-	{:else if sel !== undefined}
+	{:else if $selected !== undefined && sel !== undefined}
 		<UiLazyList
 			on:viewchanged={viewchanged}
 			bind:this={chatList}
@@ -220,6 +229,12 @@
 			</BInput>
 			<button class="button" name="send" type="submit" style="height: auto;">Send</button>
 		</form>
+		{#if app.transientSettings.ui.developMode}
+			<form class="chat-form" on:submit|preventDefault={sendCommand}>
+				<BInput bind:value={command}></BInput>
+				<button class="button" name="send" type="submit" style="height: auto;">Send Command</button>
+			</form>
+		{/if}
 	{:else}
 		<div class="chatFiller">No chat selected</div>
 	{/if}

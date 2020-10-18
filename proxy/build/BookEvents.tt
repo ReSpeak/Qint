@@ -34,7 +34,11 @@ fn convert_ids(_fmt: &mut fmt::Formatter, js: &JsStruct, structs: &[Struct]) -> 
 			continue;
 		} #>
 			PropertyId::<#= struc.name #><#= ids #> => Ok(JsPropertyId::<#= js.name #><#= ids #>),
-		<# for p in get_properties(structs, struc) {
+		<#
+		if struc.opt {
+			continue;
+		}
+		for p in get_properties(structs, struc) {
 			if let Some(modifier) = &p.modifier {
 				let ids = get_id_args(js.ids.len() + 1, true);
 				if modifier == "array" || modifier == "set" {
@@ -59,6 +63,9 @@ fn convert_value(_fmt: &mut fmt::Formatter, js: &JsStruct, structs: &[Struct]) -
 			continue;
 		} #>
 		PropertyId::<#= struc.name #><#= ids #> => if let PropertyValueRef::<#= struc.name #>(val) = p {
+			<# if struc.opt { #>
+			if let Some(val) = val {
+			<# } #>
 			Some(JsProperty::<#= js.name #>(Js<#= js.name #> {
 		<# for p in get_all_properties(structs, &js.parts) {
 			if struc.properties.iter().any(|prop| prop.name == p.name) { #>
@@ -75,27 +82,35 @@ fn convert_value(_fmt: &mut fmt::Formatter, js: &JsStruct, structs: &[Struct]) -
 		} #>
 				.. Default::default()
 			}))
+			<# if struc.opt { #>
+			} else { None }
+			<# } #>
 		} else {
 			panic!("Got wrong PropertyValue type, expected <#= js.name #>");
 		},
-		<# for prop in get_properties(structs, struc) {
-			let type_s = prop.get_inner_rust_type_as_name();
-			if let Some(modifier) = &prop.modifier {
-				let ids = get_id_args(js.ids.len() + 1, false);
-				if modifier == "array" || modifier == "set" {
-				#>
+		<#
+		if struc.opt {
+			continue;
+		}
+		for prop in get_properties(structs, struc) {
+			let type_s = prop.get_inner_type()?.to_name();
+			let ids2;
+			let ids = if prop.modifier.is_some() {
+				ids2 = get_id_args(js.ids.len() + 1, false);
+				&ids2
+			} else {
+				&ids
+			};
+			#>
 		PropertyId::<#= struc.name #><#= prop.get_name() #><#= ids #> => if let PropertyValueRef::<#= type_s #>(val) = p {
+			<#
+			if let Some(modifier) = &prop.modifier {
+				if modifier == "array" || modifier == "set" { #>
 			Some(JsProperty::<#= type_s #>(<#= get_to_owned(prop) #>))
-		} else {
-			panic!("Got wrong PropertyValue type, expected <#= type_s #>");
-		},
-				<#
-				} else {
+				<# } else {
 					panic!("Unknown modifier {}", modifier);
 				}
-			} else {
-				#>
-		PropertyId::<#= struc.name #><#= prop.get_name() #><#= ids #> => if let PropertyValueRef::<#= type_s #>(val) = p {
+			} else { #>
 			Some(JsProperty::<#= js.name #>(Js<#= js.name #> {
 		<# for p in get_all_properties(structs, &js.parts) {
 			if prop.name == p.name { #>
@@ -104,11 +119,11 @@ fn convert_value(_fmt: &mut fmt::Formatter, js: &JsStruct, structs: &[Struct]) -
 			} #>
 				.. Default::default()
 			}))
+		<# } #>
 		} else {
 			panic!("Got wrong PropertyValue type, expected <#= type_s #>");
 		},
 		<# }
-		}
 	}
 	Ok(())
 }
@@ -120,14 +135,13 @@ for struc in &self.3.0 {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct Js<#= struc.name #> {
 	<# for p in get_all_properties(&self.structs, &struc.parts) {
-		let type_s = p.get_rust_type(false);
-		if type_s == "OffsetDateTime" { #>
+		let struct_type = p.get_type()?;
+		if p.type_s == "DateTime" { #>
 	#[serde(default, deserialize_with = "deserialize_some_date_time", serialize_with = "serialize_some_date_time", skip_serializing_if = "Option::is_none")]
-	pub <#= p.name.to_snake_case() #>: Option<<#= type_s #>>,
 		<# } else { #>
 	#[serde(default, deserialize_with = "deserialize_some", skip_serializing_if = "Option::is_none")]
-	pub <#= p.name.to_snake_case() #>: Option<<#= type_s #>>,
 		<# } #>
+	pub <#= p.name.to_snake_case() #>: Option<<#= struct_type #>>,
 	<# } #>
 }
 
@@ -219,7 +233,7 @@ pub struct <#= e.msg.name #> {
 		let name = r.from_name_singular();
 		#>
 	#[serde(default, deserialize_with = "deserialize_some", skip_serializing_if = "Option::is_none")]
-	pub <#= r.from_name().to_snake_case() #>: Option<<#= r.get_type_no_option_owned() #>>,
+	pub <#= r.from_name().to_snake_case() #>: Option<<#= r.get_type_no_option() #>>,
 	<# }
 #>
 }
@@ -230,17 +244,11 @@ impl <#= e.msg.name #> {
 
 		let<# if !e.rules.is_empty() { #> mut<# } #> packet = s.<#= change_name.to_snake_case() #>(<#= set_all_id_arguments(e) #>);
 	<# for r in &e.rules {
-		let type_s = r.get_type_no_option();
-		let as_ref = if type_s == "&str" {
-			".as_deref()"
-		} else if type_s == "Option<&str>" {
-			".as_ref().map(|o| o.as_deref())"
-		} else {
-			""
-		};
+		let getter = r.get_type_no_option().wrap_ref().code_as_ref("p");
 		#>
-		if let Some(p) = self.<#= r.from_name().to_snake_case() #><#= as_ref #> {
-			packet = packet.set_<#= r.from_name().to_snake_case() #>(p);
+		// <#= format!("{:?}", r.get_type()) #>
+		if let Some(p) = &self.<#= r.from_name().to_snake_case() #> {
+			packet = packet.set_<#= r.from_name().to_snake_case() #>(<#= getter #>);
 		}
 	<# } #>
 		Ok(packet.to_packet())

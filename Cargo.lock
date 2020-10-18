@@ -1229,8 +1229,8 @@ checksum = "134951f4028bdadb9b84baf4232681efbf277da25144b9b0ad65df75946c422b"
 
 [[package]]
 name = "eax"
-version = "0.3.0-pre"
-source = "git+https://github.com/Flakebi/AEADs?branch=partial-tag#8874ea1e6c0d215789f38fac2704861c4501ddb2"
+version = "0.3.0"
+source = "git+https://github.com/RustCrypto/AEADs#0a28591aa7dfd30ed6d09af4bfa666865fa3dd80"
 dependencies = [
  "aead",
  "cipher",

@@ -14,7 +14,9 @@ pub enum MessageF2P {
 		target: MessageTarget,
 		message: String,
 	},
-	/// Set the loudness threshold for sending audio in LUFS
+	/// Send a TeamSpeak command, for debugging purposes.
+	SendCommand(String),
+	/// Set the loudness threshold for sending audio in LUFS.
 	SetLoudnessThreshold(f64),
 	/// Ask the proxy to send loudness data or not.
 	SubscribeLoudness(bool),
