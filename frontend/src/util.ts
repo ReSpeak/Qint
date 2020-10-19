@@ -42,6 +42,15 @@ export function flash(element: HTMLElement) {
 	});
 }
 
+export function autoError(element: HTMLImageElement) {
+	if (!element) return;
+	function errFn(this: HTMLImageElement) {
+		this.src = "/128x128.png"
+		this.removeEventListener("onerror", errFn);
+	}
+	element.addEventListener("onerror", errFn);
+}
+
 // See https://jsperf.com/node-uuid-performance/64 about how to generate a uuid fast
 export function createUuidV4(): string {
 	const d2h: string[] = [], vals = new Array(16);

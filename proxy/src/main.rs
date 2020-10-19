@@ -44,10 +44,12 @@ mod messages;
 mod secret;
 mod shortcut;
 mod websocket;
+mod site_peek;
 
 use filecache::FileCache;
 use secret::Secret;
 use websocket::Ws;
+use site_peek::decode_and_analyze_link;
 const DIR_ORGANIZATION: &str = "ReSpeak";
 const DIR_PROJECT: &str = "Qint";
 const SETTINGS_FILENAME: &str = "config.toml";
@@ -461,6 +463,11 @@ async fn download_cache_file(
 	}
 }
 
+#[get("/peek_link/{url}")]
+async fn get_link_preview(url: web::Path<String>) -> impl Responder {
+	HttpResponse::Ok().json(decode_and_analyze_link(&url).await)
+}
+
 fn get_transient_setting_internal(
 	state: &State, req: &str,
 ) -> Option<Value> {
@@ -841,6 +848,7 @@ impl App {
 					.service(download_cache_file)
 					.service(get_transient_setting)
 					.service(set_transient_setting)
+					.service(get_link_preview)
 					.service(db::graphql::db_graphql)
 					.service(db::graphql::graphiql)
 					.service(Files::new("", "../frontend/build/").index_file("index.html"))
@@ -1122,7 +1130,7 @@ mod tests {
 					plugin_path: None,
 					no_audio: true,
 					no_open: true,
-					tauri: true,
+					browser: true,
 					verbosity: 1,
 				};
 				App::run(logger, args).await?;

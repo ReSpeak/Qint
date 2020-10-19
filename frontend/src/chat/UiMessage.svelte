@@ -19,11 +19,6 @@
 		const obj = document.createElement("div");
 		obj.innerHTML = html;
 
-		// Process links and images
-		links = [...obj.querySelectorAll("a")]
-			.filter((a) => !!a.href)
-			.map((a) => [a.href, a.innerText]);
-
 		// Apply highlight.js
 		for (let elem of obj.getElementsByTagName("code")) {
 			hljsHighlight(elem);
@@ -45,6 +40,11 @@
 				elem.innerText = code ?? "";
 			}
 		}
+
+		// Process links and images
+		links = [...obj.querySelectorAll("a")]
+			.filter((a) => !!a.href)
+			.map((a) => [a.href, a.innerText]);
 
 		if (rendered) {
 			rendered.innerHTML = "";
@@ -172,6 +172,13 @@
 
 	.messageRendered > *:not(:last-child) {
 		padding-bottom: 0.5em;
+	}
+
+
+	.messageRendered :global(img),
+	.messageRendered :global(.chatVideo) {
+		//max-height: min(50vh, 30em);
+		max-height: min(30em);
 	}
 
 	.tool-buttons {
