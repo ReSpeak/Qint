@@ -4,6 +4,9 @@
 	@import "highlight.js/styles/vs2015";
 
 	$scheme-main: $grey-accent;
+	$input-color: $text;
+	$input-icon-color: darken($text, 25);
+	$input-icon-active-color: darken($text, 10);
 
 	@import "bulma/sass/base/_all";
 	@import "bulma/sass/components/media";
