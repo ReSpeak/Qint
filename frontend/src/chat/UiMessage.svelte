@@ -1,21 +1,29 @@
 <script lang="typescript">
-	import { hljsHighlight } from "./hljs";
 	import katex from "katex";
+	import { hljsHighlight } from "./hljs";
 	import { onMount } from "svelte";
-	import Icon from "../ui/Icon.svelte";
 	import { Message } from "./chat";
 	import { LONG_DATETIME } from "../util";
+	import Icon from "../ui/Icon.svelte";
+	import LinkPreview from "./LinkPreview.svelte";
 
 	export let unread: boolean;
 	export let message: Message;
 
 	let viewRaw = false;
 	let rendered!: HTMLElement;
+	let links: [string, string][] = [];
 	$: renderedObj = render(message.rendered);
 
 	function render(html: string) {
 		const obj = document.createElement("div");
 		obj.innerHTML = html;
+
+		// Process links and images
+		links = [...obj.querySelectorAll("a")]
+			.filter((a) => !!a.href)
+			.map((a) => [a.href, a.innerText]);
+
 		// Apply highlight.js
 		for (let elem of obj.getElementsByTagName("code")) {
 			hljsHighlight(elem);
@@ -37,6 +45,7 @@
 				elem.innerText = code ?? "";
 			}
 		}
+
 		if (rendered) {
 			rendered.innerHTML = "";
 			rendered.appendChild(obj);
@@ -51,22 +60,25 @@
 </script>
 
 <svelte:options immutable />
-<div class="message-row" class:unread>
+<div class="messageRow" class:unread>
 	<div class="hover-container">
-		<div class="message-time chat-left-col">
-			<span title={message.date.format(LONG_DATETIME)}>
-				{message.date.format('HH:mm')}
-			</span>
+		<div class="messageTime chat-left-col">
+			<span title={message.date.format(LONG_DATETIME)}> {message.date.format('HH:mm')} </span>
 		</div>
 		<!-- msg.status === MessageStatus::Sending -->
 		<!-- msg.status === MessageStatus::Error -->
 		<div
-			class="message-content"
+			class="messageBody"
 			class:message-sending={false}
 			class:message-error={false}
 			class:viewRaw>
-			<div class="content message-rendered" bind:this={rendered} />
-			<div class="message-raw">
+			<div class="messageRendered">
+				<div class="content messageTextBody" bind:this={rendered} />
+				{#each links as [link, text] (link)}
+					<LinkPreview {link} textContent={text} />
+				{/each}
+			</div>
+			<div class="messageRaw">
 				<pre>{message.raw}</pre>
 			</div>
 			<div class="tool-buttons">
@@ -77,7 +89,10 @@
 					<button class="button is-small is-rounded">
 						<Icon name="format-quote-close" />
 					</button>
-					<button class="button is-small is-rounded" on:click={() => (viewRaw = !viewRaw)} title="It’s raw!">
+					<button
+						class="button is-small is-rounded"
+						on:click={() => (viewRaw = !viewRaw)}
+						title="It’s raw!">
 						<Icon raw="🥩" />
 					</button>
 				</div>
@@ -89,7 +104,7 @@
 <style lang="scss">
 	$row-pad: 0.25em;
 
-	.message-row {
+	.messageRow {
 		transition: background 2s;
 
 		&.unread {
@@ -113,14 +128,14 @@
 		}
 	}
 
-	.message-time {
+	.messageTime {
 		font-size: 0.8em;
 		* {
 			color: mix($text, $background, 60%);
 		}
 	}
 
-	.message-content {
+	.messageBody {
 		flex: 1;
 
 		// for tool buttons
@@ -137,22 +152,26 @@
 			-moz-tab-size: 4;
 			// TODO Prevent scrollbar
 		}
+	}
 
-		.message-raw > pre {
-			overflow-y: hidden;
+	.messageRaw > pre {
+		overflow-y: hidden;
+		background: none;
+		margin: 0;
+	}
+
+	.messageTextBody {
+		white-space: pre-wrap;
+		word-wrap: break-word;
+		margin-bottom: 0;
+
+		:global(pre) {
 			background: none;
-			margin: 0;
 		}
+	}
 
-		.message-rendered {
-			white-space: pre-wrap;
-			word-wrap: break-word;
-			margin-bottom: 0;
-
-			:global(pre) {
-				background: none;
-			}
-		}
+	.messageRendered > *:not(:last-child) {
+		padding-bottom: 0.5em;
 	}
 
 	.tool-buttons {
@@ -175,20 +194,20 @@
 
 	// View raw toggle
 
-	.message-content {
-		.message-raw {
+	.messageBody {
+		.messageRaw {
 			display: none;
 		}
-		.message-rendered {
+		.messageRendered {
 			display: inherit;
 		}
 	}
 
-	.message-content.viewRaw {
-		.message-raw {
+	.messageBody.viewRaw {
+		.messageRaw {
 			display: inherit;
 		}
-		.message-rendered {
+		.messageRendered {
 			display: none;
 		}
 	}

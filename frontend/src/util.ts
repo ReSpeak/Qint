@@ -16,7 +16,7 @@ export const BOOKMARK_OFF = "star-outline";
 export const EDIT_ICON = "pencil-outline";
 
 // @ts-ignore
-export const BASE_ADDRESS = ""; //"__buildEnv__" === "development" ? "http://localhost:4422" : "";
+export const BASE_ADDRESS = "http://localhost:4422"; //"__buildEnv__" === "development" ? "http://localhost:4422" : "";
 export const BUILD_ENV = "__buildEnv__";
 export const BUILD_DAT = "__buildDat__";
 export const IS_TAURI = "__TAURI_INVOKE_HANDLER__" in window;

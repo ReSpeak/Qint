@@ -378,33 +378,33 @@ dependencies = [
 
 [[package]]
 name = "aes"
-version = "0.6.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "884391ef1066acaa41e766ba8f596341b96e93ce34f9a43e7d24bf0a0eaf0561"
+checksum = "dd2bc6d3f370b5666245ff421e231cba4353df936e26986d2918e61a8fd6aef6"
 dependencies = [
  "aes-soft",
  "aesni",
- "cipher",
+ "block-cipher",
 ]
 
 [[package]]
 name = "aes-soft"
-version = "0.6.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c5ab1fa47ce0ddf44cbd65b1b4e626e3c03b06fd42005603acdc6fa13526296"
+checksum = "63dd91889c49327ad7ef3b500fd1109dbd3c509a03db0d4a9ce413b79f575cb6"
 dependencies = [
+ "block-cipher",
  "byteorder",
- "cipher",
  "opaque-debug",
 ]
 
 [[package]]
 name = "aesni"
-version = "0.10.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea2e11f5e94c2f7d386164cc2aa1f97823fed6f259e486940a71c174dd01b0ce"
+checksum = "0a6fe808308bb07d393e2ea47780043ec47683fcf19cf5efc8ca51c50cc8c68a"
 dependencies = [
- "cipher",
+ "block-cipher",
  "opaque-debug",
 ]
 
@@ -632,6 +632,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "block-cipher"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f337a3e6da609650eb74e02bc9fac7b735049f7623ab12f2e4c719316fcc7e80"
+dependencies = [
+ "generic-array",
+]
+
+[[package]]
 name = "brotli-sys"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -781,15 +790,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7477065d45a8fe57167bf3cf8bcd3729b54cfcb81cca49bda2d038ea89ae82ca"
 
 [[package]]
-name = "cipher"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1f7954ae5588102b35257639b1c36a2e7425cc6540fcdb4de19dcb91055d659"
-dependencies = [
- "generic-array",
-]
-
-[[package]]
 name = "clap"
 version = "2.33.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -824,9 +824,9 @@ dependencies = [
 
 [[package]]
 name = "cmac"
-version = "0.5.1"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "73d4de4f7724e5fe70addfb2bd37c2abd2f95084a429d7773b0b9645499b4272"
+checksum = "5220604fe5c112e2851b00da795c72cbb71bf112f2cbd532bdcfb4106eeb320b"
 dependencies = [
  "crypto-mac",
  "dbl",
@@ -979,11 +979,11 @@ dependencies = [
 
 [[package]]
 name = "crypto-mac"
-version = "0.10.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4857fd85a0c34b3c3297875b747c1e02e06b6a0ea32dd892d8192b9ce0813ea6"
+checksum = "58bcd97a54c7ca5ce2f6eb16f6bede5b0ab5f0055fedc17d2f0b4466e21671ca"
 dependencies = [
- "cipher",
+ "block-cipher",
  "generic-array",
  "subtle",
 ]
@@ -1012,11 +1012,11 @@ dependencies = [
 
 [[package]]
 name = "ctr"
-version = "0.6.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb4a30d54f7443bf3d6191dcd486aca19e67cb3c49fa7a06a319966346707e7f"
+checksum = "cc03dee3a2843ac6eb4b5fb39cfcf4cb034d078555d1f4a0afbed418b822f3c2"
 dependencies = [
- "cipher",
+ "stream-cipher",
 ]
 
 [[package]]
@@ -1229,11 +1229,11 @@ checksum = "134951f4028bdadb9b84baf4232681efbf277da25144b9b0ad65df75946c422b"
 
 [[package]]
 name = "eax"
-version = "0.3.0"
-source = "git+https://github.com/RustCrypto/AEADs#0a28591aa7dfd30ed6d09af4bfa666865fa3dd80"
+version = "0.3.0-pre"
+source = "git+https://github.com/Flakebi/AEADs?branch=partial-tag#8874ea1e6c0d215789f38fac2704861c4501ddb2"
 dependencies = [
  "aead",
- "cipher",
+ "block-cipher",
  "cmac",
  "ctr",
  "subtle",
@@ -3452,6 +3452,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "213701ba3370744dcd1a12960caa4843b3d68b4d1c0a5d575e0d65b2ee9d16c0"
 
 [[package]]
+name = "stream-cipher"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c80e15f898d8d8f25db24c253ea615cc14acf418ff307822995814e7d42cfa89"
+dependencies = [
+ "block-cipher",
+ "generic-array",
+]
+
+[[package]]
 name = "strength_reduce"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4064,7 +4074,6 @@ dependencies = [
  "eax",
  "flakebi-ring",
  "futures",
- "generic-array",
  "git-testament",
  "num-bigint 0.3.0",
  "num-derive",
