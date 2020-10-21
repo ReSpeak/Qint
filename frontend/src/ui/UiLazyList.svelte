@@ -1,14 +1,23 @@
 <script lang="typescript">
 	import { ListFetchDir } from "./lazyList";
 	import type { FetchResult } from "./lazyList";
-	import { assert, binarySearchByKey } from "../util";
-	import { createEventDispatcher, tick, onMount, onDestroy } from "svelte";
+	import { assert, binarySearchByKey, Debounce } from "../util";
+	import { createEventDispatcher, tick, onMount } from "svelte";
 	import ResizeObserver from "resize-observer-polyfill";
 	const dispatch = createEventDispatcher<{ viewchanged: { first?: T; last?: T } }>();
 
 	// Dummy class to have nice typing for our 'generic' parameter T which
 	// represents the element type.
 	type T = any;
+
+	// The golden handbook for js/css:
+	// - pan.scrollHeight, // complete content
+	// - pan.scrollTop,    // current scroll position
+	// - pan.scrollTopMax, // max scoll position
+	// - pan.offsetHeight, // container height
+	// - pan.clientHeight, // inner view height (after subtracting border/padding)
+	// ! ELEM.offsetTop    // is the top of a element measured from the top of the first position:relative parent.
+	// ! clientHeight + scrollTopMax === scrollHeight
 
 	// *** State+Export variables ***
 
@@ -21,10 +30,9 @@
 	let showJumpStart: boolean;
 	let showJumpEnd: boolean;
 	let loadAnchored: ListFetchDir | undefined = undefined;
-	let lastViewStart: T | undefined;
-	let lastViewEnd: T | undefined;
-	type CacheElem = { t: T; posTop: number; posMid: number; posBot: number };
-	let lastViewSizeCache: { elems: CacheElem[]; size: number } | undefined;
+	let lastViewStart: number | undefined;
+	let lastViewEnd: number | undefined;
+	let visObs: IntersectionObserver;
 
 	// the data elements held by this list
 	let elems: T[] = [];
@@ -37,7 +45,7 @@
 	let minPxDistanceToRemove = 1500;
 	// The holding list element which has the scrollbar
 	let pan: HTMLElement;
-	let scrollPane: HTMLElement | undefined | null;
+	let scrollPane: HTMLElement;
 	// prevent async weirdness by only allowing one async task
 	let fetchTask: Promise<void> | undefined;
 
@@ -51,11 +59,6 @@
 		showJumpEnd = false;
 		lastViewStart = undefined;
 		lastViewEnd = undefined;
-		lastViewSizeCache = undefined;
-		if (currentDebounceTimer !== undefined) {
-			clearTimeout(currentDebounceTimer);
-			currentDebounceTimer = undefined;
-		}
 	}
 
 	export function sourceChanged(dir: ListFetchDir, anchor?: ListFetchDir) {
@@ -130,116 +133,10 @@
 		return elems.length !== 0 ? elems[elems.length - 1] : undefined;
 	}
 
-	function handle_scroll() {
-		// console.log(
-		// 	pan.scrollHeight, // complete content
-		// 	pan.scrollTop,    // current scroll position
-		// 	pan.scrollTopMax, // max scoll position
-		// 	pan.offsetHeight, // container height
-		// 	pan.clientHeight, // inner view height (after subtracting border/padding)
-		// );
-		// ! ELEM.offsetTop   // is the top of a element measured from the top of the first position:relative parent.
-		// ! clientHeight + scrollTopMax === scrollHeight
-		start_fill();
-	}
-
-	function getHtmlElements(): ArrayLike<HTMLElement> | undefined {
-		if (!scrollPane)
-			return undefined;
+	function getHtmlElements(): ArrayLike<HTMLElement> {
 		const childList = (scrollPane.children as any) as ArrayLike<HTMLElement>;
 		assert(childList.length === elems.length, "HTML node count does not match elements count");
 		return childList;
-	}
-
-	function recheckView(contentChanged: boolean) {
-		scrollPanChanged();
-		if (contentChanged) {
-			recheckCurrentView();
-		} else {
-			checkCurrentView();
-		}
-	}
-
-	function scrollPanChanged() {
-		if (!scrollPane) {
-			showJumpStart = false;
-			showJumpEnd = false;
-			return;
-		}
-		// Update jump up/down button visibility
-		const isScrollable = pan.scrollHeight > pan.clientHeight;
-		if (suggestJumpStart) {
-			const isScrolledToStart = pan.scrollTop <= 0;
-			showJumpStart = isScrollable && (!isScrolledToStart || canLoadBeforeStart);
-		}
-		if (suggestJumpEnd) {
-			const isScrolledToEnd = pan.scrollTop >= pan.scrollHeight - pan.clientHeight;
-			showJumpEnd = isScrollable && (!isScrolledToEnd || canLoadAfterEnd);
-		}
-	}
-
-	function recheckCurrentView() {
-		lastViewSizeCache = undefined;
-		checkCurrentView();
-	}
-
-	const viewDebounceRate = 250;
-	let currentDebounceTimer: number | undefined;
-	function checkCurrentView() {
-		if (currentDebounceTimer === undefined) {
-			currentDebounceTimer = setTimeout(() => {
-				doCheckCurrentView();
-				currentDebounceTimer = undefined;
-			}, viewDebounceRate);
-		}
-	}
-
-	function doCheckCurrentView() {
-		if (!scrollPane) return;
-		if (notifyViewChanged) {
-			if (lastViewSizeCache === undefined || lastViewSizeCache.size !== pan.scrollHeight) {
-				const childList = getHtmlElements();
-				if (childList === undefined)
-					return;
-				const cacheElems = new Array<CacheElem>(elems.length);
-				for (let i = 0; i < cacheElems.length; i++) {
-					let childElem = childList[i];
-					cacheElems[i] = {
-						t: elems[i],
-						posTop: childElem.offsetTop,
-						posMid: childElem.offsetTop + childElem.offsetHeight / 2,
-						posBot: childElem.offsetTop + childElem.offsetHeight,
-					};
-				}
-				lastViewSizeCache = {
-					elems: cacheElems,
-					size: pan.scrollHeight,
-				};
-			}
-
-			const viewStart = pan.scrollTop;
-			const topElemIndex = binarySearchByKey(
-				lastViewSizeCache.elems,
-				viewStart,
-				(cacheElem) => cacheElem.posMid
-			);
-			const topElem = lastViewSizeCache.elems[topElemIndex.index];
-
-			const viewEnd = viewStart + pan.clientHeight;
-			const botElemIndex = binarySearchByKey(
-				lastViewSizeCache.elems,
-				viewEnd,
-				(cacheElem) => cacheElem.posMid,
-				topElemIndex.index
-			);
-			const botElem = lastViewSizeCache.elems[botElemIndex.index - 1];
-
-			if (lastViewStart !== topElem.t || lastViewEnd !== botElem.t) {
-				lastViewStart = topElem.t;
-				lastViewEnd = botElem.t;
-				dispatch("viewchanged", { first: lastViewStart, last: lastViewEnd });
-			}
-		}
 	}
 
 	function start_fill() {
@@ -251,13 +148,10 @@
 
 	async function fill_loop() {
 		const loadMaxBeforeError = 50;
-		let hasChange = false;
 		for (let i = 0; i <= loadMaxBeforeError; i++) {
 			if (i === loadMaxBeforeError) throw Error("yah, thats a loop");
 			if (await fill_body()) break;
-			else hasChange = true;
 		}
-		recheckView(hasChange);
 		fetchTask = undefined;
 	}
 
@@ -351,15 +245,22 @@
 	 * Utility method to replace the current list with a new list without
 	 * changing the scroll position.
 	 */
-	async function modifyElems(newElems: T[]) {
+	async function modifyElems(newElems: T[], isAtTop: boolean) {
 		const lastScrollHeight = pan.scrollHeight;
 		const lastScrollTop = pan.scrollTop;
 		//console.log("Before change scrollHeight", lastScrollHeight, ", scrollTop", pan.scrollTop);
 		elems = newElems;
 		await tick();
-		//console.log("In change scrollTop", pan.scrollTop);
-		const scrollAdjust = pan.scrollHeight - lastScrollHeight;
-		pan.scrollTop = lastScrollTop + scrollAdjust;
+
+		const childList = getHtmlElements();
+		Array.from(childList).forEach((element) => {
+			visObs.observe(element);
+		});
+
+		if (isAtTop) {
+			const scrollAdjust = pan.scrollHeight - lastScrollHeight;
+			pan.scrollTop = lastScrollTop + scrollAdjust;
+		}
 		// console.log("modifyElems scrollHeight", pan.scrollHeight, "scrollTop", pan.scrollTop, "scrollAdjust", scrollAdjust);
 	}
 
@@ -369,10 +270,8 @@
 	 */
 	async function tryTrimEnd() {
 		if (elems.length <= minItemsToRemove) return;
-		await tick();
+		if (elems.length === 0) return;
 		const childList = getHtmlElements();
-		if (childList === undefined)
-			return;
 
 		const distFn = (e: HTMLElement) => {
 			// The top of the element within our list (unscrolled)
@@ -389,7 +288,7 @@
 		console.log("tryTrimEnd", res, res.index <= removeIndex);
 		if (res.index <= removeIndex) {
 			// modification is at the end => safe
-			elems = elems.slice(0, res.index);
+			await modifyElems(elems.slice(0, res.index), false);
 			canLoadAfterEnd = true;
 		}
 	}
@@ -400,10 +299,8 @@
 	 */
 	async function tryTrimStart() {
 		if (elems.length <= minItemsToRemove) return;
-		await tick();
+		if (elems.length === 0) return;
 		const childList = getHtmlElements();
-		if (childList === undefined)
-			return;
 
 		const distFn = (e: HTMLElement) => {
 			// The bottom of the element within our list (unscrolled)
@@ -426,7 +323,7 @@
 		// that is _smaller_ than our threshold distance.
 		if (res.index >= minItemsToRemove) {
 			// mofification at start => helper
-			await modifyElems(elems.slice(res.index - 1));
+			await modifyElems(elems.slice(res.index - 1), true);
 			canLoadBeforeStart = true;
 		}
 	}
@@ -439,13 +336,13 @@
 		switch (dir) {
 			case ListFetchDir.After:
 				// This case adds elements at the end => trim start
-				elems = [...elems, ...newElems]; // modification is at the end => safe
+				await modifyElems([...elems, ...newElems], false); // modification is at the end => safe
 				await tryTrimStart();
 				break;
 
 			case ListFetchDir.Before:
 				// This case adds elements at the start => trim end
-				await modifyElems([...newElems, ...elems]); // mofification at start => helper
+				await modifyElems([...newElems, ...elems], true); // mofification at start => helper
 				await tryTrimEnd();
 				break;
 
@@ -454,8 +351,9 @@
 				if (loadAnchored === ListFetchDir.Before) {
 					scrollToStart();
 				} else if (loadAnchored === ListFetchDir.After) {
-					await tick();
-					scrollToEnd();
+					//await tick();
+					//scrollToEnd();
+					docked = true;
 				}
 				break;
 
@@ -464,34 +362,135 @@
 		}
 	}
 
-	let _obs: ResizeObserver;
+	// Resize/Scroll events
+	let docked = false;
+	let resizing = false;
+
+	let lockElem: HTMLElement | undefined;
+	let lockPos: number | undefined;
+
+	const resizingTimeout = new Debounce(
+		() => {
+			resizing = false;
+			start_fill();
+		},
+		200,
+		{ resetOnCall: true }
+	);
+
+	function triggerResizing() {
+		if (docked) {
+			pan.scrollTop = pan.scrollHeight;
+		} else {
+			if (lockElem && lockPos !== undefined) {
+				pan.scrollTop = lockElem.offsetTop - lockPos;
+				//console.log("jumping", lockElem.offsetTop - lockPos, lockElem.offsetTop, lockPos);
+			}
+		}
+
+		resizing = true;
+		resizingTimeout.call();
+	}
+
+	function handle_scroll() {
+		if (!resizing) {
+			setLockPos();
+			if (pan.scrollTop === pan.scrollHeight - pan.clientHeight) {
+				if (docked === false) console.log("docked");
+				docked = true;
+			} else {
+				if (docked === true) console.log("undocked");
+				docked = false;
+			}
+			start_fill();
+		}
+
+		if (elems.length === 0) {
+			showJumpStart = false;
+			showJumpEnd = false;
+		} else {
+			// Update jump up/down button visibility
+			const isScrollable = pan.scrollHeight > pan.clientHeight;
+			if (suggestJumpStart) {
+				const isScrolledToStart = pan.scrollTop <= 0;
+				showJumpStart = isScrollable && (!isScrolledToStart || canLoadBeforeStart);
+			}
+			if (suggestJumpEnd) {
+				const isScrolledToEnd = pan.scrollTop >= pan.scrollHeight - pan.clientHeight;
+				showJumpEnd = isScrollable && (!isScrolledToEnd || canLoadAfterEnd);
+			}
+		}
+	}
+
+	function setLockPos(elem?: HTMLElement) {
+		if (resizing) return;
+		if (elem) {
+			lockElem = elem;
+		} else if (!lockElem) {
+			return;
+		}
+		lockPos = lockElem.offsetTop - pan.scrollTop;
+	}
+
+	function onIntersectionChanged(elem: IntersectionObserverEntry[]): void {
+		let oldIdStart = lastViewStart;
+		let oldIdEnd = lastViewEnd;
+		for (const e of elem) {
+			let htmlElem = e.target as HTMLElement;
+			let elemId = Number(htmlElem.dataset.index);
+			if (e.isIntersecting) {
+				if (lastViewStart === undefined || elemId < lastViewStart) {
+					setLockPos(
+						htmlElem.nextElementSibling
+							? (htmlElem.nextElementSibling as HTMLElement)
+							: htmlElem
+					);
+					lastViewStart = elemId;
+				} else if (lastViewEnd === undefined || elemId > lastViewEnd) {
+					lastViewEnd = elemId;
+				}
+			} else {
+				if (
+					e.boundingClientRect.bottom < e.rootBounds!.top &&
+					(lastViewStart === undefined || elemId + 1 > lastViewStart)
+				) {
+					setLockPos(
+						htmlElem.nextElementSibling
+							? (htmlElem.nextElementSibling as HTMLElement)
+							: htmlElem
+					);
+					lastViewStart = elemId + 1;
+				} else if (
+					e.boundingClientRect.top > e.rootBounds!.bottom &&
+					(lastViewEnd === undefined || elemId - 1 < lastViewEnd)
+				) {
+					lastViewEnd = elemId - 1;
+				}
+			}
+		}
+		if (oldIdStart !== lastViewStart || oldIdEnd !== lastViewEnd) {
+			if (notifyViewChanged) {
+				dispatch("viewchanged", { first: lastViewStart, last: lastViewEnd });
+			}
+		}
+	}
+
 	onMount(() => {
 		start_fill();
-		pan.onresize = () => {
-			start_fill();
+
+		const resizeObserver = new ResizeObserver(() => triggerResizing());
+		resizeObserver.observe(pan);
+		resizeObserver.observe(scrollPane);
+
+		visObs = new IntersectionObserver(onIntersectionChanged, {
+			root: pan,
+			threshold: 0,
+		});
+
+		return () => {
+			resizeObserver.disconnect();
+			visObs.disconnect();
 		};
-		bottomScroller(pan);
-
-		function bottomScroller(scroller: HTMLElement) {
-			let oldScrollTop = scroller.scrollTop;
-			let oldHeight = scroller.clientHeight;
-
-			scroller.addEventListener("scroll", (_: Event) => {
-				if (oldHeight === scroller.clientHeight) oldScrollTop = scroller.scrollTop;
-			});
-
-			_obs = new ResizeObserver(() => {
-				let newScrollTop = oldScrollTop + oldHeight - scroller.clientHeight;
-				scroller.scrollTop = newScrollTop;
-				oldScrollTop = newScrollTop;
-				oldHeight = scroller.clientHeight;
-				recheckView(true);
-			});
-			_obs.observe(pan);
-		}
-	});
-	onDestroy(() => {
-		_obs.disconnect();
 	});
 </script>
 
@@ -500,18 +499,14 @@
 		<div />
 	</button>
 	<div class="lazyListView" bind:this={pan} on:scroll={handle_scroll}>
-		{#if elems.length > 0}
-			<div class="scrollPane" bind:this={scrollPane}>
-				{#each elems as item (item)}
-					<div class="lazyListElement">
-						<slot {item} />
-					</div>
-				{/each}
-			</div>
-			{#if loadAnchored === ListFetchDir.After}
-				<div id="anchor" />
-			{/if}
-		{:else}
+		<div class="scrollPane" bind:this={scrollPane}>
+			{#each elems as item, index (item)}
+				<div class="lazyListElement" data-index={index}>
+					<slot {item} />
+				</div>
+			{/each}
+		</div>
+		{#if elems.length === 0}
 			<div class="filler">
 				{#if fetchTask !== undefined}
 					<slot name="loading" />
@@ -539,10 +534,6 @@
 		overflow-x: hidden;
 		overflow-y: scroll;
 		height: 100%;
-		* {
-			/* don't allow the children of the scrollable element to be selected as an anchor node */
-			overflow-anchor: none;
-		}
 	}
 
 	// Jump start end buttons
@@ -598,13 +589,11 @@
 	}
 
 	// Anchoring
-	// See: https://blog.eqrion.net/pin-to-bottom/
-
-	#anchor {
-		/* allow the final child to be selected as an anchor node */
-		overflow-anchor: auto;
-		/* anchor nodes are required to have non-zero area */
-		height: 1px;
+	// Shouldn't do much, but prevent our scrolling panel to be selected as
+	// anchor since it's useless.
+	.lazyListView,
+	.scrollPane {
+		overflow-anchor: none;
 	}
 
 	.filler {

@@ -47,6 +47,7 @@ export class App {
 		const checkOldNode = get(this.selectedNode);
 		if (NodeSelection.equals(checkOldNode, nodeSel))
 			return;
+		console.log("Switching to ", nodeSel?.uniqueStr);
 		this.selectedNode.update(oldNode => {
 			if (oldNode !== undefined) {
 				oldNode.node.update({ isSelected: false });

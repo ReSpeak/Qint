@@ -27,7 +27,6 @@
 				<div class="media-left">
 					<figure class="image is-48x48">
 						<img use:autoError src={result.imageSrc} alt="Link preview" />
-						<!-- <img src={result.imageSrc} alt="Link preview" /> -->
 					</figure>
 				</div>
 				<div class="media-content">

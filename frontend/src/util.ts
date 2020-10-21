@@ -341,3 +341,43 @@ export function oneshot<T>(
 		}
 	});
 }
+
+type FnFunc<T extends unknown[]> = (...args: T) => void;
+interface DebounceOpt {
+	resetOnCall?: boolean // default: true
+}
+export class Debounce<T extends unknown[]>
+{
+	private func: FnFunc<T>;
+	private timeout: number;
+	private timer: number | undefined;
+	private opt: DebounceOpt;
+
+	constructor(fn: FnFunc<T>, timeout: number, options?: DebounceOpt) {
+		this.func = fn;
+		this.timeout = timeout;
+		this.opt = options ?? {
+			resetOnCall: false,
+		};
+	}
+
+	public call(...args: T) {
+		if (this.opt.resetOnCall) {
+			this.cancel();
+		}
+
+		if (this.timer === undefined) {
+			this.timer = setTimeout(() => {
+				this.timer = undefined;
+				this.func(...args);
+			}, this.timeout);
+		}
+	}
+
+	public cancel() {
+		if (this.timer !== undefined) {
+			clearTimeout(this.timer);
+			this.timer = undefined;
+		}
+	}
+}

@@ -46,6 +46,10 @@ pub(crate) async fn analyze_link(link: &str) -> Result<AnalyzeResult> {
 			let document_str = response.text().await?;
 			let document = Html::parse_document(&document_str);
 
+			// TODO also add reader for
+			// - <meta name="Description" content="Phoronix is the leading technology website for Linux hardware reviews, open-source news, Linux benchmarks, open-source benchmarks, and computer hardware tests.">
+			// - <title>Open-Source RADV Vulkan Driver Is Seeing Work To Allow Building It On Windows - Phoronix</title>
+			// - <link rel="icon" type="image/png" href="/android-chrome-192x192.png" sizes="192x192"> (pick biggest size)
 			let selector_title = Selector::parse(r#"meta[property='og:title']"#).unwrap();
 			let selector_image = Selector::parse(r#"meta[property='og:image']"#).unwrap();
 			let selector_descr = Selector::parse(r#"meta[property='og:description']"#).unwrap();
