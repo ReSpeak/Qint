@@ -1,0 +1,193 @@
+<#@ template cleanws="true" #>
+import { ChannelGroupId, ChannelId, ClientDbId, ClientId, ClientType, EccKeyPubP256, IconId, IpAddr, MaxClients, ServerGroupId, SocketAddr, TalkPowerRequest, Uid } from "./ts";
+import { datetimeDeserialize, durationDeserialize } from "./util";
+import { Duration, Moment } from "moment";
+<#
+let mut base_structs = Vec::new();
+for struc in &self.3.0 {
+	if struc.parts.is_empty() {
+		continue;
+	}
+	base_structs.push(format!("{}Base", struc.name));
+} #>
+import { <#= base_structs.join(", ") #> } from "./bookBase";
+
+// Enums
+
+<#
+use std::fmt;
+
+use tsproto_structs::enums;
+use tsproto_structs::enums::*;
+
+for e in &enums::DATA.enums { #>
+export enum <#= e.name #> {
+<# for v in &e.variants { #>
+	<#= v.name #> = "<#= v.name #>",
+<# } #>
+}
+
+<# }
+for e in &enums::DATA.bitflags { #>
+export enum <#= e.name #> {
+<# for v in &e.variants { #>
+	<#= v.name #> = "<#= v.name #>",
+<# } #>
+}
+
+<# } #>
+
+// Structs
+
+<#
+for struc in &self.3.0 {
+	if struc.parts.is_empty() {
+		continue;
+	} #>
+export class <#= struc.name #> extends <#= struc.name #>Base {
+	<# for p in get_all_properties(&self.structs, &struc.parts) {
+		// TODO More things should be optional, e.g. server.uptime
+		let struct_type = p.get_type()?; #>
+	public readonly <#= p.name.to_mixed_case() #>!: <# struct_type.inner.fmt_ts(_fmt)?; #>;
+	<# } #>
+
+	public update(obj: Partial<this>): this {
+	<#
+	// Preprocess properties
+	for p in get_all_properties(&self.structs, &struc.parts) {
+		let struct_type = p.get_type()?;
+		let inner = struct_type.inner.peel_opt();
+		let name = p.name.to_mixed_case();
+		if let InnerRustType::Primitive(t) = inner {
+			if t == "OffsetDateTime" { #>
+		if ("<#= name #>" in obj && obj.<#= name #>)
+			Object.assign(obj, { <#= name #>: datetimeDeserialize((obj as any).<#= name #>) });
+			<# } else if t == "Duration" { #>
+		if ("<#= name #>" in obj && obj.<#= name #>)
+			Object.assign(obj, { <#= name #>: durationDeserialize((obj as any).<#= name #>) });
+			<# }
+		}
+	} #>
+		Object.assign(this, obj);
+		return this;
+	}
+}
+
+<# } #>
+// Setter
+<#
+let mut setter_structs = Vec::new();
+
+for e in &self.2.decls {
+	let msg_group = self.2.messages.get_message_group(&e.msg);
+	let uses_lifetime = self.2.messages.uses_lifetime(&e.msg);
+	// Update
+	if e.op == RuleOp::Update {
+		let small_change_name = e.get_small_name();
+		let change_name = e.get_change_name();
+		setter_structs.push(e.msg.name.clone());
+		#>
+
+export interface OChange<#= e.msg.name #> {
+	<#= e.msg.name #>: {
+		<#= self.3.get_struct_ids_ts(&e.book_struct.name) #>
+	<#
+	// Event IDs
+	for r in &e.ids {
+		match r {
+			RuleKind::ArgumentMap { .. } |
+			RuleKind::ArgumentFunction { .. } => { #>
+		<#= r.get_argument() #>,
+			<# }
+			_ => {}
+		}
+	}
+
+	// Event Props
+	for r in &e.rules {
+		let name = r.from_name_singular();
+		#>
+		<#= r.from_name().to_mixed_case() #>?: <# r.get_type_no_option().inner.fmt_ts(_fmt)?; #>;
+	<# }
+#>
+	};
+}
+<#
+	} else if e.op == RuleOp::Remove {
+	if e.rules.is_empty() {
+		let args = get_all_arguments_ts(e, None);
+		let name_add = if !args.is_empty() {
+			format!("_{}", &args[..args.find('?').unwrap()])
+		} else {
+			"".into()
+		};
+		let struct_name = format!("{}Remove{}", e.book_struct.name, name_add.to_camel_case());
+		setter_structs.push(struct_name.clone());
+	#>
+
+export interface OChange<#= struct_name #> {
+	<#= struct_name #>: {
+		<#= self.3.get_struct_ids_ts(&e.book_struct.name) #>
+		<#= args #>
+	};
+}
+	<#
+	} else {
+		for r in &e.rules {
+			let args = get_all_arguments_ts(e, Some(r));
+			let name_add = if !args.is_empty() {
+				format!("_{}", &args[..args.find('?').unwrap()])
+			} else {
+				"".into()
+			};
+			let struct_name = format!("{}Remove{}", e.book_struct.name, name_add.to_camel_case());
+			setter_structs.push(struct_name.clone());
+	#>
+
+export interface OChange<#= struct_name #> {
+	<#= struct_name #>: {
+		<#= self.3.get_struct_ids_ts(&e.book_struct.name) #>
+		<#= args #>
+	};
+}
+	<#
+		}
+	}
+	} else if e.op == RuleOp::Add {
+		for r in &e.rules {
+			let name = r.from_name_singular();
+			let name = format!("{}{}", e.book_struct.name, name);
+
+			let args = get_all_arguments_ts(e, Some(r));
+			let name_add = if !args.is_empty() {
+				format!("_{}", &args[..args.find('?').unwrap()])
+			} else {
+				"".into()
+			};
+			let struct_name = format!("{}Add{}", e.book_struct.name, r.from_name_singular());
+			setter_structs.push(struct_name.clone());
+	#>
+
+export interface OChange<#= struct_name #> {
+	<#= struct_name #>: {
+		<#= self.3.get_struct_ids_ts(&e.book_struct.name) #>
+		<#= args #>
+	};
+}
+	<#
+		}
+	}
+} #>
+
+export type OChange =
+<#
+let mut is_first = true;
+for setter in &setter_structs {
+	if is_first {
+		is_first = false; #>
+	OChange<#= setter #>
+	<# } else { #>
+	| OChange<#= setter #>
+<# }
+} #>
+;

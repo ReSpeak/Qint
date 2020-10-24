@@ -1,13 +1,14 @@
 // tslint:disable: interface-name
 
 import { Channel, ChannelGroup, Client, Server, ServerGroup } from "../book";
-import { ChannelId, ChannelGroupId, ChannelType, ClientId, Codec, ServerGroupId } from "../ts";
+import { ChannelId, ChannelGroupId, ClientId, ServerGroupId } from "../ts";
+import { ChannelType, Codec, OChange, Reason } from "../book_events";
 
 export type WsMessageTarget =
 	"Server"
 	| "Channel"
-	| { Client: number }
-	| { Poke: number };
+	| { Client: ClientId }
+	| { Poke: ClientId };
 
 // Out Messages
 export type OutMsg = OMsgConnect | OMsgDisconnect | OMsgSendMessage | OMsgSendCommand | OMsgSetLoudnessThreshold
@@ -25,21 +26,6 @@ export interface OMsgConnect {
 		log_packets: boolean;
 		log_udp_packets: boolean;
 	};
-}
-
-export enum Reason {
-	None = "None",
-	Moved = "Moved",
-	Subscription = "Subscription",
-	LostConnection = "LostConnection",
-	KickChannel = "KickChannel",
-	KickServer = "KickServer",
-	KickServerBan = "KickServerBan",
-	Serverstop = "Serverstop",
-	Clientdisconnect = "Clientdisconnect",
-	Channelupdate = "Channelupdate",
-	Channeledit = "Channeledit",
-	ClientdisconnectServerShutdown = "ClientdisconnectServerShutdown",
 }
 
 interface OMsgDisconnect {
@@ -76,9 +62,10 @@ interface OMsgSetClientVolume {
 }
 
 interface OMsgChange {
-	Change: ChangeChannelEdit | ChangeChannelMove | ChangeClientEdit | ChangeClientUpdate
+	Change: OChange;
+	/*Change: ChangeChannelEdit | ChangeChannelMove | ChangeClientEdit | ChangeClientUpdate
 	| ChangeClientMove | ChangeClientAddServerGroup | ChangeClientRemoveServerGroup
-	| ChangeClientKick;
+	| ChangeClientKick;*/
 }
 
 interface ChangeChannelEdit {
@@ -164,7 +151,7 @@ export type InMsg = InMsgConnected | InDisconnectedTemporarily | InDisconnected 
 interface InMsgConnected {
 	Connected: {
 		server: number[];
-		own_client: number,
+		own_client: ClientId,
 	};
 }
 
@@ -182,7 +169,7 @@ interface InMsgError {
 }
 
 interface InTalkersChanged {
-	TalkersChanged: [number, boolean][];
+	TalkersChanged: [ClientId, boolean][];
 }
 
 interface InMsgEvents {

@@ -163,6 +163,7 @@ impl Ws {
 				if self.self_talking {
 					talkers.push((state.own_client, false));
 				}
+				let talkers = talkers.into_iter().map(|(i, t)| (i.to_string(), t)).collect();
 				self.send_message(&MessageP2F::TalkersChanged(talkers), ctx);
 				return;
 			}
@@ -231,7 +232,10 @@ impl Ws {
 								match server_key.get_uid_no_base64() {
 									Ok(server) => {
 										self.send_message(
-											&MessageP2F::Connected { server, own_client },
+											&MessageP2F::Connected {
+												server,
+												own_client: own_client.to_string(),
+											},
 											ctx,
 										);
 									}

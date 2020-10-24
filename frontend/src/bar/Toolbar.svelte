@@ -5,6 +5,7 @@
 	import { app, NodeSelection } from "../app";
 	import type { Writable } from "svelte/store";
 	import { Client } from "../book";
+	import type { OChangeClientUpdate } from "../book_events";
 
 	export let showSidebar: boolean;
 	export let showDescription: boolean;
@@ -28,19 +29,17 @@
 		const connection = consVal.length > 0 ? consVal[0] : undefined;
 		if (connection !== undefined) {
 			ownClient = connection.book.ownClient;
-			inputMuted = $ownClient?.input_muted ?? false;
-			outputMuted = $ownClient?.output_muted ?? false;
-			const awayMessage = $ownClient?.away_message;
+			inputMuted = $ownClient?.inputMuted ?? false;
+			outputMuted = $ownClient?.outputMuted ?? false;
+			const awayMessage = $ownClient?.awayMessage;
 			isAway = awayMessage !== undefined && awayMessage !== null;
 		}
 	}
 
-	function changeOwnClient(change: any) {
+	function changeOwnClient(change: OChangeClientUpdate) {
 		for (let c of $cons) {
 			c.sendMessage({
-				Change: {
-					ClientUpdate: change,
-				},
+				Change: change,
 			});
 		}
 	}
@@ -116,21 +115,21 @@
 			class="toolbutton"
 			class:active={inputMuted}
 			class:invisible={!showMuteButtons}
-			on:click={() => changeOwnClient({ input_muted: !inputMuted })}>
+			on:click={() => changeOwnClient({ ClientUpdate: { inputMuted: !inputMuted }})}>
 			<Icon name={inputMuted ? 'microphone-off' : 'microphone'} />
 		</button>
 		<button
 			class="toolbutton"
 			class:active={outputMuted}
 			class:invisible={!showMuteButtons}
-			on:click={() => changeOwnClient({ output_muted: !outputMuted })}>
+			on:click={() => changeOwnClient({ ClientUpdate: { outputMuted: !outputMuted }})}>
 			<Icon name={outputMuted ? 'volume-off' : 'volume-high'} />
 		</button>
 		<button
 			class="toolbutton"
 			class:active={isAway}
 			class:invisible={!showMuteButtons}
-			on:click={() => changeOwnClient({ away: isAway ? null : '' })}>
+			on:click={() => changeOwnClient({ ClientUpdate: { away: isAway ? null : '' }})}>
 			<Icon name={isAway ? 'sleep' : 'sleep-off'} />
 		</button>
 		<div style="width: 2em;" />

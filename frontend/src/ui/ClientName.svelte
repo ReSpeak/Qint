@@ -1,16 +1,17 @@
 <script lang="typescript">
-	import { GraphQlClient } from "../book";
+	import { ClientBase } from "../bookBase";
+	import { Client, GraphQlClient } from "../book";
 	import { Message } from "../chat/chat";
 	import { getDataColor } from "../util";
 
-	export let client: GraphQlClient | Message;
+	export let client: GraphQlClient | Client | Message;
 
 	let color: string = "";
 	let name: string = "";
 
-	function refreshClient(cl: GraphQlClient | Message) {
+	function refreshClient(cl: GraphQlClient | Client | Message) {
 		let data, name;
-		if (cl instanceof GraphQlClient) {
+		if (cl instanceof ClientBase) {
 			data = cl.uid ?? cl.name;
 			name = cl.name;
 		} else {

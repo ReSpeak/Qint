@@ -42,7 +42,7 @@
 	$: chatData = $selected?.node.chat;
 	$: on(chatData !== undefined && $chatData, unreadCountChanged());
 
-	let oldOwnChannel: number | undefined;
+	let oldOwnChannel: string | undefined;
 	let oldCon: string | undefined;
 	$: {
 		const ownChannel = $ownClient?.channel;

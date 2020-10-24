@@ -22,7 +22,6 @@ pub(crate) async fn decode_and_analyze_link(link: &str) -> AnalyzeResult {
 		}
 	}
 	if let Ok(url) = percent_decode_str(link).decode_utf8() {
-		println!("got url: {}", &url);
 		let result = analyze_link(url.as_ref()).await.unwrap_or(AnalyzeResult::Unknown);
 		{
 			let mut cache = CACHE.lock().unwrap();

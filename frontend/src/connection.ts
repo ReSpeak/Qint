@@ -1,4 +1,4 @@
-import { OutMsg, OMsgConnect, InMsg, Reason } from "./backend/ws";
+import { OutMsg, OMsgConnect, InMsg } from "./backend/ws";
 import { get, writable, Writable, Readable } from "svelte/store";
 import { Book, Channel, ChatData } from "./book";
 import { getStringFromConnect, oneshot } from "./util";
@@ -7,7 +7,9 @@ import { backend, IBackendConnection } from "./backend/backend";
 import { app } from "./app";
 import { graphql } from "./graphql";
 import { ConnectData } from "./connect/connect";
+import { Reason } from "./book_events";
 import moment from "moment";
+import { ChannelId, ClientId } from "./ts";
 
 export class Connection {
 	private readonly _state = writable(new ConnectionState());
@@ -76,7 +78,7 @@ export class Connection {
 		this.moveClient(this.book.ownClientId!, channel.id);
 	}
 
-	public moveClient(clientId: number, channelId: number) {
+	public moveClient(clientId: ClientId, channelId: ChannelId) {
 		this.sendMessage({
 			Change: {
 				ClientMove: {
@@ -87,7 +89,7 @@ export class Connection {
 		});
 	}
 
-	public moveChannel(moveChannelId: number, targetParentId: number, targetOrderId: number) {
+	public moveChannel(moveChannelId: ChannelId, targetParentId: ChannelId, targetOrderId: ChannelId) {
 		this.sendMessage({
 			Change: {
 				ChannelMove: {
@@ -108,7 +110,7 @@ export class Connection {
 				unreadCount
 			}
 		}`, {
-			server: this.book.server.public_key,
+			server: this.book.server.publicKey,
 		});
 		if (serverData.data.chat !== null)
 			this.book.server.updateChat(ChatData.fromGraphql(serverData.data.chat));
@@ -127,11 +129,11 @@ export class Connection {
 				}
 			}
 		}`, {
-			server: this.book.server.public_key,
+			server: this.book.server.publicKey,
 		});
 		for (const channel of channelData.data.server.channels) {
 			if (channel.chat !== null)
-				this.book.channels.get(Number(channel.id))!.updateChat(ChatData.fromGraphql(channel.chat));
+				this.book.channels.get(channel.id)!.updateChat(ChatData.fromGraphql(channel.chat));
 		}
 
 		// Clients
@@ -143,7 +145,7 @@ export class Connection {
 					unreadCount
 				}
 			}`, {
-				server: this.book.server.public_key,
+				server: this.book.server.publicKey,
 				client: client.uidStr,
 			});
 			if (clientData.data.chat !== null)
@@ -151,7 +153,7 @@ export class Connection {
 		}
 	}
 
-	private async updateClientUnreadCount(clientId: number) {
+	private async updateClientUnreadCount(clientId: ClientId) {
 		const client = this.book.getClient(clientId)!;
 		const clientData = await graphql(`query GetUnreadCount($server: [Int!]!, $client: ID!) {
 			chat(typ: CLIENT, server: $server, id: $client) {
@@ -160,7 +162,7 @@ export class Connection {
 				unreadCount
 			}
 		}`, {
-			server: this.book.server.public_key,
+			server: this.book.server.publicKey,
 			client: client.uidStr,
 		});
 		if (clientData.data.chat !== null)
@@ -193,7 +195,7 @@ export class Connection {
 						location.hash = getStringFromConnect(this.connectOptions!);
 						this.updateAllUnreadCounts();
 					} else if ("Message" in tsevt) {
-						const fromOwnClient = tsevt.Message.invoker.id === this.book.ownClientId;
+						const fromOwnClient = tsevt.Message.invoker.id.toString() === this.book.ownClientId;
 						let chat = undefined;
 						if (tsevt.Message.target === "Server") {
 							chat = this.book.server.chat;
@@ -206,7 +208,7 @@ export class Connection {
 						} else if ("Client" in tsevt.Message.target || "Poke" in tsevt.Message.target) {
 							const targetClientId = "Client" in tsevt.Message.target ? tsevt.Message.target.Client : tsevt.Message.target.Poke;
 							const chatClientId = fromOwnClient ? targetClientId : tsevt.Message.invoker.id;
-							const client = this.book.getClient(chatClientId);
+							const client = this.book.getClient(chatClientId.toString());
 							if (client !== undefined)
 								chat = client.chat;
 						}

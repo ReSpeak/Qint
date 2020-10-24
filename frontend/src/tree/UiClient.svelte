@@ -6,11 +6,12 @@
 	import FilterString from "../ui/FilterString.svelte";
 	import Icon from "../ui/Icon.svelte";
 	import { Connection } from "../connection";
-	import { Client, TalkState } from "../book";
+	import { Client } from "../book";
 	import { draggable, DragData } from "../ui/draggable";
 	import { findParent, flash, render_updates } from "../util";
 	import { afterUpdate } from "svelte";
 	import { app } from "../app";
+	import { TalkState } from "../ts";
 
 	if (render_updates) afterUpdate(() => flash(div));
 
@@ -84,7 +85,7 @@
 		console.log(hoverOpt, dropTarget);
 		if (dropTarget !== undefined) {
 			console.log("Would drop to", dropTarget.dataset.key);
-			connection.moveClient(client.id, Number(dropTarget.dataset.key));
+			connection.moveClient(client.id, dropTarget.dataset.key!);
 		}
 	}
 </script>
@@ -110,16 +111,16 @@
 				<FilterString filter={showId ? '' : thisFilter} content={$client.name} />
 			</span>
 			<span class="icons">
-				{#if $client.input_muted}
+				{#if $client.inputMuted}
 					<Icon name="microphone-off" style="color: red;" />
 				{/if}
-				{#if $client.output_muted}
+				{#if $client.outputMuted}
 					<Icon name="volume-off" style="color: red;" />
 				{/if}
-				{#if $client.away_message !== null}
+				{#if $client.awayMessage !== null}
 					<Icon name="sleep" style="color: rgb(70,180,255);" />
 				{/if}
-				{#each $client.server_groups as grp (grp)}
+				{#each $client.serverGroups as grp (grp)}
 					<ServerGroupIcon id={grp} {connection} />
 				{/each}
 				{#if $chat.unreadCount > 0}
@@ -137,13 +138,13 @@
 			<div class="hover menu" style="top: {div.getBoundingClientRect().top}px;">
 				<div class="corner" />
 				<div class="name">
-					<ClientName client={$client} />
-					{#if client.away_message !== null && client.away_message.length !== 0}
-						({client.away_message})
+					<ClientName {client} />
+					{#if client.awayMessage !== null && client.awayMessage.length !== 0}
+						({client.awayMessage})
 					{/if}
 				</div>
 				{#if !ownClient}
-					<ClientVolume client={$client} {connection} />
+					<ClientVolume {client} {connection} />
 				{/if}
 			</div>
 		{/if}

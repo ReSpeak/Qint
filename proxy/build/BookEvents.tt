@@ -133,12 +133,35 @@ for struc in &self.3.0 {
 		continue;
 	} #>
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Js<#= struc.name #> {
 	<# for p in get_all_properties(&self.structs, &struc.parts) {
 		let struct_type = p.get_type()?;
 		if p.type_s == "DateTime" { #>
 	#[serde(default, deserialize_with = "deserialize_some_date_time", serialize_with = "serialize_some_date_time", skip_serializing_if = "Option::is_none")]
-		<# } else { #>
+		<# } else if p.type_s == "Duration" {
+			if p.opt { #>
+	#[serde(default, deserialize_with = "deserialize_some_some_duration", serialize_with = "serialize_some_some_duration", skip_serializing_if = "Option::is_none")]
+			<# } else { #>
+	#[serde(default, deserialize_with = "deserialize_some_duration", serialize_with = "serialize_some_duration", skip_serializing_if = "Option::is_none")]
+			<# }
+		} else if p.type_s == "i64" {
+			panic!("i64 support not implemented");
+		} else if p.type_s == "u64" {
+			if p.opt { #>
+	#[serde(default, deserialize_with = "deserialize_some_some_u64", serialize_with = "serialize_some_some_u64", skip_serializing_if = "Option::is_none")]
+			<# } else { #>
+	#[serde(default, deserialize_with = "deserialize_some_u64", serialize_with = "serialize_some_u64", skip_serializing_if = "Option::is_none")]
+			<# }
+		} else if p.type_s.ends_with("Id") {
+			if p.opt { #>
+	#[serde(default, deserialize_with = "deserialize_some_some_id", serialize_with = "serialize_some_some_id", skip_serializing_if = "Option::is_none")]
+			<# } else if p.modifier.as_ref().map(|m| m == "set").unwrap_or_default() { #>
+	#[serde(default, deserialize_with = "deserialize_some_set_id", serialize_with = "serialize_some_set_id", skip_serializing_if = "Option::is_none")]
+			<# } else { #>
+	#[serde(default, deserialize_with = "deserialize_some_id", serialize_with = "serialize_some_id", skip_serializing_if = "Option::is_none")]
+			<# }
+		} else { #>
 	#[serde(default, deserialize_with = "deserialize_some", skip_serializing_if = "Option::is_none")]
 		<# } #>
 	pub <#= p.name.to_snake_case() #>: Option<<#= struct_type #>>,
@@ -214,6 +237,7 @@ for e in &self.2.decls {
 		#>
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct <#= e.msg.name #> {
 	<#= self.3.get_struct_ids(&e.book_struct.name) #>
 	<#
@@ -268,6 +292,7 @@ impl <#= e.msg.name #> {
 	#>
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct <#= struct_name #> {
 	<#= self.3.get_struct_ids(&e.book_struct.name) #>
 	<#= args #>
@@ -293,6 +318,7 @@ impl <#= struct_name #> {
 	#>
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct <#= struct_name #> {
 	<#= self.3.get_struct_ids(&e.book_struct.name) #>
 	<#= args #>
@@ -323,6 +349,7 @@ impl <#= struct_name #> {
 	#>
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct <#= struct_name #> {
 	<#= self.3.get_struct_ids(&e.book_struct.name) #>
 	<#= args #>

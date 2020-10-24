@@ -3,8 +3,9 @@
 	import { Connection } from "../connection";
 	import { getIconPath, DummyStore } from "./clientIcon";
 	import { ServerGroup } from "../book";
+	import type { ServerGroupId } from "../ts";
 
-	export let id: number;
+	export let id: ServerGroupId;
 	// Either connection or server has to be set to fetch the icon
 	export let connection: Connection;
 	export let server: string | undefined = undefined;

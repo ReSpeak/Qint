@@ -45,7 +45,7 @@ export class Chat {
 	public async getMessages(idFrom: Message | undefined, dir: ListFetchDir): Promise<FetchResult<Message>> {
 		const selected = get(this.selectedChat);
 		if (selected === undefined) return Chat.EmptyFetch;
-		let public_key = selected.connection.book.server.public_key;
+		let public_key = selected.connection.book.server.publicKey;
 		if (public_key === undefined) {
 			console.error("Cannot get messages for a non-existant connection");
 			return Chat.EmptyFetch;
@@ -143,7 +143,7 @@ export class Chat {
 	public async setLastRead(messageId: string, lastRead: Moment) {
 		const selected = get(this.selectedChat);
 		if (selected === undefined) return;
-		let public_key = selected.connection.book.server.public_key;
+		let public_key = selected.connection.book.server.publicKey;
 		if (public_key === undefined) {
 			console.error("Cannot get messages for a non-existant connection");
 			return;

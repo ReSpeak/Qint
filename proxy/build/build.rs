@@ -5,12 +5,12 @@ use std::path::{Path, PathBuf};
 
 mod book_events;
 
-use crate::book_events::BookEvents;
+use crate::book_events::{BookEvents, BookEventsTs};
 
 fn main() {
 	let target = env::var("TARGET").unwrap();
+	let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
 	if target.contains("pc-windows") {
-		let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
 		let mut lib_dir = manifest_dir.clone();
 		let mut dll_dir = manifest_dir.clone();
 		if target.contains("msvc") {
@@ -52,5 +52,11 @@ fn main() {
 
 	// Bookkeeping events
 	let mut structs = File::create(&path.join("book_events.rs")).unwrap();
-	write!(&mut structs, "{}", BookEvents::default()).unwrap();
+	let events = BookEvents::default();
+	write!(&mut structs, "{}", events).unwrap();
+
+	let path = manifest_dir.join("..").join("frontend").join("src");
+	std::fs::create_dir_all(&path).unwrap();
+	let mut structs = File::create(&path.join("book_events.ts")).unwrap();
+	write!(&mut structs, "{}", BookEventsTs(events)).unwrap();
 }

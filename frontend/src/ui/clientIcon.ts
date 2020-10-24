@@ -1,12 +1,13 @@
 import { Connection } from "../connection";
 import { writable, Writable } from "svelte/store";
 import { backend } from "../backend/backend";
+import { Uid } from "src/ts";
 
-export type IconSource = { icon: number | undefined } | undefined;
+export type IconSource = { icon: string | undefined } | undefined;
 export type IconSourceLike = {
-	icon: number | undefined | null,
+	icon: string | undefined | null,
 	avatar_hash?: string,
-	uid?: number[],
+	uid?: Uid | null,
 	getAvatarUid?: () => string | undefined,
 };
 
@@ -25,12 +26,12 @@ export function getClientIconPath(client: IconSourceLike | null | undefined, con
 	if (connection) {
 		if (client.avatar_hash && client.avatar_hash !== "" && client.uid)
 			return `${connection.backend.serverFileSrc}/file/0/avatar_${client.getAvatarUid!()}?hash=${client.avatar_hash}`;
-		else if (client.icon)
+		else if (client.icon && client.icon !== "0")
 			return `${connection.backend.serverFileSrc}/file/0/icon_${client.icon}`;
 	} else if (server) {
 		if (client.avatar_hash && client.avatar_hash !== "" && client.uid)
 			return `${backend.cacheFileSrc}/${server}/0/avatar_${client.getAvatarUid!()}`;
-		else if (client.icon)
+		else if (client.icon && client.icon !== "0")
 			return `${backend.cacheFileSrc}/${server}/0/icon_${client.icon}`;
 	}
 	return;
@@ -59,15 +60,15 @@ export function getIconPath(source: IconSource, connection?: Connection, server?
 		console.error("ClientIcon needs either connection or server");
 		return;
 	}
-	if (!source || !source.icon)
+	if (!source || !source.icon || source.icon === "0")
 		return;
 
 	const i = source.icon;
-	/**/ if (i === 100) return "alpha-c-circle-outline";
-	else if (i === 200) return "alpha-o-circle-outline";
-	else if (i === 300) return "alpha-s-circle-outline";
-	else if (i === 500) return "alpha-q-circle-outline";
-	else if (i === 600) return "alpha-v-circle-outline";
+	/**/ if (i === "100") return "alpha-c-circle-outline";
+	else if (i === "200") return "alpha-o-circle-outline";
+	else if (i === "300") return "alpha-s-circle-outline";
+	else if (i === "500") return "alpha-q-circle-outline";
+	else if (i === "600") return "alpha-v-circle-outline";
 
 	if (connection) {
 		return `${connection.backend.serverFileSrc}/file/0/icon_${i}`;

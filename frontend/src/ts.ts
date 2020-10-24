@@ -1,31 +1,35 @@
-export type ChannelId = number;
-export type ChannelGroupId = number;
-export type ClientId = number;
-export type ServerGroupId = number;
+import { Moment } from "moment";
 
-export enum Codec {
-	SpeexNarrowband = "SpeexNarrowband",
-	SpeexWideband = "SpeexWideband",
-	SpeexUltrawideband = "SpeexUltrawideband",
-	CeltMono = "CeltMono",
-	OpusVoice = "OpusVoice",
-	OpusMusic = "OpusMusic",
+export type ChannelId = string;
+export type ChannelGroupId = string;
+export type ClientDbId = string;
+export type ClientId = string;
+export type IconId = string;
+export type IpAddr = string;
+export type ServerGroupId = string;
+export type SocketAddr = string;
+export type Uid = number[];
+
+export type EccKeyPubP256 = number[];
+
+export type ClientType = "Normal" | ClientTypeQuery;
+interface ClientTypeQuery {
+	Query: {
+		admin: boolean;
+	};
 }
 
-export function codecToName(codec: Codec) {
-	switch (codec) {
-		case Codec.SpeexNarrowband: return "Speex Narrowband";
-		case Codec.SpeexWideband: return "Speex Wideband";
-		case Codec.SpeexUltrawideband: return "Speex Ultrawideband";
-		case Codec.CeltMono: return "Celt Mono";
-		case Codec.OpusVoice: return "Opus Voice";
-		case Codec.OpusMusic: return "Opus Music";
-		default: return "Unknown";
-	}
+export interface TalkPowerRequest {
+	time: Moment;
+	message: String;
 }
 
-export enum ChannelType {
-	Permanent = "Permanent",
-	SemiPermanent = "SemiPermanent",
-	Temporary = "Temporary"
+export enum TalkState {
+	Off,
+	Voice,
+	Whisper
 }
+
+export type MaxClients = "Inherited" | "Unlimited" | { Limited: number };
+export type OffsetDateTime = [number, number];
+export type RustDuration = [number, number];

@@ -60,7 +60,8 @@ pub(crate) fn start(
 	let pool = runtime.handle().clone();
 
 	// Create thread local runtime for non-send tasks
-	let (spawn_send, mut spawn_recv) = mpsc::channel(1);
+	// A channel size of 1 leads to audio drops when cpu is fully used
+	let (spawn_send, mut spawn_recv) = mpsc::channel(5);
 	let ts2a = TsToAudio::new(logger.clone(), audio_subsystem.clone(), connections)?.start();
 	let a2ts = AudioToTs::new(logger.clone(), audio_subsystem, spawn_send)?.start();
 

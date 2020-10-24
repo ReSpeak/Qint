@@ -1,7 +1,7 @@
 <script lang="typescript">
 	import { get } from "svelte/store";
 	import { Connection } from "../connection";
-	import type { ServerGroupId } from "../ts";
+	import type { ClientId, ServerGroupId } from "../ts";
 	//import { Moment } from "moment";
 	import Icon from "../ui/Icon.svelte";
 	import PlatformIcon from "../ui/PlatformIcon.svelte";
@@ -12,10 +12,10 @@
 	import StickySlot from "../ui/StickySlot.svelte";
 	import ClientVolume from "../ui/ClientVolume.svelte";
 	import { getClientAvatarPath } from "../ui/clientIcon";
-	import { Reason } from "../backend/ws";
+	import { Reason } from "../book_events";
 
 	export let connection: Connection;
-	export let clientId: number;
+	export let clientId: ClientId;
 
 	const sgs = connection.book.serverGroups;
 	$: clientRaw = connection.book.clients.get(clientId)!;
@@ -35,9 +35,9 @@
 		groups = [];
 		$sgs.forEach((group, id) => {
 			const g = get(group);
-			if (g.group_type === "Regular") {
+			if (g.groupType === "Regular") {
 				groups.push({
-					isMember: client.server_groups.includes(id),
+					isMember: client.serverGroups.includes(id),
 					...g
 				});
 			}
@@ -48,7 +48,7 @@
 			const nameCmp = a.name.localeCompare(b.name);
 			if (nameCmp !== 0)
 				return nameCmp;
-			return a.id - b.id;
+			return Number(a.id) - Number(b.id);
 		});
 	}
 

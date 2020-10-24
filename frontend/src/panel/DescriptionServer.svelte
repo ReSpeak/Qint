@@ -1,7 +1,7 @@
 <script lang="typescript">
 	import { Connection } from "../connection";
 	import moment from "moment";
-	import { datetimeDeserialize, LONG_DATETIME } from "../util";
+	import { LONG_DATETIME } from "../util";
 	import Icon from "../ui/Icon.svelte";
 	import PlatformIcon from "../ui/PlatformIcon.svelte";
 	import ServerName from "../ui/ServerName.svelte";
@@ -13,7 +13,7 @@
 	const serverRaw = connection.book.server;
 	$: server = $serverRaw;
 	$: create_date =
-		server.created !== undefined ? datetimeDeserialize(server.created) : moment.unix(0);
+		server.created !== undefined ? server.created : moment.unix(0);
 
 	function disconnect() {
 		connection.disconnect();
@@ -51,7 +51,7 @@
 		</div>
 		<div class="dataLine">
 			<div>Current Clients:</div>
-			<div>{'?'} / {server.max_clients}</div>
+			<div>{'?'} / {server.maxClients}</div>
 		</div>
 	</div>
 	<StickySlot>Actions</StickySlot>

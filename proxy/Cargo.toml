@@ -73,7 +73,7 @@ dependencies = { }
 
 [build-dependencies]
 heck = "0.3"
-t4rust-derive = "0.2"
+t4rust-derive = "0.3"
 tsproto-structs = { path = "../../tsclientlib/utils/tsproto-structs", version = "=0.1.0" }
 
 [dev-dependencies]

@@ -1,10 +1,12 @@
 import { get } from "svelte/store";
 
 import { Book, Channel, Client, Server, ServerGroup } from "./book";
-import { InBookMsg, InMsg, Invoker, Reason, WsMessageTarget } from "./backend/ws";
+import { InBookMsg, InMsg, Invoker, WsMessageTarget } from "./backend/ws";
 import { Connection } from "./connection";
 import { app } from "./app";
 import { IPlugin } from "./plugins";
+import { ClientId } from "./ts";
+import { Reason } from "./book_events";
 
 type NotificationArg = Book | Channel | Client | Invoker | Server | ServerGroup | string | null | undefined;
 
@@ -24,18 +26,18 @@ export class TsNotification {
 				const a = this.args[i];
 				if (a === null || a === undefined) continue;
 				if (a instanceof Channel) {
-					if (a.phonetic_name !== null && a.phonetic_name.length > 0)
-						res += a.phonetic_name;
+					if (a.phoneticName !== null && a.phoneticName.length > 0)
+						res += a.phoneticName;
 					else
 						res += a.name.split(' ', 2)[0];
 				} else if (a instanceof Client) {
-					if (a.phonetic_name && a.phonetic_name.length > 0)
-						res += a.phonetic_name;
+					if (a.phoneticName && a.phoneticName.length > 0)
+						res += a.phoneticName;
 					else
 						res += a.name.split(' ', 2)[0];
 				} else if (a instanceof Server) {
-					if (a.phonetic_name && a.phonetic_name.length > 0)
-						res += a.phonetic_name;
+					if (a.phoneticName && a.phoneticName.length > 0)
+						res += a.phoneticName;
 					else
 						res += a.name.split(' ', 2)[0];
 				} else if (a instanceof ServerGroup) {
@@ -44,10 +46,10 @@ export class TsNotification {
 					res += a;
 				} else if ("name" in a) {
 					// Is an invoker
-					const client = con.book.getClient(a.id);
+					const client = con.book.getClient(a.id.toString());
 					if (client !== undefined) {
-						if (client.phonetic_name.length > 0)
-							res += client.phonetic_name;
+						if (client.phoneticName.length > 0)
+							res += client.phoneticName;
 						else
 							res += client.name.split(' ', 2)[0];
 					} else {
@@ -96,7 +98,7 @@ export function handleMessage(con: Connection, msg: InMsg, plugins: IPlugin[]) {
 	}
 }
 
-function isPoke(target: WsMessageTarget): target is { Poke: number } {
+function isPoke(target: WsMessageTarget): target is { Poke: ClientId } {
 	return target.hasOwnProperty("Poke");
 }
 
@@ -253,38 +255,38 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHand
 						handler(con, msg, notif`${client} is now known as ${newClient.name}`);
 					}
 
-					if (newClient.away_message !== undefined) {
-						if (newClient.away_message === null)
+					if (newClient.awayMessage !== undefined) {
+						if (newClient.awayMessage === null)
 							handler(con, msg, notif`${client} is back`);
-						else if (newClient.away_message!.length === 0)
+						else if (newClient.awayMessage!.length === 0)
 							handler(con, msg, notif`${client} has gone`);
 						else
-							handler(con, msg, notif`${client} has gone to ${newClient.away_message}`);
+							handler(con, msg, notif`${client} has gone to ${newClient.awayMessage}`);
 					}
 
-					if (newClient.input_muted !== undefined) {
+					if (newClient.inputMuted !== undefined) {
 						if (client.id === ownClientId) {
-							if (newClient.input_muted)
+							if (newClient.inputMuted)
 								handler(con, msg, notif`muted`);
 							else
 								handler(con, msg, notif`unmuted`);
 						} else if (inOwnChannel) {
-							if (newClient.input_muted)
+							if (newClient.inputMuted)
 								handler(con, msg, notif`${client} is muted`);
 							else
 								handler(con, msg, notif`${client} is unmuted`);
 						}
 					}
 
-					if (newClient.output_muted !== undefined && (client.id === ownClientId || inOwnChannel)) {
-						if (newClient.output_muted)
+					if (newClient.outputMuted !== undefined && (client.id === ownClientId || inOwnChannel)) {
+						if (newClient.outputMuted)
 							handler(con, msg, notif`${client} is deaf`);
 						else
 							handler(con, msg, notif`${client} is listening`);
 					}
 
-					if (newClient.input_hardware_enabled !== undefined && (client.id === ownClientId || inOwnChannel)) {
-						if (newClient.input_hardware_enabled)
+					if (newClient.inputHardwareEnabled !== undefined && (client.id === ownClientId || inOwnChannel)) {
+						if (newClient.inputHardwareEnabled)
 							handler(con, msg, notif`${client} can talk`);
 						else
 							handler(con, msg, notif`${client} is silent`);

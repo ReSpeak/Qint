@@ -12,8 +12,8 @@
 	import { draggable, DragData } from "../ui/draggable";
 	import { findParent, assert, flash, render_updates } from "../util";
 	import { SpacerType } from "./tree";
-	import { ChannelType } from "../ts";
 	import { app } from "../app";
+	import { ChannelType } from "../book_events";
 
 	if (render_updates) afterUpdate(() => flash(div));
 
@@ -137,7 +137,7 @@
 			const rect = dropTarget.getBoundingClientRect();
 			let clickY = ev.detail.mouseEvent.clientY - rect.top;
 			let clickPerc = clickY / (rect.bottom - rect.top);
-			let target = connection.book.getChannel(Number(dropTarget.dataset.key))!;
+			let target = connection.book.getChannel(dropTarget.dataset.key!)!;
 			// < 0.25      : Dropped in the upper quarter
 			// 0.25 - 0.75 : Dropped in the middle half
 			// > 0.75      : Dropped in the lower quarter
@@ -149,13 +149,13 @@
 			} else if (clickPerc < 0.75) {
 				// Case B: Dropped MIDDLE
 				//      => Target is the new parent, order 0 since it's the first child now
-				connection.moveChannel(channel.id, target.id, 0);
+				connection.moveChannel(channel.id, target.id, "0");
 			} else {
 				// Dropped BOTTOM
 				if (get(target.channels).length > 0) {
 					// Case C: Channel HAS child
 					//      => Same as middle
-					connection.moveChannel(channel.id, target.id, 0);
+					connection.moveChannel(channel.id, target.id, "0");
 				} else {
 					// Case D: Channel NO child
 					//      => Place below target, parent same as target, order is target
@@ -170,7 +170,7 @@
 	function getDisplayName(c: Channel) {
 		// TODO consider special names [*spacer] --- ... -.- ___ -..
 		let data = { type: SpacerType.None, name: c.name };
-		if (c.parent !== 0 || c.channel_type !== ChannelType.Permanent) return data;
+		if (c.parent !== "0" || c.channelType !== ChannelType.Permanent) return data;
 		const match = /^\[(c|l|r|\*|)spacer[^\]]*\](.*)$/.exec(c.name);
 		if (match == null) return data;
 		data.name = match[2];

@@ -11,7 +11,7 @@ interface BookmarkServer {
 	name: string;
 	publicKey: number[];
 	hexPublicKey: string;
-	icon: number | undefined;
+	icon: string | undefined;
 }
 
 export class Bookmark {
@@ -30,7 +30,7 @@ export class Bookmark {
 			this.lastUsed = datetimeDeserialize([content.lastUsed, content.timezone]);
 		if (this.server !== null) {
 			if (content.server?.icon !== undefined)
-				this.server.icon = Number(content.server.icon);
+				this.server.icon = content.server.icon;
 			this.server.hexPublicKey = hexEncode(this.server.publicKey);
 		}
 	}

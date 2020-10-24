@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use tsclientlib::{ClientId, DisconnectOptions, MessageTarget, Version};
+use tsclientlib::{DisconnectOptions, MessageTarget, Version};
 use uuid::Uuid;
 
 use crate::book_events::{JsEvent, JsM2B};
@@ -42,12 +42,12 @@ pub enum MessageP2F {
 		/// The uid of the server.
 		server: Vec<u8>,
 		/// The id of our own client.
-		own_client: ClientId,
+		own_client: String,
 	},
 	/// The connection to the server was lost. Trying to reconnect automatically.
 	DisconnectedTemporarily(),
-	/// The list of currently talking clients and `true` if they are whispering.
-	TalkersChanged(Vec<(ClientId, bool)>),
+	/// The list of currently talking client ids and `true` if they are whispering.
+	TalkersChanged(Vec<(String, bool)>),
 	/// The connection received events.
 	Events(Vec<JsEvent>),
 	Loudness(f64),

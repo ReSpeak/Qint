@@ -1,5 +1,5 @@
 use std::default::Default;
-use std::fmt::Write;
+use std::fmt::{self, Write};
 use std::ops::Deref;
 
 use heck::*;
@@ -9,6 +9,7 @@ use tsproto_structs::book_to_messages::{
 	self, BookToMessagesDeclarations, Event, RuleKind, RuleOp,
 };
 use tsproto_structs::messages_to_book::{self, MessagesToBookDeclarations};
+use tsproto_structs::InnerRustType;
 
 #[derive(Template)]
 #[TemplatePath = "build/BookEvents.tt"]
@@ -20,8 +21,18 @@ pub struct BookEvents<'a>(
 	JsStructs,
 );
 
+#[derive(Template)]
+#[TemplatePath = "build/BookEventsTs.tt"]
+#[derive(Debug)]
+pub struct BookEventsTs<'a>(pub(crate) BookEvents<'a>);
+
 impl Deref for BookEvents<'_> {
 	type Target = BookDeclarations;
+	fn deref(&self) -> &Self::Target { &self.0 }
+}
+
+impl<'a> Deref for BookEventsTs<'a> {
+	type Target = BookEvents<'a>;
 	fn deref(&self) -> &Self::Target { &self.0 }
 }
 
@@ -126,11 +137,31 @@ fn get_all_arguments<'a>(e: &'a Event<'a>, r: Option<&'a RuleKind<'a>>) -> Strin
 	for r in e.ids.iter().chain(r.iter().cloned()) {
 		match r {
 			RuleKind::ArgumentMap { .. } | RuleKind::ArgumentFunction { .. } => {
+				// TODO Custom serializer
 				let arg = r.get_argument();
 				if !arg.is_empty() {
 					args.push_str("pub ");
 					args.push_str(&arg);
 					args.push_str(", ");
+				}
+			}
+			_ => {}
+		}
+	}
+	args
+}
+
+fn get_all_arguments_ts<'a>(e: &'a Event<'a>, r: Option<&'a RuleKind<'a>>) -> String {
+	let mut args = String::new();
+	for r in e.ids.iter().chain(r.iter().cloned()) {
+		match r {
+			RuleKind::ArgumentMap { .. } | RuleKind::ArgumentFunction { .. } => {
+				// TODO convert argument to mixed case
+				let arg = r.get_argument();
+				if !arg.is_empty() {
+					args.push_str("");
+					args.push_str(&arg.replace(':', "?:"));
+					args.push_str(";\n");
 				}
 			}
 			_ => {}
@@ -202,8 +233,83 @@ impl JsStructs {
 			ids.push_str(&i.0.to_snake_case());
 			ids.push_str(": ");
 			ids.push_str(&i.1);
-			ids.push_str(", ");
+			ids.push_str(",\n");
 		}
 		ids
+	}
+
+	fn get_struct_ids_ts(&self, mut name: &str) -> String {
+		if name == "Connection" {
+			name = "Server";
+		}
+		let struc =
+			self.get_struct(name).unwrap_or_else(|| panic!("Did not find struct '{}'", name));
+		let mut ids = String::new();
+		for i in &struc.ids {
+			ids.push_str(&i.0.to_snake_case());
+			ids.push_str(": ");
+			ids.push_str(&i.1);
+			ids.push_str(";\n");
+		}
+		ids
+	}
+}
+
+trait RustTypeExt {
+	fn fmt_ts(&self, f: &mut fmt::Formatter) -> fmt::Result;
+	fn peel_opt(&self) -> &Self;
+}
+
+/// The JavaScript `number` types is a double and not large enough to store e.g. `i64`.
+///
+/// As these are mostly used as ids, we store them as strings instead. Benchmarks showed that
+/// comparing strings is also faster than comparing numbers.
+impl RustTypeExt for InnerRustType {
+	fn fmt_ts(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			Self::Struct(s)
+				if s == "str" || s == "String" || s == "IpAddr" || s == "SocketAddr" =>
+			{
+				write!(f, "string")?
+			}
+			Self::Struct(s) if s == "UidRef" => write!(f, "Uid")?,
+			Self::Primitive(s) if s == "u64" => write!(f, "string")?,
+			Self::Primitive(s)
+				if s.starts_with('i') || s.starts_with('u') || s.starts_with('f') =>
+			{
+				write!(f, "number")?;
+			}
+			Self::Primitive(s) if s == "bool" => write!(f, "boolean")?,
+			Self::Primitive(s) if s == "OffsetDateTime" => write!(f, "Moment")?,
+			Self::Primitive(s) | Self::Struct(s) => write!(f, "{}", s)?,
+			Self::Ref(i) => i.fmt_ts(f)?,
+			Self::Option(i) => {
+				i.fmt_ts(f)?;
+				write!(f, " | null")?;
+			}
+			Self::Map(k, v) => {
+				write!(f, "Record<")?;
+				k.fmt_ts(f)?;
+				write!(f, ", ")?;
+				v.fmt_ts(f)?;
+				write!(f, ">")?;
+			}
+			Self::Set(i) => {
+				i.fmt_ts(f)?;
+				write!(f, "[]")?;
+			}
+			Self::Vec(i) => {
+				i.fmt_ts(f)?;
+				write!(f, "[]")?;
+			}
+		}
+		Ok(())
+	}
+
+	fn peel_opt(&self) -> &Self {
+		match self {
+			Self::Option(i) => i.peel_opt(),
+			_ => self,
+		}
 	}
 }

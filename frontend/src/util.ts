@@ -1,8 +1,8 @@
 import chroma from "chroma-js";
-import moment from "moment";
+import moment, { Duration } from "moment";
 import { Moment } from "moment";
 import { OMsgConnect } from "./backend/ws";
-import { OffsetDateTime } from "./book";
+import { OffsetDateTime, RustDuration } from "./ts";
 import { Readable } from "svelte/store";
 import { ConnectData } from "./connect/connect";
 export const debug: boolean = true;
@@ -304,6 +304,14 @@ export function datetimeDeserialize(rustDate: OffsetDateTime): Moment {
 
 export function datetimeSerialize(date: Moment): OffsetDateTime {
 	return [date.unix(), date.utcOffset() * 60];
+}
+
+export function durationDeserialize(rustDuration: RustDuration): Duration {
+	return moment.duration(rustDuration[0] * 1000 + rustDuration[1] / 1000000);
+}
+
+export function durationSerialize(time: Duration): RustDuration {
+	return [Math.floor(time.asSeconds()), Math.floor(time.asMilliseconds() * 1000000)];
 }
 
 /**

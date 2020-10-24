@@ -669,9 +669,9 @@ dependencies = [
 
 [[package]]
 name = "bstr"
-version = "0.2.13"
+version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31accafdb70df7871592c058eca3985b71104e15ac32f64706022c58867da931"
+checksum = "473fc6b38233f9af7baa94fb5852dca389e3d95b8e21c8e3719301462c5d9faf"
 dependencies = [
  "lazy_static",
  "memchr",
@@ -756,9 +756,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cfg_aliases"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6da2b592f5a2e590c3d94c44313bab369f2286cfe1e4134c830bf3317814866"
+checksum = "fd16c4719339c4530435d38e511904438d07cce7950afa3718a84ac36c10e89e"
 
 [[package]]
 name = "chrono"
@@ -898,11 +898,11 @@ checksum = "8aebca1129a03dc6dc2b127edd729435bbc4a37e1d5f4d7513165089ceb02634"
 
 [[package]]
 name = "crc32fast"
-version = "1.2.0"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba125de2af0df55319f41944744ad91c71113bf74a4646efff39afe1f6842db1"
+checksum = "81156fece84ab6a9f2afdb109ce3ae577e42b1228441eded99bd77f627953b1a"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
 ]
 
 [[package]]
@@ -1350,15 +1350,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "find-crate"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "057a1d48e8ff33649ee2d7c510b79ecf1f8a52b684d446a72de600ad7e2823b6"
-dependencies = [
- "toml",
-]
-
-[[package]]
 name = "flakebi-ring"
 version = "0.16.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1482,7 +1473,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56b858f13b6a7a4ef32d4f7e2382ef3556f150f99ad2146e4bc481165dc2083c"
 dependencies = [
  "derive_utils",
- "find-crate",
  "quote 1.0.7",
  "syn 1.0.45",
 ]
@@ -1869,7 +1859,7 @@ dependencies = [
 [[package]]
 name = "juniper"
 version = "0.14.2"
-source = "git+https://github.com/graphql-rust/juniper#c964fd805c8c9909d662a722532558cf7fad69a3"
+source = "git+https://github.com/graphql-rust/juniper#3e4cf680e2cb07d4deca207ff1753bcab18e9a97"
 dependencies = [
  "async-trait",
  "bson",
@@ -1889,7 +1879,7 @@ dependencies = [
 [[package]]
 name = "juniper_codegen"
 version = "0.14.2"
-source = "git+https://github.com/graphql-rust/juniper#c964fd805c8c9909d662a722532558cf7fad69a3"
+source = "git+https://github.com/graphql-rust/juniper#3e4cf680e2cb07d4deca207ff1753bcab18e9a97"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -2604,9 +2594,9 @@ dependencies = [
 
 [[package]]
 name = "pin-project-lite"
-version = "0.1.10"
+version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e555d9e657502182ac97b539fb3dae8b79cda19e3e4f8ffb5e8de4f18df93c95"
+checksum = "c917123afa01924fc84bb20c4c03f004d9c38e5127e3c039bbf7f4b9c76a2f6b"
 
 [[package]]
 name = "pin-utils"
@@ -2750,7 +2740,7 @@ dependencies = [
  "slog-stdlog",
  "slog-term",
  "structopt",
- "t4rust-derive 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "t4rust-derive",
  "tauri",
  "tempfile",
  "time 0.2.22",
@@ -3754,20 +3744,9 @@ dependencies = [
 
 [[package]]
 name = "t4rust-derive"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05da4fefb247b3b208fe1a406c547e1be83b70bc438299f681997254a50f608e"
-dependencies = [
- "nom 5.1.2",
- "proc-macro2",
- "quote 1.0.7",
- "syn 1.0.45",
-]
-
-[[package]]
-name = "t4rust-derive"
-version = "0.2.0"
-source = "git+https://github.com/ReSpeak/t4rust.git#7a6eeef42904824bfe9220d196d4e23b067ac655"
+checksum = "b97b5372931346e9152892e48c669674766c75ecd9c00860575706eb43c8a4b1"
 dependencies = [
  "nom 5.1.2",
  "proc-macro2",
@@ -4230,7 +4209,7 @@ dependencies = [
  "num-traits",
  "serde",
  "slog",
- "t4rust-derive 0.2.0 (git+https://github.com/ReSpeak/t4rust.git)",
+ "t4rust-derive",
  "thiserror",
  "time 0.2.22",
  "tsproto-packets",
@@ -4345,7 +4324,7 @@ dependencies = [
  "rand 0.7.3",
  "serde",
  "simple_asn1",
- "t4rust-derive 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "t4rust-derive",
  "thiserror",
  "time 0.2.22",
  "tsproto-structs",

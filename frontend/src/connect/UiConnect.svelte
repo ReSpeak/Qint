@@ -107,7 +107,7 @@
 				// Get into tree form
 				for (let c of channels.values()) {
 					// Add to parent
-					if (c.parent !== 0) {
+					if (c.parent !== "0") {
 						let children = channels.get(c.parent)!.channels;
 						children.update((cs) => {
 							Book.addChannelSorted(cs, c);
