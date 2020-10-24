@@ -17,7 +17,7 @@ use tsclientlib::prelude::*;
 use tsclientlib::StreamItem as TsStreamItem;
 use tsclientlib::{
 	events, ChannelId, ClientId, Connection, DisconnectOptions, FileDownloadResult,
-	FiletransferHandle, MessageTarget, Uid,
+	FileUploadResult, FiletransferHandle, MessageTarget, Uid,
 };
 use tsproto::resend::PacketId;
 use tsproto_packets::packets::{AudioData, OutPacket};
@@ -38,6 +38,7 @@ pub(crate) struct Ws {
 	connect_options: Option<messages::ConnectOptions>,
 	channel_list_finished_msg: Option<ChannelListMsg>,
 	file_downloads: HashMap<FiletransferHandle, oneshot::Sender<Result<FileDownloadResult>>>,
+	file_uploads: HashMap<FiletransferHandle, oneshot::Sender<Result<FileUploadResult>>>,
 
 	tauri: Option<WebviewMut>,
 	websocket_closed: bool,
@@ -69,6 +70,15 @@ pub(crate) struct HandleWsMessageMsg(pub TauriWsF2P);
 pub(crate) struct DownloadFile {
 	pub channel: ChannelId,
 	pub path: String,
+}
+
+pub(crate) struct UploadFile {
+	pub channel: ChannelId,
+	pub path: String,
+	pub channel_password: Option<String>,
+	pub size: u64,
+	pub overwrite: bool,
+	pub resume: bool,
 }
 
 impl Actor for Ws {
@@ -128,8 +138,11 @@ impl Message for HandleWsMessageMsg {
 	type Result = ();
 }
 impl Message for DownloadFile {
-	/// The size of the file and the stream
+	/// The size of the file, the stream and the server key.
 	type Result = Result<(u64, TcpStream, EccKeyPubP256)>;
+}
+impl Message for UploadFile {
+	type Result = Result<TcpStream>;
 }
 
 impl Ws {
@@ -148,6 +161,7 @@ impl Ws {
 			connect_options: None,
 			channel_list_finished_msg: None,
 			file_downloads: Default::default(),
+			file_uploads: Default::default(),
 
 			tauri,
 			websocket_closed: false,
@@ -355,8 +369,15 @@ impl Ws {
 					let _ = transfer.send(Ok(file));
 				}
 			}
+			TsStreamItem::FileUpload(handle, file) => {
+				if let Some(transfer) = self.file_uploads.remove(&handle) {
+					let _ = transfer.send(Ok(file));
+				}
+			}
 			TsStreamItem::FiletransferFailed(handle, e) => {
 				if let Some(transfer) = self.file_downloads.remove(&handle) {
+					let _ = transfer.send(Err(e.into()));
+				} else if let Some(transfer) = self.file_uploads.remove(&handle) {
 					let _ = transfer.send(Err(e.into()));
 				}
 			}
@@ -721,6 +742,39 @@ impl Handler<DownloadFile> for Ws {
 			self.file_downloads.insert(handle, send);
 			Box::pin(recv.map(|r| match r {
 				Ok(Ok(r)) => Ok((r.size, r.stream, public_key)),
+				Ok(Err(e)) => Err(e),
+				Err(e) => Err(e.into()),
+			}))
+		} else {
+			Box::pin(futures::future::err(format_err!("Connection does not exist")))
+		}
+	}
+}
+
+impl Handler<UploadFile> for Ws {
+	type Result = ResponseFuture<Result<TcpStream>>;
+	fn handle(&mut self, msg: UploadFile, _: &mut Self::Context) -> Self::Result {
+		if let Some(con) = &mut self.connection {
+			let handle = match con.upload_file(
+				msg.channel,
+				&format!("/{}", msg.path),
+				msg.channel_password.as_deref(),
+				msg.size,
+				msg.overwrite,
+				msg.resume,
+			) {
+				Ok(r) => r,
+				Err(e) => {
+					return Box::pin(futures::future::err(format_err!(
+						"Failed to upload file: {}",
+						e
+					)));
+				}
+			};
+			let (send, recv) = oneshot::channel();
+			self.file_uploads.insert(handle, send);
+			Box::pin(recv.map(|r| match r {
+				Ok(Ok(r)) => Ok(r.stream),
 				Ok(Err(e)) => Err(e),
 				Err(e) => Err(e.into()),
 			}))

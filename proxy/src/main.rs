@@ -43,13 +43,14 @@ mod markdown;
 mod messages;
 mod secret;
 mod shortcut;
-mod websocket;
 mod site_peek;
+mod websocket;
 
 use filecache::FileCache;
 use secret::Secret;
-use websocket::Ws;
 use site_peek::decode_and_analyze_link;
+use websocket::Ws;
+
 const DIR_ORGANIZATION: &str = "ReSpeak";
 const DIR_PROJECT: &str = "Qint";
 const SETTINGS_FILENAME: &str = "config.toml";
@@ -400,13 +401,15 @@ async fn download_file(
 				return HttpResponse::Gone().finish();
 			}
 		};
-		if let Some((_, stream)) = state.file_cache.get_cached_file(&server, channel, &path).await {
+		if let Some((len, stream)) = state.file_cache.get_cached_file(&server, channel, &path).await
+		{
 			let (stream, mut response) = guess_content_type(stream).await;
+			response.no_chunking(len);
 			return response.streaming(stream);
 		}
 
 		debug!(state.logger, "Downloading file"; "channel" => channel.0, "path" => &path);
-		let (_, file_stream, server) =
+		let (len, file_stream, server) =
 			match con.send(websocket::DownloadFile { channel, path: path.clone() }).await {
 				Err(_) => {
 					return HttpResponse::Gone().finish();
@@ -430,6 +433,7 @@ async fn download_file(
 		let stream =
 			FramedRead::new(file_stream, BytesCodec::new()).map(|r| r.map(web::BytesMut::freeze));
 		let (stream, mut response) = guess_content_type(stream).await;
+		response.no_chunking(len);
 
 		// Cache icons and avatars for offline usage
 		if channel.0 == 0 && (path.starts_with("icon_") || path.starts_with("avatar_")) {
@@ -438,6 +442,71 @@ async fn download_file(
 		} else {
 			response.streaming(stream)
 		}
+	} else {
+		HttpResponse::Gone().finish()
+	}
+}
+
+#[put("/con/{id}/file/{channel}/{path:.*}")]
+async fn upload_file(
+	state: web::Data<Arc<State>>, web::Path((id, channel, path)): web::Path<(Uuid, u64, String)>,
+	req: web::HttpRequest, body: web::Payload,
+) -> impl Responder
+{
+	let channel = ChannelId(channel);
+	let cons = state.connections.lock().unwrap();
+	if let Some(con) = cons.get(&ConnectionId(id)).cloned() {
+		drop(cons);
+
+		debug!(state.logger, "Uploading file"; "channel" => channel.0, "path" => &path);
+		let size = if let Some(r) = req.headers().get(http::header::CONTENT_LENGTH) {
+			match r.to_str() {
+				Err(e) => {
+					warn!(state.logger, "Invalid content length header"; "error" => %e);
+					return HttpResponse::BadRequest().body("Invalid content length header");
+				}
+				Ok(s) => match s.parse() {
+					Err(e) => {
+						warn!(state.logger, "Invalid content length header value"; "error" => %e);
+						return HttpResponse::BadRequest()
+							.body("Invalid content length header - not a number");
+					}
+					Ok(r) => r,
+				},
+			}
+		} else {
+			return HttpResponse::BadRequest().body("Content length header is missing");
+		};
+		let mut file_stream = match con
+			.send(websocket::UploadFile {
+				channel,
+				path: path.clone(),
+				channel_password: None,
+				size,
+				overwrite: true,
+				resume: false,
+			})
+			.await
+		{
+			Err(_) => {
+				return HttpResponse::Gone().finish();
+			}
+			Ok(Err(e)) => {
+				error!(state.logger, "File upload failed"; "error" => %e, "path" => &path);
+				return HttpResponse::InternalServerError()
+					.body(format!("Failed to upload file: {}", e));
+			}
+			Ok(Ok(r)) => r,
+		};
+		// Upload
+		let mut body_reader = tokio::io::stream_reader(body.map_err(|e| {
+			std::io::Error::new(std::io::ErrorKind::Other, format!("Payload error {}", e))
+		}));
+		if let Err(e) = tokio::io::copy(&mut body_reader, &mut file_stream).await {
+			warn!(state.logger, "File upload aborted"; "error" => %e);
+			return HttpResponse::BadGateway().body(format!("Upload failed: {}", e));
+		}
+		HttpResponse::Ok().finish()
 	} else {
 		HttpResponse::Gone().finish()
 	}
@@ -455,8 +524,9 @@ async fn download_cache_file(
 		Ok(id) => EccKeyPubP256::from_short(id),
 	};
 	let channel = ChannelId(channel);
-	if let Some((_, stream)) = state.file_cache.get_cached_file(&server, channel, &path).await {
+	if let Some((len, stream)) = state.file_cache.get_cached_file(&server, channel, &path).await {
 		let (stream, mut response) = guess_content_type(stream).await;
+		response.no_chunking(len);
 		response.streaming(stream)
 	} else {
 		HttpResponse::NotFound().finish()
@@ -468,9 +538,7 @@ async fn get_link_preview(url: web::Path<String>) -> impl Responder {
 	HttpResponse::Ok().json(decode_and_analyze_link(&url).await)
 }
 
-fn get_transient_setting_internal(
-	state: &State, req: &str,
-) -> Option<Value> {
+fn get_transient_setting_internal(state: &State, req: &str) -> Option<Value> {
 	let transient_values = state.transient_settings.read().unwrap();
 	if req == "*" {
 		Some(serde_json::to_value(&*transient_values).unwrap())
@@ -492,9 +560,7 @@ async fn get_transient_setting(
 	}
 }
 
-fn set_transient_setting_internal(
-	state: &State, req: &str, body: Value,
-) -> Result<()> {
+fn set_transient_setting_internal(state: &State, req: &str, body: Value) -> Result<()> {
 	state.modify_transient_settings(|transient_values| {
 		if req == "*" {
 			if let Value::Object(obj) = body {
@@ -734,8 +800,9 @@ impl App {
 			let logger = state.logger.clone();
 			actix::spawn(async move {
 				// Connect to localhost if == 0.0.0.0 or ::
-				let url = if addr.ip() == "0.0.0.0".parse::<IpAddr>().unwrap() ||
-					addr.ip() == "::".parse::<IpAddr>().unwrap() {
+				let url = if addr.ip() == "0.0.0.0".parse::<IpAddr>().unwrap()
+					|| addr.ip() == "::".parse::<IpAddr>().unwrap()
+				{
 					format!("http://localhost:{}", port)
 				} else {
 					format!("http://{}", addr)
@@ -845,6 +912,7 @@ impl App {
 					.service(list_plugins)
 					.service(get_plugin)
 					.service(download_file)
+					.service(upload_file)
 					.service(download_cache_file)
 					.service(get_transient_setting)
 					.service(set_transient_setting)
