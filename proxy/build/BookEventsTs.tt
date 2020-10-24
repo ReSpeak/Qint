@@ -116,39 +116,29 @@ export interface OChange<#= e.msg.name #> {
 	} else if e.op == RuleOp::Remove {
 	if e.rules.is_empty() {
 		let args = get_all_arguments_ts(e, None);
-		let name_add = if !args.is_empty() {
-			format!("_{}", &args[..args.find('?').unwrap()])
-		} else {
-			"".into()
-		};
-		let struct_name = format!("{}Remove{}", e.book_struct.name, name_add.to_camel_case());
+		let name_add = get_first_argument_name(e, None);
+		let struct_name = format!("{}Remove{}", e.book_struct.name, name_add);
 		setter_structs.push(struct_name.clone());
 	#>
 
 export interface OChange<#= struct_name #> {
 	<#= struct_name #>: {
 		<#= self.3.get_struct_ids_ts(&e.book_struct.name) #>
-		<#= args #>
-	};
+<#= args #>	};
 }
 	<#
 	} else {
 		for r in &e.rules {
 			let args = get_all_arguments_ts(e, Some(r));
-			let name_add = if !args.is_empty() {
-				format!("_{}", &args[..args.find('?').unwrap()])
-			} else {
-				"".into()
-			};
-			let struct_name = format!("{}Remove{}", e.book_struct.name, name_add.to_camel_case());
+			let name_add = get_first_argument_name(e, Some(r));
+			let struct_name = format!("{}Remove{}", e.book_struct.name, name_add);
 			setter_structs.push(struct_name.clone());
 	#>
 
 export interface OChange<#= struct_name #> {
 	<#= struct_name #>: {
 		<#= self.3.get_struct_ids_ts(&e.book_struct.name) #>
-		<#= args #>
-	};
+<#= args #>	};
 }
 	<#
 		}
@@ -159,11 +149,6 @@ export interface OChange<#= struct_name #> {
 			let name = format!("{}{}", e.book_struct.name, name);
 
 			let args = get_all_arguments_ts(e, Some(r));
-			let name_add = if !args.is_empty() {
-				format!("_{}", &args[..args.find('?').unwrap()])
-			} else {
-				"".into()
-			};
 			let struct_name = format!("{}Add{}", e.book_struct.name, r.from_name_singular());
 			setter_structs.push(struct_name.clone());
 	#>
@@ -171,8 +156,7 @@ export interface OChange<#= struct_name #> {
 export interface OChange<#= struct_name #> {
 	<#= struct_name #>: {
 		<#= self.3.get_struct_ids_ts(&e.book_struct.name) #>
-		<#= args #>
-	};
+<#= args #>	};
 }
 	<#
 		}

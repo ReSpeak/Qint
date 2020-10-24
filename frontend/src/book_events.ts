@@ -1,7 +1,6 @@
 import { ChannelGroupId, ChannelId, ClientDbId, ClientId, ClientType, EccKeyPubP256, IconId, IpAddr, MaxClients, ServerGroupId, SocketAddr, TalkPowerRequest, Uid } from "./ts";
 import { datetimeDeserialize, durationDeserialize } from "./util";
 import { Duration, Moment } from "moment";
-import moment from "moment";
 import { ChannelBase, ClientBase, ServerBase, ServerGroupBase, ChannelGroupBase } from "./bookBase";
 
 // Enums
@@ -516,7 +515,6 @@ export interface OChangeClientUpdate {
 export interface OChangeConnectionRemove {
 	ConnectionRemove: {
 		
-		
 	};
 }
 
@@ -524,8 +522,7 @@ export interface OChangeClientAddServerGroup {
 	ClientAddServerGroup: {
 		id: ClientId;
 
-		server_group: ServerGroupId | undefined;
-
+		serverGroup?: ServerGroupId;
 	};
 }
 
@@ -533,8 +530,7 @@ export interface OChangeClientRemoveServerGroup {
 	ClientRemoveServerGroup: {
 		id: ClientId;
 
-		server_group: ServerGroupId | undefined;
-
+		serverGroup?: ServerGroupId;
 	};
 }
 
@@ -572,8 +568,7 @@ export interface OChangeServerGroupAddClient {
 	ServerGroupAddClient: {
 		id: ServerGroupId;
 
-		client: ClientDbId | undefined;
-
+		client?: ClientDbId;
 	};
 }
 
@@ -581,8 +576,7 @@ export interface OChangeServerGroupRemoveClient {
 	ServerGroupRemoveClient: {
 		id: ServerGroupId;
 
-		client: ClientDbId | undefined;
-
+		client?: ClientDbId;
 	};
 }
 

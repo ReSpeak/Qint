@@ -61,7 +61,7 @@
 				Change: {
 					ClientAddServerGroup: {
 						id: clientId,
-						server_group: group,
+						serverGroup: group,
 					}
 				}
 			});
@@ -70,7 +70,7 @@
 				Change: {
 					ClientRemoveServerGroup: {
 						id: clientId,
-						server_group: group,
+						serverGroup: group,
 					}
 				}
 			});

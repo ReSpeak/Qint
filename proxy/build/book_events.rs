@@ -9,7 +9,7 @@ use tsproto_structs::book_to_messages::{
 	self, BookToMessagesDeclarations, Event, RuleKind, RuleOp,
 };
 use tsproto_structs::messages_to_book::{self, MessagesToBookDeclarations};
-use tsproto_structs::InnerRustType;
+use tsproto_structs::{InnerRustType, RustType};
 
 #[derive(Template)]
 #[TemplatePath = "build/BookEvents.tt"]
@@ -132,18 +132,74 @@ fn get_to_owned(p: &Property) -> String {
 	}
 }
 
-fn get_all_arguments<'a>(e: &'a Event<'a>, r: Option<&'a RuleKind<'a>>) -> String {
+/// `opt`: If this is wrapped into an `Option`.
+fn get_serde_attr(t: &InnerRustType, opt: bool) -> String {
+	let part = get_serializer_part(t);
+	if part == "" && !opt {
+		"".into()
+	} else if part == "_some" || (part == "" && opt) {
+		r#"#[serde(default, deserialize_with = "deserialize_some", skip_serializing_if = "Option::is_none")]"#
+			.into()
+	} else {
+		let default_part = if opt { "default, " } else { "" };
+		let opt_part = if opt { "_some" } else { "" };
+		let skip_part = if opt { r#", skip_serializing_if = "Option::is_none""# } else { "" };
+		format!(
+			r#"#[serde({def}deserialize_with = "deserialize{opt}{part}", serialize_with = "serialize{opt}{part}"{skip})]"#,
+			part = part,
+			def = default_part,
+			opt = opt_part,
+			skip = skip_part,
+		)
+	}
+}
+
+fn get_serializer_part(t: &InnerRustType) -> String {
+	match t {
+		InnerRustType::Option(i) => format!("_some{}", get_serializer_part(i)),
+		InnerRustType::Set(i) => format!("_set{}", get_serializer_part(i)),
+		InnerRustType::Primitive(s) if s.ends_with("Id") => "_id".into(),
+		InnerRustType::Primitive(s) if s == "u64" => "_u64".into(),
+		InnerRustType::Primitive(s) if s == "i64" => "_i64".into(),
+		InnerRustType::Primitive(s) if s == "Duration" => "_duration".into(),
+		InnerRustType::Primitive(s) if s == "OffsetDateTime" => "_date_time".into(),
+		_ => "".into(),
+	}
+}
+
+fn get_first_argument<'a>(
+	e: &'a Event<'a>, r: Option<&'a RuleKind<'a>>,
+) -> Option<&'a RuleKind<'a>> {
+	for r in e.ids.iter().chain(r.iter().cloned()) {
+		match r {
+			RuleKind::ArgumentMap { .. } | RuleKind::ArgumentFunction { .. } => return Some(r),
+			_ => {}
+		}
+	}
+	None
+}
+
+fn get_first_argument_name<'a>(e: &'a Event<'a>, r: Option<&'a RuleKind<'a>>) -> &'a str {
+	let first_arg = get_first_argument(e, r);
+	if let Some(a) = first_arg { a.from_name() } else { "" }
+}
+
+fn get_all_arguments(e: &Event, r: Option<&RuleKind>) -> String {
 	let mut args = String::new();
 	for r in e.ids.iter().chain(r.iter().cloned()) {
 		match r {
 			RuleKind::ArgumentMap { .. } | RuleKind::ArgumentFunction { .. } => {
-				// TODO Custom serializer
-				let arg = r.get_argument();
-				if !arg.is_empty() {
-					args.push_str("pub ");
-					args.push_str(&arg);
-					args.push_str(", ");
+				let r_type = r.get_type();
+				// Custom serializer
+				let ser = get_serde_attr(&r_type.inner, false);
+				if !ser.is_empty() {
+					args.push('\t');
+					args.push_str(&ser);
+					args.push('\n');
 				}
+				args.push_str("\tpub ");
+				args.push_str(&r.get_argument());
+				args.push_str(",\n");
 			}
 			_ => {}
 		}
@@ -151,18 +207,16 @@ fn get_all_arguments<'a>(e: &'a Event<'a>, r: Option<&'a RuleKind<'a>>) -> Strin
 	args
 }
 
-fn get_all_arguments_ts<'a>(e: &'a Event<'a>, r: Option<&'a RuleKind<'a>>) -> String {
+fn get_all_arguments_ts(e: &Event, r: Option<&RuleKind>) -> String {
 	let mut args = String::new();
 	for r in e.ids.iter().chain(r.iter().cloned()) {
 		match r {
 			RuleKind::ArgumentMap { .. } | RuleKind::ArgumentFunction { .. } => {
-				// TODO convert argument to mixed case
-				let arg = r.get_argument();
-				if !arg.is_empty() {
-					args.push_str("");
-					args.push_str(&arg.replace(':', "?:"));
-					args.push_str(";\n");
-				}
+				args.push_str("\t\t");
+				args.push_str(&r.from_name().to_mixed_case());
+				args.push_str("?: ");
+				args.push_str(&r.get_type().to_ref(true).to_string());
+				args.push_str(";\n");
 			}
 			_ => {}
 		}
@@ -229,7 +283,15 @@ impl JsStructs {
 			self.get_struct(name).unwrap_or_else(|| panic!("Did not find struct '{}'", name));
 		let mut ids = String::new();
 		for i in &struc.ids {
-			ids.push_str("pub ");
+			// Custom serializer
+			let r_type: RustType = i.1.parse().unwrap();
+			let ser = get_serde_attr(&r_type.inner, false);
+			if !ser.is_empty() {
+				ids.push('\t');
+				ids.push_str(&ser);
+				ids.push('\n');
+			}
+			ids.push_str("\tpub ");
 			ids.push_str(&i.0.to_snake_case());
 			ids.push_str(": ");
 			ids.push_str(&i.1);

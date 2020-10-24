@@ -137,33 +137,8 @@ for struc in &self.3.0 {
 pub struct Js<#= struc.name #> {
 	<# for p in get_all_properties(&self.structs, &struc.parts) {
 		let struct_type = p.get_type()?;
-		if p.type_s == "DateTime" { #>
-	#[serde(default, deserialize_with = "deserialize_some_date_time", serialize_with = "serialize_some_date_time", skip_serializing_if = "Option::is_none")]
-		<# } else if p.type_s == "Duration" {
-			if p.opt { #>
-	#[serde(default, deserialize_with = "deserialize_some_some_duration", serialize_with = "serialize_some_some_duration", skip_serializing_if = "Option::is_none")]
-			<# } else { #>
-	#[serde(default, deserialize_with = "deserialize_some_duration", serialize_with = "serialize_some_duration", skip_serializing_if = "Option::is_none")]
-			<# }
-		} else if p.type_s == "i64" {
-			panic!("i64 support not implemented");
-		} else if p.type_s == "u64" {
-			if p.opt { #>
-	#[serde(default, deserialize_with = "deserialize_some_some_u64", serialize_with = "serialize_some_some_u64", skip_serializing_if = "Option::is_none")]
-			<# } else { #>
-	#[serde(default, deserialize_with = "deserialize_some_u64", serialize_with = "serialize_some_u64", skip_serializing_if = "Option::is_none")]
-			<# }
-		} else if p.type_s.ends_with("Id") {
-			if p.opt { #>
-	#[serde(default, deserialize_with = "deserialize_some_some_id", serialize_with = "serialize_some_some_id", skip_serializing_if = "Option::is_none")]
-			<# } else if p.modifier.as_ref().map(|m| m == "set").unwrap_or_default() { #>
-	#[serde(default, deserialize_with = "deserialize_some_set_id", serialize_with = "serialize_some_set_id", skip_serializing_if = "Option::is_none")]
-			<# } else { #>
-	#[serde(default, deserialize_with = "deserialize_some_id", serialize_with = "serialize_some_id", skip_serializing_if = "Option::is_none")]
-			<# }
-		} else { #>
-	#[serde(default, deserialize_with = "deserialize_some", skip_serializing_if = "Option::is_none")]
-		<# } #>
+		let attr = get_serde_attr(&struct_type.inner, true); #>
+	<#= attr #>
 	pub <#= p.name.to_snake_case() #>: Option<<#= struct_type #>>,
 	<# } #>
 }
@@ -239,13 +214,17 @@ for e in &self.2.decls {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct <#= e.msg.name #> {
-	<#= self.3.get_struct_ids(&e.book_struct.name) #>
+<#= self.3.get_struct_ids(&e.book_struct.name) #>
 	<#
 	// Event IDs
 	for r in &e.ids {
 		match r {
 			RuleKind::ArgumentMap { .. } |
-			RuleKind::ArgumentFunction { .. } => { #>
+			RuleKind::ArgumentFunction { .. } => {
+				let attr = get_serde_attr(&r.get_type().inner, false);
+				if !attr.is_empty() { #>
+	<#= attr #>
+				<# } #>
 	pub <#= r.get_argument() #>,
 			<# }
 			_ => {}
@@ -255,8 +234,11 @@ pub struct <#= e.msg.name #> {
 	// Event Props
 	for r in &e.rules {
 		let name = r.from_name_singular();
-		#>
-	#[serde(default, deserialize_with = "deserialize_some", skip_serializing_if = "Option::is_none")]
+		let t = r.get_type_no_option();
+		let attr = get_serde_attr(&t.inner, true);
+		if !attr.is_empty() { #>
+	<#= attr #>
+		<# } #>
 	pub <#= r.from_name().to_snake_case() #>: Option<<#= r.get_type_no_option() #>>,
 	<# }
 #>
@@ -282,52 +264,42 @@ impl <#= e.msg.name #> {
 	} else if e.op == RuleOp::Remove {
 	if e.rules.is_empty() {
 		let args = get_all_arguments(e, None);
-		let name_add = if !args.is_empty() {
-			format!("_{}", &args[4..args.find(':').unwrap()])
-		} else {
-			"".into()
-		};
-		let struct_name = format!("{}Remove{}", e.book_struct.name, name_add.to_camel_case());
+		let name_add = get_first_argument_name(e, None);
+		let struct_name = format!("{}Remove{}", e.book_struct.name, name_add);
 		setter_structs.push(struct_name.clone());
 	#>
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct <#= struct_name #> {
-	<#= self.3.get_struct_ids(&e.book_struct.name) #>
-	<#= args #>
-}
+<#= self.3.get_struct_ids(&e.book_struct.name) #>
+<#= args #>}
 
 impl <#= struct_name #> {
 	pub fn to_packet(&self, con: &Connection) -> Result<OutCommand> {
 		<# get_struct(_fmt, e.book_struct.name.as_str())?; #>
-		Ok(s.remove<#= name_add #>(<#= set_all_id_arguments(e) #>).to_packet())
+		Ok(s.remove<# if !name_add.is_empty() { #>_<# } #><#= name_add.to_snake_case() #>(<#= set_all_id_arguments(e) #>).to_packet())
 	}
 }
 	<#
 	} else {
 		for r in &e.rules {
 			let args = get_all_arguments(e, Some(r));
-			let name_add = if !args.is_empty() {
-				format!("_{}", &args[4..args.find(':').unwrap()])
-			} else {
-				"".into()
-			};
-			let struct_name = format!("{}Remove{}", e.book_struct.name, name_add.to_camel_case());
+			let name_add = get_first_argument_name(e, Some(r));
+			let struct_name = format!("{}Remove{}", e.book_struct.name, name_add);
 			setter_structs.push(struct_name.clone());
 	#>
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct <#= struct_name #> {
-	<#= self.3.get_struct_ids(&e.book_struct.name) #>
-	<#= args #>
-}
+<#= self.3.get_struct_ids(&e.book_struct.name) #>
+<#= args #>}
 
 impl <#= struct_name #> {
 	pub fn to_packet(&self, con: &Connection) -> Result<OutCommand> {
 		<# get_struct(_fmt, e.book_struct.name.as_str())?; #>
-		Ok(s.remove<#= name_add #>(<#= set_all_arguments(e, Some(r)) #>).to_packet())
+		Ok(s.remove<# if !name_add.is_empty() { #>_<# } #><#= name_add.to_snake_case() #>(<#= set_all_arguments(e, Some(r)) #>).to_packet())
 	}
 }
 	<#
@@ -339,11 +311,6 @@ impl <#= struct_name #> {
 			let name = format!("{}{}", e.book_struct.name, name);
 
 			let args = get_all_arguments(e, Some(r));
-			let name_add = if !args.is_empty() {
-				format!("_{}", &args[4..args.find(':').unwrap()])
-			} else {
-				"".into()
-			};
 			let struct_name = format!("{}Add{}", e.book_struct.name, r.from_name_singular());
 			setter_structs.push(struct_name.clone());
 	#>
@@ -351,9 +318,8 @@ impl <#= struct_name #> {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct <#= struct_name #> {
-	<#= self.3.get_struct_ids(&e.book_struct.name) #>
-	<#= args #>
-}
+<#= self.3.get_struct_ids(&e.book_struct.name) #>
+<#= args #>}
 
 impl <#= struct_name #> {
 	pub fn to_packet(&self, con: &Connection) -> Result<OutCommand> {

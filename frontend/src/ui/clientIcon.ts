@@ -6,7 +6,7 @@ import { Uid } from "src/ts";
 export type IconSource = { icon: string | undefined } | undefined;
 export type IconSourceLike = {
 	icon: string | undefined | null,
-	avatar_hash?: string,
+	avatarHash?: string,
 	uid?: Uid | null,
 	getAvatarUid?: () => string | undefined,
 };
@@ -24,12 +24,12 @@ export function getClientIconPath(client: IconSourceLike | null | undefined, con
 		return;
 
 	if (connection) {
-		if (client.avatar_hash && client.avatar_hash !== "" && client.uid)
-			return `${connection.backend.serverFileSrc}/file/0/avatar_${client.getAvatarUid!()}?hash=${client.avatar_hash}`;
+		if (client.avatarHash && client.avatarHash !== "" && client.uid)
+			return `${connection.backend.serverFileSrc}/file/0/avatar_${client.getAvatarUid!()}?hash=${client.avatarHash}`;
 		else if (client.icon && client.icon !== "0")
 			return `${connection.backend.serverFileSrc}/file/0/icon_${client.icon}`;
 	} else if (server) {
-		if (client.avatar_hash && client.avatar_hash !== "" && client.uid)
+		if (client.avatarHash && client.avatarHash !== "" && client.uid)
 			return `${backend.cacheFileSrc}/${server}/0/avatar_${client.getAvatarUid!()}`;
 		else if (client.icon && client.icon !== "0")
 			return `${backend.cacheFileSrc}/${server}/0/icon_${client.icon}`;
@@ -46,10 +46,10 @@ export function getClientAvatarPath(client: IconSourceLike | null | undefined, c
 		return;
 
 	if (connection) {
-		if (client.avatar_hash !== "" && client.uid)
-			return `${connection.backend.serverFileSrc}/file/0/avatar_${client.getAvatarUid!()}?hash=${client.avatar_hash}`;
+		if (client.avatarHash !== "" && client.uid)
+			return `${connection.backend.serverFileSrc}/file/0/avatar_${client.getAvatarUid!()}?hash=${client.avatarHash}`;
 	} else if (server) {
-		if (client.avatar_hash !== "" && client.uid)
+		if (client.avatarHash !== "" && client.uid)
 			return `${backend.cacheFileSrc}/${server}/0/avatar_${client.getAvatarUid!()}`;
 	}
 	return;

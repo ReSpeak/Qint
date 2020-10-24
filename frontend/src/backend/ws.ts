@@ -2,7 +2,7 @@
 
 import { Channel, ChannelGroup, Client, Server, ServerGroup } from "../book";
 import { ChannelId, ChannelGroupId, ClientId, ServerGroupId } from "../ts";
-import { ChannelType, Codec, OChange, Reason } from "../book_events";
+import { OChange, Reason } from "../book_events";
 
 export type WsMessageTarget =
 	"Server"
@@ -63,85 +63,6 @@ interface OMsgSetClientVolume {
 
 interface OMsgChange {
 	Change: OChange;
-	/*Change: ChangeChannelEdit | ChangeChannelMove | ChangeClientEdit | ChangeClientUpdate
-	| ChangeClientMove | ChangeClientAddServerGroup | ChangeClientRemoveServerGroup
-	| ChangeClientKick;*/
-}
-
-interface ChangeChannelEdit {
-	ChannelEdit: {
-		id: ChannelId,
-		password?: string | null;
-		channel_type?: ChannelType;
-		description?: string;
-		order?: ChannelId;
-		name?: string;
-		topic?: string;
-		is_default?: boolean;
-		codec?: Codec;
-		codec_quality?: number;
-		needed_talk_power?: number;
-		icon?: number;
-		codec_latency_factor?: number;
-		is_unencrypted?: boolean;
-		delete_delay?: any;
-		phonetic_name?: string;
-	};
-}
-
-interface ChangeChannelMove {
-	ChannelMove: {
-		id: ChannelId;
-		parent: ChannelId;
-		order: ChannelId;
-	};
-}
-
-interface ChangeClientEdit {
-	ClientEdit: {
-		id: ClientId,
-		description?: string;
-		talk_power_granted?: boolean;
-	};
-}
-
-interface ChangeClientUpdate {
-	ClientUpdate: {
-		name?: string;
-		input_muted?: boolean;
-		output_muted?: boolean;
-		away?: string | null;
-	}
-}
-
-interface ChangeClientMove {
-	ClientMove: {
-		id: ClientId,
-		channel: ChannelId,
-		password?: string;
-	}
-}
-
-interface ChangeClientAddServerGroup {
-	ClientAddServerGroup: {
-		id: ClientId,
-		server_group: ServerGroupId,
-	}
-}
-
-interface ChangeClientRemoveServerGroup {
-	ClientRemoveServerGroup: {
-		id: ClientId,
-		server_group: ServerGroupId,
-	}
-}
-
-interface ChangeClientKick {
-	ClientKick: {
-		id: ClientId,
-		reason: Reason,
-		reason_message?: string,
-	}
 }
 
 
