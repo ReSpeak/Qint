@@ -4,7 +4,7 @@
 	import { Client } from "../book";
 	import BSlider from "./BSlider.svelte";
 	import Icon from "./Icon.svelte";
-	import { debounced } from "src/util";
+	import { debounced } from "../util";
 
 	export let connection: Connection;
 	export let client: Client;
@@ -12,8 +12,6 @@
 	let minVolume = -30;
 	let maxVolume = +30;
 	let clientVolume = client.volume;
-
-	let volumeTimer: number | undefined;
 
 	async function loadVolume() {
 		await client.loadVolume();

@@ -249,6 +249,9 @@
 		const lastScrollHeight = pan.scrollHeight;
 		const lastScrollTop = pan.scrollTop;
 		//console.log("Before change scrollHeight", lastScrollHeight, ", scrollTop", pan.scrollTop);
+
+		triggerResizing();
+
 		elems = newElems;
 		await tick();
 

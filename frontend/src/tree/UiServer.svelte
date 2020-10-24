@@ -59,6 +59,8 @@
 				</span>
 			{/if}
 		</span>
+		<!-- TODO implement hover container -->
+		<div class="hover"></div>
 	</div>
 </StickySlot>
 
@@ -83,7 +85,7 @@
 {/if}
 
 <style lang="scss">
-	@import "./tree";
+	@import "./tree_shared";
 
 	ul {
 		margin: 0 0 0 0.2em;

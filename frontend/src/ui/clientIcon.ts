@@ -1,7 +1,7 @@
 import { Connection } from "../connection";
 import { writable, Writable } from "svelte/store";
 import { backend } from "../backend/backend";
-import { Uid } from "src/ts";
+import { Uid } from "../ts";
 
 export type IconSource = { icon: string | undefined } | undefined;
 export type IconSourceLike = {
