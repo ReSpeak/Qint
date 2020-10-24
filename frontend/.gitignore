@@ -8,3 +8,4 @@ public/fonts
 package-lock.json
 yarn.lock
 .rpt2_cache
+book_events.ts

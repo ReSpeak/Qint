@@ -45,9 +45,13 @@ for struc in &self.3.0 {
 		continue;
 	} #>
 export class <#= struc.name #> extends <#= struc.name #>Base {
-	<# for p in get_all_properties(&self.structs, &struc.parts) {
+	<# for (s, p) in get_all_properties_with_struct(&self.structs, &struc.parts) {
 		// TODO More things should be optional, e.g. server.uptime
-		let struct_type = p.get_type()?; #>
+		let mut struct_type = p.get_type()?;
+		if !struct_type.is_opt() && s.opt {
+			struct_type = struct_type.wrap_opt();
+		}
+		#>
 	public readonly <#= p.name.to_mixed_case() #>!: <# struct_type.inner.fmt_ts(_fmt)?; #>;
 	<# } #>
 

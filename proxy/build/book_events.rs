@@ -99,18 +99,22 @@ fn get_properties<'a>(structs: &'a [Struct], s: &'a Struct) -> Vec<&'a Property>
 	s.properties.iter().filter(|p| !structs.iter().any(|s| s.name == p.type_s)).collect()
 }
 
-fn get_all_properties<'a>(structs: &'a [Struct], parts: &[&str]) -> Vec<&'a Property> {
+fn get_all_properties_with_struct<'a>(structs: &'a [Struct], parts: &[&str]) -> Vec<(&'a Struct, &'a Property)> {
 	let mut props = Vec::new();
 	for struc in structs {
 		if !parts.contains(&struc.name.as_str()) {
 			continue;
 		}
 		for p in get_properties(structs, struc) {
-			props.push(p);
+			props.push((struc, p));
 		}
 	}
 
 	props
+}
+
+fn get_all_properties<'a>(structs: &'a [Struct], parts: &[&str]) -> Vec<&'a Property> {
+	get_all_properties_with_struct(structs, parts).into_iter().map(|(_, p)| p).collect()
 }
 
 fn get_to_owned(p: &Property) -> String {
