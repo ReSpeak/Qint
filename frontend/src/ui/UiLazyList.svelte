@@ -1,7 +1,7 @@
 <script lang="typescript">
 	import { ListFetchDir } from "./lazyList";
 	import type { FetchResult } from "./lazyList";
-	import { assert, binarySearchByKey, Debounce } from "../util";
+	import { assert, binarySearchByKey, debounced } from "../util";
 	import { createEventDispatcher, tick, onMount } from "svelte";
 	import ResizeObserver from "resize-observer-polyfill";
 	const dispatch = createEventDispatcher<{ viewchanged: { first?: T; last?: T } }>();
@@ -369,7 +369,7 @@
 	let lockElem: HTMLElement | undefined;
 	let lockPos: number | undefined;
 
-	const resizingTimeout = new Debounce(
+	const resizingTimeout = debounced(
 		() => {
 			resizing = false;
 			start_fill();
@@ -389,7 +389,7 @@
 		}
 
 		resizing = true;
-		resizingTimeout.call();
+		resizingTimeout();
 	}
 
 	function handle_scroll() {

@@ -346,38 +346,34 @@ type FnFunc<T extends unknown[]> = (...args: T) => void;
 interface DebounceOpt {
 	resetOnCall?: boolean // default: true
 }
-export class Debounce<T extends unknown[]>
-{
-	private func: FnFunc<T>;
-	private timeout: number;
-	private timer: number | undefined;
-	private opt: DebounceOpt;
 
-	constructor(fn: FnFunc<T>, timeout: number, options?: DebounceOpt) {
-		this.func = fn;
-		this.timeout = timeout;
-		this.opt = options ?? {
-			resetOnCall: false,
-		};
-	}
+export function debounced<T extends unknown[] = []>(fn: FnFunc<T>, timeout: number, options?: DebounceOpt) {
+	let timer: number | undefined;
+	let opt = options ?? {
+		resetOnCall: false,
+	};
 
-	public call(...args: T) {
-		if (this.opt.resetOnCall) {
-			this.cancel();
-		}
-
-		if (this.timer === undefined) {
-			this.timer = setTimeout(() => {
-				this.timer = undefined;
-				this.func(...args);
-			}, this.timeout);
+	function cancel() {
+		if (timer !== undefined) {
+			clearTimeout(timer);
+			timer = undefined;
 		}
 	}
 
-	public cancel() {
-		if (this.timer !== undefined) {
-			clearTimeout(this.timer);
-			this.timer = undefined;
+	function call(...args: T) {
+		if (opt.resetOnCall) {
+			cancel();
+		}
+
+		if (timer === undefined) {
+			timer = setTimeout(() => {
+				timer = undefined;
+				fn(...args);
+			}, timeout);
 		}
 	}
+
+	call.cancel = cancel;
+	call.call = call;
+	return call;
 }

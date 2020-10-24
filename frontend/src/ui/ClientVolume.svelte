@@ -4,6 +4,7 @@
 	import { Client } from "../book";
 	import BSlider from "./BSlider.svelte";
 	import Icon from "./Icon.svelte";
+	import { debounced } from "src/util";
 
 	export let connection: Connection;
 	export let client: Client;
@@ -27,19 +28,13 @@
 		updateVolume();
 	}
 
-	function updateVolume() {
-		if (volumeTimer)
-			return;
-		// Update every few ms
-		volumeTimer = setTimeout(() => {
-			volumeTimer = undefined;
-			let vol = 0;
-			if ($clientVolume !== minVolume) {
-				vol = Math.pow(10, $clientVolume / 20);
-			}
-			client.updateVolume(connection, vol);
-		}, 100);
-	}
+	let updateVolume = debounced(() => {
+		let vol = 0;
+		if ($clientVolume !== minVolume) {
+			vol = Math.pow(10, $clientVolume / 20);
+		}
+		client.updateVolume(connection, vol);
+	}, 100);
 
 	onMount(() => {
 		loadVolume();
@@ -47,14 +42,21 @@
 </script>
 
 <div class="volumeControl">
-<button class="volume button" on:click={toggleVolume}>
-	{#if $clientVolume === minVolume}
-		<Icon name="volume-off" />
-	{:else}
-		<Icon name="volume-high" />
-	{/if}
-</button>
-<BSlider min={minVolume} max={maxVolume} step={1} bind:value={$clientVolume} display={n => `${n} dB`} tooltip={true} on:input={updateVolume} />
+	<button class="volume button" on:click={toggleVolume}>
+		{#if $clientVolume === minVolume}
+			<Icon name="volume-off" />
+		{:else}
+			<Icon name="volume-high" />
+		{/if}
+	</button>
+	<BSlider
+		min={minVolume}
+		max={maxVolume}
+		step={1}
+		bind:value={$clientVolume}
+		display={(n) => `${n} dB`}
+		tooltip={true}
+		on:input={updateVolume} />
 </div>
 
 <style lang="scss">

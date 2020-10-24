@@ -8,6 +8,7 @@
 	import BKeyValue from "../ui/BKeyValue.svelte";
 	import BSlider from "../ui/BSlider.svelte";
 	import type { SettGroup } from "../transientSettings";
+	import { debounced } from "../util";
 
 	export let connection: Connection;
 	let loudness = connection.loudness;
@@ -15,18 +16,12 @@
 	let minLoudnessThreshold = -100;
 	let maxLoudnessThreshold = 0;
 	let loudnessThreshold = minLoudnessThreshold;
-	let loudnessTimer: number | undefined;
 
 	connection.sendMessage({ SubscribeLoudness: true });
 
-	function updateLoudness() {
-		if (loudnessTimer !== undefined) return;
-		// Update every few ms
-		loudnessTimer = setTimeout(() => {
-			loudnessTimer = undefined;
+	let updateLoudness = debounced(() => {
 			connection.sendMessage({ SetLoudnessThreshold: loudnessThreshold });
-		}, 100);
-	}
+	}, 100);
 
 	function syncSettings(group?: SettGroup) {
 		app.transientSettings.save(group);
