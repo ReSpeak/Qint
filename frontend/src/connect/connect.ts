@@ -33,10 +33,10 @@ export class ConnectData {
 				name: this.name,
 				channel,
 				version: getDefaultVersion(),
-				ignore_identity_mismatch: false,
-				log_commands: false,
-				log_packets: false,
-				log_udp_packets: false,
+				ignoreIdentityMismatch: false,
+				logCommands: false,
+				logPackets: false,
+				logUdpPackets: false,
 			}
 		};
 	}

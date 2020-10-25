@@ -21,7 +21,7 @@ use tsproto_structs::enums;
 use tsproto_structs::enums::*;
 
 for e in &enums::DATA.enums { #>
-export enum <#= e.name #> {
+export const enum <#= e.name #> {
 <# for v in &e.variants { #>
 	<#= v.name #> = "<#= v.name #>",
 <# } #>

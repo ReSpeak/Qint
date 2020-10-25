@@ -12,6 +12,14 @@
 <div class="name">
 	{channel.name}
 </div>
+{#if channel.topic !== null && channel.topic.length > 0}
+<div class="topic">
+	{channel.topic}
+</div>
+{/if}
 
 <style lang="scss">
+	.topic {
+		font-size: 0.85em;
+	}
 </style>

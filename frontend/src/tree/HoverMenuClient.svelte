@@ -18,6 +18,11 @@
 		({client.awayMessage})
 	{/if}
 </div>
+{#if client.description.length > 0}
+<div>
+	{client.description}
+</div>
+{/if}
 {#if !ownClient}
 	<ClientVolume {client} {connection} />
 {/if}

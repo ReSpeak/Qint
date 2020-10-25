@@ -80,7 +80,8 @@
 		left: var(--channel-tree-width);
 		display: flex;
 		flex-direction: column;
-		gap: 1em;
+		align-items: flex-start;
+		gap: 0.5em;
 	}
 
 	.hover .corner {
@@ -124,6 +125,6 @@
 	}
 
 	.buttons {
-		margin-bottom: 0.5em;
+		margin-bottom: 0.2em;
 	}
 </style>

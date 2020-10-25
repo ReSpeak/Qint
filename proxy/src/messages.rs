@@ -6,7 +6,7 @@ use crate::book_events::{JsEvent, JsInMessage, JsM2B};
 
 /// A message sent over a websocket connection from the frontend to the proxy.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
 pub enum MessageF2P {
 	Connect(ConnectOptions),
 	Disconnect(DisconnectOptions),
@@ -32,7 +32,7 @@ pub enum MessageF2P {
 
 /// A message sent over a websocket connection from the proxy to the frontend.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
 pub enum MessageP2F {
 	/// The connection failed. The websocket connection should be closed
 	/// afterwards.
@@ -42,6 +42,7 @@ pub enum MessageP2F {
 		/// The uid of the server.
 		server: Vec<u8>,
 		/// The id of our own client.
+		#[serde(rename = "ownClient")]
 		own_client: String,
 	},
 	/// The connection to the server was lost. Trying to reconnect automatically.
@@ -86,7 +87,7 @@ pub struct TauriWsEventF2P {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
 pub enum TauriHttpRequest {
 	DownloadFile {
 		connection: Uuid,

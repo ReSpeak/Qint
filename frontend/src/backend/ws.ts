@@ -21,10 +21,10 @@ export interface OMsgConnect {
 		name: string;
 		channel: string | undefined;
 		version: string;
-		ignore_identity_mismatch: boolean;
-		log_commands: boolean;
-		log_packets: boolean;
-		log_udp_packets: boolean;
+		ignoreIdentityMismatch: boolean;
+		logCommands: boolean;
+		logPackets: boolean;
+		logUdpPackets: boolean;
 	};
 }
 
@@ -72,7 +72,7 @@ export type InMsg = InMsgConnected | InDisconnectedTemporarily | InDisconnected 
 interface InMsgConnected {
 	Connected: {
 		server: number[];
-		own_client: ClientId,
+		ownClient: ClientId,
 	};
 }
 

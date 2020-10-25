@@ -181,7 +181,7 @@ export class Connection {
 		handleMessage(this, msg, app.plugins);
 		if ("Connected" in msg) {
 			this.book.server.update({ uid: msg.Connected.server });
-			this.book.ownClientId = msg.Connected.own_client;
+			this.book.ownClientId = msg.Connected.ownClient;
 		} else if ("DisconnectedTemporarily" in msg) {
 			this._state.update(s => s.setConnecting());
 			this.book.reset();
