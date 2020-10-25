@@ -13,6 +13,7 @@
 	export let connection: Connection;
 	let loudness = connection.loudness;
 
+	let developMode = app.transientSettings.ui._developMode;
 	let minLoudnessThreshold = -100;
 	let maxLoudnessThreshold = 0;
 	let loudnessThreshold = minLoudnessThreshold;
@@ -56,7 +57,7 @@
 			<BKeyValue label="Developer Mode">
 				<input
 					type="checkbox"
-					bind:checked={app.transientSettings.ui.developMode}
+					bind:checked={$developMode}
 					on:change={() => syncSettings('ui')} />
 			</BKeyValue>
 		</BTabSlot>

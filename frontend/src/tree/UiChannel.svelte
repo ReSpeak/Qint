@@ -12,8 +12,9 @@
 	import { draggable, DragData } from "../ui/draggable";
 	import { findParent, assert, flash, render_updates } from "../util";
 	import { SpacerType } from "./tree";
-	import { app } from "../app";
+	import { app, NodeSelection } from "../app";
 	import { ChannelType } from "../book_events";
+	import HoverMenu from "./HoverMenu.svelte";
 
 	if (render_updates) afterUpdate(() => flash(div));
 
@@ -235,11 +236,8 @@
 				{/if}
 			</span>
 		</div>
-		{#if hovered}
-			<div class="hover menu" style="top: {div.getBoundingClientRect().top}px;">
-				<div class="corner" />
-				{$channel.name}
-			</div>
+		{#if connection !== undefined && hovered}
+			<HoverMenu {div} selected={new NodeSelection(connection, channel)} />
 		{/if}
 	</div>
 	<ul class="menu-list">

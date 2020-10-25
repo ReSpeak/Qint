@@ -22,6 +22,7 @@
 	const selected = app.selectedNode;
 	let chatStore = app.transientSettings.chat;
 
+	let developMode = app.transientSettings.ui._developMode;
 	let chatList: UiLazyList | undefined;
 	let messagesError: unknown | undefined;
 	let messageInput: BInput;
@@ -229,7 +230,7 @@
 			</BInput>
 			<button class="button" name="send" type="submit" style="height: auto;">Send</button>
 		</form>
-		{#if app.transientSettings.ui.developMode}
+		{#if $developMode}
 			<form class="chat-form" on:submit|preventDefault={sendCommand}>
 				<BInput bind:value={command}></BInput>
 				<button class="button" name="send" type="submit" style="height: auto;">Send Command</button>

@@ -1,7 +1,5 @@
 <script lang="typescript">
 	import TsIcon from "../ui/TsIcon.svelte";
-	import ClientVolume from "../ui/ClientVolume.svelte";
-	import ClientName from "../ui/ClientName.svelte";
 	import ServerGroupIcon from "../ui/ServerGroupIcon.svelte";
 	import FilterString from "../ui/FilterString.svelte";
 	import Icon from "../ui/Icon.svelte";
@@ -10,8 +8,9 @@
 	import { draggable, DragData } from "../ui/draggable";
 	import { findParent, flash, render_updates } from "../util";
 	import { afterUpdate } from "svelte";
-	import { app } from "../app";
+	import { app, NodeSelection } from "../app";
 	import { TalkState } from "../ts";
+	import HoverMenu from "./HoverMenu.svelte";
 
 	if (render_updates) afterUpdate(() => flash(div));
 
@@ -135,29 +134,13 @@
 			</span>
 		</div>
 		{#if hovered}
-			<div class="hover menu" style="top: {div.getBoundingClientRect().top}px;">
-				<div class="corner" />
-				<div class="name">
-					<ClientName {client} />
-					{#if client.awayMessage !== null && client.awayMessage.length !== 0}
-						({client.awayMessage})
-					{/if}
-				</div>
-				{#if !ownClient}
-					<ClientVolume {client} {connection} />
-				{/if}
-			</div>
+			<HoverMenu {div} selected={new NodeSelection(connection, client)} />
 		{/if}
 	</div>
 </li>
 
 <style lang="scss">
 	@import "./tree";
-
-	.hover .name {
-		grid-row: 1;
-		grid-column: 1 / 3;
-	}
 
 	.talkWave {
 		transition: opacity 0.2s ease-in-out, height 0.2s ease-in-out;

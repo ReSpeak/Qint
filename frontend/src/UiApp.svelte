@@ -10,6 +10,7 @@
 	import Connect from "./connect/UiConnect.svelte";
 	import GlobalCss from "./GlobalCss.svelte";
 	import { ConnectData } from "./connect/connect";
+	import { DescriptionMode } from "./transientSettings";
 
 	const connections = app.connections;
 	let filter: string = "";
@@ -18,11 +19,16 @@
 	const selected = app.selectedNode;
 	const ui = app.transientSettings.ui;
 
-	let showSidebar = ui.showSidebar;
-	let showDescription = ui.showDescription;
+	let descriptionMode = ui._descriptionMode;
 	let displayPanel = DisplayPanel.Connect;
 	let columnStyle = "";
 	let connectData = new ConnectData("", "");
+
+	let showSidebar = false;
+	$: {
+		if ($connections.length !== 0)
+			showSidebar = true;
+	}
 
 	$: {
 		columnStyle = "";
@@ -38,14 +44,13 @@
 </script>
 
 <div class="appContainer" style="grid-template-columns: {columnStyle}">
-	<!-- TODO Toolbar does not need connection -->
-	<Toolbar bind:showSidebar bind:showDescription bind:displayPanel />
+	<Toolbar bind:showSidebar bind:displayPanel />
 	<Searchbar bind:filter visible={showSidebar} />
 	<Sidebar {connections} {filter} visible={showSidebar} {showConnect} />
 	<div class="panel">
 		{#if displayPanel === DisplayPanel.Main}
 			<UiChat {chat} />
-			{#if showDescription}
+			{#if $descriptionMode !== DescriptionMode.None}
 				<Description selected={$selected} />
 			{/if}
 		{:else if displayPanel === DisplayPanel.Settings && $connections.length !== 0}

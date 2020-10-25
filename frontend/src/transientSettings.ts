@@ -1,6 +1,7 @@
 import { soft_merge } from "./util";
 import { backend } from "./backend/backend";
 import { NodeSelection } from "./app";
+import { get, writable } from "svelte/store";
 
 type FilterFlags<Base, Condition> = {
 	[Key in keyof Base]: Base[Key] extends Condition ? never : Key
@@ -8,6 +9,12 @@ type FilterFlags<Base, Condition> = {
 type AllowedNames<Base, Condition> = FilterFlags<Base, Condition>[keyof Base];
 type SubType<Base, Condition> = Pick<Base, AllowedNames<Base, Condition>>;
 export type SettGroup = NonNullable<keyof SubType<TransientSettings, Function>>;
+
+export const enum DescriptionMode {
+	None = "None",
+	Info = "Info",
+	Files = "Files",
+}
 
 export class TransientSettings {
 	private _syncDebounceTimer: number | undefined;
@@ -115,9 +122,10 @@ export class TransientSettingsSynth {
 }
 
 export class TransientSettingsUi {
-	public showSidebar: boolean = true;
-	public showDescription: boolean = true;
-	public developMode: boolean = false;
+	private get descriptionMode() { return get(this._descriptionMode); }
+	private get developMode() { return get(this._developMode); }
+	public readonly _descriptionMode = writable(DescriptionMode.None);
+	public readonly _developMode = writable(false);
 }
 
 export class TransientSettingsChat {

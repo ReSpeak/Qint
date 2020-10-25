@@ -43,7 +43,7 @@ export class App {
 		this.selectNode(undefined);
 	}
 
-	private selectNode(nodeSel?: NodeSelection) {
+	public selectNode(nodeSel?: NodeSelection) {
 		const checkOldNode = get(this.selectedNode);
 		if (NodeSelection.equals(checkOldNode, nodeSel))
 			return;

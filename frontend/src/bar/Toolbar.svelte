@@ -7,24 +7,20 @@
 	import { Client } from "../book";
 	import type { OChangeClientUpdate } from "../book_events";
 
-	export let showSidebar: boolean;
-	export let showDescription: boolean;
 	export let displayPanel: DisplayPanel;
+	export let showSidebar: boolean;
 
 	let inputMuted = false;
 	let outputMuted = false;
 	let isAway = false;
 
 	let showMuteButtons = false;
-	let showDescriptionButton = false;
 
 	const cons = app.connections;
 	let ownClient: Writable<Client | undefined> | undefined;
 	$: {
 		const consVal = $cons;
 		showMuteButtons = consVal.length > 0;
-		showDescriptionButton = consVal.length > 0 || showSidebar;
-		if (!showDescriptionButton) showDescription = false;
 
 		const connection = consVal.length > 0 ? consVal[0] : undefined;
 		if (connection !== undefined) {
@@ -46,27 +42,6 @@
 
 	function toggleSidebar(show: boolean) {
 		showSidebar = show;
-		if ($cons.length === 0) {
-			app.transientSettings.ui.showSidebar = show;
-			app.transientSettings.save();
-		}
-	}
-
-	function toggleDescription(show: boolean) {
-		showDescription = show;
-		app.transientSettings.ui.showDescription = show;
-		app.transientSettings.save();
-	}
-
-	$: displayPanelChanged(displayPanel);
-	function displayPanelChanged(pan: DisplayPanel) {
-		if (pan !== DisplayPanel.Main) showDescription = false;
-		else showDescription = app.transientSettings.ui.showDescription;
-	}
-
-	$: showDescriptionChanged(showDescription);
-	function showDescriptionChanged(to: boolean) {
-		if (to) displayPanel = DisplayPanel.Main;
 	}
 
 	const selectedNode = app.selectedNode;
@@ -74,7 +49,6 @@
 	function selectedNodeChanged(node: NodeSelection | undefined) {
 		if (node !== undefined) {
 			displayPanel = DisplayPanel.Main;
-			showDescription = app.transientSettings.ui.showDescription;
 		}
 	}
 </script>
@@ -133,13 +107,6 @@
 			<Icon name={isAway ? 'sleep' : 'sleep-off'} />
 		</button>
 		<div style="width: 2em;" />
-		<button
-			class="toolbutton"
-			class:active={showDescription}
-			class:invisible={!showDescriptionButton}
-			on:click={() => toggleDescription(!showDescription)}>
-			<Icon name="information-outline" />
-		</button>
 	</div>
 </div>
 

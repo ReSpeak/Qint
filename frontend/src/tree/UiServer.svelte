@@ -8,7 +8,8 @@
 	import { ConnectData } from "../connect/connect";
 	import { flash, render_updates } from "../util";
 	import { afterUpdate } from "svelte";
-	import { app } from "../app";
+	import { app, NodeSelection } from "../app";
+	import HoverMenu from "./HoverMenu.svelte";
 
 	let div: HTMLElement;
 	if (render_updates) afterUpdate(() => flash(div));
@@ -17,6 +18,7 @@
 	export let filter: string;
 	export let showConnect: (data: ConnectData) => void;
 
+	let hovered = false;
 	const state = connection.state;
 	const server = connection.book.server;
 	let channels = server.channels;
@@ -35,10 +37,24 @@
 	function cancel() {
 		connection.close();
 	}
+
+	function hover() {
+		if (connection === undefined) return;
+		hovered = true;
+	}
+
+	function leave(event: MouseEvent) {
+		if (event.relatedTarget) {
+			if (div.contains(event.relatedTarget as Node)) {
+				return;
+			}
+		}
+		hovered = false;
+	}
 </script>
 
 <StickySlot styled={false} on:click={click}>
-	<div bind:this={div} class="button serverHeader" class:selectedServerChat>
+	<div bind:this={div} class="button serverHeader" class:selectedServerChat on:mouseover={hover} on:mouseout={leave}>
 		<TsIcon type="server" source={$server} {connection} />
 		<ServerName {connection} />
 		<div class="buttons">
@@ -59,8 +75,9 @@
 				</span>
 			{/if}
 		</span>
-		<!-- TODO implement hover container -->
-		<div class="hover"></div>
+		{#if hovered}
+			<HoverMenu {div} selected={new NodeSelection(connection, server)} />
+		{/if}
 	</div>
 </StickySlot>
 
