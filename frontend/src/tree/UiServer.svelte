@@ -6,7 +6,7 @@
 	import UiChannel from "./UiChannelWrap.svelte";
 	import { Connection } from "../connection";
 	import { ConnectData } from "../connect/connect";
-	import { flash, render_updates } from "../util";
+	import { DelayedHover, flash, render_updates } from "../util";
 	import { afterUpdate } from "svelte";
 	import { app, NodeSelection } from "../app";
 	import HoverMenu from "./HoverMenu.svelte";
@@ -18,7 +18,8 @@
 	export let filter: string;
 	export let showConnect: (data: ConnectData) => void;
 
-	let hovered = false;
+	let hover = new DelayedHover();
+	let hovered = hover.hovered;
 	const state = connection.state;
 	const server = connection.book.server;
 	let channels = server.channels;
@@ -37,24 +38,10 @@
 	function cancel() {
 		connection.close();
 	}
-
-	function hover() {
-		if (connection === undefined) return;
-		hovered = true;
-	}
-
-	function leave(event: MouseEvent) {
-		if (event.relatedTarget) {
-			if (div.contains(event.relatedTarget as Node)) {
-				return;
-			}
-		}
-		hovered = false;
-	}
 </script>
 
 <StickySlot styled={false} on:click={click}>
-	<div bind:this={div} class="button serverHeader" class:selectedServerChat on:mouseover={hover} on:mouseout={leave}>
+	<div bind:this={div} class="button serverHeader" class:selectedServerChat tabindex="0" on:mouseover={() => hover.mouseover()} on:mouseout={e => hover.mouseout(e)} on:focus={() => hover.mouseover()} on:blur={() => hover.mouseout(undefined)}>
 		<TsIcon type="server" source={$server} {connection} />
 		<ServerName {connection} />
 		<div class="buttons">
@@ -75,7 +62,7 @@
 				</span>
 			{/if}
 		</span>
-		{#if hovered}
+		{#if $hovered}
 			<HoverMenu {div} selected={new NodeSelection(connection, server)} />
 		{/if}
 	</div>
@@ -131,7 +118,7 @@
 	}
 
 	// Server name
-	.serverHeader :global():nth-child(2) {
+	.serverHeader > :global():nth-child(2) {
 		flex: 1;
 		text-align: start;
 		overflow: hidden;

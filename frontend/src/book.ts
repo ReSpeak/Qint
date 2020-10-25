@@ -1,6 +1,5 @@
 import { Writable, writable, get, Readable } from "svelte/store";
 import { InBookChangeMsg, WsMessageTarget } from "./backend/ws";
-import { graphql } from "./graphql";
 import { Connection } from "./connection";
 import { binarySearchBy, getDataColor, arraysEqual, base64Encode, Cached, datetimeDeserialize, assert } from "./util";
 import { ChannelGroupId, ChannelId, ClientId, IconId, IpAddr, MaxClients, OffsetDateTime, ServerGroupId, TalkState, Uid } from "./ts";
@@ -9,6 +8,8 @@ import * as book_events from "./book_events";
 import { Moment } from "moment";
 import moment from "moment";
 import { ClientBase, ServerBase } from "./bookBase";
+import { app } from "./app";
+import { backend } from "./backend/backend";
 
 export function codecToName(codec: Codec) {
 	switch (codec) {
@@ -485,7 +486,7 @@ export class Client extends book_events.Client implements ITreeNode, Readable<Cl
 	}
 
 	public async loadVolume() {
-		const res = await graphql(`query GetClientVolume($client: [Int!]!) {
+		const res = await backend.graphql(`query GetClientVolume($client: [Int!]!) {
 			client(uid: $client) { volume }
 		}`, {
 			client: this.uid,

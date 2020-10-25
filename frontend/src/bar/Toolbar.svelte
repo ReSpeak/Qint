@@ -58,7 +58,8 @@
 		<button
 			class="toolbutton"
 			class:active={showSidebar}
-			on:click={() => toggleSidebar(!showSidebar)}>
+			on:click={() => toggleSidebar(!showSidebar)}
+			title="Channel tree">
 			<Icon name="file-tree" />
 		</button>
 	</div>
@@ -67,19 +68,22 @@
 		<button
 			class="toolbutton"
 			class:active={displayPanel === DisplayPanel.Main}
-			on:click={() => (displayPanel = DisplayPanel.Main)}>
+			on:click={() => (displayPanel = DisplayPanel.Main)}
+			title="Chat">
 			<Icon name="chat-outline" />
 		</button>
 		<button
 			class="toolbutton"
 			class:active={displayPanel === DisplayPanel.Settings}
-			on:click={() => (displayPanel = DisplayPanel.Settings)}>
+			on:click={() => (displayPanel = DisplayPanel.Settings)}
+			title="Settings">
 			<Icon name="cog" />
 		</button>
 		<button
 			class="toolbutton"
 			class:active={displayPanel === DisplayPanel.Connect}
-			on:click={() => (displayPanel = DisplayPanel.Connect)}>
+			on:click={() => (displayPanel = DisplayPanel.Connect)}
+			title="Connect to a new server">
 			<Icon name={SERVER_ICON} />
 		</button>
 	</div>
@@ -89,24 +93,26 @@
 			class="toolbutton"
 			class:active={inputMuted}
 			class:invisible={!showMuteButtons}
-			on:click={() => changeOwnClient({ ConnectionClientUpdate: { inputMuted: !inputMuted }})}>
+			on:click={() => changeOwnClient({ ConnectionClientUpdate: { inputMuted: !inputMuted }})}
+			title="Mute microphone">
 			<Icon name={inputMuted ? 'microphone-off' : 'microphone'} />
 		</button>
 		<button
 			class="toolbutton"
 			class:active={outputMuted}
 			class:invisible={!showMuteButtons}
-			on:click={() => changeOwnClient({ ConnectionClientUpdate: { outputMuted: !outputMuted }})}>
+			on:click={() => changeOwnClient({ ConnectionClientUpdate: { outputMuted: !outputMuted }})}
+			title="Mute output">
 			<Icon name={outputMuted ? 'volume-off' : 'volume-high'} />
 		</button>
 		<button
 			class="toolbutton"
 			class:active={isAway}
 			class:invisible={!showMuteButtons}
-			on:click={() => changeOwnClient({ ConnectionClientUpdate: { away: isAway ? null : '' }})}>
+			on:click={() => changeOwnClient({ ConnectionClientUpdate: { away: isAway ? null : '' }})}
+			title="Toggle away">
 			<Icon name={isAway ? 'sleep' : 'sleep-off'} />
 		</button>
-		<div style="width: 2em;" />
 	</div>
 </div>
 

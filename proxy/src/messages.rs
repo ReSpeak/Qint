@@ -1,13 +1,12 @@
 use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
-use tsclientlib::{ChannelId, DisconnectOptions, MessageTarget, Version};
+use tsclientlib::{DisconnectOptions, MessageTarget, Version};
 use uuid::Uuid;
 
 use crate::book_events::{JsEvent, JsInMessage, JsM2B};
 
 /// A message sent over a websocket connection from the frontend to the proxy.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub enum MessageF2P {
 	Connect(ConnectOptions),
 	Disconnect(DisconnectOptions),
@@ -33,7 +32,7 @@ pub enum MessageF2P {
 
 /// A message sent over a websocket connection from the proxy to the frontend.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub enum MessageP2F {
 	/// The connection failed. The websocket connection should be closed
 	/// afterwards.
@@ -54,15 +53,13 @@ pub enum MessageP2F {
 	/// The connection received a message.
 	Message(JsInMessage),
 	Loudness(f64),
-	FileList(Vec<JsChannelFile>)
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ConnectOptions {
-	// TODO as camelCase
 	/// Id of the bookmark
-	pub bookmark: Option<i64>,
+	pub bookmark: Option<u64>,
 	pub address: String,
 	pub name: String,
 	pub channel: Option<String>,
@@ -75,18 +72,6 @@ pub struct ConnectOptions {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct JsChannelFile {
-	// TODO As string
-	pub channel_id: ChannelId,
-	pub path: String,
-	pub name: String,
-	pub size: u64,
-	pub last_modified: OffsetDateTime,
-	pub is_file: bool,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub enum TauriWsF2P {
 	Msg(MessageF2P),
@@ -94,14 +79,14 @@ pub enum TauriWsF2P {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct TauriWsEventF2P {
 	pub connection: Uuid,
 	pub msg: TauriWsF2P,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub enum TauriHttpRequest {
 	DownloadFile {
 		connection: Uuid,
@@ -123,7 +108,7 @@ pub enum TauriHttpRequest {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct TauriHttpRequestWrapper {
 	#[serde(flatten)]
 	pub req: TauriHttpRequest,

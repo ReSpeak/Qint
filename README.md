@@ -36,27 +36,29 @@ git clone https://github.com/Flakebi/Qint.git
 ```
 
 ## Build and run Qint
+### Build and start the backend
+```bash
+cd Qint/proxy
+env RUST_LOG=debug cargo run -- -b
+# For release builds
+cargo build --release
+```
+
+To activate logging for audio, use e.g. `RUST_LOG=debug,qint_proxy::audio::audio_to_ts=trace`.
+
 ### Build the frontend
+The backend needs to be built first because it autogenerates part of the frontend code.
+
 ```bash
 cd Qint/frontend
 # Install dependencies
 yarn
 
 # For the development server
-yarn run dev
-# For builds
-yarn run build
+snowpack dev
+# For builds (note: does not build without --watch)
+snowpack build --watch
 ```
-
-### Build and start the backend
-```bash
-cd Qint/proxy
-env RUST_LOG=debug cargo run -- -t
-# For release builds
-cago build --release
-```
-
-To activate logging for audio, use e.g. `RUST_LOG=debug,qint_proxy::audio::audio_to_ts=trace`.
 
 Now, you can use the client at http://localhost:4422.
 

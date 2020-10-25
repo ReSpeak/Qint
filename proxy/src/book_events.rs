@@ -147,9 +147,7 @@ fn serialize_some_date_time<S: Serializer>(
 }
 
 // Serialize Duration as seconds + nanoseconds (default serializer)
-fn deserialize_duration<'de, D: Deserializer<'de>>(
-	deserializer: D,
-) -> Result<Duration, D::Error> {
+fn deserialize_duration<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Duration, D::Error> {
 	Ok(Deserialize::deserialize(deserializer)?)
 }
 
@@ -183,9 +181,7 @@ fn serialize_some_some_duration<S: Serializer>(
 	datetime.serialize(serializer)
 }
 
-fn deserialize_i64<'de, D: Deserializer<'de>>(
-	deserializer: D,
-) -> Result<i64, D::Error> {
+fn deserialize_i64<'de, D: Deserializer<'de>>(deserializer: D) -> Result<i64, D::Error> {
 	let s: String = Deserialize::deserialize(deserializer)?;
 	Ok(s.parse().map_err(SerdeError::custom)?)
 }
@@ -194,9 +190,7 @@ fn serialize_i64<S: Serializer>(i: &i64, serializer: S) -> Result<S::Ok, S::Erro
 	i.to_string().serialize(serializer)
 }
 
-fn deserialize_u64<'de, D: Deserializer<'de>>(
-	deserializer: D,
-) -> Result<u64, D::Error> {
+fn deserialize_u64<'de, D: Deserializer<'de>>(deserializer: D) -> Result<u64, D::Error> {
 	let s: String = Deserialize::deserialize(deserializer)?;
 	Ok(s.parse().map_err(SerdeError::custom)?)
 }

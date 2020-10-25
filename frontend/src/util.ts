@@ -2,7 +2,7 @@ import chroma from "chroma-js";
 import moment, { Duration } from "moment";
 import { Moment } from "moment";
 import { OffsetDateTime, RustDuration } from "./ts";
-import { Readable } from "svelte/store";
+import { Readable, writable } from "svelte/store";
 import { ConnectData } from "./connect/connect";
 export const debug: boolean = true;
 export const render_updates: boolean = false;
@@ -375,4 +375,28 @@ export function debounced<T extends unknown[] = []>(fn: FnFunc<T>, timeout: numb
 	call.cancel = cancel;
 	call.call = call;
 	return call;
+}
+
+/// Used for the hover menu of the channel tree.
+export class DelayedHover {
+	public readonly hovered = writable(false);
+	private newHover = false;
+
+	mouseover() {
+		this.hovered.set(true);
+		this.newHover = true;
+	}
+
+	mouseout(event: MouseEvent | undefined) {
+		if (event && event.target instanceof HTMLElement && event.relatedTarget) {
+			if (event.target.contains(event.relatedTarget as Node)) {
+				return;
+			}
+		}
+		this.newHover = false;
+		setTimeout(() => {
+			if (!this.newHover) this.hovered.set(false);
+		}, 50);
+	}
+
 }

@@ -11,6 +11,7 @@ export interface IBackend {
 	cacheFileSrc: string;
 	createNewConnection(): IBackendConnection;
 	fetch(cmd: string, data?: RequestInit): Promise<IFetchLike>;
+	graphql<T = any>(query: string, variables?: object): Promise<{ data: T }>;
 	setTitle(name: string): void;
 }
 

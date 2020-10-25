@@ -5,7 +5,6 @@ import { getStringFromConnect, oneshot } from "./util";
 import { handleMessage } from "./notification";
 import { backend, IBackendConnection } from "./backend/backend";
 import { app } from "./app";
-import { graphql } from "./graphql";
 import { ConnectData } from "./connect/connect";
 import { Reason } from "./book_events";
 import moment from "moment";
@@ -103,7 +102,7 @@ export class Connection {
 
 	private async updateAllUnreadCounts() {
 		// Server
-		const serverData = await graphql(`query GetUnreadCounts($server: [Int!]!) {
+		const serverData = await backend.graphql(`query GetUnreadCounts($server: [Int!]!) {
 			chat(typ: SERVER, server: $server) {
 				lastRead
 				timezone
@@ -117,7 +116,7 @@ export class Connection {
 
 
 		// Channels
-		const channelData = await graphql(`query GetUnreadCounts($server: [Int!]!) {
+		const channelData = await backend.graphql(`query GetUnreadCounts($server: [Int!]!) {
 			server(server: $server) {
 				channels(includeDeleted: false) {
 					id
@@ -138,7 +137,7 @@ export class Connection {
 
 		// Clients
 		for (const client of this.book.clients.values()) {
-			const clientData = await graphql(`query GetUnreadCount($server: [Int!]!, $client: ID!) {
+			const clientData = await backend.graphql(`query GetUnreadCount($server: [Int!]!, $client: ID!) {
 				chat(typ: CLIENT, server: $server, id: $client) {
 					lastRead
 					timezone
@@ -155,7 +154,7 @@ export class Connection {
 
 	private async updateClientUnreadCount(clientId: ClientId) {
 		const client = this.book.getClient(clientId)!;
-		const clientData = await graphql(`query GetUnreadCount($server: [Int!]!, $client: ID!) {
+		const clientData = await backend.graphql(`query GetUnreadCount($server: [Int!]!, $client: ID!) {
 			chat(typ: CLIENT, server: $server, id: $client) {
 				lastRead
 				timezone

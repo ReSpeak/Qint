@@ -60,19 +60,17 @@ export class TauriBackend implements IBackend {
 		return (await promisified<{ Plugin: string }>({ GetPlugin: name })).Plugin;
 	}
 
-	private async graphql(body: string): Promise<any> {
-		return (await promisified<{ Graphql: any }>({ Graphql: JSON.parse(body) })).Graphql;
-	}
-
 	public async fetch(cmd: string, data: RequestInit): Promise<IFetchLike> {
 		if (cmd === "/plugins") {
 			return new FetchLike(this.listPlugins());
 		} else if (cmd.startsWith("/plugins/")) {
 			return new FetchLike(this.getPlugin(cmd.slice("/plugins/".length)));
-		} else if (cmd.startsWith("/db")) {
-			return new FetchLike(this.graphql(data.body!.toString()));
 		}
 		return fetch(`${BASE_ADDRESS}${cmd}`, data);
+	}
+
+	public async graphql<T = any>(query: string, variables?: object): Promise<{ data: T }> {
+		return (await promisified<{ Graphql: any }>({ Graphql: { query, variables } })).Graphql;
 	}
 
 	public setTitle(name: string): void {

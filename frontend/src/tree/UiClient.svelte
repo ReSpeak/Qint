@@ -6,7 +6,7 @@
 	import { Connection } from "../connection";
 	import { Client } from "../book";
 	import { draggable, DragData } from "../ui/draggable";
-	import { findParent, flash, render_updates } from "../util";
+	import { DelayedHover, findParent, flash, render_updates } from "../util";
 	import { afterUpdate } from "svelte";
 	import { app, NodeSelection } from "../app";
 	import { TalkState } from "../ts";
@@ -18,8 +18,8 @@
 	export let client: Client;
 	export let filter: string;
 	export let filterShow: boolean = true;
-	let hovered = false;
-	let newHover = false;
+	let hover = new DelayedHover();
+	let hovered = hover.hovered;
 	let showId = false;
 	let thisFilter = "";
 
@@ -51,23 +51,6 @@
 		}
 	}
 
-	function hover() {
-		hovered = true;
-		newHover = true;
-	}
-
-	function leave(event: MouseEvent) {
-		if (event.relatedTarget) {
-			if (div.contains(event.relatedTarget as Node)) {
-				return;
-			}
-		}
-		newHover = false;
-		setTimeout(() => {
-			if (!newHover) hovered = false;
-		}, 50);
-	}
-
 	function dragStart(ev: CustomEvent<DragData>) {
 		ev.detail.dragNode.classList.add("dragStyle");
 		const channelTree = findParent(ev.detail.dragNode, ".channel-list")!;
@@ -90,7 +73,7 @@
 </script>
 
 <li class="container" class:hidden={!filterShow}>
-	<div bind:this={div} on:mouseover={hover} on:mouseout={leave} class="hoverDummy">
+	<div bind:this={div} tabindex="0" on:mouseover={() => hover.mouseover()} on:mouseout={e => hover.mouseout(e)} on:focus={() => hover.mouseover()} on:blur={() => hover.mouseout(undefined)} class="hoverDummy">
 		<div
 			class:ownClient
 			class:isSelected
@@ -111,13 +94,13 @@
 			</span>
 			<span class="icons">
 				{#if $client.inputMuted}
-					<Icon name="microphone-off" style="color: red;" />
+					<Icon name="microphone-off" style="color: red;" title="Muted" />
 				{/if}
 				{#if $client.outputMuted}
-					<Icon name="volume-off" style="color: red;" />
+					<Icon name="volume-off" style="color: red;" title="Deaf" />
 				{/if}
 				{#if $client.awayMessage !== null}
-					<Icon name="sleep" style="color: rgb(70,180,255);" />
+					<Icon name="sleep" style="color: rgb(70,180,255);" title="Away" />
 				{/if}
 				{#each $client.serverGroups as grp (grp)}
 					<ServerGroupIcon id={grp} {connection} />
@@ -133,7 +116,7 @@
 				{/if}
 			</span>
 		</div>
-		{#if hovered}
+		{#if $hovered}
 			<HoverMenu {div} selected={new NodeSelection(connection, client)} />
 		{/if}
 	</div>

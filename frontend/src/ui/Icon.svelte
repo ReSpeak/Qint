@@ -5,9 +5,10 @@
 	export let name: string | undefined = undefined;
 	export let isLeft: boolean = false;
 	export let style: string = "";
+	export let title: string | undefined = undefined;
 </script>
 
-<span class="icon {isLeft ? 'is-left' : ''}" >
+<span class="icon {isLeft ? 'is-left' : ''}" {title}>
 	{#if raw}
 		{raw}
 	{:else}

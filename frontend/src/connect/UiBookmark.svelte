@@ -1,5 +1,5 @@
 <script lang="typescript">
-	import { BOOKMARK_OFF, BOOKMARK_ON, EDIT_ICON } from "../util";
+	import { BOOKMARK_OFF, BOOKMARK_ON, EDIT_ICON, LONG_DATETIME } from "../util";
 	import TsIcon from "../ui/TsIcon.svelte";
 	import { Bookmark } from "./bookmark";
 	import { ConnectData } from "./connect";
@@ -58,13 +58,13 @@
 	</div>
 	<div class="bookmarkName">{bookmark.name || bookmark.server?.name}</div>
 	{#if bookmark.lastUsed}
-		<div class="bookmarkInfo" title={bookmark.lastUsed.format() ?? ''}>{fullAddress}</div>
+		<div class="bookmarkInfo" title={bookmark.lastUsed.format(LONG_DATETIME) ?? ''}>{fullAddress}</div>
 	{/if}
 
 	<button class="button bookmarkEdit" on:click|stopPropagation={toggleEdit}>
 		<i class="mdi mdi-{EDIT_ICON} mdi-24px" />
 	</button>
-	<button class="button bookmarkStar" on:click|stopPropagation={toggleBookmark}>
+	<button class="button bookmarkStar" on:click|stopPropagation={toggleBookmark} title="Bookmark">
 		<i class="mdi mdi-{BOOKMARK_ON} mdi-24px bookmarkOn" />
 		<i class="mdi mdi-{BOOKMARK_OFF} mdi-24px bookmarkOff" />
 	</button>

@@ -1,10 +1,10 @@
-import { get, writable, Writable, Readable } from "svelte/store";
+import { get, Readable } from "svelte/store";
 import type { Moment } from "moment";
-import { graphql } from "../graphql";
 import { GraphQlClient, ChatData } from "../book";
 import { datetimeDeserialize, getDataColor, assert, Lazy } from "../util";
 import { ListFetchDir, FetchResult } from "../ui/lazyList";
 import { NodeSelection } from "../app";
+import { backend } from "../backend/backend";
 
 export class Chat {
 	public static readonly EmptyFetch: FetchResult<Message> = {
@@ -66,7 +66,7 @@ export class Chat {
 			startId = idFrom.id;
 		}
 
-		const res = await graphql(`query GetMessages($chatType: GMessageTarget!, $server: [Int!]!, $chatId: ID,
+		const res = await backend.graphql(`query GetMessages($chatType: GMessageTarget!, $server: [Int!]!, $chatId: ID,
 					$startTime: NaiveDateTime, $startId: ID, $loadAtBeginning: Boolean) {
 				chat(typ: $chatType, server: $server, id: $chatId) {
 					lastRead
@@ -148,7 +148,7 @@ export class Chat {
 			console.error("Cannot get messages for a non-existant connection");
 			return;
 		}
-		const res = await graphql(`mutation SetLastRead($chatType: GMessageTarget!, $server: [Int!]!, $chatId: ID,
+		const res = await backend.graphql(`mutation SetLastRead($chatType: GMessageTarget!, $server: [Int!]!, $chatId: ID,
 					$message: ID!) {
 				setLastRead(typ: $chatType, server: $server, id: $chatId, message: $message)
 			}`, {

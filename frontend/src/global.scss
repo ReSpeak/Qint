@@ -12,27 +12,6 @@ a {
 	color: #57a4e8;
 }
 
-.hover.menu {
-	position: fixed;
-	z-index: 3;
-	border: solid 1px $border;
-	border-radius: 0.5em;
-	background: $background;
-	padding: 0.5em;
-}
-
-.hover.menu .corner {
-	position: absolute;
-	transform: rotate(45deg);
-	left: -0.3em;
-	top: 0.8em;
-	width: 0.5em;
-	height: 0.5em;
-	border-left: solid 1px $border;
-	border-bottom: solid 1px $border;
-	background: $background;
-}
-
 .update-flash {
 	color: rgba(255, 62, 0, 1) !important;
 	background-color: rgba(255, 62, 0, 0.2) !important;

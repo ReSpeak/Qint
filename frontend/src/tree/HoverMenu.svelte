@@ -36,10 +36,11 @@
 			$descriptionMode = mode;
 			app.selectNode(selected);
 		}
+		app.transientSettings.save("ui");
 	}
 </script>
 
-<div class="hover menu" style="top: {div.getBoundingClientRect().top}px;">
+<div class="hover menu" style="top: calc({div.getBoundingClientRect().top}px - 1.5em);">
 	<div class="corner" />
 	{#if selected.node instanceof Client}
 		<HoverMenuClient connection={selected.connection} clientId={selected.node.id} />
@@ -52,14 +53,16 @@
 		<button
 			class="toolbutton"
 			class:active={infoActive}
-			on:click={() => setDescriptionMode(DescriptionMode.Info)}>
+			on:click={() => setDescriptionMode(DescriptionMode.Info)}
+			title="Details">
 			<Icon name="information-outline" />
 		</button>
 		{#if !(selected.node instanceof Client)}
 			<button
 				class="toolbutton"
 				class:active={filesActive}
-				on:click={() => setDescriptionMode(DescriptionMode.Files)}>
+				on:click={() => setDescriptionMode(DescriptionMode.Files)}
+				title="Browse files">
 				<Icon name="folder" />
 			</button>
 		{/if}
@@ -68,17 +71,31 @@
 
 <style lang="scss">
 	.hover {
-		left: calc(var(--channel-tree-width) - 0em);
-		display: grid;
-		grid-gap: 1em;
+		position: fixed;
+		z-index: 3;
+		border: solid 1px $border;
+		border-radius: 0.5em;
+		background: $background;
+		padding: 0.5em;
+		left: var(--channel-tree-width);
+		display: flex;
+		flex-direction: column;
+		gap: 1em;
 	}
 
-	.hover > :global(.name) {
-		grid-row: 1;
-		grid-column: 1 / 3;
+	.hover .corner {
+		position: absolute;
+		transform: rotate(45deg);
+		left: -0.3em;
+		top: 1.8em;
+		width: 0.5em;
+		height: 0.5em;
+		border-left: solid 1px $border;
+		border-bottom: solid 1px $border;
+		background: $background;
 	}
 
-	.hover :global(.icon) {
+	.buttons :global(.icon) {
 		margin-left: unset !important;
 		margin-right: unset !important;
 	}
@@ -106,7 +123,7 @@
 		}
 	}
 
-	.hover .buttons {
+	.buttons {
 		margin-bottom: 0.5em;
 	}
 </style>

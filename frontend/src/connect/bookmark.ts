@@ -1,5 +1,5 @@
 import { Moment } from "moment";
-import { graphql } from "../graphql";
+import { backend } from "../backend/backend";
 import { datetimeDeserialize, hexEncode, base64Decode } from "../util";
 
 interface BookmarkChannel {
@@ -36,7 +36,7 @@ export class Bookmark {
 	}
 
 	public async update(): Promise<void> {
-		await graphql(`mutation UpdateBookmark($update: UpdateBookmark!) {
+		await backend.graphql(`mutation UpdateBookmark($update: UpdateBookmark!) {
 			updateBookmark(update: $update) { void }
 		}`, {
 			update: {
@@ -49,7 +49,7 @@ export class Bookmark {
 	}
 
 	public static async get(): Promise<Bookmark[]> {
-		const bookmarks = await graphql(`query GetBookmarks {
+		const bookmarks = await backend.graphql(`query GetBookmarks {
 			bookmarks {
 				id
 				name
@@ -74,7 +74,7 @@ export class Bookmark {
 
 	public static async getRecent(): Promise<Bookmark | undefined> {
 		try {
-			return new Bookmark((await graphql(`query GetRecentBookmark {
+			return new Bookmark((await backend.graphql(`query GetRecentBookmark {
 			mostRecentBookmark {
 				id
 				name

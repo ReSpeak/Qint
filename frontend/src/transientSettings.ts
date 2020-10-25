@@ -128,7 +128,17 @@ export class TransientSettingsUi {
 	private set developMode(val: boolean) { this._developMode.set(val); }
 	public readonly _descriptionMode = writable(DescriptionMode.None);
 	public readonly _developMode = writable(false);
+
+	toJSON() {
+		const res: any = {};
+		for (const k in this) {
+			res[k] = this[k];
+		}
+		return res;
+	}
 }
+Object.defineProperty(TransientSettingsUi.prototype, 'descriptionMode', {enumerable: true});
+Object.defineProperty(TransientSettingsUi.prototype, 'developMode', {enumerable: true});
 
 export class TransientSettingsChat {
 	private _parent: TransientSettings;

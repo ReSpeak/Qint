@@ -10,7 +10,7 @@
 	import UiChannel from "./UiChannelWrap.svelte";
 	import { Connection } from "../connection";
 	import { draggable, DragData } from "../ui/draggable";
-	import { findParent, assert, flash, render_updates } from "../util";
+	import { findParent, assert, flash, render_updates, DelayedHover } from "../util";
 	import { SpacerType } from "./tree";
 	import { app, NodeSelection } from "../app";
 	import { ChannelType } from "../book_events";
@@ -26,10 +26,11 @@
 	export let channel: Channel;
 
 	let collapsed = false;
-	let hovered = false;
 	let showId = false;
 	let thisFilter = "";
 	let childrenFilter = "";
+	let hover = new DelayedHover();
+	let hovered = hover.hovered;
 
 	$: isSelected = $channel.isSelected;
 	$: channels = channel.channels;
@@ -104,20 +105,6 @@
 		if (connection !== undefined) app.select(connection, channel);
 	}
 
-	function hover() {
-		if (connection === undefined) return;
-		hovered = true;
-	}
-
-	function leave(event: MouseEvent) {
-		if (event.relatedTarget) {
-			if (div.contains(event.relatedTarget as Node)) {
-				return;
-			}
-		}
-		hovered = false;
-	}
-
 	function dragStart(ev: CustomEvent<DragData>) {
 		ev.detail.dragNode.classList.add("dragStyle");
 		const channelTree = findParent(ev.detail.dragNode, ".channel-list")!;
@@ -190,7 +177,7 @@
 </script>
 
 <li class="container" class:hidden={!filterShow} class:collapsed>
-	<div bind:this={div} on:mouseover={hover} on:mouseout={leave} class="hoverDummy">
+	<div bind:this={div} tabindex="0" on:mouseover={() => hover.mouseover()} on:mouseout={e => hover.mouseout(e)} on:focus={() => hover.mouseover()} on:blur={() => hover.mouseout(undefined)} class="hoverDummy">
 		<div
 			class="innerContainer"
 			class:ownClient
@@ -236,7 +223,7 @@
 				{/if}
 			</span>
 		</div>
-		{#if connection !== undefined && hovered}
+		{#if connection !== undefined && $hovered}
 			<HoverMenu {div} selected={new NodeSelection(connection, channel)} />
 		{/if}
 	</div>

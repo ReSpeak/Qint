@@ -17,6 +17,15 @@ export class BrowserBackend implements IBackend {
 		return fetch(`${BASE_ADDRESS}${cmd}`, data);
 	}
 
+	public async graphql<T = any>(query: string, variables?: object): Promise<{ data: T }> {
+		const val = await this.fetch(`/db`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ query, variables })
+		});
+		return await val.json();
+	}
+
 	public setTitle(name: string): void {
 		document.title = name;
 	}

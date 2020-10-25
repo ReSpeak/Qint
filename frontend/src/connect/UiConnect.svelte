@@ -4,12 +4,12 @@
 	import { ConnectData } from "./connect";
 	import Icon from "../ui/Icon.svelte";
 	import UiBookmark from "./UiBookmark.svelte";
-	import { graphql } from "../graphql";
 	import { Book, Channel } from "../book";
 	import UiChannel from "../tree/UiChannel.svelte";
 	import type { ChannelId } from "../ts";
 	import { SERVER_ICON, CLIENT_ICON, base64Decode, hexEncode } from "../util";
 	import { app } from "../app";
+	import { backend } from "../backend/backend";
 
 	export let data: ConnectData;
 	let addressInput: HTMLInputElement;
@@ -76,7 +76,7 @@
 
 	async function loadChannels(address: string): Promise<Channel[]> {
 		try {
-			const query = await graphql<{serverByAddress:{uid:string, channels:Channel[]}}>(
+			const query = await backend.graphql<{serverByAddress:{uid:string, channels:Channel[]}}>(
 				`
 					query GetChannels($address: String!) {
 						serverByAddress(address: $address) {
@@ -167,6 +167,7 @@
 						id="username"
 						class="input"
 						type="text"
+						title="Username"
 						placeholder="Username" />
 					<Icon name={CLIENT_ICON} isLeft />
 				</p>
@@ -181,6 +182,7 @@
 						id="server"
 						class="input"
 						type="text"
+						title="Server address"
 						placeholder="Server" />
 					<Icon name={SERVER_ICON} isLeft />
 				</p>

@@ -37,7 +37,7 @@ nom = "5"
 percent-encoding = "2.1"
 pulldown-cmark = "0.8"
 regex = "1"
-reqwest = { version = "0.10", features = [] }
+reqwest = "0.10"
 rmp-serde = "0.14"
 scraper = "0.12"
 sdl2 = "0.34"
@@ -60,16 +60,13 @@ tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }
 tsproto-types = { path = "../../tsclientlib/utils/tsproto-types" }
 uuid = { version = "0.8", features = [ "serde" ] }
 
-  [dependencies.log]
-  version = "0.4"
-  features = [ "max_level_info", "release_max_level_info" ]
+[dependencies.log]
+version = "0.4"
+features = [ "max_level_info", "release_max_level_info" ]
 
-  [dependencies.slog]
-  version = "2"
-  features = [ "max_level_trace", "release_max_level_debug" ]
-
-[target."cfg(target_arch = \"aarch64\")"]
-dependencies = { }
+[dependencies.slog]
+version = "2"
+features = [ "max_level_trace", "release_max_level_debug" ]
 
 [build-dependencies]
 heck = "0.3"

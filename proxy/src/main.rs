@@ -48,7 +48,6 @@ mod websocket;
 
 use filecache::FileCache;
 use secret::Secret;
-use site_peek::decode_and_analyze_link;
 use websocket::Ws;
 
 const DIR_ORGANIZATION: &str = "ReSpeak";
@@ -164,6 +163,7 @@ pub struct State {
 	database: Addr<db::DbHandler>,
 	graphql_schema: Arc<db::graphql::Schema>,
 	file_cache: Arc<FileCache>,
+	site_peek_cache: site_peek::SitePeekCache,
 	secret: Secret,
 }
 
@@ -534,8 +534,8 @@ async fn download_cache_file(
 }
 
 #[get("/peek_link/{url}")]
-async fn get_link_preview(url: web::Path<String>) -> impl Responder {
-	HttpResponse::Ok().json(decode_and_analyze_link(&url).await)
+async fn get_link_preview(state: web::Data<Arc<State>>, url: web::Path<String>) -> impl Responder {
+	HttpResponse::Ok().json(state.site_peek_cache.decode_and_analyze_link(&url).await)
 }
 
 fn get_transient_setting_internal(state: &State, req: &str) -> Option<Value> {
@@ -779,6 +779,7 @@ impl App {
 		}
 
 		let graphql_schema = db::graphql::create_schema();
+		let site_peek_cache = Default::default();
 		let state = Arc::new(State {
 			logger,
 			connections,
@@ -789,6 +790,7 @@ impl App {
 			database,
 			graphql_schema,
 			file_cache,
+			site_peek_cache,
 			secret,
 		});
 
