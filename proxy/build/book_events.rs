@@ -8,18 +8,21 @@ use tsproto_structs::book::*;
 use tsproto_structs::book_to_messages::{
 	self, BookToMessagesDeclarations, Event, RuleKind, RuleOp,
 };
+use tsproto_structs::messages::{self, Message, MessageDeclarations};
 use tsproto_structs::messages_to_book::{self, MessagesToBookDeclarations};
 use tsproto_structs::{InnerRustType, RustType};
 
 #[derive(Template)]
 #[TemplatePath = "build/BookEvents.tt"]
 #[derive(Debug)]
-pub struct BookEvents<'a>(
-	&'a BookDeclarations,
-	&'a MessagesToBookDeclarations<'a>,
-	&'a BookToMessagesDeclarations<'a>,
-	JsStructs,
-);
+pub struct BookEvents<'a> {
+	book: &'a BookDeclarations,
+	m2b: &'a MessagesToBookDeclarations<'a>,
+	b2m: &'a BookToMessagesDeclarations<'a>,
+	messages: &'a MessageDeclarations,
+	structs: JsStructs,
+	js_in_messages: JsInMessages<'a>,
+}
 
 #[derive(Template)]
 #[TemplatePath = "build/BookEventsTs.tt"]
@@ -28,7 +31,7 @@ pub struct BookEventsTs<'a>(pub(crate) BookEvents<'a>);
 
 impl Deref for BookEvents<'_> {
 	type Target = BookDeclarations;
-	fn deref(&self) -> &Self::Target { &self.0 }
+	fn deref(&self) -> &Self::Target { &self.book }
 }
 
 impl<'a> Deref for BookEventsTs<'a> {
@@ -38,7 +41,14 @@ impl<'a> Deref for BookEventsTs<'a> {
 
 impl Default for BookEvents<'static> {
 	fn default() -> Self {
-		BookEvents(&DATA, &messages_to_book::DATA, &book_to_messages::DATA, JsStructs::default())
+		Self {
+			book: &DATA,
+			m2b: &messages_to_book::DATA,
+			b2m: &book_to_messages::DATA,
+			messages: &messages::DATA,
+			structs: JsStructs::default(),
+			js_in_messages: JsInMessages::new(&messages::DATA),
+		}
 	}
 }
 
@@ -53,6 +63,9 @@ struct JsStruct {
 
 #[derive(Debug)]
 struct JsStructs(Vec<JsStruct>);
+
+#[derive(Debug)]
+struct JsInMessages<'a>(Vec<&'a Message>);
 
 impl Default for JsStructs {
 	fn default() -> Self {
@@ -95,11 +108,35 @@ impl JsStructs {
 	fn get_struct(&self, name: &str) -> Option<&JsStruct> { self.0.iter().find(|s| s.name == name) }
 }
 
+impl<'a> JsInMessages<'a> {
+	fn new(messages: &'a MessageDeclarations) -> Self {
+		let msgs = [
+			"ChannelListFinished",
+			"ChannelPasswordChanged",
+			"ClientChatClosed",
+			"ClientChatComposing",
+			"FiletransferStatus",
+			"PluginCommand",
+			"FileInfo",
+			"FileList",
+			"Filetransfer",
+			"OfflineMessage",
+			"OfflineMessageList",
+			"ServerLog",
+		];
+
+		let msgs = msgs.iter().map(|m| messages.get_message(m)).collect();
+		JsInMessages(msgs)
+	}
+}
+
 fn get_properties<'a>(structs: &'a [Struct], s: &'a Struct) -> Vec<&'a Property> {
 	s.properties.iter().filter(|p| !structs.iter().any(|s| s.name == p.type_s)).collect()
 }
 
-fn get_all_properties_with_struct<'a>(structs: &'a [Struct], parts: &[&str]) -> Vec<(&'a Struct, &'a Property)> {
+fn get_all_properties_with_struct<'a>(
+	structs: &'a [Struct], parts: &[&str],
+) -> Vec<(&'a Struct, &'a Property)> {
 	let mut props = Vec::new();
 	for struc in structs {
 		if !parts.contains(&struc.name.as_str()) {
@@ -248,7 +285,11 @@ fn set_all_id_arguments<'a>(e: &'a Event<'a>) -> String {
 	for r in &e.ids {
 		match r {
 			RuleKind::ArgumentMap { .. } | RuleKind::ArgumentFunction { .. } => {
-				let getter = r.get_type().code_as_ref("field").replacen("field", &format!("self.{}", &r.from_name().to_snake_case()), 1);
+				let getter = r.get_type().code_as_ref("field").replacen(
+					"field",
+					&format!("self.{}", &r.from_name().to_snake_case()),
+					1,
+				);
 				args.push_str(&getter);
 				args.push_str(", ");
 			}

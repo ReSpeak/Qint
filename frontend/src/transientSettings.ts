@@ -123,7 +123,9 @@ export class TransientSettingsSynth {
 
 export class TransientSettingsUi {
 	private get descriptionMode() { return get(this._descriptionMode); }
+	private set descriptionMode(val: DescriptionMode) { this._descriptionMode.set(val); }
 	private get developMode() { return get(this._developMode); }
+	private set developMode(val: boolean) { this._developMode.set(val); }
 	public readonly _descriptionMode = writable(DescriptionMode.None);
 	public readonly _developMode = writable(false);
 }

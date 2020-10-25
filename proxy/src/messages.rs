@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
-use tsclientlib::{DisconnectOptions, MessageTarget, Version};
+use time::OffsetDateTime;
+use tsclientlib::{ChannelId, DisconnectOptions, MessageTarget, Version};
 use uuid::Uuid;
 
-use crate::book_events::{JsEvent, JsM2B};
+use crate::book_events::{JsEvent, JsInMessage, JsM2B};
 
 /// A message sent over a websocket connection from the frontend to the proxy.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -50,12 +51,16 @@ pub enum MessageP2F {
 	TalkersChanged(Vec<(String, bool)>),
 	/// The connection received events.
 	Events(Vec<JsEvent>),
+	/// The connection received a message.
+	Message(JsInMessage),
 	Loudness(f64),
+	FileList(Vec<JsChannelFile>)
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ConnectOptions {
+	// TODO as camelCase
 	/// Id of the bookmark
 	pub bookmark: Option<i64>,
 	pub address: String,
@@ -67,6 +72,18 @@ pub struct ConnectOptions {
 	pub log_commands: bool,
 	pub log_packets: bool,
 	pub log_udp_packets: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct JsChannelFile {
+	// TODO As string
+	pub channel_id: ChannelId,
+	pub path: String,
+	pub name: String,
+	pub size: u64,
+	pub last_modified: OffsetDateTime,
+	pub is_file: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

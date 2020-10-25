@@ -10,6 +10,7 @@ use time::{Duration, OffsetDateTime};
 use tsclientlib::data::Connection;
 use tsclientlib::events::{Event, ExtraInfo, PropertyId, PropertyValueRef};
 use tsclientlib::prelude::*;
+use tsclientlib::TsError as Error;
 use tsclientlib::*;
 use tsproto_packets::packets::OutCommand;
 use tsproto_types::crypto::EccKeyPubP256;
@@ -44,20 +45,15 @@ pub enum JsEvent {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum JsPropertyId {
 	Channel(
-		#[serde(deserialize_with = "deserialize_id", serialize_with = "serialize_id")]
-		ChannelId,
+		#[serde(deserialize_with = "deserialize_id", serialize_with = "serialize_id")] ChannelId,
 	),
 	ChannelGroup(
 		#[serde(deserialize_with = "deserialize_id", serialize_with = "serialize_id")]
 		ChannelGroupId,
 	),
-	Client(
-		#[serde(deserialize_with = "deserialize_id", serialize_with = "serialize_id")]
-		ClientId,
-	),
+	Client(#[serde(deserialize_with = "deserialize_id", serialize_with = "serialize_id")] ClientId),
 	ClientServerGroup(
-		#[serde(deserialize_with = "deserialize_id", serialize_with = "serialize_id")]
-		ClientId,
+		#[serde(deserialize_with = "deserialize_id", serialize_with = "serialize_id")] ClientId,
 		#[serde(deserialize_with = "deserialize_id", serialize_with = "serialize_id")]
 		ServerGroupId,
 	),
@@ -124,6 +120,19 @@ fn deserialize_some<'de, T: Deserialize<'de>, D: Deserializer<'de>>(
 }
 
 // Serialize OffsetDateTime as unix timestamp with timezone as i32 in seconds
+fn deserialize_date_time<'de, D: Deserializer<'de>>(
+	deserializer: D,
+) -> Result<OffsetDateTime, D::Error> {
+	let (ts, offset) = Deserialize::deserialize(deserializer)?;
+	Ok(OffsetDateTime::from_unix_timestamp(ts).to_offset(offset))
+}
+
+fn serialize_date_time<S: Serializer>(
+	datetime: &OffsetDateTime, serializer: S,
+) -> Result<S::Ok, S::Error> {
+	(datetime.timestamp(), datetime.offset()).serialize(serializer)
+}
+
 fn deserialize_some_date_time<'de, D: Deserializer<'de>>(
 	deserializer: D,
 ) -> Result<Option<OffsetDateTime>, D::Error> {
@@ -138,6 +147,18 @@ fn serialize_some_date_time<S: Serializer>(
 }
 
 // Serialize Duration as seconds + nanoseconds (default serializer)
+fn deserialize_duration<'de, D: Deserializer<'de>>(
+	deserializer: D,
+) -> Result<Duration, D::Error> {
+	Ok(Deserialize::deserialize(deserializer)?)
+}
+
+fn serialize_duration<S: Serializer>(
+	datetime: &Duration, serializer: S,
+) -> Result<S::Ok, S::Error> {
+	datetime.serialize(serializer)
+}
+
 fn deserialize_some_duration<'de, D: Deserializer<'de>>(
 	deserializer: D,
 ) -> Result<Option<Duration>, D::Error> {
@@ -160,6 +181,28 @@ fn serialize_some_some_duration<S: Serializer>(
 	datetime: &Option<Option<Duration>>, serializer: S,
 ) -> Result<S::Ok, S::Error> {
 	datetime.serialize(serializer)
+}
+
+fn deserialize_i64<'de, D: Deserializer<'de>>(
+	deserializer: D,
+) -> Result<i64, D::Error> {
+	let s: String = Deserialize::deserialize(deserializer)?;
+	Ok(s.parse().map_err(SerdeError::custom)?)
+}
+
+fn serialize_i64<S: Serializer>(i: &i64, serializer: S) -> Result<S::Ok, S::Error> {
+	i.to_string().serialize(serializer)
+}
+
+fn deserialize_u64<'de, D: Deserializer<'de>>(
+	deserializer: D,
+) -> Result<u64, D::Error> {
+	let s: String = Deserialize::deserialize(deserializer)?;
+	Ok(s.parse().map_err(SerdeError::custom)?)
+}
+
+fn serialize_u64<S: Serializer>(i: &u64, serializer: S) -> Result<S::Ok, S::Error> {
+	i.to_string().serialize(serializer)
 }
 
 fn deserialize_some_u64<'de, D: Deserializer<'de>>(
@@ -186,16 +229,12 @@ fn serialize_some_some_u64<S: Serializer>(
 	i.map(|i| i.map(|i| i.to_string())).serialize(serializer)
 }
 
-fn deserialize_id<'de, D: Deserializer<'de>, T: Id>(
-	deserializer: D,
-) -> Result<T, D::Error> {
+fn deserialize_id<'de, D: Deserializer<'de>, T: Id>(deserializer: D) -> Result<T, D::Error> {
 	let s: String = Deserialize::deserialize(deserializer)?;
 	Ok(T::parse_id(&s).map_err(SerdeError::custom)?)
 }
 
-fn serialize_id<S: Serializer, T: Id>(
-	i: &T, serializer: S,
-) -> Result<S::Ok, S::Error> {
+fn serialize_id<S: Serializer, T: Id>(i: &T, serializer: S) -> Result<S::Ok, S::Error> {
 	i.to_string_id().serialize(serializer)
 }
 

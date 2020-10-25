@@ -2,7 +2,7 @@
 
 import { Channel, ChannelGroup, Client, Server, ServerGroup } from "../book";
 import { ChannelId, ChannelGroupId, ClientId, ServerGroupId, OffsetDateTime } from "../ts";
-import { OChange, Reason } from "../book_events";
+import { InMessage, OChange, Reason } from "../book_events";
 
 export type WsMessageTarget =
 	"Server"
@@ -67,7 +67,7 @@ interface OMsgChange {
 
 
 // In Messages
-export type InMsg = InMsgConnected | InDisconnectedTemporarily | InDisconnected | InMsgError | InTalkersChanged | InMsgEvents | InLoudness | InChannelFileList;
+export type InMsg = InMsgConnected | InDisconnectedTemporarily | InDisconnected | InMsgError | InTalkersChanged | InMsgEvents | InMsgMessage | InLoudness | InChannelFileList;
 
 interface InMsgConnected {
 	Connected: {
@@ -95,6 +95,10 @@ interface InTalkersChanged {
 
 interface InMsgEvents {
 	Events: InBookMsg[];
+}
+
+interface InMsgMessage {
+	Message: InMessage;
 }
 
 interface InLoudness {
@@ -228,8 +232,6 @@ interface IMsgBookRemoved {
 	PropertyRemoved: PropertyMod;
 }
 
-type IMskBookChannelListFinished = "ChannelListFinished";
-
 interface IMsgBookMessage {
 	Message: {
 		target: WsMessageTarget;
@@ -240,7 +242,7 @@ interface IMsgBookMessage {
 
 export type InBookChangeMsg = IMsgBookAdded | IMsgBookChanged | IMsgBookRemoved;
 
-export type InBookMsg = InBookChangeMsg | IMskBookChannelListFinished | IMsgBookMessage;
+export type InBookMsg = InBookChangeMsg | IMsgBookMessage;
 
 // type BookOp<TOp extends string, TTo extends string, TObj> = {
 // 	to: TTo;

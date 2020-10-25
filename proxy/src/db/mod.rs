@@ -15,7 +15,7 @@ use tsclientlib::data::Client;
 use tsclientlib::data::Connection as TsData;
 use tsclientlib::events::{Event, PropertyId, PropertyValue};
 use tsclientlib::Connection as TsConnection;
-use tsclientlib::{ChannelId, ClientId, Identity, Invoker, MessageTarget, Uid};
+use tsclientlib::{ChannelId, ClientId, Identity, InMessage, Invoker, MessageTarget, Uid};
 use tsproto_types::crypto::EccKeyPubP256;
 
 use crate::filecache::FileCache;
@@ -779,7 +779,6 @@ impl DbHandler {
 					}
 					handler.handle_message(*target, invoker, message)
 				}
-				Event::ChannelListFinished => handler.handle_channellistfinished(),
 			};
 
 			if let Err(e) = r {
@@ -807,6 +806,19 @@ impl DbHandler {
 
 		Ok(())
 	}
+
+	pub(crate) fn handle_message(
+		logger: &Logger, state: &State, con: &TsConnection, data: &TsData, msg: &InMessage,
+	) -> Result<()>
+	{
+		let handler = EventHandler::new(logger, state, con, data);
+		if let InMessage::ChannelListFinished(_) = msg {
+			handler.handle_channellistfinished()
+		} else {
+			Ok(())
+		}
+	}
+
 
 	pub fn create_client(
 		logger: &Logger, state: &State, con: &TsConnection, data: &TsData, client: &Client,

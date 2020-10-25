@@ -7,6 +7,7 @@ import { loadPlugins, IPlugin } from "./plugins";
 import { backend } from "./backend/backend";
 import { oneshot } from "./util";
 import { ConnectData } from "./connect/connect";
+import { DisplayPanel } from "./panel/panel";
 
 export class App {
 	public readonly connections: Writable<Connection[]> = writable([]);
@@ -16,6 +17,8 @@ export class App {
 	// );
 	public get hasConnected() { return get(this.connections).some(s => get(s.state).connected); }
 	public readonly selectedNode: Writable<NodeSelection | undefined> = writable(undefined);
+	public readonly showSidebar = writable(false);
+	public readonly displayPanel = writable(DisplayPanel.Connect);
 
 	public readonly chat: Chat = new Chat(this.selectedNode);
 	public readonly transientSettings: TransientSettings = new TransientSettings();
@@ -64,6 +67,11 @@ export class App {
 		oneshot(con.state, s => s.closed, () => {
 			this.connections.update(cs => {
 				cs.remove_item(con);
+				if (cs.length === 0) {
+					// Hide sidebare and show connect screen
+					this.showSidebar.set(false);
+					this.displayPanel.set(DisplayPanel.Connect);
+				}
 				return cs;
 			});
 		});
@@ -71,6 +79,7 @@ export class App {
 			cs.push(con);
 			return cs;
 		});
+		this.showSidebar.set(true);
 		return con;
 	}
 }

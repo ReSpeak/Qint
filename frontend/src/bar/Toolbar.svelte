@@ -89,21 +89,21 @@
 			class="toolbutton"
 			class:active={inputMuted}
 			class:invisible={!showMuteButtons}
-			on:click={() => changeOwnClient({ ClientUpdate: { inputMuted: !inputMuted }})}>
+			on:click={() => changeOwnClient({ ConnectionClientUpdate: { inputMuted: !inputMuted }})}>
 			<Icon name={inputMuted ? 'microphone-off' : 'microphone'} />
 		</button>
 		<button
 			class="toolbutton"
 			class:active={outputMuted}
 			class:invisible={!showMuteButtons}
-			on:click={() => changeOwnClient({ ClientUpdate: { outputMuted: !outputMuted }})}>
+			on:click={() => changeOwnClient({ ConnectionClientUpdate: { outputMuted: !outputMuted }})}>
 			<Icon name={outputMuted ? 'volume-off' : 'volume-high'} />
 		</button>
 		<button
 			class="toolbutton"
 			class:active={isAway}
 			class:invisible={!showMuteButtons}
-			on:click={() => changeOwnClient({ ClientUpdate: { away: isAway ? null : '' }})}>
+			on:click={() => changeOwnClient({ ConnectionClientUpdate: { away: isAway ? null : '' }})}>
 			<Icon name={isAway ? 'sleep' : 'sleep-off'} />
 		</button>
 		<div style="width: 2em;" />

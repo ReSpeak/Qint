@@ -128,14 +128,14 @@ fn convert_value(_fmt: &mut fmt::Formatter, js: &JsStruct, structs: &[Struct]) -
 	Ok(())
 }
 
-for struc in &self.3.0 {
+for struc in &self.structs.0 {
 	if struc.parts.is_empty() {
 		continue;
 	} #>
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Js<#= struc.name #> {
-	<# for p in get_all_properties(&self.structs, &struc.parts) {
+	<# for p in get_all_properties(&self.book.structs, &struc.parts) {
 		let struct_type = p.get_type()?;
 		let attr = get_serde_attr(&struct_type.inner, true); #>
 	<#= attr #>
@@ -169,7 +169,6 @@ pub fn convert_event(con: &Connection, e: &Event) -> Option<JsEvent> {
 				extra: extra.clone(),
 			})
 		}
-		Event::ChannelListFinished => Some(JsEvent::ChannelListFinished),
 		Event::Message { target, invoker, message } => Some(JsEvent::Message {
 			target: *target, invoker: invoker.clone(), message: message.clone(),
 		}),
@@ -178,8 +177,8 @@ pub fn convert_event(con: &Connection, e: &Event) -> Option<JsEvent> {
 
 fn property_to_js(id: &PropertyId, p: PropertyValueRef) -> Option<JsProperty> {
 	match id {
-<# for struc in &self.3.0 {
-	convert_value(_fmt, struc, &self.structs)?;
+<# for struc in &self.structs.0 {
+	convert_value(_fmt, struc, &self.book.structs)?;
 } #>
 		_ => None,
 	}
@@ -189,11 +188,71 @@ impl TryFrom<PropertyId> for JsPropertyId {
 	type Error = ();
 	fn try_from(id: PropertyId) -> Result<Self, ()> {
 		match id {
-<# for struc in &self.3.0 {
-	convert_ids(_fmt, struc, &self.structs)?;
+<# for struc in &self.structs.0 {
+	convert_ids(_fmt, struc, &self.book.structs)?;
 } #>
 			_ => Err(()),
 		}
+	}
+}
+
+// Messages
+
+<# for msg in &self.js_in_messages.0 { #>
+<# if !msg.attributes.is_empty() { #>
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct JsIn<#= msg.name #>(Vec<JsIn<#= msg.name #>Part>);
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct JsIn<#= msg.name #>Part {
+<# for a in &msg.attributes {
+	let field = self.messages.get_field(a);
+	let rust_type = field.get_type(a)?;
+	let attr = get_serde_attr(&rust_type.inner, false);
+	if !attr.is_empty() { #>
+	<#= attr #>
+	<# } #>
+	<#= field.pretty.to_snake_case() #>: <#= rust_type #>,
+<# } #>
+}
+
+impl<'a> From<&'a messages::s2c::In<#= msg.name #>Part> for JsIn<#= msg.name #>Part {
+	fn from(p: &'a messages::s2c::In<#= msg.name #>Part) -> Self {
+		Self {
+		<# for a in &msg.attributes {
+			let field = self.messages.get_field(a);
+			let rust_type = field.get_type(a)?;
+			#>
+			<#= field.pretty.to_snake_case() #>: p.<#= field.pretty.to_snake_case() #>.clone(),
+		<# } #>
+		}
+	}
+}
+
+<# } else { #>
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct JsIn<#= msg.name #>;
+
+<# } #>
+<# } #>
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub enum JsInMessage {
+<# for msg in &self.js_in_messages.0 { #>
+	<#= msg.name #>(JsIn<#= msg.name #>),
+<# } #>
+}
+
+pub fn convert_message(msg: &InMessage) -> Option<JsInMessage> {
+	match msg {
+<# for msg in &self.js_in_messages.0 { #>
+	<# if !msg.attributes.is_empty() { #>
+		InMessage::<#= msg.name #>(msg) => Some(JsInMessage::<#= msg.name #>(JsIn<#= msg.name #>(msg.iter().map(|p| p.into()).collect()))),
+	<# } else { #>
+		InMessage::<#= msg.name #>(_) => Some(JsInMessage::<#= msg.name #>(JsIn<#= msg.name #>)),
+	<# } #>
+<# } #>
+		_ => None,
 	}
 }
 
@@ -201,9 +260,9 @@ impl TryFrom<PropertyId> for JsPropertyId {
 <#
 let mut setter_structs = Vec::new();
 
-for e in &self.2.decls {
-	let msg_group = self.2.messages.get_message_group(&e.msg);
-	let uses_lifetime = self.2.messages.uses_lifetime(&e.msg);
+for e in &self.b2m.decls {
+	let msg_group = self.b2m.messages.get_message_group(&e.msg);
+	let uses_lifetime = self.b2m.messages.uses_lifetime(&e.msg);
 	// Update
 	if e.op == RuleOp::Update {
 		let small_change_name = e.get_small_name();
@@ -214,7 +273,7 @@ for e in &self.2.decls {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct <#= get_prefixed_name(e) #> {
-<#= self.3.get_struct_ids(&e.book_struct.name) #>
+<#= self.structs.get_struct_ids(&e.book_struct.name) #>
 	<#
 	// Event IDs
 	for r in &e.ids {
@@ -271,7 +330,7 @@ impl <#= get_prefixed_name(e) #> {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct <#= struct_name #> {
-<#= self.3.get_struct_ids(&e.book_struct.name) #>
+<#= self.structs.get_struct_ids(&e.book_struct.name) #>
 <#= args #>}
 
 impl <#= struct_name #> {
@@ -292,7 +351,7 @@ impl <#= struct_name #> {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct <#= struct_name #> {
-<#= self.3.get_struct_ids(&e.book_struct.name) #>
+<#= self.structs.get_struct_ids(&e.book_struct.name) #>
 <#= args #>}
 
 impl <#= struct_name #> {
@@ -317,7 +376,7 @@ impl <#= struct_name #> {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct <#= struct_name #> {
-<#= self.3.get_struct_ids(&e.book_struct.name) #>
+<#= self.structs.get_struct_ids(&e.book_struct.name) #>
 <#= args #>}
 
 impl <#= struct_name #> {

@@ -1,7 +1,6 @@
 import chroma from "chroma-js";
 import moment, { Duration } from "moment";
 import { Moment } from "moment";
-import { OMsgConnect } from "./backend/ws";
 import { OffsetDateTime, RustDuration } from "./ts";
 import { Readable } from "svelte/store";
 import { ConnectData } from "./connect/connect";
@@ -15,8 +14,8 @@ export const BOOKMARK_ON = "star";
 export const BOOKMARK_OFF = "star-outline";
 export const EDIT_ICON = "pencil-outline";
 
-// @ts-ignore
-export const BASE_ADDRESS = "http://localhost:4422"; //"__buildEnv__" === "development" ? "http://localhost:4422" : "";
+export const IS_SNOWPACK = (import.meta as any).hot;
+export const BASE_ADDRESS = IS_SNOWPACK ? "http://localhost:4422" : "";
 export const BUILD_ENV = "__buildEnv__";
 export const BUILD_DAT = "__buildDat__";
 export const IS_TAURI = "__TAURI_INVOKE_HANDLER__" in window;

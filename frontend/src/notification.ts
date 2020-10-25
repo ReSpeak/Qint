@@ -6,7 +6,7 @@ import { Connection } from "./connection";
 import { app } from "./app";
 import { IPlugin } from "./plugins";
 import { ClientId } from "./ts";
-import { Reason } from "./book_events";
+import { InMessage, Reason } from "./book_events";
 
 type NotificationArg = Book | Channel | Client | Invoker | Server | ServerGroup | string | null | undefined;
 
@@ -89,6 +89,8 @@ export function handleMessage(con: Connection, msg: InMsg, plugins: IPlugin[]) {
 			for (const tsevt of msg.Events) {
 				handleEvents(con, tsevt, handler);
 			}
+		} else if ("Message" in msg) {
+			handleInMessage(con, msg.Message, handler);
 		} else if ("TalkersChanged" in msg) {
 		} else if ("Error" in msg) {
 			handler(con, msg, notif`Error`);
@@ -108,8 +110,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHand
 		const ownClient = get(con.book.ownClient);
 		const ownChannelId = ownClient !== undefined ? ownClient.channel : 0;
 
-		if (msg === "ChannelListFinished") {
-		} else if ("Message" in msg) {
+		if ("Message" in msg) {
 			const longMessage = msg.Message.message.length > 20 || msg.Message.message.length === 0 || msg.Message.message.includes("//");
 			if (isPoke(msg.Message.target)) {
 				if (longMessage)
@@ -389,6 +390,13 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHand
 		}
 	} catch (e) {
 		console.error("Failed to create notification for event", e);
+	}
+}
+
+function handleInMessage(con: Connection, msg: InMessage, handler: NotificationHandler) {
+	try {
+	} catch (e) {
+		console.error("Failed to create notification for message", e);
 	}
 }
 

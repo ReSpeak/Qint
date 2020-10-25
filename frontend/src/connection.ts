@@ -189,12 +189,9 @@ export class Connection {
 		} else if ("Events" in msg) {
 			for (const tsevt of msg.Events) {
 				try {
-					console.log(tsevt);
-					if (tsevt === "ChannelListFinished") {
-						this._state.update(s => s.setChannelListFinished());
-						location.hash = getStringFromConnect(this.connectOptions!);
-						this.updateAllUnreadCounts();
-					} else if ("Message" in tsevt) {
+					if (get(app.transientSettings.ui._developMode))
+						console.log(tsevt);
+					if ("Message" in tsevt) {
 						const fromOwnClient = tsevt.Message.invoker.id.toString() === this.book.ownClientId;
 						let chat = undefined;
 						if (tsevt.Message.target === "Server") {
@@ -256,6 +253,15 @@ export class Connection {
 				} catch (err) {
 					console.error("Failed to handle event", tsevt, err);
 				}
+			}
+		} else if ("Message" in msg) {
+			const message = msg.Message;
+			if (get(app.transientSettings.ui._developMode))
+				console.log(message);
+			if ("ChannelListFinished" in message) {
+				this._state.update(s => s.setChannelListFinished());
+				location.hash = getStringFromConnect(this.connectOptions!);
+				this.updateAllUnreadCounts();
 			}
 		} else if ("TalkersChanged" in msg) {
 			this.book.talkersHandler(msg.TalkersChanged);

@@ -17,7 +17,7 @@ use tsclientlib::prelude::*;
 use tsclientlib::StreamItem as TsStreamItem;
 use tsclientlib::{
 	events, ChannelId, ClientId, Connection, DisconnectOptions, FileDownloadResult,
-	FileUploadResult, FiletransferHandle, MessageTarget, Uid,
+	FileUploadResult, FiletransferHandle, InMessage, MessageTarget, Uid,
 };
 use tsproto::resend::PacketId;
 use tsproto_packets::packets::{AudioData, OutPacket};
@@ -229,7 +229,7 @@ impl Ws {
 
 	fn handle_event(&mut self, event: TsStreamItem, ctx: &mut <Self as Actor>::Context) {
 		match event {
-			TsStreamItem::ConEvents(events) => {
+			TsStreamItem::BookEvents(events) => {
 				let mut connected_msg = None;
 				for e in &events {
 					if let TsEvent::PropertyAdded { id: events::PropertyId::Server, .. } = e {
@@ -273,30 +273,6 @@ impl Ws {
 							}
 							None => error!(self.logger, "Failed to get server key"),
 						}
-					} else if let TsEvent::ChannelListFinished = e {
-						// Tell the database that all channels are now available
-						if let Some(msg) = self.channel_list_finished_msg.take() {
-							let logger = self.logger.clone();
-							actix::spawn(self.state.database.send(msg).map(move |r| match r {
-								Ok(Ok(())) => {}
-								Ok(Err(e)) => {
-									debug!(logger, "Failed to update bookmark"; "error" => %e);
-								}
-								Err(_) => {
-									warn!(logger, "Failed to send message to database");
-								}
-							}))
-						}
-
-						// Subscribe to all channels
-						if let Some(con) = &mut self.connection {
-							if let Ok(data) = con.get_state() {
-								if let Err(e) = data.server.set_subscribed(true).send(con) {
-									error!(self.logger, "Failed to subscribe to server";
-										"error" => %e);
-								}
-							}
-						}
 					}
 				}
 
@@ -331,6 +307,51 @@ impl Ws {
 						);
 						self.send_message(msg, ctx);
 					}
+				}
+			}
+			TsStreamItem::MessageEvent(msg) => {
+				if let InMessage::ChannelListFinished(_) = msg {
+					// Tell the database that all channels are now available
+					if let Some(msg) = self.channel_list_finished_msg.take() {
+						let logger = self.logger.clone();
+						actix::spawn(self.state.database.send(msg).map(move |r| match r {
+							Ok(Ok(())) => {}
+							Ok(Err(e)) => {
+								debug!(logger, "Failed to update bookmark"; "error" => %e);
+							}
+							Err(_) => {
+								warn!(logger, "Failed to send message to database");
+							}
+						}))
+					}
+
+					if let Some(con) = &mut self.connection {
+						if let Ok(data) = con.get_state() {
+							if let Err(e) = db::DbHandler::handle_message(
+								&self.logger,
+								&self.state,
+								con,
+								data,
+								&msg,
+							) {
+								error!(self.logger, "Database failed to handle \
+									message"; "error" => %e);
+							}
+
+							// Subscribe to all channels
+							if let Err(e) = data.server.set_subscribed(true).send(con) {
+								error!(self.logger, "Failed to subscribe to server";
+									"error" => %e);
+							}
+						}
+					}
+				}
+
+				if let Some(m) = book_events::convert_message(&msg) {
+					self.send_message(&MessageP2F::Message(m), ctx);
+				} else {
+					warn!(self.logger, "Message could not be converted for frontend";
+						"mesage" => ?msg);
 				}
 			}
 			TsStreamItem::Audio(audio) => {

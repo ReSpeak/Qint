@@ -17,8 +17,12 @@
 	let filesActive: boolean;
 	$: {
 		if (NodeSelection.equals($curSelected, selected)) {
-			infoActive = $descriptionMode === DescriptionMode.Info;
-			filesActive = $descriptionMode === DescriptionMode.Files;
+			if (selected.node instanceof Client) {
+				infoActive = $descriptionMode !== DescriptionMode.None;
+			} else {
+				infoActive = $descriptionMode === DescriptionMode.Info;
+				filesActive = $descriptionMode === DescriptionMode.Files;
+			}
 		} else {
 			infoActive = false;
 			filesActive = false;

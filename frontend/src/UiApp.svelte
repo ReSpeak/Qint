@@ -18,45 +18,40 @@
 	const chat = app.chat;
 	const selected = app.selectedNode;
 	const ui = app.transientSettings.ui;
+	let showSidebar = app.showSidebar;
+	let displayPanel = app.displayPanel;
 
 	let descriptionMode = ui._descriptionMode;
-	let displayPanel = DisplayPanel.Connect;
 	let columnStyle = "";
 	let connectData = new ConnectData("", "");
 
-	let showSidebar = false;
-	$: {
-		if ($connections.length !== 0)
-			showSidebar = true;
-	}
-
 	$: {
 		columnStyle = "";
-		if (showSidebar) columnStyle += " var(--channel-tree-width)";
+		if ($showSidebar) columnStyle += " var(--channel-tree-width)";
 		else columnStyle += " 0";
 		columnStyle += " 1fr";
 	}
 
 	function showConnect(data: ConnectData) {
 		connectData = data;
-		displayPanel = DisplayPanel.Connect;
+		$displayPanel = DisplayPanel.Connect;
 	}
 </script>
 
 <div class="appContainer" style="grid-template-columns: {columnStyle}">
-	<Toolbar bind:showSidebar bind:displayPanel />
-	<Searchbar bind:filter visible={showSidebar} />
-	<Sidebar {connections} {filter} visible={showSidebar} {showConnect} />
+	<Toolbar bind:showSidebar={$showSidebar} bind:displayPanel={$displayPanel} />
+	<Searchbar bind:filter visible={$showSidebar} />
+	<Sidebar {connections} {filter} visible={$showSidebar} {showConnect} />
 	<div class="panel">
-		{#if displayPanel === DisplayPanel.Main}
+		{#if $displayPanel === DisplayPanel.Main}
 			<UiChat {chat} />
 			{#if $descriptionMode !== DescriptionMode.None}
 				<Description selected={$selected} />
 			{/if}
-		{:else if displayPanel === DisplayPanel.Settings && $connections.length !== 0}
+		{:else if $displayPanel === DisplayPanel.Settings && $connections.length !== 0}
 			<!-- TODO consider something better ? -->
 			<UiGlobalSettings connection={$connections[0]} />
-		{:else if displayPanel === DisplayPanel.Connect}
+		{:else if $displayPanel === DisplayPanel.Connect}
 			<Connect data={connectData} />
 		{/if}
 	</div>

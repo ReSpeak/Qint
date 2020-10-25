@@ -4,7 +4,7 @@ import { datetimeDeserialize, durationDeserialize } from "./util";
 import { Duration, Moment } from "moment";
 <#
 let mut base_structs = Vec::new();
-for struc in &self.3.0 {
+for struc in &self.structs.0 {
 	if struc.parts.is_empty() {
 		continue;
 	}
@@ -40,12 +40,12 @@ export enum <#= e.name #> {
 // Structs
 
 <#
-for struc in &self.3.0 {
+for struc in &self.structs.0 {
 	if struc.parts.is_empty() {
 		continue;
 	} #>
 export class <#= struc.name #> extends <#= struc.name #>Base {
-	<# for (s, p) in get_all_properties_with_struct(&self.structs, &struc.parts) {
+	<# for (s, p) in get_all_properties_with_struct(&self.book.structs, &struc.parts) {
 		// TODO More things should be optional, e.g. server.uptime
 		let mut struct_type = p.get_type()?;
 		if !struct_type.is_opt() && s.opt {
@@ -58,7 +58,7 @@ export class <#= struc.name #> extends <#= struc.name #>Base {
 	public update(obj: Partial<this>): this {
 	<#
 	// Preprocess properties
-	for p in get_all_properties(&self.structs, &struc.parts) {
+	for p in get_all_properties(&self.book.structs, &struc.parts) {
 		let struct_type = p.get_type()?;
 		let inner = struct_type.inner.peel_opt();
 		let name = p.name.to_mixed_case();
@@ -78,11 +78,46 @@ export class <#= struc.name #> extends <#= struc.name #>Base {
 }
 
 <# } #>
+// Messages
+
+<# for msg in &self.js_in_messages.0 { #>
+<# if !msg.attributes.is_empty() { #>
+export interface IMsg<#= msg.name #> {
+	<#= msg.name #>: IMsg<#= msg.name #>Part[];
+}
+
+export interface IMsg<#= msg.name #>Part {
+<# for a in &msg.attributes {
+	let field = self.messages.get_field(a);
+	let rust_type = field.get_type(a)?; #>
+	<#= field.pretty.to_mixed_case() #>: <# rust_type.inner.fmt_ts(_fmt)?; #>;
+<# } #>
+}
+
+<# } else { #>
+export interface IMsg<#= msg.name #> {
+	<#= msg.name #>: {};
+};
+
+<# } #>
+<# } #>
+export type InMessage =
+<#
+let mut is_first = true;
+for msg in &self.js_in_messages.0 {
+	if is_first {
+		is_first = false; #>
+	IMsg<#= msg.name #>
+	<# } else { #>
+	| IMsg<#= msg.name #>
+<# }
+} #>
+
 // Setter
 <#
 let mut setter_structs = Vec::new();
 
-for e in &self.2.decls {
+for e in &self.b2m.decls {
 	// Update
 	if e.op == RuleOp::Update {
 		setter_structs.push(get_prefixed_name(e));
@@ -90,7 +125,7 @@ for e in &self.2.decls {
 
 export interface OChange<#= get_prefixed_name(e) #> {
 	<#= get_prefixed_name(e) #>: {
-		<#= self.3.get_struct_ids_ts(&e.book_struct.name) #>
+		<#= self.structs.get_struct_ids_ts(&e.book_struct.name) #>
 	<#
 	// Event IDs
 	for r in &e.ids {
@@ -123,7 +158,7 @@ export interface OChange<#= get_prefixed_name(e) #> {
 
 export interface OChange<#= struct_name #> {
 	<#= struct_name #>: {
-		<#= self.3.get_struct_ids_ts(&e.book_struct.name) #>
+		<#= self.structs.get_struct_ids_ts(&e.book_struct.name) #>
 <#= args #>	};
 }
 	<#
@@ -137,7 +172,7 @@ export interface OChange<#= struct_name #> {
 
 export interface OChange<#= struct_name #> {
 	<#= struct_name #>: {
-		<#= self.3.get_struct_ids_ts(&e.book_struct.name) #>
+		<#= self.structs.get_struct_ids_ts(&e.book_struct.name) #>
 <#= args #>	};
 }
 	<#
@@ -155,7 +190,7 @@ export interface OChange<#= struct_name #> {
 
 export interface OChange<#= struct_name #> {
 	<#= struct_name #>: {
-		<#= self.3.get_struct_ids_ts(&e.book_struct.name) #>
+		<#= self.structs.get_struct_ids_ts(&e.book_struct.name) #>
 <#= args #>	};
 }
 	<#
