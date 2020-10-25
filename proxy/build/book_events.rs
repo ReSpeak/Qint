@@ -248,8 +248,8 @@ fn set_all_id_arguments<'a>(e: &'a Event<'a>) -> String {
 	for r in &e.ids {
 		match r {
 			RuleKind::ArgumentMap { .. } | RuleKind::ArgumentFunction { .. } => {
-				args.push_str("self.");
-				args.push_str(&r.from_name().to_snake_case());
+				let getter = r.get_type().code_as_ref("field").replacen("field", &format!("self.{}", &r.from_name().to_snake_case()), 1);
+				args.push_str(&getter);
 				args.push_str(", ");
 			}
 			_ => {}
@@ -275,6 +275,15 @@ fn get_id_args(num: usize, name: bool) -> String {
 		}
 		res.push(')');
 		res
+	}
+}
+
+fn get_prefixed_name(event: &Event) -> String {
+	let from_name = &event.book_struct.name;
+	if !event.msg.name.contains(from_name) {
+		format!("{}{}", from_name, event.msg.name)
+	} else {
+		event.msg.name.clone()
 	}
 }
 

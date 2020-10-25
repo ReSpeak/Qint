@@ -5,7 +5,7 @@
 	import { app, NodeSelection } from "../app";
 	import type { Writable } from "svelte/store";
 	import { Client } from "../book";
-	import type { OChangeClientUpdate } from "../book_events";
+	import type { OChangeConnectionClientUpdate } from "../book_events";
 
 	export let displayPanel: DisplayPanel;
 	export let showSidebar: boolean;
@@ -32,7 +32,7 @@
 		}
 	}
 
-	function changeOwnClient(change: OChangeClientUpdate) {
+	function changeOwnClient(change: OChangeConnectionClientUpdate) {
 		for (let c of $cons) {
 			c.sendMessage({
 				Change: change,

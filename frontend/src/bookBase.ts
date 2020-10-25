@@ -2,8 +2,7 @@ import { Writable, writable, get, Readable } from "svelte/store";
 import { arraysEqual, base64Encode, Cached, datetimeDeserialize, getDataColor } from "./util";
 import { Moment } from "moment";
 import moment from "moment";
-import { IconId, Uid } from "./ts";
-import { Server } from "./book_events";
+import { Uid } from "./ts";
 
 
 export class ChatData {

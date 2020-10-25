@@ -208,12 +208,12 @@ for e in &self.2.decls {
 	if e.op == RuleOp::Update {
 		let small_change_name = e.get_small_name();
 		let change_name = e.get_change_name();
-		setter_structs.push(e.msg.name.clone());
+		setter_structs.push(get_prefixed_name(e));
 		#>
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct <#= e.msg.name #> {
+pub struct <#= get_prefixed_name(e) #> {
 <#= self.3.get_struct_ids(&e.book_struct.name) #>
 	<#
 	// Event IDs
@@ -225,7 +225,7 @@ pub struct <#= e.msg.name #> {
 				if !attr.is_empty() { #>
 	<#= attr #>
 				<# } #>
-	pub <#= r.get_argument() #>,
+	pub <#= r.from_name().to_snake_case() #>: <#= r.get_type() #>,
 			<# }
 			_ => {}
 		}
@@ -244,7 +244,7 @@ pub struct <#= e.msg.name #> {
 #>
 }
 
-impl <#= e.msg.name #> {
+impl <#= get_prefixed_name(e) #> {
 	pub fn to_packet(&self, con: &Connection) -> Result<OutCommand> {
 		<# get_struct(_fmt, e.book_struct.name.as_str())?; #>
 
@@ -252,7 +252,6 @@ impl <#= e.msg.name #> {
 	<# for r in &e.rules {
 		let getter = r.get_type_no_option().wrap_ref().code_as_ref("p");
 		#>
-		// <#= format!("{:?}", r.get_type()) #>
 		if let Some(p) = &self.<#= r.from_name().to_snake_case() #> {
 			packet = packet.set_<#= r.from_name().to_snake_case() #>(<#= getter #>);
 		}

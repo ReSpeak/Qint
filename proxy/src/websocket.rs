@@ -23,7 +23,7 @@ use tsproto::resend::PacketId;
 use tsproto_packets::packets::{AudioData, OutPacket};
 use tsproto_types::crypto::EccKeyPubP256;
 
-use crate::book_events::{ClientUpdate, JsM2B};
+use crate::book_events::{ConnectionClientUpdate, JsM2B};
 use crate::db::{ChannelListMsg, ChatId, ChatType, SetClientVolumeMsg};
 use crate::messages::{self, MessageF2P, MessageP2F, TauriWsF2P};
 use crate::{audio, book_events, db, ConnectionId, State, Tristate, WsFormat, WsOptions};
@@ -556,7 +556,7 @@ impl Ws {
 						}
 						Ok(state) => {
 							let mut audio_active = None;
-							if let JsM2B::ClientUpdate(ClientUpdate {
+							if let JsM2B::ConnectionClientUpdate(ConnectionClientUpdate {
 								input_muted,
 								output_muted,
 								away,

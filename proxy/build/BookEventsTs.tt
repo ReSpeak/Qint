@@ -83,17 +83,13 @@ export class <#= struc.name #> extends <#= struc.name #>Base {
 let mut setter_structs = Vec::new();
 
 for e in &self.2.decls {
-	let msg_group = self.2.messages.get_message_group(&e.msg);
-	let uses_lifetime = self.2.messages.uses_lifetime(&e.msg);
 	// Update
 	if e.op == RuleOp::Update {
-		let small_change_name = e.get_small_name();
-		let change_name = e.get_change_name();
-		setter_structs.push(e.msg.name.clone());
+		setter_structs.push(get_prefixed_name(e));
 		#>
 
-export interface OChange<#= e.msg.name #> {
-	<#= e.msg.name #>: {
+export interface OChange<#= get_prefixed_name(e) #> {
+	<#= get_prefixed_name(e) #>: {
 		<#= self.3.get_struct_ids_ts(&e.book_struct.name) #>
 	<#
 	// Event IDs
@@ -101,7 +97,7 @@ export interface OChange<#= e.msg.name #> {
 		match r {
 			RuleKind::ArgumentMap { .. } |
 			RuleKind::ArgumentFunction { .. } => { #>
-		<#= r.get_argument() #>,
+		<#= r.from_name().to_mixed_case() #>: <# r.get_type().inner.fmt_ts(_fmt)?; #>;
 			<# }
 			_ => {}
 		}

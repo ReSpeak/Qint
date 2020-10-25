@@ -1,7 +1,7 @@
 // tslint:disable: interface-name
 
 import { Channel, ChannelGroup, Client, Server, ServerGroup } from "../book";
-import { ChannelId, ChannelGroupId, ClientId, ServerGroupId } from "../ts";
+import { ChannelId, ChannelGroupId, ClientId, ServerGroupId, OffsetDateTime } from "../ts";
 import { OChange, Reason } from "../book_events";
 
 export type WsMessageTarget =
@@ -67,7 +67,7 @@ interface OMsgChange {
 
 
 // In Messages
-export type InMsg = InMsgConnected | InDisconnectedTemporarily | InDisconnected | InMsgError | InTalkersChanged | InMsgEvents | InLoudness;
+export type InMsg = InMsgConnected | InDisconnectedTemporarily | InDisconnected | InMsgError | InTalkersChanged | InMsgEvents | InLoudness | InChannelFileList;
 
 interface InMsgConnected {
 	Connected: {
@@ -99,6 +99,19 @@ interface InMsgEvents {
 
 interface InLoudness {
 	Loudness: number;
+}
+
+export interface InChannelFileList {
+	FileList: InChannelFile[];
+}
+
+export interface InChannelFile {
+	channelId: string;
+	path: string;
+	name: string;
+	size: number;
+	lastModified: OffsetDateTime;
+	isFile: boolean;
 }
 
 //#region PropertyId
