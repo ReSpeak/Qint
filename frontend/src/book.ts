@@ -520,13 +520,7 @@ export class Channel extends book_events.Channel implements ITreeNode, Readable<
 	}
 
 	public static fromGraphql(obj: any): Channel {
-		return new Channel().update({
-			id: obj.id,
-			parent: obj.parent,
-			name: obj.name,
-			order: obj.orderId,
-			icon: obj.icon
-		});
+		return new Channel().update(obj);
 	}
 
 	public equals(other: this): boolean {
