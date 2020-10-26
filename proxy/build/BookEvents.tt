@@ -56,7 +56,7 @@ fn convert_ids(_fmt: &mut fmt::Formatter, js: &JsStruct, structs: &[Struct]) -> 
 	Ok(())
 }
 
-fn convert_value(_fmt: &mut fmt::Formatter, js: &JsStruct, structs: &[Struct]) -> fmt::Result {
+fn convert_value(_fmt: &mut fmt::Formatter, book_events: &BookEvents, js: &JsStruct, structs: &[Struct]) -> fmt::Result {
 	let ids = get_id_args(js.ids.len(), false);
 	for struc in structs {
 		if !js.parts.contains(&struc.name.as_str()) {
@@ -68,17 +68,27 @@ fn convert_value(_fmt: &mut fmt::Formatter, js: &JsStruct, structs: &[Struct]) -
 			<# } #>
 			Some(JsProperty::<#= js.name #>(Js<#= js.name #> {
 		<# for p in get_all_properties(structs, &js.parts) {
-			if struc.properties.iter().any(|prop| prop.name == p.name) { #>
+			if struc.properties.iter().any(|prop| prop.name == p.name) {
+				let owned = get_to_owned(p);
+				#>
 				<#= p.name.to_snake_case() #>: Some({
-					<# let owned = get_to_owned(p);
-					if owned == "val" { #>
+					<# if owned == "val" { #>
 					val.<#= p.name.to_snake_case() #><# if p.modifier.is_some() { #>.clone()<# } #>
 					<# } else { #>
 					let val = &val.<#= p.name.to_snake_case() #>;
 					<#= owned #>
 					<# } #>
 				}),
+			<#
+				if book_events.has_render(&struc.name, &p.name) {
+					let rendered = if p.opt {
+						format!("val.{}.as_deref().map(crate::markdown::markdown)", p.name.to_snake_case())
+					} else {
+						format!("Some(crate::markdown::markdown(&val.{}))", p.name.to_snake_case())
+					}; #>
+				<#= p.name.to_snake_case() #>_rendered: <#= rendered #>,
 			<# }
+			}
 		} #>
 				.. Default::default()
 			}))
@@ -115,7 +125,16 @@ fn convert_value(_fmt: &mut fmt::Formatter, js: &JsStruct, structs: &[Struct]) -
 		<# for p in get_all_properties(structs, &js.parts) {
 			if prop.name == p.name { #>
 				<#= p.name.to_snake_case() #>: Some(<#= get_to_owned(p) #>),
-			<# }
+				<#
+				if book_events.has_render(&struc.name, &p.name) {
+					let rendered = if p.opt {
+						"val.as_ref().map(|val| crate::markdown::markdown(&val))"
+					} else {
+						"Some(crate::markdown::markdown(&val))"
+					}; #>
+				<#= p.name.to_snake_case() #>_rendered: <#= rendered #>,
+				<# }
+				}
 			} #>
 				.. Default::default()
 			}))
@@ -135,12 +154,17 @@ for struc in &self.structs.0 {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Js<#= struc.name #> {
-	<# for p in get_all_properties(&self.book.structs, &struc.parts) {
+	<# for (s, p) in get_all_properties_with_struct(&self.book.structs, &struc.parts) {
 		let struct_type = p.get_type()?;
 		let attr = get_serde_attr(&struct_type.inner, true); #>
 	<#= attr #>
-	pub <#= p.name.to_snake_case() #>: Option<<#= struct_type #>>,
-	<# } #>
+	<#= p.name.to_snake_case() #>: Option<<#= struct_type #>>,
+	<#
+		if self.has_render(&s.name, &p.name) { #>
+	#[serde(default, deserialize_with = "deserialize_some", skip_serializing_if = "Option::is_none")]
+	<#= p.name.to_snake_case() #>_rendered: Option<String>,
+		<# }
+	} #>
 }
 
 <# } #>
@@ -178,7 +202,7 @@ pub fn convert_event(con: &Connection, e: &Event) -> Option<JsEvent> {
 fn property_to_js(id: &PropertyId, p: PropertyValueRef) -> Option<JsProperty> {
 	match id {
 <# for struc in &self.structs.0 {
-	convert_value(_fmt, struc, &self.book.structs)?;
+	convert_value(_fmt, self, struc, &self.book.structs)?;
 } #>
 		_ => None,
 	}
@@ -214,6 +238,14 @@ pub struct JsIn<#= msg.name #>Part {
 	<#= attr #>
 	<# } #>
 	<#= field.pretty.to_snake_case() #>: <#= rust_type #>,
+	<#
+		if self.has_render(&msg.name, &field.pretty) {
+			if rust_type.is_opt() { #>
+	#[serde(default, deserialize_with = "deserialize_some", skip_serializing_if = "Option::is_none")]
+			<# } #>
+	<#= field.pretty.to_snake_case() #>_rendered: <# if rust_type.is_opt() {
+		#>Option<<# } #>String<# if rust_type.is_opt() { #>><# } #>,
+	<# } #>
 <# } #>
 }
 
@@ -225,7 +257,16 @@ impl<'a> From<&'a messages::s2c::In<#= msg.name #>Part> for JsIn<#= msg.name #>P
 			let rust_type = field.get_type(a)?;
 			#>
 			<#= field.pretty.to_snake_case() #>: p.<#= field.pretty.to_snake_case() #>.clone(),
-		<# } #>
+			<#
+			if self.has_render(&msg.name, &field.pretty) {
+				let rendered = if rust_type.is_opt() {
+					format!("p.{}.as_deref().map(crate::markdown::markdown)", field.pretty.to_snake_case())
+				} else {
+					format!("crate::markdown::markdown(&p.{})", field.pretty.to_snake_case())
+				}; #>
+			<#= field.pretty.to_snake_case() #>_rendered: <#= rendered #>,
+			<# }
+			} #>
 		}
 	}
 }

@@ -25,6 +25,33 @@ a {
 	color: $text-strong !important;
 }
 
+.toolbutton {
+	@extend %unselectable;
+	-moz-appearance: none;
+	-webkit-appearance: none;
+
+	height: 2.5em;
+	border-radius: 100%;
+	border: none;
+	margin: 0.2em;
+	font-size: 1rem;
+	display: inline-flex;
+	align-items: center;
+
+	background-color: #444444;
+	color: #fff;
+
+	cursor: pointer;
+
+	&.active {
+		background-color: #888888;
+	}
+}
+
+.buttons:not(:last-child) {
+	margin-bottom: 0;
+}
+
 .hidden {
 	display: none !important;
 }

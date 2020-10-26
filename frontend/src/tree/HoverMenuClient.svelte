@@ -3,6 +3,7 @@
 	import type { ClientId } from "../ts";
 	import ClientName from "../ui/ClientName.svelte";
 	import ClientVolume from "../ui/ClientVolume.svelte";
+	import RenderedText from "../ui/RenderedText.svelte";
 
 	export let connection: Connection;
 	export let clientId: ClientId;
@@ -18,9 +19,9 @@
 		({client.awayMessage})
 	{/if}
 </div>
-{#if client.description.length > 0}
-<div>
-	{client.description}
+{#if client.descriptionRendered.length > 0}
+<div class="description">
+	<RenderedText text={client.descriptionRendered} />
 </div>
 {/if}
 {#if !ownClient}

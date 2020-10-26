@@ -1,62 +1,15 @@
 <script lang="typescript">
-	import katex from "katex";
-	import { hljsHighlight } from "./hljs";
-	import { onMount } from "svelte";
 	import { Message } from "./chat";
 	import { LONG_DATETIME } from "../util";
 	import Icon from "../ui/Icon.svelte";
 	import LinkPreview from "./LinkPreview.svelte";
+	import RenderedText from "../ui/RenderedText.svelte";
 
 	export let unread: boolean;
 	export let message: Message;
 
 	let viewRaw = false;
-	let rendered!: HTMLElement;
 	let links: [string, string][] = [];
-	$: renderedObj = render(message.rendered);
-
-	function render(html: string) {
-		const obj = document.createElement("div");
-		obj.innerHTML = html;
-
-		// Apply highlight.js
-		for (let elem of obj.getElementsByTagName("code")) {
-			hljsHighlight(elem);
-		}
-
-		// Apply KaTeX
-		for (let elem of (obj.getElementsByClassName("latex") as any) as HTMLElement[]) {
-			const code = elem.getAttribute("data-latex");
-			const mode = elem.getAttribute("data-displaymode");
-			try {
-				if (code) {
-					katex.render(code, elem, {
-						displayMode: mode === "true",
-						throwOnError: false,
-					});
-				}
-			} catch {
-				console.error("Failed to render latex");
-				elem.innerText = code ?? "";
-			}
-		}
-
-		// Process links and images
-		links = [...obj.querySelectorAll("a")]
-			.filter((a) => !!a.href)
-			.map((a) => [a.href, a.innerText]);
-
-		if (rendered) {
-			rendered.innerHTML = "";
-			rendered.appendChild(obj);
-		}
-		return obj;
-	}
-
-	onMount(() => {
-		rendered.innerHTML = "";
-		rendered.appendChild(renderedObj);
-	});
 </script>
 
 <svelte:options immutable />
@@ -73,7 +26,7 @@
 			class:message-error={false}
 			class:viewRaw>
 			<div class="messageRendered">
-				<div class="content messageTextBody" bind:this={rendered} />
+				<RenderedText text={message.rendered} bind:links />
 				{#each links as [link, text] (link)}
 					<LinkPreview {link} textContent={text} />
 				{/each}
@@ -160,17 +113,7 @@
 		margin: 0;
 	}
 
-	.messageTextBody {
-		white-space: pre-wrap;
-		word-wrap: break-word;
-		margin-bottom: 0;
-
-		:global(pre) {
-			background: none;
-		}
-	}
-
-	.messageRendered > *:not(:last-child) {
+	.messageRendered > :global(*:not(:last-child)) {
 		padding-bottom: 0.5em;
 	}
 
@@ -217,31 +160,5 @@
 		.messageRendered {
 			display: none;
 		}
-	}
-
-	:global(code.hljs) {
-		display: inline;
-		padding: 0.1em;
-	}
-
-	:global(pre code.hljs) {
-		display: block;
-		padding: 0.5em;
-		position: relative;
-		overflow-x: scroll;
-	}
-
-	:global([data-codelang]::before) {
-		font-size: 0.85em;
-		content: attr(data-codelang);
-		position: absolute;
-		z-index: 2;
-		bottom: 0;
-		right: 3px;
-		color: $orange;
-		font-weight: bold;
-		font-family: Sans-Serif;
-		text-transform: uppercase;
-		pointer-events: none;
 	}
 </style>

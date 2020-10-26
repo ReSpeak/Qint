@@ -3,42 +3,12 @@
 	import { DisplayPanel } from "../panel/panel";
 	import { SERVER_ICON } from "../util";
 	import { app, NodeSelection } from "../app";
-	import type { Writable } from "svelte/store";
-	import { Client } from "../book";
-	import type { OChangeConnectionClientUpdate } from "../book_events";
+	import ConnectionSettings from "./ConnectionSettings.svelte";
 
 	export let displayPanel: DisplayPanel;
 	export let showSidebar: boolean;
 
-	let inputMuted = false;
-	let outputMuted = false;
-	let isAway = false;
-
-	let showMuteButtons = false;
-
 	const cons = app.connections;
-	let ownClient: Writable<Client | undefined> | undefined;
-	$: {
-		const consVal = $cons;
-		showMuteButtons = consVal.length > 0;
-
-		const connection = consVal.length > 0 ? consVal[0] : undefined;
-		if (connection !== undefined) {
-			ownClient = connection.book.ownClient;
-			inputMuted = $ownClient?.inputMuted ?? false;
-			outputMuted = $ownClient?.outputMuted ?? false;
-			const awayMessage = $ownClient?.awayMessage;
-			isAway = awayMessage !== undefined && awayMessage !== null;
-		}
-	}
-
-	function changeOwnClient(change: OChangeConnectionClientUpdate) {
-		for (let c of $cons) {
-			c.sendMessage({
-				Change: change,
-			});
-		}
-	}
 
 	function toggleSidebar(show: boolean) {
 		showSidebar = show;
@@ -89,30 +59,9 @@
 	</div>
 	<div class="spacer" />
 	<div class="rightButtons">
-		<button
-			class="toolbutton"
-			class:active={inputMuted}
-			class:invisible={!showMuteButtons}
-			on:click={() => changeOwnClient({ ConnectionClientUpdate: { inputMuted: !inputMuted }})}
-			title="Mute microphone">
-			<Icon name={inputMuted ? 'microphone-off' : 'microphone'} />
-		</button>
-		<button
-			class="toolbutton"
-			class:active={outputMuted}
-			class:invisible={!showMuteButtons}
-			on:click={() => changeOwnClient({ ConnectionClientUpdate: { outputMuted: !outputMuted }})}
-			title="Mute output">
-			<Icon name={outputMuted ? 'volume-off' : 'volume-high'} />
-		</button>
-		<button
-			class="toolbutton"
-			class:active={isAway}
-			class:invisible={!showMuteButtons}
-			on:click={() => changeOwnClient({ ConnectionClientUpdate: { away: isAway ? null : '' }})}
-			title="Toggle away">
-			<Icon name={isAway ? 'sleep' : 'sleep-off'} />
-		</button>
+		{#if $cons.length > 0}
+			<ConnectionSettings connection={$cons[0]} />
+		{/if}
 	</div>
 </div>
 
@@ -131,28 +80,5 @@
 	.leftButtons,
 	.rightButtons {
 		display: inline-flex;
-	}
-
-	.toolbutton {
-		@extend %unselectable;
-		-moz-appearance: none;
-		-webkit-appearance: none;
-
-		height: 2.5em;
-		border-radius: 100%;
-		border: none;
-		margin: 0.2em;
-		font-size: 1rem;
-		display: inline-flex;
-		align-items: center;
-
-		background-color: #444444;
-		color: #fff;
-
-		cursor: pointer;
-
-		&.active {
-			background-color: #888888;
-		}
 	}
 </style>

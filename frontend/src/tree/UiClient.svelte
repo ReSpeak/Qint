@@ -1,4 +1,5 @@
 <script lang="typescript">
+	import type { Writable } from "svelte/store";
 	import TsIcon from "../ui/TsIcon.svelte";
 	import ServerGroupIcon from "../ui/ServerGroupIcon.svelte";
 	import FilterString from "../ui/FilterString.svelte";
@@ -7,7 +8,7 @@
 	import { Client } from "../book";
 	import { draggable, DragData } from "../ui/draggable";
 	import { DelayedHover, findParent, flash, render_updates } from "../util";
-	import { afterUpdate } from "svelte";
+	import { afterUpdate, onMount } from "svelte";
 	import { app, NodeSelection } from "../app";
 	import { TalkState } from "../ts";
 	import HoverMenu from "./HoverMenu.svelte";
@@ -18,8 +19,8 @@
 	export let client: Client;
 	export let filter: string;
 	export let filterShow: boolean = true;
-	let hover = new DelayedHover();
-	let hovered = hover.hovered;
+	let hover: DelayedHover;
+	let hovered: Writable<boolean>;
 	let showId = false;
 	let thisFilter = "";
 
@@ -70,10 +71,17 @@
 			connection.moveClient(client.id, dropTarget.dataset.key!);
 		}
 	}
+
+	onMount(() => {
+		hover = new DelayedHover([div]);
+		hovered = hover.hovered;
+
+		return () => hover.unregister();
+	});
 </script>
 
 <li class="container" class:hidden={!filterShow}>
-	<div bind:this={div} tabindex="0" on:mouseover={() => hover.mouseover()} on:mouseout={e => hover.mouseout(e)} on:focus={() => hover.mouseover()} on:blur={() => hover.mouseout(undefined)} class="hoverDummy">
+	<div bind:this={div} tabindex="0" class="hoverDummy">
 		<div
 			class:ownClient
 			class:isSelected

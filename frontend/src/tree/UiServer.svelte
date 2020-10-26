@@ -1,4 +1,5 @@
 <script lang="typescript">
+	import type { Writable } from "svelte/store";
 	import StickySlot from "../ui/StickySlot.svelte";
 	import ServerName from "../ui/ServerName.svelte";
 	import TsIcon from "../ui/TsIcon.svelte";
@@ -7,7 +8,7 @@
 	import { Connection } from "../connection";
 	import { ConnectData } from "../connect/connect";
 	import { DelayedHover, flash, render_updates } from "../util";
-	import { afterUpdate } from "svelte";
+	import { afterUpdate, onMount } from "svelte";
 	import { app, NodeSelection } from "../app";
 	import HoverMenu from "./HoverMenu.svelte";
 
@@ -18,8 +19,9 @@
 	export let filter: string;
 	export let showConnect: (data: ConnectData) => void;
 
-	let hover = new DelayedHover();
-	let hovered = hover.hovered;
+	let hover: DelayedHover;
+	let hovered: Writable<boolean>;
+	let hoverComp: HTMLElement;
 	const state = connection.state;
 	const server = connection.book.server;
 	let channels = server.channels;
@@ -38,10 +40,17 @@
 	function cancel() {
 		connection.close();
 	}
+
+	onMount(() => {
+		hover = new DelayedHover([div, hoverComp]);
+		hovered = hover.hovered;
+
+		return () => hover.unregister();
+	});
 </script>
 
 <StickySlot styled={false} on:click={click}>
-	<div bind:this={div} class="button serverHeader" class:selectedServerChat tabindex="0" on:mouseover={() => hover.mouseover()} on:mouseout={e => hover.mouseout(e)} on:focus={() => hover.mouseover()} on:blur={() => hover.mouseout(undefined)}>
+	<div bind:this={div} class="button serverHeader" class:selectedServerChat tabindex="0">
 		<TsIcon type="server" source={$server} {connection} />
 		<ServerName {connection} />
 		<div class="buttons">
@@ -62,11 +71,13 @@
 				</span>
 			{/if}
 		</span>
-		{#if $hovered}
-			<HoverMenu {div} selected={new NodeSelection(connection, server)} />
-		{/if}
 	</div>
 </StickySlot>
+<div bind:this={hoverComp}>
+{#if $hovered}
+	<HoverMenu {div} selected={new NodeSelection(connection, server)} />
+{/if}
+</div>
 
 {#if !$state.connected}
 	<div class="statusField">

@@ -1,5 +1,6 @@
 <script lang="typescript">
-	import { afterUpdate } from "svelte";
+	import { afterUpdate, onMount } from "svelte";
+	import type { Writable } from "svelte/store";
 	import { get } from "svelte/store";
 	import Icon from "../ui/Icon.svelte";
 	import TsIcon from "../ui/TsIcon.svelte";
@@ -29,8 +30,8 @@
 	let showId = false;
 	let thisFilter = "";
 	let childrenFilter = "";
-	let hover = new DelayedHover();
-	let hovered = hover.hovered;
+	let hover: DelayedHover;
+	let hovered: Writable<boolean>;
 
 	$: isSelected = $channel.isSelected;
 	$: channels = channel.channels;
@@ -174,10 +175,17 @@
 		}
 		return data;
 	}
+
+	onMount(() => {
+		hover = new DelayedHover([div]);
+		hovered = hover.hovered;
+
+		return () => hover.unregister();
+	});
 </script>
 
 <li class="container" class:hidden={!filterShow} class:collapsed>
-	<div bind:this={div} tabindex="0" on:mouseover={() => hover.mouseover()} on:mouseout={e => hover.mouseout(e)} on:focus={() => hover.mouseover()} on:blur={() => hover.mouseout(undefined)} class="hoverDummy">
+	<div bind:this={div} tabindex="0" class="hoverDummy">
 		<div
 			class="innerContainer"
 			class:ownClient

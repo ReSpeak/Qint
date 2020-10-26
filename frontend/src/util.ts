@@ -381,6 +381,27 @@ export function debounced<T extends unknown[] = []>(fn: FnFunc<T>, timeout: numb
 export class DelayedHover {
 	public readonly hovered = writable(false);
 	private newHover = false;
+	private listener: [HTMLElement, string, any][] = [];
+
+	public constructor(components: HTMLElement[]) {
+		for (const c of components) {
+			this.addListener(c, "mouseover", () => this.mouseover());
+			this.addListener(c, "mouseout", e => this.mouseout(e));
+			this.addListener(c, "focus", () => this.mouseover());
+			this.addListener(c, "blur", () => this.mouseout(undefined));
+		}
+	}
+
+	private addListener<K extends keyof HTMLElementEventMap>(c: HTMLElement, s: K, f: (this: HTMLElement, ev: HTMLElementEventMap[K]) => any) {
+		c.addEventListener(s, f);
+		this.listener.push([c, s, f]);
+	}
+
+	unregister() {
+		for (const l of this.listener) {
+			l[0].removeEventListener(l[1], l[2]);
+		}
+	}
 
 	mouseover() {
 		this.hovered.set(true);

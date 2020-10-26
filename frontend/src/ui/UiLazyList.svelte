@@ -363,6 +363,7 @@
 			default:
 				throw new Error("Unhandled direction case");
 		}
+		recheckJumpButton();
 	}
 
 	// Resize/Scroll events
@@ -407,7 +408,10 @@
 			}
 			start_fill();
 		}
+		recheckJumpButton();
+	}
 
+	function recheckJumpButton() {
 		if (elems.length === 0) {
 			showJumpStart = false;
 			showJumpEnd = false;
@@ -473,7 +477,10 @@
 		}
 		if (oldIdStart !== lastViewStart || oldIdEnd !== lastViewEnd) {
 			if (notifyViewChanged) {
-				dispatch("viewchanged", { first: lastViewStart, last: lastViewEnd });
+				dispatch("viewchanged", {
+					first: lastViewStart !== undefined ? elems[lastViewStart] : undefined,
+					last: lastViewEnd !== undefined ? elems[lastViewEnd] : undefined,
+				});
 			}
 		}
 	}

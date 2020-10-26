@@ -38,6 +38,10 @@
 		}
 		app.transientSettings.save("ui");
 	}
+
+	function disconnect() {
+		selected.connection.disconnect();
+	}
 </script>
 
 <div class="hover menu" style="top: calc({div.getBoundingClientRect().top}px - 1.5em);">
@@ -66,13 +70,22 @@
 				<Icon name="folder" />
 			</button>
 		{/if}
+		{#if selected.node instanceof Server}
+			<button
+				class="toolbutton"
+				class:active={filesActive}
+				on:click={disconnect}
+				title="Disconnect">
+				<Icon name="exit-to-app" />
+			</button>
+		{/if}
 	</div>
 </div>
 
 <style lang="scss">
 	.hover {
 		position: fixed;
-		z-index: 3;
+		z-index: 20;
 		border: solid 1px $border;
 		border-radius: 0.5em;
 		background: $background;
@@ -96,35 +109,11 @@
 		background: $background;
 	}
 
-	.buttons :global(.icon) {
-		margin-left: unset !important;
-		margin-right: unset !important;
-	}
-
-	.toolbutton {
-		@extend %unselectable;
-		-moz-appearance: none;
-		-webkit-appearance: none;
-
-		height: 2.5em;
-		border-radius: 100%;
-		border: none;
-		margin: 0.2em;
-		font-size: 1rem;
-		display: inline-flex;
-		align-items: center;
-
-		background-color: #444444;
-		color: #fff;
-
-		cursor: pointer;
-
-		&.active {
-			background-color: #888888;
-		}
-	}
-
 	.buttons {
 		margin-bottom: 0.2em;
+	}
+
+	.hover > :global(.description) {
+		font-size: 0.85em;
 	}
 </style>

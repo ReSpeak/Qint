@@ -1,6 +1,7 @@
 <script lang="typescript">
 	import { Connection } from "../connection";
 	import type { ChannelId } from "../ts";
+	import RenderedText from "../ui/RenderedText.svelte";
 
 	export let connection: Connection;
 	export let channelId: ChannelId;
@@ -12,14 +13,11 @@
 <div class="name">
 	{channel.name}
 </div>
-{#if channel.topic !== null && channel.topic.length > 0}
-<div class="topic">
-	{channel.topic}
+{#if channel.topicRendered !== null && channel.topicRendered.length > 0}
+<div class="description">
+	<RenderedText text={channel.topicRendered} />
 </div>
 {/if}
 
 <style lang="scss">
-	.topic {
-		font-size: 0.85em;
-	}
 </style>

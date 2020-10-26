@@ -22,12 +22,35 @@ pub struct BookEvents<'a> {
 	messages: &'a MessageDeclarations,
 	structs: JsStructs,
 	js_in_messages: JsInMessages<'a>,
+	/// These properties should also be rendered as markdown.
+	render: Vec<StructProperty>,
 }
 
 #[derive(Template)]
 #[TemplatePath = "build/BookEventsTs.tt"]
 #[derive(Debug)]
 pub struct BookEventsTs<'a>(pub(crate) BookEvents<'a>);
+
+#[derive(Debug)]
+struct JsStruct {
+	name: &'static str,
+	/// Each id is a tuple of name and type.
+	ids: Vec<(&'static str, &'static str)>,
+	/// book structs that are aggregated in this js struct.
+	parts: Vec<&'static str>,
+}
+
+#[derive(Debug)]
+struct JsStructs(Vec<JsStruct>);
+
+#[derive(Debug)]
+struct JsInMessages<'a>(Vec<&'a Message>);
+
+#[derive(Clone, Debug)]
+struct StructProperty {
+	struc: String,
+	prop: String,
+}
 
 impl Deref for BookEvents<'_> {
 	type Target = BookDeclarations;
@@ -46,26 +69,18 @@ impl Default for BookEvents<'static> {
 			m2b: &messages_to_book::DATA,
 			b2m: &book_to_messages::DATA,
 			messages: &messages::DATA,
-			structs: JsStructs::default(),
+			structs: Default::default(),
 			js_in_messages: JsInMessages::new(&messages::DATA),
+			render: StructProperty::get_defaults(),
 		}
 	}
 }
 
-#[derive(Debug)]
-struct JsStruct {
-	name: &'static str,
-	/// Each id is a tuple of name and type.
-	ids: Vec<(&'static str, &'static str)>,
-	/// book structs that are aggregated in this js struct.
-	parts: Vec<&'static str>,
+impl BookEvents<'_> {
+	fn has_render(&self, struc: &str, prop: &str) -> bool {
+		self.render.iter().any(|p| p.struc == struc && p.prop == prop)
+	}
 }
-
-#[derive(Debug)]
-struct JsStructs(Vec<JsStruct>);
-
-#[derive(Debug)]
-struct JsInMessages<'a>(Vec<&'a Message>);
 
 impl Default for JsStructs {
 	fn default() -> Self {
@@ -127,6 +142,25 @@ impl<'a> JsInMessages<'a> {
 
 		let msgs = msgs.iter().map(|m| messages.get_message(m)).collect();
 		JsInMessages(msgs)
+	}
+}
+
+impl StructProperty {
+	fn new(struc: &str, prop: &str) -> Self { Self { struc: struc.into(), prop: prop.into() } }
+
+	fn get_defaults() -> Vec<Self> {
+		vec![
+			// Structs
+			Self::new("OptionalChannelData", "Description"),
+			Self::new("Channel", "Topic"),
+			Self::new("Client", "Description"),
+			Self::new("Server", "WelcomeMessage"),
+			Self::new("Server", "Hostmessage"),
+			// Messages
+			Self::new("OfflineMessage", "Subject"),
+			Self::new("OfflineMessage", "Message"),
+			Self::new("OfflineMessageList", "Subject"),
+		]
 	}
 }
 

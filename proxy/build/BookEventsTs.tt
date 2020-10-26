@@ -46,14 +46,15 @@ for struc in &self.structs.0 {
 	} #>
 export class <#= struc.name #> extends <#= struc.name #>Base {
 	<# for (s, p) in get_all_properties_with_struct(&self.book.structs, &struc.parts) {
-		// TODO More things should be optional, e.g. server.uptime
 		let mut struct_type = p.get_type()?;
 		if !struct_type.is_opt() && s.opt {
 			struct_type = struct_type.wrap_opt();
-		}
-		#>
+		} #>
 	public readonly <#= p.name.to_mixed_case() #>!: <# struct_type.inner.fmt_ts(_fmt)?; #>;
-	<# } #>
+		<# if self.has_render(&s.name, &p.name) { #>
+	public readonly <#= p.name.to_mixed_case() #>Rendered!: string<# if p.opt || s.opt { #> | null<# } #>;
+	<# }
+	} #>
 
 	public update(obj: Partial<this>): this {
 	<#
@@ -91,7 +92,10 @@ export interface IMsg<#= msg.name #>Part {
 	let field = self.messages.get_field(a);
 	let rust_type = field.get_type(a)?; #>
 	<#= field.pretty.to_mixed_case() #>: <# rust_type.inner.fmt_ts(_fmt)?; #>;
-<# } #>
+	<# if self.has_render(&msg.name, &field.pretty) { #>
+	<#= field.pretty.to_mixed_case() #>Rendered: string<# if rust_type.is_opt() { #> | null<# } #>;
+<# }
+} #>
 }
 
 <# } else { #>
@@ -149,23 +153,9 @@ export interface OChange<#= get_prefixed_name(e) #> {
 }
 <#
 	} else if e.op == RuleOp::Remove {
-	if e.rules.is_empty() {
-		let args = get_all_arguments_ts(e, None);
-		let name_add = get_first_argument_name(e, None);
-		let struct_name = format!("{}Remove{}", e.book_struct.name, name_add);
-		setter_structs.push(struct_name.clone());
-	#>
-
-export interface OChange<#= struct_name #> {
-	<#= struct_name #>: {
-		<#= self.structs.get_struct_ids_ts(&e.book_struct.name) #>
-<#= args #>	};
-}
-	<#
-	} else {
-		for r in &e.rules {
-			let args = get_all_arguments_ts(e, Some(r));
-			let name_add = get_first_argument_name(e, Some(r));
+		if e.rules.is_empty() {
+			let args = get_all_arguments_ts(e, None);
+			let name_add = get_first_argument_name(e, None);
 			let struct_name = format!("{}Remove{}", e.book_struct.name, name_add);
 			setter_structs.push(struct_name.clone());
 	#>
@@ -176,8 +166,21 @@ export interface OChange<#= struct_name #> {
 <#= args #>	};
 }
 	<#
+		} else {
+			for r in &e.rules {
+				let args = get_all_arguments_ts(e, Some(r));
+				let name_add = get_first_argument_name(e, Some(r));
+				let struct_name = format!("{}Remove{}", e.book_struct.name, name_add);
+				setter_structs.push(struct_name.clone());
+	#>
+
+export interface OChange<#= struct_name #> {
+	<#= struct_name #>: {
+		<#= self.structs.get_struct_ids_ts(&e.book_struct.name) #>
+<#= args #>	};
+}
+		<# }
 		}
-	}
 	} else if e.op == RuleOp::Add {
 		for r in &e.rules {
 			let name = r.from_name_singular();
