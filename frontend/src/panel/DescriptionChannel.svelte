@@ -5,6 +5,7 @@
 	import StickySlot from "../ui/StickySlot.svelte";
 	import type { ChannelId } from "../ts";
 	import { codecToName } from "../book";
+	import RenderedText from "../ui/RenderedText.svelte";
 
 	export let connection: Connection;
 	export let channelId: ChannelId;
@@ -21,6 +22,13 @@
 		else
 			formatMaxClients = channel.maxClients?.Limited ?? "unknown";
 	}
+
+	// Load description
+	$: connection.sendMessage({ Change: {
+		ChannelDescriptionRequest: {
+			id: channelId,
+		},
+	}});
 </script>
 
 <StickyList>
@@ -47,9 +55,17 @@
 			<div>{clientCount} / {formatMaxClients}</div>
 		</div>
 	</div>
+	<div class="description">
+		{#if channel.descriptionRendered}
+			<RenderedText text={channel.descriptionRendered} />
+		{/if}
+	</div>
 	<StickySlot>Settings</StickySlot>
 	klik here for party
 </StickyList>
 
 <style>
+	.description {
+		margin: 1em;
+	}
 </style>

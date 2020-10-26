@@ -167,19 +167,21 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHand
 				const invoker = msg.PropertyChanged.invoker;
 				const prop = msg.PropertyChanged.prop!;
 				if ("Channel" in prop && "Channel" in msg.PropertyChanged.id) {
-					let isInteresting = false;
-					for (let k in prop.Channel) {
-						if (k !== "subscribed") {
-							isInteresting = true;
-							break;
+					if (msg.PropertyChanged.extra.reason === Reason.Channeledit) {
+						let isInteresting = false;
+						for (let k in prop.Channel) {
+							if (k !== "subscribed") {
+								isInteresting = true;
+								break;
+							}
 						}
-					}
-					if (isInteresting) {
-						const channel = con.book.getChannel(msg.PropertyChanged.id.Channel)!;
-						if (invoker !== null) {
-							handler(con, msg, notif`${invoker} edited ${channel}`);
-						} else {
-							handler(con, msg, notif`${channel} was edited`);
+						if (isInteresting) {
+							const channel = con.book.getChannel(msg.PropertyChanged.id.Channel)!;
+							if (invoker !== null) {
+								handler(con, msg, notif`${invoker} edited ${channel}`);
+							} else {
+								handler(con, msg, notif`${channel} was edited`);
+							}
 						}
 					}
 				} else if ("Client" in prop && "Client" in msg.PropertyChanged.id) {

@@ -12,12 +12,12 @@
 <div class="name">
 	<ServerName {connection} />
 </div>
-{#if server.hostmessageRendered.length > 0}
+{#if server.hostmessageRendered && server.hostmessageRendered.length > 0}
 <div class="description">
 	<RenderedText text={server.hostmessageRendered} />
 </div>
 {/if}
-{#if server.welcomeMessageRendered.length > 0}
+{#if server.welcomeMessageRendered && server.welcomeMessageRendered.length > 0}
 <div class="description">
 	<RenderedText text={server.welcomeMessageRendered} />
 </div>

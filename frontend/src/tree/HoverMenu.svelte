@@ -73,7 +73,6 @@
 		{#if selected.node instanceof Server}
 			<button
 				class="toolbutton"
-				class:active={filesActive}
 				on:click={disconnect}
 				title="Disconnect">
 				<Icon name="exit-to-app" />
