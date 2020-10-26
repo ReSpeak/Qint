@@ -1,5 +1,5 @@
 <script lang="typescript">
-	import { ListFetchDir } from "./lazyList";
+	import { CustomIntersectionObserver, ListFetchDir } from "./lazyList";
 	import type { FetchResult } from "./lazyList";
 	import { assert, binarySearchByKey, debounced } from "../util";
 	import { createEventDispatcher, tick, onMount } from "svelte";
@@ -32,7 +32,7 @@
 	let loadAnchored: ListFetchDir | undefined = undefined;
 	let lastViewStart: number | undefined;
 	let lastViewEnd: number | undefined;
-	let visObs: IntersectionObserver;
+	let visObs: CustomIntersectionObserver;
 
 	// the data elements held by this list
 	let elems: T[] = [];
@@ -46,6 +46,7 @@
 	// The holding list element which has the scrollbar
 	let pan: HTMLElement;
 	let scrollPane: HTMLElement;
+	let mounted = false;
 	// prevent async weirdness by only allowing one async task
 	let fetchTask: Promise<void> | undefined;
 
@@ -119,11 +120,11 @@
 	// *** Private functions ***
 
 	function scrollToStart() {
-		if (!pan) return;
+		if (!mounted) return;
 		pan.scrollTop = 0;
 	}
 	function scrollToEnd() {
-		if (!pan) return;
+		if (!mounted) return;
 		pan.scrollTop = pan.scrollHeight - pan.clientHeight;
 	}
 	function getFirstElem() {
@@ -140,7 +141,7 @@
 	}
 
 	function start_fill() {
-		if (fetchTask || pan === undefined) {
+		if (fetchTask || !mounted) {
 			return;
 		}
 		fetchTask = fill_loop();
@@ -256,9 +257,9 @@
 		await tick();
 
 		const childList = getHtmlElements();
-		Array.from(childList).forEach((element) => {
-			visObs.observe(element);
-		});
+		visObs.observeReplace(childList);
+		lastViewStart = undefined;
+		lastViewEnd = undefined;
 
 		if (isAtTop) {
 			const scrollAdjust = pan.scrollHeight - lastScrollHeight;
@@ -442,16 +443,13 @@
 	function onIntersectionChanged(elem: IntersectionObserverEntry[]): void {
 		let oldIdStart = lastViewStart;
 		let oldIdEnd = lastViewEnd;
+		let newLockElem: HTMLElement | undefined;
 		for (const e of elem) {
 			let htmlElem = e.target as HTMLElement;
 			let elemId = Number(htmlElem.dataset.index);
 			if (e.isIntersecting) {
 				if (lastViewStart === undefined || elemId < lastViewStart) {
-					setLockPos(
-						htmlElem.nextElementSibling
-							? (htmlElem.nextElementSibling as HTMLElement)
-							: htmlElem
-					);
+					newLockElem = htmlElem;
 					lastViewStart = elemId;
 				} else if (lastViewEnd === undefined || elemId > lastViewEnd) {
 					lastViewEnd = elemId;
@@ -461,11 +459,9 @@
 					e.boundingClientRect.bottom < e.rootBounds!.top &&
 					(lastViewStart === undefined || elemId + 1 > lastViewStart)
 				) {
-					setLockPos(
-						htmlElem.nextElementSibling
-							? (htmlElem.nextElementSibling as HTMLElement)
-							: htmlElem
-					);
+					newLockElem = htmlElem.nextElementSibling
+						? (htmlElem.nextElementSibling as HTMLElement)
+						: htmlElem;
 					lastViewStart = elemId + 1;
 				} else if (
 					e.boundingClientRect.top > e.rootBounds!.bottom &&
@@ -475,13 +471,17 @@
 				}
 			}
 		}
-		if (oldIdStart !== lastViewStart || oldIdEnd !== lastViewEnd) {
-			if (notifyViewChanged) {
-				dispatch("viewchanged", {
-					first: lastViewStart !== undefined ? elems[lastViewStart] : undefined,
-					last: lastViewEnd !== undefined ? elems[lastViewEnd] : undefined,
-				});
-			}
+
+		const startChanged = oldIdStart !== lastViewStart;
+		const endChanged = oldIdEnd !== lastViewEnd;
+		if (startChanged && newLockElem !== undefined) {
+			setLockPos(newLockElem);
+		}
+		if (notifyViewChanged && (startChanged || endChanged)) {
+			dispatch("viewchanged", {
+				first: lastViewStart !== undefined ? elems[lastViewStart] : undefined,
+				last: lastViewEnd !== undefined ? elems[lastViewEnd] : undefined,
+			});
 		}
 	}
 
@@ -492,14 +492,16 @@
 		resizeObserver.observe(pan);
 		resizeObserver.observe(scrollPane);
 
-		visObs = new IntersectionObserver(onIntersectionChanged, {
+		visObs = new CustomIntersectionObserver(onIntersectionChanged, {
 			root: pan,
 			threshold: 0,
 		});
 
+		mounted = true;
 		return () => {
 			resizeObserver.disconnect();
 			visObs.disconnect();
+			mounted = false;
 		};
 	});
 </script>

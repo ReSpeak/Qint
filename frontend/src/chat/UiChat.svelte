@@ -156,7 +156,7 @@
 
 	async function viewchanged(ev: CustomEvent<{ first?: Message; last?: Message }>) {
 		lastDisplayed = ev.detail.last;
-		markRead();
+		await markRead();
 	}
 
 	onMount(() => {
@@ -281,7 +281,7 @@
 		margin-left: 0.5em;
 	}
 
-	.chat :global(.scrollPane) {
+	.chat :global(.scrollPane:last-child) {
 		padding: 0.5em;
 	}
 
