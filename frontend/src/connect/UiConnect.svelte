@@ -7,7 +7,7 @@
 	import { Book, Channel } from "../book";
 	import UiChannel from "../tree/UiChannel.svelte";
 	import type { ChannelId, Uid } from "../ts";
-	import { SERVER_ICON, CLIENT_ICON, base64Decode, hexEncode } from "../util";
+	import { SERVER_ICON, CLIENT_ICON, hexEncode } from "../util";
 	import { app } from "../app";
 	import { backend } from "../backend/backend";
 

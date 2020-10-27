@@ -55,9 +55,9 @@ cd Qint/frontend
 yarn
 
 # For the development server
-snowpack dev
-# For builds (note: does not build without --watch)
-snowpack build --watch
+yarn dev
+# For builds
+yarn build
 ```
 
 Now, you can use the client at http://localhost:4422.
