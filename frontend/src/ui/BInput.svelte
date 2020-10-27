@@ -1,8 +1,10 @@
 <script lang="typescript">
-	import { onMount, tick } from "svelte";
+	import { createEventDispatcher, onMount, tick } from "svelte";
 	export let value: string;
+	const submitDispatch = createEventDispatcher<{ submit: undefined }>();
 	let setValue: string | undefined;
 	let self!: HTMLElement;
+	let expectQuickPaste = false;
 
 	$: if (value !== setValue) {
 		applyValue(value);
@@ -32,6 +34,14 @@
 		}
 	}
 
+	function onChatKeyDown(e: KeyboardEvent) {
+		if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey) {
+			submitDispatch("submit");
+			e.preventDefault();
+		}
+		expectQuickPaste = e.key.toLowerCase() === "v" && e.shiftKey && e.ctrlKey;
+	}
+
 	function handlePaste(e: ClipboardEvent) {
 		e.stopPropagation();
 		e.preventDefault();
@@ -44,6 +54,9 @@
 		range.insertNode(textNode);
 		range.collapse(false);
 		textChanged();
+		if (expectQuickPaste) {
+			submitDispatch("submit");
+		}
 	}
 
 	onMount(() => {
@@ -58,7 +71,7 @@
 	</div>
 	<div
 		bind:this={self}
-		on:keydown
+		on:keydown={onChatKeyDown}
 		on:input={textChanged}
 		on:paste={handlePaste}
 		class="input textBox"

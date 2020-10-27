@@ -128,13 +128,6 @@
 		command = "";
 	}
 
-	function onChatKeyDown(e: any) {
-		if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey) {
-			sendMessage();
-			e.preventDefault();
-		}
-	}
-
 	async function fetchElements(idFrom: Message | undefined, dir: ListFetchDir) {
 		messagesError = undefined;
 		try {
@@ -215,7 +208,7 @@
 				unread={chatData !== undefined && item.date > $chatData.lastRead} />
 		</UiLazyList>
 		<form class="chat-form" class:hidden={!canChatHere} on:submit|preventDefault={sendMessage}>
-			<BInput bind:this={messageInput} bind:value={text} on:keydown={onChatKeyDown}>
+			<BInput bind:this={messageInput} bind:value={text} on:submit={sendMessage}>
 				<div slot="placeholder">
 					<span>Send to</span>
 					<!-- TODO: Remove 'sel !== undefined' when svelte-tool understands it -->
