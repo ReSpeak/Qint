@@ -59,6 +59,10 @@
 
 <style lang="scss">
 	.textBody {
+		white-space: pre-wrap;
+		word-wrap: break-word;
+		margin-bottom: 0;
+
 		// Overwrite bulma default
 		:global(pre) {
 			position: relative;
@@ -72,34 +76,34 @@
 			// TODO Prevent scrollbar
 		}
 
-		white-space: pre-wrap;
-		word-wrap: break-word;
-		margin-bottom: 0;
-	}
+		:global(.para:not(:last-child)) {
+			margin-bottom: 1em;
+		}
 
-	:global(code.hljs) {
-		display: inline;
-		padding: 0.1em;
-	}
+		:global(code.hljs) {
+			display: inline;
+			padding: 0.1em;
+		}
 
-	:global(pre code.hljs) {
-		display: block;
-		padding: 0.5em;
-		position: relative;
-		overflow-x: scroll;
-	}
+		:global(pre code.hljs) {
+			display: block;
+			padding: 0.5em;
+			position: relative;
+			overflow-x: scroll;
+		}
 
-	:global([data-codelang]::before) {
-		font-size: 0.85em;
-		content: attr(data-codelang);
-		position: absolute;
-		z-index: 2;
-		bottom: 0;
-		right: 3px;
-		color: $orange;
-		font-weight: bold;
-		font-family: Sans-Serif;
-		text-transform: uppercase;
-		pointer-events: none;
+		:global([data-codelang]::before) {
+			font-size: 0.85em;
+			content: attr(data-codelang);
+			position: absolute;
+			z-index: 2;
+			bottom: 0;
+			right: 3px;
+			color: $orange;
+			font-weight: bold;
+			font-family: Sans-Serif;
+			text-transform: uppercase;
+			pointer-events: none;
+		}
 	}
 </style>

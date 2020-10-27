@@ -52,12 +52,10 @@
 		"sirv-cli": "^1.0.3"
 	},
 	"scripts": {
-		"build": "rollup -c",
+		"build": "snowpack build",
 		"fresh": "yarn install && yarn upgrade --latest",
-		"autobuild": "rollup -c -w",
-		"dev": "run-p start:dev autobuild",
-		"start": "sirv public",
-		"start:dev": "sirv public --dev --host",
+		"autobuild": "snowpack build --watch",
+		"dev": "snowpack dev",
 		"tauri": "tauri"
 	},
 	"comments": {

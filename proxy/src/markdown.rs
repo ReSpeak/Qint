@@ -142,6 +142,16 @@ impl VTag {
 	}
 
 	fn add_child(&mut self, node: VNode) { self.children.push(node); }
+
+	fn get_inner_text(&self) -> String {
+		let mut inner_str = String::new();
+		for r in self.children.iter() {
+			if let VNode::VText(text) = r {
+				inner_str.push_str(text);
+			}
+		}
+		inner_str
+	}
 }
 
 impl fmt::Display for VTag {
@@ -220,13 +230,15 @@ impl<TStack> Render<TStack> {
 		let mut last_url = 0usize;
 
 		for m in MATCH_URL.find_iter(text) {
-			self.push_text(&text[last_url..m.start()]);
-			let mut a = Self::make_link();
-			let href = m.as_str();
-			a.add_attribute("href", href);
-			a.add_child(href.to_string().into());
-			self.push_node(a.into());
-			last_url = m.end();
+			if !text[m.start()..].to_lowercase().ends_with("[/img]") {
+				self.push_text(&text[last_url..m.start()]);
+				let mut a = Self::make_link();
+				let href = m.as_str();
+				a.add_attribute("href", href);
+				a.add_child(href.to_string().into());
+				self.push_node(a.into());
+				last_url = m.end();
+			}
 		}
 
 		self.push_text(&text[last_url..]);
@@ -412,11 +424,12 @@ impl RenderMd {
 			}
 			Tag::Link(link_type, href, title) => {
 				let mut el = Self::make_link();
+				el.add_attribute("data-ismdlink", "true");
 				match link_type {
 					LinkType::Email => el.add_attribute("href", &format!("mailto:{}", href)),
 					_ => el.add_attribute("href", &href),
 				}
-				if title.as_ref() != "" {
+				if !title.as_ref().is_empty() {
 					el.add_attribute("title", &title);
 				}
 				(RenderMdMeta::None, el)
@@ -424,7 +437,7 @@ impl RenderMd {
 			Tag::Image(_, src, title) => {
 				let mut el = VTag::new("img");
 				el.add_attribute("src", &src);
-				if title.as_ref() != "" {
+				if !title.as_ref().is_empty() {
 					el.add_attribute("title", &title);
 				}
 				(RenderMdMeta::None, el)
@@ -502,6 +515,7 @@ enum BBTag {
 	Underline,
 	Color,
 	Url,
+	Img,
 }
 
 fn bb(raw: &str) -> VNode { RenderBb::new().mini_bb(raw) }
@@ -554,21 +568,22 @@ impl RenderBb {
 							}
 							el
 						}
+						BBTag::Img => VTag::new("img"),
 					};
 					self.spine.push((tag, vtag));
 				}
 				BBSegment::Close(tag) => {
 					while let Some((stack_tag, mut vtag)) = self.spine.pop() {
 						if stack_tag == BBTag::Url && !vtag.attributes.contains_key("href") {
-							let mut href_opt = None;
-							for r in vtag.children.iter() {
-								if let VNode::VText(text) = r {
-									href_opt = Some(text.clone());
-									break;
-								}
-							}
-							if let Some(href) = href_opt {
+							let href = vtag.get_inner_text();
+							if !href.is_empty() {
 								vtag.add_attribute("href", &href);
+							}
+						} else if stack_tag == BBTag::Img {
+							let src = vtag.get_inner_text();
+							if !src.is_empty() {
+								vtag.add_attribute("src", &src);
+								vtag.children.clear();
 							}
 						}
 						self.push_vtag(vtag);
@@ -649,6 +664,8 @@ fn nom_bb_match_tag(s: &str) -> Option<BBTag> {
 				Some(BBTag::Url)
 			} else if s.eq_ignore_ascii_case("COLOR") {
 				Some(BBTag::Color)
+			} else if s.eq_ignore_ascii_case("IMG") {
+				Some(BBTag::Img)
 			} else {
 				None
 			}
