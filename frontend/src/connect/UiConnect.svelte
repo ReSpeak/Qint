@@ -6,7 +6,7 @@
 	import UiBookmark from "./UiBookmark.svelte";
 	import { Book, Channel } from "../book";
 	import UiChannel from "../tree/UiChannel.svelte";
-	import type { ChannelId } from "../ts";
+	import type { ChannelId, Uid } from "../ts";
 	import { SERVER_ICON, CLIENT_ICON, base64Decode, hexEncode } from "../util";
 	import { app } from "../app";
 	import { backend } from "../backend/backend";
@@ -76,7 +76,7 @@
 
 	async function loadChannels(address: string): Promise<Channel[]> {
 		try {
-			const query = await backend.graphql<{serverByAddress:{uid:string, channels:Channel[]}}>(
+			const query = await backend.graphql<{serverByAddress:{uid: Uid, channels:Channel[]}}>(
 				`
 					query GetChannels($address: String!) {
 						serverByAddress(address: $address) {
@@ -96,7 +96,7 @@
 				}
 			);
 			if (query.data.serverByAddress !== null) {
-				server = hexEncode(base64Decode(query.data.serverByAddress.uid));
+				server = hexEncode(query.data.serverByAddress.uid);
 				let channels: Map<ChannelId, Channel> = new Map(
 					query.data.serverByAddress.channels.map((c: any) => {
 						let channel = Channel.fromGraphql(c);
@@ -107,7 +107,7 @@
 				// Get into tree form
 				for (let c of channels.values()) {
 					// Add to parent
-					if (c.parent !== "0") {
+					if (c.parent !== null) {
 						let children = channels.get(c.parent)!.channels;
 						children.update((cs) => {
 							Book.addChannelSorted(cs, c);
