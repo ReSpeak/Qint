@@ -9,10 +9,15 @@
 
 	export let connection: Connection;
 	export let clientId: ClientId;
-	let clientModalVisible = false;
+	let pokeModalVisible = false;
 
 	function onPokeClick(e: MouseEvent) {
-		clientModalVisible = true;
+		pokeModalVisible = true;
+	}
+
+	function onPokeSend(e: MouseEvent) {
+		console.log("yeet");
+		pokeModalVisible = false;
 	}
 
 	$: clientRaw = connection.book.clients.get(clientId)!;
@@ -42,7 +47,12 @@
 		<Icon name="hand-pointing-right"></Icon>
 	</button>
 </div>
-<BModal name={clientId} bind:visible={clientModalVisible}></BModal>
+<BModal title={"Poke " + client.name} bind:visible={pokeModalVisible}>
+	<div slot="content">
+		<input class="input" type="text">
+	</div>
+	<button slot="footer" on:click={onPokeSend} class="button is-success">Poke</button>
+</BModal>
 
 <style lang="scss">
 </style>

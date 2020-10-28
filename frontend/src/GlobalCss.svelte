@@ -23,6 +23,7 @@
 	@import "bulma/sass/form/select";
 	@import "bulma/sass/form/tools";
 	@import "bulma-slider/src/sass/index";
+	@import "bulmaswatch/cyborg/overrides";
 
 	@import "./global";
 </style>
