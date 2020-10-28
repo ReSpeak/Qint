@@ -10,7 +10,7 @@
 	}
 
     $: {
-		app.clientModalOpen.set(visible);
+		app.modalVisible.set(visible);
     }
 </script>
 

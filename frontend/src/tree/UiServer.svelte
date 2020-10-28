@@ -11,7 +11,7 @@
 	import { afterUpdate, onMount } from "svelte";
 	import { app, NodeSelection } from "../app";
 	import HoverMenu from "./HoverMenu.svelte";
-	import { DelayedHover } from "../tree/delayedHover";
+	import { DelayedHover } from "./delayedHover";
 
 	let div: HTMLElement;
 	if (render_updates) afterUpdate(() => flash(div));

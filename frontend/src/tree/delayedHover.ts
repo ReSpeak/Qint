@@ -23,7 +23,7 @@ export class DelayedHover {
 			//this.addListener(c, "focus", () => this.mouseover());
 			//this.addListener(c, "blur", () => this.mouseout());
 		}
-		this.unsub1 = app.clientModalOpen.subscribe(open => {
+		this.unsub1 = app.modalVisible.subscribe(open => {
 			this.modalState = open;
 		});
 		this.unsub2 = hover_id.subscribe(new_id => {

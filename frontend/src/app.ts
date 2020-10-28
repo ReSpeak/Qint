@@ -19,7 +19,7 @@ export class App {
 	public readonly selectedNode: Writable<NodeSelection | undefined> = writable(undefined);
 	public readonly showSidebar = writable(false);
 	public readonly displayPanel = writable(DisplayPanel.Connect);
-	public readonly clientModalOpen = writable(false);
+	public readonly modalVisible = writable(false);
 
 	public readonly chat: Chat = new Chat(this.selectedNode);
 	public readonly transientSettings: TransientSettings = new TransientSettings();

@@ -12,7 +12,7 @@
 	import { app, NodeSelection } from "../app";
 	import { TalkState } from "../ts";
 	import HoverMenu from "./HoverMenu.svelte";
-	import { DelayedHover } from "../tree/delayedHover";
+	import { DelayedHover } from "./delayedHover";
 
 	if (render_updates) afterUpdate(() => flash(div));
 
