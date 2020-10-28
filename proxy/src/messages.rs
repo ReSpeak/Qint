@@ -1,8 +1,11 @@
 use serde::{Deserialize, Serialize};
-use tsclientlib::{DisconnectOptions, MessageTarget, Version};
+use tsclientlib::{ClientId, DisconnectOptions, MessageTarget, Version};
 use uuid::Uuid;
 
-use crate::book_events::{JsEvent, JsInMessage, JsM2B};
+use crate::book_events::{
+	deserialize_id, deserialize_some_u64, serialize_id, serialize_some_u64, JsEvent, JsInMessage,
+	JsM2B,
+};
 
 /// A message sent over a websocket connection from the frontend to the proxy.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -11,7 +14,7 @@ pub enum MessageF2P {
 	Connect(ConnectOptions),
 	Disconnect(DisconnectOptions),
 	SendMessage {
-		target: MessageTarget,
+		target: JsMessageTarget,
 		message: String,
 	},
 	/// Send a TeamSpeak command, for debugging purposes.
@@ -56,10 +59,31 @@ pub enum MessageP2F {
 	Loudness(f64),
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub enum JsMessageTarget {
+	Server,
+	Channel,
+	Client(
+		#[serde(default, deserialize_with = "deserialize_id", serialize_with = "serialize_id")]
+		ClientId,
+	),
+	Poke(
+		#[serde(default, deserialize_with = "deserialize_id", serialize_with = "serialize_id")]
+		ClientId,
+	),
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ConnectOptions {
 	/// Id of the bookmark
+	#[serde(
+		default,
+		deserialize_with = "deserialize_some_u64",
+		serialize_with = "serialize_some_u64",
+		skip_serializing_if = "Option::is_none"
+	)]
 	pub bookmark: Option<u64>,
 	pub address: String,
 	pub name: String,
@@ -125,4 +149,26 @@ pub enum TauriHttpResponse {
 	Plugin(String),
 	TransientSetting(Option<serde_json::Value>),
 	Void(),
+}
+
+impl From<MessageTarget> for JsMessageTarget {
+	fn from(target: MessageTarget) -> Self {
+		match target {
+			MessageTarget::Server => Self::Server,
+			MessageTarget::Channel => Self::Channel,
+			MessageTarget::Client(id) => Self::Client(id),
+			MessageTarget::Poke(id) => Self::Poke(id),
+		}
+	}
+}
+
+impl Into<MessageTarget> for JsMessageTarget {
+	fn into(self) -> MessageTarget {
+		match self {
+			Self::Server => MessageTarget::Server,
+			Self::Channel => MessageTarget::Channel,
+			Self::Client(id) => MessageTarget::Client(id),
+			Self::Poke(id) => MessageTarget::Poke(id),
+		}
+	}
 }

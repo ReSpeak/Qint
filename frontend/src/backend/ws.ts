@@ -16,7 +16,7 @@ export type OutMsg = OMsgConnect | OMsgDisconnect | OMsgSendMessage | OMsgSendCo
 
 export interface OMsgConnect {
 	Connect: {
-		bookmark: number | undefined;
+		bookmark: string | undefined;
 		address: string;
 		name: string;
 		channel: string | undefined;

@@ -6,24 +6,29 @@
 	import ClientVolume from "../ui/ClientVolume.svelte";
 	import RenderedText from "../ui/RenderedText.svelte";
 	import BModal from "../ui/BModal.svelte";
+	import { tick } from "svelte";
 
 	export let connection: Connection;
 	export let clientId: ClientId;
 	let pokeModalVisible = false;
 	let pokeMessage: string;
+	let pokeInput: HTMLElement | undefined;
 
-	function onPokeClick(e: MouseEvent) {
+	async function onPokeClick() {
 		pokeModalVisible = true;
+		await tick();
+		if (pokeInput !== undefined)
+			pokeInput.focus();
 	}
 
-	function onPokeSend(e: MouseEvent) {
+	function onPokeSend() {
 		connection.sendMessage({
 			SendMessage: {
 				target: {
-					Poke: Number(clientId) as any
+					Poke: clientId,
 				},
-				message: pokeMessage
-			}
+				message: pokeMessage,
+			},
 		});
 		pokeModalVisible = false;
 	}
@@ -55,10 +60,15 @@
 		<Icon name="hand-pointing-right"></Icon>
 	</button>
 </div>
-<BModal title={"Poke " + client.name} bind:visible={pokeModalVisible}>
-	<input class="input" type="text" bind:value={pokeMessage}>
-	<button slot="footer" on:click={onPokeSend} class="button is-success">Poke</button>
-</BModal>
+<form on:submit|preventDefault={onPokeSend}>
+	<BModal bind:visible={pokeModalVisible}>
+		<div slot="header">
+			Poke <ClientName {client} />
+		</div>
+		<input class="input" type="text" bind:this={pokeInput} bind:value={pokeMessage}>
+		<button type="submit" slot="footer" class="button is-success">Poke</button>
+	</BModal>
+</form>
 
 <style lang="scss">
 </style>

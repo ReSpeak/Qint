@@ -14,7 +14,7 @@
 	}
 
 	function doConnect() {
-		const channel = bookmark.channel !== null ? Number(bookmark.channel.id) : undefined;
+		const channel = bookmark.channel !== null ? bookmark.channel.id : undefined;
 		if (
 			bookmark.username !== undefined &&
 			bookmark.address !== undefined &&
@@ -24,9 +24,9 @@
 				new ConnectData(
 					bookmark.username,
 					bookmark.address,
-					Number(bookmark.id),
+					bookmark.id,
 					bookmark.channel?.fullPath,
-					channel
+					channel,
 				)
 			);
 	}

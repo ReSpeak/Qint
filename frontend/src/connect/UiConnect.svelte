@@ -146,9 +146,9 @@
 				data.address = recent.address ?? "";
 				if (recent.channel !== null) {
 					data.channel = recent.channel.fullPath;
-					data.channelId = Number(recent.channel.id);
+					data.channelId = recent.channel.id;
 				}
-				data.bookmark = Number(recent.id);
+				data.bookmark = recent.id;
 			}
 		}
 	});

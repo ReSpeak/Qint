@@ -566,7 +566,7 @@ impl Ws {
 				));
 			}
 			MessageF2P::SendMessage { target, message } => {
-				self.send_chat_message(target, message);
+				self.send_chat_message(target.into(), message);
 			}
 			MessageF2P::SendCommand(cmd) => self.send_command(cmd),
 			MessageF2P::Change(change) => {

@@ -1,15 +1,16 @@
 import { getDefaultVersion } from "../util";
 import { OMsgConnect } from "../backend/ws";
+import { ChannelId } from "../ts";
 
 export class ConnectData {
 	constructor(
 		public name: string,
 		public address: string,
-		public bookmark?: number,
+		public bookmark?: string,
 		public channel?: string,
-		public channelId?: number) { }
+		public channelId?: ChannelId) { }
 
-	public static fromConString(name: string, address: string, bookmark?: number, channelId?: number): ConnectData {
+	public static fromConString(name: string, address: string, bookmark?: string, channelId?: ChannelId): ConnectData {
 		const sep = address.indexOf("/");
 		let addr = address;
 		let channel = undefined;
