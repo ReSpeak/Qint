@@ -7,10 +7,11 @@
 	import UiChannel from "./UiChannelWrap.svelte";
 	import { Connection } from "../connection";
 	import { ConnectData } from "../connect/connect";
-	import { DelayedHover, flash, render_updates } from "../util";
+	import { flash, render_updates } from "../util";
 	import { afterUpdate, onMount } from "svelte";
 	import { app, NodeSelection } from "../app";
 	import HoverMenu from "./HoverMenu.svelte";
+	import { DelayedHover } from "../tree/delayedHover";
 
 	let div: HTMLElement;
 	if (render_updates) afterUpdate(() => flash(div));
@@ -42,7 +43,7 @@
 	}
 
 	onMount(() => {
-		hover = new DelayedHover([div, hoverComp]);
+		hover = new DelayedHover(div, [div, hoverComp]);
 		hovered = hover.hovered;
 
 		return () => hover.unregister();

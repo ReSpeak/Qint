@@ -11,11 +11,12 @@
 	import UiChannel from "./UiChannelWrap.svelte";
 	import { Connection } from "../connection";
 	import { draggable, DragData } from "../ui/draggable";
-	import { findParent, assert, flash, render_updates, DelayedHover } from "../util";
+	import { findParent, assert, flash, render_updates } from "../util";
 	import { SpacerType } from "./tree";
 	import { app, NodeSelection } from "../app";
 	import { ChannelType } from "../book_events";
 	import HoverMenu from "./HoverMenu.svelte";
+	import { DelayedHover } from "../tree/delayedHover";
 
 	if (render_updates) afterUpdate(() => flash(div));
 
@@ -177,7 +178,7 @@
 	}
 
 	onMount(() => {
-		hover = new DelayedHover([div]);
+		hover = new DelayedHover(div, [div]);
 		hovered = hover.hovered;
 
 		return () => hover.unregister();

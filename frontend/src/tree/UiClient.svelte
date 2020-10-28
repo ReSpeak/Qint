@@ -1,5 +1,5 @@
 <script lang="typescript">
-	import type { Writable } from "svelte/store";
+	import type { Readable } from "svelte/store";
 	import TsIcon from "../ui/TsIcon.svelte";
 	import ServerGroupIcon from "../ui/ServerGroupIcon.svelte";
 	import FilterString from "../ui/FilterString.svelte";
@@ -7,11 +7,12 @@
 	import { Connection } from "../connection";
 	import { Client } from "../book";
 	import { draggable, DragData } from "../ui/draggable";
-	import { DelayedHover, findParent, flash, render_updates } from "../util";
+	import { findParent, flash, render_updates } from "../util";
 	import { afterUpdate, onMount } from "svelte";
 	import { app, NodeSelection } from "../app";
 	import { TalkState } from "../ts";
 	import HoverMenu from "./HoverMenu.svelte";
+	import { DelayedHover } from "../tree/delayedHover";
 
 	if (render_updates) afterUpdate(() => flash(div));
 
@@ -20,7 +21,7 @@
 	export let filter: string;
 	export let filterShow: boolean = true;
 	let hover: DelayedHover;
-	let hovered: Writable<boolean>;
+	let hovered: Readable<boolean>;
 	let showId = false;
 	let thisFilter = "";
 
@@ -73,7 +74,7 @@
 	}
 
 	onMount(() => {
-		hover = new DelayedHover([div]);
+		hover = new DelayedHover(div, [div]);
 		hovered = hover.hovered;
 
 		return () => hover.unregister();
