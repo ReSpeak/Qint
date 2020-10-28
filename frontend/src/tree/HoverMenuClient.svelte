@@ -10,13 +10,21 @@
 	export let connection: Connection;
 	export let clientId: ClientId;
 	let pokeModalVisible = false;
+	let pokeMessage: string;
 
 	function onPokeClick(e: MouseEvent) {
 		pokeModalVisible = true;
 	}
 
 	function onPokeSend(e: MouseEvent) {
-		console.log("yeet");
+		connection.sendMessage({
+			SendMessage: {
+				target: {
+					Poke: Number(clientId) as any
+				},
+				message: pokeMessage
+			}
+		});
 		pokeModalVisible = false;
 	}
 
@@ -48,7 +56,7 @@
 	</button>
 </div>
 <BModal title={"Poke " + client.name} bind:visible={pokeModalVisible}>
-	<input class="input" type="text">
+	<input class="input" type="text" bind:value={pokeMessage}>
 	<button slot="footer" on:click={onPokeSend} class="button is-success">Poke</button>
 </BModal>
 
