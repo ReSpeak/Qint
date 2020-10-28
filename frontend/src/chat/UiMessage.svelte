@@ -62,7 +62,7 @@
 		transition: background 2s;
 
 		&.unread {
-			background-color: mix($background, $blue, 80%);
+			background-color: $highlight-strong;
 		}
 	}
 

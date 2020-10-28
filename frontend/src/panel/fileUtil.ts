@@ -1,15 +1,16 @@
+const NarrowNoBreakSpace = String.fromCharCode(0x202f);
 export function formatBytes(size: number): string {
-	if (size < 1000) return `${size} B`;
+	if (size < 1000) return `${size}${NarrowNoBreakSpace}B`;
 	size /= 1000;
-	if (size < 1000) return `${size.toFixed()} KB`;
+	if (size < 1000) return `${size.toFixed()}${NarrowNoBreakSpace}KB`;
 	size /= 1000;
-	if (size < 1000) return `${size.toFixed()} MB`;
+	if (size < 1000) return `${size.toFixed()}${NarrowNoBreakSpace}MB`;
 	size /= 1000;
-	if (size < 1000) return `${size.toFixed()} GB`;
+	if (size < 1000) return `${size.toFixed()}${NarrowNoBreakSpace}GB`;
 	size /= 1000;
-	if (size < 1000) return `${size.toFixed()} TB`;
+	if (size < 1000) return `${size.toFixed()}${NarrowNoBreakSpace}TB`;
 	size /= 1000;
-	return `${size.toFixed()} EB`;
+	return `${size.toFixed()}${NarrowNoBreakSpace}EB`;
 }
 
 export function extensionToIcon(file: string): string {

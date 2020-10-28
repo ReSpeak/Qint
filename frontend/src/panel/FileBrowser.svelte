@@ -2,6 +2,8 @@
 	import type { ChannelId } from "../ts";
 	import { Connection } from "../connection";
 	import Icon from "../ui/Icon.svelte";
+	import BTable from "../ui/BTable.svelte";
+	import type { IColumns, IRows } from "../ui/table";
 	import { FolderState } from "../fileTreeCache";
 	import type { FileTreeNode } from "../fileTreeCache";
 	import { extensionToIcon, formatBytes } from "./fileUtil";
@@ -10,7 +12,6 @@
 	export let channelId: ChannelId;
 
 	let path: string[] = [];
-	let selectedElem: FileTreeNode | null = null;
 	const fileTreeCache = connection.fileTreeCache;
 	let displayChannel: FileTreeNode | null;
 	let displayChildren: FileTreeNode[];
@@ -20,7 +21,7 @@
 		displayChannel = $fileTreeCache.get(getCachePath(path), true);
 		let childrenIter = displayChannel?.children?.values();
 		displayChildren = childrenIter !== undefined ? Array.from(childrenIter) : [];
-		console.log("Picked", displayChannel, displayChildren);
+		//console.log("Picked", displayChannel, displayChildren);
 	}
 	$: channelRaw = connection.book.channels.get(channelId)!;
 	$: channel = $channelRaw;
@@ -59,29 +60,59 @@
 		refreshCurrentFolder(true);
 	}
 
-	function clearSelection() {
-		selectedElem = null;
-	}
-
-	function selectElem(elem: FileTreeNode) {
-		selectedElem = elem;
-	}
-
-	function onDoubleclick(elem: FileTreeNode) {
-		if (elem.isFile) {
-			const cachePath = getCachePath(path).join("/");
-			const fileUrl = `${connection.backend.serverFileSrc}/file/${cachePath}/${elem.name}?dl=${encodeURIComponent(elem.name)}`;
-			console.log(fileUrl);
-			dummyDownloader.src = fileUrl;
-		} else {
-			pushFolder(elem.name);
+	function onClick(
+		evt: CustomEvent<{ event: MouseEvent; row: FileTreeNode; dblclick: boolean }>
+	) {
+		let { event, row, dblclick } = evt.detail;
+		if (dblclick) {
+			if (row.isFile) {
+				const cachePath = getCachePath(path).join("/");
+				const fileUrl = `${connection.backend.serverFileSrc}/file/${cachePath}/${
+					row.name
+				}?dl=${encodeURIComponent(row.name)}`;
+				console.log(fileUrl);
+				dummyDownloader.src = fileUrl;
+			} else {
+				pushFolder(row.name);
+			}
 		}
 	}
+
+	const columns: IColumns<FileTreeNode> = [
+		{
+			key: "type",
+			title: "",
+			value: (v) => v.isFile,
+			sortable: false,
+			headerClass: "text-left",
+			customRender: true,
+		},
+		{
+			key: "name",
+			title: "Name",
+			value: (v) => v.name,
+			sortable: true,
+		},
+		{
+			key: "size",
+			title: "Size",
+			value: (v) => (v.isFile ? v.size : 0),
+			renderValue: (v) => (v.isFile ? formatBytes(v.size) : ""),
+			sortable: true,
+		},
+		{
+			key: "lastModified",
+			title: "Last Modified",
+			value: (v) => v.lastModified,
+			renderValue: (v) => v.lastModified.format("lll"), // capitalize
+			sortable: true,
+		},
+	];
 
 	refreshCurrentFolder(false);
 </script>
 
-<div on:click={clearSelection} class="padBox">
+<div class="padBox">
 	<div class="buttons">
 		<button class="button" on:click={() => refreshCurrentFolder(false)}>
 			<Icon name="reload" />
@@ -120,44 +151,33 @@
 		</ul>
 	</nav>
 
-	<table class="table">
-		<tr>
-			<th>
+	<BTable {columns} rows={displayChildren} on:clickRow={onClick} sortBy="name">
+		<tr slot="headerCell" let:col>
+			{#if col.key === 'type'}
 				<div on:click={() => goUp()} class="upIcon">
 					<Icon name="arrow-up-circle-outline" />
 				</div>
-			</th>
-			<th>Name</th>
-			<th>Size</th>
-			<th>Last Modified</th>
+			{/if}
 		</tr>
-		{#each displayChildren as childNode (childNode.name)}
-			<tr
-				class="elem"
-				on:click={() => selectElem(childNode)}
-				on:dblclick={() => onDoubleclick(childNode)}>
-				{#if childNode.isFile}
-					<td>
-						<Icon name={extensionToIcon(childNode.name)} />
-					</td>
-					<td>{childNode.name}</td>
-					<td>{formatBytes(childNode.size)}</td>
-					<td>{childNode.lastModified.format('lll')}</td>
+		<tr slot="colCell" let:col let:row>
+			{#if col.key === 'type'}
+				{#if row.isFile}
+					<Icon name={extensionToIcon(row.name)} />
 				{:else}
-					<td>
-						<Icon name="folder" />
-					</td>
-					<td colspan="2">{childNode.name}</td>
-					<td>{childNode.lastModified.format('lll')}</td>
+					<Icon name="folder" />
 				{/if}
-			</tr>
-		{:else}
-			<tr>
-				<th class="noFiles" colspan="4">No files</th>
-			</tr>
-		{/each}
-	</table>
-	<iframe title="Dummy Downloader" style="display: none;" bind:this={dummyDownloader} sandbox="allow-downloads" />
+			{/if}
+		</tr>
+		<tr slot="empty">
+			<th class="noFiles" colspan="4">No files</th>
+		</tr>
+	</BTable>
+
+	<iframe
+		title="Dummy Downloader"
+		style="display: none;"
+		bind:this={dummyDownloader}
+		sandbox="allow-downloads" />
 </div>
 
 <style lang="scss">
@@ -189,15 +209,6 @@
 		.home {
 			display: flex;
 			font-weight: bold;
-		}
-	}
-
-	.table {
-		width: 100%;
-
-		.elem:hover {
-			background-color: $highlight-weak;
-			cursor: pointer;
 		}
 	}
 

@@ -54,7 +54,7 @@ class FileTreeFile {
 	constructor(entry: IMsgFileListPart) {
 		this.name = entry.name;
 		this.size = Number(entry.size);
-		this.lastModified = datetimeDeserialize(entry.dateTime as any); // TODO !!!!!!!
+		this.lastModified = datetimeDeserialize(entry.dateTime);
 	}
 
 }
@@ -87,7 +87,7 @@ class FileTreeFolder {
 	private static createFromEntry(entry: IMsgFileListPart) {
 		return new FileTreeFolder(
 			entry.name,
-			datetimeDeserialize(entry.dateTime as any) // TODO !!!!!!!
+			datetimeDeserialize(entry.dateTime)
 		);
 	}
 
