@@ -2,12 +2,15 @@
 	import katex from "katex";
 	import { hljsHighlight } from "./hljs";
 	import { onMount } from "svelte";
+	import Icon from "../ui/Icon.svelte";
 
 	export let text: string;
+	export let raw: string | undefined = undefined;
 	export let links: [string, string][] = [];
 
 	let rendered!: HTMLElement;
 	$: renderedObj = render(text);
+	let viewRaw = false;
 
 	function render(html: string) {
 		const obj = document.createElement("div");
@@ -53,15 +56,36 @@
 	});
 </script>
 
-<div class="textRendered">
-	<div class="textBody" bind:this={rendered} />
+<div
+	class="textBody"
+	class:viewRaw>
+	<div class="textRendered" bind:this={rendered} />
+	{#if raw !== undefined}
+		<div class="textRaw">
+			<pre>{raw}</pre>
+		</div>
+		<div class="tool-buttons">
+			<div class="tool-buttons-wrap buttons has-addons">
+				<button
+					class="button is-small is-rounded"
+					on:click={() => (viewRaw = !viewRaw)}
+					title="It’s raw!">
+					<Icon raw="🥩" />
+				</button>
+			</div>
+		</div>
+	{/if}
 </div>
 
 <style lang="scss">
+	@import "../global_mixin";
+	$row-pad: 0.25em;
+
 	.textBody {
-		white-space: pre-wrap;
-		word-wrap: break-word;
-		margin-bottom: 0;
+		flex: 1;
+
+		// for tool buttons
+		position: relative;
 
 		// Overwrite bulma default
 		:global(pre) {
@@ -75,6 +99,18 @@
 			-moz-tab-size: 4;
 			// TODO Prevent scrollbar
 		}
+
+		&:hover {
+			.tool-buttons {
+				visibility: visible;
+			}
+		}
+	}
+
+	.textRendered {
+		white-space: pre-wrap;
+		word-wrap: break-word;
+		margin-bottom: 0;
 
 		:global(.para:not(:last-child)) {
 			margin-bottom: 1em;
@@ -104,6 +140,50 @@
 			font-family: Sans-Serif;
 			text-transform: uppercase;
 			pointer-events: none;
+		}
+	}
+
+	.textRaw > pre {
+		overflow-y: hidden;
+		background: none;
+		margin: 0;
+	}
+
+	.tool-buttons {
+		visibility: hidden;
+		position: absolute;
+		right: 0;
+		top: 0;
+
+		.tool-buttons-wrap {
+			box-sizing: border-box;
+			position: absolute;
+			right: 20px;
+			// Note: if {-top == bottom} the box is perfectly
+			// centered on the top of the message line.
+			top: -$row-pad;
+			bottom: $row-pad;
+			flex-wrap: nowrap;
+		}
+	}
+
+	// View raw toggle
+
+	.textBody {
+		.textRaw {
+			display: none;
+		}
+		.textRendered {
+			display: inherit;
+		}
+	}
+
+	.textBody.viewRaw {
+		.textRaw {
+			display: inherit;
+		}
+		.textRendered {
+			display: none;
 		}
 	}
 </style>

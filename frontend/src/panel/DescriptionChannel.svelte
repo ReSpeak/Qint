@@ -57,7 +57,7 @@
 	</div>
 	<div class="description">
 		{#if channel.descriptionRendered}
-			<RenderedText text={channel.descriptionRendered} />
+			<RenderedText text={channel.descriptionRendered} raw={channel.description ?? undefined} />
 		{/if}
 	</div>
 	<StickySlot>Settings</StickySlot>

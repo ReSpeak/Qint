@@ -46,7 +46,7 @@
 </div>
 {#if client.descriptionRendered.length > 0}
 <div class="description">
-	<RenderedText text={client.descriptionRendered} />
+	<RenderedText text={client.descriptionRendered} raw={client.description} />
 </div>
 {/if}
 {#if !ownClient}

@@ -74,7 +74,6 @@
 
 		&:hover {
 			background-color: $highlight-weak;
-			transition: none; // TODO Improve that..., unread should have an animation, hover not
 
 			.tool-buttons {
 				visibility: visible;

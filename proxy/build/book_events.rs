@@ -407,6 +407,7 @@ impl JsStructs {
 
 trait RustTypeExt {
 	fn fmt_ts(&self, f: &mut fmt::Formatter) -> fmt::Result;
+	fn fmt_ts_opts(&self, f: &mut fmt::Formatter, convert: bool) -> fmt::Result;
 	fn peel_opt(&self) -> &Self;
 }
 
@@ -416,6 +417,11 @@ trait RustTypeExt {
 /// comparing strings is also faster than comparing numbers.
 impl RustTypeExt for InnerRustType {
 	fn fmt_ts(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		self.fmt_ts_opts(f, true)
+	}
+
+	/// If `convert` is `true`, use `Moment` for `OffsetDateTime` instead of the rust type.
+	fn fmt_ts_opts(&self, f: &mut fmt::Formatter, convert: bool) -> fmt::Result {
 		match self {
 			Self::Struct(s)
 				if s == "str" || s == "String" || s == "IpAddr" || s == "SocketAddr" =>
@@ -430,26 +436,27 @@ impl RustTypeExt for InnerRustType {
 				write!(f, "number")?;
 			}
 			Self::Primitive(s) if s == "bool" => write!(f, "boolean")?,
-			Self::Primitive(s) if s == "OffsetDateTime" => write!(f, "Moment")?,
+			Self::Primitive(s) if s == "OffsetDateTime" && convert => write!(f, "Moment")?,
+			Self::Primitive(s) if s == "Duration" && !convert => write!(f, "RustDuration")?,
 			Self::Primitive(s) | Self::Struct(s) => write!(f, "{}", s)?,
-			Self::Ref(i) => i.fmt_ts(f)?,
+			Self::Ref(i) => i.fmt_ts_opts(f, convert)?,
 			Self::Option(i) => {
-				i.fmt_ts(f)?;
+				i.fmt_ts_opts(f, convert)?;
 				write!(f, " | null")?;
 			}
 			Self::Map(k, v) => {
 				write!(f, "Record<")?;
-				k.fmt_ts(f)?;
+				k.fmt_ts_opts(f, convert)?;
 				write!(f, ", ")?;
-				v.fmt_ts(f)?;
+				v.fmt_ts_opts(f, convert)?;
 				write!(f, ">")?;
 			}
 			Self::Set(i) => {
-				i.fmt_ts(f)?;
+				i.fmt_ts_opts(f, convert)?;
 				write!(f, "[]")?;
 			}
 			Self::Vec(i) => {
-				i.fmt_ts(f)?;
+				i.fmt_ts_opts(f, convert)?;
 				write!(f, "[]")?;
 			}
 		}

@@ -1,5 +1,5 @@
 <#@ template cleanws="true" #>
-import { ChannelGroupId, ChannelId, ClientDbId, ClientId, ClientType, EccKeyPubP256, IconId, IpAddr, MaxClients, ServerGroupId, SocketAddr, TalkPowerRequest, Uid } from "./ts";
+import { ChannelGroupId, ChannelId, ClientDbId, ClientId, ClientType, EccKeyPubP256, IconId, IpAddr, MaxClients, OffsetDateTime, RustDuration, ServerGroupId, SocketAddr, TalkPowerRequest, Uid } from "./ts";
 import { datetimeDeserialize, durationDeserialize } from "./util";
 import { Duration, Moment } from "moment";
 <#
@@ -65,10 +65,10 @@ export class <#= struc.name #> extends <#= struc.name #>Base {
 		let name = p.name.to_mixed_case();
 		if let InnerRustType::Primitive(t) = inner {
 			if t == "OffsetDateTime" { #>
-		if ("<#= name #>" in obj && obj.<#= name #>)
+		if (obj.<#= name #>)
 			Object.assign(obj, { <#= name #>: datetimeDeserialize((obj as any).<#= name #>) });
 			<# } else if t == "Duration" { #>
-		if ("<#= name #>" in obj && obj.<#= name #>)
+		if (obj.<#= name #>)
 			Object.assign(obj, { <#= name #>: durationDeserialize((obj as any).<#= name #>) });
 			<# }
 		}
@@ -91,7 +91,7 @@ export interface IMsg<#= msg.name #>Part {
 <# for a in &msg.attributes {
 	let field = self.messages.get_field(a);
 	let rust_type = field.get_type(a)?; #>
-	<#= field.pretty.to_mixed_case() #>: <# rust_type.inner.fmt_ts(_fmt)?; #>;
+	<#= field.pretty.to_mixed_case() #>: <# rust_type.inner.fmt_ts_opts(_fmt, false)?; #>;
 	<# if self.has_render(&msg.name, &field.pretty) { #>
 	<#= field.pretty.to_mixed_case() #>Rendered: string<# if rust_type.is_opt() { #> | null<# } #>;
 <# }
@@ -136,7 +136,7 @@ export interface OChange<#= get_prefixed_name(e) #> {
 		match r {
 			RuleKind::ArgumentMap { .. } |
 			RuleKind::ArgumentFunction { .. } => { #>
-		<#= r.from_name().to_mixed_case() #>: <# r.get_type().inner.fmt_ts(_fmt)?; #>;
+		<#= r.from_name().to_mixed_case() #>: <# r.get_type().inner.fmt_ts_opts(_fmt, false)?; #>;
 			<# }
 			_ => {}
 		}
@@ -146,7 +146,7 @@ export interface OChange<#= get_prefixed_name(e) #> {
 	for r in &e.rules {
 		let name = r.from_name_singular();
 		#>
-		<#= r.from_name().to_mixed_case() #>?: <# r.get_type_no_option().inner.fmt_ts(_fmt)?; #>;
+		<#= r.from_name().to_mixed_case() #>?: <# r.get_type_no_option().inner.fmt_ts_opts(_fmt, false)?; #>;
 	<# }
 #>
 	};
