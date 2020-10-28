@@ -588,6 +588,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3441f0f7b02788e948e47f457ca01f1d7e6d92c693bc132c22b087d3141c03ff"
 
 [[package]]
+name = "bit-set"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e11e16035ea35e4e5997b393eacbf6f63983188f7a2ad25bfb13465f5ad59de"
+dependencies = [
+ "bit-vec",
+]
+
+[[package]]
 name = "bit-vec"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1335,6 +1344,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d32e9bd16cc02eae7db7ef620b392808b89f6a5e16bb3497d159c6b92a0f4f86"
 dependencies = [
  "backtrace",
+]
+
+[[package]]
+name = "fancy-regex"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3dd548a6d6249025f0f828a2dc6d15b1a35f6deba0bee5d55162ea027ec067c5"
+dependencies = [
+ "bit-set",
+ "regex",
 ]
 
 [[package]]
@@ -2710,6 +2729,7 @@ dependencies = [
  "diesel_migrations",
  "directories",
  "ebur128",
+ "fancy-regex",
  "flakebi-ring",
  "futures",
  "git-testament",

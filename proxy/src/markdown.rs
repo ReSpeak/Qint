@@ -12,13 +12,14 @@ use nom::{
 	Err, IResult,
 };
 use pulldown_cmark::{Alignment, CodeBlockKind, Event, LinkType, Options, Parser, Tag};
-use regex::Regex;
 
+#[derive(Debug, Clone)]
 enum VNode {
 	VText(String),
 	VTag(VTag),
 }
 
+#[derive(Debug, Clone)]
 struct VTag {
 	tag: String,
 	attributes: HashMap<String, String>,
@@ -221,23 +222,16 @@ impl<TStack> Render<TStack> {
 	/// - Finding urls
 	/// - Processing special urls like client:// ts3file:// etc.
 	fn process_text(&mut self, text: &str) {
-		lazy_static! {
-			static ref MATCH_URL: Regex =
-				Regex::new("(f|ht)tps?://([^/?#\\s]*)?([^?#\\s]*)(\\?([^#\\s]*))?(#(\\S*))?")
-					.unwrap();
-		}
-
-		let mut last_url = 0usize;
-
-		for m in MATCH_URL.find_iter(text) {
-			if !text[m.start()..].to_lowercase().ends_with("[/img]") {
-				self.push_text(&text[last_url..m.start()]);
+		let mut last_url = 0;
+		for m in crate::find_url::find_urls(text) {
+			if !text[m.start..].to_lowercase().ends_with("[/img]") {
+				self.push_text(&text[last_url..m.start]);
 				let mut a = Self::make_link();
-				let href = m.as_str();
+				last_url = m.end;
+				let href = &text[m];
 				a.add_attribute("href", href);
 				a.add_child(href.to_string().into());
 				self.push_node(a.into());
-				last_url = m.end();
 			}
 		}
 
@@ -440,6 +434,7 @@ impl RenderMd {
 				if !title.as_ref().is_empty() {
 					el.add_attribute("title", &title);
 				}
+				// The alt text is the content
 				(RenderMdMeta::None, el)
 			}
 			// Footnotes are not rendered as anything special
@@ -464,6 +459,20 @@ impl RenderMd {
 				let mut pre = VTag::new("pre");
 				pre.add_child(child.unwrap_or_else(|| top.into()));
 				top = pre;
+			}
+			Tag::Image(_, _, _) => {
+				// The content of an image is its alt text
+				let mut alt = String::new();
+				for r in top.children.iter() {
+					if let VNode::VText(t) = r {
+						alt.push_str(t);
+					}
+				}
+				top.children.clear();
+
+				if !alt.is_empty() {
+					top.add_attribute("alt", &alt);
+				}
 			}
 			Tag::Table(aligns) => {
 				for r in top.children.iter_mut() {

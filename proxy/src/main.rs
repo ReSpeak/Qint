@@ -39,6 +39,7 @@ mod audio;
 mod book_events;
 mod db;
 mod filecache;
+mod find_url;
 mod markdown;
 mod messages;
 mod secret;
@@ -388,7 +389,7 @@ struct GetFileOptions {
 
 #[get("/con/{id}/file/{channel}/{path:.*}")]
 async fn download_file(
-	state: web::Data<Arc<State>>, 
+	state: web::Data<Arc<State>>,
 	web::Path((id, channel, path)): web::Path<(Uuid, u64, String)>,
 	query_opt: Query<GetFileOptions>
 ) -> impl Responder {

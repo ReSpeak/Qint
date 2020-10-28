@@ -23,6 +23,7 @@ diesel-derive-enum = { version = "1", features = [ "sqlite" ] }
 diesel_migrations = "1.4"
 directories = "3"
 ebur128 = "0.1"
+fancy-regex = "0.4"
 flakebi-ring = "0.16.9"
 futures = "0.3"
 git-testament = "0.1"

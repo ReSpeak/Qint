@@ -25,9 +25,13 @@ export class TransientSettings {
 	public app = new TransientSettingsApp();
 
 	public async loadAsync() {
-		const resp = await backend.fetch(`/transient/*`);
-		const data = await resp.json();
-		soft_merge(this, data);
+		try {
+			const resp = await backend.fetch(`/transient/*`);
+			const data = await resp.json();
+			soft_merge(this, data);
+		} catch (e) {
+			console.error("Failed to load transient settings", e);
+		}
 	}
 
 	public save(group?: SettGroup) {
@@ -53,11 +57,15 @@ export class TransientSettings {
 			? [group, this[group]]
 			: ["*", this];
 
-		await backend.fetch(`/transient/${path}`, {
-			method: 'PUT',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(obj, (k, v) => k.startsWith('_') ? undefined : v)
-		});
+		try {
+			await backend.fetch(`/transient/${path}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(obj, (k, v) => k.startsWith('_') ? undefined : v)
+			});
+		} catch (e) {
+			console.error("Failed to save transient settings", e);
+		}
 	}
 }
 
