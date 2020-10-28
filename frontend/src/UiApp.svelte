@@ -5,18 +5,21 @@
 	import Sidebar from "./bar/Sidebar.svelte";
 	import Toolbar from "./bar/Toolbar.svelte";
 	import Description from "./panel/Description.svelte";
+	import FileBrowser from "./panel/FileBrowser.svelte";
 	import { DisplayPanel } from "./panel/panel";
 	import { app } from "./app";
 	import Connect from "./connect/UiConnect.svelte";
 	import GlobalCss from "./GlobalCss.svelte";
 	import { ConnectData } from "./connect/connect";
 	import { DescriptionMode } from "./transientSettings";
+	import { Channel } from "./book";
 
 	const connections = app.connections;
 	let filter: string = "";
 
 	const chat = app.chat;
 	const selected = app.selectedNode;
+	$: sel = $selected;
 	const ui = app.transientSettings.ui;
 	let showSidebar = app.showSidebar;
 	let displayPanel = app.displayPanel;
@@ -46,7 +49,13 @@
 		{#if $displayPanel === DisplayPanel.Main}
 			<UiChat {chat} />
 			{#if $descriptionMode !== DescriptionMode.None}
-				<Description selected={$selected} />
+				<div class="description">
+					{#if $descriptionMode === DescriptionMode.Files && sel?.node instanceof Channel}
+						<FileBrowser connection={sel.connection} channelId={sel.node.id} />
+					{:else}
+						<Description selected={$selected} />
+					{/if}
+				</div>
 			{/if}
 		{:else if $displayPanel === DisplayPanel.Settings && $connections.length !== 0}
 			<!-- TODO consider something better ? -->
@@ -96,5 +105,12 @@
 		> :global(*) {
 			flex: 1;
 		}
+	}
+
+	.description {
+		overflow-y: hidden;
+		overflow-x: hidden;
+		background-color: #242424;
+		box-shadow: -3px 0 3px #0005;
 	}
 </style>

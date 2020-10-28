@@ -67,7 +67,7 @@ interface OMsgChange {
 
 
 // In Messages
-export type InMsg = InMsgConnected | InDisconnectedTemporarily | InDisconnected | InMsgError | InTalkersChanged | InMsgEvents | InMsgMessage | InLoudness | InChannelFileList;
+export type InMsg = InMsgConnected | InDisconnectedTemporarily | InDisconnected | InMsgError | InTalkersChanged | InMsgEvents | InMsgMessage | InLoudness;
 
 interface InMsgConnected {
 	Connected: {
@@ -103,19 +103,6 @@ interface InMsgMessage {
 
 interface InLoudness {
 	Loudness: number;
-}
-
-export interface InChannelFileList {
-	FileList: InChannelFile[];
-}
-
-export interface InChannelFile {
-	channelId: string;
-	path: string;
-	name: string;
-	size: number;
-	lastModified: OffsetDateTime;
-	isFile: boolean;
 }
 
 //#region PropertyId

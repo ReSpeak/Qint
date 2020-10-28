@@ -55,6 +55,7 @@
 </div>
 
 <style lang="scss">
+	@import "../global_mixin";
 	$row-pad: 0.25em;
 
 	.messageRow {
@@ -72,7 +73,7 @@
 		line-height: 1.1em;
 
 		&:hover {
-			background-color: mix($background, $text, 90%);
+			background-color: $highlight-weak;
 			transition: none; // TODO Improve that..., unread should have an animation, hover not
 
 			.tool-buttons {

@@ -1,0 +1,10 @@
+@mixin linkLike {
+	color: #57a4e8;
+	cursor: pointer;
+
+	&:hover {
+		color: #55b2de;
+	}
+}
+
+$highlight-weak: mix($background, $text, 90%);

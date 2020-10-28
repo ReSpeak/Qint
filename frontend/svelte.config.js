@@ -18,11 +18,6 @@ module.exports = {
 			@import "bulmaswatch/cyborg/variables";
 			@import "bulma/sass/utilities/all";
 			`,
-			// data is for preproc < 4.X
-			data: `
-			@import "bulmaswatch/cyborg/variables";
-			@import "bulma/sass/utilities/all";
-			`
 		},
 	}),
 

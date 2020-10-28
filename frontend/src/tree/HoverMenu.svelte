@@ -30,7 +30,7 @@
 	}
 
 	function setDescriptionMode(mode: DescriptionMode) {
-		if ((mode === DescriptionMode.Info && infoActive) || (mode == DescriptionMode.Files && filesActive)) {
+		if ((mode === DescriptionMode.Info && infoActive) || (mode === DescriptionMode.Files && filesActive)) {
 			$descriptionMode = DescriptionMode.None;
 		} else {
 			$descriptionMode = mode;

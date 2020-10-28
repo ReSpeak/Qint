@@ -16,7 +16,7 @@ use std::sync::{mpsc, Arc, Mutex, RwLock};
 use actix::*;
 use actix_cors::Cors;
 use actix_files::Files;
-use actix_web::dev::{HttpResponseBuilder, Service};
+use actix_web::{web::Query, dev::{HttpResponseBuilder, Service}};
 use actix_web::web::Bytes;
 use actix_web::*;
 use actix_web_actors::ws;
@@ -381,9 +381,16 @@ async fn get_plugin(state: web::Data<Arc<State>>, name: web::Path<String>) -> im
 		.with_header(http::header::CONTENT_TYPE, "application/javascript; charset=utf-8")
 }
 
+#[derive(Deserialize)]
+struct GetFileOptions {
+	dl: Option<String>
+}
+
 #[get("/con/{id}/file/{channel}/{path:.*}")]
 async fn download_file(
-	state: web::Data<Arc<State>>, web::Path((id, channel, path)): web::Path<(Uuid, u64, String)>,
+	state: web::Data<Arc<State>>, 
+	web::Path((id, channel, path)): web::Path<(Uuid, u64, String)>,
+	query_opt: Query<GetFileOptions>
 ) -> impl Responder {
 	let channel = ChannelId(channel);
 	let cons = state.connections.lock().unwrap();
@@ -434,6 +441,9 @@ async fn download_file(
 			FramedRead::new(file_stream, BytesCodec::new()).map(|r| r.map(web::BytesMut::freeze));
 		let (stream, mut response) = guess_content_type(stream).await;
 		response.no_chunking(len);
+		if let Some(filename) = query_opt.dl.as_ref() {
+			response.set_header("Content-Disposition", format!("attachment; filename=\"{}\"", filename));
+		}
 
 		// Cache icons and avatars for offline usage
 		if channel.0 == 0 && (path.starts_with("icon_") || path.starts_with("avatar_")) {

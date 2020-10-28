@@ -1,3 +1,5 @@
+@import "./global_mixin";
+
 :root {
 	--channel-tree-width: 20em;
 }
@@ -9,7 +11,11 @@ html {
 }
 
 a {
-	color: #57a4e8;
+	@include linkLike;
+	
+	&:hover {
+		text-decoration: underline;
+	}
 }
 
 .update-flash {

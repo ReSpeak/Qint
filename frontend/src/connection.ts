@@ -1,4 +1,4 @@
-import { OutMsg, OMsgConnect, InMsg } from "./backend/ws";
+import { OutMsg, InMsg } from "./backend/ws";
 import { get, writable, Writable, Readable } from "svelte/store";
 import { Book, Channel, ChatData } from "./book";
 import { getStringFromConnect, oneshot } from "./util";
@@ -9,12 +9,14 @@ import { ConnectData } from "./connect/connect";
 import { Reason } from "./book_events";
 import moment from "moment";
 import { ChannelId, ClientId } from "./ts";
+import { FileTreeCache } from "./fileTreeCache";
 
 export class Connection {
 	private readonly _state = writable(new ConnectionState());
 	public get state(): Readable<ConnectionState> { return this._state; };
 
 	public readonly book: Book = new Book();
+	public readonly fileTreeCache: Writable<FileTreeCache> = writable(new FileTreeCache());
 	public backend: IBackendConnection;
 
 	public loudness: Writable<number> = writable(0);
@@ -261,6 +263,8 @@ export class Connection {
 				this._state.update(s => s.setChannelListFinished());
 				location.hash = getStringFromConnect(this.connectOptions!);
 				this.updateAllUnreadCounts();
+			} else if ("FileList" in message) {
+				this.fileTreeCache.update(ftc => ftc.applyFileList(message));
 			}
 		} else if ("TalkersChanged" in msg) {
 			this.book.talkersHandler(msg.TalkersChanged);

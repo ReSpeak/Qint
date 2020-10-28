@@ -9,6 +9,7 @@
 	$input-icon-active-color: darken($text, 10);
 
 	@import "bulma/sass/base/_all";
+	@import "bulma/sass/components/breadcrumb";
 	@import "bulma/sass/components/media";
 	@import "bulma/sass/components/menu";
 	@import "bulma/sass/components/tabs";
@@ -18,6 +19,7 @@
 	@import "bulma/sass/elements/icon";
 	@import "bulma/sass/elements/image";
 	@import "bulma/sass/elements/notification";
+	@import "bulma/sass/elements/table";
 	@import "bulma/sass/form/shared";
 	@import "bulma/sass/form/input-textarea";
 	@import "bulma/sass/form/select";

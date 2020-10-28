@@ -1,14 +1,13 @@
 import { Writable, writable, get, Readable } from "svelte/store";
 import { InBookChangeMsg, WsMessageTarget } from "./backend/ws";
 import { Connection } from "./connection";
-import { binarySearchBy, getDataColor, arraysEqual, base64Encode, Cached, datetimeDeserialize, assert } from "./util";
-import { ChannelGroupId, ChannelId, ClientId, IconId, IpAddr, MaxClients, OffsetDateTime, ServerGroupId, TalkState, Uid } from "./ts";
-import { ChannelType, Codec, GroupNamingMode, GroupType } from "./book_events";
+import { binarySearchBy,datetimeDeserialize, assert } from "./util";
+import { ChannelGroupId, ChannelId, ClientId, IconId, IpAddr, OffsetDateTime, ServerGroupId, TalkState, Uid } from "./ts";
+import { Codec } from "./book_events";
 import * as book_events from "./book_events";
 import { Moment } from "moment";
 import moment from "moment";
 import { ClientBase, ServerBase } from "./bookBase";
-import { app } from "./app";
 import { backend } from "./backend/backend";
 
 export function codecToName(codec: Codec) {

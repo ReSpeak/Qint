@@ -247,10 +247,6 @@
 		> :global(.lazyList) {
 			flex: 1;
 		}
-
-		:global(a:hover) {
-			text-decoration: underline;
-		}
 	}
 
 	.chat-form {
