@@ -48,9 +48,7 @@
 	</button>
 </div>
 <BModal title={"Poke " + client.name} bind:visible={pokeModalVisible}>
-	<div slot="content">
-		<input class="input" type="text">
-	</div>
+	<input class="input" type="text">
 	<button slot="footer" on:click={onPokeSend} class="button is-success">Poke</button>
 </BModal>
 
