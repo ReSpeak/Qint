@@ -9,8 +9,11 @@ export class DragData {
 	public maxY?: number;
 	public minDistBeforeTrigger = 5;
 	public hasTriggered = false;
-	public mouseEvent!: MouseEvent;
+	public mouseStart!: MouseEvent;
+	public mouseMove!: MouseEvent;
+	public mouseDrop!: MouseEvent;
 	public customData: any | undefined;
+	public customDragNode?: HTMLElement
 
 	constructor(
 		public dragNode: HTMLElement,
@@ -23,6 +26,7 @@ export function draggable(node: HTMLElement, enabled: boolean = true) {
 
 	function handleMousedown(event: MouseEvent) {
 		if (!dd.enabled) return;
+		dd.mouseStart = event;
 		dd.x = event.clientX;
 		dd.y = event.clientY;
 		dd.hasTriggered = false;
@@ -45,7 +49,7 @@ export function draggable(node: HTMLElement, enabled: boolean = true) {
 			if (dd.maxY !== undefined) dy = Math.min(dd.maxY, dy);
 		}
 
-		dd.mouseEvent = event;
+		dd.mouseMove = event;
 		if (!dd.hasTriggered) {
 			if (Math.abs(dx) + Math.abs(dy) < dd.minDistBeforeTrigger)
 				return;
@@ -54,12 +58,12 @@ export function draggable(node: HTMLElement, enabled: boolean = true) {
 			node.dispatchEvent(new CustomEvent('svddrag', { detail: dd }));
 		} else {
 			node.dispatchEvent(new CustomEvent('svdmove', { detail: dd }));
+			dd.dragNode.style.transform = `translate(${dx}px,${dy}px)`;
 		}
-		node.style.transform = `translate(${dx}px,${dy}px)`;
 	}
 
 	function handleMouseup(event: MouseEvent) {
-		dd.mouseEvent = event;
+		dd.mouseDrop = event;
 		stopDrag();
 	}
 
@@ -67,7 +71,7 @@ export function draggable(node: HTMLElement, enabled: boolean = true) {
 		window.removeEventListener('mousemove', handleMousemove);
 		window.removeEventListener('mouseup', handleMouseup);
 		if (dd.hasTriggered) {
-			node.style.transform = null!;
+			dd.dragNode.style.transform = null!;
 			node.style.pointerEvents = null!;
 			node.dispatchEvent(new CustomEvent('svddrop', { detail: dd }));
 		}

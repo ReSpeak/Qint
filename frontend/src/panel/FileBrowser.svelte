@@ -7,35 +7,49 @@
 	import { FolderState } from "../fileTreeCache";
 	import type { FileTreeNode } from "../fileTreeCache";
 	import { extensionToIcon, formatBytes } from "./fileUtil";
+	import { on } from "../util";
 
 	export let connection: Connection;
 	export let channelId: ChannelId;
 
 	let path: string[] = [];
-	const fileTreeCache = connection.fileTreeCache;
+	let invalidateCache = true;
+	$: fileTreeCache = connection.fileTreeCache;
 	let displayChannel: FileTreeNode | null;
 	let displayChildren: FileTreeNode[];
 	let dummyDownloader: HTMLIFrameElement;
 
-	$: {
-		displayChannel = $fileTreeCache.get(getCachePath(path), true);
-		let childrenIter = displayChannel?.children?.values();
-		displayChildren = childrenIter !== undefined ? Array.from(childrenIter) : [];
-		//console.log("Picked", displayChannel, displayChildren);
-	}
 	$: channelRaw = connection.book.channels.get(channelId)!;
 	$: channel = $channelRaw;
+	$: on(channelId, channelChanged());
+	$: {
+		on(path);
+		const cachePath = getCachePath();
+		displayChannel = $fileTreeCache.get(cachePath, true);
+		let childrenIter = displayChannel?.children?.values();
+		displayChildren = childrenIter !== undefined ? Array.from(childrenIter) : [];
+	}
+	$: on(channelId, path, refreshCurrentFolder(true));
 
-	function getCachePath(p: string[]) {
-		return [channelId, ...p];
+	function channelChanged() {
+		path = [];
+		invalidateCache = true;
+	}
+
+	function getCachePath(): string[] {
+		return [channelId, ...path];
 	}
 
 	function refreshCurrentFolder(useCache: boolean) {
-		const cachePath = getCachePath(path);
-		if (useCache) {
+		const cachePath = getCachePath();
+		if (useCache && !invalidateCache) {
 			const cachedFolder = $fileTreeCache.get(cachePath, true);
-			if (cachedFolder !== null && cachedFolder.contentLoaded !== FolderState.Dummy) return;
+			if (cachedFolder !== null && cachedFolder.contentLoaded !== FolderState.Dummy) {
+				console.log("cached");
+				return;
+			}
 		}
+		invalidateCache = false;
 		$fileTreeCache.clear(cachePath);
 		let getPath = "/" + path.join("/");
 		connection.sendMessage({
@@ -57,7 +71,6 @@
 	function pushFolder(name: string) {
 		path.push(name);
 		path = path;
-		refreshCurrentFolder(true);
 	}
 
 	function onClick(
@@ -66,8 +79,8 @@
 		let { event, row, dblclick } = evt.detail;
 		if (dblclick) {
 			if (row.isFile) {
-				const cachePath = getCachePath(path).join("/");
-				const fileUrl = `${connection.backend.serverFileSrc}/file/${cachePath}/${
+				const cachePathStr = getCachePath().join("/");
+				const fileUrl = `${connection.backend.serverFileSrc}/file/${cachePathStr}/${
 					row.name
 				}?dl=${encodeURIComponent(row.name)}`;
 				console.log(fileUrl);
@@ -108,8 +121,6 @@
 			sortable: true,
 		},
 	];
-
-	refreshCurrentFolder(false);
 </script>
 
 <div class="padBox">

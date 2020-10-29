@@ -125,7 +125,7 @@
 		console.log(hoverOpt, dropTarget);
 		if (dropTarget !== undefined && connection !== undefined) {
 			const rect = dropTarget.getBoundingClientRect();
-			let clickY = ev.detail.mouseEvent.clientY - rect.top;
+			let clickY = ev.detail.mouseDrop.clientY - rect.top;
 			let clickPerc = clickY / (rect.bottom - rect.top);
 			let target = connection.book.getChannel(dropTarget.dataset.key!)!;
 			// < 0.25      : Dropped in the upper quarter

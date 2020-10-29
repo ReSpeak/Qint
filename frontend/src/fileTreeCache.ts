@@ -27,7 +27,6 @@ export class FileTreeCache {
 	}
 
 	public updateCache(entry: IMsgFileListPart) {
-		console.log("updating", FileTreeCache.getPath(entry), entry);
 		this.root.updateCachePath(FileTreeCache.getPath(entry), entry);
 	}
 

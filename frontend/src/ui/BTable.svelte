@@ -26,6 +26,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	import { createEventDispatcher } from "svelte";
 	import { SortOrder } from "./table";
 	import type { ColumnKey, IColumn, IColumns, IRows } from "./table";
+	import { draggable, DragData } from "../ui/draggable";
+	import Icon from "./Icon.svelte";
 
 	const dispatch = createEventDispatcher<{
 		clickCol: { event: MouseEvent; col: TCol; key: ColumnKey };
@@ -40,10 +42,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	export let rows: IRows<TRow>;
 	export let sortBy: ColumnKey = "";
 	export let sortOrder: SortOrder = SortOrder.Asc;
-	export let classNameThead = "";
-	export let classNameTbody = "";
-	export let classNameRow = "";
-	export let classNameCell = "";
 
 	type SortFun = (t: InternalRow) => string | number;
 	const defaultSort: SortFun = (t) => t.id;
@@ -179,11 +177,39 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	function handleClickCell(event: MouseEvent, row: InternalRow, key: ColumnKey) {
 		dispatch("clickCell", { event, row, key });
 	}
+
+	let draggingElements = false;
+	let dragVisualizer: HTMLElement;
+
+	function dragStart(ev: CustomEvent<DragData>, row: InternalRow) {
+		if (!row.selected) {
+			clearSelection();
+			selectElem(row);
+		}
+		draggingElements = true;
+
+		dragVisualizer.style.display = null!;
+		ev.detail.dragNode = dragVisualizer;
+		const rect = dragVisualizer.getBoundingClientRect();
+		let dx = ev.detail.mouseStart.clientX - rect.x;
+		let dy = ev.detail.mouseStart.clientY - rect.y;
+		ev.detail.x -= dx;
+		ev.detail.y -= dy;
+		dragVisualizer.style.transform = `translate(${dx}px,${dy}px)`;
+	}
+
+	function dragDrop(ev: CustomEvent<DragData>) {
+		draggingElements = false;
+		dragVisualizer.style.display = "none";
+	}
 </script>
 
 <svelte:window on:click={clearSelection} />
-<table on:click|stopPropagation class="table">
-	<thead class={classNameThead}>
+<div class="dragVisualize" bind:this={dragVisualizer} style="display: none;">
+	<Icon name="file-multiple-outline" />
+</div>
+<table on:click|stopPropagation class="table" class:draggingElements>
+	<thead>
 		<tr>
 			{#each columns as col}
 				<th
@@ -200,19 +226,22 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 			{/each}
 		</tr>
 	</thead>
-	<tbody class={classNameTbody}>
+	<tbody>
+		<slot />
 		{#each c_rows as row}
 			<tr
+				use:draggable={true}
+				on:svddrag={(e) => dragStart(e, row)}
+				on:svddrop={dragDrop}
 				on:click={(e) => handleClickRow(e, row, false)}
 				on:dblclick={(e) => handleClickRow(e, row, true)}
-				class:selected={row.selected}
-				class={classNameRow}>
+				class:selected={row.selected}>
 				{#each columns as col}
 					<td
 						on:click={(e) => {
 							handleClickCell(e, row, col.key);
 						}}
-						class={[col.class, classNameCell].join(' ')}>
+						class={col.class}>
 						{#if col.customRender === true}
 							<slot name="colCell" {col} row={row.t} />
 						{:else}{col.renderValue ? col.renderValue(row.t) : col.value(row.t)}{/if}
@@ -239,6 +268,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		.selected {
 			background-color: $highlight-strong;
 		}
+
+		&.draggingElements .selected {
+			background-color: $highlight-weak;
+			color: darken($text, 50%);
+		}
 	}
 
 	tr,
@@ -247,15 +281,23 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		@extend %unselectable;
 	}
 
-	.rowSelect {
-		display: none;
-
-		&:checked + tr {
-			background-color: $highlight-strong;
-		}
-	}
-
 	.isSortable {
 		cursor: pointer;
+	}
+
+	.dragVisualize {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		background-color: rgba(20, 70, 70, 0.6);
+		width: 5rem;
+		height: 5rem;
+		font-size: 3em;
+		line-height: 1em;
+		border-radius: 0.5em;
+		border: #1e5050 solid 1px;
+		box-shadow: 5px 5px 10px 5px rgba(30, 30, 30, 0.5);
+		position: absolute;
+		z-index: 200;
 	}
 </style>
