@@ -122,3 +122,11 @@ export function extensionToIcon(file: string): string {
 			return DEFAULT;
 	}
 }
+
+export function pathJoin(...parts: string[]): string {
+	let path = "";
+	for (const part of parts) {
+		path += "/" + part;
+	}
+	return path === "" ? "/" : path;
+}

@@ -33,6 +33,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		clickCol: { event: MouseEvent; col: TCol; key: ColumnKey };
 		clickRow: { event: MouseEvent; row: TRow; dblclick: boolean };
 		clickCell: { event: MouseEvent; row: TRow; key: ColumnKey };
+		selectionChanged: { selected: TRow[] };
+		lostFocus: undefined;
 	}>();
 
 	type TRow = any;
@@ -64,7 +66,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	$: remap(rows);
 
 	function remap(_rows: IRows<TRow>) {
-		selected.clear();
+		clearSelection(true);
 		c_rows = _rows.map((r, id) => {
 			return { t: r, selected: false, id };
 		});
@@ -75,7 +77,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	$: reSort(sortBy, sortOrder);
 
 	function reSort(_sortBy: ColumnKey, _sortOrder: SortOrder) {
-		clearSelection();
+		clearSelection(true);
 		if (_sortBy === "") {
 			sortFunction = defaultSort;
 		} else {
@@ -118,38 +120,57 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		dispatch("clickCol", { event, col, key: col.key });
 	}
 
-	function clearSelection() {
+	function lostFocus() {
+		//clearSelection(true);
+		//dispatch("lostFocus");
+	}
+
+	function clearSelection(triggerEvent: boolean): boolean {
+		let hasChanged = false;
 		for (const oldSel of selected.values()) {
 			c_rows[oldSel].selected = false;
+			hasChanged = true;
 		}
 		selected.clear();
-		c_rows = c_rows; // refresh list
+		if (hasChanged && triggerEvent) selectionChanged();
+		return hasChanged;
 	}
 
 	function unselectElem(row: InternalRow) {
 		if (selected.has(row.id)) {
 			selected.delete(row.id);
 			row.selected = false;
-			c_rows[row.id] = row; // refresh list
+			selectionChanged();
 		}
 	}
 
-	function selectElem(...rows: InternalRow[]) {
+	function selectElem(add: boolean, ...rows: InternalRow[]) {
+		let hasChanged = false;
+		if (!add) {
+			hasChanged ||= clearSelection(false);
+		}
 		for (const row of rows) {
 			if (!selected.has(row.id)) {
 				selected.add(row.id);
 				row.selected = true;
+				hasChanged = true;
 			}
 		}
-		c_rows = c_rows; // refresh list
+		if (hasChanged) selectionChanged();
 	}
 
-	function toggleElem(row: InternalRow) {
+	function toggleElem(add: boolean, row: InternalRow) {
 		if (selected.has(row.id)) {
 			unselectElem(row);
 		} else {
-			selectElem(row);
+			selectElem(add, row);
 		}
+	}
+
+	function selectionChanged() {
+		c_rows = c_rows;
+		const newSel = Array.from(selected.values(), (id) => c_rows[id].t);
+		dispatch("selectionChanged", { selected: newSel });
 	}
 
 	function handleClickRow(event: MouseEvent, row: InternalRow, dblclick: boolean) {
@@ -157,17 +178,19 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		if (!dblclick) {
 			if (event.ctrlKey) {
 				lastSelected = row.id;
-				toggleElem(row);
+				toggleElem(true, row);
 				event.preventDefault();
 			} else if (event.shiftKey) {
-				clearSelection();
 				let [start, end] =
 					row.id > lastSelected ? [lastSelected, row.id] : [row.id, lastSelected];
-				selectElem(...c_rows.slice(start, end + 1));
+				selectElem(false, ...c_rows.slice(start, end + 1));
 			} else {
-				clearSelection();
 				lastSelected = row.id;
-				selectElem(row);
+				if (selected.has(row.id) && selected.size === 1) {
+					unselectElem(row);
+				} else {
+					selectElem(false, row);
+				}
 			}
 		}
 
@@ -183,8 +206,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 	function dragStart(ev: CustomEvent<DragData>, row: InternalRow) {
 		if (!row.selected) {
-			clearSelection();
-			selectElem(row);
+			selectElem(false, row);
 		}
 		draggingElements = true;
 
@@ -204,60 +226,65 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	}
 </script>
 
-<svelte:window on:click={clearSelection} />
+<svelte:window on:click={lostFocus} />
 <div class="dragVisualize" bind:this={dragVisualizer} style="display: none;">
 	<Icon name="file-multiple-outline" />
 </div>
-<table on:click|stopPropagation class="table" class:draggingElements>
-	<thead>
-		<tr>
-			{#each columns as col}
-				<th
-					on:click={(e) => handleClickCol(e, col)}
-					class:isSortable={col.sortable}
-					class={col.headerClass}>
-					{#if col.customRender === true}
-						<slot name="headerCell" {col} />
-					{:else}{col.title}{/if}
-					{#if sortBy === col.key}
-						<slot name="orderIcon" {sortOrder}>{sortOrder === 1 ? '▲' : '▼'}</slot>
-					{/if}
-				</th>
-			{/each}
-		</tr>
-	</thead>
-	<tbody>
-		<slot />
-		{#each c_rows as row}
-			<tr
-				use:draggable={true}
-				on:svddrag={(e) => dragStart(e, row)}
-				on:svddrop={dragDrop}
-				on:click={(e) => handleClickRow(e, row, false)}
-				on:dblclick={(e) => handleClickRow(e, row, true)}
-				class:selected={row.selected}>
+<div class="scrollContainer">
+	<table on:click|stopPropagation class="table" class:draggingElements>
+		<thead>
+			<tr>
 				{#each columns as col}
-					<td
-						on:click={(e) => {
-							handleClickCell(e, row, col.key);
-						}}
-						class={col.class}>
+					<th
+						on:click={(e) => handleClickCol(e, col)}
+						class:isSortable={col.sortable}
+						class={col.headerClass}>
 						{#if col.customRender === true}
-							<slot name="colCell" {col} row={row.t} />
-						{:else}{col.renderValue ? col.renderValue(row.t) : col.value(row.t)}{/if}
-					</td>
+							<slot name="headerCell" {col} />
+						{:else}{col.title}{/if}
+						{#if sortBy === col.key}
+							<slot name="orderIcon" {sortOrder}>{sortOrder === 1 ? '▲' : '▼'}</slot>
+						{/if}
+					</th>
 				{/each}
 			</tr>
-		{:else}
-			<slot name="empty" />
-		{/each}
-	</tbody>
-</table>
+		</thead>
+		<tbody>
+			<slot />
+			{#each c_rows as row}
+				<tr
+					use:draggable={true}
+					on:svddrag={(e) => dragStart(e, row)}
+					on:svddrop={dragDrop}
+					on:click={(e) => handleClickRow(e, row, false)}
+					on:dblclick={(e) => handleClickRow(e, row, true)}
+					class:selected={row.selected}>
+					{#each columns as col}
+						<td
+							on:click={(e) => {
+								handleClickCell(e, row, col.key);
+							}}
+							class={col.class}>
+							{#if col.customRender === true}
+								<slot name="colCell" {col} row={row.t} />
+							{:else}
+								{col.renderValue ? col.renderValue(row.t) : col.value(row.t)}
+							{/if}
+						</td>
+					{/each}
+				</tr>
+			{:else}
+				<slot name="empty" />
+			{/each}
+		</tbody>
+	</table>
+</div>
 
 <style lang="scss">
 	@import "../global_mixin";
 
 	table {
+		position: relative;
 		width: 100%;
 
 		.elem:hover {
@@ -275,10 +302,24 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		}
 	}
 
+	thead {
+		position: sticky;
+		top: 0;
+		background-color: inherit;
+	}
+
 	tr,
 	th,
 	td {
 		@extend %unselectable;
+	}
+
+	.scrollContainer {
+		overflow-x: hidden;
+		overflow-y: scroll;
+	}
+
+	tr th {
 	}
 
 	.isSortable {
@@ -299,5 +340,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		box-shadow: 5px 5px 10px 5px rgba(30, 30, 30, 0.5);
 		position: absolute;
 		z-index: 200;
+		pointer-events: none;
 	}
 </style>

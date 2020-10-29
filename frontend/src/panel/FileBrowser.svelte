@@ -6,18 +6,22 @@
 	import type { IColumns, IRows } from "../ui/table";
 	import { FolderState } from "../fileTreeCache";
 	import type { FileTreeNode } from "../fileTreeCache";
-	import { extensionToIcon, formatBytes } from "./fileUtil";
+	import { extensionToIcon, formatBytes, pathJoin } from "./fileUtil";
 	import { on } from "../util";
 
 	export let connection: Connection;
 	export let channelId: ChannelId;
+	$: fileTreeCache = connection.fileTreeCache;
 
 	let path: string[] = [];
-	let invalidateCache = true;
-	$: fileTreeCache = connection.fileTreeCache;
 	let displayChannel: FileTreeNode | null;
 	let displayChildren: FileTreeNode[];
 	let dummyDownloader: HTMLIFrameElement;
+	let invalidateCache = true;
+	let fileSelection: FileTreeNode[] = [];
+	let creatingNewFolder = false;
+	let createNewFolderName = "";
+	let deletingFiles = false;
 
 	$: channelRaw = connection.book.channels.get(channelId)!;
 	$: channel = $channelRaw;
@@ -91,6 +95,55 @@
 		}
 	}
 
+	function createNewFolderClick() {
+		creatingNewFolder = !creatingNewFolder;
+		createNewFolderName = "";
+	}
+
+	function createNewFolder() {
+		const createPath = pathJoin(...path, createNewFolderName);
+		connection.sendMessage({
+			Change: {
+				ChannelCreateDirectory: {
+					id: channelId,
+					password: "", // TODO
+					path: createPath,
+				},
+			},
+		});
+		creatingNewFolder = false;
+		refreshCurrentFolder(false); // TODO apply in chage instead
+	}
+
+	function deleteFiles() {
+		// TODO as one packet
+		for (let toDelete of fileSelection) {
+			const deletePath = pathJoin(...path, toDelete.name);
+			connection.sendMessage({
+				Change: {
+					ChannelDeleteFile: {
+						id: channelId,
+						password: "", // TODO
+						path: deletePath,
+					},
+				},
+			});
+		}
+		deletingFiles = false;
+		refreshCurrentFolder(false); // TODO apply in chage instead
+	}
+
+	function selectionChanged(evt: CustomEvent<{ selected: FileTreeNode[] }>) {
+		fileSelection = evt.detail.selected;
+		deletingFiles = false;
+		creatingNewFolder = false;
+	}
+
+	function focusNewFolderDiag(node: Element, args: any): SvelteTransitionConfig {
+		(node as HTMLElement).focus();
+		return {};
+	}
+
 	const columns: IColumns<FileTreeNode> = [
 		{
 			key: "type",
@@ -117,7 +170,7 @@
 			key: "lastModified",
 			title: "Last Modified",
 			value: (v) => v.lastModified,
-			renderValue: (v) => v.lastModified.format("lll"), // capitalize
+			renderValue: (v) => v.lastModified.format("lll"),
 			sortable: true,
 		},
 	];
@@ -131,9 +184,33 @@
 		<button class="button">
 			<Icon name="upload" />
 		</button>
-		<button class="button">
+		<button class="button" on:click={createNewFolderClick}>
 			<Icon name="folder-plus" />
 		</button>
+		<!-- <div style="flex:1;" /> -->
+		<div class="field has-addons">
+			{#if !deletingFiles}
+				<p class="control">
+					<button
+						disabled={fileSelection.length === 0}
+						class="button is-danger is-outlined"
+						on:click={() => (deletingFiles = true)}>
+						<Icon name="delete" />
+					</button>
+				</p>
+			{:else}
+				<p class="control">
+					<button class="button" on:click={() => (deletingFiles = false)}>
+						<Icon name="close" />
+					</button>
+				</p>
+				<p class="control">
+					<button class="button is-danger" on:click={deleteFiles}>
+						<Icon name="delete-alert" />
+					</button>
+				</p>
+			{/if}
+		</div>
 	</div>
 
 	<nav class="breadcrumb" aria-label="path">
@@ -154,7 +231,7 @@
 			{/each}
 			{#if path.length > 0}
 				<li class="is-active">
-					<div class="crumb is-active" aria-current="page">{path[path.length - 1]}</div>
+					<div class="crumb is-active">{path[path.length - 1]}</div>
 				</li>
 			{:else}
 				<li />
@@ -162,7 +239,34 @@
 		</ul>
 	</nav>
 
-	<BTable {columns} rows={displayChildren} on:clickRow={onClick} sortBy="name">
+	<BTable
+		{columns}
+		rows={displayChildren}
+		on:clickRow={onClick}
+		sortBy="name"
+		on:selectionChanged={selectionChanged}>
+		{#if creatingNewFolder}
+			<tr
+				on:focusout={() => {
+					//creatingNewFolder = false;
+				}}>
+				<td style="text-align: center;vertical-align: middle;">
+					<Icon name="folder" />
+				</td>
+				<td colspan="3">
+					<div class="flex">
+						<input
+							in:focusNewFolderDiag|local
+							class="input"
+							type="text"
+							bind:value={createNewFolderName} />
+						<button class="button" on:click={createNewFolder}>
+							<Icon name="check" />
+						</button>
+					</div>
+				</td>
+			</tr>
+		{/if}
 		<tr slot="headerCell" let:col>
 			{#if col.key === 'type'}
 				<div on:click={() => goUp()} class="upIcon">
@@ -196,6 +300,9 @@
 
 	.padBox {
 		padding: 1em;
+		display: flex;
+		flex-direction: column;
+		height: 100%;
 	}
 
 	.upIcon {
