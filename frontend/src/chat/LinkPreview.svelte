@@ -23,7 +23,7 @@
 		<VideoPreview videoSrc={result.videoSrc} />
 	{:else if result.kind === 'site'}
 		<a href={link} target="_blank" class="box">
-			<div class="media">
+			<div>
 				<div class="media-left">
 					<figure class="image is-48x48">
 						<img use:autoError src={result.imageSrc} alt="Link preview" />
@@ -32,15 +32,6 @@
 				<div class="media-content">
 					<p class="title">{result.title}</p>
 					<span>{result.description ?? ''}</span>
-				</div>
-				<div class="media-right">
-					<button
-						class="button close"
-						on:click|stopPropagation|preventDefault={() => {
-							result = { kind: undefined };
-						}}>
-						<Icon name="close" />
-					</button>
 				</div>
 			</div>
 		</a>
@@ -59,6 +50,10 @@
 
 	.box {
 		padding: 1em;
+	}
+
+	.media-left {
+		float: left;
 	}
 
 	.close {
