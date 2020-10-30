@@ -25,15 +25,26 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 <script lang="typescript">
 	import { createEventDispatcher } from "svelte";
 	import { SortOrder } from "./table";
-	import type { ColumnKey, IColumn, IColumns, IRows } from "./table";
+	import type {
+		ColumnKey,
+		IColumn,
+		IColumns,
+		IRows,
+		IRowOptions,
+		ClickRowData,
+		IDragOptions,
+	} from "./table";
 	import { draggable, DragData } from "../ui/draggable";
 	import Icon from "./Icon.svelte";
 
 	const dispatch = createEventDispatcher<{
 		clickCol: { event: MouseEvent; col: TCol; key: ColumnKey };
-		clickRow: { event: MouseEvent; row: TRow; dblclick: boolean };
+		clickRow: ClickRowData<TRow>;
 		clickCell: { event: MouseEvent; row: TRow; key: ColumnKey };
 		selectionChanged: { selected: TRow[] };
+		dragEnter: { target: HTMLElement };
+		dragLeave: { target: HTMLElement };
+		dragDrop: { target: HTMLElement };
 	}>();
 
 	type TRow = any;
@@ -48,15 +59,23 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 	export let columns: IColumns<TRow>;
 	export let rows: IRows<TRow>;
+	export let rowOptions: IRowOptions<TRow> = {};
+	export let dragOptions: IDragOptions = {};
 	export let sortBy: ColumnKey = "";
 	export let sortOrder: SortOrder = SortOrder.Asc;
 
-	const defaultSort: SortFun = (t) => t.id;
-	let sortFunction: SortFun = defaultSort;
 	let c_rows: InternalRow[];
+	let columnByKey: Record<ColumnKey, TCol> = {};
 
 	export function clearSelection() {
 		clearSelectionInternal(true);
+	}
+
+	$: {
+		columnByKey = {};
+		columns.forEach((col) => {
+			columnByKey[col.key] = col;
+		});
 	}
 
 	$: remap(rows);
@@ -70,44 +89,24 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		// })
 	}
 
-	$: reSort(sortBy, sortOrder);
+	$: reSort(), sortBy, sortOrder, rows;
 
-	function reSort(_sortBy: ColumnKey, _sortOrder: SortOrder) {
+	function reSort() {
 		clearSelectionInternal(true);
-		if (_sortBy === "") {
-			sortFunction = defaultSort;
-		} else {
-			c_rows.forEach((r) => {
-				r.sortVal = sortFunction(r);
-			});
-		}
-		c_rows = c_rows.sort((a, b) => {
-			if (a.sortVal > b.sortVal) return _sortOrder;
-			else if (a.sortVal < b.sortVal) return -_sortOrder;
-			return 0;
-		});
+		if (sortBy === "") return;
+		let sortFn = columnByKey[sortBy].sort;
+		if (sortFn === undefined) return;
+		c_rows = c_rows.sort((a, b) => sortFn!(a.t, b.t) * sortOrder);
 		c_rows.forEach((r, i) => {
 			r.id = i;
 		});
 	}
 
-	$: {
-		let columnByKey: Record<ColumnKey, TCol> = {};
-		columns.forEach((col) => {
-			columnByKey[col.key] = col;
-		});
-
-		let col = columnByKey[sortBy];
-		if (col !== undefined && col.sortable === true && typeof col.value === "function") {
-			sortFunction = (r) => col.value(r.t);
-		}
-	}
-
 	function updateSortOrder(colKey: ColumnKey) {
 		if (colKey === sortBy) {
-			sortOrder = sortOrder === 1 ? -1 : 1;
+			sortOrder = sortOrder === SortOrder.Asc ? SortOrder.Desc : SortOrder.Asc;
 		} else {
-			sortOrder = 1;
+			sortOrder = SortOrder.Asc;
 		}
 	}
 
@@ -115,7 +114,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	let lastSelected: number = 0;
 
 	function handleClickCol(event: MouseEvent, col: TCol) {
-		if (!col.sortable) return;
+		if (col.sort === undefined) return;
 		updateSortOrder(col.key);
 		sortBy = col.key;
 		dispatch("clickCol", { event, col, key: col.key });
@@ -140,12 +139,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		}
 	}
 
-	function selectElem(add: boolean, ...rows: InternalRow[]) {
+	function selectElem(add: boolean, ...selectRows: InternalRow[]) {
 		let hasChanged = false;
 		if (!add) {
 			hasChanged ||= clearSelectionInternal(false);
 		}
-		for (const row of rows) {
+		for (const row of selectRows) {
 			if (!selected.has(row.id)) {
 				selected.add(row.id);
 				row.selected = true;
@@ -199,12 +198,31 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 	let draggingElements = false;
 	let dragVisualizer: HTMLElement;
+	let dropTargets: HTMLElement[] = [];
+	let lastDropTarget: HTMLElement | undefined = undefined;
+
+	function dragEnter(e: MouseEvent) {
+		if (!draggingElements) return;
+		lastDropTarget = e.target as HTMLElement;
+		dispatch("dragEnter", { target: lastDropTarget });
+	}
+
+	function dragLeave(e: MouseEvent) {
+		if (!draggingElements) return;
+		lastDropTarget = undefined;
+		dispatch("dragLeave", { target: e.target as HTMLElement });
+	}
 
 	function dragStart(ev: CustomEvent<DragData>, row: InternalRow) {
 		if (!row.selected) {
 			selectElem(false, row);
 		}
 		draggingElements = true;
+		dropTargets = dragOptions.dropFilter ? dragOptions.dropFilter() : [];
+		for (const dropTarget of dropTargets) {
+			dropTarget.addEventListener("mouseenter", dragEnter);
+			dropTarget.addEventListener("mouseleave", dragLeave);
+		}
 
 		dragVisualizer.style.display = null!;
 		ev.detail.dragNode = dragVisualizer;
@@ -217,8 +235,18 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	}
 
 	function dragDrop(ev: CustomEvent<DragData>) {
+		for (const dropTarget of dropTargets) {
+			dropTarget.removeEventListener("mouseenter", dragEnter);
+			dropTarget.removeEventListener("mouseleave", dragLeave);
+		}
+		dropTargets = [];
 		draggingElements = false;
 		dragVisualizer.style.display = "none";
+
+		if (lastDropTarget !== undefined) {
+			dispatch("dragDrop", { target: lastDropTarget });
+			lastDropTarget = undefined;
+		}
 	}
 </script>
 
@@ -232,7 +260,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 				{#each columns as col}
 					<th
 						on:click={(e) => handleClickCol(e, col)}
-						class:isSortable={col.sortable}
+						class:isSortable={col.sort !== undefined}
 						class={col.headerClass}>
 						{#if col.customRender === true}
 							<slot name="headerCell" {col} />
@@ -253,7 +281,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 					on:svddrop={dragDrop}
 					on:click={(e) => handleClickRow(e, row, false)}
 					on:dblclick={(e) => handleClickRow(e, row, true)}
-					class:selected={row.selected}>
+					class:selected={row.selected}
+					data-type={rowOptions.dataType ? rowOptions.dataType(row.t) : null}
+					data-key={rowOptions.dataValue ? rowOptions.dataValue(row.t) : null}>
 					{#each columns as col}
 						<td
 							on:click={(e) => {

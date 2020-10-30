@@ -3,17 +3,27 @@
 	import { Connection } from "../connection";
 	import Icon from "../ui/Icon.svelte";
 	import BTable from "../ui/BTable.svelte";
-	import type { IColumns } from "../ui/table";
+	import type { IColumns, IRowOptions, ClickRowEvent, IDragOptions } from "../ui/table";
 	import { FolderState } from "../fileTreeCache";
 	import type { FileTreeNode } from "../fileTreeCache";
-	import { extensionToIcon, formatBytes, pathJoin } from "./fileUtil";
-	import { on } from "../util";
+	import { extensionToIcon, formatBytes, pathJoin, pathSplit } from "./fileUtil";
+	import { assert, on } from "../util";
 
 	export let connection: Connection;
 	export let channelId: ChannelId;
 	$: fileTreeCache = connection.fileTreeCache;
 
+	const enum WorkState {
+		None,
+		CreatingNewFolder,
+		DraggingFilesForUpload,
+		DeletingFiles,
+		EditingFile,
+	}
+
+	let currentState = WorkState.None;
 	let path: string[] = [];
+	let fileBrowserHasFocus = false;
 	let fileTable: BTable;
 	let displayChannel: FileTreeNode | null;
 	let displayChildren: FileTreeNode[];
@@ -21,10 +31,7 @@
 	let dummyUploader: HTMLInputElement;
 	let invalidateCache = true;
 	let fileSelection: FileTreeNode[] = [];
-	let creatingNewFolder = false;
 	let createNewFolderName = "";
-	let deletingFiles = false;
-	let draggingFilesForUpload = false;
 	let uploadQueue: File[] = [];
 	let currentUploadTask: Promise<void> | undefined;
 
@@ -54,7 +61,7 @@
 		if (useCache && !invalidateCache) {
 			const cachedFolder = $fileTreeCache.get(cachePath, true);
 			if (cachedFolder !== null && cachedFolder.contentLoaded !== FolderState.Dummy) {
-				console.log("cached");
+				//console.log("cached");
 				return;
 			}
 		}
@@ -82,10 +89,8 @@
 		path = path;
 	}
 
-	function onClick(
-		evt: CustomEvent<{ event: MouseEvent; row: FileTreeNode; dblclick: boolean }>
-	) {
-		let { event, row, dblclick } = evt.detail;
+	function onClickRow(evt: ClickRowEvent<FileTreeNode>) {
+		let { row, dblclick } = evt.detail;
 		if (dblclick) {
 			if (row.isFile) {
 				const cachePathStr = getCachePath().join("/");
@@ -99,8 +104,13 @@
 		}
 	}
 
+	function toggleState(s: WorkState) {
+		if (currentState !== s) currentState = s;
+		else currentState = WorkState.None;
+	}
+
 	function createNewFolderClick() {
-		creatingNewFolder = !creatingNewFolder;
+		toggleState(WorkState.CreatingNewFolder);
 		createNewFolderName = "";
 	}
 
@@ -115,7 +125,7 @@
 				},
 			},
 		});
-		creatingNewFolder = false;
+		currentState = WorkState.None;
 		refreshCurrentFolder(false); // TODO apply in chage instead
 	}
 
@@ -133,14 +143,13 @@
 				},
 			});
 		}
-		deletingFiles = false;
+		currentState = WorkState.None;
 		refreshCurrentFolder(false); // TODO apply in chage instead
 	}
 
 	function selectionChanged(evt: CustomEvent<{ selected: FileTreeNode[] }>) {
 		fileSelection = evt.detail.selected;
-		deletingFiles = false;
-		creatingNewFolder = false;
+		currentState = WorkState.None;
 	}
 
 	function focusNewFolderDiag(node: Element, args: any): SvelteTransitionConfig {
@@ -148,12 +157,12 @@
 		return {};
 	}
 
+	const sortOpt = { sensitivity: "base" };
 	const columns: IColumns<FileTreeNode> = [
 		{
 			key: "type",
 			title: "",
 			value: (v) => v.isFile,
-			sortable: false,
 			headerClass: "text-left",
 			customRender: true,
 		},
@@ -161,23 +170,31 @@
 			key: "name",
 			title: "Name",
 			value: (v) => v.name,
-			sortable: true,
+			sort: (a, b) => a.name.localeCompare(b.name, undefined, sortOpt),
 		},
 		{
 			key: "size",
 			title: "Size",
 			value: (v) => (v.isFile ? v.size : 0),
 			renderValue: (v) => (v.isFile ? formatBytes(v.size) : ""),
-			sortable: true,
+			sort: (a, b) => (b.isFile ? b.size : -1) - (a.isFile ? a.size : -1),
 		},
 		{
 			key: "lastModified",
 			title: "Last Modified",
 			value: (v) => v.lastModified,
 			renderValue: (v) => v.lastModified.format("D.M.YY HH:mm"),
-			sortable: true,
+			sort: (a, b) => a.lastModified.isAfter(b.lastModified) ? 1 : -1,
 		},
 	];
+	const rowOptions: IRowOptions<FileTreeNode> = {
+		dataType: (t) => (t.isFile ? null : "folder"),
+		dataValue: (t) => (t.isFile ? null : pathJoin(...path, t.name)),
+	};
+	const dragOptions: IDragOptions = {
+		dropFilter: () =>
+			Array.from(document.querySelectorAll("[data-type='folder']:not(.selected)")),
+	};
 
 	function uploadFiles(...files: File[]) {
 		uploadQueue.push(...files);
@@ -190,17 +207,9 @@
 		while (true) {
 			if (uploadQueue.length === 0) break;
 			let file = uploadQueue.shift()!;
-
-			let size = file.size;
-			//let formData = new FormData();
-			//formData.append("file", file);
-			//let stream = file.stream();
 			await connection.backend.fetch(`/file${pathJoin(channelId, ...path, file.name)}`, {
 				method: "PUT",
 				body: file,
-				// headers: {
-				// 	"Content-Length": size.toString(),
-				// },
 			});
 			refreshCurrentFolder(false); // TODO apply in chage instead
 		}
@@ -208,12 +217,12 @@
 	}
 
 	function dragEnter(e: DragEvent) {
-		draggingFilesForUpload = true;
+		currentState = WorkState.DraggingFilesForUpload;
 		e.preventDefault();
 	}
 
 	function dragLeave(e: DragEvent) {
-		draggingFilesForUpload = false;
+		currentState = WorkState.None;
 		e.preventDefault();
 	}
 
@@ -222,7 +231,7 @@
 	}
 
 	function dragDrop(e: DragEvent) {
-		draggingFilesForUpload = false;
+		currentState = WorkState.None;
 		e.preventDefault();
 
 		let files = e.dataTransfer?.files;
@@ -241,12 +250,88 @@
 	function clickBackground(this: HTMLElement, e: MouseEvent) {
 		if (this !== e.target) return;
 		fileTable.clearSelection();
-		creatingNewFolder = false;
+		currentState = WorkState.None;
+	}
+
+	function onHotkey(e: KeyboardEvent) {
+		if (!fileBrowserHasFocus) return;
+		if ((e.target as HTMLElement).tagName === "INPUT") return;
+
+		console.log(e.key);
+
+		if (e.key === "F2" && fileSelection.length === 1) {
+			e.preventDefault();
+			currentState = WorkState.EditingFile;
+		}
+		if (e.key === "Delete") {
+			e.preventDefault();
+			if (currentState !== WorkState.DeletingFiles && fileSelection.length > 0) {
+				currentState = WorkState.DeletingFiles;
+			} else {
+				deleteFiles();
+			}
+		}
+	}
+
+	function clickEditFile() {
+		toggleState(WorkState.EditingFile);
+	}
+
+	type BTableDDEvent = CustomEvent<{ target: HTMLElement }>;
+	function dropTargetEnter(e: BTableDDEvent) {
+		const elem = e.detail.target;
+		elem.classList.add("dropTarget");
+	}
+	function dropTargetLeave(e: BTableDDEvent) {
+		const elem = e.detail.target;
+		elem.classList.remove("dropTarget");
+	}
+	function dropRowsToTarget(e: BTableDDEvent) {
+		const elem = e.detail.target;
+		elem.classList.remove("dropTarget");
+		assert(elem.dataset.key !== undefined, "type 'folder' node must have a 'key'");
+		moveFiles(elem.dataset.key, fileSelection);
+	}
+
+	function moveFiles(targetPath: string, files: FileTreeNode[]) {
+		for (const file of files) {
+			const fromPath = pathJoin(...path, file.name);
+			const toPath = pathJoin(targetPath, file.name);
+			const fromChannel = channelId;
+			const toChannel = undefined;
+			const toChannelPassword = toChannel !== undefined ? "" : undefined;
+
+			if (fromChannel === toChannel && fromPath === toPath) continue;
+
+			connection.sendMessage({
+				Change: {
+					ChannelRenameFile: {
+						id: fromChannel,
+						password: "", // TODO
+						fromPath,
+						toPath,
+						toChannel,
+						toChannelPassword, // TODO
+					},
+				},
+			});
+		}
+
+		$fileTreeCache.clear(pathSplit(channelId, targetPath));
+		invalidateCache = true;
+		path = path;
 	}
 </script>
 
-<div on:dragenter={dragEnter} on:click={clickBackground} class="padBox">
-	{#if draggingFilesForUpload}
+<div
+	on:dragenter={dragEnter}
+	on:click={clickBackground}
+	on:keydown={onHotkey}
+	on:blur={() => (fileBrowserHasFocus = false)}
+	on:focus={() => (fileBrowserHasFocus = true)}
+	tabindex={0}
+	class="padBox">
+	{#if currentState === WorkState.DraggingFilesForUpload}
 		<div
 			on:dragleave={dragLeave}
 			on:dragover={dragOver}
@@ -262,32 +347,46 @@
 		<button class="button" on:click={() => refreshCurrentFolder(false)}>
 			<Icon name="reload" />
 		</button>
-		<button on:click={() => dummyUploader.click()} class:is-info={currentUploadTask !== undefined} class="button">
+		<button
+			title="Upload files"
+			on:click={() => dummyUploader.click()}
+			class:is-info={currentUploadTask !== undefined}
+			class="button">
 			<Icon name={currentUploadTask === undefined ? 'upload' : 'orbit mdi-spin'} />
 		</button>
-		<button class="button" class:is-info={creatingNewFolder} on:click={createNewFolderClick}>
+		<button
+			class="button"
+			class:is-info={currentState === WorkState.CreatingNewFolder}
+			on:click={createNewFolderClick}>
 			<Icon name="folder-plus" />
 		</button>
 		<!-- <div style="flex:1;" /> -->
+		<button
+			class="button"
+			disabled={fileSelection.length !== 1}
+			class:is-info={currentState === WorkState.EditingFile}
+			on:click={clickEditFile}>
+			<Icon name="pen" />
+		</button>
 		<div class="field has-addons">
-			{#if !deletingFiles}
+			{#if currentState === WorkState.DeletingFiles}
 				<p class="control">
-					<button
-						disabled={fileSelection.length === 0}
-						class="button is-danger is-outlined"
-						on:click={() => (deletingFiles = true)}>
-						<Icon name="delete" />
-					</button>
-				</p>
-			{:else}
-				<p class="control">
-					<button class="button" on:click={() => (deletingFiles = false)}>
+					<button class="button" on:click={() => (currentState = WorkState.None)}>
 						<Icon name="close" />
 					</button>
 				</p>
 				<p class="control">
 					<button class="button is-danger" on:click={deleteFiles}>
 						<Icon name="delete-alert" />
+					</button>
+				</p>
+			{:else}
+				<p class="control">
+					<button
+						disabled={fileSelection.length === 0}
+						class="button is-danger is-outlined"
+						on:click={() => (currentState = WorkState.DeletingFiles)}>
+						<Icon name="delete" />
 					</button>
 				</p>
 			{/if}
@@ -299,15 +398,24 @@
 			<li>
 				<div
 					on:click={() => goUp(0)}
+					data-type="folder"
+					data-key="/"
 					class="crumb home"
-					class:crubclickable={path.length > 0}>
+					class:crubclickable={path.length > 0}
+					class:selected={path.length === 0}>
 					<Icon name="folder-home" />
 					<span>{channel.name}</span>
 				</div>
 			</li>
 			{#each path.slice(0, -1) as folder, dep (folder)}
 				<li>
-					<div on:click={() => goUp(dep + 1)} class="crumb crubclickable">{folder}</div>
+					<div
+						on:click={() => goUp(dep + 1)}
+						data-type="folder"
+						data-key={pathJoin(...path.slice(0, dep + 1))}
+						class="crumb crubclickable">
+						{folder}
+					</div>
 				</li>
 			{/each}
 			{#if path.length > 0}
@@ -323,11 +431,16 @@
 	<BTable
 		bind:this={fileTable}
 		{columns}
+		{rowOptions}
+		{dragOptions}
 		rows={displayChildren}
-		on:clickRow={onClick}
+		on:clickRow={onClickRow}
 		sortBy="name"
-		on:selectionChanged={selectionChanged}>
-		{#if creatingNewFolder}
+		on:selectionChanged={selectionChanged}
+		on:dragEnter={dropTargetEnter}
+		on:dragLeave={dropTargetLeave}
+		on:dragDrop={dropRowsToTarget}>
+		{#if currentState === WorkState.CreatingNewFolder}
 			<tr>
 				<td style="text-align: center;vertical-align: middle;">
 					<Icon name="folder" />
@@ -390,6 +503,10 @@
 		flex-direction: column;
 		height: 100%;
 		position: relative;
+
+		:global(.dropTarget) {
+			background-color: $highlight-strong;
+		}
 	}
 
 	.upIcon {

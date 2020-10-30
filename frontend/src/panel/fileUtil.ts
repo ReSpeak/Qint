@@ -125,8 +125,34 @@ export function extensionToIcon(file: string): string {
 
 export function pathJoin(...parts: string[]): string {
 	let path = "";
-	for (const part of parts) {
-		path += "/" + part;
+	for (const segment of parts) {
+		let pathEndsSlash = path.endsWith("/");
+		let segmentStartsSlash = segment.startsWith("/");
+		if (pathEndsSlash !== segmentStartsSlash) {
+			path += segment;
+		} else if (pathEndsSlash && segmentStartsSlash) {
+			path += segment.substring(1);
+		} else {
+			path += "/" + segment;
+		}
 	}
 	return path === "" ? "/" : path;
+}
+
+export function pathSplit(...parts: string[]): string[] {
+	let path = [];
+	for (const segment of parts) {
+		if (segment === "/")
+			continue;
+		let subSegment = segment.substring(
+			segment.startsWith("/") ? 1 : 0,
+			segment.endsWith("/") ? segment.length - 1 : segment.length);
+		if (subSegment.length === 0)
+			continue;
+		if (!subSegment.includes('/'))
+			path.push(subSegment);
+		else
+			path.push(...subSegment.split(/\//g));
+	}
+	return path;
 }

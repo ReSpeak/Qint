@@ -1,6 +1,7 @@
 import { IMsgFileList, IMsgFileListPart, IMsgFileInfo } from "./book_events";
 import { datetimeDeserialize } from "./util";
 import moment, { Moment } from "moment";
+import { pathSplit } from "./panel/fileUtil";
 
 export class FileTreeCache {
 	public isLoading: boolean = false;
@@ -18,12 +19,7 @@ export class FileTreeCache {
 	}
 
 	private static getPath(entry: IMsgFileListPart): string[] {
-		let path = [entry.channelId];
-		if (entry.path !== "/" && entry.path.startsWith("/")) {
-			path.push(...entry.path.substring(1).split(/\//g));
-		}
-		path.push(entry.name);
-		return path;
+		return pathSplit(entry.channelId, entry.path, entry.name);
 	}
 
 	public updateCache(entry: IMsgFileListPart) {
@@ -37,7 +33,7 @@ export class FileTreeCache {
 	}
 
 	public clear(path: string[] = []) {
-		console.log("clearing", path);
+		//console.log("clearing", path);
 		this.root.clear(path);
 	}
 }
@@ -131,6 +127,7 @@ class FileTreeFolder {
 		if (this.children === undefined) return;
 		if (path.length === 0) {
 			this.children?.clear();
+			this.contentLoaded = FolderState.Dummy;
 		} else {
 			let [part, ...rest] = path;
 			let child = this.children.get(part);
