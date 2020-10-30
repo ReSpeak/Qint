@@ -1,5 +1,5 @@
 <script lang="typescript">
-	import { onDestroy } from "svelte";
+	import { onDestroy, onMount } from "svelte";
 	import { Connection } from "../connection";
 	import { app } from "../app";
 	import BTabList from "../ui/BTabList.svelte";
@@ -7,7 +7,7 @@
 	import BDropDown from "../ui/BDropDown.svelte";
 	import BKeyValue from "../ui/BKeyValue.svelte";
 	import BSlider from "../ui/BSlider.svelte";
-	import type { SettGroup } from "../transientSettings";
+	import type { SettGroup, TransientSettings } from "../transientSettings";
 	import { debounced } from "../util";
 
 	export let connection: Connection;
@@ -17,6 +17,7 @@
 	let minLoudnessThreshold = -100;
 	let maxLoudnessThreshold = 0;
 	let loudnessThreshold = minLoudnessThreshold;
+	let browserNotificationDenied = false;
 
 	connection.sendMessage({ SubscribeLoudness: true });
 
@@ -40,6 +41,17 @@
 		synthSett.trySpeak(text);
 	}
 
+	function browserNotificationChanged() {
+		syncSettings('app');
+		if (app.transientSettings.app.allowBrowserNotifications && Notification.permission === "default") {
+			Notification.requestPermission();
+		}
+	}
+
+	onMount(() => {
+		browserNotificationDenied = Notification.permission === "denied";
+	})
+
 	onDestroy(() => {
 		connection.sendMessage({ SubscribeLoudness: false });
 	});
@@ -59,6 +71,15 @@
 					type="checkbox"
 					bind:checked={$developMode}
 					on:change={() => syncSettings('ui')} />
+			</BKeyValue>
+			<BKeyValue
+				label="Browser notifications"
+				title={browserNotificationDenied ? "Your browser blocked notifications for this page. If you want to use them, enable notifications in your browser settings and reload the page." : ""}>
+				<input
+					type="checkbox"
+					disabled={browserNotificationDenied}
+					bind:checked={app.transientSettings.app.allowBrowserNotifications}
+					on:change={browserNotificationChanged}>
 			</BKeyValue>
 		</BTabSlot>
 

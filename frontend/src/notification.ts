@@ -7,6 +7,8 @@ import { app } from "./app";
 import { IPlugin } from "./plugins";
 import { ClientId } from "./ts";
 import { InMessage, Reason } from "./book_events";
+import { getClientIconPath } from "./ui/clientIcon";
+import { base64Decode } from "./util";
 
 type NotificationArg = Book | Channel | Client | Invoker | Server | ServerGroup | string | null | undefined;
 
@@ -117,6 +119,16 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHand
 					handler(con, msg, notif`${msg.Message.invoker} poked you`);
 				else
 					handler(con, msg, notif`${msg.Message.invoker} poked ${msg.Message.message}`);
+
+				if (app.transientSettings.app.allowBrowserNotifications) {
+					let client = msg.Message.invoker.uid ? con.book.getClient(msg.Message.invoker.id.toString()) : undefined;
+					let iconUrl = client ? getClientIconPath(client, con) : undefined;
+					new Notification(notif`👉 ${msg.Message.invoker}`.toString(con), {
+						body: notif`${msg.Message.message}`.toString(con),
+						icon: iconUrl,
+						badge: "/icon.png"
+					});
+				}
 			} else {
 				if (longMessage)
 					handler(con, msg, notif`${msg.Message.invoker} wrote a message`);

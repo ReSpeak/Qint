@@ -4,6 +4,7 @@
 
 	export let label: string;
 	export let narrow: boolean = false;
+	export let title: string = "";
 
 	const ctx = getContext("component_id") as any ?? "";
 	const labelId: string = label.replace(/\s/g, '-') + ctx;
@@ -22,7 +23,7 @@
 
 <svelte:options immutable="{true}" />
 <!-- svelte-ignore a11y-label-has-associated-control -->
-<div class="field is-horizontal">
+<div class="field is-horizontal" title={title}>
 	<div class="field-label is-normal">
 		<label class="label" for={labelId}>{label}</label>
 	</div>
