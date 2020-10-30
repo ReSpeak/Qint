@@ -3,7 +3,7 @@
 	import { Connection } from "../connection";
 	import Icon from "../ui/Icon.svelte";
 	import BTable from "../ui/BTable.svelte";
-	import type { IColumns, IRows } from "../ui/table";
+	import type { IColumns } from "../ui/table";
 	import { FolderState } from "../fileTreeCache";
 	import type { FileTreeNode } from "../fileTreeCache";
 	import { extensionToIcon, formatBytes, pathJoin } from "./fileUtil";
@@ -22,6 +22,9 @@
 	let creatingNewFolder = false;
 	let createNewFolderName = "";
 	let deletingFiles = false;
+	let draggingFilesForUpload = false;
+	let uploadQueue: File[] = [];
+	let currentUploadTask: Promise<void> | undefined;
 
 	$: channelRaw = connection.book.channels.get(channelId)!;
 	$: channel = $channelRaw;
@@ -174,17 +177,81 @@
 			sortable: true,
 		},
 	];
+
+	function uploadFiles(...files: File[]) {
+		uploadQueue.push(...files);
+		if (currentUploadTask === undefined) {
+			currentUploadTask = uploadTaskFn();
+		}
+	}
+
+	async function uploadTaskFn() {
+		while (true) {
+			if (uploadQueue.length === 0) break;
+			let file = uploadQueue.shift()!;
+
+			let size = file.size;
+			//let formData = new FormData();
+			//formData.append("file", file);
+			//let stream = file.stream();
+			await connection.backend.fetch(`/file${pathJoin(channelId, ...path, file.name)}`, {
+				method: "PUT",
+				body: file,
+				// headers: {
+				// 	"Content-Length": size.toString(),
+				// },
+			});
+			refreshCurrentFolder(false); // TODO apply in chage instead
+		}
+		currentUploadTask = undefined;
+	}
+
+	function dragEnter(e: DragEvent) {
+		draggingFilesForUpload = true;
+		e.preventDefault();
+	}
+
+	function dragLeave(e: DragEvent) {
+		console.log("leave");
+		draggingFilesForUpload = false;
+		e.preventDefault();
+	}
+
+	function dragOver(e: DragEvent) {
+		e.preventDefault();
+	}
+
+	function dragDrop(e: DragEvent) {
+		draggingFilesForUpload = false;
+		e.preventDefault();
+
+		let files = e.dataTransfer?.files;
+		if (!files) return;
+		uploadFiles(...files);
+	}
 </script>
 
-<div class="padBox">
+<div on:dragenter={dragEnter} class="padBox">
+	{#if draggingFilesForUpload}
+		<div
+			on:dragleave={dragLeave}
+			on:dragover={dragOver}
+			on:drop={dragDrop}
+			class="fileDropOverlay">
+			<div class="fileDropInnerBorder">
+				<Icon name="file-upload-outline" size="12em" />
+			</div>
+		</div>
+	{/if}
+
 	<div class="buttons">
 		<button class="button" on:click={() => refreshCurrentFolder(false)}>
 			<Icon name="reload" />
 		</button>
-		<button class="button">
-			<Icon name="upload" />
+		<button class:is-info={currentUploadTask !== undefined} class="button">
+			<Icon name={currentUploadTask === undefined ? 'upload' : 'orbit mdi-spin'} />
 		</button>
-		<button class="button" on:click={createNewFolderClick}>
+		<button class="button" class:is-info={creatingNewFolder} on:click={createNewFolderClick}>
 			<Icon name="folder-plus" />
 		</button>
 		<!-- <div style="flex:1;" /> -->
@@ -303,6 +370,7 @@
 		display: flex;
 		flex-direction: column;
 		height: 100%;
+		position: relative;
 	}
 
 	.upIcon {
@@ -332,5 +400,29 @@
 
 	.noFiles {
 		text-align: center;
+	}
+
+	.fileDropOverlay {
+		position: absolute;
+		z-index: 1;
+		top: 0;
+		bottom: 0;
+		left: 0;
+		right: 0;
+
+		background-color: rgba(50, 50, 50, 0.5);
+		padding: 2em;
+	}
+
+	.fileDropInnerBorder {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+
+		border: 0.5em rgb(60, 60, 60) dashed;
+		width: 100%;
+		height: 100%;
+		border-radius: 3em;
+		pointer-events: none;
 	}
 </style>

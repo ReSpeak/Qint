@@ -116,4 +116,8 @@ export class TauriBackendConnection implements IBackendConnection {
 		emit("websocket", JSON.stringify(msg));
 		this.id = createUuidV4();
 	}
+
+	public async fetch(cmd: string, data: RequestInit): Promise<IFetchLike> {
+		return fetch(`${this.serverFileSrc}${cmd}`, data);
+	}
 }

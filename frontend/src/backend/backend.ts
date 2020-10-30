@@ -24,6 +24,7 @@ export interface IBackendConnection {
 		onError: errorFn,
 		onClose: closedFn): Promise<void>;
 	close(): void;
+	fetch(cmd: string, data?: RequestInit): Promise<IFetchLike>;
 }
 
 export interface IFetchLike {

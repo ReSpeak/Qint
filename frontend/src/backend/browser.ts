@@ -74,4 +74,8 @@ export class BrowserBackendConnection implements IBackendConnection {
 		this.id = createUuidV4();
 		this.socket = undefined;
 	}
+
+	public fetch(cmd: string, data: RequestInit): Promise<IFetchLike> {
+		return fetch(`${this.serverFileSrc}${cmd}`, data);
+	}
 }
