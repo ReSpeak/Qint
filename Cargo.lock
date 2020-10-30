@@ -2772,6 +2772,7 @@ dependencies = [
  "tsproto-packets",
  "tsproto-structs",
  "tsproto-types",
+ "url",
  "uuid",
 ]
 

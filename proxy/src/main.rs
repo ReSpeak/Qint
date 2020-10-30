@@ -1003,10 +1003,10 @@ mod tests {
 	use rand::Rng;
 
 	use juniper::http::GraphQLRequest;
-	use tsclientlib::{ClientId, MessageTarget, Version};
+	use tsclientlib::{ClientId, Version};
 
 	use super::*;
-	use messages::{ConnectOptions, MessageF2P, MessageP2F};
+	use messages::{ConnectOptions, JsMessageTarget, MessageF2P, MessageP2F};
 
 	struct TestProxy {
 		logger: Logger,
@@ -1247,7 +1247,7 @@ mod tests {
 			.await?;
 			loop {
 				if let MessageP2F::Connected { own_client, .. } = self.recv().await? {
-					return Ok(own_client);
+					return Ok(ClientId(own_client.parse().unwrap()));
 				}
 			}
 		}
@@ -1343,7 +1343,7 @@ mod tests {
 		// con0 sends a message to con1
 		let msg = "Hello 1";
 		con0.send(&MessageF2P::SendMessage {
-			target: MessageTarget::Client(con1_id),
+			target: JsMessageTarget::Client(con1_id),
 			message: msg.to_string(),
 		})
 		.await?;

@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt;
 
@@ -218,19 +219,27 @@ impl<TStack> Render<TStack> {
 		}
 	}
 
+	/// Add `http://` to a linke if it has no scheme
+	fn link_add_scheme(href: &str) -> Cow<str> {
+		if !href.contains("://") {
+			Cow::Owned(format!("http://{}", href))
+		} else {
+			Cow::Borrowed(href)
+		}
+	}
+
 	/// Should do stuff like
 	/// - Finding urls
 	/// - Processing special urls like client:// ts3file:// etc.
 	fn process_text(&mut self, text: &str) {
 		let mut last_url = 0;
-		for m in crate::find_url::find_urls(text) {
+		for (m, url) in crate::find_url::find_urls(text) {
 			if !text[m.start..].to_lowercase().ends_with("[/img]") {
 				self.push_text(&text[last_url..m.start]);
 				let mut a = Self::make_link();
 				last_url = m.end;
-				let href = &text[m];
-				a.add_attribute("href", href);
-				a.add_child(href.to_string().into());
+				a.add_attribute("href", Self::link_add_scheme(&url.to_string()).as_ref());
+				a.add_child(text[m].to_string().into());
 				self.push_node(a.into());
 			}
 		}
@@ -421,7 +430,7 @@ impl RenderMd {
 				el.add_attribute("data-ismdlink", "true");
 				match link_type {
 					LinkType::Email => el.add_attribute("href", &format!("mailto:{}", href)),
-					_ => el.add_attribute("href", &href),
+					_ => el.add_attribute("href", Self::link_add_scheme(&href).as_ref()),
 				}
 				if !title.as_ref().is_empty() {
 					el.add_attribute("title", &title);
@@ -573,7 +582,7 @@ impl RenderBb {
 						BBTag::Url => {
 							let mut el = Self::make_link();
 							if let Some(href) = arg {
-								el.add_attribute("href", &href);
+								el.add_attribute("href", Self::link_add_scheme(&href).as_ref());
 							}
 							el
 						}
@@ -586,7 +595,7 @@ impl RenderBb {
 						if stack_tag == BBTag::Url && !vtag.attributes.contains_key("href") {
 							let href = vtag.get_inner_text();
 							if !href.is_empty() {
-								vtag.add_attribute("href", &href);
+								vtag.add_attribute("href", Self::link_add_scheme(&href).as_ref());
 							}
 						} else if stack_tag == BBTag::Img {
 							let src = vtag.get_inner_text();
