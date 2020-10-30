@@ -34,39 +34,35 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		clickRow: { event: MouseEvent; row: TRow; dblclick: boolean };
 		clickCell: { event: MouseEvent; row: TRow; key: ColumnKey };
 		selectionChanged: { selected: TRow[] };
-		lostFocus: undefined;
 	}>();
 
 	type TRow = any;
 	type TCol = IColumn<TRow>;
-
-	export let columns: IColumns<TRow>;
-	export let rows: IRows<TRow>;
-	export let sortBy: ColumnKey = "";
-	export let sortOrder: SortOrder = SortOrder.Asc;
-
-	type SortFun = (t: InternalRow) => string | number;
-	const defaultSort: SortFun = (t) => t.id;
-	let sortFunction: SortFun = defaultSort;
-	let columnByKey: Record<ColumnKey, TCol> = {};
-
-	columns.forEach((col) => {
-		columnByKey[col.key] = col;
-	});
-
 	type InternalRow = {
 		t: TRow;
 		id: number;
 		selected: boolean;
 		sortVal?: any;
 	};
+	type SortFun = (t: InternalRow) => string | number;
 
+	export let columns: IColumns<TRow>;
+	export let rows: IRows<TRow>;
+	export let sortBy: ColumnKey = "";
+	export let sortOrder: SortOrder = SortOrder.Asc;
+
+	const defaultSort: SortFun = (t) => t.id;
+	let sortFunction: SortFun = defaultSort;
 	let c_rows: InternalRow[];
+
+	export function clearSelection() {
+		clearSelectionInternal(true);
+	}
 
 	$: remap(rows);
 
 	function remap(_rows: IRows<TRow>) {
-		clearSelection(true);
+		clearSelectionInternal(true);
 		c_rows = _rows.map((r, id) => {
 			return { t: r, selected: false, id };
 		});
@@ -77,7 +73,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	$: reSort(sortBy, sortOrder);
 
 	function reSort(_sortBy: ColumnKey, _sortOrder: SortOrder) {
-		clearSelection(true);
+		clearSelectionInternal(true);
 		if (_sortBy === "") {
 			sortFunction = defaultSort;
 		} else {
@@ -96,6 +92,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	}
 
 	$: {
+		let columnByKey: Record<ColumnKey, TCol> = {};
+		columns.forEach((col) => {
+			columnByKey[col.key] = col;
+		});
+
 		let col = columnByKey[sortBy];
 		if (col !== undefined && col.sortable === true && typeof col.value === "function") {
 			sortFunction = (r) => col.value(r.t);
@@ -120,12 +121,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		dispatch("clickCol", { event, col, key: col.key });
 	}
 
-	function lostFocus() {
-		//clearSelection(true);
-		//dispatch("lostFocus");
-	}
-
-	function clearSelection(triggerEvent: boolean): boolean {
+	function clearSelectionInternal(triggerEvent: boolean): boolean {
 		let hasChanged = false;
 		for (const oldSel of selected.values()) {
 			c_rows[oldSel].selected = false;
@@ -147,7 +143,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	function selectElem(add: boolean, ...rows: InternalRow[]) {
 		let hasChanged = false;
 		if (!add) {
-			hasChanged ||= clearSelection(false);
+			hasChanged ||= clearSelectionInternal(false);
 		}
 		for (const row of rows) {
 			if (!selected.has(row.id)) {
@@ -226,7 +222,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	}
 </script>
 
-<svelte:window on:click={lostFocus} />
 <div class="dragVisualize" bind:this={dragVisualizer} style="display: none;">
 	<Icon name="file-multiple-outline" />
 </div>
@@ -317,9 +312,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	.scrollContainer {
 		overflow-x: hidden;
 		overflow-y: scroll;
-	}
-
-	tr th {
 	}
 
 	.isSortable {

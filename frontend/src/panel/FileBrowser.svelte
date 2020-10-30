@@ -14,9 +14,11 @@
 	$: fileTreeCache = connection.fileTreeCache;
 
 	let path: string[] = [];
+	let fileTable: BTable;
 	let displayChannel: FileTreeNode | null;
 	let displayChildren: FileTreeNode[];
 	let dummyDownloader: HTMLIFrameElement;
+	let dummyUploader: HTMLInputElement;
 	let invalidateCache = true;
 	let fileSelection: FileTreeNode[] = [];
 	let creatingNewFolder = false;
@@ -90,7 +92,6 @@
 				const fileUrl = `${connection.backend.serverFileSrc}/file/${cachePathStr}/${
 					row.name
 				}?dl=${encodeURIComponent(row.name)}`;
-				console.log(fileUrl);
 				dummyDownloader.src = fileUrl;
 			} else {
 				pushFolder(row.name);
@@ -173,7 +174,7 @@
 			key: "lastModified",
 			title: "Last Modified",
 			value: (v) => v.lastModified,
-			renderValue: (v) => v.lastModified.format("lll"),
+			renderValue: (v) => v.lastModified.format("D.M.YY HH:mm"),
 			sortable: true,
 		},
 	];
@@ -212,7 +213,6 @@
 	}
 
 	function dragLeave(e: DragEvent) {
-		console.log("leave");
 		draggingFilesForUpload = false;
 		e.preventDefault();
 	}
@@ -229,9 +229,23 @@
 		if (!files) return;
 		uploadFiles(...files);
 	}
+
+	function uploadSelected(e: Event) {
+		let files = dummyUploader.files;
+		if (files && files.length > 0) {
+			uploadFiles(...files);
+			dummyUploader.value = null!;
+		}
+	}
+
+	function clickBackground(this: HTMLElement, e: MouseEvent) {
+		if (this !== e.target) return;
+		fileTable.clearSelection();
+		creatingNewFolder = false;
+	}
 </script>
 
-<div on:dragenter={dragEnter} class="padBox">
+<div on:dragenter={dragEnter} on:click={clickBackground} class="padBox">
 	{#if draggingFilesForUpload}
 		<div
 			on:dragleave={dragLeave}
@@ -248,7 +262,7 @@
 		<button class="button" on:click={() => refreshCurrentFolder(false)}>
 			<Icon name="reload" />
 		</button>
-		<button class:is-info={currentUploadTask !== undefined} class="button">
+		<button on:click={() => dummyUploader.click()} class:is-info={currentUploadTask !== undefined} class="button">
 			<Icon name={currentUploadTask === undefined ? 'upload' : 'orbit mdi-spin'} />
 		</button>
 		<button class="button" class:is-info={creatingNewFolder} on:click={createNewFolderClick}>
@@ -307,16 +321,14 @@
 	</nav>
 
 	<BTable
+		bind:this={fileTable}
 		{columns}
 		rows={displayChildren}
 		on:clickRow={onClick}
 		sortBy="name"
 		on:selectionChanged={selectionChanged}>
 		{#if creatingNewFolder}
-			<tr
-				on:focusout={() => {
-					//creatingNewFolder = false;
-				}}>
+			<tr>
 				<td style="text-align: center;vertical-align: middle;">
 					<Icon name="folder" />
 				</td>
@@ -355,6 +367,13 @@
 		</tr>
 	</BTable>
 
+	<input
+		title="Dummy Uploader"
+		style="display: none;"
+		bind:this={dummyUploader}
+		on:change={uploadSelected}
+		type="file"
+		multiple />
 	<iframe
 		title="Dummy Downloader"
 		style="display: none;"
