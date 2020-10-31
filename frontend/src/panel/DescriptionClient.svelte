@@ -59,20 +59,24 @@
 		if (isMember) {
 			connection.sendMessage({
 				Change: {
-					ClientAddServerGroup: {
-						id: clientId,
-						serverGroup: group,
-					}
-				}
+					change: {
+						ClientAddServerGroup: {
+							id: clientId,
+							serverGroup: group,
+						},
+					},
+				},
 			});
 		} else {
 			connection.sendMessage({
 				Change: {
-					ClientRemoveServerGroup: {
-						id: clientId,
-						serverGroup: group,
-					}
-				}
+					change: {
+						ClientRemoveServerGroup: {
+							id: clientId,
+							serverGroup: group,
+						},
+					},
+				},
 			});
 		}
 	}
@@ -80,22 +84,26 @@
 	function kickFromChannel() {
 		connection.sendMessage({
 			Change: {
-				ClientKick: {
-					id: clientId,
-					reason: Reason.KickChannel,
-				}
-			}
+				change: {
+					ClientKick: {
+						id: clientId,
+						reason: Reason.KickChannel,
+					},
+				},
+			},
 		});
 	}
 
 	function kickFromServer() {
 		connection.sendMessage({
 			Change: {
-				ClientKick: {
-					id: clientId,
-					reason: Reason.KickServer,
-				}
-			}
+				change: {
+					ClientKick: {
+						id: clientId,
+						reason: Reason.KickServer,
+					},
+				},
+			},
 		});
 	}
 </script>

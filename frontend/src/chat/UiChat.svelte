@@ -123,7 +123,9 @@
 	function sendCommand() {
 		if (!command || !connection) return;
 		connection.sendMessage({
-			SendCommand: command,
+			SendCommand: {
+				command,
+			},
 		});
 		command = "";
 	}

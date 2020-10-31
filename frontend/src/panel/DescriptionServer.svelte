@@ -16,28 +16,28 @@
 	$: create_date =
 		server.created !== undefined ? server.created : moment.unix(0);
 
-	$: connection.sendMessage({ Change: {
+	$: connection.sendMessage({ Change: { change: {
 		ServerVariablesRequest: {},
-	}});
+	}}});
 
 	function disconnect() {
 		connection.disconnect();
 	}
 
 	function editHostmessage(e: CustomEvent<{ text: string }>) {
-		connection.sendMessage({ Change: {
+		connection.sendMessage({ Change: { change: {
 			ServerEdit: {
 				hostmessage: e.detail.text,
 			},
-		}});
+		}}});
 	}
 
 	function editWelcomeMessage(e: CustomEvent<{ text: string }>) {
-		connection.sendMessage({ Change: {
+		connection.sendMessage({ Change: { change: {
 			ServerEdit: {
 				welcomeMessage: e.detail.text,
 			},
-		}});
+		}}});
 	}
 </script>
 

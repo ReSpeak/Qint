@@ -70,10 +70,12 @@
 		let getPath = "/" + path.join("/");
 		connection.sendMessage({
 			Change: {
-				ChannelFileListRequest: {
-					id: channelId,
-					password: "", // TODO
-					path: getPath,
+				change: {
+					ChannelFileListRequest: {
+						id: channelId,
+						password: "", // TODO
+						path: getPath,
+					},
 				},
 			},
 		});
@@ -118,10 +120,12 @@
 		const createPath = pathJoin(...path, createNewFolderName);
 		connection.sendMessage({
 			Change: {
-				ChannelCreateDirectory: {
-					id: channelId,
-					password: "", // TODO
-					path: createPath,
+				change: {
+					ChannelCreateDirectory: {
+						id: channelId,
+						password: "", // TODO
+						path: createPath,
+					},
 				},
 			},
 		});
@@ -135,10 +139,12 @@
 			const deletePath = pathJoin(...path, toDelete.name);
 			connection.sendMessage({
 				Change: {
-					ChannelDeleteFile: {
-						id: channelId,
-						password: "", // TODO
-						path: deletePath,
+					change: {
+						ChannelDeleteFile: {
+							id: channelId,
+							password: "", // TODO
+							path: deletePath,
+						},
 					},
 				},
 			});
@@ -300,13 +306,15 @@
 
 			connection.sendMessage({
 				Change: {
-					ChannelRenameFile: {
-						id: fromChannel,
-						password: "", // TODO
-						fromPath,
-						toPath,
-						toChannel,
-						toChannelPassword, // TODO
+					change: {
+						ChannelRenameFile: {
+							id: fromChannel,
+							password: "", // TODO
+							fromPath,
+							toPath,
+							toChannel,
+							toChannelPassword, // TODO
+						},
 					},
 				},
 			});

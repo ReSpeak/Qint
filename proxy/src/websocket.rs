@@ -20,7 +20,7 @@ use tsclientlib::{
 	FileUploadResult, FiletransferHandle, InMessage, MessageTarget, Uid,
 };
 use tsproto::resend::PacketId;
-use tsproto_packets::packets::{AudioData, OutPacket};
+use tsproto_packets::packets::{AudioData, OutCommand, OutPacket};
 use tsproto_types::crypto::EccKeyPubP256;
 
 use crate::book_events::{ConnectionClientUpdate, JsM2B};
@@ -565,15 +565,17 @@ impl Ws {
 					},
 				));
 			}
-			MessageF2P::SendMessage { target, message } => {
-				self.send_chat_message(target.into(), message);
+			MessageF2P::SendMessage { target, message, return_code } => {
+				self.send_chat_message(target.into(), message, return_code.as_deref(), ctx);
 			}
-			MessageF2P::SendCommand(cmd) => self.send_command(cmd),
-			MessageF2P::Change(change) => {
+			MessageF2P::SendCommand { command, return_code } => {
+				self.send_command(command, return_code.as_deref(), ctx)
+			}
+			MessageF2P::Change { change, return_code } => {
 				if let Some(con) = &mut self.connection {
 					match con.get_state() {
 						Err(e) => {
-							error!(self.logger, "Failed to get state"; "error" => %e);
+							self.send_error(return_code.as_deref(), format!("Failed to get state: {}", e), ctx);
 						}
 						Ok(state) => {
 							let mut audio_active = None;
@@ -602,11 +604,13 @@ impl Ws {
 								}
 							}
 
-							if let Err(e) = change
-								.to_packet(state)
-								.and_then(|p| p.send(con).map_err(|e| e.into()))
-							{
-								error!(self.logger, "Failed to send change"; "error" => %e);
+							match change.to_packet(state) {
+								Ok(msg) => {
+									let _ = self.send_ts_message(msg, return_code.as_deref(), ctx);
+								}
+								Err(e) => {
+									self.send_error(return_code.as_deref(), format!("Failed to create packet for change: {}", e), ctx);
+								}
 							}
 							if let Some(active) = audio_active {
 								self.set_audio_input_active(ctx, active);
@@ -630,28 +634,45 @@ impl Ws {
 		}
 	}
 
-	fn send_chat_message(&mut self, target: MessageTarget, message: String) {
+	fn send_error(&mut self, return_code: Option<&str>, error: String, ctx: &mut <Self as Actor>::Context) {
+		if let Some(code) = return_code {
+			self.send_message(&MessageP2F::Result {
+				return_code: code.into(),
+				ts_result: None,
+				description: Some(error),
+			}, ctx);
+		} else {
+			warn!(self.logger, "Proxy error"; "error" => error);
+		}
+	}
+
+	fn send_chat_message(&mut self, target: MessageTarget, message: String, return_code: Option<&str>, ctx: &mut <Self as Actor>::Context) {
 		if let Some(con) = &mut self.connection {
 			match con.get_state() {
 				Err(e) => {
-					error!(self.logger, "Failed to get state"; "error" => %e);
+					self.send_error(return_code, format!("Failed to get state: {}", e), ctx);
+					return;
 				}
 				Ok(state) => {
-					if let Err(e) = state.send_message(target, &message).send(con) {
-						error!(self.logger, "Failed to send message"; "error" => %e);
+					let msg = state.send_message(target, &message);
+					if self.send_ts_message(msg, return_code, ctx).is_err() {
+						return;
 					}
 				}
 			}
 
+			// Reborrow
+			let con = self.connection.as_mut().unwrap();
 			let server = match con.get_server_key() {
 				Ok(key) => key,
 				Err(e) => {
-					// TODO Return as error
-					error!(self.logger, "Failed to get server key"; "error" => %e);
+					self.send_error(return_code, format!("Failed to get server key: {}", e), ctx);
 					return;
 				}
 			};
 
+			// Reborrow
+			let con = self.connection.as_mut().unwrap();
 			if let Ok(state) = con.get_state() {
 				let own_channel;
 				let invoker_uid = {
@@ -660,11 +681,11 @@ impl Ws {
 						if let Some(uid) = own_client.uid.as_ref() {
 							uid.clone()
 						} else {
-							error!(self.logger, "Failed to get own client uid");
+							self.send_error(return_code, "Failed to get own client uid".into(), ctx);
 							return;
 						}
 					} else {
-						error!(self.logger, "Failed to get own client");
+						self.send_error(return_code, "Failed to get own client".into(), ctx);
 						return;
 					}
 				};
@@ -693,7 +714,7 @@ impl Ws {
 								ChatType::Poke(uid.0.clone())
 							}
 						} else {
-							error!(self.logger, "Failed to get uid of client"; "client" => ?id);
+							self.send_error(return_code, "Failed to get uid of client".into(), ctx);
 							return;
 						}
 					}
@@ -716,25 +737,37 @@ impl Ws {
 					}
 				}));
 			} else {
-				error!(self.logger, "Failed to get connection state");
+				self.send_error(return_code, "Failed to get connection state".into(), ctx);
 			}
 		} else {
-			// TODO Respond with error
+			self.send_error(return_code, "Not connected".into(), ctx);
 		}
 	}
 
-	fn send_command(&mut self, command: String) {
-		if let Some(con) = &mut self.connection {
-			let cmd = tsproto_packets::packets::OutCommand::new(
-				tsproto_packets::packets::Direction::C2S,
-				tsproto_packets::packets::Flags::empty(),
-				tsproto_packets::packets::PacketType::Command,
-				&command,
-			);
-			if let Err(e) = cmd.send(con) {
-				error!(self.logger, "Failed to send command"; "error" => %e);
-			}
+	fn send_ts_message(&mut self, mut msg: OutCommand, return_code: Option<&str>, ctx: &mut <Self as Actor>::Context) -> Result<()> {
+		if let Some(code) = &return_code {
+			msg.write_arg("return_code", code);
 		}
+		if let Some(con) = &mut self.connection {
+			let r = msg.send(con);
+			if let Err(e) = &r {
+				self.send_error(return_code, format!("Failed to send message: {}", e), ctx);
+			}
+			r.map_err(|e| e.into())
+		} else {
+			self.send_error(return_code, "Not connected".into(), ctx);
+			bail!("Not connected");
+		}
+	}
+
+	fn send_command(&mut self, command: String, return_code: Option<&str>, ctx: &mut <Self as Actor>::Context) {
+		let cmd = tsproto_packets::packets::OutCommand::new(
+			tsproto_packets::packets::Direction::C2S,
+			tsproto_packets::packets::Flags::empty(),
+			tsproto_packets::packets::PacketType::Command,
+			&command,
+		);
+		let _ = self.send_ts_message(cmd, return_code, ctx);
 	}
 }
 

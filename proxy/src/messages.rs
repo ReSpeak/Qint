@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use tsclientlib::{ClientId, DisconnectOptions, MessageTarget, Version};
+use tsclientlib::{ClientId, DisconnectOptions, MessageTarget, TsError, Version};
 use uuid::Uuid;
 
 use crate::book_events::{
@@ -16,9 +16,15 @@ pub enum MessageF2P {
 	SendMessage {
 		target: JsMessageTarget,
 		message: String,
+		#[serde(default, rename = "returnCode", skip_serializing_if = "Option::is_none")]
+		return_code: Option<String>,
 	},
 	/// Send a TeamSpeak command, for debugging purposes.
-	SendCommand(String),
+	SendCommand {
+		command: String,
+		#[serde(default, rename = "returnCode", skip_serializing_if = "Option::is_none")]
+		return_code: Option<String>,
+	},
 	/// Set the loudness threshold for sending audio in LUFS.
 	SetLoudnessThreshold(f64),
 	/// Ask the proxy to send loudness data or not.
@@ -30,7 +36,11 @@ pub enum MessageF2P {
 		volume: f32,
 	},
 	/// Change something in the book.
-	Change(JsM2B),
+	Change {
+		change: JsM2B,
+		#[serde(default, rename = "returnCode", skip_serializing_if = "Option::is_none")]
+		return_code: Option<String>,
+	},
 }
 
 /// A message sent over a websocket connection from the proxy to the frontend.
@@ -57,6 +67,14 @@ pub enum MessageP2F {
 	/// The connection received a message.
 	Message(JsInMessage),
 	Loudness(f64),
+	Result {
+		#[serde(rename = "returnCode")]
+		return_code: String,
+		#[serde(rename = "tsResult")]
+		ts_result: Option<TsError>,
+		/// Description for non-ts errors
+		description: Option<String>,
+	},
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]

@@ -83,23 +83,27 @@ export class Connection {
 	public moveClient(clientId: ClientId, channelId: ChannelId) {
 		this.sendMessage({
 			Change: {
-				ClientMove: {
-					id: clientId,
-					channel: channelId,
-				}
-			}
+				change: {
+					ClientMove: {
+						id: clientId,
+						channel: channelId,
+					},
+				},
+			},
 		});
 	}
 
 	public moveChannel(moveChannelId: ChannelId, targetParentId: ChannelId, targetOrderId: ChannelId) {
 		this.sendMessage({
 			Change: {
-				ChannelMove: {
-					id: moveChannelId,
-					parent: targetParentId,
-					order: targetOrderId,
-				}
-			}
+				change: {
+					ChannelMove: {
+						id: moveChannelId,
+						parent: targetParentId,
+						order: targetOrderId,
+					},
+				},
+			},
 		});
 	}
 
@@ -269,11 +273,11 @@ export class Connection {
 					for (const c of message.ChannelDescriptionChanged) {
 						if (c.channelId === curTarget.node.qlId) {
 							// Update channel description
-							this.sendMessage({ Change: {
+							this.sendMessage({ Change: { change: {
 								ChannelDescriptionRequest: {
 									id: c.channelId,
 								},
-							}});
+							}}});
 							break;
 						}
 					}
@@ -286,9 +290,9 @@ export class Connection {
 				this.fileTreeCache.update(ftc => ftc.applyFileList(message));
 			} else if ("ServerEdited" in message) {
 				// TODO We do not get this message because it is a book message...
-				this.sendMessage({ Change: {
+				this.sendMessage({ Change: { change: {
 					ServerVariablesRequest: {},
-				}});
+				}}});
 			}
 		} else if ("TalkersChanged" in msg) {
 			this.book.talkersHandler(msg.TalkersChanged);

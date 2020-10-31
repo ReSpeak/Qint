@@ -39,11 +39,15 @@ interface OMsgSendMessage {
 	SendMessage: {
 		target: WsMessageTarget,
 		message: string;
+		returnCode?: string;
 	};
 }
 
 interface OMsgSendCommand {
-	SendCommand: string;
+	SendCommand: {
+		command: string;
+		returnCode?: string;
+	};
 }
 
 interface OMsgSetLoudnessThreshold {
@@ -62,12 +66,15 @@ interface OMsgSetClientVolume {
 }
 
 interface OMsgChange {
-	Change: OChange;
+	Change: {
+		change: OChange;
+		returnCode?: string;
+	};
 }
 
 
 // In Messages
-export type InMsg = InMsgConnected | InDisconnectedTemporarily | InDisconnected | InMsgError | InTalkersChanged | InMsgEvents | InMsgMessage | InLoudness;
+export type InMsg = InMsgConnected | InDisconnectedTemporarily | InDisconnected | InMsgError | InTalkersChanged | InMsgEvents | InMsgMessage | InLoudness | InResult;
 
 interface InMsgConnected {
 	Connected: {
@@ -103,6 +110,14 @@ interface InMsgMessage {
 
 interface InLoudness {
 	Loudness: number;
+}
+
+interface InResult {
+	Result: {
+		returnCode: string;
+		tsResult?: string;
+		description?: string;
+	};
 }
 
 //#region PropertyId

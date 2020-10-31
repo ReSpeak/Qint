@@ -25,25 +25,31 @@
 
 	// Load description
 	$: connection.sendMessage({ Change: {
-		ChannelDescriptionRequest: {
-			id: channelId,
+		change: {
+			ChannelDescriptionRequest: {
+				id: channelId,
+			},
 		},
 	}});
 
 	function editTopic(e: CustomEvent<{ text: string }>) {
 		connection.sendMessage({ Change: {
-			ChannelEdit: {
-				id: channelId,
-				topic: e.detail.text,
+			change: {
+				ChannelEdit: {
+					id: channelId,
+					topic: e.detail.text,
+				},
 			},
 		}});
 	}
 
 	function editDescription(e: CustomEvent<{ text: string }>) {
 		connection.sendMessage({ Change: {
-			ChannelEdit: {
-				id: channelId,
-				description: e.detail.text,
+			change: {
+				ChannelEdit: {
+					id: channelId,
+					description: e.detail.text,
+				},
 			},
 		}});
 	}

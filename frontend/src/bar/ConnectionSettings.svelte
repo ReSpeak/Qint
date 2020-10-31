@@ -22,7 +22,9 @@
 
 	function changeOwnClient(change: OChangeConnectionClientUpdate) {
 		connection.sendMessage({
-			Change: change,
+			Change: {
+				change,
+			},
 		});
 	}
 </script>

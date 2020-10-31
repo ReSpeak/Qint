@@ -198,7 +198,7 @@
 			data-key={$channel.id}>
 			<button
 				class="button collapseButton noBut"
-				class:haschildren={$channels.length !== 0}
+				class:haschildren={$channels.length !== 0 || $clients.length !== 0}
 				class:spacer={spacerType !== SpacerType.None}
 				on:click={() => (collapsed = !collapsed)}>
 				<Icon name="chevron-right{collapsed ? '' : ' mdi-rotate-90'}" />
