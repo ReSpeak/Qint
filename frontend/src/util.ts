@@ -216,6 +216,11 @@ export function findParent(elem: HTMLElement, selector: string): HTMLElement | u
 	return undefined;
 }
 
+export function focus(node: Element, args: any): {} {
+	(node as HTMLElement).focus();
+	return {};
+}
+
 export function getDefaultVersion(): string {
 	let platform = ((window.navigator as any).oscpu ?? window.navigator.userAgent).toLowerCase();
 	if (platform.includes("windows")) {

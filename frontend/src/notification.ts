@@ -68,7 +68,7 @@ function notif(strings: TemplateStringsArray, ...keys: NotificationArg[]): TsNot
 	return new TsNotification(strings, keys);
 }
 
-export type NotificationHandler = (con: Connection, e: InMsg | InBookMsg, no: TsNotification) => void;
+export type NotificationHandler = (con: Connection, e: InMsg | InBookMsg | InMessage, no: TsNotification) => void;
 
 function getHandler(plugins: IPlugin[]): NotificationHandler {
 	for (let p of plugins) {
@@ -310,7 +310,8 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHand
 					if (invoker !== null) {
 						handler(con, msg, notif`${invoker} edited the server`);
 					} else {
-						handler(con, msg, notif`Server was edited`);
+						// We get this event after requesting info
+						//handler(con, msg, notif`Server was edited`);
 					}
 				}
 			} else if ("PropertyRemoved" in msg) {
@@ -409,15 +410,25 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHand
 
 function handleInMessage(con: Connection, msg: InMessage, handler: NotificationHandler) {
 	try {
+		if ("ChannelDescriptionChanged" in msg) {
+			for (const c of msg.ChannelDescriptionChanged) {
+				const channel = con.book.getChannel(c.channelId)!;
+				/*if (invoker !== null) {
+					handler(con, msg, notif`${invoker} edited ${channel}’s description`);
+				} else {*/
+					handler(con, msg, notif`${channel}’s description was edited`);
+				//}
+			}
+		}
 	} catch (e) {
 		console.error("Failed to create notification for message", e);
 	}
 }
 
-function textToSpeechNotification(con: Connection, _e: InMsg | InBookMsg, no: TsNotification) {
+function textToSpeechNotification(con: Connection, _e: InMsg | InBookMsg | InMessage, no: TsNotification) {
 	app.transientSettings.synth.trySpeak(no.toString(con));
 }
 
-function textNotification(_c: Connection, _e: InMsg | InBookMsg, no: TsNotification) {
+function textNotification(_c: Connection, _e: InMsg | InBookMsg | InMessage, no: TsNotification) {
 	// TODO
 }

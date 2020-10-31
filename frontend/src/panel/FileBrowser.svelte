@@ -7,7 +7,7 @@
 	import { FolderState } from "../fileTreeCache";
 	import type { FileTreeNode } from "../fileTreeCache";
 	import { extensionToIcon, formatBytes, pathJoin, pathSplit } from "./fileUtil";
-	import { assert, on } from "../util";
+	import { assert, focus, on } from "../util";
 
 	export let connection: Connection;
 	export let channelId: ChannelId;
@@ -150,11 +150,6 @@
 	function selectionChanged(evt: CustomEvent<{ selected: FileTreeNode[] }>) {
 		fileSelection = evt.detail.selected;
 		currentState = WorkState.None;
-	}
-
-	function focusNewFolderDiag(node: Element, args: any): SvelteTransitionConfig {
-		(node as HTMLElement).focus();
-		return {};
 	}
 
 	const sortOpt = { sensitivity: "base" };
@@ -442,20 +437,22 @@
 		on:dragDrop={dropRowsToTarget}>
 		{#if currentState === WorkState.CreatingNewFolder}
 			<tr>
-				<td style="text-align: center;vertical-align: middle;">
+				<td style="vertical-align: middle;">
 					<Icon name="folder" />
 				</td>
 				<td colspan="3">
-					<div class="flex">
+					<form on:submit|preventDefault={createNewFolder}
+						on:keydown={e => {if (e.key === "Escape") createNewFolderClick();}}
+						class="flex">
 						<input
-							in:focusNewFolderDiag|local
-							class="input"
+							in:focus|local
+							class="input mr-2"
 							type="text"
 							bind:value={createNewFolderName} />
-						<button class="button" on:click={createNewFolder}>
+						<button class="button" type="submit">
 							<Icon name="check" />
 						</button>
-					</div>
+					</form>
 				</td>
 			</tr>
 		{/if}

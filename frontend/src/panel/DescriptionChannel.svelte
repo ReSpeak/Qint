@@ -29,6 +29,24 @@
 			id: channelId,
 		},
 	}});
+
+	function editTopic(e: CustomEvent<{ text: string }>) {
+		connection.sendMessage({ Change: {
+			ChannelEdit: {
+				id: channelId,
+				topic: e.detail.text,
+			},
+		}});
+	}
+
+	function editDescription(e: CustomEvent<{ text: string }>) {
+		connection.sendMessage({ Change: {
+			ChannelEdit: {
+				id: channelId,
+				description: e.detail.text,
+			},
+		}});
+	}
 </script>
 
 <StickyList>
@@ -42,7 +60,9 @@
 		</div>
 		<div class="dataLine">
 			<div>Topic:</div>
-			<div>{channel.topic}</div>
+			<div>
+				<RenderedText text={channel.topicRendered ?? ""} raw={channel.topic ?? undefined} editable={true} on:edited={editTopic} />
+			</div>
 		</div>
 		<div class="dataLine">
 			<div>Codec:</div>
@@ -56,9 +76,7 @@
 		</div>
 	</div>
 	<div class="description">
-		{#if channel.descriptionRendered}
-			<RenderedText text={channel.descriptionRendered} raw={channel.description ?? undefined} />
-		{/if}
+		<RenderedText text={channel.descriptionRendered ?? ""} raw={channel.description ?? undefined} editable={true} on:edited={editDescription} />
 	</div>
 	<StickySlot>Settings</StickySlot>
 	klik here for party

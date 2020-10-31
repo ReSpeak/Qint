@@ -128,6 +128,7 @@ impl<'a> JsInMessages<'a> {
 		let msgs = [
 			"ChannelListFinished",
 			"ChannelPasswordChanged",
+			"ChannelDescriptionChanged",
 			"ClientChatClosed",
 			"ClientChatComposing",
 			"FiletransferStatus",

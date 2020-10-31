@@ -15,7 +15,7 @@
 </div>
 {#if channel.topicRendered !== null && channel.topicRendered.length > 0}
 <div class="description">
-	<RenderedText text={channel.topicRendered} raw={channel.topic ?? undefined} />
+	<RenderedText text={channel.topicRendered} />
 </div>
 {/if}
 

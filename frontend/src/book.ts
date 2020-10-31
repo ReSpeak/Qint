@@ -527,7 +527,7 @@ export class Channel extends book_events.Channel implements ITreeNode, Readable<
 	}
 
 	public readonly qlType = "CHANNEL";
-	public get qlId() { return this.id.toString() };
+	public get qlId() { return this.id };
 	public readonly wsTarget = "Channel";
 }
 

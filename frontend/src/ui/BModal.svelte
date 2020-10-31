@@ -9,17 +9,12 @@
 		e.stopPropagation();
 	}
 
-	function keydown(e: KeyboardEvent) {
-		if (e.key === "Escape")
-			close(e);
-	}
-
 	$: {
 		app.modalVisible.set(visible);
 	}
 </script>
 
-<div on:keydown={keydown} class="modal" class:is-active={visible}>
+<div on:keydown={e => {if (e.key === "Escape") close(e);}} class="modal" class:is-active={visible}>
 	<div on:click={close} class="modal-background" />
 	<div class="modal-card">
 		<header class="modal-card-head">

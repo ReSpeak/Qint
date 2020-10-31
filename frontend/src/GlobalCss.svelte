@@ -24,6 +24,8 @@
 	@import "bulma/sass/form/input-textarea";
 	@import "bulma/sass/form/select";
 	@import "bulma/sass/form/tools";
+	@import "bulma/sass/helpers/spacing";
+	@import "bulma/sass/helpers/typography";
 	@import "bulma-slider/src/sass/index";
 	@import "bulmaswatch/cyborg/overrides";
 

@@ -1,16 +1,21 @@
 <script lang="typescript">
 	import katex from "katex";
 	import { hljsHighlight } from "./hljs";
-	import { onMount } from "svelte";
+	import { createEventDispatcher, onMount } from "svelte";
 	import Icon from "../ui/Icon.svelte";
+	import { focus } from "../util";
 
 	export let text: string;
 	export let raw: string | undefined = undefined;
+	export let editable = false;
 	export let links: [string, string][] = [];
 
+	const dispatch = createEventDispatcher<{edited: { text: string }}>();
 	let rendered!: HTMLElement;
 	$: renderedObj = render(text);
 	let viewRaw = false;
+	let editing = false;
+	$: editingText = raw ?? text;
 
 	function render(html: string) {
 		const obj = document.createElement("div");
@@ -50,6 +55,11 @@
 		return obj;
 	}
 
+	function edited() {
+		dispatch("edited", { text: editingText });
+		editing = false;
+	}
+
 	onMount(() => {
 		rendered.innerHTML = "";
 		rendered.appendChild(renderedObj);
@@ -58,20 +68,48 @@
 
 <div
 	class="textBody"
-	class:viewRaw>
+	class:viewRaw
+	class:editing
+	class:editable>
+	{#if editing}
+		<form on:submit|preventDefault={edited}
+			on:keydown={e => {if (e.key === "Escape") editing = false;}}
+			class="flex">
+			<input
+				in:focus|local
+				class="input mr-2"
+				type="text"
+				bind:value={editingText} />
+			<button class="button" type="submit">
+				<Icon name="check" />
+			</button>
+		</form>
+	{/if}
 	<div class="textRendered" bind:this={rendered} />
 	{#if raw !== undefined}
 		<div class="textRaw">
 			<pre>{raw}</pre>
 		</div>
+	{/if}
+	{#if raw !== undefined || editable}
 		<div class="tool-buttons">
 			<div class="tool-buttons-wrap buttons has-addons">
-				<button
-					class="button is-small is-rounded"
-					on:click={() => (viewRaw = !viewRaw)}
-					title="It’s raw!">
-					<Icon raw="🥩" />
-				</button>
+				{#if editable}
+					<button
+						class="button is-small is-rounded"
+						on:click={() => (editing = !editing)}
+						title="Edit">
+						<Icon name="pencil" />
+					</button>
+				{/if}
+				{#if raw !== undefined}
+					<button
+						class="button is-small is-rounded"
+						on:click={() => (viewRaw = !viewRaw)}
+						title="It’s raw!">
+						<Icon raw="🥩" />
+					</button>
+				{/if}
 			</div>
 		</div>
 	{/if}
@@ -105,6 +143,11 @@
 				visibility: visible;
 			}
 		}
+	}
+
+	.textBody.editable {
+		min-width: 1em;
+		min-height: 1em;
 	}
 
 	.textRendered {
@@ -181,6 +224,15 @@
 	.textBody.viewRaw {
 		.textRaw {
 			display: inherit;
+		}
+		.textRendered {
+			display: none;
+		}
+	}
+
+	.textBody.editing {
+		.textRaw {
+			display: none;
 		}
 		.textRendered {
 			display: none;

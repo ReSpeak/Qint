@@ -8,6 +8,7 @@
 	import TsIcon from "../ui/TsIcon.svelte";
 	import StickyList from "../ui/StickyList.svelte";
 	import StickySlot from "../ui/StickySlot.svelte";
+	import RenderedText from "../ui/RenderedText.svelte";
 
 	export let connection: Connection;
 	const serverRaw = connection.book.server;
@@ -15,8 +16,28 @@
 	$: create_date =
 		server.created !== undefined ? server.created : moment.unix(0);
 
+	$: connection.sendMessage({ Change: {
+		ServerVariablesRequest: {},
+	}});
+
 	function disconnect() {
 		connection.disconnect();
+	}
+
+	function editHostmessage(e: CustomEvent<{ text: string }>) {
+		connection.sendMessage({ Change: {
+			ServerEdit: {
+				hostmessage: e.detail.text,
+			},
+		}});
+	}
+
+	function editWelcomeMessage(e: CustomEvent<{ text: string }>) {
+		connection.sendMessage({ Change: {
+			ServerEdit: {
+				welcomeMessage: e.detail.text,
+			},
+		}});
 	}
 </script>
 
@@ -44,6 +65,14 @@
 			<div>Version:</div>
 			<PlatformIcon platform={server.platform} />
 			<div>{server.version}</div>
+		</div>
+		<div class="dataLine">
+			<div>Host message:</div>
+			<RenderedText text={server.hostmessageRendered ?? ""} raw={server.hostmessage ?? undefined} editable={true} on:edited={editHostmessage} />
+		</div>
+		<div class="dataLine">
+			<div>Welcome message:</div>
+			<RenderedText text={server.welcomeMessageRendered ?? ""} raw={server.welcomeMessage ?? undefined} editable={true} on:edited={editWelcomeMessage} />
 		</div>
 		<div class="dataLine">
 			<div>Created:</div>

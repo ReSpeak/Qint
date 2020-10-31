@@ -10,6 +10,7 @@ import { Reason } from "./book_events";
 import moment from "moment";
 import { ChannelId, ClientId } from "./ts";
 import { FileTreeCache } from "./fileTreeCache";
+import { DescriptionMode } from "./transientSettings";
 
 export class Connection {
 	private readonly _state = writable(new ConnectionState());
@@ -192,6 +193,7 @@ export class Connection {
 				try {
 					if (get(app.transientSettings.ui._developMode))
 						console.log(tsevt);
+
 					if ("Message" in tsevt) {
 						const fromOwnClient = tsevt.Message.invoker.id.toString() === this.book.ownClientId;
 						let chat = undefined;
@@ -259,12 +261,34 @@ export class Connection {
 			const message = msg.Message;
 			if (get(app.transientSettings.ui._developMode))
 				console.log(message);
-			if ("ChannelListFinished" in message) {
+
+			if ("ChannelDescriptionChanged" in message) {
+				const curTarget = get(app.selectedNode);
+				if (curTarget !== undefined && curTarget.connection === this && curTarget.node.qlType === "CHANNEL"
+					&& get(app.transientSettings.ui._descriptionMode) === DescriptionMode.Info) {
+					for (const c of message.ChannelDescriptionChanged) {
+						if (c.channelId === curTarget.node.qlId) {
+							// Update channel description
+							this.sendMessage({ Change: {
+								ChannelDescriptionRequest: {
+									id: c.channelId,
+								},
+							}});
+							break;
+						}
+					}
+				}
+			} else if ("ChannelListFinished" in message) {
 				this._state.update(s => s.setChannelListFinished());
 				location.hash = getStringFromConnect(this.connectOptions!);
 				this.updateAllUnreadCounts();
 			} else if ("FileList" in message) {
 				this.fileTreeCache.update(ftc => ftc.applyFileList(message));
+			} else if ("ServerEdited" in message) {
+				// TODO We do not get this message because it is a book message...
+				this.sendMessage({ Change: {
+					ServerVariablesRequest: {},
+				}});
 			}
 		} else if ("TalkersChanged" in msg) {
 			this.book.talkersHandler(msg.TalkersChanged);
