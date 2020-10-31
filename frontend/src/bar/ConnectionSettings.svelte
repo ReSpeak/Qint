@@ -20,10 +20,10 @@
 		isAway = awayMessage !== undefined && awayMessage !== null;
 	}
 
-	function changeOwnClient(change: OChangeConnectionClientUpdate) {
+	function changeOwnClient(change: OChangeConnectionClientUpdate["ConnectionClientUpdate"]) {
 		connection.sendMessage({
 			Change: {
-				change,
+				change: { ConnectionClientUpdate: change },
 			},
 		});
 	}
@@ -33,21 +33,21 @@
 	<button
 		class="toolbutton"
 		class:active={inputMuted}
-		on:click={() => changeOwnClient({ ConnectionClientUpdate: { inputMuted: !inputMuted }})}
+		on:click={() => changeOwnClient({ inputMuted: !inputMuted })}
 		title="Mute microphone">
 		<Icon name={inputMuted ? 'microphone-off' : 'microphone'} />
 	</button>
 	<button
 		class="toolbutton"
 		class:active={outputMuted}
-		on:click={() => changeOwnClient({ ConnectionClientUpdate: { outputMuted: !outputMuted }})}
+		on:click={() => changeOwnClient({ outputMuted: !outputMuted })}
 		title="Mute output">
 		<Icon name={outputMuted ? 'volume-off' : 'volume-high'} />
 	</button>
 	<button
 		class="toolbutton"
 		class:active={isAway}
-		on:click={() => changeOwnClient({ ConnectionClientUpdate: { away: isAway ? null : '' }})}
+		on:click={() => changeOwnClient({ away: isAway ? null : '' })}
 		title="Toggle away">
 		<Icon name={isAway ? 'sleep' : 'sleep-off'} />
 	</button>

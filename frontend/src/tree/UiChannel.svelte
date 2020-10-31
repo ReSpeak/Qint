@@ -99,8 +99,11 @@
 		}
 	}
 
-	function switchChannel() {
-		connection?.switchChannel(channel);
+	async function switchChannel() {
+		const res = await connection?.switchChannel(channel);
+		if (res !== undefined) {
+			console.log("Failed to switch channel", res);
+		}
 	}
 
 	function setChat() {

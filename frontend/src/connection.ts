@@ -1,4 +1,4 @@
-import { OutMsg, InMsg } from "./backend/ws";
+import { ResultDetails, OutMsg, InMsg } from "./backend/ws";
 import { get, writable, Writable, Readable } from "svelte/store";
 import { Book, Channel, ChatData } from "./book";
 import { getStringFromConnect, oneshot } from "./util";
@@ -6,14 +6,27 @@ import { handleMessage } from "./notification";
 import { backend, IBackendConnection } from "./backend/backend";
 import { app } from "./app";
 import { ConnectData } from "./connect/connect";
-import { Reason } from "./book_events";
+import { OChange, Reason } from "./book_events";
 import moment from "moment";
 import { ChannelId, ClientId } from "./ts";
 import { FileTreeCache } from "./fileTreeCache";
 import { DescriptionMode } from "./transientSettings";
 
+type ResultPromise = {
+	resolve: (res: ResultDetails | undefined) => void;
+	reject: () => void;
+};
+
+const ConnectionClosedResult: ResultDetails = {
+	tsResult: "TODO",
+};
+
+export type ChangePromise = Promise<ResultDetails | undefined>;
+
 export class Connection {
 	private readonly _state = writable(new ConnectionState());
+	private curReturnCode = 0;
+	private returnCodes = new Map<number, ResultPromise>();
 	public get state(): Readable<ConnectionState> { return this._state; };
 
 	public readonly book: Book = new Book();
@@ -66,43 +79,55 @@ export class Connection {
 		location.hash = "";
 		// Reset chat if the selected node is from this connection.
 		app.selectedNode.update(n => n?.connection === this ? undefined : n);
+		this.rejectReturnCodes();
+	}
+
+	private rejectReturnCodes() {
+		for (const value of this.returnCodes.values()) {
+			value.resolve(ConnectionClosedResult);
+		}
+		this.returnCodes.clear();
 	}
 
 	public sendMessage(data: OutMsg) {
 		this.backend.send(data);
 	}
 
+	public sendChange(change: OChange): ChangePromise {
+		const returnCode = this.curReturnCode;
+		this.curReturnCode = (this.curReturnCode + 1) % 65536;
+		this.sendMessage({ Change: {
+			change,
+			returnCode: returnCode.toString(),
+		}});
+		return new Promise((resolve, reject) => {
+			this.returnCodes.set(returnCode, { resolve, reject });
+		});
+	}
+
 	public disconnect(reason?: Reason, message?: string) {
 		this.sendMessage({ Disconnect: { reason, message } });
 	}
 
-	public switchChannel(channel: Channel) {
-		this.moveClient(this.book.ownClientId!, channel.id);
+	public switchChannel(channel: Channel): ChangePromise {
+		return this.moveClient(this.book.ownClientId!, channel.id);
 	}
 
-	public moveClient(clientId: ClientId, channelId: ChannelId) {
-		this.sendMessage({
-			Change: {
-				change: {
-					ClientMove: {
-						id: clientId,
-						channel: channelId,
-					},
-				},
+	public moveClient(clientId: ClientId, channelId: ChannelId): ChangePromise {
+		return this.sendChange({
+			ClientMove: {
+				id: clientId,
+				channel: channelId,
 			},
 		});
 	}
 
-	public moveChannel(moveChannelId: ChannelId, targetParentId: ChannelId, targetOrderId: ChannelId) {
-		this.sendMessage({
-			Change: {
-				change: {
-					ChannelMove: {
-						id: moveChannelId,
-						parent: targetParentId,
-						order: targetOrderId,
-					},
-				},
+	public moveChannel(moveChannelId: ChannelId, targetParentId: ChannelId, targetOrderId: ChannelId): ChangePromise {
+		return this.sendChange({
+			ChannelMove: {
+				id: moveChannelId,
+				parent: targetParentId,
+				order: targetOrderId,
 			},
 		});
 	}
@@ -192,6 +217,7 @@ export class Connection {
 		} else if ("DisconnectedTemporarily" in msg) {
 			this._state.update(s => s.setConnecting());
 			this.book.reset();
+			this.rejectReturnCodes();
 		} else if ("Events" in msg) {
 			for (const tsevt of msg.Events) {
 				try {
@@ -304,6 +330,14 @@ export class Connection {
 			}
 		} else if ("Loudness" in msg) {
 			this.loudness.set(msg.Loudness);
+		} else if ("Result" in msg) {
+			const ret = this.returnCodes.get(Number(msg.Result.returnCode));
+			if (ret !== undefined) {
+				if (msg.Result.tsResult === undefined && msg.Result.description === undefined)
+					ret.resolve(undefined);
+				else
+					ret.resolve(msg.Result);
+			}
 		} else {
 			console.error("Unknown message", msg);
 		}

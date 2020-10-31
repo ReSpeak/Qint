@@ -112,12 +112,15 @@ interface InLoudness {
 	Loudness: number;
 }
 
-interface InResult {
+export interface ResultDetails {
+	tsResult?: string;
+	description?: string;
+}
+
+export interface InResult {
 	Result: {
 		returnCode: string;
-		tsResult?: string;
-		description?: string;
-	};
+	} & ResultDetails;
 }
 
 //#region PropertyId

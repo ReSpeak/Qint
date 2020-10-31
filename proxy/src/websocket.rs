@@ -345,6 +345,16 @@ impl Ws {
 							}
 						}
 					}
+				} else if let InMessage::CommandError(error) = &msg {
+					for e in error.iter() {
+						if let Some(return_code) = &e.return_code {
+							self.send_message(&MessageP2F::Result {
+								return_code: return_code.clone(),
+								ts_result: Some(e.id),
+								description: None,
+							}, ctx);
+						}
+					}
 				}
 
 				if let Some(m) = book_events::convert_message(&msg) {
@@ -410,6 +420,13 @@ impl Ws {
 						));
 					}
 				}
+			}
+			TsStreamItem::MessageResult(handle, res) => {
+				self.send_message(&MessageP2F::Result {
+					return_code: handle.0.to_string(),
+					ts_result: res.err(),
+					description: None,
+				}, ctx);
 			}
 			_ => {}
 		}
