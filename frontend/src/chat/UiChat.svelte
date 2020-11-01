@@ -15,7 +15,7 @@
 	import { Channel, Client, Server } from "../book";
 	import { writable } from "svelte/store";
 	import type { Writable } from "svelte/store";
-	import { on } from "../util";
+	import { on, SERVER_ICON } from "../util";
 
 	export let chat: Chat;
 
@@ -198,10 +198,18 @@
 			{#if item.displayGroupHeader}
 				<div class="invoker-row">
 					<div class="invoker-icon chat-left-col">
-						<TsIcon type="client" source={item.invoker} {connection} />
+						{#if item.invoker}
+							<TsIcon type="client" source={item.invoker} {connection} />
+						{:else}
+							<Icon name={SERVER_ICON} />
+						{/if}
 					</div>
 					<div class="invoker-name has-text-weight-bold">
-						<ClientName client={item.invoker} />
+						{#if item.invoker}
+							<ClientName client={item.invoker} />
+						{:else}
+							Server
+						{/if}
 					</div>
 				</div>
 			{/if}

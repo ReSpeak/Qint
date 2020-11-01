@@ -31,6 +31,8 @@
 			},
 		});
 		pokeModalVisible = false;
+		// Update chat
+		client.chat.update(c => c);
 	}
 
 	$: clientRaw = connection.book.clients.get(clientId)!;

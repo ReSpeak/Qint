@@ -458,13 +458,18 @@ impl Handler<WriteMessageMsg> for DbHandler {
 		}
 
 		let chat = self.get_or_create_chat(&message.chat)?;
-		// Insert message
+		// Insert message with state sending (except for pokes, which do not receive again)
+		let status = if let ChatType::Poke(_) = message.chat.chat_type {
+			MessageStatus::Success
+		} else {
+			MessageStatus::Sending
+		};
 		let message = models::MessageInsert {
 			chat,
 			invoker: Some(&message.invoker_uid.0),
 			invoker_name: None,
 			content: &message.message,
-			status: MessageStatus::Sending,
+			status,
 			time: &utc_time,
 			timezone: utc_to_local_offset,
 		};

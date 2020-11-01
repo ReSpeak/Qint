@@ -86,6 +86,7 @@ export class Chat {
 						content
 						rendered
 						status
+						isPoke
 						time
 						timezone
 					}
@@ -112,7 +113,7 @@ export class Chat {
 					client = GraphQlClient.fromGraphqlInvoker(msg.invoker);
 				}
 				msgs.push(new Message(msg.id, client, msg.invokerName,
-					msg.content, msg.rendered, datetimeDeserialize([msg.time, msg.timezone])));
+					msg.content, msg.rendered, datetimeDeserialize([msg.time, msg.timezone]), msg.status, msg.isPoke));
 			});
 			console.log("Fetching messages " + (loadAtBeginning ? "before" : "after"), [startTime, startId], "; got", msgs);
 
@@ -161,6 +162,12 @@ export class Chat {
 	}
 }
 
+export const enum MessageStatus {
+	Sending = "SENDING",
+	Success = "SUCCESS",
+	Error = "ERROR",
+}
+
 export class Message {
 	private readonly _clientColor: Lazy<string>;
 	public displayDateSeparator: boolean = false;
@@ -176,6 +183,8 @@ export class Message {
 		public raw: string,
 		public rendered: string,
 		public date: Moment,
+		public status: MessageStatus,
+		public isPoke: boolean,
 	) {
 		this._clientColor = new Lazy(() => this.generateClientColor());
 	}

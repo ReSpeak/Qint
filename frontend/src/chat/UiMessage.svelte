@@ -1,5 +1,5 @@
 <script lang="typescript">
-	import { Message } from "./chat";
+	import { Message, MessageStatus } from "./chat";
 	import { LONG_DATETIME } from "../util";
 	import Icon from "../ui/Icon.svelte";
 	import LinkPreview from "./LinkPreview.svelte";
@@ -22,8 +22,9 @@
 		<!-- msg.status === MessageStatus::Error -->
 		<div
 			class="messageBody"
-			class:message-sending={false}
-			class:message-error={false}
+			class:messageSending={message.status === MessageStatus.Sending}
+			class:messageError={message.status === MessageStatus.Error}
+			class:isPoke={message.isPoke}
 			class:viewRaw>
 			<div class="messageRendered">
 				<RenderedText text={message.rendered} bind:links />
@@ -104,6 +105,16 @@
 			tab-size: 4;
 			-moz-tab-size: 4;
 			// TODO Prevent scrollbar
+		}
+
+		&.isPoke {
+			display: inline-flex;
+		}
+
+		&.isPoke::before {
+			content: "Poke: ";
+			font-style: italic;
+			margin-right: 0.5em;
 		}
 	}
 
