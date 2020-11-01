@@ -19,7 +19,7 @@ import { <#= base_structs.join(", ") #> } from "./bookBase";
 <#
 use std::fmt;
 
-use tsproto_structs::enums;
+use tsproto_structs::{enums, errors, versions};
 use tsproto_structs::enums::*;
 
 for e in &enums::DATA.enums { #>
@@ -29,8 +29,20 @@ export const enum <#= e.name #> {
 <# } #>
 }
 
-<# }
-for e in &enums::DATA.bitflags { #>
+<# } #>
+export const enum Error {
+<# for v in &errors::DATA.0 { #>
+	<#= v.name.to_camel_case() #> = "<#= v.name.to_camel_case() #>",
+<# } #>
+}
+
+export const enum Version {
+<# for v in &versions::DATA.0 { #>
+	<#= v.get_enum_name() #> = "<#= v.get_enum_name() #>",
+<# } #>
+}
+
+<# for e in &enums::DATA.bitflags { #>
 export enum <#= e.name #> {
 <# for v in &e.variants { #>
 	<#= v.name #> = "<#= v.name #>",

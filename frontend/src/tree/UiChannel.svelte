@@ -100,9 +100,11 @@
 	}
 
 	async function switchChannel() {
-		const res = await connection?.switchChannel(channel);
-		if (res !== undefined) {
-			console.log("Failed to switch channel", res);
+		if (connection !== undefined) {
+			const res = await connection.switchChannel(channel);
+			if (res !== undefined) {
+				console.log("Failed to switch channel", res);
+			}
 		}
 	}
 
@@ -212,7 +214,8 @@
 				class:spacerL={spacerType === SpacerType.LSpacer}
 				class:spacerR={spacerType === SpacerType.RSpacer}
 				class="nameBox"
-				on:click={setChat}>
+				on:click={setChat}
+				on:dblclick={switchChannel}>
 				{#if showId}
 					[<FilterString filter={thisFilter} content={$channel.id.toString()} />]
 				{/if}
@@ -227,11 +230,6 @@
 							{$chat.unreadCount}
 						{/if}
 					</span>
-				{/if}
-				{#if connection !== undefined}
-						<button class="button noBut" on:click={switchChannel}>
-							<Icon name="shoe-print" />
-						</button>
 				{/if}
 			</span>
 		</div>

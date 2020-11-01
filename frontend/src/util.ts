@@ -2,8 +2,10 @@ import chroma from "chroma-js";
 import moment, { Duration } from "moment";
 import { Moment } from "moment";
 import { OffsetDateTime, RustDuration } from "./ts";
-import { Readable, writable } from "svelte/store";
+import { Readable } from "svelte/store";
 import { ConnectData } from "./connect/connect";
+import { Version } from "./book_events";
+
 export const debug: boolean = true;
 export const render_updates: boolean = false;
 
@@ -221,20 +223,20 @@ export function focus(node: Element, args: any): {} {
 	return {};
 }
 
-export function getDefaultVersion(): string {
+export function getDefaultVersion(): Version {
 	let platform = ((window.navigator as any).oscpu ?? window.navigator.userAgent).toLowerCase();
 	if (platform.includes("windows")) {
-		return "Windows_3_X_X__1";
+		return Version.Windows_3_X_X__1;
 	} else if (platform.includes("linux")) {
-		return "Linux_3_X_X";
+		return Version.Linux_3_X_X;
 	} else if (platform.includes("android")) {
-		return "Android_3_X_X";
+		return Version.Android_3_X_X;
 	} else if (platform.includes("ios")) {
-		return "iOS_3_X_X";
+		return Version.iOS_3_X_X;
 	} else if (platform.includes("mac")) {
-		return "OS_X_3_X_X";
+		return Version.OS_X_3_X_X;
 	} else {
-		return "Windows_3_X_X__2";
+		return Version.Windows_3_X_X__2;
 	}
 }
 

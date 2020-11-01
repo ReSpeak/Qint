@@ -2,7 +2,7 @@
 
 import { Channel, ChannelGroup, Client, Server, ServerGroup } from "../book";
 import { ChannelId, ChannelGroupId, ClientId, ServerGroupId, OffsetDateTime } from "../ts";
-import { InMessage, OChange, Reason } from "../book_events";
+import { Error, InMessage, OChange, Reason, Version } from "../book_events";
 
 export type WsMessageTarget =
 	"Server"
@@ -20,7 +20,7 @@ export interface OMsgConnect {
 		address: string;
 		name: string;
 		channel: string | undefined;
-		version: string;
+		version: Version;
 		ignoreIdentityMismatch: boolean;
 		logCommands: boolean;
 		logPackets: boolean;
@@ -93,7 +93,7 @@ interface InDisconnected {
 }
 
 interface InMsgError {
-	Error: string;
+	Error: Error;
 }
 
 interface InTalkersChanged {
