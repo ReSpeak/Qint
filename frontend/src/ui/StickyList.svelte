@@ -3,7 +3,7 @@
 	import ResizeObserver from 'resize-observer-polyfill';
 	import { setContext } from 'svelte';
 
-	let stickyList!: HTMLElement;
+	let stickyList: HTMLElement;
 	let stickyChildren: ArrayLike<HTMLElement> = [];
 	let stickySizes = [] as number[];
 	let stickyAcc = [] as number[];
@@ -25,6 +25,7 @@
 	}
 
 	function stickyChanged() {
+		if (!stickyList) return;
 		stickyChildren = Array(...stickyList.children).filter(c => c.matches(".stickySlot")) as HTMLElement[];
 		stickySizes = Array(stickyChildren.length);
 		stickyAcc = Array(stickyChildren.length);

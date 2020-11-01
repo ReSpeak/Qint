@@ -51,7 +51,7 @@
 </script>
 
 <StickySlot styled={false} on:click={click}>
-	<div bind:this={div} class="button serverHeader" class:selectedServerChat tabindex="0">
+	<div bind:this={div} class="button stickyLine" class:selectedServerChat tabindex="0">
 		<TsIcon type="server" source={$server} {connection} />
 		<ServerName {connection} />
 		<div class="buttons">
@@ -64,20 +64,16 @@
 		<span class="icons">
 			{#if $state.connected && $chat.unreadCount > 0}
 				<span class="unreadCount" title={$chat.unreadCount.toString()}>
-					{#if $chat.unreadCount >= 100}
-						99+
-					{:else}
-						{$chat.unreadCount}
-					{/if}
+					{#if $chat.unreadCount >= 100}99+{:else}{$chat.unreadCount}{/if}
 				</span>
 			{/if}
 		</span>
 	</div>
 </StickySlot>
 <div bind:this={hoverComp}>
-{#if $hovered}
-	<HoverMenu {div} selected={new NodeSelection(connection, server)} />
-{/if}
+	{#if $hovered}
+		<HoverMenu {div} selected={new NodeSelection(connection, server)} />
+	{/if}
 </div>
 
 {#if !$state.connected}
@@ -112,30 +108,18 @@
 		z-index: 3 !important;
 	}
 
-	.serverHeader {
-		background: transparent;
-		border: none;
-		border-radius: 0;
-		width: 100%;
-		justify-content: flex-start;
-		display: flex;
-
-		&:focus {
-			box-shadow: none;
-		}
-
+	.stickyLine {
 		&.selectedServerChat {
 			background-color: mix($background, $text, 95%);
 		}
-	}
 
-	// Server name
-	.serverHeader > :global():nth-child(2) {
-		flex: 1;
-		text-align: start;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		margin-right: 0.25em;
+		> :global(.serverName){
+			flex: 1;
+			text-align: start;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			margin-right: 0.25em;
+		}
 	}
 
 	.statusField {

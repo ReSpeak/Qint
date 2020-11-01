@@ -40,13 +40,19 @@
 	</div>
 </div>
 
-<style>
+<style lang="scss">
+	@import "./style/global_mixin";
+
 	.tabBody {
 		padding: 0.5em;
 	}
 
+	a:hover {
+		text-decoration: none;
+	}
+
 	.tabs li.is-active a {
-		color: #0dead0;
-		border-bottom-color: #0dead0;
+		color: $main-blue;
+		border-bottom-color: $main-blue;
 	}
 </style>

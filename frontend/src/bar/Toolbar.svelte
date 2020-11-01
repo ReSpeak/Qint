@@ -34,7 +34,7 @@
 		</button>
 	</div>
 	<div class="spacer" />
-	<div class="centerButtons">
+	<div class="centerButtons toolbuttons">
 		<button
 			class="toolbutton"
 			class:active={displayPanel === DisplayPanel.Main}

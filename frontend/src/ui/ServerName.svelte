@@ -7,11 +7,11 @@
 </script>
 
 {#if !$state.connected}
-	<span>
+	<span class="serverName">
 		{connection.connectOptions.address}
 	</span>
 {:else}
-	<span style={$server.color}>
+	<span class="serverName" style={$server.color}>
 		{$server.name}
 	</span>
 {/if}

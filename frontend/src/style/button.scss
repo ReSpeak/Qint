@@ -1,0 +1,17 @@
+.outline-button {
+	background: none;
+	color: $text;
+	vertical-align: middle;
+	border: 1px solid;
+	border-radius: 5px;
+	border-color: $blue;
+	margin-left: 0.5em;
+
+	&:hover {
+		color: lighten($blue, 10%);
+	}
+
+	&.active {
+		background: $blue;
+	}
+}

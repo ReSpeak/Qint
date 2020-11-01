@@ -56,7 +56,7 @@
 </div>
 
 <style lang="scss">
-	@import "../global_mixin";
+	@import "../style/global_mixin";
 	$row-pad: 0.25em;
 
 	.messageRow {

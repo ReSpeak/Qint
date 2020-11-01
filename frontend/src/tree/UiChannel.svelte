@@ -265,10 +265,6 @@
 <style lang="scss">
 	@import "./tree";
 
-	.noBut {
-		@include noBut;
-	}
-
 	.collapseButton {
 		position: relative;
 		// This should match the icon w/h

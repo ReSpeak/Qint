@@ -1,4 +1,5 @@
 @import "./global_mixin";
+@import "./button";
 
 :root {
 	--channel-tree-width: 20em;
@@ -31,18 +32,30 @@ a {
 	color: $text-strong !important;
 }
 
+.toolbuttons {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-start;
+
+	> *:not(:last-child) {
+		margin-right: 0.5em;
+	}
+}
+
 .toolbutton {
 	@extend %unselectable;
 	-moz-appearance: none;
 	-webkit-appearance: none;
 
 	height: 2.5em;
+	width: 2.5em;
 	border-radius: 100%;
 	border: none;
-	margin: 0.2em;
 	font-size: 1rem;
 	display: inline-flex;
 	align-items: center;
+	justify-content: center;
 
 	background-color: #444444;
 	color: #fff;
@@ -51,6 +64,15 @@ a {
 
 	&.active {
 		background-color: #888888;
+	}
+
+	&.compact {
+		margin: 0;
+	}
+
+	&.is-small {
+		height: 1.5em;
+		width: 1.5em;
 	}
 }
 
@@ -61,9 +83,36 @@ a {
 .hidden {
 	display: none !important;
 }
+
 .invisible {
 	visibility: hidden !important;
 }
+
 .flex {
 	display: flex;
+}
+
+.noBut {
+	@include noBut;
+}
+
+.iconButton {
+	@include noBut;
+	width: 1.5em;
+	height: 1.5em;
+}
+
+// Util class for sticky slots with buttons
+
+.stickyLine {
+	background: transparent;
+	border: none;
+	border-radius: 0;
+	width: 100%;
+	justify-content: flex-start;
+	display: flex;
+
+	&:focus {
+		box-shadow: none;
+	}
 }

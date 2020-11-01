@@ -500,7 +500,7 @@
 </div>
 
 <style lang="scss">
-	@import "../global_mixin";
+	@import "../style/global_mixin";
 
 	.padBox {
 		padding: 1em;

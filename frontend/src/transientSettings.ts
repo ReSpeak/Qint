@@ -129,6 +129,7 @@ export class TransientSettingsSynth {
 	}
 }
 
+// TODO move into own app.ui management
 export class TransientSettingsUi {
 	private get descriptionMode() { return get(this._descriptionMode); }
 	private set descriptionMode(val: DescriptionMode) { this._descriptionMode.set(val); }

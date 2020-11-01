@@ -231,7 +231,7 @@
 					{/if}
 				</div>
 			</BInput>
-			<button class="button" name="send" type="submit" style="height: auto;">Send</button>
+			<button class="button outline-button" name="send" type="submit" style="height: auto;">Send</button>
 		</form>
 		{#if $developMode}
 			<form class="chat-form" on:submit|preventDefault={sendCommand}>
@@ -269,15 +269,6 @@
 
 	.chat-form > :global(*) {
 		box-shadow: 0px -5px 20px -5px rgba(0, 0, 0, 0.3);
-	}
-
-	.chat-form button {
-		background: none;
-		color: $blue;
-		vertical-align: middle;
-		border: 1px solid;
-		border-radius: 5px;
-		margin-left: 0.5em;
 	}
 
 	.chat :global(.scrollPane:last-child) {

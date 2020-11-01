@@ -1,16 +1,7 @@
+@import "../style/global_mixin";
+
 .ownClient :global(span) {
 	font-weight: bold;
-}
-
-@mixin noBut {
-	background: none;
-	border: none;
-	height: auto;
-	padding: 0;
-
-	&:focus {
-		box-shadow: none;
-	}
 }
 
 .innerContainer {

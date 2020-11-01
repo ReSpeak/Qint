@@ -27,7 +27,8 @@
 	@import "bulma/sass/helpers/spacing";
 	@import "bulma/sass/helpers/typography";
 	@import "bulma-slider/src/sass/index";
+	@import "bulma-switch/src/sass/index";
 	@import "bulmaswatch/cyborg/overrides";
 
-	@import "./global";
+	@import "./style/global";
 </style>

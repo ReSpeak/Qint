@@ -29,7 +29,7 @@
 	}
 </script>
 
-<div class="buttons">
+<div class="toolbuttons">
 	<button
 		class="toolbutton"
 		class:active={inputMuted}

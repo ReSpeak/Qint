@@ -53,7 +53,7 @@
 	{:else if selected.node instanceof Server}
 		<HoverMenuServer connection={selected.connection} />
 	{/if}
-	<div class="buttons">
+	<div class="toolbuttons">
 		<button
 			class="toolbutton"
 			class:active={infoActive}

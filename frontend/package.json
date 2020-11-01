@@ -43,6 +43,7 @@
 		"@uupaa/dynamic-import-polyfill": "^1.0.2",
 		"bulma": "^0.9.1",
 		"bulma-slider": "^2.0.4",
+		"bulma-switch": "^2.0.0",
 		"bulmaswatch": "^0.8.1",
 		"chroma-js": "^2.1.0",
 		"highlight.js": "^10.3.1",

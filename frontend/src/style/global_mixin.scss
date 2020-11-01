@@ -1,3 +1,15 @@
+@mixin noBut {
+	background: none;
+	border: none;
+	height: auto;
+	padding: 0;
+
+	&:focus {
+		box-shadow: none;
+	}
+}
+
+
 @mixin linkLike {
 	color: #57a4e8;
 	cursor: pointer;
@@ -9,3 +21,5 @@
 
 $highlight-strong: mix($background, $blue, 80%);
 $highlight-weak: mix($background, $text, 90%);
+
+$main-blue: #0dead0;
