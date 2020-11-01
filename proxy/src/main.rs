@@ -423,17 +423,15 @@ async fn download_file(
 					return HttpResponse::Gone().finish();
 				}
 				Ok(Err(e)) => {
-					if let Some(TsError::CommandError(tsclientlib::TsError::FileInvalidPath)) =
-						e.downcast_ref::<TsError>()
-					{
-						debug!(state.logger, "File not found"; "path" => &path);
-						return HttpResponse::NotFound().finish();
-					} else {
-						error!(state.logger, "File download failed"; "error" => %e,
-							"path" => &path);
-						return HttpResponse::InternalServerError()
-							.body(format!("Failed to download file: {}", e));
+					if let Some(TsError::CommandError(err)) = e.downcast_ref::<TsError>() {
+						if err.error == tsclientlib::TsError::FileInvalidPath {
+							debug!(state.logger, "File not found"; "path" => &path);
+							return HttpResponse::NotFound().finish();
+						}
 					}
+					error!(state.logger, "File download failed"; "error" => %e, "path" => &path);
+					return HttpResponse::InternalServerError()
+						.body(format!("Failed to download file: {}", e));
 				}
 				Ok(Ok(r)) => r,
 			};

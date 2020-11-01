@@ -114,6 +114,7 @@ interface InLoudness {
 
 export interface ResultDetails {
 	tsResult?: string;
+	missingPermission?: number;
 	description?: string;
 }
 

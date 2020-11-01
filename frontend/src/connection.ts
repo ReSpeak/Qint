@@ -1,6 +1,6 @@
 import { ResultDetails, OutMsg, InMsg } from "./backend/ws";
 import { get, writable, Writable, Readable } from "svelte/store";
-import { Book, Channel, ChatData } from "./book";
+import { Book, Channel, ChatData, Client } from "./book";
 import { getStringFromConnect, oneshot } from "./util";
 import { handleMessage } from "./notification";
 import { backend, IBackendConnection } from "./backend/backend";
@@ -254,10 +254,15 @@ export class Connection {
 					} else {
 						if ("PropertyRemoved" in tsevt) {
 							if ("Client" in tsevt.PropertyRemoved.id) {
-								if (tsevt.PropertyRemoved.id.Client === this.book.ownClientId) {
+								const id = tsevt.PropertyRemoved.id.Client;
+								if (id === this.book.ownClientId) {
 									this.close();
 									return;
 								}
+								// Reset chat if the selected node is from this client.
+								app.selectedNode.update(n => n?.connection === this
+									&& n.node instanceof Client
+									&& n.node.id === id ? undefined : n);
 							}
 						}
 

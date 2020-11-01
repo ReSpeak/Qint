@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use tsclientlib::{ClientId, DisconnectOptions, MessageTarget, TsError, Version};
+use tsclientlib::{ClientId, DisconnectOptions, MessageTarget, Permission, TsError, Version};
 use uuid::Uuid;
 
 use crate::book_events::{
@@ -72,6 +72,8 @@ pub enum MessageP2F {
 		return_code: String,
 		#[serde(default, rename = "tsResult", skip_serializing_if = "Option::is_none")]
 		ts_result: Option<TsError>,
+		#[serde(default, rename = "missingPermission", skip_serializing_if = "Option::is_none")]
+		missing_permission: Option<Permission>,
 		/// Description for non-ts errors
 		#[serde(default, skip_serializing_if = "Option::is_none")]
 		description: Option<String>,

@@ -114,6 +114,13 @@
 				{#each $client.serverGroups as grp (grp)}
 					<ServerGroupIcon id={grp} {connection} />
 				{/each}
+				{#if $client.clientType !== "Normal"}
+					{#if $client.clientType.Query.admin}
+						<Icon name="robot-outline" title="Admin Serverquery" />
+					{:else}
+						<Icon name="robot-outline" title="Serverquery" />
+					{/if}
+				{/if}
 				{#if $chat.unreadCount > 0}
 					<span class="unreadCount" title={$chat.unreadCount.toString()}>
 						{#if $chat.unreadCount >= 100}

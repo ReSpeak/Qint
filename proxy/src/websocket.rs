@@ -351,6 +351,7 @@ impl Ws {
 							self.send_message(&MessageP2F::Result {
 								return_code: return_code.clone(),
 								ts_result: Some(e.id),
+								missing_permission: e.missing_permission_id,
 								description: None,
 							}, ctx);
 						}
@@ -422,9 +423,15 @@ impl Ws {
 				}
 			}
 			TsStreamItem::MessageResult(handle, res) => {
+				let (ts_result, missing_permission) = if let Err(e) = res {
+					(Some(e.error), e.missing_permission)
+				} else {
+					(None, None)
+				};
 				self.send_message(&MessageP2F::Result {
 					return_code: handle.0.to_string(),
-					ts_result: res.err(),
+					ts_result,
+					missing_permission,
 					description: None,
 				}, ctx);
 			}
@@ -656,6 +663,7 @@ impl Ws {
 			self.send_message(&MessageP2F::Result {
 				return_code: code.into(),
 				ts_result: None,
+				missing_permission: None,
 				description: Some(error),
 			}, ctx);
 		} else {
