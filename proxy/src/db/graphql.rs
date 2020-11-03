@@ -686,16 +686,17 @@ impl SearchResult {
 		let mut sorted_hls = self.content_highlights.iter().map(|h| h.0.clone()).collect::<Vec<_>>();
 		sorted_hls.sort_by_key(|h| h.start);
 		let hl_strs = sorted_hls.iter().map(|h| {
-			&self.message.msg.content[h.clone()]
+			let r = crate::search::char_to_byte_range(h.start, h.end, &self.message.msg.content);
+			&self.message.msg.content[r]
 		}).collect::<Vec<_>>();
 
 		let rendered = crate::markdown::markdown(&self.message.msg.content);
 		let mut rendered_hls = Vec::new();
 		// Check if the highlighted parts are still in the rendered message
 		// TODO Search for highlighted parts only in body parts
-		if hl_strs.iter().all(|h| if let Some(i) = rendered.find(h) {
-			rendered_hls.push(Highlight(i..i + h.len()));
-			// !h.contains(&['>', '<', '&', '\'', '\"'])
+		if hl_strs.iter().all(|s| if let Some(i) = rendered.find(s) {
+			rendered_hls.push(Highlight(i..i + s.len()));
+			// !s.contains(&['>', '<', '&', '\'', '\"'])
 			false
 		} else {
 			false
@@ -707,17 +708,30 @@ impl SearchResult {
 			let mut res = String::new();
 			let mut last_end = 0;
 			for h in &sorted_hls {
-				if h.start - last_end > 10 {
+				let r = crate::search::char_to_byte_range(h.start, h.end, src);
+				if r.start - last_end > 20 {
 					res.push('…');
 				} else {
-					res.push_str(&src[last_end..h.start]);
+					res.push_str(&src[last_end..r.start]);
 				}
 				res.push_str(r#"<span class="filterHighlight"><span>"#);
-				res.push_str(&src[h.clone()]);
+				res.push_str(&src[r.clone()]);
 				res.push_str("</span></span>");
-				last_end = h.end;
-				if res.len() > 30 {
+				last_end = r.end;
+				if res.len() > 100 {
 					break;
+				}
+			}
+			if last_end < src.len() {
+				if res.len() < 100 {
+					if src.len() - last_end < 20 {
+						res.push_str(&src[last_end..]);
+					} else {
+						res.push_str(&src[last_end..last_end + 20]);
+						res.push('…');
+					}
+				} else {
+					res.push('…');
 				}
 			}
 			res
@@ -879,8 +893,8 @@ impl Query {
 					if let Some(msg) = msgs.remove(&d.num_id) {
 						results.push(SearchResult {
 							message: msg,
-							author_highlights: Vec::new(), // TODO
-							content_highlights: Vec::new(), // TODO
+							author_highlights: Vec::new(),
+							content_highlights: d.content_highlights.into_iter().map(Highlight).collect(),
 						});
 					} else {
 						warn!(logger, "Message from search database not found";

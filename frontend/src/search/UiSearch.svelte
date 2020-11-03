@@ -44,7 +44,11 @@
 				if (res.results.length < 50)
 					canLoadAfterEnd = false;
 			}
-			console.log("loading", idFrom, dir, "gives", res.results);
+			if (res.results.length === 0) {
+				canLoadBeforeStart = false;
+				canLoadAfterEnd = false;
+			}
+			console.log("loading search", idFrom, dir, "gives", res.results);
 			return {
 				items: res.results,
 				canLoadAfterEnd,
@@ -65,7 +69,7 @@
 				<div class="message-header">
 					<p>Error</p>
 				</div>
-				<div class="message-body">Failed to search</div>
+				<div class="message-body">Search failed</div>
 			</article>
 		</div>
 	{:else if filter.length >= 2}

@@ -3,9 +3,10 @@ use std::ops::Range;
 use std::path::Path;
 use std::sync::Arc;
 
+use anyhow::format_err;
 use diesel::prelude::*;
 use futures::FutureExt;
-use meilisearch_core::{Database, DatabaseOptions, Highlight, Schema};
+use meilisearch_core::{Database, DatabaseOptions, Schema};
 use meilisearch_core::settings::{SettingsUpdate, UpdateState};
 use meilisearch_core::store::Index;
 use serde::{Deserialize, Serialize};
@@ -27,7 +28,8 @@ pub struct Search {
 pub struct SearchResult {
 	pub id: String,
 	pub num_id: u64,
-	pub highlights: Vec<Highlight>,
+	pub author_highlights: Vec<Range<usize>>,
+	pub content_highlights: Vec<Range<usize>>,
 }
 
 #[derive(Clone, Debug, Hash)]
@@ -42,6 +44,24 @@ pub struct MessageDocument {
 	pub id: String,
 	pub author: String,
 	pub content: String,
+}
+
+pub fn char_to_byte_range(index: usize, length: usize, text: &str) -> Range<usize> {
+	let mut byte_index = 0;
+	let mut byte_length = 0;
+
+	for (n, (i, c)) in text.char_indices().enumerate() {
+		if n == index {
+			byte_index = i;
+		}
+
+		if n + 1 == index + length {
+			byte_length = i - byte_index + c.len_utf8();
+			break;
+		}
+	}
+
+	Range { start: byte_index, end: byte_index + byte_length }
 }
 
 impl Search {
@@ -148,11 +168,15 @@ impl Search {
 	pub fn search(&self, query: &str, range: Range<usize>) -> Result<SearchResults> {
 		let reader = self.database.main_read_txn()?;
 		let builder = self.index.query_builder();
-		//builder.with_fetch_timeout(Duration::from_millis(timeout));
 		trace!(self.logger, "Search query"; "query" => query, "range" => ?range);
 		let result = builder.query(&reader, Some(query), range)?;
 		let mut attrs = HashSet::new();
 		attrs.insert("id");
+
+		let schema = self.index.main.schema(&reader)?
+			.ok_or_else(|| format_err!("Schema not found"))?;
+		let content_attr = schema.id("content")
+			.ok_or_else(|| format_err!("Content not found in schema"))?.0;
 
 		let mut res = SearchResults {
 			results: Vec::new(),
@@ -166,10 +190,21 @@ impl Search {
 
 			if let Some(id) = self.index.document::<IdDocument>(&reader, Some(&attrs), r.id)? {
 				let num_id = id.id[1..].parse::<u64>()?;
+				let author_highlights = Vec::new();
+				let mut content_highlights = Vec::new();
+
+				for h in &r.highlights {
+					if h.attribute == content_attr {
+						//content_highlights.push(h.char_index as usize..h.char_index as usize + h.char_length as usize);
+						content_highlights.push(h.char_index as usize..h.char_length as usize);
+					}
+				}
+
 				res.results.push(SearchResult {
 					id: id.id,
 					num_id,
-					highlights: r.highlights,
+					author_highlights,
+					content_highlights,
 				});
 			} else {
 				warn!(self.logger, "Search document not found"; "id" => ?r.id);
