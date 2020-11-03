@@ -32,9 +32,13 @@ juniper = { git = "https://github.com/graphql-rust/juniper" }
 lazy_static = "1"
 libsqlite3-sys = { version = "0.18", features = [ "bundled" ] }
 livesplit-hotkey = "0.5"
-open = "1"
+meilisearch-core = { git = "https://github.com/meilisearch/MeiliSearch", version = "0.16.0" }
+#meilisearch-error = { path = "../meilisearch-error", version = "0.16.0" }
+#meilisearch-schema = { git = "https://github.com/meilisearch/MeiliSearch", version = "0.16.0" }
+#meilisearch-tokenizer = {path = "../meilisearch-tokenizer", version = "0.16.0"}
 nnnoiseless = "0.3"
 nom = "5"
+open = "1"
 percent-encoding = "2.1"
 pulldown-cmark = "0.8"
 regex = "1"

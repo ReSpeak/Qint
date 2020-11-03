@@ -1,7 +1,9 @@
 // Broken warning with juniper derive
 #![allow(unused_braces)]
 
+use std::collections::HashMap;
 use std::convert::TryInto;
+use std::ops::Range;
 use std::sync::Arc;
 
 use actix_web::*;
@@ -11,6 +13,7 @@ use diesel::prelude::*;
 use juniper::http::graphiql::graphiql_source;
 use juniper::http::{GraphQLRequest, GraphQLResponse};
 use juniper::{EmptySubscription, FieldError, RootNode, ID};
+use slog::warn;
 use tsproto_types::crypto::EccKeyPubP256;
 
 use super::models::MessageStatus;
@@ -47,6 +50,18 @@ struct Message {
 }
 struct Server(models::Server);
 struct ServerClient(models::ServersClients);
+
+struct Highlight(Range<usize>);
+struct SearchResult {
+	message: Message,
+	author_highlights: Vec<Highlight>,
+	content_highlights: Vec<Highlight>,
+}
+
+struct SearchResults {
+	results: Vec<SearchResult>,
+	count: usize,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, juniper::GraphQLEnum)]
 enum GMessageTarget {
@@ -655,6 +670,68 @@ impl ServerClient {
 }
 
 #[juniper::graphql_object(Context = State)]
+impl Highlight {
+	fn start(&self) -> i32 { self.0.start as i32 }
+	fn end(&self) -> i32 { self.0.end as i32 }
+}
+
+#[juniper::graphql_object(Context = State)]
+impl SearchResult {
+	fn message(&self) -> &Message { &self.message }
+	fn author_highlights(&self) -> &[Highlight] { &self.author_highlights }
+	fn content_highlights(&self) -> &[Highlight] { &self.content_highlights }
+
+	/// Gives a rendered view of the content which contains parts of the content and highlighting.
+	fn highlighted_content(&self) -> String {
+		let mut sorted_hls = self.content_highlights.iter().map(|h| h.0.clone()).collect::<Vec<_>>();
+		sorted_hls.sort_by_key(|h| h.start);
+		let hl_strs = sorted_hls.iter().map(|h| {
+			&self.message.msg.content[h.clone()]
+		}).collect::<Vec<_>>();
+
+		let rendered = crate::markdown::markdown(&self.message.msg.content);
+		let mut rendered_hls = Vec::new();
+		// Check if the highlighted parts are still in the rendered message
+		// TODO Search for highlighted parts only in body parts
+		if hl_strs.iter().all(|h| if let Some(i) = rendered.find(h) {
+			rendered_hls.push(Highlight(i..i + h.len()));
+			// !h.contains(&['>', '<', '&', '\'', '\"'])
+			false
+		} else {
+			false
+		}) {
+			rendered
+		} else {
+			// Highlight and cut out highlights
+			let src = &self.message.msg.content;
+			let mut res = String::new();
+			let mut last_end = 0;
+			for h in &sorted_hls {
+				if h.start - last_end > 10 {
+					res.push('…');
+				} else {
+					res.push_str(&src[last_end..h.start]);
+				}
+				res.push_str(r#"<span class="filterHighlight"><span>"#);
+				res.push_str(&src[h.clone()]);
+				res.push_str("</span></span>");
+				last_end = h.end;
+				if res.len() > 30 {
+					break;
+				}
+			}
+			res
+		}
+	}
+}
+
+#[juniper::graphql_object(Context = State)]
+impl SearchResults {
+	fn results(&self) -> &[SearchResult] { &self.results }
+	fn count(&self) -> i32 { self.count as i32 }
+}
+
+#[juniper::graphql_object(Context = State)]
 impl Query {
 	// TODO Support pagination: https://relay.dev/graphql/connections.htm
 	async fn bookmarks(state: &State) -> GResult<Vec<Bookmark>> {
@@ -771,6 +848,50 @@ impl Query {
 
 				let query = clients::table.filter(clients::uid.eq(client));
 				GResult::Ok(Client(query.first::<models::Client>(&db.con)?))
+			}))
+			.await??;
+		Ok(res)
+	}
+
+	/// Search for a query string and returns 50 results.
+	///
+	/// A start offset can be specified to fetch further results.
+	async fn search(state: &State, query: String, start: Option<i32>) -> GResult<SearchResults> {
+		let start = start.unwrap_or_default() as usize;
+		let search_res = state.search.search(&query, start..start + MESSAGES_LIMIT as usize)?;
+		let logger = state.logger.clone();
+		let res = state
+			.database
+			.send(RunOnDbMsg(move |db| {
+				use schema::messages;
+
+				let ids = search_res.results.iter().map(|d| d.num_id as i64).collect::<Vec<_>>();
+				// TODO is_poke is lost
+				let mut msgs = messages::table.filter(messages::id.eq_any(&ids))
+					.load::<models::Message>(&db.con)?
+					.into_iter()
+					.map(|msg| (msg.id as u64, Message { msg, is_poke: false }))
+					.collect::<HashMap<u64, Message>>();
+
+				// Order by search results
+				let mut results = Vec::new();
+				for d in search_res.results {
+					if let Some(msg) = msgs.remove(&d.num_id) {
+						results.push(SearchResult {
+							message: msg,
+							author_highlights: Vec::new(), // TODO
+							content_highlights: Vec::new(), // TODO
+						});
+					} else {
+						warn!(logger, "Message from search database not found";
+							"id" => d.id);
+					}
+				}
+
+				GResult::Ok(SearchResults {
+					results,
+					count: search_res.count,
+				})
 			}))
 			.await??;
 		Ok(res)

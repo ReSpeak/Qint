@@ -19,13 +19,14 @@ use tsclientlib::{ChannelId, ClientId, Identity, InMessage, Invoker, MessageTarg
 use tsproto_types::crypto::EccKeyPubP256;
 
 use crate::filecache::FileCache;
+use crate::search::Search;
 use crate::secret::Secret;
 use crate::{Settings, State};
 use models::MessageStatus;
 
 pub(crate) mod graphql;
 mod models;
-mod schema;
+pub mod schema;
 
 type DieselResult<T> = std::result::Result<T, diesel::result::Error>;
 
@@ -34,8 +35,9 @@ diesel_migrations::embed_migrations!();
 pub struct DbHandler {
 	logger: Logger,
 	file_cache: Arc<FileCache>,
+	search: Arc<Search>,
 	secret: Secret,
-	con: SqliteConnection,
+	pub con: SqliteConnection,
 	last_message_id: i64,
 }
 
@@ -58,7 +60,7 @@ pub struct GetClientVolumeMsg(pub Uid);
 #[derive(Clone, Debug)]
 pub struct SetClientVolumeMsg(pub Uid, pub f32);
 pub struct UpdateIdentityMsg(pub Identity);
-struct RunOnDbMsg<I: 'static, E: 'static, F: FnOnce(&mut DbHandler) -> result::Result<I, E>>(F);
+pub struct RunOnDbMsg<I: 'static, E: 'static, F: FnOnce(&mut DbHandler) -> result::Result<I, E>>(pub F);
 
 /// After we connected successfully to a server.
 pub struct ConnectedMsg {
@@ -150,7 +152,7 @@ impl Message for RunMsg {
 
 impl DbHandler {
 	pub(crate) fn new(
-		logger: Logger, file_cache: Arc<FileCache>, settings: &Settings, secret: Secret,
+		logger: Logger, file_cache: Arc<FileCache>, search: Arc<Search>, settings: &Settings, secret: Secret,
 	) -> Result<Self> {
 		let database_url = settings.config_path.join("storage.sqlite");
 		let con = SqliteConnection::establish(database_url.to_str().unwrap())?;
@@ -175,7 +177,7 @@ impl DbHandler {
 			info!(logger, "Run database migrations"; "output" => s);
 		}
 
-		Ok(Self { logger, file_cache, secret, con, last_message_id: 0 })
+		Ok(Self { logger, file_cache, search, secret, con, last_message_id: 0 })
 	}
 
 	/// Create a new chat entry in the database and returns the id.
@@ -464,7 +466,7 @@ impl Handler<WriteMessageMsg> for DbHandler {
 		} else {
 			MessageStatus::Sending
 		};
-		let message = models::MessageInsert {
+		let msg = models::MessageInsert {
 			chat,
 			invoker: Some(&message.invoker_uid.0),
 			invoker_name: None,
@@ -473,7 +475,20 @@ impl Handler<WriteMessageMsg> for DbHandler {
 			time: &utc_time,
 			timezone: utc_to_local_offset,
 		};
-		diesel::insert_into(messages::table).values(&message).execute(&self.con)?;
+		let message_id = self.con.transaction::<_, diesel::result::Error, _>(|| {
+			diesel::insert_into(messages::table).values(&msg).execute(&self.con)?;
+			messages::table
+				.order(messages::id.desc())
+				.select(messages::id)
+				.first::<i64>(&self.con)
+		})?;
+		// Add to search db
+		// TODO Get invoker name or don't save in search db?
+		self.search.add_message(crate::search::MessageDocument {
+			id: format!("m{}", message_id as u64),
+			author: "".into(),
+			content: message.message,
+		})?;
 
 		// Update last read from the chat
 		diesel::update(chats::table.find(chat))
@@ -1371,6 +1386,7 @@ impl<'a> EventHandler<'a> {
 	fn handle_message(
 		&self, target: MessageTarget, invoker: &Invoker, message: &str,
 	) -> Result<()> {
+		let search = self.state.search.clone();
 		let server = self.con.get_server_key()?;
 
 		let invoker_uid = if let Some(uid) = &invoker.uid { Some(uid.0.clone()) } else { None };
@@ -1507,6 +1523,13 @@ impl<'a> EventHandler<'a> {
 					.select(messages::id)
 					.first::<i64>(&db.con)
 			})?;
+			// Add to search db
+			search.add_message(crate::search::MessageDocument {
+				id: format!("m{}", db.last_message_id as u64),
+				author: "".into(),
+				content: message,
+			})?;
+
 			Ok(())
 		});
 		Ok(())
