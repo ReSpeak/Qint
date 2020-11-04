@@ -63,12 +63,14 @@
 			<BKeyValue label="Ask before closing">
 				<input
 					type="checkbox"
+					class="checkbox-switch is-info"
 					bind:checked={app.transientSettings.app.askBeforeClosing}
 					on:change={() => syncSettings('app')} />
 			</BKeyValue>
 			<BKeyValue label="Developer Mode">
 				<input
 					type="checkbox"
+					class="checkbox-switch is-info"
 					bind:checked={$developMode}
 					on:change={() => syncSettings('ui')} />
 			</BKeyValue>
@@ -77,6 +79,7 @@
 				title={browserNotificationDenied ? "Your browser blocked notifications for this page. If you want to use them, enable notifications in your browser settings and reload the page." : ""}>
 				<input
 					type="checkbox"
+					class="checkbox-switch is-info"
 					disabled={browserNotificationDenied}
 					bind:checked={app.transientSettings.app.allowBrowserNotifications}
 					on:change={browserNotificationChanged}>
@@ -140,7 +143,7 @@
 	</BTabList>
 </div>
 
-<style>
+<style lang="scss">
 	.settings {
 		padding: 1em;
 	}

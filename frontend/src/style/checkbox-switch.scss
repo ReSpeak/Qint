@@ -1,0 +1,61 @@
+$size: 1rem;
+$switch-height: $size * 1.5;
+$switch-width: $switch-height * 2;
+$paddle-size: $size;
+$paddle-offset: $size * 0.25;
+$paddle-offset-active: $switch-width - $paddle-size - ($paddle-offset * 1.5);
+$bg-color: #777;
+
+.checkbox-switch {
+	appearance: none;
+	box-sizing: content-box;
+	position: relative;
+	display: block;
+	width: $switch-width;
+	height: $switch-height;
+	border: 0.1rem solid transparent;
+	border-radius: $switch-height * 0.6;
+	background-color: $bg-color;
+	cursor: pointer;
+}
+
+.checkbox-switch:focus {
+	outline: 1px solid $bg-color;
+}
+
+.checkbox-switch:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.checkbox-switch::after {
+	content: "";
+	display: block;
+	position: absolute;
+	top: ($switch-height - $paddle-size) * 0.5;
+	left: $paddle-offset;
+	width: $paddle-size;
+	height: $paddle-size;
+	background: white;
+	border-radius: 50%;
+	transition: all ease-in-out 100ms;
+}
+
+.checkbox-switch:checked::after {
+	left: $paddle-offset-active;
+}
+
+.checkbox-switch:disabled::after {
+	background-color: darken($bg-color, 15);
+}
+
+.checkbox-switch:checked {
+	@each $name, $pair in $colors {
+		$color: nth($pair, 1);
+		$color-invert: nth($pair, 2);
+		
+		&.is-#{$name} {
+			background-color: $color;
+		}
+	}
+}

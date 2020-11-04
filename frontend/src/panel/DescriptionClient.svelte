@@ -141,7 +141,7 @@
 				{#each groups as grp (grp)}
 				<label class="checkbox serverGroupContainer" for={"group" + grp.id}>
 					<div class="serverGroupCheckbox">
-						<input type="checkbox" id={"group" + grp.id} on:input={e => changeServerGroup(e, grp.id, !grp.isMember)} checked={grp.isMember} />
+						<input type="checkbox" class="checkbox-switch is-info" id={"group" + grp.id} on:input={e => changeServerGroup(e, grp.id, !grp.isMember)} checked={grp.isMember} />
 					</div>
 					<div class="serverGroupSpacing"></div>
 					<div class="serverGroupIcon">
@@ -206,8 +206,6 @@
 	}
 
 	.serverGroupCheckbox {
-		padding-left: 1em;
-		padding-right: 1em;
 		margin-right: 0.1em;
 		border-radius: 0.2em 0 0 0.2em;
 

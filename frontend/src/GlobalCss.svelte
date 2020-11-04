@@ -29,6 +29,7 @@
 	@import "bulma-slider/src/sass/index";
 	@import "bulma-switch/src/sass/index";
 	@import "bulmaswatch/cyborg/overrides";
-
+	
+	@import "./style/checkbox-switch";
 	@import "./style/global";
 </style>
