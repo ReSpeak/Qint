@@ -44,6 +44,7 @@ mod markdown;
 mod messages;
 mod secret;
 mod shortcut;
+mod search;
 mod site_peek;
 mod websocket;
 
@@ -166,6 +167,7 @@ pub struct State {
 	file_cache: Arc<FileCache>,
 	site_peek_cache: site_peek::SitePeekCache,
 	secret: Secret,
+	search: Arc<search::Search>,
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, serde::Serialize, serde::Deserialize)]
@@ -754,9 +756,14 @@ impl App {
 
 		let file_cache = Arc::new(FileCache::new(logger.clone(), settings.cache_path.clone()));
 
+		// Open search database
+		let (search, search_is_new) = search::Search::new(logger.clone(),
+			&settings.cache_path.join("search.db"))?;
+		let search = Arc::new(search);
+
 		// Open database
 		let database =
-			db::DbHandler::new(logger.clone(), file_cache.clone(), &settings, secret.clone())?
+			db::DbHandler::new(logger.clone(), file_cache.clone(), search.clone(), &settings, secret.clone())?
 				.start();
 
 		let connections = Arc::new(Mutex::new(HashMap::new()));
@@ -801,9 +808,14 @@ impl App {
 			file_cache,
 			site_peek_cache,
 			secret,
+			search,
 		});
 
 		state.shortcuts.apply_config(&state)?;
+
+		if search_is_new {
+			search::Search::start_setup(&state);
+		}
 
 		if !no_open {
 			// Open browser
