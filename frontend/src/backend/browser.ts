@@ -3,10 +3,11 @@ import { BASE_ADDRESS, createUuidV4 } from "../util";
 import { closedFn, errorFn, IBackend, IBackendConnection, IFetchLike, msgFn } from "./backend";
 
 export class BrowserBackend implements IBackend {
-	public cacheFileSrc: string;
+	public readonly cacheFileSrc: string;
+	public readonly baseAddress: string = BASE_ADDRESS;
 
 	constructor() {
-		this.cacheFileSrc = `${BASE_ADDRESS}/filecache`;
+		this.cacheFileSrc = `${this.baseAddress}/filecache`;
 	}
 
 	createNewConnection(): IBackendConnection {
@@ -14,7 +15,7 @@ export class BrowserBackend implements IBackend {
 	}
 
 	public fetch(cmd: string, data: RequestInit): Promise<IFetchLike> {
-		return fetch(`${BASE_ADDRESS}${cmd}`, data);
+		return fetch(`${this.baseAddress}${cmd}`, data);
 	}
 
 	public async graphql<T = any>(query: string, variables?: object): Promise<{ data: T }> {

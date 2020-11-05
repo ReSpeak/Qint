@@ -57,6 +57,7 @@
 
 <style lang="scss">
 	@import "../style/global_mixin";
+	@import "./chat_style";
 	$row-pad: 0.25em;
 
 	.messageRow {
@@ -70,7 +71,7 @@
 	.hover-container {
 		display: grid;
 		grid-template-columns: min-content minmax(0, 1fr);
-		padding: $row-pad 0;
+		padding: $row-pad $side-pad-width;
 		line-height: 1.1em;
 
 		&:hover {

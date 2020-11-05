@@ -8,7 +8,8 @@ export type msgFn = (msg: InMsg) => void;
 export type closedFn = () => void;
 
 export interface IBackend {
-	cacheFileSrc: string;
+	readonly cacheFileSrc: string;
+	readonly baseAddress: string;
 	createNewConnection(): IBackendConnection;
 	fetch(cmd: string, data?: RequestInit): Promise<IFetchLike>;
 	graphql<T = any>(query: string, variables?: object): Promise<{ data: T }>;
@@ -16,8 +17,8 @@ export interface IBackend {
 }
 
 export interface IBackendConnection {
-	id: string;
-	serverFileSrc: string;
+	readonly id: string;
+	readonly serverFileSrc: string;
 	send(data: OutMsg): void;
 	connect(
 		onMsg: msgFn,

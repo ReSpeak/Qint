@@ -1,5 +1,4 @@
 <script lang="typescript">
-	import { assert } from "../util";
 	import { createEventDispatcher, onMount } from "svelte";
 	export let items: any[];
 	export let selected: any;
@@ -7,12 +6,11 @@
 	export let id: string | undefined = undefined;
 	let dd: HTMLSelectElement;
 	const dispatch = createEventDispatcher<{ change: any }>();
-	assert(Array.isArray(items), "items must be set to an array");
 
 	$: selectedToIndex(selected);
 
 	function selectedToIndex(selected: any) {
-		if (dd === undefined) return;
+		if (dd == null) return;
 		const newIndex = items.findIndex(i => i === selected);
 		if (newIndex !== -1) {
 			dd.selectedIndex = newIndex;
@@ -20,7 +18,7 @@
 	}
 
 	function indexToSelected() {
-		if (dd === undefined) return;
+		if (dd == null) return;
 		selected = items[dd.selectedIndex];
 		dispatch("change", selected);
 	}

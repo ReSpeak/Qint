@@ -207,9 +207,7 @@
 					<div class="invoker-name has-text-weight-bold">
 						{#if item.invoker}
 							<ClientName client={item.invoker} />
-						{:else}
-							Server
-						{/if}
+						{:else}Server{/if}
 					</div>
 				</div>
 			{/if}
@@ -231,11 +229,15 @@
 					{/if}
 				</div>
 			</BInput>
-			<button class="button outline-button" name="send" type="submit" style="height: auto;">Send</button>
+			<button
+				class="button outline-button"
+				name="send"
+				type="submit"
+				style="height: auto;">Send</button>
 		</form>
 		{#if $developMode}
 			<form class="chat-form" on:submit|preventDefault={sendCommand}>
-				<BInput bind:value={command}></BInput>
+				<BInput bind:value={command} />
 				<button class="button" name="send" type="submit" style="height: auto;">Send Command</button>
 			</form>
 		{/if}
@@ -245,6 +247,8 @@
 </div>
 
 <style lang="scss">
+	@import "./chat_style";
+
 	.chat {
 		overflow: hidden;
 		display: flex;
@@ -272,7 +276,7 @@
 	}
 
 	.chat :global(.scrollPane:last-child) {
-		padding: 0.5em;
+		padding-bottom: 0.5em;
 	}
 
 	@mixin block-margin {
@@ -302,15 +306,14 @@
 		display: flex;
 		align-items: center;
 		@include block-margin;
+		margin-left: $side-pad-width;
+		margin-right: $side-pad-width;
 	}
 
 	.chat :global(.chat-left-col) {
 		width: 48px;
-		padding-right: 8px;
-		padding-left: 8px;
-	}
+		padding-right: 0.5em;
 
-	.invoker-icon {
 		display: flex;
 		justify-content: center;
 		text-align: center;

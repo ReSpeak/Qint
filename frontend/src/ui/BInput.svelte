@@ -1,6 +1,7 @@
 <script lang="typescript">
 	import { createEventDispatcher, onMount, tick } from "svelte";
 	export let value: string;
+	export let enterToSubmit = true;
 	const submitDispatch = createEventDispatcher<{ submit: undefined }>();
 	let setValue: string | undefined;
 	let self!: HTMLElement;
@@ -35,7 +36,7 @@
 	}
 
 	function onChatKeyDown(e: KeyboardEvent) {
-		if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey) {
+		if (enterToSubmit && e.key === "Enter" && !e.shiftKey && !e.ctrlKey) {
 			submitDispatch("submit");
 			e.preventDefault();
 		}

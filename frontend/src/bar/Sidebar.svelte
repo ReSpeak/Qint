@@ -31,6 +31,7 @@
 		background-color: $box-background-color;
 		box-shadow: 3px 0 3px #0006;
 		overflow-y: auto;
+		z-index: 3; // Required to be over the chat
 	}
 
 	.sidebar > .menu .menu-list li {

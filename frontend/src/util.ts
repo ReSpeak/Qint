@@ -350,11 +350,16 @@ export function oneshot<T>(
 
 type FnFunc<T extends unknown[]> = (...args: T) => void;
 interface DebounceOpt {
-	resetOnCall?: boolean // default: true
+	/**
+	 * When true, resets timer on each new call. Does not fire until the timer ran out.
+	 * **Default**: true
+	 */
+	resetOnCall?: boolean,
 }
 
 export function debounced<T extends unknown[] = []>(fn: FnFunc<T>, timeout: number, options?: DebounceOpt) {
 	let timer: number | undefined;
+	let lastArgs: T;
 	let opt = options ?? {
 		resetOnCall: false,
 	};
@@ -367,6 +372,7 @@ export function debounced<T extends unknown[] = []>(fn: FnFunc<T>, timeout: numb
 	}
 
 	function call(...args: T) {
+		lastArgs = args;
 		if (opt.resetOnCall) {
 			cancel();
 		}
@@ -374,7 +380,7 @@ export function debounced<T extends unknown[] = []>(fn: FnFunc<T>, timeout: numb
 		if (timer === undefined) {
 			timer = setTimeout(() => {
 				timer = undefined;
-				fn(...args);
+				fn(...lastArgs);
 			}, timeout);
 		}
 	}

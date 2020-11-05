@@ -19,6 +19,10 @@ a {
 	}
 }
 
+hr {
+	min-height: 2px;
+}
+
 .update-flash {
 	color: rgba(255, 62, 0, 1) !important;
 	background-color: rgba(255, 62, 0, 0.2) !important;
@@ -90,6 +94,9 @@ a {
 
 .flex {
 	display: flex;
+}
+.flex1 {
+	flex: 1;
 }
 
 .noBut {

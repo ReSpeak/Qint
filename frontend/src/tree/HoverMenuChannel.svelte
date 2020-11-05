@@ -1,7 +1,6 @@
 <script lang="typescript">
 	import { Connection } from "../connection";
 	import type { ChannelId } from "../ts";
-	import RenderedText from "../ui/RenderedText.svelte";
 
 	export let connection: Connection;
 	export let channelId: ChannelId;
@@ -15,7 +14,7 @@
 </div>
 {#if channel.topicRendered !== null && channel.topicRendered.length > 0}
 <div class="description">
-	<RenderedText text={channel.topicRendered} />
+	{channel.topic}
 </div>
 {/if}
 

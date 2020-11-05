@@ -1,6 +1,5 @@
 <script lang="typescript">
 	import Loader from "../ui/Loader.svelte";
-	import Icon from "../ui/Icon.svelte";
 	import VideoPreview from "./VideoPreview.svelte";
 	import { analyzeLink } from "./previewAnalyzer";
 	import { autoError } from "../util";
@@ -50,15 +49,10 @@
 
 	.box {
 		padding: 1em;
+		margin-right: 1em;
 	}
 
 	.media-left {
 		float: left;
-	}
-
-	.close {
-		border-radius: 100%;
-		width: 2.5em;
-		height: 2.5em;
 	}
 </style>

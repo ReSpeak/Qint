@@ -51,6 +51,7 @@
 
 <div bind:this={stickyList} class="stickyList">
 	<slot />
+	<div class="stickEndDummy"></div>
 </div>
 
 <style lang="scss">
@@ -60,5 +61,9 @@
 		height: 100%;
 		overflow-x: hidden;
 		overflow-y: auto;
+	}
+
+	.stickEndDummy {
+		min-height: 1px;
 	}
 </style>

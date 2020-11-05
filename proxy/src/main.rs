@@ -16,9 +16,12 @@ use std::sync::{mpsc, Arc, Mutex, RwLock};
 use actix::*;
 use actix_cors::Cors;
 use actix_files::Files;
-use actix_web::{web::Query, dev::{HttpResponseBuilder, Service}};
 use actix_web::web::Bytes;
 use actix_web::*;
+use actix_web::{
+	dev::{HttpResponseBuilder, Service},
+	web::Query,
+};
 use actix_web_actors::ws;
 use anyhow::{bail, Result};
 use futures::prelude::*;
@@ -40,15 +43,17 @@ mod book_events;
 mod db;
 mod filecache;
 mod find_url;
+mod markdown_ws;
 mod markdown;
 mod messages;
+mod search;
 mod secret;
 mod shortcut;
-mod search;
 mod site_peek;
 mod websocket;
 
 use filecache::FileCache;
+use markdown_ws::MarkdownService;
 use secret::Secret;
 use websocket::Ws;
 
@@ -386,15 +391,15 @@ async fn get_plugin(state: web::Data<Arc<State>>, name: web::Path<String>) -> im
 
 #[derive(Deserialize)]
 struct GetFileOptions {
-	dl: Option<String>
+	dl: Option<String>,
 }
 
 #[get("/con/{id}/file/{channel}/{path:.*}")]
 async fn download_file(
-	state: web::Data<Arc<State>>,
-	web::Path((id, channel, path)): web::Path<(Uuid, u64, String)>,
-	query_opt: Query<GetFileOptions>
-) -> impl Responder {
+	state: web::Data<Arc<State>>, web::Path((id, channel, path)): web::Path<(Uuid, u64, String)>,
+	query_opt: Query<GetFileOptions>,
+) -> impl Responder
+{
 	let channel = ChannelId(channel);
 	let cons = state.connections.lock().unwrap();
 	if let Some(con) = cons.get(&ConnectionId(id)).cloned() {
@@ -443,7 +448,10 @@ async fn download_file(
 		let (stream, mut response) = guess_content_type(stream).await;
 		response.no_chunking(len);
 		if let Some(filename) = query_opt.dl.as_ref() {
-			response.set_header("Content-Disposition", format!("attachment; filename=\"{}\"", filename));
+			response.set_header(
+				"Content-Disposition",
+				format!("attachment; filename=\"{}\"", filename),
+			);
 		}
 
 		// Cache icons and avatars for offline usage
@@ -547,6 +555,22 @@ async fn download_cache_file(
 #[get("/peek_link/{url}")]
 async fn get_link_preview(state: web::Data<Arc<State>>, url: web::Path<String>) -> impl Responder {
 	HttpResponse::Ok().json(state.site_peek_cache.decode_and_analyze_link(&url).await)
+}
+
+#[get("/render_md_service")]
+async fn render_md_service(
+	state: web::Data<Arc<State>>, req: HttpRequest, stream: web::Payload
+) -> impl Responder {
+	let ws = MarkdownService::new();
+	match ws::start_with_addr(ws, &req, stream) {
+		Err(e) => {
+			error!(state.logger, "Failed to create websocket actor"; "error" => %e);
+			Either::A(HttpResponse::InternalServerError().body("Failed to start connection"))
+		}
+		Ok((_, ws)) => {
+			Either::B(ws)
+		}
+	}
 }
 
 fn get_transient_setting_internal(state: &State, req: &str) -> Option<Value> {
@@ -757,14 +781,19 @@ impl App {
 		let file_cache = Arc::new(FileCache::new(logger.clone(), settings.cache_path.clone()));
 
 		// Open search database
-		let (search, search_is_new) = search::Search::new(logger.clone(),
-			&settings.cache_path.join("search.db"))?;
+		let (search, search_is_new) =
+			search::Search::new(logger.clone(), &settings.cache_path.join("search.db"))?;
 		let search = Arc::new(search);
 
 		// Open database
-		let database =
-			db::DbHandler::new(logger.clone(), file_cache.clone(), search.clone(), &settings, secret.clone())?
-				.start();
+		let database = db::DbHandler::new(
+			logger.clone(),
+			file_cache.clone(),
+			search.clone(),
+			&settings,
+			secret.clone(),
+		)?
+		.start();
 
 		let connections = Arc::new(Mutex::new(HashMap::new()));
 
@@ -940,6 +969,7 @@ impl App {
 					.service(get_transient_setting)
 					.service(set_transient_setting)
 					.service(get_link_preview)
+					.service(render_md_service)
 					.service(db::graphql::db_graphql)
 					.service(db::graphql::graphiql)
 					.service(Files::new("", "../frontend/build/").index_file("index.html"))

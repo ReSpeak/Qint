@@ -45,5 +45,27 @@
 			"</style>",
 		],
 		"description": "Svelte scss boilerplate"
+	},
+	"Svelte if:end": {
+		"scope": "svelte",
+		"prefix": "sif",
+		"body": [
+			"{#if $1}",
+			"\t$2",
+			"{/if}",
+		],
+		"description": "Svelte #if : /if"
+	},
+	"Svelte if:else:end": {
+		"scope": "svelte",
+		"prefix": "sife",
+		"body": [
+			"{#if $1}",
+			"\t$2",
+			"{:else}",
+			"\t",
+			"{/if}",
+		],
+		"description": "Svelte #if : else : /if"
 	}
 }

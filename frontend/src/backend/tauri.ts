@@ -43,6 +43,7 @@ class FetchLike implements IFetchLike {
 
 export class TauriBackend implements IBackend {
 	public cacheFileSrc: string;
+	public readonly baseAddress: string = BASE_ADDRESS;
 
 	constructor() {
 		this.cacheFileSrc = `${BASE_ADDRESS}/filecache`;
