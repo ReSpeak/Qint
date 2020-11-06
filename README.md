@@ -46,6 +46,8 @@ cargo build --release
 
 To activate logging for audio, use e.g. `RUST_LOG=debug,qint_proxy::audio::audio_to_ts=trace`.
 
+By default, the proxy searches for the frontend in `../frontend/build`, where the frontend gets built by default. For packaging, it is useful to load the frontend for another directory, which can be set during compilation: `env FRONTEND_PATH=./frontend/ cargo build`
+
 ### Build the frontend
 The backend needs to be built first because it autogenerates part of the frontend code.
 
@@ -60,7 +62,7 @@ yarn dev
 yarn build
 ```
 
-Now, you can use the client at http://localhost:4422.
+Now, you can use the client at [http://localhost:4422](http://localhost:4422).
 
 ## License
 Licensed under the [Open Software License](LICENSE-OSL) and [GNU Affero General Public License v3](LICENSE-AGPL).

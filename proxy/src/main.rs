@@ -952,6 +952,7 @@ impl App {
 				.build()
 				.run();
 		} else {
+			let frontend_path = std::option_env!("FRONTEND_PATH").unwrap_or("../frontend/build/");
 			let state2 = state.clone();
 			HttpServer::new(move || {
 				let state = state2.clone();
@@ -972,7 +973,7 @@ impl App {
 					.service(render_md_service)
 					.service(db::graphql::db_graphql)
 					.service(db::graphql::graphiql)
-					.service(Files::new("", "../frontend/build/").index_file("index.html"))
+					.service(Files::new("", frontend_path).index_file("index.html"))
 					.wrap_fn(|req, srv| {
 						let fut = srv.call(req);
 						async {
