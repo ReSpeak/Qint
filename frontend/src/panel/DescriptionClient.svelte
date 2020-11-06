@@ -2,7 +2,7 @@
 	import { get } from "svelte/store";
 	import { Connection } from "../connection";
 	import type { ClientId, ServerGroupId } from "../ts";
-	//import { Moment } from "moment";
+	// import { Moment } from "moment";
 	import Icon from "../ui/Icon.svelte";
 	import PlatformIcon from "../ui/PlatformIcon.svelte";
 	import ServerGroupIcon from "../ui/ServerGroupIcon.svelte";
@@ -13,6 +13,7 @@
 	import ClientVolume from "../ui/ClientVolume.svelte";
 	import { getClientAvatarPath } from "../ui/clientIcon";
 	import { Reason } from "../book_events";
+	import { onMount } from "svelte";
 
 	export let connection: Connection;
 	export let clientId: ClientId;
@@ -106,6 +107,28 @@
 			},
 		});
 	}
+
+	onMount(() => {
+		updateClientInfo();
+		let timer = setInterval(updateClientInfo, 1000);
+		// onDestroy handler
+		return () => clearInterval(timer);
+	});
+
+	async function updateClientInfo() {
+		await connection.sendChange({
+			ClientConnectionInfoRequest: {
+				id: clientId,
+			},
+		}).catch(reason => {
+			console.error("Client info update failed: ")
+			console.error(reason);
+		});
+	}
+
+	function countryCodeToEmojis(countryCode: string): string {
+		return [...countryCode].map(char => String.fromCodePoint(char.charCodeAt(0) + 127397)).join("");
+	}
 </script>
 
 <StickyList>
@@ -114,6 +137,7 @@
 		<div class="dataLine headLine">
 			<TsIcon type="client" source={{icon: $client.icon}} {connection} />
 			<ClientName client={$client} />
+			<span class="countryFlag">{countryCodeToEmojis(client.countryCode)}</span>
 			<div style="flex: 1;" />
 			<div>
 				{'Version'}
@@ -122,15 +146,19 @@
 		</div>
 		<div class="dataLine">
 			<div>Description:</div>
-			<div>{$client.description}</div>
+			<div>{client.description}</div>
 		</div>
 		<div class="dataLine">
 			<div>Online since:</div>
-			<div>No Data</div>
+			<div>{client.connectedTime ? `${client.connectedTime.humanize()} ago` : ""}</div>
 		</div>
 		<div class="dataLine">
-			<div>Time away:</div>
-			<div>No Data</div>
+			<div>Last active:</div>
+			<div>{client.idleTime ? `${client.idleTime.humanize()} ago` : ""}</div>
+		</div>
+		<div class="dataLine">
+			<div>IP Address:</div>
+			<div>{client.clientAddress ?? ""}</div>
 		</div>
 		{#if avatarPath}
 			<img class="clientAvatar" src={avatarPath} alt="Client avatar" />
@@ -179,6 +207,10 @@
 </StickyList>
 
 <style lang="scss">
+	.countryFlag {
+		margin-left: .5em;
+	}
+
 	.clientAvatar {
 		max-width: 100%;
 	}
