@@ -1,6 +1,10 @@
 [workspace]
 members = ["proxy"]
 
+[patch.crates-io]
+# Use master branch to fix reserving 200 G disk space on windows
+lmdb-rkv-sys = { git = "https://github.com/Flakebi/lmdb-rs" }
+
 # Compile in release mode to speed up
 [profile.dev.package.audiopus]
 opt-level = 3

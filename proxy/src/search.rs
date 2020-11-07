@@ -130,10 +130,6 @@ impl Search {
 							author,
 							content: r.3,
 						};
-						if r.0 % 1000 == 0 {
-							println!("Doc: {:?}", doc);
-							println!("Doc json: {:?}", serde_json::to_string(&doc));
-						}
 						additions.update_document(doc);
 					} else {
 						warn!(state2.logger, "Neither invoker nor invoker_name are set for message";
