@@ -624,7 +624,9 @@ impl RenderBb {
 	}
 }
 
-fn error<'a, T>() -> IResult<&'a str, T> { Err(Err::Error(("", ErrorKind::Tag))) }
+fn error<'a, T>() -> IResult<&'a str, T> {
+	Err(nom::Err::Error(nom::error::Error { input: "", code: ErrorKind::Tag }))
+}
 
 fn nom_bb_read(bb: &str) -> Vec<BBSegment> {
 	let mut segs = vec![];

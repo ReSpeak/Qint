@@ -8,15 +8,15 @@ description = "Qint is a TeamSpeak client"
 
 [dependencies]
 actix = "0.10"
-actix-cors = "0.4"
-actix-files = "0.3"
+actix-cors = "0.5"
+actix-files = "0.4"
 actix-web = "3"
 actix-web-actors = "3"
 actix-rt = "1"
 anyhow = "1"
 audiopus = "0.2"
 base32 = "0.4"
-base64 = "0.12"
+base64 = "0.13"
 chrono = { version = "0.4", features = [ "serde" ] }
 diesel = { version = "1.4", features = [ "chrono", "sqlite" ] }
 diesel-derive-enum = { version = "1", features = [ "sqlite" ] }
@@ -37,7 +37,7 @@ meilisearch-core = { git = "https://github.com/meilisearch/MeiliSearch", version
 #meilisearch-schema = { git = "https://github.com/meilisearch/MeiliSearch", version = "0.16.0" }
 #meilisearch-tokenizer = {path = "../meilisearch-tokenizer", version = "0.16.0"}
 nnnoiseless = "0.3"
-nom = "5"
+nom = "6"
 open = "1"
 percent-encoding = "2.1"
 pulldown-cmark = "0.8"

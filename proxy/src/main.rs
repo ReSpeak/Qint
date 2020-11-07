@@ -16,7 +16,7 @@ use std::sync::{mpsc, Arc, Mutex, RwLock};
 use actix::*;
 use actix_cors::Cors;
 use actix_files::Files;
-use actix_web::web::Bytes;
+use actix_web::{web::Bytes, middleware::Condition};
 use actix_web::*;
 use actix_web::{
 	dev::{HttpResponseBuilder, Service},
@@ -43,8 +43,8 @@ mod book_events;
 mod db;
 mod filecache;
 mod find_url;
-mod markdown_ws;
 mod markdown;
+mod markdown_ws;
 mod messages;
 mod search;
 mod secret;
@@ -559,7 +559,7 @@ async fn get_link_preview(state: web::Data<Arc<State>>, url: web::Path<String>) 
 
 #[get("/render_md_service")]
 async fn render_md_service(
-	state: web::Data<Arc<State>>, req: HttpRequest, stream: web::Payload
+	state: web::Data<Arc<State>>, req: HttpRequest, stream: web::Payload,
 ) -> impl Responder {
 	let ws = MarkdownService::new();
 	match ws::start_with_addr(ws, &req, stream) {
@@ -567,9 +567,7 @@ async fn render_md_service(
 			error!(state.logger, "Failed to create websocket actor"; "error" => %e);
 			Either::A(HttpResponse::InternalServerError().body("Failed to start connection"))
 		}
-		Ok((_, ws)) => {
-			Either::B(ws)
-		}
+		Ok((_, ws)) => Either::B(ws),
 	}
 }
 
@@ -953,11 +951,12 @@ impl App {
 				.run();
 		} else {
 			let frontend_path = std::option_env!("FRONTEND_PATH").unwrap_or("../frontend/build/");
+			let is_production = std::option_env!("FRONTEND_PATH").is_some();
 			let state2 = state.clone();
 			HttpServer::new(move || {
 				let state = state2.clone();
 				actix_web::App::new()
-					.wrap(Cors::new().max_age(3600).finish())
+					.wrap(Condition::new(!is_production, Cors::permissive().max_age(3600)))
 					.data(state)
 					.service(create_ws)
 					.service(run_shortcut)
