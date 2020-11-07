@@ -30,6 +30,12 @@
 		}
 	}
 
+	:global(.descTable) {
+		display: grid;
+		grid-template-columns: max-content max-content;
+		gap: 0 1em;
+	}
+
 	:global(.headLine) {
 		font-weight: bold;
 	}

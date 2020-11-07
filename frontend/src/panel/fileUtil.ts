@@ -1,16 +1,17 @@
-const NarrowNoBreakSpace = String.fromCharCode(0x202f);
+import { NARROW_NO_BREAK_SPACE } from "../util";
+
 export function formatBytes(size: number): string {
-	if (size < 1000) return `${size}${NarrowNoBreakSpace}B`;
+	if (size < 1000) return `${size}${NARROW_NO_BREAK_SPACE}B`;
 	size /= 1000;
-	if (size < 1000) return `${size.toFixed()}${NarrowNoBreakSpace}KB`;
+	if (size < 1000) return `${size.toFixed()}${NARROW_NO_BREAK_SPACE}KB`;
 	size /= 1000;
-	if (size < 1000) return `${size.toFixed()}${NarrowNoBreakSpace}MB`;
+	if (size < 1000) return `${size.toFixed()}${NARROW_NO_BREAK_SPACE}MB`;
 	size /= 1000;
-	if (size < 1000) return `${size.toFixed()}${NarrowNoBreakSpace}GB`;
+	if (size < 1000) return `${size.toFixed()}${NARROW_NO_BREAK_SPACE}GB`;
 	size /= 1000;
-	if (size < 1000) return `${size.toFixed()}${NarrowNoBreakSpace}TB`;
+	if (size < 1000) return `${size.toFixed()}${NARROW_NO_BREAK_SPACE}TB`;
 	size /= 1000;
-	return `${size.toFixed()}${NarrowNoBreakSpace}EB`;
+	return `${size.toFixed()}${NARROW_NO_BREAK_SPACE}EB`;
 }
 
 export function extensionToIcon(file: string): string {

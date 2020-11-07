@@ -14,9 +14,13 @@
 	import { getClientAvatarPath } from "../ui/clientIcon";
 	import { Reason } from "../book_events";
 	import { onMount } from "svelte";
+	import { NARROW_NO_BREAK_SPACE } from "../util";
+	import { Client } from "../book";
 
 	export let connection: Connection;
 	export let clientId: ClientId;
+
+	let statsOpen = false;
 
 	const sgs = connection.book.serverGroups;
 	$: clientRaw = connection.book.clients.get(clientId)!;
@@ -129,6 +133,22 @@
 	function countryCodeToEmojis(countryCode: string): string {
 		return [...countryCode].map(char => String.fromCodePoint(char.charCodeAt(0) + 127397)).join("");
 	}
+
+	function formatClientPing(client: Client): string {
+		if (!client.ping || !client.pingDeviation) return "";
+
+		return `${Math.round(client.ping.asSeconds() * 10) / 10}${NARROW_NO_BREAK_SPACE}ms ± ${Math.round(client.pingDeviation.asSeconds() * 10) / 10}`;
+	}
+
+	function formatPacketLoss(...losses: (number | null)[]) {
+		let totalLoss = Math.round(losses.reduce((a, b) => a! + b!)! * 10) / 10;
+		return `${totalLoss}${NARROW_NO_BREAK_SPACE}%`;
+	}
+
+	function formatPacketCount(...packetCounts: (string | null)[]) {
+		let totalCount = Math.round(packetCounts.map(x => x ? parseInt(x) : 0).reduce((a, b) => a + b) / 100) / 10;
+		return `${totalCount}${NARROW_NO_BREAK_SPACE}k`;
+	}
 </script>
 
 <StickyList>
@@ -144,21 +164,14 @@
 				<PlatformIcon platform={'Platform'} />
 			</div>
 		</div>
-		<div class="dataLine">
+		
+		<div class="descTable">
 			<div>Description:</div>
 			<div>{client.description}</div>
-		</div>
-		<div class="dataLine">
 			<div>Online since:</div>
 			<div>{client.connectedTime ? `${client.connectedTime.humanize()} ago` : ""}</div>
-		</div>
-		<div class="dataLine">
 			<div>Last active:</div>
 			<div>{client.idleTime ? `${client.idleTime.humanize()} ago` : ""}</div>
-		</div>
-		<div class="dataLine">
-			<div>IP Address:</div>
-			<div>{client.clientAddress ?? ""}</div>
 		</div>
 		{#if avatarPath}
 			<img class="clientAvatar" src={avatarPath} alt="Client avatar" />
@@ -204,9 +217,53 @@
 			</div>
 		{/if}
 	</div>
+	<StickySlot on:click={() => (statsOpen = true)}>
+		<button class="button iconButton" on:click|stopPropagation={() => (statsOpen = !statsOpen)}>
+			<Icon name="chevron-right{statsOpen ? ' mdi-rotate-90' : ''}" />
+		</button>
+		<span>Stats</span>
+	</StickySlot>
+	{#if statsOpen}
+	<div class="descGroup">
+		<div class="descTable">
+			<div>Ping:</div>
+			<div>{formatClientPing(client)}</div>
+			<div>IP Address:</div>
+			<div>{client.clientAddress ?? ""}</div>
+		</div>
+	</div>
+	<div class="descGroup">
+		<div class="statsTable">
+			<div></div>
+			<div>Total</div>
+			<div>In</div>
+			<div>Out</div>
+
+			<div>Packet loss:</div>
+			<div>{formatPacketLoss(client.serverToClientPacketlossTotal, client.clientToServerPacketlossTotal)}</div>
+			<div>{formatPacketLoss(client.serverToClientPacketlossTotal)}</div>
+			<div>{formatPacketLoss(client.clientToServerPacketlossTotal)}</div>
+
+			<div>Packets transferred:</div>
+			<div></div>
+			<div>{formatPacketCount(client.packetsReceivedSpeech, client.packetsReceivedKeepalive, client.packetsReceivedControl)}</div>
+			<div>{formatPacketCount(client.packetsSentSpeech, client.packetsSentKeepalive, client.packetsSentControl)}</div>
+		</div>
+	</div>
+	{/if}
 </StickyList>
 
 <style lang="scss">
+	.statsTable {
+		display: grid;
+		grid-template-columns: repeat(4, max-content);
+		gap: .5em;
+	}
+
+	.statsTable > *:nth-child(-n+4) {
+		font-style: italic;
+	}
+
 	.countryFlag {
 		margin-left: .5em;
 	}
