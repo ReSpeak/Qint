@@ -10,7 +10,7 @@ use nom::{
 	character::complete::{alpha1, char},
 	combinator::opt,
 	error::ErrorKind,
-	Err, IResult,
+	IResult,
 };
 use pulldown_cmark::{Alignment, CodeBlockKind, Event, LinkType, Options, Parser, Tag};
 

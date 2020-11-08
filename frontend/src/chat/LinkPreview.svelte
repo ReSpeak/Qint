@@ -12,7 +12,7 @@
 
 <svelte:options immutable={true} />
 {#await analyzeResult}
-	<Loader text="Loading preview..." />
+	<!-- <Loader text="Loading preview..." /> -->
 {:then result}
 	{#if result.kind === 'image'}
 		<a href={link} target="_blank">

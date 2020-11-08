@@ -164,7 +164,7 @@
 	function formatClientPing(client: Client): string {
 		if (!client.ping || !client.pingDeviation) return "";
 
-		return `${Math.round(client.ping.asSeconds() * 10) / 10}${NARROW_NO_BREAK_SPACE}ms ± ${Math.round(client.pingDeviation.asSeconds() * 10) / 10}`;
+		return `(${Math.round(client.ping.asMilliseconds() * 10) / 10} ± ${Math.round(client.pingDeviation.asMilliseconds() * 10) / 10})${NARROW_NO_BREAK_SPACE}ms`;
 	}
 
 	function formatPacketLoss(...losses: (number | null)[]) {
@@ -191,7 +191,7 @@
 				<PlatformIcon platform={'Platform'} />
 			</div>
 		</div>
-		
+
 		<div class="descTable">
 			<div>Description:</div>
 			<div>{client.description}</div>
