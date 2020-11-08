@@ -16,11 +16,16 @@
 	import { onMount } from "svelte";
 	import { NARROW_NO_BREAK_SPACE } from "../util";
 	import { Client } from "../book";
+	import BModal from "../ui/BModal.svelte";
+	import { tick } from "svelte";
 
 	export let connection: Connection;
 	export let clientId: ClientId;
 
 	let statsOpen = false;
+	let pokeModalVisible = false;
+	let pokeInput: HTMLElement | undefined;
+	let pokeMessage: string = "";
 
 	const sgs = connection.book.serverGroups;
 	$: clientRaw = connection.book.clients.get(clientId)!;
@@ -130,6 +135,28 @@
 		});
 	}
 
+	async function onPokeClick() {
+		pokeModalVisible = true;
+		await tick();
+		if (pokeInput !== undefined)
+			pokeInput.focus();
+	}
+
+	function onPokeSend() {
+		connection.sendMessage({
+			SendMessage: {
+				target: {
+					Poke: clientId,
+				},
+				message: pokeMessage,
+			},
+		});
+		pokeModalVisible = false;
+		pokeMessage = "";
+		// Update chat
+		client.chat.update(c => c);
+	}
+
 	function countryCodeToEmojis(countryCode: string): string {
 		return [...countryCode].map(char => String.fromCodePoint(char.charCodeAt(0) + 127397)).join("");
 	}
@@ -196,8 +223,12 @@
 	</div>
 	<StickySlot>Actions</StickySlot>
 	<div class="descGroup">
-		{#if !ownClient}
+		{#if true || !ownClient}
 			<p class="buttons">
+				<button class="button is-small is-primary" on:click={onPokeClick}>
+					<Icon name="hand-pointing-right" />
+					<span>Poke</span>
+				</button>
 				<button class="button is-small is-warning" on:click={kickFromChannel}>
 					<Icon name="shoe-formal" />
 					<span>Kick Channel</span>
@@ -215,6 +246,15 @@
 				<div>Volume:</div>
 				<ClientVolume {client} {connection} />
 			</div>
+			<form on:submit|preventDefault={onPokeSend}>
+				<BModal bind:visible={pokeModalVisible}>
+					<div slot="header">
+						Poke <ClientName {client} />
+					</div>
+					<input class="input pokeInput" type="text" bind:this={pokeInput} bind:value={pokeMessage}>
+					<button type="submit" slot="footer" class="button is-success">Poke</button>
+				</BModal>
+			</form>
 		{/if}
 	</div>
 	<StickySlot on:click={() => (statsOpen = true)}>
@@ -312,5 +352,9 @@
 	.serverGroupDescription {
 		padding-right: 1em;
 		border-radius: 0 0.2em 0.2em 0;
+	}
+
+	.pokeInput {
+		width: 100%;
 	}
 </style>
