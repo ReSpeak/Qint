@@ -54,6 +54,7 @@
 
 	export function clear() {
 		elems = [];
+		visObs.clear();
 		canLoadAfterEnd = false;
 		canLoadBeforeStart = false;
 		showJumpStart = false;

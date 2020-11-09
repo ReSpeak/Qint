@@ -14,8 +14,9 @@
 	import { app, NodeSelection } from "../app";
 	import { Channel, Client, Server } from "../book";
 	import { writable } from "svelte/store";
-	import type { Writable } from "svelte/store";
+	import type { Readable, Writable } from "svelte/store";
 	import { on, SERVER_ICON } from "../util";
+	import type { ChatData } from "../bookBase";
 
 	export let chat: Chat;
 
@@ -40,9 +41,6 @@
 		ownClient = connection?.book.ownClient ?? writable(undefined);
 	}
 
-	$: chatData = $selected?.node.chat;
-	$: on(chatData !== undefined && $chatData, unreadCountChanged());
-
 	let oldOwnChannel: string | undefined;
 	let oldCon: string | undefined;
 	$: {
@@ -56,9 +54,19 @@
 	}
 
 	let sel: NodeSelection | undefined;
+	let chatData: Readable<ChatData> | undefined;
+	// Note here: we need to check `chatChanged` and `unreadCountChanged` in one
+	// update cycle. Otherwise starting the 'wrong' one first will prevent the
+	// second one from working correctly.
+	// E.g. unreadCountChanged -> async update stared -> chatChanged -> (does nothing)
 	$: {
-		sel = $selected;
-		chatChanged();
+		chatData = $selected?.node.chat;
+		if (sel !== $selected) {
+			sel = $selected;
+			chatChanged();
+		} else if (chatData !== undefined && $chatData) {
+			unreadCountChanged();
+		}
 	}
 
 	function chatChanged() {
@@ -67,7 +75,7 @@
 		const sel = $selected;
 		if (sel === undefined) {
 			oldSelection = undefined;
-			chatList?.clear();
+			chatList.clear();
 			canChatHere = false;
 			return;
 		}
