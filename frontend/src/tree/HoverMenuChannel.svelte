@@ -1,20 +1,17 @@
 <script lang="typescript">
+	import { Channel } from "../book";
 	import { Connection } from "../connection";
-	import type { ChannelId } from "../ts";
 
 	export let connection: Connection;
-	export let channelId: ChannelId;
-
-	$: channelRaw = connection.book.channels.get(channelId)!;
-	$: channel = $channelRaw;
+	export let channel: Channel;
 </script>
 
 <div class="name">
-	{channel.name}
+	{$channel.name}
 </div>
-{#if channel.topicRendered !== null && channel.topicRendered.length > 0}
+{#if $channel.topicRendered !== null && $channel.topicRendered.length > 0}
 <div class="description">
-	{channel.topic}
+	{$channel.topic}
 </div>
 {/if}
 

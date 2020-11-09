@@ -29,7 +29,7 @@
 			<slot name="footer" />
 		</footer>
 	</div>
-	<button on:click={close} class="modal-close is-large" aria-label="close" />
+	<button on:click|preventDefault={close} class="modal-close is-large" aria-label="close" />
 </div>
 
 <style lang="scss">

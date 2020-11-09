@@ -5,17 +5,20 @@
 	import ClientName from "../ui/ClientName.svelte";
 	import ClientVolume from "../ui/ClientVolume.svelte";
 	import RenderedText from "../ui/RenderedText.svelte";
+	import { app } from "../app";
+	import { Client } from "../book";
 
 	export let connection: Connection;
-	export let clientId: ClientId;
+	export let client: Client;
 	let pokeMessage: string = "";
 	let pokeInput: HTMLElement | undefined;
+	let developMode = app.transientSettings.ui._developMode;
 
 	function onPokeSend() {
 		connection.sendMessage({
 			SendMessage: {
 				target: {
-					Poke: clientId,
+					Poke: client.id,
 				},
 				message: pokeMessage,
 			},
@@ -25,34 +28,34 @@
 		client.chat.update(c => c);
 	}
 
-	$: clientRaw = connection.book.clients.get(clientId)!;
-	$: client = $clientRaw;
-	$: ownClient = clientId === connection.book.ownClientId;
+	$: ownClient = client.id === connection.book.ownClientId;
 </script>
 
 <div class="name">
-	<ClientName {client} />
-	{#if client.awayMessage !== null && client.awayMessage.length !== 0}
-		({client.awayMessage})
+	<ClientName client={$client} />
+	{#if $client.awayMessage !== null && $client.awayMessage.length !== 0}
+		({$client.awayMessage})
 	{/if}
 </div>
-{#if client.descriptionRendered.length > 0}
+{#if $client.descriptionRendered.length > 0}
 <div class="description">
-	<RenderedText text={client.descriptionRendered} />
+	<RenderedText text={$client.descriptionRendered} />
 </div>
 {/if}
 {#if !ownClient}
-	<ClientVolume {client} {connection} />
+	<ClientVolume client={$client} {connection} />
 {/if}
-<div>
-	<button
-		class="toolbutton"
-		on:click={onPokeSend}
-		title="Poke">
-		<Icon name="hand-pointing-right"></Icon>
-	</button>
-	<input class="input poke-input" type="text" placeholder="Poke message (optional)" bind:this={pokeInput} bind:value={pokeMessage}>
-</div>
+{#if $developMode || !ownClient}
+	<div>
+		<button
+			class="toolbutton"
+			on:click={onPokeSend}
+			title="Poke">
+			<Icon name="hand-pointing-right"></Icon>
+		</button>
+		<input class="input poke-input" type="text" placeholder="Poke message (optional)" bind:this={pokeInput} bind:value={pokeMessage}>
+	</div>
+{/if}
 
 <style lang="scss">
 	.poke-input {
