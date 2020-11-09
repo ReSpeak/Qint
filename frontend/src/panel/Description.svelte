@@ -13,7 +13,7 @@
 	{#if selected !== undefined && selected.node instanceof Client}
 		<DescriptionClient connection={selected.connection} clientId={selected.node.id} />
 	{:else if selected !== undefined && selected.node instanceof Channel}
-		<DescriptionChannel connection={selected.connection} channelId={selected.node.id} />
+		<DescriptionChannel connection={selected.connection} channel={selected.node} />
 	{:else if selected !== undefined && selected.node instanceof Server}
 		<DescriptionServer connection={selected.connection} />
 	{/if}

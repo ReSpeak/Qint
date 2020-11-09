@@ -9,7 +9,8 @@ export type closedFn = () => void;
 
 export interface IBackend {
 	readonly cacheFileSrc: string;
-	readonly baseAddress: string;
+	/** The url address prefix for websockets */
+	readonly wsBaseAddress: string;
 	createNewConnection(): IBackendConnection;
 	fetch(cmd: string, data?: RequestInit): Promise<IFetchLike>;
 	graphql<T = any>(query: string, variables?: object): Promise<{ data: T }>;

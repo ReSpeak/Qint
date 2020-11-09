@@ -2,7 +2,6 @@ import svelte from "rollup-plugin-svelte";
 import replace from '@rollup/plugin-replace';
 import resolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
-import livereload from "rollup-plugin-livereload";
 import { terser } from "rollup-plugin-terser";
 import copy from 'rollup-plugin-copy';
 import typescript from '@rollup/plugin-typescript';
@@ -11,7 +10,6 @@ import babel from "@rollup/plugin-babel";
 const svelteOptions = require("./svelte.config");
 
 //console.log(process.env);
-const start_liveserver = (process.env.ROLLUP_WATCH || "false").toLowerCase() === "true";
 const production = false;
 
 export default {
@@ -58,10 +56,6 @@ export default {
 				{ src: './node_modules/katex/dist/fonts/*', dest: 'public/fonts' }
 			]
 		}),
-
-		// Watch the `public` directory and refresh the
-		// browser on changes when not in production
-		start_liveserver && livereload("public"),
 
 		// If we're building for production (npm run build
 		// instead of npm run dev), minify

@@ -1,21 +1,22 @@
 import { InMsg, OutMsg } from "./ws";
 import { BASE_ADDRESS, createUuidV4 } from "../util";
 import { closedFn, errorFn, IBackend, IBackendConnection, IFetchLike, msgFn } from "./backend";
+import { urlToWebSocket } from "./backendUtil";
 
 export class BrowserBackend implements IBackend {
 	public readonly cacheFileSrc: string;
-	public readonly baseAddress: string = BASE_ADDRESS;
+	public readonly wsBaseAddress: string = urlToWebSocket(BASE_ADDRESS);
 
 	constructor() {
-		this.cacheFileSrc = `${this.baseAddress}/filecache`;
+		this.cacheFileSrc = `${BASE_ADDRESS}/filecache`;
 	}
 
 	createNewConnection(): IBackendConnection {
-		return new BrowserBackendConnection();
+		return new BrowserBackendConnection(this);
 	}
 
 	public fetch(cmd: string, data: RequestInit): Promise<IFetchLike> {
-		return fetch(`${this.baseAddress}${cmd}`, data);
+		return fetch(`${BASE_ADDRESS}${cmd}`, data);
 	}
 
 	public async graphql<T = any>(query: string, variables?: object): Promise<{ data: T }> {
@@ -37,7 +38,9 @@ export class BrowserBackendConnection implements IBackendConnection {
 	public id: string;
 	private socket?: WebSocket;
 
-	constructor() {
+	constructor(
+		private parent: BrowserBackend
+	) {
 		this.serverFileSrc = "";
 		this.id = createUuidV4();
 	}
@@ -52,15 +55,7 @@ export class BrowserBackendConnection implements IBackendConnection {
 
 		this.serverFileSrc = `${BASE_ADDRESS}/con/${this.id}`;
 
-		let path = BASE_ADDRESS;
-		if (!path.startsWith("http"))
-			path = window.location.origin;
-		if (!path.startsWith("http"))
-			throw Error("Failed to get websocket path");
-		// Replace http by ws, so https gets wss
-		path = path.slice(4);
-
-		this.socket = new WebSocket(`ws${path}/con/${this.id}/ws?format=Json`);
+		this.socket = new WebSocket(`${this.parent.wsBaseAddress}/con/${this.id}/ws?format=Json`);
 		this.socket.onerror = (error) => onError(String(error));
 		this.socket.onclose = onClose;
 		this.socket.onmessage = (evt) => { onMsg(JSON.parse(evt.data) as InMsg); };

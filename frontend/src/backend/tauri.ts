@@ -3,6 +3,7 @@ import { BASE_ADDRESS, createUuidV4 } from "../util";
 import { closedFn, errorFn, IBackend, IBackendConnection, IFetchLike, msgFn } from "./backend";
 import { emit, listen } from 'tauri/api/event';
 import { promisified } from 'tauri/api/tauri'
+import { urlToWebSocket } from "./backendUtil";
 
 type OutWsEvent = { Msg: OutMsg } | "Close";
 
@@ -43,7 +44,7 @@ class FetchLike implements IFetchLike {
 
 export class TauriBackend implements IBackend {
 	public cacheFileSrc: string;
-	public readonly baseAddress: string = BASE_ADDRESS;
+	public readonly wsBaseAddress: string = urlToWebSocket(BASE_ADDRESS);
 
 	constructor() {
 		this.cacheFileSrc = `${BASE_ADDRESS}/filecache`;

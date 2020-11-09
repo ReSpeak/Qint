@@ -29,7 +29,7 @@
 	);
 
 	onMount(() => {
-		mdRenderSocket = new WebSocket(`ws${backend.baseAddress.substring(4)}/render_md_service`);
+		mdRenderSocket = new WebSocket(`${backend.wsBaseAddress}/render_md_service`);
 		mdRenderSocket.onmessage = (ev) => {
 			rendered = ev.data as string;
 		};

@@ -25,6 +25,10 @@ export const LONG_DATETIME = "dddd, MMMM Do YYYY, HH:mm:ss UTCZ";
 
 export const NARROW_NO_BREAK_SPACE = String.fromCharCode(0x202f);
 
+export type RequiredNN<T> = {
+	[P in keyof T]: NonNullable<T[P]>;
+};
+
 export async function sleep(timeout: number): Promise<void> {
 	return new Promise(resolve => setTimeout(resolve, timeout));
 }
@@ -319,7 +323,7 @@ export function durationDeserialize(rustDuration: RustDuration): Duration {
 }
 
 export function durationSerialize(time: Duration): RustDuration {
-	return [Math.floor(time.asSeconds()), Math.floor(time.asMilliseconds() * 1000000)];
+	return [Math.floor(time.asSeconds()), Math.floor((time.asMilliseconds() % 1000) * 1000000)];
 }
 
 /**

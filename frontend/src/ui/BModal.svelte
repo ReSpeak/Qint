@@ -37,6 +37,6 @@
 	@import "bulmaswatch/cyborg/overrides";
 
 	.modal {
-		z-index: 200;
+		z-index: 1000;
 	}
 </style>
