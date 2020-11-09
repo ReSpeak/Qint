@@ -8,41 +8,55 @@
 	import TsIcon from "../ui/TsIcon.svelte";
 	import StickyList from "../ui/StickyList.svelte";
 	import StickySlot from "../ui/StickySlot.svelte";
+	import StickyHeader from "./StickyHeader.svelte";
 	import RenderedText from "../ui/RenderedText.svelte";
 
 	export let connection: Connection;
 	const serverRaw = connection.book.server;
 	$: server = $serverRaw;
-	$: create_date =
-		server.created !== undefined ? server.created : moment.unix(0);
+	$: create_date = server.created !== undefined ? server.created : moment.unix(0);
 
-	$: connection.sendMessage({ Change: { change: {
-		ServerVariablesRequest: {},
-	}}});
+	$: connection.sendMessage({
+		Change: {
+			change: {
+				ServerVariablesRequest: {},
+			},
+		},
+	});
 
 	function disconnect() {
 		connection.disconnect();
 	}
 
 	function editHostmessage(e: CustomEvent<{ text: string }>) {
-		connection.sendMessage({ Change: { change: {
-			ServerEdit: {
-				hostmessage: e.detail.text,
+		connection.sendMessage({
+			Change: {
+				change: {
+					ServerEdit: {
+						hostmessage: e.detail.text,
+					},
+				},
 			},
-		}}});
+		});
 	}
 
 	function editWelcomeMessage(e: CustomEvent<{ text: string }>) {
-		connection.sendMessage({ Change: { change: {
-			ServerEdit: {
-				welcomeMessage: e.detail.text,
+		connection.sendMessage({
+			Change: {
+				change: {
+					ServerEdit: {
+						welcomeMessage: e.detail.text,
+					},
+				},
 			},
-		}}});
+		});
 	}
 </script>
 
 <StickyList>
-	<StickySlot>Info</StickySlot>
+	<StickySlot styled={false}>
+		<StickyHeader title="Info" />
+	</StickySlot>
 	<div class="descGroup">
 		<div class="dataLine headLine">
 			<TsIcon type="server" source={server} {connection} />
@@ -63,16 +77,15 @@
 		</div>
 		<div class="dataLine">
 			<div>Version:</div>
-			<PlatformIcon platform={server.platform} />
-			<div>{server.version}</div>
+			<PlatformIcon platform={server.platform} version={server.version} />
 		</div>
 		<div class="dataLine">
 			<div>Host message:</div>
-			<RenderedText text={server.hostmessageRendered ?? ""} raw={server.hostmessage ?? undefined} editable={true} on:edited={editHostmessage} />
+			<RenderedText text={server.hostmessageRendered ?? ''} />
 		</div>
 		<div class="dataLine">
 			<div>Welcome message:</div>
-			<RenderedText text={server.welcomeMessageRendered ?? ""} raw={server.welcomeMessage ?? undefined} editable={true} on:edited={editWelcomeMessage} />
+			<RenderedText text={server.welcomeMessageRendered ?? ''} />
 		</div>
 		<div class="dataLine">
 			<div>Created:</div>

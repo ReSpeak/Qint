@@ -1,8 +1,9 @@
 <script lang="typescript">
 	import { get } from "svelte/store";
 	import { Connection } from "../connection";
-	import type { ClientId, ServerGroupId } from "../ts";
-	// import { Moment } from "moment";
+	import type { ServerGroupId } from "../ts";
+	import moment from "moment";
+	import type { Duration } from "moment";
 	import Icon from "../ui/Icon.svelte";
 	import PlatformIcon from "../ui/PlatformIcon.svelte";
 	import ServerGroupIcon from "../ui/ServerGroupIcon.svelte";
@@ -10,6 +11,7 @@
 	import ClientName from "../ui/ClientName.svelte";
 	import StickyList from "../ui/StickyList.svelte";
 	import StickySlot from "../ui/StickySlot.svelte";
+	import StickyHeader from "./StickyHeader.svelte";
 	import ClientVolume from "../ui/ClientVolume.svelte";
 	import { getClientAvatarPath } from "../ui/clientIcon";
 	import { Reason } from "../book_events";
@@ -20,7 +22,7 @@
 	import { tick } from "svelte";
 
 	export let connection: Connection;
-	export let clientId: ClientId;
+	export let client: Client;
 
 	let statsOpen = false;
 	let pokeModalVisible = false;
@@ -28,14 +30,15 @@
 	let pokeMessage: string = "";
 
 	const sgs = connection.book.serverGroups;
-	$: clientRaw = connection.book.clients.get(clientId)!;
-	$: client = $clientRaw;
 	$: avatarPath = getClientAvatarPath($client, connection);
-	$: ownClient = clientId === connection.book.ownClientId;
+	$: ownClient = client.id === connection.book.ownClientId;
+	$: {
+		if ($client.version == null) getClientVariables();
+	}
 	//let onlineSince: Moment; TODO
 
 	interface ExtendedGroup {
-		isMember: boolean,
+		isMember: boolean;
 		id: ServerGroupId;
 		name: string;
 	}
@@ -47,31 +50,28 @@
 			const g = get(group);
 			if (g.groupType === "Regular") {
 				groups.push({
-					isMember: client.serverGroups.includes(id),
-					...g
+					isMember: $client.serverGroups.includes(id),
+					...g,
 				});
 			}
 		});
 		groups.sort((a, b) => {
-			if (a.isMember !== b.isMember)
-				return a.isMember ? -1 : 1;
+			if (a.isMember !== b.isMember) return a.isMember ? -1 : 1;
 			const nameCmp = a.name.localeCompare(b.name);
-			if (nameCmp !== 0)
-				return nameCmp;
+			if (nameCmp !== 0) return nameCmp;
 			return Number(a.id) - Number(b.id);
 		});
 	}
 
 	function changeServerGroup(e: Event, group: ServerGroupId, isMember: boolean) {
-		if (e.target instanceof HTMLInputElement)
-			e.target.disabled = true;
+		if (e.target instanceof HTMLInputElement) e.target.disabled = true;
 
 		if (isMember) {
 			connection.sendMessage({
 				Change: {
 					change: {
 						ClientAddServerGroup: {
-							id: clientId,
+							id: client.id,
 							serverGroup: group,
 						},
 					},
@@ -82,7 +82,7 @@
 				Change: {
 					change: {
 						ClientRemoveServerGroup: {
-							id: clientId,
+							id: client.id,
 							serverGroup: group,
 						},
 					},
@@ -96,7 +96,7 @@
 			Change: {
 				change: {
 					ClientKick: {
-						id: clientId,
+						id: client.id,
 						reason: Reason.KickChannel,
 					},
 				},
@@ -109,7 +109,7 @@
 			Change: {
 				change: {
 					ClientKick: {
-						id: clientId,
+						id: client.id,
 						reason: Reason.KickServer,
 					},
 				},
@@ -125,28 +125,42 @@
 	});
 
 	async function updateClientInfo() {
-		await connection.sendChange({
-			ClientConnectionInfoRequest: {
-				id: clientId,
-			},
-		}).catch(reason => {
-			console.error("Client info update failed: ")
-			console.error(reason);
-		});
+		await connection
+			.sendChange({
+				ClientConnectionInfoRequest: {
+					id: client.id,
+				},
+			})
+			.catch((reason) => {
+				console.error("Client info update failed: ");
+				console.error(reason);
+			});
+	}
+
+	async function getClientVariables() {
+		await connection
+			.sendChange({
+				ClientVariablesRequest: {
+					id: client.id,
+				},
+			})
+			.catch((reason) => {
+				console.error("ClientVariablesRequest failed: ");
+				console.error(reason);
+			});
 	}
 
 	async function onPokeClick() {
 		pokeModalVisible = true;
 		await tick();
-		if (pokeInput !== undefined)
-			pokeInput.focus();
+		if (pokeInput !== undefined) pokeInput.focus();
 	}
 
 	function onPokeSend() {
 		connection.sendMessage({
 			SendMessage: {
 				target: {
-					Poke: clientId,
+					Poke: client.id,
 				},
 				message: pokeMessage,
 			},
@@ -154,17 +168,21 @@
 		pokeModalVisible = false;
 		pokeMessage = "";
 		// Update chat
-		client.chat.update(c => c);
+		client.chat.update((c) => c);
 	}
 
 	function countryCodeToEmojis(countryCode: string): string {
-		return [...countryCode].map(char => String.fromCodePoint(char.charCodeAt(0) + 127397)).join("");
+		return [...countryCode]
+			.map((char) => String.fromCodePoint(char.charCodeAt(0) + 127397))
+			.join("");
 	}
 
 	function formatClientPing(client: Client): string {
 		if (!client.ping || !client.pingDeviation) return "";
 
-		return `(${Math.round(client.ping.asMilliseconds() * 10) / 10} ± ${Math.round(client.pingDeviation.asMilliseconds() * 10) / 10})${NARROW_NO_BREAK_SPACE}ms`;
+		return `(${Math.round(client.ping.asMilliseconds() * 10) / 10} ± ${
+			Math.round(client.pingDeviation.asMilliseconds() * 10) / 10
+		})${NARROW_NO_BREAK_SPACE}ms`;
 	}
 
 	function formatPacketLoss(...losses: (number | null)[]) {
@@ -173,50 +191,76 @@
 	}
 
 	function formatPacketCount(...packetCounts: (string | null)[]) {
-		let totalCount = Math.round(packetCounts.map(x => x ? parseInt(x) : 0).reduce((a, b) => a + b) / 100) / 10;
+		let totalCount =
+			Math.round(
+				packetCounts.map((x) => (x ? parseInt(x) : 0)).reduce((a, b) => a + b) / 100
+			) / 10;
 		return `${totalCount}${NARROW_NO_BREAK_SPACE}k`;
+	}
+
+	function formatAgo(duration: Duration | null | undefined, ago: boolean): string {
+		if (!duration) return "";
+		if (ago) return moment.duration(-duration.asSeconds(), "seconds").humanize(true);
+		else return moment.duration(duration.asSeconds(), "seconds").humanize();
+	}
+
+	function formatDuration(duration: Duration | null | undefined): string {
+		if (!duration) return "";
+		const asSec = Math.floor(duration.asSeconds());
+		if (asSec <= 60) return `${asSec}s`;
+		const asMin = Math.floor(duration.asMinutes());
+		const floorSec = Math.floor(duration.seconds());
+		if (asMin <= 60) return `${asMin}m ${floorSec}s`;
+		const asHour = Math.floor(duration.asHours());
+		const floorMin = Math.floor(duration.minutes());
+		if (asHour <= 24) return `${asHour}h ${floorMin}m ${floorSec}s`;
+		const asDay = Math.floor(duration.asDays());
+		const floorHour = Math.floor(duration.hours());
+		return `${asDay}d ${floorHour}h ${floorMin}m ${floorSec}s`;
 	}
 </script>
 
 <StickyList>
-	<StickySlot>Info</StickySlot>
+	<StickySlot styled={false}>
+		<StickyHeader title="Info" />
+	</StickySlot>
 	<div class="descGroup">
 		<div class="dataLine headLine">
-			<TsIcon type="client" source={{icon: $client.icon}} {connection} />
+			<TsIcon type="client" source={{ icon: $client.icon }} {connection} />
 			<ClientName client={$client} />
 			<span class="countryFlag">{countryCodeToEmojis(client.countryCode)}</span>
 			<div style="flex: 1;" />
-			<div>
-				{'Version'}
-				<PlatformIcon platform={'Platform'} />
-			</div>
+			<PlatformIcon platform={$client.platform} version={$client.version} />
 		</div>
 
 		<div class="descTable">
 			<div>Description:</div>
-			<div>{client.description}</div>
-			<div>Online since:</div>
-			<div>{client.connectedTime ? `${client.connectedTime.humanize()} ago` : ""}</div>
+			<div>{$client.description}</div>
+			<div>Online:</div>
+			<div>{formatDuration($client.connectedTime)}</div>
 			<div>Last active:</div>
-			<div>{client.idleTime ? `${client.idleTime.humanize()} ago` : ""}</div>
+			<div>{formatAgo($client.idleTime, true)}</div>
 		</div>
-		{#if avatarPath}
-			<img class="clientAvatar" src={avatarPath} alt="Client avatar" />
-		{/if}
+		{#if avatarPath}<img class="clientAvatar" src={avatarPath} alt="Client avatar" />{/if}
 		<div class="serverGroups">
 			<div>Server Groups:</div>
 			<div class="serverGroupList">
 				{#each groups as grp (grp)}
-				<label class="checkbox serverGroupContainer" for={"group" + grp.id}>
-					<div class="serverGroupCheckbox">
-						<input type="checkbox" class="checkbox-switch is-info" id={"group" + grp.id} on:input={e => changeServerGroup(e, grp.id, !grp.isMember)} checked={grp.isMember} />
-					</div>
-					<div class="serverGroupSpacing"></div>
-					<div class="serverGroupIcon">
-						<ServerGroupIcon id={grp.id} {connection} />
-					</div>
-					<div class="serverGroupDescription" title={"Id " + grp.id}>{grp.name}</div>
-				</label>
+					<label class="checkbox serverGroupContainer" for={'group' + grp.id}>
+						<div class="serverGroupCheckbox">
+							<input
+								type="checkbox"
+								class="checkbox-switch is-info"
+								id={'group' + grp.id}
+								on:input={(e) => changeServerGroup(e, grp.id, !grp.isMember)}
+								checked={grp.isMember} />
+						</div>
+						<div class="serverGroupSpacing" />
+						<div class="serverGroupIcon">
+							<ServerGroupIcon id={grp.id} {connection} />
+						</div>
+						<div class="serverGroupDescription" title={'Id ' + grp.id}>{grp.name}</div>
+					</label>
 				{/each}
 			</div>
 		</div>
@@ -249,9 +293,14 @@
 			<form on:submit|preventDefault={onPokeSend}>
 				<BModal bind:visible={pokeModalVisible}>
 					<div slot="header">
-						Poke <ClientName {client} />
+						<span>Poke</span>
+						<ClientName {client} />
 					</div>
-					<input class="input pokeInput" type="text" bind:this={pokeInput} bind:value={pokeMessage}>
+					<input
+						class="input pokeInput"
+						type="text"
+						bind:this={pokeInput}
+						bind:value={pokeMessage} />
 					<button type="submit" slot="footer" class="button is-success">Poke</button>
 				</BModal>
 			</form>
@@ -264,32 +313,38 @@
 		<span>Stats</span>
 	</StickySlot>
 	{#if statsOpen}
-	<div class="descGroup">
-		<div class="descTable">
-			<div>Ping:</div>
-			<div>{formatClientPing(client)}</div>
-			<div>IP Address:</div>
-			<div>{client.clientAddress ?? ""}</div>
+		<div class="descGroup">
+			<div class="descTable">
+				<div>Ping:</div>
+				<div>{formatClientPing(client)}</div>
+				<div>IP Address:</div>
+				<div>{client.clientAddress ?? ''}</div>
+			</div>
 		</div>
-	</div>
-	<div class="descGroup">
-		<div class="statsTable">
-			<div></div>
-			<div>Total</div>
-			<div>In</div>
-			<div>Out</div>
+		<div class="descGroup">
+			<div class="statsTable">
+				<div />
+				<div>Total</div>
+				<div>In</div>
+				<div>Out</div>
 
-			<div>Packet loss:</div>
-			<div>{formatPacketLoss(client.serverToClientPacketlossTotal, client.clientToServerPacketlossTotal)}</div>
-			<div>{formatPacketLoss(client.serverToClientPacketlossTotal)}</div>
-			<div>{formatPacketLoss(client.clientToServerPacketlossTotal)}</div>
+				<div>Packet loss:</div>
+				<div>
+					{formatPacketLoss(client.serverToClientPacketlossTotal, client.clientToServerPacketlossTotal)}
+				</div>
+				<div>{formatPacketLoss(client.serverToClientPacketlossTotal)}</div>
+				<div>{formatPacketLoss(client.clientToServerPacketlossTotal)}</div>
 
-			<div>Packets transferred:</div>
-			<div></div>
-			<div>{formatPacketCount(client.packetsReceivedSpeech, client.packetsReceivedKeepalive, client.packetsReceivedControl)}</div>
-			<div>{formatPacketCount(client.packetsSentSpeech, client.packetsSentKeepalive, client.packetsSentControl)}</div>
+				<div>Packets transferred:</div>
+				<div />
+				<div>
+					{formatPacketCount(client.packetsReceivedSpeech, client.packetsReceivedKeepalive, client.packetsReceivedControl)}
+				</div>
+				<div>
+					{formatPacketCount(client.packetsSentSpeech, client.packetsSentKeepalive, client.packetsSentControl)}
+				</div>
+			</div>
 		</div>
-	</div>
 	{/if}
 </StickyList>
 
@@ -297,15 +352,15 @@
 	.statsTable {
 		display: grid;
 		grid-template-columns: repeat(4, max-content);
-		gap: .5em;
+		gap: 0.5em;
 	}
 
-	.statsTable > *:nth-child(-n+4) {
+	.statsTable > *:nth-child(-n + 4) {
 		font-style: italic;
 	}
 
 	.countryFlag {
-		margin-left: .5em;
+		margin-left: 0.5em;
 	}
 
 	.clientAvatar {

@@ -15,7 +15,7 @@
 
 <style lang="scss">
 	.stickySlot {
-		z-index: 500;
+		z-index: 300;
 		display: block;
 		position: sticky;
 		top: 0;

@@ -357,7 +357,7 @@ export function oneshot<T>(
 type FnFunc<T extends unknown[]> = (...args: T) => void;
 interface DebounceOpt {
 	/**
-	 * When true, resets timer on each new call. Does not fire until the timer ran out.
+	 * When true, resets timer on each new call. Does not fire until the timer ran out.<br>
 	 * **Default**: true
 	 */
 	resetOnCall?: boolean,
