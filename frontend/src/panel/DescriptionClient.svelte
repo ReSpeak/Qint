@@ -20,6 +20,7 @@
 	import { Client } from "../book";
 	import BModal from "../ui/BModal.svelte";
 	import { tick } from "svelte";
+	import BChart from "../ui/BChart.svelte";
 
 	export let connection: Connection;
 	export let client: Client;
@@ -320,6 +321,9 @@
 				<div>IP Address:</div>
 				<div>{client.clientAddress ?? ''}</div>
 			</div>
+		</div>
+		<div class="descGroup">
+			<BChart />
 		</div>
 		<div class="descGroup">
 			<div class="statsTable">
