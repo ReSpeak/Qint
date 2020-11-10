@@ -1,12 +1,12 @@
 import { ResultDetails, OutMsg, InMsg } from "./backend/ws";
 import { get, writable, Writable, Readable } from "svelte/store";
 import { Book, Channel, ChatData, Client } from "./book";
-import { getStringFromConnect, oneshot } from "./util";
+import { getStringFromConnect, oneshot, fnBroadcast } from "./util";
 import { handleMessage } from "./notification";
 import { backend, IBackendConnection } from "./backend/backend";
 import { app } from "./app";
 import { ConnectData } from "./connect/connect";
-import { OChange, Reason } from "./book_events";
+import { OChange, Reason, IMsgPluginCommandPart } from "./book_events";
 import moment from "moment";
 import { ChannelId, ClientId } from "./ts";
 import { FileTreeCache } from "./fileTreeCache";
@@ -35,6 +35,7 @@ export class Connection {
 
 	public loudness: Writable<number> = writable(0);
 	public connectOptions: ConnectData;
+	public pluginCmd = fnBroadcast<[IMsgPluginCommandPart]>();
 
 	constructor(connectOptions: ConnectData) {
 		this.connectOptions = connectOptions;
@@ -96,10 +97,12 @@ export class Connection {
 	public sendChange(change: OChange): ChangePromise {
 		const returnCode = this.curReturnCode;
 		this.curReturnCode = (this.curReturnCode + 1) % 65536;
-		this.sendMessage({ Change: {
-			change,
-			returnCode: returnCode.toString(),
-		}});
+		this.sendMessage({
+			Change: {
+				change,
+				returnCode: returnCode.toString(),
+			}
+		});
 		return new Promise((resolve, reject) => {
 			this.returnCodes.set(returnCode, { resolve, reject });
 		});
@@ -304,11 +307,15 @@ export class Connection {
 					for (const c of message.ChannelDescriptionChanged) {
 						if (c.channelId === curTarget.node.qlId) {
 							// Update channel description
-							this.sendMessage({ Change: { change: {
-								ChannelDescriptionRequest: {
-									id: c.channelId,
-								},
-							}}});
+							this.sendMessage({
+								Change: {
+									change: {
+										ChannelDescriptionRequest: {
+											id: c.channelId,
+										},
+									}
+								}
+							});
 							break;
 						}
 					}
@@ -321,9 +328,15 @@ export class Connection {
 				this.fileTreeCache.update(ftc => ftc.applyFileList(message));
 			} else if ("ServerEdited" in message) {
 				// TODO We do not get this message because it is a book message...
-				this.sendMessage({ Change: { change: {
-					ServerVariablesRequest: {},
-				}}});
+				this.sendMessage({
+					Change: {
+						change: {
+							ServerVariablesRequest: {},
+						}
+					}
+				});
+			} else if ("PluginCommand" in message) {
+				message.PluginCommand.forEach((pc) => this.pluginCmd(pc));
 			}
 		} else if ("TalkersChanged" in msg) {
 			this.book.talkersHandler(msg.TalkersChanged);

@@ -354,21 +354,26 @@ export function oneshot<T>(
 	});
 }
 
-type FnFunc<T extends unknown[]> = (...args: T) => void;
+type FuncTyp<T extends unknown[]> = (...args: T) => void;
 interface DebounceOpt {
 	/**
 	 * When true, resets timer on each new call. Does not fire until the timer ran out.<br>
-	 * **Default**: true
+	 * **Default**: false
 	 */
 	resetOnCall?: boolean,
+
+	/**
+	 * When true, calls the function once when starting the timer.<br>
+	 * **Default**: false
+	 */
+	callInitial?: boolean,
 }
 
-export function debounced<T extends unknown[] = []>(fn: FnFunc<T>, timeout: number, options?: DebounceOpt) {
+export function debounced<T extends unknown[] = []>(fn: FuncTyp<T>, timeout: number, options?: DebounceOpt) {
 	let timer: number | undefined;
 	let lastArgs: T;
-	let opt = options ?? {
-		resetOnCall: false,
-	};
+	let resetOnCall = options?.resetOnCall ?? false;
+	let callInitial = options?.callInitial ?? false;
 
 	function cancel() {
 		if (timer !== undefined) {
@@ -379,7 +384,7 @@ export function debounced<T extends unknown[] = []>(fn: FnFunc<T>, timeout: numb
 
 	function call(...args: T) {
 		lastArgs = args;
-		if (opt.resetOnCall) {
+		if (resetOnCall) {
 			cancel();
 		}
 
@@ -388,10 +393,36 @@ export function debounced<T extends unknown[] = []>(fn: FnFunc<T>, timeout: numb
 				timer = undefined;
 				fn(...lastArgs);
 			}, timeout);
+			if (callInitial)
+				fn(...args);
 		}
 	}
 
 	call.cancel = cancel;
 	call.call = call;
+	return call;
+}
+
+export function fnBroadcast<T extends unknown[] = []>() {
+	let callList: (FuncTyp<T>)[] = [];
+
+	function call(...args: T): void {
+		for (const func of callList) {
+			func(...args);
+		}
+	}
+
+	function clear(): void {
+		callList = [];
+	}
+
+	function subscribe(func: FuncTyp<T>): () => void {
+		callList.push(func);
+		return () => callList.remove_item(func);
+	}
+
+	call.call = call;
+	call.clear = clear;
+	call.subscribe = subscribe;
 	return call;
 }

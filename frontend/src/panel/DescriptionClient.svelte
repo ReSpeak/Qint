@@ -21,6 +21,7 @@
 	import BModal from "../ui/BModal.svelte";
 	import { tick } from "svelte";
 	import BChart from "../ui/BChart.svelte";
+	import { app } from "../app";
 
 	export let connection: Connection;
 	export let client: Client;
@@ -29,6 +30,7 @@
 	let pokeModalVisible = false;
 	let pokeInput: HTMLElement | undefined;
 	let pokeMessage: string = "";
+	let developMode = app.transientSettings.ui._developMode;
 
 	const sgs = connection.book.serverGroups;
 	$: avatarPath = getClientAvatarPath($client, connection);
@@ -229,7 +231,7 @@
 		<div class="dataLine headLine">
 			<TsIcon type="client" source={{ icon: $client.icon }} {connection} />
 			<ClientName client={$client} />
-			<span class="countryFlag">{countryCodeToEmojis(client.countryCode)}</span>
+			<span class="countryFlag" title={$client.countryCode}>{countryCodeToEmojis($client.countryCode)}</span>
 			<div style="flex: 1;" />
 			<PlatformIcon platform={$client.platform} version={$client.version} />
 		</div>
@@ -266,9 +268,9 @@
 			</div>
 		</div>
 	</div>
-	<StickySlot>Actions</StickySlot>
-	<div class="descGroup">
-		{#if true || !ownClient}
+	{#if $developMode || !ownClient}
+		<StickySlot>Actions</StickySlot>
+		<div class="descGroup">
 			<p class="buttons">
 				<button class="button is-small is-primary" on:click={onPokeClick}>
 					<Icon name="hand-pointing-right" />
@@ -295,7 +297,7 @@
 				<BModal bind:visible={pokeModalVisible}>
 					<div slot="header">
 						<span>Poke</span>
-						<ClientName {client} />
+						<ClientName client={$client} />
 					</div>
 					<input
 						class="input pokeInput"
@@ -305,8 +307,8 @@
 					<button type="submit" slot="footer" class="button is-success">Poke</button>
 				</BModal>
 			</form>
-		{/if}
-	</div>
+		</div>
+	{/if}
 	<StickySlot on:click={() => (statsOpen = true)}>
 		<button class="button iconButton" on:click|stopPropagation={() => (statsOpen = !statsOpen)}>
 			<Icon name="chevron-right{statsOpen ? ' mdi-rotate-90' : ''}" />
@@ -317,9 +319,9 @@
 		<div class="descGroup">
 			<div class="descTable">
 				<div>Ping:</div>
-				<div>{formatClientPing(client)}</div>
+				<div>{formatClientPing($client)}</div>
 				<div>IP Address:</div>
-				<div>{client.clientAddress ?? ''}</div>
+				<div>{$client.clientAddress ?? ''}</div>
 			</div>
 		</div>
 		<div class="descGroup">
@@ -334,18 +336,18 @@
 
 				<div>Packet loss:</div>
 				<div>
-					{formatPacketLoss(client.serverToClientPacketlossTotal, client.clientToServerPacketlossTotal)}
+					{formatPacketLoss($client.serverToClientPacketlossTotal, $client.clientToServerPacketlossTotal)}
 				</div>
-				<div>{formatPacketLoss(client.serverToClientPacketlossTotal)}</div>
-				<div>{formatPacketLoss(client.clientToServerPacketlossTotal)}</div>
+				<div>{formatPacketLoss($client.serverToClientPacketlossTotal)}</div>
+				<div>{formatPacketLoss($client.clientToServerPacketlossTotal)}</div>
 
 				<div>Packets transferred:</div>
 				<div />
 				<div>
-					{formatPacketCount(client.packetsReceivedSpeech, client.packetsReceivedKeepalive, client.packetsReceivedControl)}
+					{formatPacketCount($client.packetsReceivedSpeech, $client.packetsReceivedKeepalive, $client.packetsReceivedControl)}
 				</div>
 				<div>
-					{formatPacketCount(client.packetsSentSpeech, client.packetsSentKeepalive, client.packetsSentControl)}
+					{formatPacketCount($client.packetsSentSpeech, $client.packetsSentKeepalive, $client.packetsSentControl)}
 				</div>
 			</div>
 		</div>

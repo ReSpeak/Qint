@@ -47,9 +47,9 @@
 <div class="hover menu" style="top: calc({div.getBoundingClientRect().top}px - 1.5em);">
 	<div class="corner" />
 	{#if selected.node instanceof Client}
-		<HoverMenuClient connection={selected.connection} clientId={selected.node.id} />
+		<HoverMenuClient connection={selected.connection} client={selected.node} />
 	{:else if selected.node instanceof Channel}
-		<HoverMenuChannel connection={selected.connection} channelId={selected.node.id} />
+		<HoverMenuChannel connection={selected.connection} channel={selected.node} />
 	{:else if selected.node instanceof Server}
 		<HoverMenuServer connection={selected.connection} />
 	{/if}
