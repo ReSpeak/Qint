@@ -1,39 +1,53 @@
 <script lang="typescript">
 	import Icon from "../ui/Icon.svelte";
-	import type { Connection } from "../connection";
-	import { HTML5VideoControl, SyncState } from "./videoSync";
-	import type { IVideoControl, VSyncEvent } from "./videoSync";
+	import { HTML5VideoControl, SyncState, YoutubeVideoControl } from "./videoSync";
+	import type { IVideoControl } from "./videoSync";
 	import { onDestroy, onMount } from "svelte";
-	import type { IMsgPluginCommandPart } from "../book_events";
 	import type { NodeSelection } from "../app";
+	import { assert, youtubeUrlRegex } from "../util";
+	import type { EmbedTypes } from "./previewAnalyzer";
 
 	export let videoSrc: string;
 	export let nodeSel: NodeSelection;
+	export let embed: EmbedTypes | undefined;
 
 	let html5videoElem: HTMLVideoElement | undefined;
-	type CacheType = { videoControl: IVideoControl; video_key: string };
-	let cache: CacheType | undefined | null;
+	let youtubeVideoElem: HTMLIFrameElement | undefined;
+	let videoControl: IVideoControl | undefined | null;
 	let vSync: SyncState | undefined;
 
-	function getVideoControl(): CacheType | null {
-		if (cache !== undefined) return cache;
-		if (html5videoElem) {
-			cache = {
-				videoControl: new HTML5VideoControl(html5videoElem),
-				video_key: videoSrc,
-			};
+	let detectedType: "youtube" | "media";
+	let video_key: string;
+
+	let ytMatch = youtubeUrlRegex.exec(videoSrc);
+	if (ytMatch !== null) {
+		detectedType = "youtube";
+		video_key = ytMatch[5]; // ?
+	} else {
+		detectedType = "media";
+		video_key = videoSrc;
+	}
+
+	function getVideoControl(): IVideoControl | null {
+		if (videoControl !== undefined) return videoControl;
+		if (detectedType === "media") {
+			assert(html5videoElem, "No html5videoElem");
+			videoControl = new HTML5VideoControl(html5videoElem);
+		} else if (detectedType === "youtube") {
+			assert(youtubeVideoElem, "No youtubeVideoElem");
+			videoControl = new YoutubeVideoControl(youtubeVideoElem);
 		} else {
-			cache = null;
+			videoControl = null;
 		}
-		return cache;
+		return videoControl;
 	}
 
 	function toggleVSync() {
 		if (vSync === undefined) {
-			let videoData = getVideoControl();
-			if (videoData === null) return;
-			console.log(nodeSel, videoData.video_key, videoData.videoControl);
-			vSync = new SyncState(nodeSel, videoData.video_key, videoData.videoControl);
+			const _videoControl = getVideoControl();
+			if (_videoControl === null) return;
+			//console.log(nodeSel, video_key, videoControl);
+			vSync = new SyncState(nodeSel, video_key, _videoControl);
 		}
 		if (vSync.enabled) {
 			vSync.unsubscribe();
@@ -49,11 +63,22 @@
 </script>
 
 <div class="chatVideo">
-	<video bind:this={html5videoElem} controls>
-		<source src={videoSrc} />
-		<track kind="captions" />
-		Your browser does not support the video tag.
-	</video>
+	{#if detectedType === 'media'}
+		<video bind:this={html5videoElem} controls>
+			<source src={videoSrc} />
+			<track kind="captions" />
+			Your browser does not support the video tag.
+		</video>
+	{:else if detectedType === 'youtube'}
+		<iframe
+			bind:this={youtubeVideoElem}
+			title="Youtube Video"
+			type="text/html"
+			width="640"
+			height="390"
+			src="https://www.youtube.com/embed/{video_key}?enablejsapi=1"
+			frameborder="0" />
+	{/if}
 	<div class="videoTools">
 		<button
 			class="videoButton"

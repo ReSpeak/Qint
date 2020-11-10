@@ -4,7 +4,8 @@ import { get } from "svelte/store";
 import { NodeSelection, app } from "../app";
 import { Client, Server } from "../book";
 import { PluginTargetMode, Channel, IMsgPluginCommandPart } from "../book_events";
-import { assert, debounced } from "../util";
+import { assert, debounced, fnBroadcast } from "../util";
+import moment, { Moment } from "moment";
 
 export const vSyncCmdKey = "qint.vsync";
 
@@ -55,6 +56,8 @@ export class SyncState {
 	}
 
 	private processLocalAction(ev: VSyncEvent) {
+		//console.log("Local action", ev);
+		if (!this.enabled) return;
 		if (this.debouncedEvent === undefined)
 			this.debouncedEvent = ev;
 		else
@@ -70,6 +73,7 @@ export class SyncState {
 	}, 200, { resetOnCall: false });
 
 	public broadcastNewState(ev: VSyncEvent) {
+		if (!this.enabled) return;
 		const broadcastTarget = this.target();
 		if (broadcastTarget === null) return;
 		const [target, targetClientId] = broadcastTarget;
@@ -77,7 +81,7 @@ export class SyncState {
 		// Prevent feedback loops
 		let diffEv = SyncState.diffSafe(ev, this.lastReceivedSync);
 		if (Object.keys(diffEv).length === 0) return;
-		console.log("Syncing", diffEv);
+		//console.log("Syncing", diffEv);
 
 		this.nodeSel.connection.sendChange({
 			ConnectionPluginCommandRequest: {
@@ -120,7 +124,7 @@ export class SyncState {
 	public receiveNewState(cmd: VSyncCmd) {
 		if (cmd.video_key !== this.video_key)
 			return;
-		console.log("Got sync", cmd);
+		//console.log("Got sync", cmd);
 		SyncState.copySafe(cmd.event, this.lastReceivedSync);
 		if (cmd.host) {
 			this.host = cmd.host;
@@ -142,6 +146,7 @@ export class SyncState {
 		assert(this.pluginCmdUnsub === undefined, "previous sub not removed");
 		this.pluginCmdUnsub = this.nodeSel.connection.pluginCmd.subscribe(cmd => this.processRawPluginCmd(cmd));
 		this.videoControl.event = (ev) => this.processLocalAction(ev);
+		this.videoControl.register?.();
 		this.enabled = true;
 	}
 
@@ -149,6 +154,7 @@ export class SyncState {
 		this.pluginCmdUnsub?.();
 		this.pluginCmdUnsub = undefined;
 		this.videoControl.event = undefined;
+		this.videoControl.unregister?.();
 		this.broadcastDebounced.cancel();
 		this.enabled = false;
 	}
@@ -160,6 +166,8 @@ export interface IVideoControl {
 	seek(pos: number): void;
 	speed(rate: number): void;
 	event?: (ev: VSyncEvent) => void;
+	register?(): void;
+	unregister?(): void;
 }
 
 export class HTML5VideoControl implements IVideoControl {
@@ -184,4 +192,170 @@ export class HTML5VideoControl implements IVideoControl {
 		this.elem.playbackRate = rate;
 	}
 	public event?: (ev: VSyncEvent) => void;
+}
+
+// Global msg handler to listen for postMessage events from youtube iframes
+const windowYoutubeMsg = fnBroadcast<[YoutubeEvent]>();
+window.addEventListener("message", (event) => {
+	if (event.origin !== "https://www.youtube.com") return;
+	let evd = JSON.parse(event.data) as YoutubeEvent;
+	windowYoutubeMsg(evd);
+}, false);
+
+const enum YoutubePlayerState {
+	UNSTARTED = -1,
+	ENDED = 0,
+	PLAYING = 1,
+	PAUSED = 2,
+	BUFFERING = 3,
+	CUED = 5,
+}
+type YoutubeEventBase = { channel: string, id: number };
+type YoutubeEvent = { event: "onReady", info: null } & YoutubeEventBase
+	| { event: "infoDelivery", info: Partial<YTInfoDelivery> } & YoutubeEventBase
+	| { event: "onStateChange", info: YoutubePlayerState } & YoutubeEventBase
+
+interface YTInfoDelivery {
+	currentTime: number;
+	duration: number;
+	playerState: YoutubePlayerState;
+	videoData: { video_id: string };
+	playbackRate: number;
+}
+
+const host = "https://www.youtube.com";
+export class YoutubeVideoControl implements IVideoControl {
+	private static gid: number = 1;
+
+	private pipe_id: number;
+	private evTimer: number | undefined;
+	private windowYoutubeMsgUnsub: (() => void) | undefined;
+	private originReady: boolean = false;
+	private iFrameRegistered: boolean = false;
+	private iFrameLoaded: boolean = false;
+	// state sync util
+	private dedupState: Partial<YTInfoDelivery> & { status?: YoutubePlayerState } = {};
+	private vSyncSeekTime: Moment | undefined;
+
+	constructor(
+		public elem: HTMLIFrameElement
+	) {
+		this.pipe_id = YoutubeVideoControl.gid++;
+	}
+	public play(): void {
+		this.dedupState.playerState = YoutubePlayerState.PLAYING;
+		this.elem.contentWindow?.postMessage(JSON.stringify({ ...this.getCmdObj(), func: "playVideo" }), host);
+	}
+	public pause(): void {
+		this.dedupState.playerState = YoutubePlayerState.PAUSED;
+		this.elem.contentWindow?.postMessage(JSON.stringify({ ...this.getCmdObj(), func: "pauseVideo" }), host);
+	}
+	public seek(pos: number /* In seconds*/): void {
+		const now = moment();
+		if (this.isSeekJump(now, pos)) {
+			this.elem.contentWindow?.postMessage(JSON.stringify({ ...this.getCmdObj(), func: "seekTo", args: [pos, true] }), host);
+		}
+		this.dedupState.currentTime = pos;
+		this.vSyncSeekTime = now;
+	}
+	public speed(rate: number): void {
+		this.dedupState.playbackRate = rate;
+		this.elem.contentWindow?.postMessage(JSON.stringify({ ...this.getCmdObj(), func: "setPlaybackRate", args: [rate] }), host);
+	}
+	public event?: (ev: VSyncEvent) => void;
+
+	private iFrameMessage(msg: YoutubeEvent) {
+		if (msg.id !== this.pipe_id) return;
+
+		switch (msg.event) {
+			case "onReady":
+				this.iFrameLoaded = true;
+				clearInterval(this.evTimer);
+				this.evTimer = undefined;
+				break;
+			case "onStateChange":
+				if (this.dedupState.playerState === msg.info)
+					break;
+				this.dedupState.playerState = msg.info;
+				if (msg.info === YoutubePlayerState.PLAYING) {
+					this.event?.({ action: "start", position: this.dedupState.currentTime });
+				}
+				else if (msg.info === YoutubePlayerState.PAUSED) {
+					this.event?.({ action: "pause" });
+				}
+				break;
+			case "infoDelivery":
+				if (msg.info.playbackRate !== undefined && msg.info.playbackRate !== this.dedupState.playbackRate) {
+					console.log("Rate change to", msg.info.playbackRate);
+					this.dedupState.playbackRate = msg.info.playbackRate;
+					this.event?.({ speed: msg.info.playbackRate });
+				}
+				if (msg.info.currentTime !== undefined) {
+					const now = moment();
+					if (this.isSeekJump(now, msg.info.currentTime))
+						this.event?.({ position: msg.info.currentTime });
+					this.dedupState.currentTime = msg.info.currentTime;
+					this.vSyncSeekTime = now;
+				}
+				break;
+		}
+	}
+
+	private isSeekJump(now: Moment, pos: number): boolean {
+		if (this.dedupState.currentTime !== undefined) {
+			const timeElapsed = moment.duration(now.diff(this.vSyncSeekTime));
+			const videoElapsed = moment.duration(pos - this.dedupState.currentTime, "s");
+			if (timeElapsed.subtract(videoElapsed).abs().asSeconds() > 1) {
+				return true;
+			}
+		} else {
+			return true;
+		}
+		return false;
+	}
+
+	private checkIframe() {
+		let cw = this.elem.contentWindow;
+		if (cw === null) return;
+		if (!this.originReady) {
+			try { if (cw.origin) return; } catch {
+				console.log("orig");
+				this.originReady = true;
+			}
+		}
+		if (!this.iFrameRegistered) {
+			console.log("ireg");
+			cw.postMessage(JSON.stringify({ ...this.getCmdObj(), func: "addEventListener", args: ["onReady"] }), host);
+			cw.postMessage(JSON.stringify({ ...this.getCmdObj(), func: "addEventListener", args: ["onStateChange"] }), host);
+			this.iFrameRegistered = true;
+		}
+
+		if (!this.iFrameLoaded) {
+			console.log("iload");
+			cw.postMessage(JSON.stringify({ ...this.getCmdObj("listening") }), host);
+		}
+	}
+	private getCmdObj(cmd: string = "command"): object {
+		return {
+			channel: "widget",
+			event: cmd,
+			args: [],
+			id: this.pipe_id
+		}
+	}
+
+	public register() {
+		assert(this.evTimer === undefined, "Old evTimer not cleared");
+		if (!this.iFrameLoaded)
+			this.evTimer = setInterval(() => this.checkIframe(), 250);
+		this.windowYoutubeMsgUnsub = windowYoutubeMsg.subscribe((msg) => this.iFrameMessage(msg));
+	}
+	public unregister() {
+		if (this.evTimer !== undefined) {
+			clearInterval(this.evTimer);
+			this.evTimer = undefined;
+		}
+		this.windowYoutubeMsgUnsub?.();
+		this.windowYoutubeMsgUnsub = undefined;
+	}
 }

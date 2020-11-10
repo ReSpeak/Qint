@@ -1,4 +1,5 @@
 import { backend } from "../backend/backend";
+import { youtubeUrlRegex } from "../util";
 
 const cache: Record<string, AnalyzeResult | Promise<AnalyzeResult>> = {};
 
@@ -7,26 +8,34 @@ const analyzeInBackend = true;
 export async function analyzeLink(link: string): Promise<AnalyzeResult> {
 	let result = cache[link];
 	if (result === undefined) {
-		let task = analyzeInBackend
-			? analyzeLinkInBackend(link)
-			: analyzeLinkInBrowser(link);
-		cache[link] = task;
-		try {
-			result = await task;
-
-			if (result.kind === "site") {
-				const resultUrl = result.imageSrc;
-				if (!resultUrl.startsWith("http://") && !resultUrl.startsWith("https://")) {
-					let origin = new URL(link).origin;
-					if (resultUrl.startsWith("/"))
-						result.imageSrc = `${origin}${resultUrl}`;
-					else
-						result.imageSrc = `${origin}/${resultUrl}`;
-				}
+		if (youtubeUrlRegex.test(link)) {
+			result = {
+				kind: "video",
+				videoSrc: link,
+				embed: "youtube"
 			}
-		} catch (ex) {
-			console.log("Why do you hate me?", link, ex);
-			result = Unknown;
+		} else {
+			let task = analyzeInBackend
+				? analyzeLinkInBackend(link)
+				: analyzeLinkInBrowser(link);
+			cache[link] = task;
+			try {
+				result = await task;
+
+				if (result.kind === "site") {
+					const resultUrl = result.imageSrc;
+					if (!resultUrl.startsWith("http://") && !resultUrl.startsWith("https://")) {
+						let origin = new URL(link).origin;
+						if (resultUrl.startsWith("/"))
+							result.imageSrc = `${origin}${resultUrl}`;
+						else
+							result.imageSrc = `${origin}/${resultUrl}`;
+					}
+				}
+			} catch (ex) {
+				console.log("Why do you hate me?", link, ex);
+				result = Unknown;
+			}
 		}
 		cache[link] = result;
 		return result;
@@ -106,8 +115,8 @@ const Unknown: UnknwonResult = {
 	kind: undefined,
 };
 
-type AnalyzeResult = ImageResult | SiteResult | VideoResult | YoutubeResult | UnknwonResult;
-
+type AnalyzeResult = ImageResult | SiteResult | VideoResult | UnknwonResult;
+export type EmbedTypes = "youtube";
 
 interface UnknwonResult {
 	kind: undefined;
@@ -128,9 +137,5 @@ interface ImageResult {
 interface VideoResult {
 	kind: "video",
 	videoSrc: string;
-}
-
-interface YoutubeResult {
-	kind: "video_yt",
-	youtube_id: string;
+	embed?: EmbedTypes;
 }

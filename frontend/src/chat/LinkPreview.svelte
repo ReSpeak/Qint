@@ -21,7 +21,7 @@
 			<img class="limitImg" src={result.imageSrc} alt={textContent} />
 		</a>
 	{:else if result.kind === 'video'}
-		<VideoPreview videoSrc={result.videoSrc} {nodeSel} />
+		<VideoPreview videoSrc={result.videoSrc} embed={result.embed} {nodeSel} />
 	{:else if result.kind === 'site'}
 		<a href={link} target="_blank" class="box">
 			<div>

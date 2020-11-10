@@ -24,6 +24,7 @@ export const IS_TAURI = "__TAURI_INVOKE_HANDLER__" in window;
 export const LONG_DATETIME = "dddd, MMMM Do YYYY, HH:mm:ss UTCZ";
 
 export const NARROW_NO_BREAK_SPACE = String.fromCharCode(0x202f);
+export const youtubeUrlRegex = /^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube\.com|youtu.be))(\/(?:[\w\-]+\?v=|embed\/|v\/)?)([\w\-]+)(\S+)?$/;
 
 export type RequiredNN<T> = {
 	[P in keyof T]: NonNullable<T[P]>;
