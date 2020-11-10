@@ -1,11 +1,13 @@
 <script lang="typescript">
-	import Loader from "../ui/Loader.svelte";
+	//import Loader from "../ui/Loader.svelte";
 	import VideoPreview from "./VideoPreview.svelte";
 	import { analyzeLink } from "./previewAnalyzer";
 	import { autoError } from "../util";
+	import type { NodeSelection } from "../app";
 
 	export let link: string;
 	export let textContent: string;
+	export let nodeSel: NodeSelection;
 
 	$: analyzeResult = analyzeLink(link);
 </script>
@@ -19,7 +21,7 @@
 			<img class="limitImg" src={result.imageSrc} alt={textContent} />
 		</a>
 	{:else if result.kind === 'video'}
-		<VideoPreview videoSrc={result.videoSrc} />
+		<VideoPreview videoSrc={result.videoSrc} {nodeSel} />
 	{:else if result.kind === 'site'}
 		<a href={link} target="_blank" class="box">
 			<div>

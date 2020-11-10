@@ -4,9 +4,11 @@
 	import Icon from "../ui/Icon.svelte";
 	import LinkPreview from "./LinkPreview.svelte";
 	import RenderedText from "../ui/RenderedText.svelte";
+	import type { NodeSelection } from "../app";
 
 	export let unread: boolean;
 	export let message: Message;
+	export let nodeSel: NodeSelection;
 
 	let viewRaw = false;
 	let links: [string, string][] = [];
@@ -29,7 +31,7 @@
 			<div class="messageRendered">
 				<RenderedText text={message.rendered} bind:links />
 				{#each links as [link, text] (link)}
-					<LinkPreview {link} textContent={text} />
+					<LinkPreview {link} textContent={text} {nodeSel} />
 				{/each}
 			</div>
 			<div class="messageRaw">

@@ -221,7 +221,8 @@
 			{/if}
 			<UiMessage
 				message={item}
-				unread={chatData !== undefined && item.date > $chatData.lastRead} />
+				unread={chatData !== undefined && item.date > $chatData.lastRead}
+				nodeSel={sel} />
 		</UiLazyList>
 		<form class="chat-form" class:hidden={!canChatHere} on:submit|preventDefault={sendMessage}>
 			<BInput bind:this={messageInput} bind:value={text} on:submit={sendMessage}>
