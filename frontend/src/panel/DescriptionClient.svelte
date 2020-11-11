@@ -160,18 +160,9 @@
 	}
 
 	function onPokeSend() {
-		connection.sendMessage({
-			SendMessage: {
-				target: {
-					Poke: client.id,
-				},
-				message: pokeMessage,
-			},
-		});
+		connection.pokeClient(client.id, pokeMessage);
 		pokeModalVisible = false;
 		pokeMessage = "";
-		// Update chat
-		client.chat.update((c) => c);
 	}
 
 	function countryCodeToEmojis(countryCode: string): string {

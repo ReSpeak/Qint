@@ -135,6 +135,23 @@ export class Connection {
 		});
 	}
 
+	public pokeClient(clientId: ClientId, message: string) {
+		// TODO Use return code
+		this.sendMessage({
+			SendMessage: {
+				target: {
+					Poke: clientId,
+				},
+				message,
+			},
+		});
+		// Update chat
+		const client = this.book.getClient(clientId);
+		if (client !== undefined) {
+			client.chat.set(new ChatData(moment(), 0));
+		}
+	}
+
 	private async updateAllUnreadCounts() {
 		// Server
 		const serverData = await backend.graphql(`query GetUnreadCounts($server: [Int!]!) {
@@ -244,16 +261,15 @@ export class Connection {
 							const client = this.book.getClient(chatClientId.toString());
 							if (client !== undefined)
 								chat = client.chat;
+							console.log("pok?", client, chat, targetClientId, chatClientId);
 						}
 
 						if (chat !== undefined)
-							chat.update(c => {
-								// Only increment unread count for messages from others
-								if (fromOwnClient)
-									return new ChatData(moment(), c.unreadCount);
-								else
-									return c.incrementUnread();
-							});
+							// Only increment unread count for messages from others
+							if (fromOwnClient)
+								chat.set(new ChatData(moment(), 0));
+							else
+								chat.update(c => c.incrementUnread());
 					} else {
 						if ("PropertyRemoved" in tsevt) {
 							if ("Client" in tsevt.PropertyRemoved.id) {
