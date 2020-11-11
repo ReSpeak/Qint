@@ -246,6 +246,7 @@
 						{connection}
 						filter={childrenFilter}
 						{client}
+						{channel}
 						bind:filterShow={client.filterShow} />
 				{/if}
 			{/each}

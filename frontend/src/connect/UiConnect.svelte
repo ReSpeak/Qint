@@ -7,7 +7,7 @@
 	import { Book, Channel } from "../book";
 	import UiChannel from "../tree/UiChannel.svelte";
 	import type { ChannelId, Uid } from "../ts";
-	import { SERVER_ICON, CLIENT_ICON, hexEncode } from "../util";
+	import { SERVER_ICON, CLIENT_ICON, focus, hexEncode } from "../util";
 	import { app } from "../app";
 	import { backend } from "../backend/backend";
 
@@ -137,7 +137,6 @@
 	}
 
 	onMount(async () => {
-		addressInput.focus();
 		const recent = await Bookmark.getRecent();
 		if (recent) {
 			if (data.name === "")
@@ -178,6 +177,7 @@
 						bind:this={addressInput}
 						bind:value={address}
 						on:input={onAddressChange}
+						in:focus|local
 						name="server"
 						id="server"
 						class="input"

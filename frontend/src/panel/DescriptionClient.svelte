@@ -58,6 +58,7 @@
 				});
 			}
 		});
+		// Sort alphabetically
 		groups.sort((a, b) => {
 			if (a.isMember !== b.isMember) return a.isMember ? -1 : 1;
 			const nameCmp = a.name.localeCompare(b.name);

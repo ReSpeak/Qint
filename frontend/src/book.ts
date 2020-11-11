@@ -611,7 +611,15 @@ export class ServerGroup extends book_events.ServerGroup {
 	public static fromJson(obj: Partial<ServerGroup>): ServerGroup {
 		return new ServerGroup().update(obj);
 	}
+
+	public cmp(other: ServerGroup): number {
+		// If the sortId is 0, the group id is taken
+		const ai = this.sortId === 0 ? BigInt(this.id) : BigInt(this.sortId);
+		const bi = other.sortId === 0 ? BigInt(other.id) : BigInt(other.sortId);
+		return ai === bi ? 0 : (ai < bi ? -1 : 1);
+	}
 }
+
 export class ChannelGroup extends book_events.ChannelGroup {
 	public static fromJson(obj: Partial<ChannelGroup>): ChannelGroup {
 		return new ChannelGroup().update(obj);
