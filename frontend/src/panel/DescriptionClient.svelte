@@ -38,7 +38,82 @@
 	$: {
 		if ($client.version == null) getClientVariables();
 	}
-	//let onlineSince: Moment; TODO
+
+	let chartConfig: Chart.ChartConfiguration = {
+		type: "line",
+		data: {
+			datasets: [{
+				label: "Ping",
+				data: [],
+				backgroundColor: "#87A23600",
+				borderColor: "#87A236FF",
+				pointRadius: 1
+			}, {
+				label: "Packet loss to Server",
+				data: [],
+				backgroundColor: "#9F354800",
+				borderColor: "#9F3548FF",
+				pointRadius: 1
+			}, {
+				label: "Packet loss from Server",
+				data: [],
+				backgroundColor: "#512C7300",
+				borderColor: "#512C73FF",
+				pointRadius: 1
+			}]
+		},
+		options: {
+			scales: {
+				xAxes: [{
+					type: "realtime",
+					time: {
+						minUnit: "second",
+						unit: "second",
+						stepSize: 10,
+						displayFormats: {
+							second: "X",
+							minute: "X",
+							hour: "X",
+							day: "X"
+						}
+					},
+					ticks: {
+						callback: function(value) {
+							let seconds = moment().diff(moment(value, "X"), "seconds");
+							if (seconds < 1) return "0";
+							return `${seconds}s`;
+						}
+					}
+				}],
+				yAxes: [{
+					ticks: {
+						beginAtZero: true,
+						suggestedMax: 100,
+						maxTicksLimit: 5,
+						callback: function(value) {
+							return `${value}ms`;
+						}
+					}
+				}, {
+					ticks: {
+						beginAtZero: true,
+						suggestedMax: 1,
+						maxTicksLimit: 5,
+						callback: function(value) {
+							return `${Number(value) * 100}%`;
+						}
+					}
+				}]
+			},
+			plugins: {
+				streaming: {
+					duration: 60000,
+					onRefresh: chartRefresh,
+					frameRate: 1
+				}
+			}
+		}
+	};
 
 	interface ExtendedGroup {
 		isMember: boolean;
@@ -64,6 +139,25 @@
 			if (nameCmp !== 0) return nameCmp;
 			return Number(a.id) - Number(b.id);
 		});
+	}
+
+	function createDataPoint(value: number | undefined): Chart.ChartPoint {
+		return {
+			x: Date.now(),
+			y: value,
+		};
+	}
+
+	function packetLossToPercent(loss01: number | null): number | undefined {
+		if (!loss01) return undefined;
+		if (loss01 < 0.01) return undefined; // makes the chart look nicer
+		return loss01 * 100;
+	}
+
+	function chartRefresh(chart: Chart) {
+		chart.data.datasets![0].data!.push(createDataPoint(client.ping ? client.ping.asMilliseconds() : undefined));
+		chart.data.datasets![1].data!.push(createDataPoint(packetLossToPercent(client.clientToServerPacketlossTotal)));
+		chart.data.datasets![2].data!.push(createDataPoint(packetLossToPercent(client.serverToClientPacketlossTotal)));
 	}
 
 	function changeServerGroup(e: Event, group: ServerGroupId, isMember: boolean) {
@@ -325,7 +419,7 @@
 			</div>
 		</div>
 		<div class="descGroup">
-			<BChart />
+			<BChart config={chartConfig} />
 		</div>
 		<div class="descGroup">
 			<div class="statsTable">
