@@ -41,17 +41,17 @@
 <div class="field has-addons">
 	<p class="control">
 		<button class="button" on:click={() => (view = View.Edit)}>
-			<Icon name="pencil" />
+			<Icon name="pencil" title="Source" />
 		</button>
 	</p>
 	<p class="control">
 		<button class="button" on:click={() => (view = View.Both)}>
-			<Icon name="flip-horizontal" />
+			<Icon name="flip-horizontal" title="Split view" />
 		</button>
 	</p>
 	<p class="control">
 		<button class="button" on:click={() => (view = View.Rendered)}>
-			<Icon name="eye" />
+			<Icon name="eye" title="Preview" />
 		</button>
 	</p>
 </div>

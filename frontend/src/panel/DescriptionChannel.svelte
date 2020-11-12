@@ -49,12 +49,19 @@
 	let chanEdit: EditProps = createPropsCopy();
 	let changeRequest: ChangePromise | undefined;
 
-	// Load description
-	$: descRequest = connection.sendChange({
-		ChannelDescriptionRequest: {
-			id: channel.id,
-		},
-	});
+	$: descRequest = requestDescription($channel);
+
+	function requestDescription(channel: Channel) {
+		// Load description if out of date
+		if (channel.description === undefined) {
+			return connection.sendChange({
+				ChannelDescriptionRequest: {
+					id: channel.id,
+				},
+			});
+		}
+		return undefined;
+	}
 
 	function createPropsCopy(): EditProps {
 		return {
@@ -174,7 +181,7 @@
 				<div style="flex: 1;" />
 				<span class="tag is-primary is-rounded">
 					{#if $channel.isDefault}
-						<Icon name="home" />
+						<Icon name="home" title="Default channel" />
 					{:else}{$channel.channelType}{/if}
 				</span>
 			{/if}
@@ -183,7 +190,7 @@
 			<div class="dataLine">
 				<div>Type:</div>
 				{#if $channel.isDefault}
-					<div>Default <i>(Permanent)</i></div>
+					<div title="Mark another channel as default to change this type">Default <i>(Permanent)</i></div>
 				{:else}
 					<BDropDown bind:selected={chanEdit._channelType} items={channelTypeOpt} />
 				{/if}
@@ -242,7 +249,9 @@
 				<div>&nbsp;@&nbsp;</div>
 				<div>{$channel.codecQuality}</div>
 				<div>&nbsp;</div>
-				{#if !channel.isUnencrypted}
+				{#if server.codecEncryptionMode === CodecEncryptionMode.ForcedOn}
+					<Icon name="lock-outline" title="Voice is encrypted (forced by server)" />
+				{:else if !channel.isUnencrypted}
 					<Icon name="lock-outline" title="Voice is encrypted" />
 				{/if}
 			</div>

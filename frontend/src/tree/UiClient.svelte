@@ -53,9 +53,6 @@
 
 			return ag.cmp(bg);
 		});
-		console.log(grs);
-		for (const g of get(connection.book.serverGroups).values())
-			console.log(get(g));
 		return grs;
 	}
 
