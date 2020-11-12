@@ -133,6 +133,7 @@
 				});
 			}
 		});
+		// Sort alphabetically
 		groups.sort((a, b) => {
 			if (a.isMember !== b.isMember) return a.isMember ? -1 : 1;
 			const nameCmp = a.name.localeCompare(b.name);
@@ -254,18 +255,9 @@
 	}
 
 	function onPokeSend() {
-		connection.sendMessage({
-			SendMessage: {
-				target: {
-					Poke: client.id,
-				},
-				message: pokeMessage,
-			},
-		});
+		connection.pokeClient(client.id, pokeMessage);
 		pokeModalVisible = false;
 		pokeMessage = "";
-		// Update chat
-		client.chat.update((c) => c);
 	}
 
 	function countryCodeToEmojis(countryCode: string): string {

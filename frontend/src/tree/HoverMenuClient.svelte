@@ -15,17 +15,8 @@
 	let developMode = app.transientSettings.ui._developMode;
 
 	function onPokeSend() {
-		connection.sendMessage({
-			SendMessage: {
-				target: {
-					Poke: client.id,
-				},
-				message: pokeMessage,
-			},
-		});
+		connection.pokeClient(client.id, pokeMessage);
 		pokeMessage = "";
-		// Update chat
-		client.chat.update(c => c);
 	}
 
 	$: ownClient = client.id === connection.book.ownClientId;
@@ -46,15 +37,15 @@
 	<ClientVolume client={$client} {connection} />
 {/if}
 {#if $developMode || !ownClient}
-	<div>
+	<form on:submit|preventDefault={onPokeSend}>
 		<button
+			type="submit"
 			class="toolbutton"
-			on:click={onPokeSend}
 			title="Poke">
 			<Icon name="hand-pointing-right"></Icon>
 		</button>
 		<input class="input poke-input" type="text" placeholder="Poke message (optional)" bind:this={pokeInput} bind:value={pokeMessage}>
-	</div>
+	</form>
 {/if}
 
 <style lang="scss">

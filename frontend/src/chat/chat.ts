@@ -69,8 +69,6 @@ export class Chat {
 		const res = await backend.graphql(`query GetMessages($chatType: GMessageTarget!, $server: [Int!]!, $chatId: ID,
 					$startTime: NaiveDateTime, $startId: ID, $loadAtBeginning: Boolean) {
 				chat(typ: $chatType, server: $server, id: $chatId) {
-					lastRead
-					timezone
 					messages(startTime: $startTime, startId: $startId, beforeStart: $loadAtBeginning) {
 						id
 						invoker {

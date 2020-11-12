@@ -1,16 +1,18 @@
 <script lang="typescript">
 	import type { Readable } from "svelte/store";
+	import { get } from "svelte/store";
 	import TsIcon from "../ui/TsIcon.svelte";
 	import ServerGroupIcon from "../ui/ServerGroupIcon.svelte";
 	import FilterString from "../ui/FilterString.svelte";
 	import Icon from "../ui/Icon.svelte";
 	import { Connection } from "../connection";
-	import { Client } from "../book";
+	import { Channel, Client } from "../book";
 	import { draggable, DragData } from "../ui/draggable";
 	import { findParent, flash, render_updates } from "../util";
 	import { afterUpdate, onMount } from "svelte";
 	import { app, NodeSelection } from "../app";
 	import { TalkState } from "../ts";
+	import type { ServerGroupId } from "../ts";
 	import HoverMenu from "./HoverMenu.svelte";
 	import { DelayedHover } from "./delayedHover";
 
@@ -20,6 +22,8 @@
 	export let client: Client;
 	export let filter: string;
 	export let filterShow: boolean = true;
+	// Channel where this client is in
+	export let channel: Channel | undefined = undefined;
 	let hover: DelayedHover;
 	let hovered: Readable<boolean>;
 	let showId = false;
@@ -31,8 +35,28 @@
 	let ownClient = client.id === connection.book.ownClientId;
 	let div: HTMLElement;
 
+	$: sortedServerGroups = sortServerGroups($client.serverGroups);
+
 	function setChat() {
 		app.select(connection, client);
+	}
+
+	function sortServerGroups(groups: ServerGroupId[]): ServerGroupId[] {
+		const grs = [...groups];
+		grs.sort((a, b) => {
+			const ag = connection.book.getServerGroup(a);
+			const bg = connection.book.getServerGroup(b);
+			if (ag === undefined || bg === undefined) {
+				console.warn("Didn't find server groups", a, b, ag, bg);
+				return 0;
+			}
+
+			return ag.cmp(bg);
+		});
+		console.log(grs);
+		for (const g of get(connection.book.serverGroups).values())
+			console.log(get(g));
+		return grs;
 	}
 
 	function applyFilter(filter: string, client: Client) {
@@ -111,7 +135,10 @@
 				{#if $client.awayMessage !== null}
 					<Icon name="sleep" style="color: rgb(70,180,255);" title="Away" />
 				{/if}
-				{#each $client.serverGroups as grp (grp)}
+				{#if channel !== undefined && $client.talkPower < $channel.neededTalkPower}
+					<Icon name="microphone-off" style="color: gray;" title="Not enough talk power" />
+				{/if}
+				{#each sortedServerGroups as grp (grp)}
 					<ServerGroupIcon id={grp} {connection} />
 				{/each}
 				{#if $client.clientType !== "Normal"}

@@ -101,14 +101,14 @@
 		</BTabSlot>
 
 		<BTabSlot title="TTS">
-			<BKeyValue label="Voice">
+			<BKeyValue label="Voice" labelStyle="is-normal">
 				<BDropDown
 					items={voices}
 					display={(v) => v.name}
 					bind:selected={synthSett.voice}
 					on:change={() => syncSettings('synth')} />
 			</BKeyValue>
-			<BKeyValue label="Speed">
+			<BKeyValue label="Speed" labelStyle="is-normal">
 				<BSlider
 					min={0.1}
 					max={3}
@@ -117,7 +117,7 @@
 					tooltip={true}
 					on:change={() => syncSettings('synth')} />
 			</BKeyValue>
-			<BKeyValue label="Volume">
+			<BKeyValue label="Volume" labelStyle="is-normal">
 				<BSlider
 					min={0}
 					max={1}
@@ -126,7 +126,7 @@
 					tooltip={true}
 					on:change={() => syncSettings('synth')} />
 			</BKeyValue>
-			<BKeyValue label="Preview" narrow={false}>
+			<BKeyValue label="Preview" narrow={false} labelStyle="is-normal">
 				<div class="is-horizontal field">
 					<div class="control" style="flex: 1;">
 						<input

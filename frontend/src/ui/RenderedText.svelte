@@ -53,7 +53,7 @@
 	});
 </script>
 
-<div class="textRendered" bind:this={rendered} />
+<div class="textRendered content" bind:this={rendered} />
 
 <style lang="scss">
 	.textRendered {
