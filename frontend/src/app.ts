@@ -2,7 +2,7 @@ import { Writable, writable, get } from "svelte/store";
 import { Chat } from "./chat/chat";
 import { ITreeNode } from "./book";
 import { Connection } from "./connection";
-import { TransientSettings } from "./transientSettings";
+import { TransientSettings, DescriptionMode } from "./transientSettings";
 import { loadPlugins, IPlugin } from "./plugins";
 import { backend } from "./backend/backend";
 import { fnBroadcast, oneshot } from "./util";
@@ -68,6 +68,12 @@ export class App {
 			}
 			return nodeSel;
 		});
+	}
+
+	public setDescriptionMode(selected: NodeSelection, mode: DescriptionMode) {
+		app.selectNode(selected);
+		this.transientSettings.ui._descriptionMode.set(mode);
+		app.transientSettings.save("ui");
 	}
 
 	public connect(options: ConnectData): Connection {
