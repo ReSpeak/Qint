@@ -77,7 +77,8 @@
 			width="640"
 			height="390"
 			src="https://www.youtube.com/embed/{video_key}?enablejsapi=1"
-			frameborder="0" />
+			frameborder="0"
+			allowfullscreen />
 	{/if}
 	<div class="videoTools">
 		<button

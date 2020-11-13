@@ -1385,6 +1385,7 @@ mod tests {
 		con0.send(&MessageF2P::SendMessage {
 			target: JsMessageTarget::Client(con1_id),
 			message: msg.to_string(),
+			return_code: None
 		})
 		.await?;
 

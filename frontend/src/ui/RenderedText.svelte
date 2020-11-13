@@ -59,7 +59,7 @@
 	.textRendered {
 		white-space: pre-wrap;
 		word-wrap: break-word;
-		margin-bottom: 0;
+		margin-bottom: 0 !important;
 
 		:global(.para:not(:last-child)) {
 			margin-bottom: 1em;

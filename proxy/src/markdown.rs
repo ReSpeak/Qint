@@ -18,6 +18,9 @@ use pulldown_cmark::{Alignment, CodeBlockKind, Event, LinkType, Options, Parser,
 enum VNode {
 	VText(String),
 	VTag(VTag),
+	/// A dummy node which just expands to its content without creating
+	/// a new html node.
+	VGroup(Vec<VNode>),
 }
 
 #[derive(Debug, Clone)]
@@ -108,6 +111,12 @@ impl fmt::Display for VNode {
 		match self {
 			Self::VText(text) => write!(f, "{}", escape_html_body(text)),
 			Self::VTag(t) => t.fmt(f),
+			Self::VGroup(tags) => {
+				for t in tags {
+					t.fmt(f)?
+				}
+				Ok(())
+			}
 		}
 	}
 }
@@ -159,9 +168,20 @@ impl VTag {
 impl fmt::Display for VTag {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "<{}", self.tag)?;
-		for (k, v) in &self.attributes {
-			write!(f, " {}=\"{}\"", k, escape_html_attribute(v))?;
-		}
+		// sorting in test-mode to make attributes sorted so we have a consistent
+		// output to compare to.
+		if cfg!(test) {
+			let mut items = self.attributes.iter().collect::<Vec<_>>();
+			items.sort_by(|a, b| a.0.cmp(b.0).then(a.1.cmp(b.1)));
+			for (k, v) in &items {
+				write!(f, " {}=\"{}\"", k, escape_html_attribute(v))?;
+			}
+		} else {
+			for (k, v) in &self.attributes {
+				write!(f, " {}=\"{}\"", k, escape_html_attribute(v))?;
+			}
+		};
+
 		write!(f, ">")?;
 		if self.tag == "br" {
 			return Ok(());
@@ -196,21 +216,17 @@ impl<TStack> Render<TStack> {
 		}
 	}
 
-	fn finalize_to_html(mut self) -> VNode {
+	fn finalize_to_html(self) -> VNode {
 		assert_eq!(self.spine.len(), 0);
-		if self.elems.is_empty() {
-			String::new().into()
-		} else if self.elems.len() == 1 {
-			self.elems.pop().unwrap()
-		} else {
-			let mut root = VTag::new("div");
-			root.children.append(&mut self.elems);
-			root.into()
-		}
+		VNode::VGroup(self.elems)
 	}
 
-	fn push_text(&mut self, text: &str) { self.push_node(text.to_string().into()) }
-	fn push_vtag(&mut self, elem: VTag) { self.push_node(elem.into()) }
+	fn push_text(&mut self, text: &str) {
+		if !text.is_empty() {
+			self.push_node(text.to_string().into());
+		}
+	}
+	fn push_vtag(&mut self, elem: VTag) { self.push_node(elem.into()); }
 	fn push_node(&mut self, elem: VNode) {
 		if let Some((_, tag)) = self.spine.last_mut() {
 			tag.add_child(elem);
@@ -236,8 +252,8 @@ impl<TStack> Render<TStack> {
 		for (m, url) in crate::find_url::find_urls(text) {
 			if !text[m.start..].to_lowercase().ends_with("[/img]") {
 				self.push_text(&text[last_url..m.start]);
-				let mut a = Self::make_link();
 				last_url = m.end;
+				let mut a = Self::make_link();
 				a.add_attribute("href", Self::link_add_scheme(&url.to_string()).as_ref());
 				a.add_child(text[m].to_string().into());
 				self.push_node(a.into());
@@ -262,9 +278,9 @@ impl RenderMd {
 			TextKind::None => return,
 			TextKind::Normal(code) => {
 				if code {
-					self.push_node(self.text_builder.to_string().into())
+					self.push_node(self.text_builder.to_string().into());
 				} else {
-					self.push_node(bb(&self.text_builder))
+					self.push_node(bb(&self.text_builder));
 				}
 			}
 			TextKind::Latex(dm) => {
@@ -355,22 +371,14 @@ impl RenderMd {
 
 	fn markdown_start_tag(&mut self, t: Tag) -> (RenderMdMeta, VTag) {
 		match t {
-			Tag::Paragraph => {
-				let mut el = VTag::new("div");
-				el.add_class("para");
-				(RenderMdMeta::None, el)
-			}
+			Tag::Paragraph => (RenderMdMeta::None, VTag::new("p")),
 			Tag::Strikethrough => (RenderMdMeta::None, VTag::new("s")),
 			Tag::Heading(n) => {
 				assert!(n > 0); // TODO uuhm
 				assert!(n < 7);
 				(RenderMdMeta::None, VTag::new(&format!("h{}", n)))
 			}
-			Tag::BlockQuote => {
-				let mut el = VTag::new("blockquote");
-				el.add_class("blockquote");
-				(RenderMdMeta::None, el)
-			}
+			Tag::BlockQuote => (RenderMdMeta::None, VTag::new("blockquote")),
 			Tag::CodeBlock(info) => {
 				let el = VTag::new("code");
 				match info {
@@ -383,11 +391,7 @@ impl RenderMd {
 				}
 				(RenderMdMeta::None, el)
 			}
-			Tag::List(None) => {
-				let elem = VTag::new("ul");
-				//elem.add_attribute("style", &"list-style: disc inside;");
-				(RenderMdMeta::None, elem)
-			}
+			Tag::List(None) => (RenderMdMeta::None, VTag::new("ul")),
 			Tag::List(Some(1)) => {
 				let mut elem = VTag::new("ol");
 				elem.add_attribute("style", "list-style-position: inside;");
@@ -400,11 +404,7 @@ impl RenderMd {
 				(RenderMdMeta::None, elem)
 			}
 			Tag::Item => (RenderMdMeta::None, VTag::new("li")),
-			Tag::Table(_) => {
-				let mut el = VTag::new("table");
-				el.add_class("table");
-				(RenderMdMeta::None, el)
-			}
+			Tag::Table(_) => (RenderMdMeta::None, VTag::new("table")),
 			Tag::TableHead => {
 				self.table_state = TableState::Head;
 				//let VTag::new("thead")
@@ -415,16 +415,8 @@ impl RenderMd {
 				TableState::Head => VTag::new("th"),
 				TableState::Body => VTag::new("td"),
 			}),
-			Tag::Emphasis => {
-				let mut el = VTag::new("span");
-				el.add_class("is-italic");
-				(RenderMdMeta::None, el)
-			}
-			Tag::Strong => {
-				let mut el = VTag::new("span");
-				el.add_class("has-text-weight-bold");
-				(RenderMdMeta::None, el)
-			}
+			Tag::Emphasis => (RenderMdMeta::None, VTag::new("em")),
+			Tag::Strong => (RenderMdMeta::None, VTag::new("strong")),
 			Tag::Link(link_type, href, title) => {
 				let mut el = Self::make_link();
 				el.add_attribute("data-ismdlink", "true");
@@ -710,4 +702,91 @@ fn katex_render_code(code: &str, display_mode: bool) -> Option<VNode> {
 	tag.add_attribute("data-latex", code);
 	tag.add_attribute("data-displaymode", if display_mode { "true" } else { "false" });
 	Some(tag.into())
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	fn bb_str(text: &str) -> String { bb(text).to_string() }
+	fn p(text: &str) -> String { format!("<p>{}</p>", text) }
+
+	#[test]
+	fn basic_md() {
+		assert_eq!(markdown("plain text"), p("plain text"));
+		assert_eq!(markdown("*xx*"), p("<em>xx</em>"));
+		assert_eq!(markdown("__xx__"), p("<strong>xx</strong>"));
+		assert_eq!(markdown("**xx**"), p("<strong>xx</strong>"));
+	}
+
+	#[test]
+	fn basic_bb() {
+		assert_eq!(bb_str("plain text"), "plain text");
+		assert_eq!(bb_str("[i]xx[/i]"), "<i>xx</i>");
+		assert_eq!(bb_str("[u]xx[/u]"), "<u>xx</u>");
+		assert_eq!(bb_str("[b]xx[/b]"), "<b>xx</b>");
+		assert_eq!(bb_str("[s]xx[/s]"), "<s>xx</s>");
+		assert_eq!(bb_str("[color=red]xx[/color]"), r#"<span style="color:red">xx</span>"#);
+	}
+
+	#[test]
+	fn links_mdpre_plain() {
+		assert_eq!(
+			markdown("https://markdown.com"),
+			p(
+				r#"<a href="https://markdown.com/" target="_blank">https:&#x2F;&#x2F;markdown.com</a>"#
+			)
+		);
+	}
+	#[test]
+	fn links_mdpre_md_flavoured() {
+		assert_eq!(
+			markdown("[title](https://markdown.com)"),
+			p(r#"<a data-ismdlink="true" href="https://markdown.com" target="_blank">title</a>"#)
+		);
+	}
+	#[test]
+	fn links_mdpre_bb_flavoured() {
+		assert_eq!(
+			markdown("[url=https://markdown.com]title[/url]"),
+			p(r#"<a href="https://markdown.com" target="_blank">title</a>"#)
+		);
+	}
+	#[test]
+	fn links_bbpre_plain() {
+		assert_eq!(
+			bb_str("https://markdown.com"),
+			r#"<a href="https://markdown.com/" target="_blank">https:&#x2F;&#x2F;markdown.com</a>"#
+		);
+	}
+	#[test]
+	fn links_bbpre_bb_flavoured() {
+		assert_eq!(
+			bb_str("[url=https://markdown.com]title[/url]"),
+			r#"<a href="https://markdown.com" target="_blank">title</a>"#
+		);
+	}
+
+	#[test]
+	fn combined_md_bb() {
+		assert_eq!(markdown("*md_em* [b]bb_bold[/b]"), p(r#"<em>md_em</em> <b>bb_bold</b>"#));
+	}
+
+	#[test]
+	fn combined_bb_md() {
+		assert_eq!(
+			markdown("[i]bb_italic[/i] **md_bold**"),
+			p(r#"<i>bb_italic</i> <strong>md_bold</strong>"#)
+		);
+	}
+
+	#[test]
+	fn mixed_1() {
+		assert_eq!(
+			markdown("*this* __will__ **be** [color=red]interesting[/color] 🙂"),
+			p(
+				r#"<em>this</em> <strong>will</strong> <strong>be</strong> <span style="color:red">interesting</span> 🙂"#
+			)
+		);
+	}
 }
