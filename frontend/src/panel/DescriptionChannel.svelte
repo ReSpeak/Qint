@@ -41,7 +41,9 @@
 	}
 
 	// THIS IS NOT A FULL CHANNEL OBJECT
-	type EditProps = RequiredNN<Channel> & {
+	type EditProps = Omit<RequiredNN<Channel>,
+		"description" | "isUnencrypted" | "deleteDelay" | "channelType" | "isDefault"> & {
+		_description: string;
 		_isEncrypted: boolean;
 		_deleteDelay: Duration;
 		_channelType: ChannelType | "Default";
@@ -53,7 +55,7 @@
 
 	function requestDescription(channel: Channel) {
 		// Load description if out of date
-		if (channel.description === undefined) {
+		if (channel.optionalData === null) {
 			return connection.sendChange({
 				ChannelDescriptionRequest: {
 					id: channel.id,
@@ -65,13 +67,13 @@
 
 	function createPropsCopy(): EditProps {
 		return {
-			description: channel.description,
 			name: channel.name,
 			topic: channel.topic,
 			codec: channel.codec,
 			codecQuality: channel.codecQuality,
 			maxClients: channel.maxClients,
 			maxFamilyClients: channel.maxFamilyClients,
+			_description: channel.optionalData?.description ?? "",
 			_channelType: channel.isDefault ? "Default" : channel.channelType,
 			_isEncrypted: !channel.isUnencrypted,
 			_deleteDelay: channel.deleteDelay,
@@ -99,6 +101,8 @@
 		}
 		if (channel.channelType !== chanEdit._channelType && chanEdit._channelType !== "Default")
 			diff.channelType = chanEdit._channelType;
+		if (chanEdit._description !== channel.optionalData?.description)
+			diff.description = chanEdit._description;
 		return diff;
 	}
 
@@ -207,7 +211,7 @@
 			{#if editing}
 				<input class="input" type="text" bind:value={chanEdit.topic} />
 			{:else}
-				<RenderedText text={$channel.topicRendered ?? ''} />
+				{$channel.topic ?? ''}
 			{/if}
 		</div>
 		{#if editing}
@@ -291,14 +295,14 @@
 	<hr />
 	<div class="description">
 		{#if editing}
-			<RenderedTextEditor bind:raw={chanEdit.description} />
+			<RenderedTextEditor bind:raw={chanEdit._description} />
 		{:else}
 			{#await descRequest then descRequestResult}
 				<!-- Todo check properly -->
 				{#if descRequestResult !== undefined}
 					<span style="color: red;">Missing permission</span>
 				{:else}
-					<RenderedText text={$channel.descriptionRendered ?? ''} />
+					<RenderedText text={$channel.optionalData?.descriptionRendered ?? ''} />
 				{/if}
 			{/await}
 		{/if}

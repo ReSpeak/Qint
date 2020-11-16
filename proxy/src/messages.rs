@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use tsclientlib::{ClientId, DisconnectOptions, MessageTarget, Permission, TsError, Version};
-use uuid::Uuid;
 
 use crate::book_events::{
 	deserialize_id, deserialize_some_u64, serialize_id, serialize_some_u64, JsEvent, JsInMessage,
@@ -8,7 +7,8 @@ use crate::book_events::{
 };
 
 /// A message sent over a websocket connection from the frontend to the proxy.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
+#[cfg_attr(test, derive(Serialize))]
 #[serde(deny_unknown_fields)]
 pub enum MessageF2P {
 	Connect(ConnectOptions),
@@ -44,7 +44,8 @@ pub enum MessageF2P {
 }
 
 /// A message sent over a websocket connection from the proxy to the frontend.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Debug, Serialize)]
+#[cfg_attr(test, derive(Deserialize))]
 #[serde(deny_unknown_fields)]
 pub enum MessageP2F {
 	/// The connection failed. The websocket connection should be closed
@@ -115,61 +116,6 @@ pub struct ConnectOptions {
 	pub log_commands: bool,
 	pub log_packets: bool,
 	pub log_udp_packets: bool,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-pub enum TauriWsF2P {
-	Msg(MessageF2P),
-	Close,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct TauriWsEventF2P {
-	pub connection: Uuid,
-	pub msg: TauriWsF2P,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-pub enum TauriHttpRequest {
-	DownloadFile {
-		connection: Uuid,
-		channel: u64,
-		path: String,
-	},
-	DownloadCacheFile {
-		/// Server public key
-		server: Vec<u8>,
-		channel: u64,
-		path: String,
-	},
-	GetPlugin(String),
-	GetTransientSetting(String),
-	Graphql(juniper::http::GraphQLRequest),
-	ListPlugins(),
-	RunShortcut(crate::shortcut::Action),
-	SetTransientSetting(String, serde_json::Value),
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct TauriHttpRequestWrapper {
-	#[serde(flatten)]
-	pub req: TauriHttpRequest,
-	pub callback: String,
-	pub error: String,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-pub enum TauriHttpResponse {
-	Graphql(serde_json::Value),
-	PluginList(Vec<String>),
-	Plugin(String),
-	TransientSetting(Option<serde_json::Value>),
-	Void(),
 }
 
 impl From<MessageTarget> for JsMessageTarget {

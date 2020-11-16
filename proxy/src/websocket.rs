@@ -9,7 +9,6 @@ use actix_web_actors::ws;
 use anyhow::{bail, format_err, Error, Result};
 use futures::prelude::*;
 use slog::{debug, error, o, warn, Logger};
-use tauri::WebviewMut;
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
 use tsclientlib::events::Event as TsEvent;
@@ -25,7 +24,7 @@ use tsproto_types::crypto::EccKeyPubP256;
 
 use crate::book_events::{ConnectionClientUpdate, JsM2B};
 use crate::db::{ChannelListMsg, ChatId, ChatType, SetClientVolumeMsg};
-use crate::messages::{self, MessageF2P, MessageP2F, TauriWsF2P};
+use crate::messages::{self, MessageF2P, MessageP2F};
 use crate::{audio, book_events, db, ConnectionId, State, Tristate, WsFormat, WsOptions};
 
 /// A websocket connection
@@ -40,7 +39,6 @@ pub(crate) struct Ws {
 	file_downloads: HashMap<FiletransferHandle, oneshot::Sender<Result<FileDownloadResult>>>,
 	file_uploads: HashMap<FiletransferHandle, oneshot::Sender<Result<FileUploadResult>>>,
 
-	tauri: Option<WebviewMut>,
 	websocket_closed: bool,
 	self_talking: bool,
 	talkers: Vec<(ClientId, bool)>,
@@ -64,8 +62,6 @@ pub(crate) struct SetOutputMutedMsg(pub Tristate);
 pub(crate) struct SetAwayMsg(pub Tristate);
 pub(crate) struct DisconnectMsg;
 pub(crate) struct SetChannelListMsgMsg(pub ChannelListMsg);
-// Tauri
-pub(crate) struct HandleWsMessageMsg(pub TauriWsF2P);
 
 pub(crate) struct DownloadFile {
 	pub channel: ChannelId,
@@ -134,9 +130,6 @@ impl Message for DisconnectMsg {
 impl Message for SetChannelListMsgMsg {
 	type Result = ();
 }
-impl Message for HandleWsMessageMsg {
-	type Result = ();
-}
 impl Message for DownloadFile {
 	/// The size of the file, the stream and the server key.
 	type Result = Result<(u64, TcpStream, EccKeyPubP256)>;
@@ -148,7 +141,6 @@ impl Message for UploadFile {
 impl Ws {
 	pub fn new(
 		logger: Logger, state: Arc<State>, options: WsOptions, id: ConnectionId,
-		tauri: Option<WebviewMut>,
 	) -> Self
 	{
 		let logger = logger.new(o!("id" => id.0.to_string()));
@@ -163,7 +155,6 @@ impl Ws {
 			file_downloads: Default::default(),
 			file_uploads: Default::default(),
 
-			tauri,
 			websocket_closed: false,
 			self_talking: false,
 			talkers: Default::default(),
@@ -647,14 +638,9 @@ impl Ws {
 	}
 
 	fn send_message(&mut self, msg: &MessageP2F, ctx: &mut <Self as Actor>::Context) {
-		if let Some(tauri) = &mut self.tauri {
-			tauri::event::emit(tauri, "websocket", Some(serde_json::to_string(msg).unwrap()))
-				.expect("Failed to emit websocket message");
-		} else {
-			match self.options.format {
-				WsFormat::Msgpack => ctx.binary(rmp_serde::to_vec(msg).unwrap()),
-				WsFormat::Json => ctx.text(serde_json::to_string(msg).unwrap()),
-			}
+		match self.options.format {
+			WsFormat::Msgpack => ctx.binary(rmp_serde::to_vec(msg).unwrap()),
+			WsFormat::Json => ctx.text(serde_json::to_string(msg).unwrap()),
 		}
 	}
 
@@ -1053,19 +1039,6 @@ impl Handler<SetChannelListMsgMsg> for Ws {
 	}
 }
 
-impl Handler<HandleWsMessageMsg> for Ws {
-	type Result = ();
-	fn handle(&mut self, msg: HandleWsMessageMsg, ctx: &mut Self::Context) -> Self::Result {
-		match msg.0 {
-			TauriWsF2P::Msg(msg) => self.handle_ws_message(msg, ctx),
-			TauriWsF2P::Close => {
-				self.websocket_closed = true;
-				self.disconnect(ctx);
-			}
-		}
-	}
-}
-
 impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for Ws {
 	fn handle(
 		&mut self, msg: std::result::Result<ws::Message, ws::ProtocolError>,
@@ -1078,7 +1051,8 @@ impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for Ws {
 				let msg: MessageF2P = match serde_json::from_str(&msg) {
 					Ok(r) => r,
 					Err(e) => {
-						error!(self.logger, "Error json deserializing message"; "error" => %e);
+						error!(self.logger, "json deserializing error"; "error" => %e);
+						self.send_message(&MessageP2F::Error(format!("json deserializing error: {}", e)), ctx);
 						return;
 					}
 				};
@@ -1088,7 +1062,8 @@ impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for Ws {
 				let msg: MessageF2P = match rmp_serde::from_read_ref(msg.as_ref()) {
 					Ok(r) => r,
 					Err(e) => {
-						error!(self.logger, "Error msgpack deserializing message"; "error" => %e);
+						error!(self.logger, "msgpack deserializing error"; "error" => %e);
+						self.send_message(&MessageP2F::Error(format!("msgpack deserializing error: {}", e)), ctx);
 						return;
 					}
 				};

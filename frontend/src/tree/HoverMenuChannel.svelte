@@ -9,7 +9,7 @@
 <div class="name">
 	{$channel.name}
 </div>
-{#if $channel.topicRendered !== null && $channel.topicRendered.length > 0}
+{#if $channel.topic !== null && $channel.topic.length > 0}
 <div class="description">
 	{$channel.topic}
 </div>

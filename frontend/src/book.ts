@@ -112,14 +112,14 @@ export class Book {
 		}
 	}
 
-	public updateChannel(id: ChannelId, obj: Partial<Channel>) {
+	public updateChannel(id: ChannelId, obj: Partial<Channel> | Partial<book_events.ChannelGen>) {
 		const channel = this.channels.get(id);
 		if (channel === undefined) {
 			console.error(`Cannot update non-existant channel ${id}`);
 			return;
 		}
 		const oldParent = channel.parent;
-		channel.update(obj);
+		channel.update(obj as any);
 		// Update node in channel tree
 		if (channel.parent !== oldParent || "order" in obj) {
 			let parent = this.getChannel(oldParent);
@@ -160,7 +160,7 @@ export class Book {
 		return list;
 	}
 
-	public addClient(obj: Partial<Client>) {
+	public addClient(obj: Partial<Client> | Partial<book_events.ClientGen>) {
 		const client = Client.fromJson(obj, (obj.id === this.ownClientId) ? this.ownClient : undefined);
 		if (this.clients.has(client.id)) throw Error(`Client ${client.id} already exists`);
 		this.clients.set(client.id, client);
@@ -169,14 +169,14 @@ export class Book {
 			parent.clients.update(pch => Book.addClientSorted(pch, client));
 	}
 
-	public updateClient(id: ClientId, obj: Partial<Client>) {
+	public updateClient(id: ClientId, obj: Partial<Client> | Partial<book_events.ClientGen>) {
 		const client = this.getClient(id);
 		if (client === undefined) {
 			console.error(`Cannot update non-existant client ${id}`);
 			return;
 		}
 		const oldChannel = client.channel;
-		client.update(obj);
+		client.update(obj as any);
 		// Update node in channel tree
 		if (client.channel !== oldChannel || "talk_power" in obj || "name" in obj) {
 			let parent = this.getChannel(oldChannel);
@@ -222,8 +222,8 @@ export class Book {
 		client.update({}); // TODO nicer?
 	}
 
-	public updateServer(obj: Partial<Server>) {
-		this.server.update(obj);
+	public updateServer(obj: Partial<Server> | Partial<book_events.ServerGen>) {
+		this.server.update(obj as any);
 	}
 
 	public addServerIp(ip: IpAddr) {
@@ -264,7 +264,7 @@ export class Book {
 		});
 	}
 
-	public updateServerGroup(id: ServerGroupId, obj: Partial<ServerGroup>) {
+	public updateServerGroup(id: ServerGroupId, obj: Partial<ServerGroup> | Partial<book_events.ServerGroupGen>) {
 		const serverGroup = get(this.serverGroups).get(id);
 		if (serverGroup === undefined)
 			return;
@@ -304,50 +304,81 @@ export class Book {
 
 	public messageHandler(msg: InBookChangeMsg) {
 		if ("PropertyAdded" in msg) {
+			const id = msg.PropertyAdded.id;
 			const prop = msg.PropertyAdded.prop!;
 			if ("Channel" in prop) {
-				this.addChannel(Channel.fromJson(prop.Channel));
+				this.addChannel(Channel.fromJson(prop.Channel as any));
+			} else if ("OptionalChannelData" in prop && "OptionalChannelData" in id) {
+				this.updateChannel(id.OptionalChannelData, { optionalData: prop.OptionalChannelData } as any);
 			} else if ("ChannelGroup" in prop) {
 				this.addChannelGroup(ChannelGroup.fromJson(prop.ChannelGroup));
 			} else if ("Client" in prop) {
 				this.addClient(prop.Client);
-			} else if ("ServerGroupId" in prop && "ClientServerGroup" in msg.PropertyAdded.id) {
-				this.addClientServerGroup(msg.PropertyAdded.id.ClientServerGroup[0],
-					msg.PropertyAdded.id.ClientServerGroup[1]);
+			} else if ("OptionalClientData" in prop && "OptionalClientData" in id) {
+				this.updateClient(id.OptionalClientData, { optionalData: prop.OptionalClientData } as any);
+			} else if ("ConnectionClientData" in prop && "ConnectionClientData" in id) {
+				this.updateClient(id.ConnectionClientData, { connectionData: prop.ConnectionClientData } as any);
+			} else if ("ServerGroupId" in prop && "ClientServerGroup" in id) {
+				this.addClientServerGroup(id.ClientServerGroup[0], id.ClientServerGroup[1]);
 			} else if ("Server" in prop) {
 				this.updateServer(prop.Server);
-			} else if ("IpAddr" in prop && "ServerIp" in msg.PropertyAdded.id) {
-				this.addServerIp(msg.PropertyAdded.id.ServerIp[0]);
+			} else if ("OptionalServerData" in prop) {
+				this.updateServer({ optionalData: prop.OptionalServerData } as any);
+			} else if ("ConnectionServerData" in prop) {
+				this.updateServer({ connectionData: prop.ConnectionServerData } as any);
+			} else if ("IpAddr" in prop && "ServerIp" in id) {
+				this.addServerIp(id.ServerIp[0]);
 			} else if ("ServerGroup" in prop) {
 				this.addServerGroup(ServerGroup.fromJson(prop.ServerGroup));
 			}
 		} else if ("PropertyChanged" in msg) {
+			const id = msg.PropertyChanged.id;
 			const prop = msg.PropertyChanged.prop!;
-			if ("Channel" in prop && "Channel" in msg.PropertyChanged.id) {
-				this.updateChannel(msg.PropertyChanged.id.Channel, prop.Channel);
-			} else if ("ChannelGroup" in prop && "ChannelGroup" in msg.PropertyChanged.id) {
-				this.updateChannelGroup(msg.PropertyChanged.id.ChannelGroup, prop.ChannelGroup);
-			} else if ("Client" in prop && "Client" in msg.PropertyChanged.id) {
-				this.updateClient(msg.PropertyChanged.id.Client, prop.Client);
+			if ("Channel" in prop && "Channel" in id) {
+				this.updateChannel(id.Channel, prop.Channel);
+			} else if ("OptionalChannelData" in prop && "OptionalChannelData" in id) {
+				this.updateChannel(id.OptionalChannelData, { optionalData: prop.OptionalChannelData } as any);
+			} else if ("ChannelGroup" in prop && "ChannelGroup" in id) {
+				this.updateChannelGroup(id.ChannelGroup, prop.ChannelGroup);
+			} else if ("Client" in prop && "Client" in id) {
+				this.updateClient(id.Client, prop.Client);
+			} else if ("OptionalClientData" in prop && "OptionalClientData" in id) {
+				this.updateClient(id.OptionalClientData, { optionalData: prop.OptionalClientData } as any);
+			} else if ("ConnectionClientData" in prop && "ConnectionClientData" in id) {
+				this.updateClient(id.ConnectionClientData, { connectionData: prop.ConnectionClientData } as any);
 			} else if ("Server" in prop) {
 				this.updateServer(prop.Server);
-			} else if ("ServerGroup" in prop && "ServerGroup" in msg.PropertyChanged.id) {
-				this.updateServerGroup(msg.PropertyChanged.id.ServerGroup, prop.ServerGroup);
+			} else if ("OptionalServerData" in prop) {
+				this.updateServer({ optionalData: prop.OptionalServerData } as any);
+			} else if ("ConnectionServerData" in prop) {
+				this.updateServer({ connectionData: prop.ConnectionServerData } as any);
+			} else if ("ServerGroup" in prop && "ServerGroup" in id) {
+				this.updateServerGroup(id.ServerGroup, prop.ServerGroup);
 			}
 		} else if ("PropertyRemoved" in msg) {
-			if ("Channel" in msg.PropertyRemoved.id) {
-				this.removeChannel(msg.PropertyRemoved.id.Channel);
-			} else if ("ChannelGroup" in msg.PropertyRemoved.id) {
-				this.removeChannelGroup(msg.PropertyRemoved.id.ChannelGroup);
-			} else if ("Client" in msg.PropertyRemoved.id) {
-				this.removeClient(msg.PropertyRemoved.id.Client);
-			} else if ("ClientServerGroup" in msg.PropertyRemoved.id) {
-				this.removeClientServerGroup(msg.PropertyRemoved.id.ClientServerGroup[0],
-					msg.PropertyRemoved.id.ClientServerGroup[1]);
-			} else if ("ServerIp" in msg.PropertyRemoved.id) {
-				this.removeServerIp(msg.PropertyRemoved.id.ServerIp[0]);
-			} else if ("ServerGroup" in msg.PropertyRemoved.id) {
-				this.removeServerGroup(msg.PropertyRemoved.id.ServerGroup);
+			const id = msg.PropertyRemoved.id;
+			if ("Channel" in id) {
+				this.removeChannel(id.Channel);
+			} else if ("OptionalChannelData" in id) {
+				this.updateChannel(id.OptionalChannelData, { optionalData: null } as any);
+			} else if ("ChannelGroup" in id) {
+				this.removeChannelGroup(id.ChannelGroup);
+			} else if ("Client" in id) {
+				this.removeClient(id.Client);
+			} else if ("OptionalClientData" in id) {
+				this.updateClient(id.OptionalClientData, { optionalData: null } as any);
+			} else if ("ConnectionClientData" in id) {
+				this.updateClient(id.ConnectionClientData, { connectionData: null } as any);
+			} else if ("ClientServerGroup" in id) {
+				this.removeClientServerGroup(id.ClientServerGroup[0], id.ClientServerGroup[1]);
+			} else if ("OptionalServerData" in id) {
+				this.updateServer({ optionalData: null } as any);
+			} else if ("ConnectionServerData" in id) {
+				this.updateServer({ connectionData: null } as any);
+			} else if ("ServerIp" in id) {
+				this.removeServerIp(id.ServerIp[0]);
+			} else if ("ServerGroup" in id) {
+				this.removeServerGroup(id.ServerGroup);
 			}
 		}
 	}
@@ -444,7 +475,7 @@ export class GraphQlClient extends ClientBase {
 	}
 }
 
-export class Client extends book_events.Client implements ITreeNode, Readable<Client> {
+export class Client extends book_events.ClientGen implements ITreeNode, Readable<Client> {
 	public volume: Writable<number> = writable(0); // TODO store probably not needed anymore
 	public readonly talking: TalkState = TalkState.Off;
 
@@ -452,12 +483,12 @@ export class Client extends book_events.Client implements ITreeNode, Readable<Cl
 		super();
 	}
 
-	public static fromJson(obj: Partial<Client>, store?: Writable<Client | undefined>): Client {
+	public static fromJson(obj: Partial<Client> | Partial<book_events.ClientGen>, store?: Writable<Client | undefined>): Client {
 		let c = new Client();
 		if (store !== undefined) {
 			(c._store as any) = store;
 		}
-		return c.update(obj);
+		return c.update(obj as any);
 	}
 
 	public update(obj: Partial<this>): this {
@@ -499,7 +530,7 @@ export class Client extends book_events.Client implements ITreeNode, Readable<Cl
 	}
 }
 
-export class Channel extends book_events.Channel implements ITreeNode, Readable<Channel> {
+export class Channel extends book_events.ChannelGen implements ITreeNode, Readable<Channel> {
 	public readonly clients: Writable<Client[]> = writable([]);
 	// ITreeParent
 	public readonly channels: Writable<Channel[]> = writable([]);
@@ -552,7 +583,7 @@ export class GraphQlServer extends ServerBase {
 	}
 }
 
-export class Server extends book_events.Server implements ITreeNode, Readable<Server> {
+export class Server extends book_events.ServerGen implements ITreeNode, Readable<Server> {
 	// ITreeParent
 	public readonly channels: Writable<Channel[]> = writable([]);
 
@@ -578,37 +609,8 @@ export class Server extends book_events.Server implements ITreeNode, Readable<Se
 	public readonly wsTarget = "Server";
 }
 
-export class OldServer extends GraphQlServer implements ITreeParent, ITreeNode, Readable<OldServer> {
-	public readonly phonetic_name!: string;
-	public readonly ips!: string[];
-	public readonly license!: string; // TODO enum
-	public readonly created!: OffsetDateTime;
-	public readonly max_clients!: number;
-	public readonly nickname!: string;
-	public readonly platform!: string;
-	public readonly version!: string;
-	public readonly welcome_message!: string;
-
-	constructor() {
-		super();
-	}
-	// ITreeParent
-	public channels: Writable<Channel[]> = writable([]);
-
-	public reset() {
-		this.channels.set([]);
-		Object.assign(this, { unreadCount: undefined });
-		this.filterShow = true;
-		this.isSelected = false;
-	}
-
-	public readonly qlType = "SERVER";
-	public readonly qlId = undefined;
-	public readonly wsTarget = "Server";
-}
-
-export class ServerGroup extends book_events.ServerGroup {
-	public static fromJson(obj: Partial<ServerGroup>): ServerGroup {
+export class ServerGroup extends book_events.ServerGroupGen {
+	public static fromJson(obj: Partial<ServerGroup> | Partial<book_events.ServerGroupGen>): ServerGroup {
 		return new ServerGroup().update(obj);
 	}
 
@@ -620,8 +622,8 @@ export class ServerGroup extends book_events.ServerGroup {
 	}
 }
 
-export class ChannelGroup extends book_events.ChannelGroup {
-	public static fromJson(obj: Partial<ChannelGroup>): ChannelGroup {
+export class ChannelGroup extends book_events.ChannelGroupGen {
+	public static fromJson(obj: Partial<ChannelGroup> | Partial<book_events.ChannelGroupGen>): ChannelGroup {
 		return new ChannelGroup().update(obj);
 	}
 }

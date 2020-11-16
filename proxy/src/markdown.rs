@@ -170,17 +170,21 @@ impl fmt::Display for VTag {
 		write!(f, "<{}", self.tag)?;
 		// sorting in test-mode to make attributes sorted so we have a consistent
 		// output to compare to.
-		if cfg!(test) {
+		let iter;
+		#[cfg(test)]
+		{
 			let mut items = self.attributes.iter().collect::<Vec<_>>();
-			items.sort_by(|a, b| a.0.cmp(b.0).then(a.1.cmp(b.1)));
-			for (k, v) in &items {
-				write!(f, " {}=\"{}\"", k, escape_html_attribute(v))?;
-			}
-		} else {
-			for (k, v) in &self.attributes {
-				write!(f, " {}=\"{}\"", k, escape_html_attribute(v))?;
-			}
-		};
+			items.sort();
+			iter = items.into_iter();
+		}
+		#[cfg(not(test))]
+		{
+			iter = self.attributes.iter();
+		}
+
+		for (k, v) in iter {
+			write!(f, " {}=\"{}\"", k, escape_html_attribute(v))?;
+		}
 
 		write!(f, ">")?;
 		if self.tag == "br" {

@@ -153,8 +153,6 @@ impl StructProperty {
 		vec![
 			// Structs
 			Self::new("OptionalChannelData", "Description"),
-			Self::new("Channel", "Topic"),
-			Self::new("Client", "Description"),
 			Self::new("Server", "WelcomeMessage"),
 			Self::new("Server", "Hostmessage"),
 			// Messages
@@ -165,28 +163,15 @@ impl StructProperty {
 	}
 }
 
-fn get_properties<'a>(structs: &'a [Struct], s: &'a Struct) -> Vec<&'a Property> {
+fn filter_structs<'a>(structs: &'a [Struct]) -> Vec<&'a Struct> {
+	structs
+		.iter()
+		.filter_map(|s| if ["Connection"].contains(&s.name.as_str()) { None } else { Some(s) })
+		.collect::<Vec<_>>()
+}
+
+fn get_properties<'a>(structs: &'a [&Struct], s: &'a Struct) -> Vec<&'a Property> {
 	s.properties.iter().filter(|p| !structs.iter().any(|s| s.name == p.type_s)).collect()
-}
-
-fn get_all_properties_with_struct<'a>(
-	structs: &'a [Struct], parts: &[&str],
-) -> Vec<(&'a Struct, &'a Property)> {
-	let mut props = Vec::new();
-	for struc in structs {
-		if !parts.contains(&struc.name.as_str()) {
-			continue;
-		}
-		for p in get_properties(structs, struc) {
-			props.push((struc, p));
-		}
-	}
-
-	props
-}
-
-fn get_all_properties<'a>(structs: &'a [Struct], parts: &[&str]) -> Vec<&'a Property> {
-	get_all_properties_with_struct(structs, parts).into_iter().map(|(_, p)| p).collect()
 }
 
 fn get_to_owned(p: &Property) -> String {
@@ -417,9 +402,7 @@ trait RustTypeExt {
 /// As these are mostly used as ids, we store them as strings instead. Benchmarks showed that
 /// comparing strings is also faster than comparing numbers.
 impl RustTypeExt for InnerRustType {
-	fn fmt_ts(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.fmt_ts_opts(f, true)
-	}
+	fn fmt_ts(&self, f: &mut fmt::Formatter) -> fmt::Result { self.fmt_ts_opts(f, true) }
 
 	/// If `convert` is `true`, use `Moment` for `OffsetDateTime` instead of the rust type.
 	fn fmt_ts_opts(&self, f: &mut fmt::Formatter, convert: bool) -> fmt::Result {

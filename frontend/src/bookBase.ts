@@ -61,6 +61,9 @@ export class ChannelBase extends BookNode {
 export class ChannelGroupBase extends Group {
 }
 
+export class OptionalChannelDataBase {
+}
+
 export class ClientBase extends BookNode {
 	//public readonly uid: Uid | null;
 	public readonly avatar_hash!: string;
@@ -108,6 +111,12 @@ export class ClientBase extends BookNode {
 	}
 }
 
+export class OptionalClientDataBase {
+}
+
+export class ConnectionClientDataBase {
+}
+
 export class ServerBase extends BookNode {
 	public readonly uid!: number[];
 	private readonly _color: Cached<number[], string>;
@@ -128,4 +137,10 @@ export class ServerBase extends BookNode {
 }
 
 export class ServerGroupBase extends Group {
+}
+
+export class OptionalServerDataBase {
+}
+
+export class ConnectionServerDataBase {
 }

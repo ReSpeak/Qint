@@ -2,6 +2,8 @@
 <#
 use std::fmt;
 
+let structs = filter_structs(&self.book.structs);
+
 fn get_struct(_fmt: &mut fmt::Formatter, name: &str) -> fmt::Result {
 match name {
 	"Channel" => { #>
@@ -27,147 +29,221 @@ match name {
 	Ok(())
 }
 
-fn convert_ids(_fmt: &mut fmt::Formatter, js: &JsStruct, structs: &[Struct]) -> fmt::Result {
-	let ids = get_id_args(js.ids.len(), true);
-	for struc in structs {
-		if !js.parts.contains(&struc.name.as_str()) {
-			continue;
-		} #>
-			PropertyId::<#= struc.name #><#= ids #> => Ok(JsPropertyId::<#= js.name #><#= ids #>),
-		<#
-		if struc.opt {
-			continue;
-		}
-		for p in get_properties(structs, struc) {
-			if let Some(modifier) = &p.modifier {
-				let ids = get_id_args(js.ids.len() + 1, true);
-				if modifier == "array" || modifier == "set" {
-				#>
-			PropertyId::<#= struc.name #><#= p.get_name() #><#= ids #> => Ok(JsPropertyId::<#= js.name #><#= p.get_name() #><#= ids #>),
-				<#
-				} else {
-					panic!("Unknown modifier {}", modifier);
-				}
-			} else { #>
-			PropertyId::<#= struc.name #><#= p.get_name() #><#= ids #> => Ok(JsPropertyId::<#= js.name #><#= ids #>),
-		<# }
-		}
+fn convert_ids(_fmt: &mut fmt::Formatter, struc: &Struct, structs: &[&Struct]) -> fmt::Result {
+	let ids = get_id_args(struc.id.len(), true);
+	let ids_wrapped = if ids.is_empty() {
+		"()"
+	} else {
+		&ids
+	};
+	#>
+			PropertyId::<#= struc.name #><#= ids #> => Ok(JsPropertyId::<#= struc.name #><#= ids_wrapped #>),
+	<#
+	if struc.opt {
+		return Ok(());
+	}
+	for p in get_properties(structs, struc) {
+		if let Some(modifier) = &p.modifier {
+			let ids = get_id_args(struc.id.len() + 1, true);
+			let ids_wrapped = if ids.is_empty() {
+				"()"
+			} else {
+				&ids
+			};
+			if modifier == "array" || modifier == "set" {
+			#>
+			PropertyId::<#= struc.name #><#= p.get_name() #><#= ids #> => Ok(JsPropertyId::<#= struc.name #><#= p.get_name() #><#= ids_wrapped #>),
+			<#
+			} else {
+				panic!("Unknown modifier {}", modifier);
+			}
+		} else { #>
+			PropertyId::<#= struc.name #><#= p.get_name() #><#= ids #> => Ok(JsPropertyId::<#= struc.name #><#= ids_wrapped #>),
+	<# }
 	}
 	Ok(())
 }
 
-fn convert_value(_fmt: &mut fmt::Formatter, book_events: &BookEvents, js: &JsStruct, structs: &[Struct]) -> fmt::Result {
-	let ids = get_id_args(js.ids.len(), false);
-	for struc in structs {
-		if !js.parts.contains(&struc.name.as_str()) {
-			continue;
-		} #>
+fn convert_value(_fmt: &mut fmt::Formatter, book_events: &BookEvents, struc: &Struct, structs: &[&Struct]) -> fmt::Result {
+	let ids = get_id_args(struc.id.len(), false);
+	#>
 		PropertyId::<#= struc.name #><#= ids #> => if let PropertyValueRef::<#= struc.name #>(val) = p {
-			<# if struc.opt { #>
+		<# if struc.opt { #>
 			if let Some(val) = val {
-			<# } #>
-			Some(JsProperty::<#= js.name #>(Js<#= js.name #> {
-		<# for p in get_all_properties(structs, &js.parts) {
-			if struc.properties.iter().any(|prop| prop.name == p.name) {
-				let owned = get_to_owned(p);
-				#>
-				<#= p.name.to_snake_case() #>: Some({
-					<# if owned == "val" { #>
-					val.<#= p.name.to_snake_case() #><# if p.modifier.is_some() { #>.clone()<# } #>
-					<# } else { #>
-					let val = &val.<#= p.name.to_snake_case() #>;
-					<#= owned #>
-					<# } #>
-				}),
+		<# } #>
+			Some(JsProperty::<#= struc.name #>(val.into()))
+		<# if struc.opt { #>
+			} else { None }
+		<# } #>
+		} else {
+			panic!("Got wrong PropertyValue type, expected <#= struc.name #>");
+		},
+	<#
+	if struc.opt {
+		return Ok(());
+	}
+	for prop in get_properties(structs, struc) {
+		let type_s = prop.get_inner_type()?.to_name();
+		let ids2;
+		let ids = if prop.modifier.is_some() {
+			ids2 = get_id_args(struc.id.len() + 1, false);
+			&ids2
+		} else {
+			&ids
+		};
+		#>
+		PropertyId::<#= struc.name #><#= prop.get_name() #><#= ids #> => if let PropertyValueRef::<#= type_s #>(val) = p {
+		<#
+		if let Some(modifier) = &prop.modifier {
+			if modifier == "array" || modifier == "set" { #>
+			Some(JsProperty::<#= type_s #>(<#= get_to_owned(prop) #>))
+			<# } else {
+				panic!("Unknown modifier {}", modifier);
+			}
+		} else { #>
+			Some(JsProperty::<#= struc.name #>(js_structs::<#= struc.name #> {
+	<# for p in get_properties(structs, struc) {
+		if prop.name == p.name { #>
+				<#= p.name.to_snake_case() #>: Some(<#= get_to_owned(p) #>),
 			<#
-				if book_events.has_render(&struc.name, &p.name) {
-					let rendered = if p.opt {
-						format!("val.{}.as_deref().map(crate::markdown::markdown)", p.name.to_snake_case())
-					} else {
-						format!("Some(crate::markdown::markdown(&val.{}))", p.name.to_snake_case())
-					}; #>
+			if book_events.has_render(&struc.name, &p.name) {
+				let rendered = if p.opt {
+					"val.as_ref().map(|val| crate::markdown::markdown(&val))"
+				} else {
+					"Some(crate::markdown::markdown(&val))"
+				}; #>
 				<#= p.name.to_snake_case() #>_rendered: <#= rendered #>,
 			<# }
 			}
 		} #>
 				.. Default::default()
 			}))
-			<# if struc.opt { #>
-			} else { None }
-			<# } #>
-		} else {
-			panic!("Got wrong PropertyValue type, expected <#= js.name #>");
-		},
-		<#
-		if struc.opt {
-			continue;
-		}
-		for prop in get_properties(structs, struc) {
-			let type_s = prop.get_inner_type()?.to_name();
-			let ids2;
-			let ids = if prop.modifier.is_some() {
-				ids2 = get_id_args(js.ids.len() + 1, false);
-				&ids2
-			} else {
-				&ids
-			};
-			#>
-		PropertyId::<#= struc.name #><#= prop.get_name() #><#= ids #> => if let PropertyValueRef::<#= type_s #>(val) = p {
-			<#
-			if let Some(modifier) = &prop.modifier {
-				if modifier == "array" || modifier == "set" { #>
-			Some(JsProperty::<#= type_s #>(<#= get_to_owned(prop) #>))
-				<# } else {
-					panic!("Unknown modifier {}", modifier);
-				}
-			} else { #>
-			Some(JsProperty::<#= js.name #>(Js<#= js.name #> {
-		<# for p in get_all_properties(structs, &js.parts) {
-			if prop.name == p.name { #>
-				<#= p.name.to_snake_case() #>: Some(<#= get_to_owned(p) #>),
-				<#
-				if book_events.has_render(&struc.name, &p.name) {
-					let rendered = if p.opt {
-						"val.as_ref().map(|val| crate::markdown::markdown(&val))"
-					} else {
-						"Some(crate::markdown::markdown(&val))"
-					}; #>
-				<#= p.name.to_snake_case() #>_rendered: <#= rendered #>,
-				<# }
-				}
-			} #>
-				.. Default::default()
-			}))
-		<# } #>
+	<# } #>
 		} else {
 			panic!("Got wrong PropertyValue type, expected <#= type_s #>");
 		},
-		<# }
-	}
+<# }
 	Ok(())
 }
 
-for struc in &self.structs.0 {
-	if struc.parts.is_empty() {
-		continue;
-	} #>
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#>
+mod js_structs {
+	use std::collections::HashSet;
+	use std::net::{IpAddr, SocketAddr};
+
+	use serde::Serialize;
+	use time::{Duration, OffsetDateTime};
+	use tsclientlib::{ChannelGroupId, ChannelId, ChannelPermissionHint, ChannelType, ClientDbId,
+		ClientId, ClientPermissionHint, ClientType, Codec, CodecEncryptionMode, GroupNamingMode,
+		GroupType, HostBannerMode, HostMessageMode, IconId, LicenseType, MaxClients, ServerGroupId,
+		TalkPowerRequest, Uid};
+	use tsproto_types::crypto::EccKeyPubP256;
+
+	use super::{serialize_some_date_time, serialize_some_duration, serialize_some_id,
+		serialize_some_set_id, serialize_some_some_duration, serialize_some_some_id,
+		serialize_some_some_u64, serialize_some_u64};
+
+<# for struc in &structs { #>
+#[derive(Debug, Default, Serialize)]
+#[cfg_attr(test, derive(Deserialize))]
 #[serde(rename_all = "camelCase")]
-pub struct Js<#= struc.name #> {
-	<# for (s, p) in get_all_properties_with_struct(&self.book.structs, &struc.parts) {
+pub struct <#= struc.name #> {
+	<# for p in &struc.properties {
 		let struct_type = p.get_type()?;
-		let attr = get_serde_attr(&struct_type.inner, true); #>
+		let attr = get_serde_attr(&struct_type.inner, true);
+		let name = p.name.to_snake_case();
+		#>
 	<#= attr #>
-	<#= p.name.to_snake_case() #>: Option<<#= struct_type #>>,
+	pub(crate) <#= name #>: Option<<#= struct_type #>>,
 	<#
-		if self.has_render(&s.name, &p.name) { #>
+		if self.has_render(&struc.name, &name.to_camel_case()) { #>
 	#[serde(default, deserialize_with = "deserialize_some", skip_serializing_if = "Option::is_none")]
-	<#= p.name.to_snake_case() #>_rendered: Option<String>,
+	pub(crate) <#= name #>_rendered: Option<String>,
 		<# }
 	} #>
 }
 
+impl From<&'_ tsclientlib::data::<#= struc.name #>> for <#= struc.name #> {
+	fn from(val: &tsclientlib::data::<#= struc.name #>) -> Self {
+		<#= struc.name #> {
+	<# for p in &struc.properties {
+		let owned = get_to_owned(p);
+
+		let mut getter;
+		if owned == "val" {
+			getter = format!("val.{}", p.name.to_snake_case());
+			if p.modifier.is_some() {
+				getter.push_str(".clone()");
+			}
+		} else {
+			getter = format!("{{\n\t\t\t\t\tlet val = &val.{};\n\t\t\t\t\t{}\n\t\t\t\t}}", p.name.to_snake_case(), owned);
+		}
+
+		if self.book.structs.iter().any(|s| s.name == p.type_s) {
+			// Need to convert inner type
+			if p.opt {
+				getter = format!("val.{}.as_ref().map({}::from)", p.name.to_snake_case(), p.type_s);
+			} else if p.modifier.as_ref().map(|m| m == "set").unwrap_or_default() {
+				getter = format!("val.{}.iter().map({}::from).collect()", p.name.to_snake_case(), p.type_s);
+			} else if p.modifier.as_ref().map(|m| m == "map").unwrap_or_default() {
+				getter = format!("val.{}.iter().map(|(k, v)| (*k, v.into())).collect()", p.name.to_snake_case());
+			} else {
+				getter = format!("(&val.{}).into()", p.name.to_snake_case());
+			}
+		}
+		#>
+			<#= p.name.to_snake_case() #>: Some(<#= getter #>),
+		<#
+		if self.has_render(&struc.name, &p.name) {
+			let rendered = if p.opt {
+				format!("val.{}.as_deref().map(crate::markdown::markdown)", p.name.to_snake_case())
+			} else {
+				format!("crate::markdown::markdown(&val.{})", p.name.to_snake_case())
+			}; #>
+			<#= p.name.to_snake_case() #>_rendered: Some(<#= rendered #>),
+	<# }
+	} #>
+		}
+	}
+}
+
 <# } #>
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[cfg_attr(test, derive(Deserialize))]
+pub enum JsPropertyId {
+<# for struc in &structs { #>
+	<#= struc.name #>(
+	<# for id in &struc.id {
+		let p = id.find_property(&self.book.structs);
+		let struct_type = p.get_type()?;
+		let attr = get_serde_attr(&struct_type.inner, false);
+		#>
+		<#= attr #>
+		<#= struct_type #>,
+	<# } #>
+	),
+<# } #>
+	ClientServerGroup(
+		#[serde(deserialize_with = "deserialize_id", serialize_with = "serialize_id")]
+		ClientId,
+		#[serde(deserialize_with = "deserialize_id", serialize_with = "serialize_id")]
+		ServerGroupId,
+	),
+	ServerIp(IpAddr),
+}
+
+#[derive(Debug, Serialize)]
+#[cfg_attr(test, derive(Deserialize))]
+pub enum JsProperty {
+<# for struc in &structs { #>
+	<#= struc.name #>(js_structs::<#= struc.name #>),
+<# } #>
+	IpAddr(IpAddr),
+	ServerGroupId(ServerGroupId),
+}
+
 pub fn convert_event(con: &Connection, e: &Event) -> Option<JsEvent> {
 	match e {
 		Event::PropertyAdded { id, invoker, extra } => {
@@ -201,8 +277,8 @@ pub fn convert_event(con: &Connection, e: &Event) -> Option<JsEvent> {
 
 fn property_to_js(id: &PropertyId, p: PropertyValueRef) -> Option<JsProperty> {
 	match id {
-<# for struc in &self.structs.0 {
-	convert_value(_fmt, self, struc, &self.book.structs)?;
+<# for struc in &structs {
+	convert_value(_fmt, self, struc, &structs)?;
 } #>
 		_ => None,
 	}
@@ -212,8 +288,8 @@ impl TryFrom<PropertyId> for JsPropertyId {
 	type Error = ();
 	fn try_from(id: PropertyId) -> Result<Self, ()> {
 		match id {
-<# for struc in &self.structs.0 {
-	convert_ids(_fmt, struc, &self.book.structs)?;
+<# for struc in &structs {
+	convert_ids(_fmt, struc, &structs)?;
 } #>
 			_ => Err(()),
 		}
@@ -302,11 +378,8 @@ pub fn convert_message(msg: &InMessage) -> Option<JsInMessage> {
 let mut setter_structs = Vec::new();
 
 for e in &self.b2m.decls {
-	let msg_group = self.b2m.messages.get_message_group(&e.msg);
-	let uses_lifetime = self.b2m.messages.uses_lifetime(&e.msg);
 	// Update
 	if e.op == RuleOp::Update {
-		let small_change_name = e.get_small_name();
 		let change_name = e.get_change_name();
 		setter_structs.push(get_prefixed_name(e));
 		#>
@@ -333,7 +406,6 @@ pub struct <#= get_prefixed_name(e) #> {
 
 	// Event Props
 	for r in &e.rules {
-		let name = r.from_name_singular();
 		let t = r.get_type_no_option();
 		let attr = get_serde_attr(&t.inner, true);
 		if !attr.is_empty() { #>
@@ -406,9 +478,6 @@ impl <#= struct_name #> {
 	}
 	} else if e.op == RuleOp::Add {
 		for r in &e.rules {
-			let name = r.from_name_singular();
-			let name = format!("{}{}", e.book_struct.name, name);
-
 			let args = get_all_arguments(e, Some(r));
 			let struct_name = format!("{}Add{}", e.book_struct.name, r.from_name_singular());
 			setter_structs.push(struct_name.clone());

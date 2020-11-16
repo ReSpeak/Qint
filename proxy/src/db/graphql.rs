@@ -11,7 +11,7 @@ use anyhow::format_err;
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use juniper::http::graphiql::graphiql_source;
-use juniper::http::{GraphQLRequest, GraphQLResponse};
+use juniper::http::GraphQLRequest;
 use juniper::{EmptySubscription, FieldError, RootNode, ID};
 use slog::warn;
 use tsproto_types::crypto::EccKeyPubP256;
@@ -91,12 +91,6 @@ struct UpdateBookmarkDb {
 #[get("/graphiql")]
 pub async fn graphiql() -> impl Responder {
 	HttpResponse::Ok().content_type("text/html; charset=utf-8").body(graphiql_source("/db", None))
-}
-
-pub(crate) async fn db_graphql_intern<'a>(
-	state: &'a State, req: &'a GraphQLRequest,
-) -> GraphQLResponse<'a> {
-	req.execute(&state.graphql_schema, state).await
 }
 
 #[post("/db")]

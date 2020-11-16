@@ -36,7 +36,8 @@
 	$: avatarPath = getClientAvatarPath($client, connection);
 	$: ownClient = client.id === connection.book.ownClientId;
 	$: {
-		if ($client.version == null) getClientVariables();
+		if ($client.optionalData == null) getOptionalData();
+		if ($client.connectionData == null) getConnectionData();
 	}
 
 	let chartConfig: Chart.ChartConfiguration = {
@@ -149,16 +150,16 @@
 		};
 	}
 
-	function packetLossToPercent(loss01: number | null): number | undefined {
+	function packetLossToPercent(loss01: number | null | undefined): number | undefined {
 		if (!loss01) return undefined;
 		if (loss01 < 0.01) return undefined; // makes the chart look nicer
 		return loss01 * 100;
 	}
 
 	function chartRefresh(chart: Chart) {
-		chart.data.datasets![0].data!.push(createDataPoint(client.ping ? client.ping.asMilliseconds() : undefined));
-		chart.data.datasets![1].data!.push(createDataPoint(packetLossToPercent(client.clientToServerPacketlossTotal)));
-		chart.data.datasets![2].data!.push(createDataPoint(packetLossToPercent(client.serverToClientPacketlossTotal)));
+		chart.data.datasets![0].data!.push(createDataPoint(client.connectionData ? client.connectionData.ping?.asMilliseconds() : undefined));
+		chart.data.datasets![1].data!.push(createDataPoint(packetLossToPercent(client.connectionData?.clientToServerPacketlossTotal)));
+		chart.data.datasets![2].data!.push(createDataPoint(packetLossToPercent(client.connectionData?.serverToClientPacketlossTotal)));
 	}
 
 	function changeServerGroup(e: Event, group: ServerGroupId, isMember: boolean) {
@@ -215,13 +216,6 @@
 		});
 	}
 
-	onMount(() => {
-		updateClientInfo();
-		let timer = setInterval(updateClientInfo, 1000);
-		// onDestroy handler
-		return () => clearInterval(timer);
-	});
-
 	async function updateClientInfo() {
 		await connection
 			.sendChange({
@@ -235,7 +229,7 @@
 			});
 	}
 
-	async function getClientVariables() {
+	async function getOptionalData() {
 		await connection
 			.sendChange({
 				ClientVariablesRequest: {
@@ -244,6 +238,19 @@
 			})
 			.catch((reason) => {
 				console.error("ClientVariablesRequest failed: ");
+				console.error(reason);
+			});
+	}
+
+	async function getConnectionData() {
+		await connection
+			.sendChange({
+				ClientConnectionInfoRequest: {
+					id: client.id,
+				},
+			})
+			.catch((reason) => {
+				console.error("ClientConnectionInfoRequest failed: ");
 				console.error(reason);
 			});
 	}
@@ -267,19 +274,25 @@
 	}
 
 	function formatClientPing(client: Client): string {
-		if (!client.ping || !client.pingDeviation) return "";
+		if (client.connectionData === null || client.connectionData.ping === null || client.connectionData.pingDeviation === null) return "";
 
-		return `(${Math.round(client.ping.asMilliseconds() * 10) / 10} ± ${
-			Math.round(client.pingDeviation.asMilliseconds() * 10) / 10
+		return `(${Math.round(client.connectionData.ping.asMilliseconds() * 10) / 10} ± ${
+			Math.round(client.connectionData.pingDeviation.asMilliseconds() * 10) / 10
 		})${NARROW_NO_BREAK_SPACE}ms`;
 	}
 
-	function formatPacketLoss(...losses: (number | null)[]) {
-		let totalLoss = Math.round(losses.reduce((a, b) => a! + b!)! * 10) / 10;
-		return `${totalLoss}${NARROW_NO_BREAK_SPACE}%`;
+	function formatPacketLoss(...losses: (number | null | undefined)[]) {
+		const filteredLosses = losses.flatMap(a => a !== null && a !== undefined ? [a] : []);
+		if (filteredLosses.length === 0) {
+			return "unknown";
+		} else {
+			const reduced = filteredLosses.reduce((a, b) => a + b);
+			const totalLoss = Math.round(reduced * 10) / 10;
+			return `${totalLoss}${NARROW_NO_BREAK_SPACE}%`;
+		}
 	}
 
-	function formatPacketCount(...packetCounts: (string | null)[]) {
+	function formatPacketCount(...packetCounts: (string | null | undefined)[]) {
 		let totalCount =
 			Math.round(
 				packetCounts.map((x) => (x ? parseInt(x) : 0)).reduce((a, b) => a + b) / 100
@@ -307,6 +320,13 @@
 		const floorHour = Math.floor(duration.hours());
 		return `${asDay}d ${floorHour}h ${floorMin}m ${floorSec}s`;
 	}
+
+	onMount(() => {
+		updateClientInfo();
+		let timer = setInterval(updateClientInfo, 1000);
+		// onDestroy handler
+		return () => clearInterval(timer);
+	});
 </script>
 
 <StickyList>
@@ -319,16 +339,18 @@
 			<ClientName client={$client} />
 			<span class="countryFlag" title={$client.countryCode}>{countryCodeToEmojis($client.countryCode)}</span>
 			<div style="flex: 1;" />
-			<PlatformIcon platform={$client.platform} version={$client.version} />
+			{#if $client.optionalData !== null}
+				<PlatformIcon platform={$client.optionalData.platform} version={$client.optionalData.version} />
+			{/if}
 		</div>
 
 		<div class="descTable">
 			<div>Description:</div>
 			<div>{$client.description}</div>
 			<div>Online:</div>
-			<div>{formatDuration($client.connectedTime)}</div>
+			<div>{formatDuration($client.connectionData?.connectedTime)}</div>
 			<div>Last active:</div>
-			<div>{formatAgo($client.idleTime, true)}</div>
+			<div>{formatAgo($client.connectionData?.idleTime, true)}</div>
 		</div>
 		{#if avatarPath}<img class="clientAvatar" src={avatarPath} alt="Client avatar" />{/if}
 		<div class="serverGroups">
@@ -407,7 +429,7 @@
 				<div>Ping:</div>
 				<div>{formatClientPing($client)}</div>
 				<div>IP Address:</div>
-				<div>{$client.clientAddress ?? ''}</div>
+				<div>{$client.connectionData?.clientAddress ?? ''}</div>
 			</div>
 		</div>
 		<div class="descGroup">
@@ -422,18 +444,18 @@
 
 				<div>Packet loss:</div>
 				<div>
-					{formatPacketLoss($client.serverToClientPacketlossTotal, $client.clientToServerPacketlossTotal)}
+					{formatPacketLoss($client.connectionData?.serverToClientPacketlossTotal, $client.connectionData?.clientToServerPacketlossTotal)}
 				</div>
-				<div>{formatPacketLoss($client.serverToClientPacketlossTotal)}</div>
-				<div>{formatPacketLoss($client.clientToServerPacketlossTotal)}</div>
+				<div>{formatPacketLoss($client.connectionData?.serverToClientPacketlossTotal)}</div>
+				<div>{formatPacketLoss($client.connectionData?.clientToServerPacketlossTotal)}</div>
 
 				<div>Packets transferred:</div>
 				<div />
 				<div>
-					{formatPacketCount($client.packetsReceivedSpeech, $client.packetsReceivedKeepalive, $client.packetsReceivedControl)}
+					{formatPacketCount($client.connectionData?.packetsReceivedSpeech, $client.connectionData?.packetsReceivedKeepalive, $client.connectionData?.packetsReceivedControl)}
 				</div>
 				<div>
-					{formatPacketCount($client.packetsSentSpeech, $client.packetsSentKeepalive, $client.packetsSentControl)}
+					{formatPacketCount($client.connectionData?.packetsSentSpeech, $client.connectionData?.packetsSentKeepalive, $client.connectionData?.packetsSentControl)}
 				</div>
 			</div>
 		</div>

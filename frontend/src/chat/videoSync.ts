@@ -2,8 +2,8 @@
 import { ClientId } from "../ts";
 import { get } from "svelte/store";
 import { NodeSelection, app } from "../app";
-import { Client, Server } from "../book";
-import { PluginTargetMode, Channel, IMsgPluginCommandPart } from "../book_events";
+import { Channel, Client, Server } from "../book";
+import { PluginTargetMode, IMsgPluginCommandPart } from "../book_events";
 import { assert, debounced, fnBroadcast } from "../util";
 import moment, { Moment } from "moment";
 

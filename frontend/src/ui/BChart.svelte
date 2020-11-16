@@ -7,7 +7,8 @@
 	let chartCanvas: HTMLCanvasElement;
 
 	onMount(() => {
-		new Chart(chartCanvas, config);
+		const chart = new Chart(chartCanvas, config);
+		return () => chart.destroy();
 	});
 </script>
 

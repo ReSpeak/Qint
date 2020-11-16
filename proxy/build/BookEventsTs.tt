@@ -5,11 +5,10 @@ import { ChannelGroupId, ChannelId, ClientDbId, ClientId, ClientType, EccKeyPubP
 import { datetimeDeserialize, durationDeserialize } from "./util";
 import { Duration, Moment } from "moment";
 <#
+let structs = filter_structs(&self.book.structs);
+
 let mut base_structs = Vec::new();
-for struc in &self.structs.0 {
-	if struc.parts.is_empty() {
-		continue;
-	}
+for struc in &structs {
 	base_structs.push(format!("{}Base", struc.name));
 } #>
 import { <#= base_structs.join(", ") #> } from "./bookBase";
@@ -17,10 +16,7 @@ import { <#= base_structs.join(", ") #> } from "./bookBase";
 // Enums
 
 <#
-use std::fmt;
-
 use tsproto_structs::{enums, errors, versions};
-use tsproto_structs::enums::*;
 
 for e in &enums::DATA.enums { #>
 export const enum <#= e.name #> {
@@ -54,26 +50,33 @@ export enum <#= e.name #> {
 // Structs
 
 <#
-for struc in &self.structs.0 {
-	if struc.parts.is_empty() {
-		continue;
-	} #>
-export class <#= struc.name #> extends <#= struc.name #>Base {
-	<# for (s, p) in get_all_properties_with_struct(&self.book.structs, &struc.parts) {
+for struc in &structs { #>
+export class <#= struc.name #>Gen extends <#= struc.name #>Base {
+	<#
+	for p in &struc.properties {
 		let mut struct_type = p.get_type()?;
-		if !struct_type.is_opt() && s.opt {
-			struct_type = struct_type.wrap_opt();
-		} #>
+		if self.book.structs.iter().any(|s| s.name == p.type_s) {
+			// Append Gen
+			let mut inner = &mut struct_type.inner;
+			if let InnerRustType::Option(t) = inner {
+				inner = &mut *t;
+			}
+			if let InnerRustType::Struct(t) = &mut inner {
+				let name = format!("{}Gen", t);
+				*t = name;
+			}
+		}
+		#>
 	public readonly <#= p.name.to_mixed_case() #>!: <# struct_type.inner.fmt_ts(_fmt)?; #>;
-		<# if self.has_render(&s.name, &p.name) { #>
-	public readonly <#= p.name.to_mixed_case() #>Rendered!: string<# if p.opt || s.opt { #> | null<# } #>;
+		<# if self.has_render(&struc.name, &p.name) { #>
+	public readonly <#= p.name.to_mixed_case() #>Rendered!: string<# if p.opt { #> | null<# } #>;
 	<# }
 	} #>
 
-	public update(obj: Partial<this>): this {
+	public update(obj: Partial<this> | Partial<<#= struc.name #>Gen>): this {
 	<#
 	// Preprocess properties
-	for p in get_all_properties(&self.book.structs, &struc.parts) {
+	for p in &struc.properties {
 		let struct_type = p.get_type()?;
 		let inner = struct_type.inner.peel_opt();
 		let name = p.name.to_mixed_case();
@@ -85,14 +88,97 @@ export class <#= struc.name #> extends <#= struc.name #>Base {
 		if (obj.<#= name #>)
 			Object.assign(obj, { <#= name #>: durationDeserialize((obj as any).<#= name #>) });
 			<# }
-		}
+		} else if self.book.structs.iter().any(|s| s.name == p.type_s) { #>
+		if (obj.<#= name #> !== undefined && obj.<#= name #> !== null)
+			Object.assign(obj, { <#= name #>: <#= p.type_s #>Gen.fromJson(obj.<#= name #>!) });
+		<# }
 	} #>
 		Object.assign(this, obj);
 		return this;
 	}
+	<# if struc.opt { #>
+
+	public static fromJson(obj: Partial<<#= struc.name #>Gen>): <#= struc.name #>Gen {
+		return new <#= struc.name #>Gen().update(obj);
+	}
+	<# } #>
+}
+
+<# }
+
+for struc in &structs { #>
+interface IMsgPropertyId<#= struc.name #> {
+	<# if struc.id.len() == 1 {
+		let p = struc.id[0].find_property(&self.book.structs);
+		let struct_type = p.get_type()?;
+		#>
+	<#= struc.name #>: <# struct_type.inner.fmt_ts(_fmt)?; #>;
+	<# } else {
+		let mut is_first = true;
+		#>
+	<#= struc.name #>: [<# for id in &struc.id {
+			if is_first {
+				is_first = false;
+			} else {
+				#>, <#
+			}
+			let p = id.find_property(&self.book.structs);
+			p.get_type()?.inner.fmt_ts(_fmt)?;
+		} #>];
+	<# } #>
 }
 
 <# } #>
+interface IMsgPropertyIdClientServerGroup {
+	ClientServerGroup: [ClientId, ServerGroupId];
+}
+
+interface IMsgPropertyIdServerIp {
+	ServerIp: IpAddr;
+}
+
+export type PropertyId =
+<#
+let mut is_first = true;
+for struc in &structs {
+	if is_first {
+		is_first = false; #>
+	IMsgPropertyId<#= struc.name #>
+	<# } else { #>
+	| IMsgPropertyId<#= struc.name #>
+<# }
+} #>
+	| IMsgPropertyIdClientServerGroup
+	| IMsgPropertyIdServerIp;
+
+<# for struc in &structs { #>
+interface IMsgPropertyValue<#= struc.name #> {
+	<#= struc.name #>: Partial<<#= struc.name #>Gen>;
+}
+
+<# } #>
+interface IMsgPropertyValueIpAddr {
+	IpAddr: IpAddr;
+}
+
+interface IMsgPropertyValueServerGroupId {
+	ServerGroupId: ServerGroupId;
+}
+
+export type PropertyValue =
+<#
+let mut is_first = true;
+for struc in &structs {
+	if is_first {
+		is_first = false; #>
+	IMsgPropertyValue<#= struc.name #>
+	<# } else { #>
+	| IMsgPropertyValue<#= struc.name #>
+<# }
+} #>
+	| IMsgPropertyValueIpAddr
+	| IMsgPropertyValueServerGroupId;
+
 // Messages
 
 <# for msg in &self.js_in_messages.0 { #>
@@ -158,7 +244,6 @@ export interface OChange<#= get_prefixed_name(e) #> {
 
 	// Event Props
 	for r in &e.rules {
-		let name = r.from_name_singular();
 		#>
 		<#= r.from_name().to_mixed_case() #>?: <# r.get_type_no_option().inner.fmt_ts_opts(_fmt, false)?; #>;
 	<# }
@@ -197,9 +282,6 @@ export interface OChange<#= struct_name #> {
 		}
 	} else if e.op == RuleOp::Add {
 		for r in &e.rules {
-			let name = r.from_name_singular();
-			let name = format!("{}{}", e.book_struct.name, name);
-
 			let args = get_all_arguments_ts(e, Some(r));
 			let struct_name = format!("{}Add{}", e.book_struct.name, r.from_name_singular());
 			setter_structs.push(struct_name.clone());

@@ -11,7 +11,7 @@ use std::fs;
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use std::sync::{mpsc, Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
 use actix::*;
 use actix_cors::Cors;
@@ -321,7 +321,7 @@ async fn create_ws(
 		);
 	}
 
-	let ws_con = Ws::new(state.logger.clone(), (**state).clone(), options.0, id, None);
+	let ws_con = Ws::new(state.logger.clone(), (**state).clone(), options.0, id);
 	match ws::start_with_addr(ws_con, &req, stream) {
 		Err(e) => {
 			error!(state.logger, "Failed to create websocket actor"; "error" => %e);
@@ -644,45 +644,6 @@ fn merge_json(a: &mut Value, b: &Value) {
 	}
 }
 
-/// Handle http requests made through the tauri interface.
-async fn handle_tauri_request(
-	state: &Arc<State>, req: messages::TauriHttpRequest,
-) -> Result<messages::TauriHttpResponse> {
-	use messages::{TauriHttpRequest, TauriHttpResponse};
-
-	match req {
-		TauriHttpRequest::RunShortcut(action) => {
-			action.run(state).await;
-			Ok(TauriHttpResponse::Void())
-		}
-		TauriHttpRequest::ListPlugins() => {
-			Ok(TauriHttpResponse::PluginList(list_plugins_intern(&*state)))
-		}
-		TauriHttpRequest::GetPlugin(name) => {
-			let path = state.settings.read().unwrap().plugin_path.join(&name);
-			Ok(TauriHttpResponse::Plugin(fs::read_to_string(path)?))
-		}
-		TauriHttpRequest::DownloadFile { connection, channel, path } => {
-			let _ = (connection, channel, path);
-			Ok(TauriHttpResponse::Void())
-		}
-		TauriHttpRequest::DownloadCacheFile { server, channel, path } => {
-			let _ = (server, channel, path);
-			Ok(TauriHttpResponse::Void())
-		}
-		TauriHttpRequest::GetTransientSetting(name) => {
-			Ok(TauriHttpResponse::TransientSetting(get_transient_setting_internal(state, &name)))
-		}
-		TauriHttpRequest::SetTransientSetting(name, content) => {
-			set_transient_setting_internal(state, &name, content)?;
-			Ok(TauriHttpResponse::Void())
-		}
-		TauriHttpRequest::Graphql(req) => Ok(TauriHttpResponse::Graphql(serde_json::to_value(
-			db::graphql::db_graphql_intern(&*state, &req).await,
-		)?)),
-	}
-}
-
 impl App {
 	async fn run(logger: Logger, args: Args) -> Result<()> {
 		let _scope_guard = slog_scope::set_global_logger(logger.clone());
@@ -865,88 +826,7 @@ impl App {
 		}
 
 		if !args.browser {
-			let state2 = state.clone();
-			let state3 = state.clone();
 			tauri::AppBuilder::new()
-				.setup(move |webview, _source| {
-					let webview = webview.as_mut();
-					let state = state2.clone();
-					tauri::event::listen("websocket", move |msg| {
-						let msg = if let Some(msg) = msg {
-							msg
-						} else {
-							error!(state.logger, "No message for websocket event");
-							return;
-						};
-						let msg: messages::TauriWsEventF2P = match serde_json::from_str(&msg) {
-							Ok(r) => r,
-							Err(e) => {
-								error!(state.logger, "Failed to parse websocket event";
-									"error" => %e);
-								return;
-							}
-						};
-						if msg.connection.is_nil() {
-							error!(state.logger, "Nil uuid is not allowed as connection id");
-							return;
-						}
-						let id = ConnectionId(msg.connection);
-
-						let con;
-						{
-							let mut cons = state.connections.lock().unwrap();
-							let entry = cons.entry(id.clone());
-							con = entry
-								.or_insert_with(|| {
-									// Create connection
-									let options = WsOptions { format: WsFormat::Json };
-									let _con = Ws::new(
-										state.logger.clone(),
-										state.clone(),
-										options,
-										id,
-										Some(webview.clone()),
-									);
-									panic!()
-									//con.start() TODO
-								})
-								.clone();
-						}
-						let logger = state.logger.clone();
-						actix::spawn(con.send(websocket::HandleWsMessageMsg(msg.msg)).map(
-							move |r| match r {
-								Err(e) => {
-									error!(logger, "Failed to handle websocket message";
-										"error" => %e);
-								}
-								Ok(()) => {}
-							},
-						));
-					});
-				})
-				.invoke_handler(move |webview, arg| {
-					match serde_json::from_str::<messages::TauriHttpRequestWrapper>(arg) {
-						Err(e) => Err(format!("Failed to parse message {}", e)),
-						Ok(command) => {
-							let req = command.req;
-							let state = state3.clone();
-							tauri::execute_promise(
-								webview,
-								move || {
-									let (send, recv) = mpsc::channel();
-									actix::spawn(async move {
-										let r = handle_tauri_request(&state, req).await;
-										let _ = send.send(r);
-									});
-									Ok(recv.recv()??)
-								},
-								command.callback,
-								command.error,
-							);
-							Ok(())
-						}
-					}
-				})
 				.build()
 				.run();
 		} else {
@@ -1286,13 +1166,17 @@ mod tests {
 			}))
 			.await?;
 			loop {
-				if let MessageP2F::Connected { own_client, .. } = self.recv().await? {
+				let msg = self.recv().await?;
+				if let MessageP2F::Connected { own_client, .. } = msg {
 					return Ok(ClientId(own_client.parse().unwrap()));
+				} else if let MessageP2F::Error(e) = msg {
+					bail!("Got proxy error: {}", e);
 				}
 			}
 		}
 
 		async fn send(&mut self, msg: &MessageF2P) -> Result<()> {
+			println!("Sending message to proxy: {}", serde_json::to_string(msg).unwrap());
 			self.socket
 				.send(ws::Message::Binary(rmp_serde::to_vec(msg)?.into()))
 				.await

@@ -28,9 +28,9 @@
 		({$client.awayMessage})
 	{/if}
 </div>
-{#if $client.descriptionRendered.length > 0}
+{#if $client.description.length > 0}
 <div class="description">
-	<RenderedText text={$client.descriptionRendered} />
+	{$client.description}
 </div>
 {/if}
 {#if !ownClient}

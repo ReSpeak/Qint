@@ -132,7 +132,7 @@
 				{#if $client.awayMessage !== null}
 					<Icon name="sleep" style="color: rgb(70,180,255);" title="Away" />
 				{/if}
-				{#if channel !== undefined && $client.talkPower < $channel.neededTalkPower}
+				{#if channel !== undefined && $channel.neededTalkPower !== null && $client.talkPower < $channel.neededTalkPower}
 					<Icon name="microphone-off" style="color: gray;" title="Not enough talk power" />
 				{/if}
 				{#each sortedServerGroups as grp (grp)}

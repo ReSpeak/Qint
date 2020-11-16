@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::convert::{TryFrom, TryInto};
 use std::hash::Hash;
-use std::net::{IpAddr, SocketAddr};
+use std::net::IpAddr;
 
 use anyhow::{format_err, Result};
 use serde::de::Error as SerdeError;
@@ -13,9 +13,8 @@ use tsclientlib::prelude::*;
 use tsclientlib::TsError as Error;
 use tsclientlib::*;
 use tsproto_packets::packets::OutCommand;
-use tsproto_types::crypto::EccKeyPubP256;
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Serialize)]
 pub enum JsEvent {
 	PropertyAdded {
 		id: JsPropertyId,
@@ -34,7 +33,6 @@ pub enum JsEvent {
 		invoker: Option<Invoker>,
 		extra: ExtraInfo,
 	},
-	ChannelListFinished,
 	Message {
 		target: MessageTarget,
 		invoker: Invoker,
@@ -42,7 +40,8 @@ pub enum JsEvent {
 	},
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+// TODO Remove
+/*#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum JsPropertyId {
 	Channel(
 		#[serde(deserialize_with = "deserialize_id", serialize_with = "serialize_id")] ChannelId,
@@ -74,7 +73,7 @@ pub enum JsProperty {
 	IpAddr(IpAddr),
 	ServerGroup(JsServerGroup),
 	ServerGroupId(ServerGroupId),
-}
+}*/
 
 pub(crate) trait Id {
 	fn to_string_id(&self) -> String;
