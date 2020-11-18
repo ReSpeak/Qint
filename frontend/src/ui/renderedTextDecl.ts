@@ -1,0 +1,76 @@
+import { Connection } from "../connection";
+import { pathJoin } from "../panel/fileUtil";
+
+export type LinksMap = Map<string, {
+	link: string,
+	title: string,
+}>;
+
+const ts3Scheme = /^(ts3file|ts3image):\/\/([^\?]*)(\?(.*))?$/i;
+
+type Ts3Scheme = {
+	scheme: "ts3file",
+	server: string,
+	attrs: Partial<Ts3FileAtt>
+} | {
+	scheme: "ts3image",
+	file: string
+	attrs: Partial<Ts3ImageAtt>
+}
+type Ts3FileAtt = {
+	port: string,
+	serverUID: string,
+	channel: string,
+	path: string,
+	filename: string,
+	isDir: string,
+	fileDateTime: string
+};
+
+type Ts3ImageAtt = {
+	channel: string,
+	path: string
+}
+
+export function parseScheme(url: string): Ts3Scheme | null {
+	const m = ts3Scheme.exec(url);
+	if (m === null) return null;
+	const schemeStr = m[1];
+	const queryPart = m[4];
+	const hostPart = m[2];
+	if (!queryPart || !hostPart) return null;
+	const params: Record<string, string> = {};
+	for (const param of queryPart.split('&')) {
+		let eqIndex = param.indexOf('=');
+		if (eqIndex === -1) continue;
+		const key = param.substring(0, eqIndex);
+		const value = decodeURIComponent(param.substring(eqIndex + 1));
+		params[key] = value;
+	}
+	if (schemeStr === "ts3file") {
+		return {
+			scheme: schemeStr,
+			server: hostPart,
+			attrs: params
+		};
+	} else if (schemeStr === "ts3image") {
+		return {
+			scheme: schemeStr,
+			file: hostPart,
+			attrs: params
+		};
+	}
+	return null;
+}
+
+export function schemeToLink(con: Connection, scheme: Ts3Scheme | null): string | null {
+	if (scheme !== null
+		&& scheme.attrs.path) {
+		if (scheme.scheme === "ts3file") {
+			return `${con.backend.serverFileSrc}/file/${scheme.attrs.channel}${pathJoin(scheme.attrs.path, scheme.attrs.filename ?? "")}`;
+		} else if (scheme.scheme === "ts3image") {
+			return `${con.backend.serverFileSrc}/file/${scheme.attrs.channel}${pathJoin(scheme.attrs.path, scheme.file)}`;
+		}
+	}
+	return null;
+}

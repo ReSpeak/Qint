@@ -64,7 +64,7 @@
 
 <div class="chatVideo">
 	{#if detectedType === 'media'}
-		<video bind:this={html5videoElem} controls>
+		<video bind:this={html5videoElem} controls playsinline allowfullscreen>
 			<source src={videoSrc} />
 			<track kind="captions" />
 			Your browser does not support the video tag.
@@ -76,9 +76,10 @@
 			type="text/html"
 			width="640"
 			height="390"
-			src="https://www.youtube.com/embed/{video_key}?enablejsapi=1"
+			src="https://www.youtube.com/embed/{video_key}?enablejsapi=1&rel=0&modestbranding=1&playsinline=1&controls=0"
 			frameborder="0"
-			allowfullscreen />
+			allowfullscreen
+			playsinline />
 	{/if}
 	<div class="videoTools">
 		<button

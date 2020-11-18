@@ -79,6 +79,6 @@ export function hljsHighlight(elem: HTMLElement) {
 		// Set hljs class for correct highlighting
 		elem.classList.add("hljs");
 	} catch {
-		elem.innerText = code;
+		elem.textContent = code;
 	}
 }

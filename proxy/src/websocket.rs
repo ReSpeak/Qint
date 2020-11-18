@@ -7,16 +7,17 @@ use std::task::{self, Poll};
 use actix::fut::wrap_future;
 use actix::*;
 use actix_web_actors::ws;
-use anyhow::{bail, format_err, Error, Result};
+use anyhow::{bail, format_err, Result};
 use futures::prelude::*;
 use slog::{debug, error, o, warn, Logger};
+use thiserror::Error;
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
 use tsclientlib::events::Event as TsEvent;
 use tsclientlib::prelude::*;
 use tsclientlib::StreamItem as TsStreamItem;
 use tsclientlib::{
-	events, AudioEvent, ChannelId, ClientId, Connection, ConnectionStats, DisconnectOptions,
+	events, AudioEvent, ChannelId, ClientId, Connection, ConnectionStats, DisconnectOptions, Error as TsclError,
 	FileDownloadResult, FileUploadResult, FiletransferHandle, InMessage, MessageTarget, Uid,
 };
 use tsproto_packets::packets::{AudioData, OutCommand, OutPacket};
@@ -35,8 +36,8 @@ pub(crate) struct Ws {
 	connection: Option<Connection>,
 	connect_options: Option<messages::ConnectOptions>,
 	channel_list_finished_msg: Option<ChannelListMsg>,
-	file_downloads: HashMap<FiletransferHandle, oneshot::Sender<Result<FileDownloadResult>>>,
-	file_uploads: HashMap<FiletransferHandle, oneshot::Sender<Result<FileUploadResult>>>,
+	file_downloads: HashMap<FiletransferHandle, oneshot::Sender<Result<FileDownloadResult, Error>>>,
+	file_uploads: HashMap<FiletransferHandle, oneshot::Sender<Result<FileUploadResult, Error>>>,
 
 	websocket_closed: bool,
 	self_talking: bool,
@@ -74,6 +75,18 @@ pub(crate) struct UploadFile {
 	pub size: u64,
 	pub overwrite: bool,
 	pub resume: bool,
+}
+
+#[derive(Debug, Error)]
+pub(crate) enum Error {
+	#[error(transparent)]
+	TsError(#[from] TsclError),
+	#[error(transparent)]
+	RecvError(#[from] tokio::sync::oneshot::error::RecvError),
+	#[error("Connection does not exist")]
+	NoConnection,
+	#[error("Failed to get uid: {0}")]
+	NoUid(#[source] TsclError),
 }
 
 impl Actor for Ws {
@@ -131,10 +144,10 @@ impl Message for SetChannelListMsgMsg {
 }
 impl Message for DownloadFile {
 	/// The size of the file, the stream and the server key.
-	type Result = Result<(u64, TcpStream, EccKeyPubP256)>;
+	type Result = Result<(u64, TcpStream, EccKeyPubP256), Error>;
 }
 impl Message for UploadFile {
-	type Result = Result<TcpStream>;
+	type Result = Result<TcpStream, Error>;
 }
 
 impl Ws {
@@ -357,12 +370,15 @@ impl Ws {
 				if let InMessage::CommandError(error) = &msg {
 					for e in error.iter() {
 						if let Some(return_code) = &e.return_code {
-							self.send_message(&MessageP2F::Result {
-								return_code: return_code.clone(),
-								ts_result: Some(e.id),
-								missing_permission: e.missing_permission_id,
-								description: None,
-							}, ctx);
+							self.send_message(
+								&MessageP2F::Result {
+									return_code: return_code.clone(),
+									ts_result: Some(e.id),
+									missing_permission: e.missing_permission_id,
+									description: None,
+								},
+								ctx,
+							);
 						}
 					}
 				} else if let Some(m) = book_events::convert_message(&msg) {
@@ -440,12 +456,15 @@ impl Ws {
 				} else {
 					(None, None)
 				};
-				self.send_message(&MessageP2F::Result {
-					return_code: handle.0.to_string(),
-					ts_result,
-					missing_permission,
-					description: None,
-				}, ctx);
+				self.send_message(
+					&MessageP2F::Result {
+						return_code: handle.0.to_string(),
+						ts_result,
+						missing_permission,
+						description: None,
+					},
+					ctx,
+				);
 			}
 			_ => {}
 		}
@@ -556,13 +575,16 @@ impl Ws {
 							let mut options = tsclientlib::Connection::build(o.address.clone())
 								.name(o.name.clone())
 								.identity(id)
-								.version(o.version.clone())
 								.logger(actor.logger.clone())
 								.log_commands(o.log_commands || settings.verbosity > 0)
 								.log_packets(o.log_packets || settings.verbosity > 1)
 								.log_udp_packets(o.log_udp_packets || settings.verbosity > 2)
 								.input_muted(o.input_muted.unwrap_or_default())
 								.output_muted(o.output_muted.unwrap_or_default());
+
+							if let Some(version) = &o.version {
+								options = options.version(version.clone());
+							}
 
 							if let Some(c) = &o.channel {
 								options = options.channel(c.clone());
@@ -675,7 +697,11 @@ impl Ws {
 				if let Some(con) = &mut self.connection {
 					match con.get_state() {
 						Err(e) => {
-							self.send_error(return_code.as_deref(), format!("Failed to get state: {}", e), ctx);
+							self.send_error(
+								return_code.as_deref(),
+								format!("Failed to get state: {}", e),
+								ctx,
+							);
 						}
 						Ok(state) => {
 							match change.to_packet(state) {
@@ -683,8 +709,11 @@ impl Ws {
 									let _ = self.send_ts_message(msg, return_code.as_deref(), ctx);
 								}
 								Err(e) => {
-									self.send_error(return_code.as_deref(),
-										format!("Failed to create packet for change: {}", e), ctx);
+									self.send_error(
+										return_code.as_deref(),
+										format!("Failed to create packet for change: {}", e),
+										ctx,
+									);
 								}
 							}
 						}
@@ -701,20 +730,29 @@ impl Ws {
 		}
 	}
 
-	fn send_error(&mut self, return_code: Option<&str>, error: String, ctx: &mut <Self as Actor>::Context) {
+	fn send_error(
+		&mut self, return_code: Option<&str>, error: String, ctx: &mut <Self as Actor>::Context,
+	) {
 		if let Some(code) = return_code {
-			self.send_message(&MessageP2F::Result {
-				return_code: code.into(),
-				ts_result: None,
-				missing_permission: None,
-				description: Some(error),
-			}, ctx);
+			self.send_message(
+				&MessageP2F::Result {
+					return_code: code.into(),
+					ts_result: None,
+					missing_permission: None,
+					description: Some(error),
+				},
+				ctx,
+			);
 		} else {
 			warn!(self.logger, "Proxy error"; "error" => error);
 		}
 	}
 
-	fn send_chat_message(&mut self, target: MessageTarget, message: String, return_code: Option<&str>, ctx: &mut <Self as Actor>::Context) {
+	fn send_chat_message(
+		&mut self, target: MessageTarget, message: String, return_code: Option<&str>,
+		ctx: &mut <Self as Actor>::Context,
+	)
+	{
 		if let Some(con) = &mut self.connection {
 			match con.get_state() {
 				Err(e) => {
@@ -749,7 +787,11 @@ impl Ws {
 						if let Some(uid) = own_client.uid.as_ref() {
 							uid.clone()
 						} else {
-							self.send_error(return_code, "Failed to get own client uid".into(), ctx);
+							self.send_error(
+								return_code,
+								"Failed to get own client uid".into(),
+								ctx,
+							);
 							return;
 						}
 					} else {
@@ -812,7 +854,11 @@ impl Ws {
 		}
 	}
 
-	fn send_ts_message(&mut self, mut msg: OutCommand, return_code: Option<&str>, ctx: &mut <Self as Actor>::Context) -> Result<()> {
+	fn send_ts_message(
+		&mut self, mut msg: OutCommand, return_code: Option<&str>,
+		ctx: &mut <Self as Actor>::Context,
+	) -> Result<()>
+	{
 		if let Some(code) = &return_code {
 			msg.write_arg("return_code", code);
 		}
@@ -828,7 +874,9 @@ impl Ws {
 		}
 	}
 
-	fn send_command(&mut self, command: String, return_code: Option<&str>, ctx: &mut <Self as Actor>::Context) {
+	fn send_command(
+		&mut self, command: String, return_code: Option<&str>, ctx: &mut <Self as Actor>::Context,
+	) {
 		let cmd = tsproto_packets::packets::OutCommand::new(
 			tsproto_packets::packets::Direction::C2S,
 			tsproto_packets::packets::Flags::empty(),
@@ -840,13 +888,14 @@ impl Ws {
 }
 
 impl Handler<DownloadFile> for Ws {
-	type Result = ResponseFuture<Result<(u64, TcpStream, EccKeyPubP256)>>;
+	type Result = ResponseFuture<Result<(u64, TcpStream, EccKeyPubP256), Error>>;
+	//type Error = Error;
 	fn handle(&mut self, msg: DownloadFile, _: &mut Self::Context) -> Self::Result {
 		if let Some(con) = &mut self.connection {
-			let public_key = match con.get_server_key().map_err(Error::from) {
+			let public_key = match con.get_server_key() {
 				Ok(k) => k,
 				Err(e) => {
-					return Box::pin(futures::future::err(format_err!("Failed to get uid: {}", e)));
+					return Box::pin(futures::future::err(Error::NoUid(e)));
 				}
 			};
 
@@ -854,27 +903,24 @@ impl Handler<DownloadFile> for Ws {
 			{
 				Ok(r) => r,
 				Err(e) => {
-					return Box::pin(futures::future::err(format_err!(
-						"Failed to download file: {}",
-						e
-					)));
+					return Box::pin(futures::future::err(e.into()));
 				}
 			};
 			let (send, recv) = oneshot::channel();
 			self.file_downloads.insert(handle, send);
 			Box::pin(recv.map(|r| match r {
 				Ok(Ok(r)) => Ok((r.size, r.stream, public_key)),
-				Ok(Err(e)) => Err(e),
+				Ok(Err(e)) => Err(e.into()),
 				Err(e) => Err(e.into()),
 			}))
 		} else {
-			Box::pin(futures::future::err(format_err!("Connection does not exist")))
+			Box::pin(futures::future::err(Error::NoConnection))
 		}
 	}
 }
 
 impl Handler<UploadFile> for Ws {
-	type Result = ResponseFuture<Result<TcpStream>>;
+	type Result = ResponseFuture<Result<TcpStream, Error>>;
 	fn handle(&mut self, msg: UploadFile, _: &mut Self::Context) -> Self::Result {
 		if let Some(con) = &mut self.connection {
 			let handle = match con.upload_file(
@@ -887,21 +933,18 @@ impl Handler<UploadFile> for Ws {
 			) {
 				Ok(r) => r,
 				Err(e) => {
-					return Box::pin(futures::future::err(format_err!(
-						"Failed to upload file: {}",
-						e
-					)));
+					return Box::pin(futures::future::err(e.into()));
 				}
 			};
 			let (send, recv) = oneshot::channel();
 			self.file_uploads.insert(handle, send);
 			Box::pin(recv.map(|r| match r {
 				Ok(Ok(r)) => Ok(r.stream),
-				Ok(Err(e)) => Err(e),
+				Ok(Err(e)) => Err(e.into()),
 				Err(e) => Err(e.into()),
 			}))
 		} else {
-			Box::pin(futures::future::err(format_err!("Connection does not exist")))
+			Box::pin(futures::future::err(Error::NoConnection))
 		}
 	}
 }
@@ -918,7 +961,7 @@ impl Handler<GetPublicKeyMsg> for Ws {
 }
 
 impl Handler<GetClientVolumeMsg> for Ws {
-	type Result = ActorResponse<Self, f32, Error>;
+	type Result = ActorResponse<Self, f32, anyhow::Error>;
 	fn handle(
 		&mut self, GetClientVolumeMsg(client): GetClientVolumeMsg, _: &mut Self::Context,
 	) -> Self::Result {

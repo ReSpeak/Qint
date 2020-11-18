@@ -8,15 +8,18 @@
 	import UiLazyList from "../ui/UiLazyList.svelte";
 	import BInput from "../ui/BInput.svelte";
 	import { onDestroy, onMount, tick } from "svelte";
-	import { Chat, Message } from "./chat";
+	import { Chat, Message, structuredViewToMd } from "./chat";
+	import type { MdWithFiles } from "./chat";
 	import { ListFetchDir } from "../ui/lazyList";
 	import { Connection } from "../connection";
 	import { app, NodeSelection } from "../app";
 	import { Channel, Client, Server } from "../book";
-	import { writable } from "svelte/store";
+	import { get, writable } from "svelte/store";
 	import type { Readable, Writable } from "svelte/store";
 	import { on, SERVER_ICON } from "../util";
 	import type { ChatData } from "../bookBase";
+	import type { ChannelId } from "../ts";
+	import { pathJoin } from "../panel/fileUtil";
 
 	export let chat: Chat;
 
@@ -122,10 +125,61 @@
 	}
 
 	function sendMessage() {
-		if (!text) return;
-		chat.sendMessage(text);
-		text = "";
+		const sel = $selected;
+		if (sel === undefined) return;
+		let textData = messageInput.getStructuredView();
+		if (textData.length === 0) return;
+		let channelId: ChannelId = get(sel.connection.book.ownClient)?.channel ?? "";
+		let mdData = structuredViewToMd(textData, channelId);
+		if (!mdData.text) return;
+		tryUploadChatImage(sel.connection, mdData, channelId);
+		chat.sendMessage(mdData.text);
+		messageInput.clear();
 		messageInput.focus();
+	}
+
+	async function tryUploadChatImage(
+		connection: Connection,
+		mdData: MdWithFiles,
+		channelId: ChannelId
+	) {
+		let hasTriedToCreateFolder = false;
+		console.log("Data", mdData);
+		for (const file of mdData.files) {
+			const resp = await connection.backend.fetch(`/file${pathJoin(channelId, file.path, file.name)}`, {
+				method: "PUT",
+				body: file.blob,
+			});
+			console.log("resp", resp);
+			let rtext = await resp.text();
+			console.log("rtext", rtext);
+			if (rtext === "error") {
+				if (!hasTriedToCreateFolder) {
+					hasTriedToCreateFolder = true;
+
+					connection.sendChange({
+						ChannelCreateDirectory: {
+							id: channelId,
+							password: "", // TODO
+							path: file.path
+						},
+					});
+				} else {
+					console.warn("Cannot upload to current folder");
+					return;
+				}
+			}
+		}
+
+		// await connection.filetransferManager.uploadFiles(
+		// 	...mdData.files.map((file) => {
+		// 		return {
+		// 			data: file.blob,
+		// 			channelId: channelId,
+		// 			path: file.name,
+		// 		};
+		// 	})
+		// );
 	}
 
 	function sendCommand() {

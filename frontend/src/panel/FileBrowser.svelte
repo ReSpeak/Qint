@@ -32,8 +32,6 @@
 	let invalidateCache = true;
 	let fileSelection: FileTreeNode[] = [];
 	let createNewFolderName = "";
-	let uploadQueue: File[] = [];
-	let currentUploadTask: Promise<void> | undefined;
 
 	$: channelRaw = connection.book.channels.get(channelId)!;
 	$: channel = $channelRaw;
@@ -206,24 +204,17 @@
 			Array.from(document.querySelectorAll("[data-type='folder']:not(.selected)")),
 	};
 
+	let currentUploadTask: any = undefined; // TODO
 	function uploadFiles(...files: File[]) {
-		uploadQueue.push(...files);
-		if (currentUploadTask === undefined) {
-			currentUploadTask = uploadTaskFn();
-		}
-	}
-
-	async function uploadTaskFn() {
-		while (true) {
-			if (uploadQueue.length === 0) break;
-			let file = uploadQueue.shift()!;
-			await connection.backend.fetch(`/file${pathJoin(channelId, ...path, file.name)}`, {
-				method: "PUT",
-				body: file,
-			});
-			refreshCurrentFolder(false); // TODO apply in chage instead
-		}
-		currentUploadTask = undefined;
+		connection.filetransferManager.uploadFiles(
+			...files.map((file) => {
+				return {
+					data: file,
+					channelId,
+					path: pathJoin(...path, file.name),
+				};
+			})
+		);
 	}
 
 	function dragEnter(e: DragEvent) {
@@ -458,8 +449,11 @@
 					<Icon name="folder" />
 				</td>
 				<td colspan="3">
-					<form on:submit|preventDefault={createNewFolder}
-						on:keydown={e => {if (e.key === "Escape") createNewFolderClick();}}
+					<form
+						on:submit|preventDefault={createNewFolder}
+						on:keydown={(e) => {
+							if (e.key === 'Escape') createNewFolderClick();
+						}}
 						class="flex">
 						<input
 							in:focus|local

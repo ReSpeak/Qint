@@ -96,7 +96,7 @@ pub enum JsMessageTarget {
 	),
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ConnectOptions {
 	/// Id of the bookmark
@@ -110,7 +110,7 @@ pub struct ConnectOptions {
 	pub address: String,
 	pub name: String,
 	pub channel: Option<String>,
-	pub version: Version,
+	pub version: Option<Version>,
 	pub input_muted: Option<bool>,
 	pub output_muted: Option<bool>,
 	pub away: Option<String>,

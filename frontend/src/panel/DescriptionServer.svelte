@@ -81,11 +81,11 @@
 		</div>
 		<div class="dataLine">
 			<div>Host message:</div>
-			<RenderedText text={server.hostmessageRendered ?? ''} />
+			<RenderedText {connection} text={server.hostmessageRendered ?? ''} />
 		</div>
 		<div class="dataLine">
 			<div>Welcome message:</div>
-			<RenderedText text={server.welcomeMessageRendered ?? ''} />
+			<RenderedText {connection} text={server.welcomeMessageRendered ?? ''} />
 		</div>
 		<div class="dataLine">
 			<div>Created:</div>

@@ -11,6 +11,7 @@ import moment from "moment";
 import { ChannelId, ClientId } from "./ts";
 import { FileTreeCache } from "./fileTreeCache";
 import { DescriptionMode } from "./transientSettings";
+import { FiletransferManager } from "./panel/filetransferManager";
 
 type ResultPromise = {
 	resolve: (res: ResultDetails | undefined) => void;
@@ -31,6 +32,7 @@ export class Connection {
 
 	public readonly book: Book = new Book();
 	public readonly fileTreeCache: Writable<FileTreeCache> = writable(new FileTreeCache());
+	public readonly filetransferManager: FiletransferManager = new FiletransferManager(this);
 	public backend: IBackendConnection;
 
 	public readonly loudness: Writable<number> = writable(0);

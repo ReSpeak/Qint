@@ -5,6 +5,9 @@ import { datetimeDeserialize, getDataColor, assert, Lazy } from "../util";
 import { ListFetchDir, FetchResult } from "../ui/lazyList";
 import { NodeSelection } from "../app";
 import { backend } from "../backend/backend";
+import { StructuredData } from "../ui/BInputDecl";
+import { ChannelId } from "../ts";
+import moment from "moment";
 
 export class Chat {
 	public static readonly EmptyFetch: FetchResult<Message> = {
@@ -205,4 +208,44 @@ export class Message {
 		}
 		return first.invoker.equals(second.invoker);
 	}
+}
+
+export interface MdWithFiles {
+	text: string;
+	files: {
+		path: string,
+		name: string,
+		blob: Blob
+	}[];
+}
+
+const QINT_CHAT_FOLDER = "/.qint_chat";
+
+export function structuredViewToMd(data: StructuredData, channel: ChannelId): MdWithFiles {
+	let text = "";
+	let chainid = 0;
+	let date: { iso: string, unix: string } | undefined;
+	let files = [];
+	for (const part of data) {
+		if (typeof part === "string") {
+			text += part;
+		} else if ("src" in part) {
+			text += `![](${part.src})`;
+		} else if ("blob" in part) {
+			const blob = part.blob;
+			if (date === undefined){
+				const m = moment();
+				date = { iso: m.format("YYYY-MM-DD_HH-mm-ss-SSS"), unix: m.unix().toString() };
+			}
+			const file = part.blob.type === "image/jpeg" ? "jpg" : "png";
+			const name = `${date.iso}-${chainid++}.${file}`;
+			files.push({ blob, path: QINT_CHAT_FOLDER, name });
+			const tslink = `ts3file://server?port=${0}&serverUID=${''}&channel=${channel}&path=${encodeURIComponent(QINT_CHAT_FOLDER)}&filename=${encodeURIComponent(name)}&isDir=0&size=${blob.size}&fileDateTime=${date.unix}`;
+			text += `![](${tslink})`;
+		}
+	}
+	return {
+		text,
+		files
+	};
 }

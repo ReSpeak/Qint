@@ -50,6 +50,7 @@ slog-stdlog = "4"
 slog-term = "2"
 structopt = { version = "0.3", default-features = false }
 tauri = { version = "0.9", features = [ "all-api" ] }
+thiserror = "1"
 time = "0.2"
 toml = "0.5"
 tokio = { version = "0.2", features = [ "fs" ] }

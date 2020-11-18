@@ -38,19 +38,21 @@
 {/if}
 {#if $developMode || !ownClient}
 	<form on:submit|preventDefault={onPokeSend}>
-		<button
-			type="submit"
-			class="toolbutton"
-			title="Poke">
-			<Icon name="hand-pointing-right"></Icon>
+		<button type="submit" class="toolbutton" title="Poke">
+			<Icon name="hand-pointing-right" />
 		</button>
-		<input class="input poke-input" type="text" placeholder="Poke message (optional)" bind:this={pokeInput} bind:value={pokeMessage}>
+		<input
+			class="input poke-input"
+			type="text"
+			placeholder="Poke message (optional)"
+			bind:this={pokeInput}
+			bind:value={pokeMessage} />
 	</form>
 {/if}
 
 <style lang="scss">
 	.poke-input {
-		margin: 0 .5em;
+		margin: 0 0.5em;
 		width: 200px;
 	}
 </style>

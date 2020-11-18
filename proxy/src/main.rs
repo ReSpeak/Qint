@@ -16,12 +16,12 @@ use std::sync::{Arc, Mutex, RwLock};
 use actix::*;
 use actix_cors::Cors;
 use actix_files::Files;
-use actix_web::{web::Bytes, middleware::Condition};
 use actix_web::*;
 use actix_web::{
 	dev::{HttpResponseBuilder, Service},
 	web::Query,
 };
+use actix_web::{middleware::Condition, web::Bytes};
 use actix_web_actors::ws;
 use anyhow::{bail, Result};
 use futures::prelude::*;
@@ -33,8 +33,8 @@ use slog::{debug, error, info, o, warn, Drain, Logger};
 use structopt::StructOpt;
 use tokio::time::{self, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
-use tsclientlib::ChannelId;
 use tsclientlib::Error as TsError;
+use tsclientlib::{ChannelId, CommandError};
 use tsproto_types::crypto::EccKeyPubP256;
 use uuid::Uuid;
 
@@ -394,6 +394,29 @@ struct GetFileOptions {
 	dl: Option<String>,
 }
 
+#[derive(Deserialize, Serialize, Default)]
+struct FiletransferError<'a> {
+	error: Option<&'a str>,
+	ts_error: Option<tsclientlib::TsError>,
+	missing_permission: Option<tsclientlib::Permission>,
+}
+
+impl<'a> FiletransferError<'a> {
+	fn generic(error: &'a str) -> FiletransferError {
+		FiletransferError { error: Some(error), ..Default::default() }
+	}
+
+	fn gone() -> FiletransferError<'static> { FiletransferError::generic("gone") }
+
+	fn from_command_error(error: &'a str, cmd_err: CommandError) -> FiletransferError {
+		FiletransferError {
+			error: Some(error),
+			ts_error: Some(cmd_err.error),
+			missing_permission: cmd_err.missing_permission,
+		}
+	}
+}
+
 #[get("/con/{id}/file/{channel}/{path:.*}")]
 async fn download_file(
 	state: web::Data<Arc<State>>, web::Path((id, channel, path)): web::Path<(Uuid, u64, String)>,
@@ -410,10 +433,10 @@ async fn download_file(
 			Ok(Ok(r)) => r,
 			Ok(Err(e)) => {
 				error!(state.logger, "Failed to get server public key"; "error" => %e);
-				return HttpResponse::Gone().finish();
+				return HttpResponse::Gone().json(FiletransferError::gone());
 			}
 			Err(_) => {
-				return HttpResponse::Gone().finish();
+				return HttpResponse::Gone().json(FiletransferError::gone());
 			}
 		};
 		if let Some((len, stream)) = state.file_cache.get_cached_file(&server, channel, &path).await
@@ -424,24 +447,33 @@ async fn download_file(
 		}
 
 		debug!(state.logger, "Downloading file"; "channel" => channel.0, "path" => &path);
-		let (len, file_stream, server) =
-			match con.send(websocket::DownloadFile { channel, path: path.clone() }).await {
-				Err(_) => {
-					return HttpResponse::Gone().finish();
-				}
-				Ok(Err(e)) => {
-					if let Some(TsError::CommandError(err)) = e.downcast_ref::<TsError>() {
-						if err.error == tsclientlib::TsError::FileInvalidPath {
-							debug!(state.logger, "File not found"; "path" => &path);
-							return HttpResponse::NotFound().finish();
-						}
+		let (len, file_stream, server) = match con
+			.send(websocket::DownloadFile { channel, path: path.clone() })
+			.await
+		{
+			Err(_) => {
+				return HttpResponse::Gone().json(FiletransferError::gone());
+			}
+			Ok(Err(websocket::Error::TsError(TsError::CommandError(err)))) => {
+				debug!(state.logger, "File download error"; "error" => %err, "path" => &path);
+				return match err.error {
+					tsclientlib::TsError::FileInvalidPath => HttpResponse::NotFound()
+						.json(FiletransferError::from_command_error("File not found", err)),
+					tsclientlib::TsError::PermissionsClientInsufficient => {
+						HttpResponse::Forbidden()
+							.json(FiletransferError::from_command_error("Missing permission", err))
 					}
-					error!(state.logger, "File download failed"; "error" => %e, "path" => &path);
-					return HttpResponse::InternalServerError()
-						.body(format!("Failed to download file: {}", e));
-				}
-				Ok(Ok(r)) => r,
-			};
+					_ => HttpResponse::BadRequest()
+						.json(FiletransferError::from_command_error("Download error", err)),
+				};
+			}
+			Ok(Err(e)) => {
+				error!(state.logger, "File download failed"; "error" => %e, "path" => &path);
+				return HttpResponse::InternalServerError()
+					.json(FiletransferError::generic(&format!("Failed to download file: {}", e)));
+			}
+			Ok(Ok(r)) => r,
+		};
 
 		let stream =
 			FramedRead::new(file_stream, BytesCodec::new()).map(|r| r.map(web::BytesMut::freeze));
@@ -462,7 +494,7 @@ async fn download_file(
 			response.streaming(stream)
 		}
 	} else {
-		HttpResponse::Gone().finish()
+		HttpResponse::Gone().json(FiletransferError::gone())
 	}
 }
 
@@ -508,12 +540,25 @@ async fn upload_file(
 			.await
 		{
 			Err(_) => {
-				return HttpResponse::Gone().finish();
+				return HttpResponse::Gone().json(FiletransferError::gone());
+			}
+			Ok(Err(websocket::Error::TsError(TsError::CommandError(err)))) => {
+				debug!(state.logger, "File upload error"; "error" => %err, "path" => &path);
+				return match err.error {
+					tsclientlib::TsError::FileInvalidPath => HttpResponse::NotFound()
+						.json(FiletransferError::from_command_error("File not found", err)),
+					tsclientlib::TsError::PermissionsClientInsufficient => {
+						HttpResponse::Forbidden()
+							.json(FiletransferError::from_command_error("Missing permission", err))
+					}
+					_ => HttpResponse::BadRequest()
+						.json(FiletransferError::from_command_error("Upload error", err)),
+				};
 			}
 			Ok(Err(e)) => {
 				error!(state.logger, "File upload failed"; "error" => %e, "path" => &path);
 				return HttpResponse::InternalServerError()
-					.body(format!("Failed to upload file: {}", e));
+					.json(FiletransferError::generic(&format!("Failed to upload file: {}", e)));
 			}
 			Ok(Ok(r)) => r,
 		};
@@ -523,11 +568,11 @@ async fn upload_file(
 		}));
 		if let Err(e) = tokio::io::copy(&mut body_reader, &mut file_stream).await {
 			warn!(state.logger, "File upload aborted"; "error" => %e);
-			return HttpResponse::BadGateway().body(format!("Upload failed: {}", e));
+			return HttpResponse::BadGateway().json(FiletransferError::generic(&format!("Upload failed: {}", e)));
 		}
-		HttpResponse::Ok().finish()
+		HttpResponse::Ok().json(FiletransferError::generic("ok"))
 	} else {
-		HttpResponse::Gone().finish()
+		HttpResponse::Gone().json(FiletransferError::gone())
 	}
 }
 
@@ -1157,12 +1202,7 @@ mod tests {
 				address: "localhost".to_string(),
 				name: "Test".to_string(),
 				version: Version::Linux_3_X_X,
-				bookmark: None,
-				channel: None,
-				ignore_identity_mismatch: false,
-				log_commands: false,
-				log_packets: false,
-				log_udp_packets: false,
+				..Default::default()
 			}))
 			.await?;
 			loop {
@@ -1269,7 +1309,7 @@ mod tests {
 		con0.send(&MessageF2P::SendMessage {
 			target: JsMessageTarget::Client(con1_id),
 			message: msg.to_string(),
-			return_code: None
+			return_code: None,
 		})
 		.await?;
 
