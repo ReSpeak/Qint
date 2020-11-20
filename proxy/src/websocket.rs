@@ -15,14 +15,12 @@ use tsclientlib::events::Event as TsEvent;
 use tsclientlib::prelude::*;
 use tsclientlib::StreamItem as TsStreamItem;
 use tsclientlib::{
-	events, ChannelId, ClientId, Connection, DisconnectOptions, FileDownloadResult,
+	events, AudioEvent, ChannelId, ClientId, Connection, DisconnectOptions, FileDownloadResult,
 	FileUploadResult, FiletransferHandle, InMessage, MessageTarget, Uid,
 };
-use tsproto::resend::PacketId;
 use tsproto_packets::packets::{AudioData, OutCommand, OutPacket};
 use tsproto_types::crypto::EccKeyPubP256;
 
-use crate::book_events::{ConnectionClientUpdate, JsM2B};
 use crate::db::{ChannelListMsg, ChatId, ChatType, SetClientVolumeMsg};
 use crate::messages::{self, MessageF2P, MessageP2F};
 use crate::{audio, book_events, db, ConnectionId, State, Tristate, WsFormat, WsOptions};
@@ -110,7 +108,7 @@ impl Message for TalkersChangedMsg {
 	type Result = ();
 }
 impl Message for SendPacketMsg {
-	type Result = Result<PacketId>;
+	type Result = Result<()>;
 }
 impl Message for CaptureLoudnessMsg {
 	type Result = ();
@@ -225,8 +223,6 @@ impl Ws {
 				for e in &events {
 					if let TsEvent::PropertyAdded { id: events::PropertyId::Server, .. } = e {
 						// Connected
-						self.set_audio_input_active(ctx, true);
-
 						match self.connection.as_ref().and_then(|c| {
 							c.get_server_key()
 								.ok()
@@ -365,6 +361,13 @@ impl Ws {
 				let id = (self.id, from);
 				self.send_to_ts2a(audio::ts_to_audio::PlayMsg(id, audio));
 			}
+			TsStreamItem::AudioChange(change) => {
+				warn!(self.logger, "Audio change"; "change" => ?change);
+				match change {
+					AudioEvent::CanSendAudio(can) => self.set_audio_input_active(ctx, can),
+					AudioEvent::CanReceiveAudio(can) => self.set_audio_output_active(ctx, can),
+				}
+			}
 			TsStreamItem::IdentityLevelIncreased => {
 				if let Some(con) = &self.connection {
 					let event =
@@ -382,7 +385,6 @@ impl Ws {
 				}
 			}
 			TsStreamItem::DisconnectedTemporarily(_) => {
-				self.set_audio_input_active(ctx, false);
 				self.send_message(&MessageP2F::DisconnectedTemporarily(), ctx);
 				self.talkers.clear();
 				self.update_talkers(ctx);
@@ -431,6 +433,7 @@ impl Ws {
 	}
 
 	fn set_audio_input_active(&mut self, ctx: &mut <Self as Actor>::Context, active: bool) {
+		// TODO Simplify to one message instead of two
 		if active {
 			self.send_to_a2ts(audio::audio_to_ts::AddListenerMsg(ctx.address()))
 		} else {
@@ -438,8 +441,13 @@ impl Ws {
 		}
 	}
 
+	fn set_audio_output_active(&mut self, _ctx: &mut <Self as Actor>::Context, _active: bool) {
+		// TODO
+	}
+
 	fn disconnect(&mut self, ctx: &mut <Self as Actor>::Context) {
 		self.set_audio_input_active(ctx, false);
+		self.set_audio_output_active(ctx, false);
 		self.talkers.clear();
 		if let Some(con) = &mut self.connection {
 			if let Err(e) = con.disconnect(DisconnectOptions::new()) {
@@ -481,10 +489,16 @@ impl Ws {
 								.logger(actor.logger.clone())
 								.log_commands(o.log_commands || settings.verbosity > 0)
 								.log_packets(o.log_packets || settings.verbosity > 1)
-								.log_udp_packets(o.log_udp_packets || settings.verbosity > 2);
+								.log_udp_packets(o.log_udp_packets || settings.verbosity > 2)
+								.input_muted(o.input_muted.unwrap_or_default())
+								.output_muted(o.output_muted.unwrap_or_default());
 
 							if let Some(c) = &o.channel {
 								options = options.channel(c.clone());
+							}
+
+							if let Some(msg) = &o.away {
+								options = options.away(msg.clone());
 							}
 
 							if !o.ignore_identity_mismatch {
@@ -593,42 +607,14 @@ impl Ws {
 							self.send_error(return_code.as_deref(), format!("Failed to get state: {}", e), ctx);
 						}
 						Ok(state) => {
-							let mut audio_active = None;
-							if let JsM2B::ConnectionClientUpdate(ConnectionClientUpdate {
-								input_muted,
-								output_muted,
-								away,
-								..
-							}) = &change
-							{
-								if input_muted.is_some() || output_muted.is_some() || away.is_some()
-								{
-									if let Some(client) = state.clients.get(&state.own_client) {
-										let input_muted =
-											input_muted.unwrap_or_else(|| client.input_muted);
-										let output_muted =
-											output_muted.unwrap_or_else(|| client.output_muted);
-										let is_away = away
-											.as_ref()
-											.map(|a| a.is_some())
-											.unwrap_or_else(|| client.away_message.is_some());
-
-										audio_active =
-											Some(!input_muted && !output_muted && !is_away);
-									}
-								}
-							}
-
 							match change.to_packet(state) {
 								Ok(msg) => {
 									let _ = self.send_ts_message(msg, return_code.as_deref(), ctx);
 								}
 								Err(e) => {
-									self.send_error(return_code.as_deref(), format!("Failed to create packet for change: {}", e), ctx);
+									self.send_error(return_code.as_deref(),
+										format!("Failed to create packet for change: {}", e), ctx);
 								}
-							}
-							if let Some(active) = audio_active {
-								self.set_audio_input_active(ctx, active);
 							}
 						}
 					}
@@ -947,12 +933,13 @@ impl Handler<CaptureLoudnessMsg> for Ws {
 }
 
 impl Handler<SendPacketMsg> for Ws {
-	type Result = Result<PacketId>;
+	type Result = Result<()>;
 	fn handle(
 		&mut self, SendPacketMsg(packet): SendPacketMsg, _: &mut Self::Context,
 	) -> Self::Result {
 		if let Some(con) = &mut self.connection {
-			Ok(con.get_tsproto_client_mut()?.send_packet(packet)?)
+			con.send_audio(packet)?;
+			Ok(())
 		} else {
 			bail!("Connection does not exist")
 		}
@@ -962,7 +949,7 @@ impl Handler<SendPacketMsg> for Ws {
 impl Handler<SetInputMutedMsg> for Ws {
 	type Result = Result<()>;
 	fn handle(
-		&mut self, SetInputMutedMsg(new): SetInputMutedMsg, ctx: &mut Self::Context,
+		&mut self, SetInputMutedMsg(new): SetInputMutedMsg, _: &mut Self::Context,
 	) -> Self::Result {
 		if let Some(con) = &mut self.connection {
 			let state = con.get_state()?;
@@ -974,7 +961,6 @@ impl Handler<SetInputMutedMsg> for Ws {
 			};
 			let new_input_muted = new.get_value(old);
 			state.client_update().set_input_muted(new_input_muted).send(con)?;
-			self.set_audio_input_active(ctx, !new_input_muted);
 		} else {
 			bail!("Connection does not exist");
 		}

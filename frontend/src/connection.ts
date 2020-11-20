@@ -26,7 +26,7 @@ export type ChangePromise = Promise<ResultDetails | undefined>;
 export class Connection {
 	private readonly _state = writable(new ConnectionState());
 	private curReturnCode = 0;
-	private returnCodes = new Map<number, ResultPromise>();
+	private returnCodes = new Map<string, ResultPromise>();
 	public get state(): Readable<ConnectionState> { return this._state; };
 
 	public readonly book: Book = new Book();
@@ -95,12 +95,12 @@ export class Connection {
 	}
 
 	public sendChange(change: OChange): ChangePromise {
-		const returnCode = this.curReturnCode;
+		const returnCode = "frontend:" + this.curReturnCode;
 		this.curReturnCode = (this.curReturnCode + 1) % 65536;
 		this.sendMessage({
 			Change: {
 				change,
-				returnCode: returnCode.toString(),
+				returnCode: returnCode,
 			}
 		});
 		return new Promise((resolve, reject) => {
@@ -365,7 +365,7 @@ export class Connection {
 		} else if ("Loudness" in msg) {
 			this.loudness.set(msg.Loudness);
 		} else if ("Result" in msg) {
-			const ret = this.returnCodes.get(Number(msg.Result.returnCode));
+			const ret = this.returnCodes.get(msg.Result.returnCode);
 			if (ret !== undefined) {
 				if (msg.Result.tsResult === undefined && msg.Result.description === undefined)
 					ret.resolve(undefined);

@@ -254,7 +254,9 @@ export function getConnectFromString(loc: string): ConnectData {
 		assert("address" in data, "connection data needs an address");
 		if (!("name" in data))
 			data.name = "TeamSpeakUser";
-		return new ConnectData(data.name, data.address, data.bookmark, data.channel, data.channelId);
+		return new ConnectData(data.name, data.address, data.bookmark,
+			data.channel, data.channelId, data.inputMuted, data.outputMuted,
+			data.away);
 	} else {
 		let start = loc.indexOf("@");
 		let name = start === -1 ? "TeamSpeakUser" : loc.substr(0, start);
@@ -267,7 +269,10 @@ export function getConnectFromString(loc: string): ConnectData {
 }
 
 export function getStringFromConnect(connect: ConnectData): string {
-	if (connect.bookmark === undefined) {
+	if (connect.bookmark === undefined &&
+		connect.inputMuted === undefined &&
+		connect.outputMuted === undefined &&
+		connect.away === undefined) {
 		let s = "";
 		if (connect.name !== "TeamSpeakUser")
 			s = connect.name + "@";

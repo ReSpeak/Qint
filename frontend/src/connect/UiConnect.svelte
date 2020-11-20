@@ -217,7 +217,7 @@
 				<div class="viewContainer">
 					<div class="scollPane">
 						{#each bookmarks as item}
-							<UiBookmark bookmark={item} />
+							<UiBookmark bookmark={item} bind:connectData={data} />
 						{/each}
 					</div>
 				</div>

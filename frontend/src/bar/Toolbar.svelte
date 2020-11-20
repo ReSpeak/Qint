@@ -4,9 +4,11 @@
 	import { SERVER_ICON } from "../util";
 	import { app, NodeSelection } from "../app";
 	import ConnectionSettings from "./ConnectionSettings.svelte";
+	import { ConnectData } from "../connect/connect";
 
 	export let displayPanel: DisplayPanel;
 	export let showSidebar: boolean;
+	export let connectData: ConnectData;
 
 	const cons = app.connections;
 
@@ -59,9 +61,7 @@
 	</div>
 	<div class="spacer" />
 	<div class="rightButtons">
-		{#if $cons.length > 0}
-			<ConnectionSettings connection={$cons[0]} />
-		{/if}
+		<ConnectionSettings connection={$cons.length > 0 ? $cons[0] : undefined} bind:connectData={connectData} />
 	</div>
 </div>
 

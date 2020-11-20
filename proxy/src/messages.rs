@@ -111,6 +111,9 @@ pub struct ConnectOptions {
 	pub name: String,
 	pub channel: Option<String>,
 	pub version: Version,
+	pub input_muted: Option<bool>,
+	pub output_muted: Option<bool>,
+	pub away: Option<String>,
 	/// Ignore if the identity of the server changed.
 	pub ignore_identity_mismatch: bool,
 	pub log_commands: bool,

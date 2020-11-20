@@ -8,21 +8,15 @@ export class ConnectData {
 		public address: string,
 		public bookmark?: string,
 		public channel?: string,
-		public channelId?: ChannelId) { }
-
-	public static fromConString(name: string, address: string, bookmark?: string, channelId?: ChannelId): ConnectData {
-		const sep = address.indexOf("/");
-		let addr = address;
-		let channel = undefined;
-		if (sep !== -1) {
-			addr = address.slice(0, sep);
-			channel = address.slice(sep + 1);
-		}
-		return new ConnectData(name, addr, bookmark, channel, channelId);
-	}
+		public channelId?: ChannelId,
+		public inputMuted?: boolean,
+		public outputMuted?: boolean,
+		public away?: string) { }
 
 	public clone(): ConnectData {
-		return new ConnectData(this.name, this.address, this.bookmark, this.channel, this.channelId);
+		return new ConnectData(this.name, this.address, this.bookmark,
+			this.channel, this.channelId, this.inputMuted,
+			this.outputMuted, this.away);
 	}
 
 	public toConnectMsg(): OMsgConnect {
@@ -34,6 +28,9 @@ export class ConnectData {
 				name: this.name,
 				channel,
 				version: getDefaultVersion(),
+				inputMuted: this.inputMuted,
+				outputMuted: this.outputMuted,
+				away: this.away,
 				ignoreIdentityMismatch: false,
 				logCommands: false,
 				logPackets: false,

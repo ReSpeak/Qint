@@ -2619,17 +2619,6 @@ dependencies = [
 
 [[package]]
 name = "num-bigint"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "090c7f9998ee0ff65aa5b723e4009f7b217707f1fb5ea551329cc4d6231fb304"
-dependencies = [
- "autocfg 1.0.1",
- "num-integer",
- "num-traits",
-]
-
-[[package]]
-name = "num-bigint"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e9a41747ae4633fce5adffb4d2e81ffc5e89593cb19917f8fb2cc5ff76507bf"
@@ -3852,12 +3841,12 @@ dependencies = [
 
 [[package]]
 name = "simple_asn1"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "692ca13de57ce0613a363c8c2f1de925adebc81b04c923ac60c5488bb44abe4b"
+checksum = "39465bdea3e86aa6f95f69d1b7e3010634fdeda0bc4b6c9124cbcd7419873065"
 dependencies = [
  "chrono",
- "num-bigint 0.2.6",
+ "num-bigint",
  "num-traits",
 ]
 
@@ -4694,7 +4683,7 @@ checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
 name = "ts-bookkeeping"
 version = "0.1.0"
 dependencies = [
- "base64 0.12.3",
+ "base64 0.13.0",
  "derive_more",
  "heck",
  "itertools",
@@ -4715,7 +4704,7 @@ name = "tsclientlib"
 version = "0.1.0"
 dependencies = [
  "audiopus",
- "base64 0.12.3",
+ "base64 0.13.0",
  "futures",
  "git-testament",
  "itertools",
@@ -4744,7 +4733,7 @@ name = "tsproto"
 version = "0.1.0"
 dependencies = [
  "aes",
- "base64 0.12.3",
+ "base64 0.13.0",
  "bitflags 1.2.1",
  "curve25519-dalek",
  "eax",
@@ -4752,7 +4741,7 @@ dependencies = [
  "futures",
  "generic-array 0.14.4",
  "git-testament",
- "num-bigint 0.3.1",
+ "num-bigint",
  "num-derive",
  "num-traits",
  "omnom",
@@ -4777,7 +4766,7 @@ name = "tsproto-packets"
 version = "0.1.0"
 dependencies = [
  "arrayref",
- "base64 0.12.3",
+ "base64 0.13.0",
  "bitflags 1.2.1",
  "num-derive",
  "num-traits",
@@ -4791,7 +4780,7 @@ dependencies = [
 name = "tsproto-structs"
 version = "0.1.0"
 dependencies = [
- "base64 0.12.3",
+ "base64 0.13.0",
  "csv",
  "heck",
  "lazy_static",
@@ -4805,13 +4794,13 @@ name = "tsproto-types"
 version = "0.1.0"
 dependencies = [
  "arrayref",
- "base64 0.12.3",
+ "base64 0.13.0",
  "bitflags 1.2.1",
  "curve25519-dalek",
  "flakebi-ring",
  "heck",
  "itertools",
- "num-bigint 0.2.6",
+ "num-bigint",
  "num-derive",
  "num-traits",
  "rand 0.7.3",

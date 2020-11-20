@@ -5,6 +5,11 @@ import { get } from "svelte/store";
 import { app } from "./app";
 import { getConnectFromString, BUILD_ENV, BUILD_DAT } from "./util";
 
+if ("qint" in window) {
+	// For snowpack hot reload: Disconnect previous connections
+	(window as any).qint.close();
+}
+
 (window as any).qint = app; // DEBUG
 (window as any).get = get; // DEBUG
 console.log("BUILD", BUILD_ENV, BUILD_DAT);
@@ -25,8 +30,8 @@ window.onbeforeunload = function (e: any) {
 
 const loc = location.hash;
 if (loc && loc !== "" && loc !== "#") {
+	// Starts with #
 	try {
-		// Starts with #
 		app.connect(getConnectFromString(decodeURIComponent(loc.substr(1))));
 	} catch (e) {
 		console.error("Failed to connect to previous connection", e);

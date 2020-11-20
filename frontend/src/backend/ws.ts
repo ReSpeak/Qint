@@ -20,6 +20,9 @@ export interface OMsgConnect {
 		name: string;
 		channel: string | undefined;
 		version: Version;
+		inputMuted?: boolean;
+		outputMuted?: boolean;
+		away?: string;
 		ignoreIdentityMismatch: boolean;
 		logCommands: boolean;
 		logPackets: boolean;

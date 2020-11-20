@@ -132,13 +132,6 @@ pub(crate) fn serialize_date_time<S: Serializer>(
 	(datetime.timestamp(), datetime.offset()).serialize(serializer)
 }
 
-pub(crate) fn deserialize_some_date_time<'de, D: Deserializer<'de>>(
-	deserializer: D,
-) -> Result<Option<OffsetDateTime>, D::Error> {
-	let (ts, offset) = Deserialize::deserialize(deserializer)?;
-	Ok(Some(OffsetDateTime::from_unix_timestamp(ts).to_offset(offset)))
-}
-
 pub(crate) fn serialize_some_date_time<S: Serializer>(
 	datetime: &Option<OffsetDateTime>, serializer: S,
 ) -> Result<S::Ok, S::Error> {
@@ -168,12 +161,6 @@ pub(crate) fn serialize_some_duration<S: Serializer>(
 	datetime: &Option<Duration>, serializer: S,
 ) -> Result<S::Ok, S::Error> {
 	datetime.serialize(serializer)
-}
-
-pub(crate) fn deserialize_some_some_duration<'de, D: Deserializer<'de>>(
-	deserializer: D,
-) -> Result<Option<Option<Duration>>, D::Error> {
-	Ok(Some(Deserialize::deserialize(deserializer)?))
 }
 
 pub(crate) fn serialize_some_some_duration<S: Serializer>(
@@ -213,13 +200,6 @@ pub(crate) fn serialize_some_u64<S: Serializer>(
 	i.map(|i| i.to_string()).serialize(serializer)
 }
 
-pub(crate) fn deserialize_some_some_u64<'de, D: Deserializer<'de>>(
-	deserializer: D,
-) -> Result<Option<Option<u64>>, D::Error> {
-	let s: Option<String> = Deserialize::deserialize(deserializer)?;
-	Ok(Some(s.map(|s| s.parse()).transpose().map_err(SerdeError::custom)?))
-}
-
 pub(crate) fn serialize_some_some_u64<S: Serializer>(
 	i: &Option<Option<u64>>, serializer: S,
 ) -> Result<S::Ok, S::Error> {
@@ -250,29 +230,10 @@ pub(crate) fn serialize_some_id<S: Serializer, T: Id>(
 	i.as_ref().map(|i| i.to_string_id()).serialize(serializer)
 }
 
-pub(crate) fn deserialize_some_some_id<'de, D: Deserializer<'de>, T: Id>(
-	deserializer: D,
-) -> Result<Option<Option<T>>, D::Error> {
-	let s: Option<String> = Deserialize::deserialize(deserializer)?;
-	Ok(Some(s.map(|s| T::parse_id(&s)).transpose().map_err(SerdeError::custom)?))
-}
-
 pub(crate) fn serialize_some_some_id<S: Serializer, T: Id>(
 	i: &Option<Option<T>>, serializer: S,
 ) -> Result<S::Ok, S::Error> {
 	i.as_ref().map(|i| i.as_ref().map(|i| i.to_string_id())).serialize(serializer)
-}
-
-pub(crate) fn deserialize_some_set_id<'de, D: Deserializer<'de>, T: Eq + Hash + Id>(
-	deserializer: D,
-) -> Result<Option<HashSet<T>>, D::Error> {
-	let s: HashSet<String> = Deserialize::deserialize(deserializer)?;
-	Ok(Some(
-		s.into_iter()
-			.map(|s| T::parse_id(&s))
-			.collect::<Result<HashSet<T>>>()
-			.map_err(SerdeError::custom)?,
-	))
 }
 
 pub(crate) fn serialize_some_set_id<S: Serializer, T: Eq + Hash + Id>(

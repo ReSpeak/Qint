@@ -42,7 +42,7 @@
 </script>
 
 <div class="appContainer" style="grid-template-columns: {columnStyle}">
-	<Toolbar bind:showSidebar={$showSidebar} bind:displayPanel={$displayPanel} />
+	<Toolbar bind:showSidebar={$showSidebar} bind:displayPanel={$displayPanel} bind:connectData={connectData} />
 	<Searchbar bind:filter visible={$showSidebar} />
 	<Sidebar {connections} {filter} visible={$showSidebar} {showConnect} />
 	<div class="panel">
@@ -61,7 +61,7 @@
 			<!-- TODO consider something better ? -->
 			<UiGlobalSettings connection={$connections[0]} />
 		{:else if $displayPanel === DisplayPanel.Connect}
-			<Connect data={connectData} />
+			<Connect bind:data={connectData} />
 		{/if}
 	</div>
 </div>

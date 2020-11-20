@@ -83,6 +83,12 @@ export class App {
 		this.showSidebar.set(true);
 		return con;
 	}
+
+	public close() {
+		for (const con of get(this.connections)) {
+			con.close();
+		}
+	}
 }
 
 export class NodeSelection {
