@@ -13,6 +13,7 @@
 	import { ConnectData } from "./connect/connect";
 	import { DescriptionMode } from "./transientSettings";
 	import { Channel } from "./book";
+	import { onMount } from "svelte";
 
 	const connections = app.connections;
 	let filter: string = "";
@@ -39,6 +40,15 @@
 		connectData = data;
 		$displayPanel = DisplayPanel.Connect;
 	}
+
+	onMount(() => {
+		app.transientSettingsLoaded.subscribe(() => {
+			if (ui.defaultInputMuted && connectData.inputMuted === undefined)
+				connectData.inputMuted = ui.defaultInputMuted;
+			if (ui.defaultOutputMuted && connectData.outputMuted === undefined)
+				connectData.outputMuted = ui.defaultOutputMuted;
+		})
+	});
 </script>
 
 <div class="appContainer" style="grid-template-columns: {columnStyle}">

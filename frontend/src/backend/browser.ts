@@ -31,6 +31,15 @@ export class BrowserBackend implements IBackend {
 	public setTitle(name: string): void {
 		document.title = name;
 	}
+
+	public setIcon(url: string | undefined): void {
+		// TODO Any??
+		const icon = document.querySelector("link[rel*='icon']") as any;
+		if (icon !== null)
+			icon.href = url ?? "icon.png";
+		else
+			console.log("Tried to set icon but did not find icon element");
+	}
 }
 
 export class BrowserBackendConnection implements IBackendConnection {

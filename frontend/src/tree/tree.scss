@@ -7,8 +7,6 @@
 .innerContainer {
 	@include noBut;
 	padding-left: 0.5em;
-	padding-top: 1px;
-	padding-bottom: 1px;
 	width: 100%;
 	overflow: hidden;
 	justify-content: start;
@@ -43,6 +41,8 @@
 .nameBox {
 	@extend %unselectable;
 	flex: 1;
+	padding-top: 1px;
+	padding-bottom: 1px;
 
 	&:hover {
 		color: $link-hover;
