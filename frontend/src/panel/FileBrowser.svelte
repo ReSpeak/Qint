@@ -158,6 +158,15 @@
 		currentState = WorkState.None;
 	}
 
+	/// Sort first by type and then by f
+	function sortFoldersFirst(f: (a: FileTreeNode, b: FileTreeNode) => number): (a: FileTreeNode, b: FileTreeNode) => number {
+		return (a, b) => {
+			if (a.isFile !== b.isFile)
+				return a.isFile ? 1 : -1;
+			return f(a, b);
+		};
+	}
+
 	const sortOpt = { sensitivity: "base" };
 	const columns: IColumns<FileTreeNode> = [
 		{
@@ -171,21 +180,21 @@
 			key: "name",
 			title: "Name",
 			value: (v) => v.name,
-			sort: (a, b) => a.name.localeCompare(b.name, undefined, sortOpt),
+			sort: sortFoldersFirst((a, b) => a.name.localeCompare(b.name, undefined, sortOpt)),
 		},
 		{
 			key: "size",
 			title: "Size",
 			value: (v) => (v.isFile ? v.size : 0),
 			renderValue: (v) => (v.isFile ? formatBytes(v.size) : ""),
-			sort: (a, b) => (b.isFile ? b.size : -1) - (a.isFile ? a.size : -1),
+			sort: sortFoldersFirst((a, b) => (b.isFile ? b.size : -1) - (a.isFile ? a.size : -1)),
 		},
 		{
 			key: "lastModified",
 			title: "Last Modified",
 			value: (v) => v.lastModified,
 			renderValue: (v) => v.lastModified.format("D.M.YY HH:mm"),
-			sort: (a, b) => a.lastModified.isAfter(b.lastModified) ? 1 : -1,
+			sort: sortFoldersFirst((a, b) => a.lastModified.isAfter(b.lastModified) ? 1 : -1),
 		},
 	];
 	const rowOptions: IRowOptions<FileTreeNode> = {
@@ -466,7 +475,7 @@
 		{/if}
 		<tr slot="headerCell" let:col>
 			{#if col.key === 'type'}
-				<div on:click={() => goUp()} class="upIcon">
+				<div on:click={() => goUp()} class="upIcon" class:invisible={path.length === 0}>
 					<Icon name="arrow-up-circle-outline" />
 				</div>
 			{/if}

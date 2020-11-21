@@ -127,7 +127,7 @@ fn convert_value(_fmt: &mut fmt::Formatter, book_events: &BookEvents, struc: &St
 }
 
 #>
-mod js_structs {
+pub mod js_structs {
 	use std::collections::HashSet;
 	use std::net::{IpAddr, SocketAddr};
 

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{self, Poll};
@@ -15,8 +16,8 @@ use tsclientlib::events::Event as TsEvent;
 use tsclientlib::prelude::*;
 use tsclientlib::StreamItem as TsStreamItem;
 use tsclientlib::{
-	events, AudioEvent, ChannelId, ClientId, Connection, DisconnectOptions, FileDownloadResult,
-	FileUploadResult, FiletransferHandle, InMessage, MessageTarget, Uid,
+	events, AudioEvent, ChannelId, ClientId, Connection, ConnectionStats, DisconnectOptions,
+	FileDownloadResult, FileUploadResult, FiletransferHandle, InMessage, MessageTarget, Uid,
 };
 use tsproto_packets::packets::{AudioData, OutCommand, OutPacket};
 use tsproto_types::crypto::EccKeyPubP256;
@@ -282,7 +283,26 @@ impl Ws {
 							events
 								.into_iter()
 								.filter_map(|e| {
-									if let Some(e) = book_events::convert_event(data, &e) {
+									if let Some(mut e) = book_events::convert_event(data, &e) {
+										use book_events::{JsEvent, JsProperty, JsPropertyId};
+
+										// Extend connection info packet for own client
+										if let JsEvent::PropertyChanged {
+											id: JsPropertyId::ConnectionClientData(id),
+											prop: JsProperty::ConnectionClientData(info),
+											..
+										} = &mut e {
+											if let Some(con) = &self.connection {
+												if let Ok(state) = con.get_state() {
+													if let Ok(stats) = con.get_network_stats() {
+														if *id == state.own_client {
+															Self::fill_connection_info(info, stats);
+														}
+													}
+												}
+											}
+										}
+
 										Some(e)
 									} else {
 										warn!(self.logger, "Event could not be converted for \
@@ -321,8 +341,8 @@ impl Ws {
 								data,
 								&msg,
 							) {
-								error!(self.logger, "Database failed to handle \
-									message"; "error" => %e);
+								error!(self.logger, "Database failed to handle message";
+									"error" => %e);
 							}
 
 							// Subscribe to all channels
@@ -445,14 +465,57 @@ impl Ws {
 		// TODO
 	}
 
+	fn fill_connection_info(info: &mut book_events::js_structs::ConnectionClientData, stats: &ConnectionStats) {
+		use tsclientlib::PacketStat;
+
+		// connected_time is missing, we do not know that
+
+		info.ping = Some(stats.rtt.try_into().ok());
+		info.ping_deviation = Some(stats.rtt_dev.try_into().ok());
+
+		info.packets_sent_speech = Some(Some(u64::from(stats.total_packets[PacketStat::OutSpeech as usize])));
+		info.packets_sent_keepalive = Some(Some(u64::from(stats.total_packets[PacketStat::OutKeepalive as usize])));
+		info.packets_sent_control = Some(Some(u64::from(stats.total_packets[PacketStat::OutControl as usize])));
+		info.bytes_sent_speech = Some(Some(u64::from(stats.total_bytes[PacketStat::OutSpeech as usize])));
+		info.bytes_sent_keepalive = Some(Some(u64::from(stats.total_bytes[PacketStat::OutKeepalive as usize])));
+		info.bytes_sent_control = Some(Some(u64::from(stats.total_bytes[PacketStat::OutControl as usize])));
+
+		info.packets_received_speech = Some(Some(u64::from(stats.total_packets[PacketStat::InSpeech as usize])));
+		info.packets_received_keepalive = Some(Some(u64::from(stats.total_packets[PacketStat::InKeepalive as usize])));
+		info.packets_received_control = Some(Some(u64::from(stats.total_packets[PacketStat::InControl as usize])));
+		info.bytes_received_speech = Some(Some(u64::from(stats.total_bytes[PacketStat::InSpeech as usize])));
+		info.bytes_received_keepalive = Some(Some(u64::from(stats.total_bytes[PacketStat::InKeepalive as usize])));
+		info.bytes_received_control = Some(Some(u64::from(stats.total_bytes[PacketStat::InControl as usize])));
+
+		let bandwidth_last_second = stats.get_last_second_bytes();
+		info.bandwidth_sent_last_second_speech = Some(Some(u64::from(bandwidth_last_second[PacketStat::OutSpeech as usize])));
+		info.bandwidth_sent_last_second_keepalive = Some(Some(u64::from(bandwidth_last_second[PacketStat::OutKeepalive as usize])));
+		info.bandwidth_sent_last_second_control = Some(Some(u64::from(bandwidth_last_second[PacketStat::OutControl as usize])));
+		info.bandwidth_received_last_second_speech = Some(Some(u64::from(bandwidth_last_second[PacketStat::InSpeech as usize])));
+		info.bandwidth_received_last_second_keepalive = Some(Some(u64::from(bandwidth_last_second[PacketStat::InKeepalive as usize])));
+		info.bandwidth_received_last_second_control = Some(Some(u64::from(bandwidth_last_second[PacketStat::InControl as usize])));
+
+		let bandwidth_last_minute = stats.get_last_second_bytes();
+		info.bandwidth_sent_last_minute_speech = Some(Some(u64::from(bandwidth_last_minute[PacketStat::OutSpeech as usize])));
+		info.bandwidth_sent_last_minute_keepalive = Some(Some(u64::from(bandwidth_last_minute[PacketStat::OutKeepalive as usize])));
+		info.bandwidth_sent_last_minute_control = Some(Some(u64::from(bandwidth_last_minute[PacketStat::OutControl as usize])));
+		info.bandwidth_received_last_minute_speech = Some(Some(u64::from(bandwidth_last_minute[PacketStat::InSpeech as usize])));
+		info.bandwidth_received_last_minute_keepalive = Some(Some(u64::from(bandwidth_last_minute[PacketStat::InKeepalive as usize])));
+		info.bandwidth_received_last_minute_control = Some(Some(u64::from(bandwidth_last_minute[PacketStat::InControl as usize])));
+
+		info.server_to_client_packetloss_speech = Some(Some(stats.get_packetloss_s2c_speech()));
+		info.server_to_client_packetloss_keepalive = Some(Some(stats.get_packetloss_s2c_keepalive()));
+		info.server_to_client_packetloss_control = Some(Some(stats.get_packetloss_s2c_control()));
+		info.server_to_client_packetloss_total = Some(Some(stats.get_packetloss_s2c_total()));
+	}
+
 	fn disconnect(&mut self, ctx: &mut <Self as Actor>::Context) {
 		self.set_audio_input_active(ctx, false);
 		self.set_audio_output_active(ctx, false);
 		self.talkers.clear();
 		if let Some(con) = &mut self.connection {
 			if let Err(e) = con.disconnect(DisconnectOptions::new()) {
-				warn!(self.logger, "Failed to disconnect properly";
-					"error" => %e);
+				warn!(self.logger, "Failed to disconnect properly"; "error" => %e);
 				self.connection = None;
 				self.disconnect(ctx);
 			}

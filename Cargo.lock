@@ -4765,7 +4765,6 @@ dependencies = [
 name = "tsproto-packets"
 version = "0.1.0"
 dependencies = [
- "arrayref",
  "base64 0.13.0",
  "bitflags 1.2.1",
  "num-derive",
@@ -4793,7 +4792,6 @@ dependencies = [
 name = "tsproto-types"
 version = "0.1.0"
 dependencies = [
- "arrayref",
  "base64 0.13.0",
  "bitflags 1.2.1",
  "curve25519-dalek",
