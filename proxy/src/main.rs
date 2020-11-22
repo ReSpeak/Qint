@@ -536,7 +536,7 @@ async fn upload_file(
 async fn download_cache_file(
 	state: web::Data<Arc<State>>, web::Path((id, channel, path)): web::Path<(String, u64, String)>,
 ) -> impl Responder {
-	let server = match hex::decode(&id) {
+	let server = match base64::decode_config(&id, base64::URL_SAFE_NO_PAD) {
 		Err(e) => {
 			return HttpResponse::BadRequest().body(format!("Not a valid server id: {}", e));
 		}

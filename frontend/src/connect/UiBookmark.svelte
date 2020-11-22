@@ -53,7 +53,7 @@
 		<TsIcon
 			type="server"
 			source={{ icon: bookmark.server?.icon }}
-			server={bookmark.server?.hexPublicKey} />
+			server={bookmark.server?.urlBase64PublicKey} />
 	</div>
 	<div class="bookmarkName">{bookmark.name || bookmark.server?.name}</div>
 	{#if bookmark.lastUsed}

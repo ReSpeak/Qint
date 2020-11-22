@@ -7,7 +7,7 @@
 	import { Book, Channel } from "../book";
 	import UiChannel from "../tree/UiChannel.svelte";
 	import type { ChannelId, Uid } from "../ts";
-	import { SERVER_ICON, CLIENT_ICON, focus, hexEncode } from "../util";
+	import { SERVER_ICON, CLIENT_ICON, focus, urlBase64Encode } from "../util";
 	import { app } from "../app";
 	import { backend } from "../backend/backend";
 
@@ -96,7 +96,7 @@
 				}
 			);
 			if (query.data.serverByAddress !== null) {
-				server = hexEncode(query.data.serverByAddress.uid);
+				server = urlBase64Encode(query.data.serverByAddress.uid);
 				let channels: Map<ChannelId, Channel> = new Map(
 					query.data.serverByAddress.channels.map((c: any) => {
 						let channel = Channel.fromGraphql(c);

@@ -583,12 +583,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2734baf8ed08920ccecce1b48a2dfce4ac74a973144add031163bd21a1c5dab"
 
 [[package]]
-name = "base32"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23ce669cd6c8588f79e15cf450314f9638f967fc5770ff1c7c1deb0925ea7cfa"
-
-[[package]]
 name = "base64"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3116,7 +3110,6 @@ dependencies = [
  "anyhow",
  "audiopus",
  "awc",
- "base32",
  "base64 0.13.0",
  "chrono",
  "diesel",
@@ -3129,7 +3122,6 @@ dependencies = [
  "futures",
  "git-testament",
  "heck",
- "hex",
  "juniper",
  "lazy_static",
  "libsqlite3-sys",

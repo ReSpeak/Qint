@@ -19,7 +19,7 @@ use tsclientlib::ChannelId;
 use tsproto_types::crypto::EccKeyPubP256;
 
 /// Files are stored in
-/// `<cache_path>/files/<base32 of server uid>/<channel_id>/<base32 of path>`.
+/// `<cache_path>/files/<base64 of server uid>/<channel_id>/<base64 of path>`.
 pub struct FileCache {
 	logger: Logger,
 	cache_path: PathBuf,
@@ -42,7 +42,7 @@ impl FileCache {
 	pub fn new(logger: Logger, cache_path: PathBuf) -> Self { Self { logger, cache_path } }
 
 	fn path_encode(data: &[u8]) -> String {
-		base32::encode(base32::Alphabet::RFC4648 { padding: false }, data)
+		base64::encode_config(data, base64::URL_SAFE_NO_PAD)
 	}
 
 	fn get_path(&self, server: &EccKeyPubP256, channel: ChannelId, path: &str) -> Result<PathBuf> {

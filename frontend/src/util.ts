@@ -262,6 +262,14 @@ export function base64Encode(data: number[]): string {
 	return btoa(res);
 }
 
+export function urlBase64Decode(s: string): number[] {
+	return base64Decode(s.replace('-', '+').replace('_', '/'));
+}
+
+export function urlBase64Encode(data: number[]): string {
+	return base64Encode(data).replace('+', '-').replace('/', '_').replace(/=+$/, '');
+}
+
 export function hexDecode(s: string): number[] {
 	let res = [];
 	for (let i = 0; i < s.length; i += 2)
