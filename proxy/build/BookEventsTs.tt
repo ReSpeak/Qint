@@ -83,14 +83,14 @@ export class <#= struc.name #>Gen extends <#= struc.name #>Base {
 		if let InnerRustType::Primitive(t) = inner {
 			if t == "OffsetDateTime" { #>
 		if (obj.<#= name #>)
-			Object.assign(obj, { <#= name #>: datetimeDeserialize((obj as any).<#= name #>) });
+			(obj as any).<#= name #> = datetimeDeserialize((obj as any).<#= name #>);
 			<# } else if t == "Duration" { #>
 		if (obj.<#= name #>)
-			Object.assign(obj, { <#= name #>: durationDeserialize((obj as any).<#= name #>) });
+			(obj as any).<#= name #> = durationDeserialize((obj as any).<#= name #>);
 			<# }
 		} else if self.book.structs.iter().any(|s| s.name == p.type_s) { #>
 		if (obj.<#= name #> !== undefined && obj.<#= name #> !== null)
-			Object.assign(obj, { <#= name #>: <#= p.type_s #>Gen.fromJson(obj.<#= name #>!) });
+			(obj as any).<#= name #> = <#= p.type_s #>Gen.fromJson(obj.<#= name #>!);
 		<# }
 	} #>
 		Object.assign(this, obj);

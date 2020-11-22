@@ -14,6 +14,8 @@
 	import { DescriptionMode } from "./transientSettings";
 	import { Channel } from "./book";
 	import { onMount } from "svelte";
+	import { derived, writable } from "svelte/store";
+	import type { Readable, Writable } from "svelte/store";
 
 	const connections = app.connections;
 	let filter: string = "";
@@ -35,6 +37,19 @@
 		else columnStyle += " 0";
 		columnStyle += " 1fr";
 	}
+
+	let connectStringDerived: Readable<string>;
+	$: {
+		if ($connections.length === 0) {
+			connectStringDerived = writable("");
+		} else {
+			connectStringDerived = derived($connections.map(c => c.connectOptions) as [Writable<ConnectData>], cs => {
+				return JSON.stringify(cs);
+			});
+		}
+	}
+
+	$: location.hash = $connectStringDerived;
 
 	function showConnect(data: ConnectData) {
 		connectData = data;

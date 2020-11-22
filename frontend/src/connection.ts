@@ -1,7 +1,7 @@
 import { ResultDetails, OutMsg, InMsg } from "./backend/ws";
 import { get, writable, Writable, Readable } from "svelte/store";
 import { Book, Channel, ChatData, Client } from "./book";
-import { getStringFromConnect, oneshot, fnBroadcast } from "./util";
+import { oneshot, fnBroadcast } from "./util";
 import { handleMessage } from "./notification";
 import { backend, IBackendConnection } from "./backend/backend";
 import { app } from "./app";
@@ -33,12 +33,12 @@ export class Connection {
 	public readonly fileTreeCache: Writable<FileTreeCache> = writable(new FileTreeCache());
 	public backend: IBackendConnection;
 
-	public loudness: Writable<number> = writable(0);
-	public connectOptions: ConnectData;
+	public readonly loudness: Writable<number> = writable(0);
+	public readonly connectOptions: Writable<ConnectData>;
 	public pluginCmd = fnBroadcast<[IMsgPluginCommandPart]>();
 
 	constructor(connectOptions: ConnectData) {
-		this.connectOptions = connectOptions;
+		this.connectOptions = writable(connectOptions);
 		this.backend = backend.createNewConnection();
 		this._state.update(s => s.setConnecting());
 		this.backend.connect(
@@ -48,7 +48,7 @@ export class Connection {
 			},
 			() => this.onClose(),
 		).then(() => {
-			this.backend.send(this.connectOptions.toConnectMsg());
+			this.backend.send(connectOptions.toConnectMsg());
 			oneshot(this.state, s => s.channelListFinished, () => {
 				const ownClient = get(this.book.ownClient);
 				if (ownClient === undefined) return;
@@ -77,7 +77,6 @@ export class Connection {
 				console.error("Failed to handle event in plugin:", e);
 			}
 		}
-		location.hash = "";
 		// Reset chat if the selected node is from this connection.
 		app.selectedNode.update(n => n?.connection === this ? undefined : n);
 		this.rejectReturnCodes();
@@ -298,12 +297,37 @@ export class Connection {
 						} else if ("PropertyChanged" in tsevt) {
 							const prop = tsevt.PropertyChanged.prop!;
 							if ("Client" in prop && "Client" in tsevt.PropertyChanged.id
-								&& tsevt.PropertyChanged.id.Client === this.book.ownClientId
-								&& "channel" in prop.Client) {
-								// Update selected node
-								const curTarget = get(app.selectedNode);
-								if (curTarget === undefined || curTarget.node.qlType === "CHANNEL")
-									app.select(this, this.book.getChannel(prop.Client.channel!)!);
+								&& tsevt.PropertyChanged.id.Client === this.book.ownClientId) {
+								if ("channel" in prop.Client) {
+									// Update selected node
+									const curTarget = get(app.selectedNode);
+									if (curTarget === undefined || curTarget.node.qlType === "CHANNEL")
+										app.select(this, this.book.getChannel(prop.Client.channel!)!);
+								}
+
+								if ("inputMuted" in prop.Client || "outputMuted" in prop.Client
+									|| "name" in prop.Client || "awayMessage" in prop.Client
+									|| "channel" in prop.Client) {
+									this.connectOptions.update(opts => {
+										if ("inputMuted" in prop.Client)
+											opts.inputMuted = prop.Client.inputMuted ? true : undefined;
+										if ("outputMuted" in prop.Client)
+											opts.outputMuted = prop.Client.outputMuted ? true : undefined;
+										if (prop.Client.name !== undefined)
+											opts.name = prop.Client.name;
+										if (prop.Client.awayMessage !== undefined) {
+											if (prop.Client.awayMessage === null)
+												opts.away = undefined;
+											else
+												opts.away = prop.Client.awayMessage;
+										}
+										if ("channel" in prop.Client) {
+											opts.channel = undefined;
+											opts.channelId = prop.Client.channel;
+										}
+										return opts;
+									});
+								}
 							}
 						}
 					}
@@ -338,7 +362,6 @@ export class Connection {
 				}
 			} else if ("ChannelListFinished" in message) {
 				this._state.update(s => s.setChannelListFinished());
-				location.hash = getStringFromConnect(this.connectOptions!);
 				this.updateAllUnreadCounts();
 			} else if ("FileList" in message) {
 				this.fileTreeCache.update(ftc => ftc.applyFileList(message));

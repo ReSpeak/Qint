@@ -35,7 +35,7 @@ export class App {
 		// TODO unsubscribe somewhere
 		this.selectedNode.subscribe(s => {
 			if (s !== undefined) {
-				const name = s.connection.book.server.name ?? s.connection.connectOptions.address;
+				const name = s.connection.book.server.name ?? get(s.connection.connectOptions).address;
 				backend.setTitle(name + " – Qint");
 				const iconPath = getIconPath(s.connection.book.server, s.connection);
 				backend.setIcon(iconPath);

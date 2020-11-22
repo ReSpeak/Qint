@@ -352,7 +352,9 @@ impl Ws {
 							}
 						}
 					}
-				} else if let InMessage::CommandError(error) = &msg {
+				}
+
+				if let InMessage::CommandError(error) = &msg {
 					for e in error.iter() {
 						if let Some(return_code) = &e.return_code {
 							self.send_message(&MessageP2F::Result {
@@ -363,9 +365,7 @@ impl Ws {
 							}, ctx);
 						}
 					}
-				}
-
-				if let Some(m) = book_events::convert_message(&msg) {
+				} else if let Some(m) = book_events::convert_message(&msg) {
 					self.send_message(&MessageP2F::Message(m), ctx);
 				} else {
 					warn!(self.logger, "Message could not be converted for frontend";
@@ -382,7 +382,6 @@ impl Ws {
 				self.send_to_ts2a(audio::ts_to_audio::PlayMsg(id, audio));
 			}
 			TsStreamItem::AudioChange(change) => {
-				warn!(self.logger, "Audio change"; "change" => ?change);
 				match change {
 					AudioEvent::CanSendAudio(can) => self.set_audio_input_active(ctx, can),
 					AudioEvent::CanReceiveAudio(can) => self.set_audio_output_active(ctx, can),

@@ -9,6 +9,7 @@
 	import { ConnectData } from "../connect/connect";
 	import { flash, render_updates } from "../util";
 	import { afterUpdate, onMount } from "svelte";
+	import { get } from "svelte/store";
 	import { app, NodeSelection } from "../app";
 	import HoverMenu from "./HoverMenu.svelte";
 	import { DelayedHover } from "./delayedHover";
@@ -32,7 +33,7 @@
 
 	function click() {
 		if (!$state.connected) {
-			showConnect(connection.connectOptions.clone());
+			showConnect(get(connection.connectOptions).clone());
 		} else {
 			app.select(connection, server);
 		}

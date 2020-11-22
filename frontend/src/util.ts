@@ -247,46 +247,6 @@ export function getDefaultVersion(): Version {
 	}
 }
 
-export function getConnectFromString(loc: string): ConnectData {
-	if (loc.startsWith("{")) {
-		// Parse json
-		let data = JSON.parse(loc);
-		assert("address" in data, "connection data needs an address");
-		if (!("name" in data))
-			data.name = "TeamSpeakUser";
-		return new ConnectData(data.name, data.address, data.bookmark,
-			data.channel, data.channelId, data.inputMuted, data.outputMuted,
-			data.away);
-	} else {
-		let start = loc.indexOf("@");
-		let name = start === -1 ? "TeamSpeakUser" : loc.substr(0, start);
-		start += 1;
-		let end = loc.indexOf("/");
-		let channel = end === -1 ? "" : loc.substr(end + 1);
-		let address = loc.substr(start, end === -1 ? undefined : end);
-		return new ConnectData(name, address, undefined, channel);
-	}
-}
-
-export function getStringFromConnect(connect: ConnectData): string {
-	if (connect.bookmark === undefined &&
-		connect.inputMuted === undefined &&
-		connect.outputMuted === undefined &&
-		connect.away === undefined) {
-		let s = "";
-		if (connect.name !== "TeamSpeakUser")
-			s = connect.name + "@";
-		s += connect.address;
-		if (connect.channel !== undefined)
-			s += "/" + connect.channel;
-		else if (connect.channelId !== undefined)
-			s += "//" + connect.channelId;
-		return s;
-	} else {
-		return JSON.stringify(connect);
-	}
-}
-
 export function base64Decode(s: string): number[] {
 	let res = [];
 	const b = atob(s);
