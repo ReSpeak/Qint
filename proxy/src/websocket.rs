@@ -513,15 +513,24 @@ impl Ws {
 		self.set_audio_output_active(ctx, false);
 		self.talkers.clear();
 		if let Some(con) = &mut self.connection {
-			if let Err(e) = con.disconnect(DisconnectOptions::new()) {
-				warn!(self.logger, "Failed to disconnect properly"; "error" => %e);
+			if con.get_state().is_ok() {
+				debug!(self.logger, "Sending disconnect packet");
+				if let Err(e) = con.disconnect(DisconnectOptions::new()) {
+					warn!(self.logger, "Failed to disconnect properly"; "error" => %e);
+					self.connection = None;
+				} else {
+					// Wait until disconnected
+					return;
+				}
+			} else {
 				self.connection = None;
-				self.disconnect(ctx);
 			}
-		} else if !self.websocket_closed {
+		}
+		if !self.websocket_closed {
 			debug!(self.logger, "Closing websocket");
 			ctx.close(None);
 		} else {
+			debug!(self.logger, "Stopping websocket");
 			ctx.stop();
 		}
 	}

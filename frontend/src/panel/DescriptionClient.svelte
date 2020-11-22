@@ -17,7 +17,7 @@
 	import { Reason } from "../book_events";
 	import { onMount } from "svelte";
 	import { NARROW_NO_BREAK_SPACE } from "../util";
-	import { Client } from "../book";
+	import { Client, ServerGroup } from "../book";
 	import BModal from "../ui/BModal.svelte";
 	import { tick } from "svelte";
 	import BChart from "../ui/BChart.svelte";
@@ -32,7 +32,7 @@
 	let pokeMessage: string = "";
 	let developMode = app.transientSettings.ui._developMode;
 
-	const sgs = connection.book.serverGroups;
+	const serverGroups = connection.book.serverGroups;
 	$: avatarPath = getClientAvatarPath($client, connection);
 	$: ownClient = client.id === connection.book.ownClientId;
 	$: {
@@ -118,28 +118,24 @@
 
 	interface ExtendedGroup {
 		isMember: boolean;
-		id: ServerGroupId;
-		name: string;
+		inner: ServerGroup;
 	}
 
 	let groups: ExtendedGroup[];
 	$: {
 		groups = [];
-		$sgs.forEach((group, id) => {
+		$serverGroups.forEach((group, id) => {
 			const g = get(group);
 			if (g.groupType === "Regular") {
 				groups.push({
 					isMember: $client.serverGroups.includes(id),
-					...g,
+					inner: g,
 				});
 			}
 		});
 		// Sort alphabetically
 		groups.sort((a, b) => {
-			if (a.isMember !== b.isMember) return a.isMember ? -1 : 1;
-			const nameCmp = a.name.localeCompare(b.name);
-			if (nameCmp !== 0) return nameCmp;
-			return Number(a.id) - Number(b.id);
+			return a.inner.cmp(b.inner);
 		});
 	}
 
@@ -357,20 +353,20 @@
 			<div>Server Groups:</div>
 			<div class="serverGroupList">
 				{#each groups as grp (grp)}
-					<label class="checkbox serverGroupContainer" for={'group' + grp.id}>
+					<label class="checkbox serverGroupContainer" for={'group' + grp.inner.id}>
 						<div class="serverGroupCheckbox">
 							<input
 								type="checkbox"
 								class="checkbox-switch is-info"
-								id={'group' + grp.id}
-								on:input={(e) => changeServerGroup(e, grp.id, !grp.isMember)}
+								id={'group' + grp.inner.id}
+								on:input={(e) => changeServerGroup(e, grp.inner.id, !grp.isMember)}
 								checked={grp.isMember} />
 						</div>
 						<div class="serverGroupSpacing" />
 						<div class="serverGroupIcon">
-							<ServerGroupIcon id={grp.id} {connection} />
+							<ServerGroupIcon id={grp.inner.id} {connection} />
 						</div>
-						<div class="serverGroupDescription" title={'Id ' + grp.id}>{grp.name}</div>
+						<div class="serverGroupDescription" title={'Id ' + grp.inner.id}>{grp.inner.name}</div>
 					</label>
 				{/each}
 			</div>

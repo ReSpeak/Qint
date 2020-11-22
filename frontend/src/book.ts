@@ -269,6 +269,8 @@ export class Book {
 		if (serverGroup === undefined)
 			return;
 		serverGroup.update((sg: ServerGroup) => sg.update(obj));
+		if ("sortId" in obj)
+			this.serverGroups.update(gs => gs);
 	}
 
 	public removeServerGroup(id: ServerGroupId) {
@@ -300,6 +302,21 @@ export class Book {
 		const sgStore = get(this.serverGroups).get(id);
 		if (sgStore === undefined) return undefined;
 		return get(sgStore);
+	}
+
+	public sortServerGroupIds(groups: ServerGroupId[]): ServerGroupId[] {
+		const grs = [...groups];
+		grs.sort((a, b) => {
+			const ag = this.getServerGroup(a);
+			const bg = this.getServerGroup(b);
+			if (ag === undefined || bg === undefined) {
+				console.warn("Didn't find server groups", a, b, ag, bg);
+				return 0;
+			}
+
+			return ag.cmp(bg);
+		});
+		return grs;
 	}
 
 	public messageHandler(msg: InBookChangeMsg) {
@@ -616,9 +633,13 @@ export class ServerGroup extends book_events.ServerGroupGen {
 
 	public cmp(other: ServerGroup): number {
 		// If the sortId is 0, the group id is taken
-		const ai = this.sortId === 0 ? BigInt(this.id) : BigInt(this.sortId);
-		const bi = other.sortId === 0 ? BigInt(other.id) : BigInt(other.sortId);
-		return ai === bi ? 0 : (ai < bi ? -1 : 1);
+		if (this.id === other.id)
+			return 0;
+		const aid = BigInt(this.id);
+		const bid = BigInt(other.id);
+		const ai = this.sortId === 0 ? aid : BigInt(this.sortId);
+		const bi = other.sortId === 0 ? bid : BigInt(other.sortId);
+		return ai === bi ? (aid < bid ? -1 : 1) : (ai < bi ? -1 : 1);
 	}
 }
 

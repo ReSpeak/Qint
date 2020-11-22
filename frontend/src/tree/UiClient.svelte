@@ -8,7 +8,7 @@
 	import { Connection } from "../connection";
 	import { Channel, Client } from "../book";
 	import { draggable, DragData } from "../ui/draggable";
-	import { findParent, flash, render_updates } from "../util";
+	import { findParent, flash, on, render_updates } from "../util";
 	import { afterUpdate, onMount } from "svelte";
 	import { app, NodeSelection } from "../app";
 	import { TalkState } from "../ts";
@@ -28,6 +28,7 @@
 	let hovered: Readable<boolean>;
 	let showId = false;
 	let thisFilter = "";
+	const serverGroups = connection.book.serverGroups;
 
 	$: isSelected = $client.isSelected;
 	$: chat = client.chat;
@@ -35,25 +36,15 @@
 	let ownClient = client.id === connection.book.ownClientId;
 	let div: HTMLElement;
 
-	$: sortedServerGroups = sortServerGroups($client.serverGroups);
+	let sortedServerGroups: ServerGroupId[];
+	$: {
+		// Also depend on server groups
+		on($serverGroups);
+		sortedServerGroups = connection.book.sortServerGroupIds($client.serverGroups);
+	}
 
 	function setChat() {
 		app.select(connection, client);
-	}
-
-	function sortServerGroups(groups: ServerGroupId[]): ServerGroupId[] {
-		const grs = [...groups];
-		grs.sort((a, b) => {
-			const ag = connection.book.getServerGroup(a);
-			const bg = connection.book.getServerGroup(b);
-			if (ag === undefined || bg === undefined) {
-				console.warn("Didn't find server groups", a, b, ag, bg);
-				return 0;
-			}
-
-			return ag.cmp(bg);
-		});
-		return grs;
 	}
 
 	function applyFilter(filter: string, client: Client) {
