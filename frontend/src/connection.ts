@@ -361,6 +361,8 @@ export class Connection {
 			if (this.getState().connecting) {
 				this.backend.close(); // TODO call general close
 				this._state.update(s => s.setError(msg.Error));
+			} else {
+				this.close();
 			}
 		} else if ("Loudness" in msg) {
 			this.loudness.set(msg.Loudness);

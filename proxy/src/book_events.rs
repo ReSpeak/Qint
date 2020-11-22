@@ -129,13 +129,13 @@ pub(crate) fn deserialize_date_time<'de, D: Deserializer<'de>>(
 pub(crate) fn serialize_date_time<S: Serializer>(
 	datetime: &OffsetDateTime, serializer: S,
 ) -> Result<S::Ok, S::Error> {
-	(datetime.timestamp(), datetime.offset()).serialize(serializer)
+	(datetime.unix_timestamp(), datetime.offset()).serialize(serializer)
 }
 
 pub(crate) fn serialize_some_date_time<S: Serializer>(
 	datetime: &Option<OffsetDateTime>, serializer: S,
 ) -> Result<S::Ok, S::Error> {
-	datetime.map(|d| (d.timestamp(), d.offset())).serialize(serializer)
+	datetime.map(|d| (d.unix_timestamp(), d.offset())).serialize(serializer)
 }
 
 // Serialize Duration as seconds + nanoseconds (default serializer)
