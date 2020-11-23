@@ -19,6 +19,14 @@
 	}
 }
 
+@mixin textselectable {
+	-webkit-touch-callout: text;
+	-webkit-user-select: text;
+	-moz-user-select: text;
+	-ms-user-select: text;
+	user-select: text;
+}
+
 $highlight-strong: mix($background, $blue, 80%);
 $highlight-weak: mix($background, $text, 90%);
 

@@ -65,6 +65,7 @@
 	$row-pad: 0.25em;
 
 	.messageRow {
+		@extend %unselectable;
 		transition: background 2s;
 
 		&.unread {
@@ -137,6 +138,10 @@
 	.messageRendered :global(.chatVideo) {
 		//max-height: min(50vh, 30em);
 		max-height: min(30em);
+	}
+
+	.messageRendered, .messageRaw, .messageTime {
+		@include textselectable;
 	}
 
 	.tool-buttons {
