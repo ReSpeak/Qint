@@ -8,6 +8,8 @@ import { backend } from "../backend/backend";
 import { StructuredData } from "../ui/BInputDecl";
 import { ChannelId } from "../ts";
 import moment from "moment";
+import debug from "debug";
+const log = debug("CHAT"), error = debug("error:CHAT");
 
 export class Chat {
 	public static readonly EmptyFetch: FetchResult<Message> = {
@@ -50,7 +52,7 @@ export class Chat {
 		if (selected === undefined) return Chat.EmptyFetch;
 		let public_key = selected.connection.book.server.publicKey;
 		if (public_key === undefined) {
-			console.error("Cannot get messages for a non-existant connection");
+			error("Cannot get messages for a non-existant connection");
 			return Chat.EmptyFetch;
 		}
 
@@ -103,7 +105,7 @@ export class Chat {
 		if ("data" in res) {
 			// We never chatted here
 			if (!res.data.chat || res.data.chat.messages.length === 0) {
-				console.log("No chats here");
+				log("No chats here");
 				return Chat.EmptyFetch;
 			}
 
@@ -116,7 +118,7 @@ export class Chat {
 				msgs.push(new Message(msg.id, client, msg.invokerName,
 					msg.content, msg.rendered, datetimeDeserialize([msg.time, msg.timezone]), msg.status, msg.isPoke));
 			});
-			console.log("Fetching messages " + (loadAtBeginning ? "before" : "after"), [startTime, startId], "; got", msgs);
+			log("Fetching messages " + (loadAtBeginning ? "before" : "after"), [startTime, startId], "; got", msgs);
 
 			Chat.groupMessages(msgs, idFrom, dir);
 
@@ -126,7 +128,7 @@ export class Chat {
 				canLoadAfterEnd: dir !== ListFetchDir.New // Heuristic: when fetching new we start at the end
 			};
 		} else {
-			console.error("GetMessages result does not contain data", res);
+			error("GetMessages result does not contain data", res);
 			return Chat.EmptyFetch;
 		}
 	}
@@ -147,7 +149,7 @@ export class Chat {
 		if (selected === undefined) return;
 		let public_key = selected.connection.book.server.publicKey;
 		if (public_key === undefined) {
-			console.error("Cannot get messages for a non-existant connection");
+			error("Cannot get messages for a non-existant connection");
 			return;
 		}
 		const res = await backend.graphql(`mutation SetLastRead($chatType: GMessageTarget!, $server: [Int!]!, $chatId: ID,
@@ -212,11 +214,12 @@ export class Message {
 
 export interface MdWithFiles {
 	text: string;
-	files: {
-		path: string,
-		name: string,
-		blob: Blob
-	}[];
+	files: MdFile[];
+}
+export interface MdFile {
+	path: string;
+	name: string;
+	blob: Blob;
 }
 
 const QINT_CHAT_FOLDER = "/.qint_chat";

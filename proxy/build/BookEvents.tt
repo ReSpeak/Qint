@@ -132,6 +132,8 @@ pub mod js_structs {
 	use std::net::{IpAddr, SocketAddr};
 
 	use serde::Serialize;
+	#[cfg(test)]
+	use serde::Deserialize;
 	use time::{Duration, OffsetDateTime};
 	use tsclientlib::{ChannelGroupId, ChannelId, ChannelPermissionHint, ChannelType, ClientDbId,
 		ClientId, ClientPermissionHint, ClientType, Codec, CodecEncryptionMode, GroupNamingMode,

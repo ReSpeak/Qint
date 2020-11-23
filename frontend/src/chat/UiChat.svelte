@@ -9,7 +9,7 @@
 	import BInput from "../ui/BInput.svelte";
 	import { onDestroy, onMount, tick } from "svelte";
 	import { Chat, Message, structuredViewToMd } from "./chat";
-	import type { MdWithFiles } from "./chat";
+	import type { MdFile, MdWithFiles } from "./chat";
 	import { ListFetchDir } from "../ui/lazyList";
 	import { Connection } from "../connection";
 	import { app, NodeSelection } from "../app";
@@ -20,6 +20,9 @@
 	import type { ChatData } from "../bookBase";
 	import type { ChannelId } from "../ts";
 	import { pathJoin } from "../panel/fileUtil";
+	import { TsError } from "../book_events";
+	import debug from "debug";
+	const log = debug("CHAT"), error = debug("error:CHAT");
 
 	export let chat: Chat;
 
@@ -124,7 +127,7 @@
 		}
 	}
 
-	function sendMessage() {
+	async function sendMessage() {
 		const sel = $selected;
 		if (sel === undefined) return;
 		let textData = messageInput.getStructuredView();
@@ -132,7 +135,7 @@
 		let channelId: ChannelId = get(sel.connection.book.ownClient)?.channel ?? "";
 		let mdData = structuredViewToMd(textData, channelId);
 		if (!mdData.text) return;
-		tryUploadChatImage(sel.connection, mdData, channelId);
+		await tryUploadChatImage(sel.connection, mdData, channelId);
 		chat.sendMessage(mdData.text);
 		messageInput.clear();
 		messageInput.focus();
@@ -143,43 +146,57 @@
 		mdData: MdWithFiles,
 		channelId: ChannelId
 	) {
-		let hasTriedToCreateFolder = false;
-		console.log("Data", mdData);
-		for (const file of mdData.files) {
-			const resp = await connection.backend.fetch(`/file${pathJoin(channelId, file.path, file.name)}`, {
-				method: "PUT",
-				body: file.blob,
-			});
-			console.log("resp", resp);
-			let rtext = await resp.text();
-			console.log("rtext", rtext);
-			if (rtext === "error") {
-				if (!hasTriedToCreateFolder) {
-					hasTriedToCreateFolder = true;
+		if (mdData.files.length === 0) return;
 
-					connection.sendChange({
-						ChannelCreateDirectory: {
-							id: channelId,
-							password: "", // TODO
-							path: file.path
-						},
-					});
+		function tryUpload(file: MdFile) {
+			const [returnCode, promise] = connection.generateReturnCode();
+			const uploadDonePromise = connection.backend.fetch(
+				`/file${pathJoin(channelId, file.path, file.name)}?return_code=${returnCode}`,
+				{
+					method: "PUT",
+					body: file.blob,
+				}
+			);
+			return promise;
+			//return (await request.json()) as ResultDetails;
+		}
+
+		async function createFolder(file: MdFile) {
+			return await connection.sendChange({
+				ChannelCreateDirectory: {
+					id: channelId,
+					password: "", // TODO
+					path: file.path,
+				},
+			});
+		}
+
+		if (mdData.files.length >= 1) {
+			let file = mdData.files[0];
+			let result = await tryUpload(file);
+
+			if (result !== undefined && result.tsResult !== TsError.Ok) {
+				if (result.tsResult === TsError.PermissionsClientInsufficient) {
+					log("No permission to upload file");
+					return;
+				} else if (result.tsResult === TsError.FileNotFound) {
+					let cresult = await createFolder(file);
+					if (cresult !== undefined) {
+						log("Could not create folder %o", cresult);
+						return;
+					}
+					result = await tryUpload(file); // XXX log?
 				} else {
-					console.warn("Cannot upload to current folder");
+					log("Unknown error %o", result);
 					return;
 				}
 			}
-		}
 
-		// await connection.filetransferManager.uploadFiles(
-		// 	...mdData.files.map((file) => {
-		// 		return {
-		// 			data: file.blob,
-		// 			channelId: channelId,
-		// 			path: file.name,
-		// 		};
-		// 	})
-		// );
+			if (mdData.files.length > 1) {
+				let tasks = mdData.files.slice(1).map((file) => tryUpload(file));
+				await Promise.allSettled(tasks);
+			}
+		}
 	}
 
 	function sendCommand() {
@@ -198,7 +215,7 @@
 			const res = await chat.getMessages(idFrom, dir);
 			return res;
 		} catch (err) {
-			console.error("Failed to load messages", err);
+			error("Failed to load messages %o", err);
 			messagesError = err;
 			return Chat.EmptyFetch;
 		}

@@ -59,7 +59,6 @@
 		if (useCache && !invalidateCache) {
 			const cachedFolder = $fileTreeCache.get(cachePath, true);
 			if (cachedFolder !== null && cachedFolder.contentLoaded !== FolderState.Dummy) {
-				//console.log("cached");
 				return;
 			}
 		}

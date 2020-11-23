@@ -6,12 +6,15 @@ import { handleMessage } from "./notification";
 import { backend, IBackendConnection } from "./backend/backend";
 import { app } from "./app";
 import { ConnectData } from "./connect/connect";
-import { OChange, Reason, IMsgPluginCommandPart } from "./book_events";
+import { OChange, Reason, IMsgPluginCommandPart, TsError } from "./book_events";
 import moment from "moment";
 import { ChannelId, ClientId } from "./ts";
 import { FileTreeCache } from "./fileTreeCache";
 import { DescriptionMode } from "./transientSettings";
 import { FiletransferManager } from "./panel/filetransferManager";
+import debug from "debug";
+const log = debug("CON"), error = debug("error:CON");
+const log_evt = log.extend("EVT"), log_msg = log.extend("MSG");
 
 type ResultPromise = {
 	resolve: (res: ResultDetails | undefined) => void;
@@ -19,7 +22,7 @@ type ResultPromise = {
 };
 
 const ConnectionClosedResult: ResultDetails = {
-	tsResult: "TODO",
+	tsResult: TsError.ConnectionLost,
 };
 
 export type ChangePromise = Promise<ResultDetails | undefined>;
@@ -76,7 +79,7 @@ export class Connection {
 			try {
 				plugin.handleEvent?.(this, { Disconnected: null });
 			} catch (e) {
-				console.error("Failed to handle event in plugin:", e);
+				error("Failed to handle event in plugin: %o", e);
 			}
 		}
 		// Reset chat if the selected node is from this connection.
@@ -96,17 +99,22 @@ export class Connection {
 	}
 
 	public sendChange(change: OChange): ChangePromise {
-		const returnCode = "frontend:" + this.curReturnCode;
-		this.curReturnCode = (this.curReturnCode + 1) % 65536;
+		const [returnCode, promise] = this.generateReturnCode();
 		this.sendMessage({
 			Change: {
 				change,
 				returnCode: returnCode,
 			}
 		});
-		return new Promise((resolve, reject) => {
+		return promise;
+	}
+
+	public generateReturnCode(): [string, ChangePromise] {
+		const returnCode = "frontend:" + this.curReturnCode;
+		this.curReturnCode = (this.curReturnCode + 1) % 65536;
+		return [returnCode, new Promise((resolve, reject) => {
 			this.returnCodes.set(returnCode, { resolve, reject });
-		});
+		})];
 	}
 
 	public disconnect(reason?: Reason, message?: string) {
@@ -227,7 +235,7 @@ export class Connection {
 			try {
 				plugin.handleEvent?.(this, msg);
 			} catch (e) {
-				console.error("Failed to handle event in plugin:", e);
+				error("Failed to handle event in plugin:%o", e);
 			}
 		}
 
@@ -242,8 +250,7 @@ export class Connection {
 		} else if ("Events" in msg) {
 			for (const tsevt of msg.Events) {
 				try {
-					if (get(app.transientSettings.ui._developMode))
-						console.log(tsevt);
+					log_evt("%o", tsevt);
 
 					if ("Message" in tsevt) {
 						const fromOwnClient = tsevt.Message.invoker.id.toString() === this.book.ownClientId;
@@ -262,7 +269,7 @@ export class Connection {
 							const client = this.book.getClient(chatClientId.toString());
 							if (client !== undefined)
 								chat = client.chat;
-							console.log("pok?", client, chat, targetClientId, chatClientId);
+							log("pok? %o %o %s %s", client, chat, targetClientId, chatClientId);
 						}
 
 						if (chat !== undefined)
@@ -339,8 +346,7 @@ export class Connection {
 			}
 		} else if ("Message" in msg) {
 			const message = msg.Message;
-			if (get(app.transientSettings.ui._developMode))
-				console.log(message);
+			log_msg("%o", message);
 
 			if ("ChannelDescriptionChanged" in message) {
 				const curTarget = get(app.selectedNode);
@@ -382,7 +388,7 @@ export class Connection {
 		} else if ("TalkersChanged" in msg) {
 			this.book.talkersHandler(msg.TalkersChanged);
 		} else if ("Error" in msg) {
-			console.warn("Con Error:", msg.Error);
+			log("Con Error: %o", msg.Error);
 			if (this.getState().connecting) {
 				this.backend.close(); // TODO call general close
 				this._state.update(s => s.setError(msg.Error));
@@ -394,13 +400,14 @@ export class Connection {
 		} else if ("Result" in msg) {
 			const ret = this.returnCodes.get(msg.Result.returnCode);
 			if (ret !== undefined) {
-				if (msg.Result.tsResult === undefined && msg.Result.description === undefined)
+				if (msg.Result.tsResult === undefined && msg.Result.description === undefined
+					|| msg.Result.tsResult === TsError.Ok)
 					ret.resolve(undefined);
 				else
 					ret.resolve(msg.Result);
 			}
 		} else {
-			console.error("Unknown message", msg);
+			error("Unknown message", msg);
 		}
 	}
 }

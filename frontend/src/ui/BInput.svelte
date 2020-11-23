@@ -2,6 +2,8 @@
 	import { escapeHtml } from "../util";
 	import { createEventDispatcher, onMount, tick } from "svelte";
 	import type { StructuredData } from "./BInputDecl";
+	import debug from "debug";
+	const log = debug("BINPUT");
 
 	export let value: string;
 	export let enterToSubmit = true;
@@ -37,7 +39,7 @@
 		setValue = tmp;
 		value = tmp;
 		hasContent = self.childNodes.length > 0;
-		console.log("value", value, getStructuredView());
+		log("value %s %o", value, getStructuredView());
 	}
 
 	export function getStructuredView(): StructuredData {
@@ -65,13 +67,13 @@
 								);
 								parts.push({ blob });
 							} else if (src.startsWith("blob:")) {
-								console.log("How did this blob end up here");
+								log("How did this blob end up here");
 							} else {
 								parts.push({ src });
 							}
 							break;
 						default:
-							console.log("Unknown node", node);
+							log("Unknown node", node);
 							break;
 					}
 					break;
@@ -121,7 +123,7 @@
 				const domparser = new DOMParser();
 				const dom = domparser.parseFromString(text_html, "text/html");
 				const domImg = dom.querySelector("img");
-				console.log("pasting as html", domImg);
+				log("pasting as html", domImg);
 				if (domImg !== null && domImg.src) {
 					const imgHtml = `<img src="${escapeHtml(domImg.src)}"/>`;
 					document.execCommand("insertHtml", false, imgHtml);
@@ -129,7 +131,7 @@
 				}
 			}
 			if (!hasHtmlNode) {
-				console.log("pasting as image");
+				log("pasting as image");
 				const file = clipboardData.files[0];
 				// TODO free object somewhen
 				const fileUrl = URL.createObjectURL(file);
@@ -149,7 +151,7 @@
 					// 	[Uint8Array.from(atob(imgData.split(",")[1]), (c) => c.charCodeAt(0))],
 					// 	{ type: "image/jpeg" }
 					// );
-					// console.log("Blob", blob);
+					// log("Blob", blob);
 					// TODO move to a 'final' block.
 					URL.revokeObjectURL(fileUrl);
 				};

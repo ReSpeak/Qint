@@ -2,6 +2,8 @@ import { IMsgFileList, IMsgFileListPart, IMsgFileInfo } from "./book_events";
 import { datetimeDeserialize } from "./util";
 import moment, { Moment } from "moment";
 import { pathSplit } from "./panel/fileUtil";
+import debug from "debug";
+const log = debug("FILECACHE");
 
 export class FileTreeCache {
 	public isLoading: boolean = false;
@@ -9,7 +11,7 @@ export class FileTreeCache {
 
 	public applyFileList(fileList: IMsgFileList) {
 		fileList.FileList.forEach(m => this.updateCache(m));
-		console.log("File list ", this)
+		log("File list %o", this)
 		return this;
 	}
 
@@ -33,7 +35,7 @@ export class FileTreeCache {
 	}
 
 	public clear(path: string[] = []) {
-		//console.log("clearing", path);
+		log("clearing %o", path);
 		this.root.clear(path);
 	}
 }

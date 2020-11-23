@@ -118,7 +118,6 @@
 
 	function setChat(ev: MouseEvent) {
 		if (connection === undefined) return;
-		console.log("press", ev.button);
 		if (ev.button === MouseButton.Main) {
 			app.setDescriptionMode(new NodeSelection(connection, channel), DescriptionMode.Info);
 		} else if (ev.button === MouseButton.Auxiliary) {
@@ -141,7 +140,6 @@
 			...ev.detail.customData.querySelectorAll(":hover"),
 		].reverse();
 		const dropTarget = hoverOpt.find((x) => x.dataset.type === "channel");
-		console.log(hoverOpt, dropTarget);
 		if (dropTarget !== undefined && connection !== undefined) {
 			const rect = dropTarget.getBoundingClientRect();
 			let clickY = ev.detail.mouseDrop.clientY - rect.top;
@@ -172,7 +170,7 @@
 				}
 			}
 
-			console.log("Would drop", channel.id, "to", dropTarget.dataset.key, "at", clickPerc);
+			//console.log("Would drop", channel.id, "to", dropTarget.dataset.key, "at", clickPerc);
 		}
 	}
 

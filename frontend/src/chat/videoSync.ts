@@ -6,6 +6,8 @@ import { Channel, Client, Server } from "../book";
 import { PluginTargetMode, IMsgPluginCommandPart } from "../book_events";
 import { assert, debounced, fnBroadcast } from "../util";
 import moment, { Moment } from "moment";
+import debug from "debug";
+const log = debug("VSYNC");
 
 export const vSyncCmdKey = "qint.vsync";
 
@@ -56,7 +58,7 @@ export class SyncState {
 	}
 
 	private processLocalAction(ev: VSyncEvent) {
-		//console.log("Local action", ev);
+		log("Local action %o", ev);
 		if (!this.enabled) return;
 		if (this.debouncedEvent === undefined)
 			this.debouncedEvent = ev;
@@ -81,7 +83,7 @@ export class SyncState {
 		// Prevent feedback loops
 		let diffEv = SyncState.diffSafe(ev, this.lastReceivedSync);
 		if (Object.keys(diffEv).length === 0) return;
-		//console.log("Syncing", diffEv);
+		log("Syncing %o", diffEv);
 
 		this.nodeSel.connection.sendChange({
 			ConnectionPluginCommandRequest: {
@@ -124,7 +126,7 @@ export class SyncState {
 	public receiveNewState(cmd: VSyncCmd) {
 		if (cmd.video_key !== this.video_key)
 			return;
-		//console.log("Got sync", cmd);
+		log("Got sync %o", cmd);
 		SyncState.copySafe(cmd.event, this.lastReceivedSync);
 		if (cmd.host) {
 			this.host = cmd.host;
@@ -286,7 +288,7 @@ export class YoutubeVideoControl implements IVideoControl {
 				break;
 			case "infoDelivery":
 				if (msg.info.playbackRate !== undefined && msg.info.playbackRate !== this.dedupState.playbackRate) {
-					console.log("Rate change to", msg.info.playbackRate);
+					log("Rate change to %d", msg.info.playbackRate);
 					this.dedupState.playbackRate = msg.info.playbackRate;
 					this.event?.({ speed: msg.info.playbackRate });
 				}
@@ -319,19 +321,19 @@ export class YoutubeVideoControl implements IVideoControl {
 		if (cw === null) return;
 		if (!this.originReady) {
 			try { if (cw.origin) return; } catch {
-				console.log("orig");
+				log("orig");
 				this.originReady = true;
 			}
 		}
 		if (!this.iFrameRegistered) {
-			console.log("ireg");
+			log("ireg");
 			cw.postMessage(JSON.stringify({ ...this.getCmdObj(), func: "addEventListener", args: ["onReady"] }), host);
 			cw.postMessage(JSON.stringify({ ...this.getCmdObj(), func: "addEventListener", args: ["onStateChange"] }), host);
 			this.iFrameRegistered = true;
 		}
 
 		if (!this.iFrameLoaded) {
-			console.log("iload");
+			log("iload");
 			cw.postMessage(JSON.stringify({ ...this.getCmdObj("listening") }), host);
 		}
 	}

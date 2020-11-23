@@ -14,7 +14,6 @@
 	let viewRaw = false;
 	let links: LinksMap | undefined;
 	$: linksArr = links !== undefined ? Array.from(links.values()) : [];
-	$: console.log(links !== undefined ? Array.from(links.values()) : []);
 </script>
 
 <svelte:options immutable />

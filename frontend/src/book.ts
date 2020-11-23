@@ -2,13 +2,15 @@ import { Writable, writable, get, Readable } from "svelte/store";
 import { InBookChangeMsg, WsMessageTarget } from "./backend/ws";
 import { Connection } from "./connection";
 import { binarySearchBy,datetimeDeserialize, assert } from "./util";
-import { ChannelGroupId, ChannelId, ClientId, IconId, IpAddr, OffsetDateTime, ServerGroupId, TalkState, Uid } from "./ts";
+import { ChannelGroupId, ChannelId, ClientId, IconId, IpAddr, ServerGroupId, TalkState, Uid } from "./ts";
 import { Codec } from "./book_events";
 import * as book_events from "./book_events";
 import { Moment } from "moment";
 import moment from "moment";
 import { ClientBase, ServerBase } from "./bookBase";
 import { backend } from "./backend/backend";
+import debug from "debug";
+const error = debug("error:BOOK");
 
 export function codecToName(codec: Codec) {
 	switch (codec) {
@@ -115,7 +117,7 @@ export class Book {
 	public updateChannel(id: ChannelId, obj: Partial<Channel> | Partial<book_events.ChannelGen>) {
 		const channel = this.channels.get(id);
 		if (channel === undefined) {
-			console.error(`Cannot update non-existant channel ${id}`);
+			error(`Cannot update non-existant channel ${id}`);
 			return;
 		}
 		const oldParent = channel.parent;
@@ -172,7 +174,7 @@ export class Book {
 	public updateClient(id: ClientId, obj: Partial<Client> | Partial<book_events.ClientGen>) {
 		const client = this.getClient(id);
 		if (client === undefined) {
-			console.error(`Cannot update non-existant client ${id}`);
+			error(`Cannot update non-existant client ${id}`);
 			return;
 		}
 		const oldChannel = client.channel;
@@ -203,7 +205,7 @@ export class Book {
 	public addClientServerGroup(id: ClientId, group: ServerGroupId) {
 		const client = this.getClient(id);
 		if (client === undefined) {
-			console.error(`Cannot update non-existant client ${id}`);
+			error(`Cannot update non-existant client ${id}`);
 			return;
 		}
 		if (!client.serverGroups.includes(group)) {
@@ -215,7 +217,7 @@ export class Book {
 	public removeClientServerGroup(id: ClientId, group: ServerGroupId) {
 		const client = this.getClient(id);
 		if (client === undefined) {
-			console.error(`Cannot update non-existant client ${id}`);
+			error(`Cannot update non-existant client ${id}`);
 			return;
 		}
 		client.serverGroups.remove_item(group);
@@ -408,7 +410,7 @@ export class Book {
 			if (i === -1 || oldTalkers[i][1] !== isWhispering) {
 				const client = this.getClient(id);
 				if (client === undefined) {
-					console.error(`Cannot update non-existant client ${id}`);
+					error(`Cannot update non-existant client ${id}`);
 					continue;
 				}
 				client.update({ talking: isWhispering ? TalkState.Whisper : TalkState.Voice });
@@ -422,7 +424,7 @@ export class Book {
 		for (const [id,] of oldTalkers) {
 			const client = this.getClient(id);
 			if (client === undefined) {
-				console.error(`Cannot update non-existant client ${id}`);
+				error(`Cannot update non-existant client ${id}`);
 				continue;
 			}
 			client.update({ talking: TalkState.Off });

@@ -4,6 +4,8 @@
 	import { assert, binarySearchByKey, debounced } from "../util";
 	import { createEventDispatcher, tick, onMount } from "svelte";
 	import ResizeObserver from "resize-observer-polyfill";
+	import debug from "debug";
+	const log = debug("LL");
 	const dispatch = createEventDispatcher<{ viewchanged: { first?: T; last?: T } }>();
 
 	// Dummy class to have nice typing for our 'generic' parameter T which
@@ -180,11 +182,11 @@
 		const wantFetchEnd = distFromBot <= pxBeforeLoad;
 
 		if (wantFetchStart && canLoadBeforeStart) {
-			// console.log("want start", holdIdStart);
+			log("want start %o", holdIdStart);
 			await load(ListFetchDir.Before, holdIdStart);
 			return false;
 		} else if (wantFetchEnd && canLoadAfterEnd) {
-			// console.log("want end", holdIdEnd);
+			log("want end %o", holdIdEnd);
 			await load(ListFetchDir.After, holdIdEnd);
 			return false;
 		} else {
@@ -209,7 +211,7 @@
 		);
 		const result = await fetchElements(from, dir);
 		assert(result, "result from fetch is not valid");
-		//console.log("fetchElements result", result);
+		log("fetchElements result %o", result);
 
 		if (dir === ListFetchDir.Before) {
 			if (result.items.length === 0)
@@ -250,7 +252,7 @@
 	async function modifyElems(newElems: T[], isAtTop: boolean) {
 		const lastScrollHeight = pan.scrollHeight;
 		const lastScrollTop = pan.scrollTop;
-		//console.log("Before change scrollHeight", lastScrollHeight, ", scrollTop", pan.scrollTop);
+		log("Before change scrollHeight:%d scrollTop:%d", lastScrollHeight, pan.scrollTop);
 
 		triggerResizing();
 
@@ -265,8 +267,8 @@
 		if (isAtTop) {
 			const scrollAdjust = pan.scrollHeight - lastScrollHeight;
 			pan.scrollTop = lastScrollTop + scrollAdjust;
+			log("isAtTop sH:%d sT:%d adjust:%d", pan.scrollHeight, pan.scrollTop, scrollAdjust);
 		}
-		// console.log("modifyElems scrollHeight", pan.scrollHeight, "scrollTop", pan.scrollTop, "scrollAdjust", scrollAdjust);
 	}
 
 	/**
@@ -290,7 +292,7 @@
 		const removeIndex = childList.length - minItemsToRemove;
 		const res = binarySearchByKey(childList, removeDistance, distFn, 0, removeIndex + 1);
 
-		console.log("tryTrimEnd", res, res.index <= removeIndex);
+		log("tryTrimEnd %o %o", res, res.index <= removeIndex);
 		if (res.index <= removeIndex) {
 			// modification is at the end => safe
 			await modifyElems(elems.slice(0, res.index), false);
@@ -323,7 +325,7 @@
 			undefined
 		);
 
-		console.log("tryTrimStart", res, res.index >= minItemsToRemove);
+		log("tryTrimStart %o %o", res, res.index >= minItemsToRemove);
 		// We are trimming index-1 since the result item is the first element
 		// that is _smaller_ than our threshold distance.
 		if (res.index >= minItemsToRemove) {
@@ -390,7 +392,7 @@
 		} else {
 			if (lockElem && lockPos !== undefined) {
 				pan.scrollTop = lockElem.offsetTop - lockPos;
-				//console.log("jumping", lockElem.offsetTop - lockPos, lockElem.offsetTop, lockPos);
+				log("jumping %d %d %d", lockElem.offsetTop - lockPos, lockElem.offsetTop, lockPos);
 			}
 		}
 
@@ -402,10 +404,10 @@
 		if (!resizing) {
 			setLockPos();
 			if (pan.scrollTop === pan.scrollHeight - pan.clientHeight) {
-				if (docked === false) console.log("docked");
+				//if (docked === false) log("docked");
 				docked = true;
 			} else {
-				if (docked === true) console.log("undocked");
+				//if (docked === true) log("undocked");
 				docked = false;
 			}
 			start_fill();

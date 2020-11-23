@@ -27,14 +27,15 @@ use anyhow::{bail, Result};
 use futures::prelude::*;
 use futures::stream::Peekable;
 use http::{header::CACHE_CONTROL, header::ETAG, HeaderValue};
+use messages::ResultDetails;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use slog::{debug, error, info, o, warn, Drain, Logger};
 use structopt::StructOpt;
 use tokio::time::{self, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
+use tsclientlib::ChannelId;
 use tsclientlib::Error as TsError;
-use tsclientlib::{ChannelId, CommandError};
 use tsproto_types::crypto::EccKeyPubP256;
 use uuid::Uuid;
 
@@ -392,29 +393,11 @@ async fn get_plugin(state: web::Data<Arc<State>>, name: web::Path<String>) -> im
 #[derive(Deserialize)]
 struct GetFileOptions {
 	dl: Option<String>,
+	return_code: Option<String>,
 }
 
-#[derive(Deserialize, Serialize, Default)]
-struct FiletransferError<'a> {
-	error: Option<&'a str>,
-	ts_error: Option<tsclientlib::TsError>,
-	missing_permission: Option<tsclientlib::Permission>,
-}
-
-impl<'a> FiletransferError<'a> {
-	fn generic(error: &'a str) -> FiletransferError {
-		FiletransferError { error: Some(error), ..Default::default() }
-	}
-
-	fn gone() -> FiletransferError<'static> { FiletransferError::generic("gone") }
-
-	fn from_command_error(error: &'a str, cmd_err: CommandError) -> FiletransferError {
-		FiletransferError {
-			error: Some(error),
-			ts_error: Some(cmd_err.error),
-			missing_permission: cmd_err.missing_permission,
-		}
-	}
+impl ResultDetails {
+	fn gone() -> Self { Self::from_desc("gone".into()) }
 }
 
 #[get("/con/{id}/file/{channel}/{path:.*}")]
@@ -433,10 +416,10 @@ async fn download_file(
 			Ok(Ok(r)) => r,
 			Ok(Err(e)) => {
 				error!(state.logger, "Failed to get server public key"; "error" => %e);
-				return HttpResponse::Gone().json(FiletransferError::gone());
+				return HttpResponse::Gone().json(ResultDetails::gone());
 			}
 			Err(_) => {
-				return HttpResponse::Gone().json(FiletransferError::gone());
+				return HttpResponse::Gone().json(ResultDetails::gone());
 			}
 		};
 		if let Some((len, stream)) = state.file_cache.get_cached_file(&server, channel, &path).await
@@ -448,29 +431,32 @@ async fn download_file(
 
 		debug!(state.logger, "Downloading file"; "channel" => channel.0, "path" => &path);
 		let (len, file_stream, server) = match con
-			.send(websocket::DownloadFile { channel, path: path.clone() })
+			.send(websocket::DownloadFile {
+				channel,
+				path: path.clone(),
+				return_code: query_opt.return_code.clone(),
+			})
 			.await
 		{
 			Err(_) => {
-				return HttpResponse::Gone().json(FiletransferError::gone());
+				return HttpResponse::Gone().json(ResultDetails::gone());
 			}
 			Ok(Err(websocket::Error::TsError(TsError::CommandError(err)))) => {
 				debug!(state.logger, "File download error"; "error" => %err, "path" => &path);
 				return match err.error {
-					tsclientlib::TsError::FileInvalidPath => HttpResponse::NotFound()
-						.json(FiletransferError::from_command_error("File not found", err)),
-					tsclientlib::TsError::PermissionsClientInsufficient => {
-						HttpResponse::Forbidden()
-							.json(FiletransferError::from_command_error("Missing permission", err))
+					tsclientlib::TsError::FileInvalidPath => {
+						HttpResponse::NotFound().json::<ResultDetails>(err.into())
 					}
-					_ => HttpResponse::BadRequest()
-						.json(FiletransferError::from_command_error("Download error", err)),
+					tsclientlib::TsError::PermissionsClientInsufficient => {
+						HttpResponse::Forbidden().json::<ResultDetails>(err.into())
+					}
+					_ => HttpResponse::BadRequest().json::<ResultDetails>(err.into()),
 				};
 			}
 			Ok(Err(e)) => {
 				error!(state.logger, "File download failed"; "error" => %e, "path" => &path);
 				return HttpResponse::InternalServerError()
-					.json(FiletransferError::generic(&format!("Failed to download file: {}", e)));
+					.json(ResultDetails::from_desc(format!("Failed to download file: {}", e)));
 			}
 			Ok(Ok(r)) => r,
 		};
@@ -494,14 +480,19 @@ async fn download_file(
 			response.streaming(stream)
 		}
 	} else {
-		HttpResponse::Gone().json(FiletransferError::gone())
+		HttpResponse::Gone().json(ResultDetails::gone())
 	}
+}
+
+#[derive(Deserialize)]
+struct PutFileOptions {
+	return_code: Option<String>,
 }
 
 #[put("/con/{id}/file/{channel}/{path:.*}")]
 async fn upload_file(
 	state: web::Data<Arc<State>>, web::Path((id, channel, path)): web::Path<(Uuid, u64, String)>,
-	req: web::HttpRequest, body: web::Payload,
+	req: web::HttpRequest, body: web::Payload, query_opt: Query<PutFileOptions>,
 ) -> impl Responder
 {
 	let channel = ChannelId(channel);
@@ -536,29 +527,29 @@ async fn upload_file(
 				size,
 				overwrite: true,
 				resume: false,
+				return_code: query_opt.return_code.clone(),
 			})
 			.await
 		{
 			Err(_) => {
-				return HttpResponse::Gone().json(FiletransferError::gone());
+				return HttpResponse::Gone().json(ResultDetails::gone());
 			}
 			Ok(Err(websocket::Error::TsError(TsError::CommandError(err)))) => {
 				debug!(state.logger, "File upload error"; "error" => %err, "path" => &path);
 				return match err.error {
-					tsclientlib::TsError::FileInvalidPath => HttpResponse::NotFound()
-						.json(FiletransferError::from_command_error("File not found", err)),
-					tsclientlib::TsError::PermissionsClientInsufficient => {
-						HttpResponse::Forbidden()
-							.json(FiletransferError::from_command_error("Missing permission", err))
+					tsclientlib::TsError::FileInvalidPath => {
+						HttpResponse::NotFound().json::<ResultDetails>(err.into())
 					}
-					_ => HttpResponse::BadRequest()
-						.json(FiletransferError::from_command_error("Upload error", err)),
+					tsclientlib::TsError::PermissionsClientInsufficient => {
+						HttpResponse::Forbidden().json::<ResultDetails>(err.into())
+					}
+					_ => HttpResponse::BadRequest().json::<ResultDetails>(err.into()),
 				};
 			}
 			Ok(Err(e)) => {
 				error!(state.logger, "File upload failed"; "error" => %e, "path" => &path);
 				return HttpResponse::InternalServerError()
-					.json(FiletransferError::generic(&format!("Failed to upload file: {}", e)));
+					.json(ResultDetails::from_desc(format!("Failed to upload file: {}", e)));
 			}
 			Ok(Ok(r)) => r,
 		};
@@ -568,11 +559,12 @@ async fn upload_file(
 		}));
 		if let Err(e) = tokio::io::copy(&mut body_reader, &mut file_stream).await {
 			warn!(state.logger, "File upload aborted"; "error" => %e);
-			return HttpResponse::BadGateway().json(FiletransferError::generic(&format!("Upload failed: {}", e)));
+			return HttpResponse::BadGateway()
+				.json(ResultDetails::from_desc(format!("Upload failed: {}", e)));
 		}
-		HttpResponse::Ok().json(FiletransferError::generic("ok"))
+		HttpResponse::Ok().json(ResultDetails::ok())
 	} else {
-		HttpResponse::Gone().json(FiletransferError::gone())
+		HttpResponse::Gone().json(ResultDetails::gone())
 	}
 }
 
@@ -871,9 +863,7 @@ impl App {
 		}
 
 		if !args.browser {
-			tauri::AppBuilder::new()
-				.build()
-				.run();
+			tauri::AppBuilder::new().build().run();
 		} else {
 			let frontend_path = std::option_env!("FRONTEND_PATH").unwrap_or("../frontend/build/");
 			let is_production = std::option_env!("FRONTEND_PATH").is_some();
@@ -1201,7 +1191,7 @@ mod tests {
 			self.send(&MessageF2P::Connect(ConnectOptions {
 				address: "localhost".to_string(),
 				name: "Test".to_string(),
-				version: Version::Linux_3_X_X,
+				version: Some(Version::Linux_3_X_X),
 				..Default::default()
 			}))
 			.await?;

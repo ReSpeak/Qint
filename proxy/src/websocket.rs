@@ -17,14 +17,15 @@ use tsclientlib::events::Event as TsEvent;
 use tsclientlib::prelude::*;
 use tsclientlib::StreamItem as TsStreamItem;
 use tsclientlib::{
-	events, AudioEvent, ChannelId, ClientId, Connection, ConnectionStats, DisconnectOptions, Error as TsclError,
-	FileDownloadResult, FileUploadResult, FiletransferHandle, InMessage, MessageTarget, Uid,
+	events, AudioEvent, ChannelId, ClientId, Connection, ConnectionStats, DisconnectOptions,
+	Error as TsclError, FileDownloadResult, FileUploadResult, FiletransferHandle, InMessage,
+	MessageTarget, Uid,
 };
 use tsproto_packets::packets::{AudioData, OutCommand, OutPacket};
 use tsproto_types::crypto::EccKeyPubP256;
 
 use crate::db::{ChannelListMsg, ChatId, ChatType, SetClientVolumeMsg};
-use crate::messages::{self, MessageF2P, MessageP2F};
+use crate::messages::{self, MessageF2P, MessageP2F, ResultDetails};
 use crate::{audio, book_events, db, ConnectionId, State, Tristate, WsFormat, WsOptions};
 
 /// A websocket connection
@@ -66,6 +67,7 @@ pub(crate) struct SetChannelListMsgMsg(pub ChannelListMsg);
 pub(crate) struct DownloadFile {
 	pub channel: ChannelId,
 	pub path: String,
+	pub return_code: Option<String>,
 }
 
 pub(crate) struct UploadFile {
@@ -75,6 +77,7 @@ pub(crate) struct UploadFile {
 	pub size: u64,
 	pub overwrite: bool,
 	pub resume: bool,
+	pub return_code: Option<String>,
 }
 
 #[derive(Debug, Error)]
@@ -151,10 +154,7 @@ impl Message for UploadFile {
 }
 
 impl Ws {
-	pub fn new(
-		logger: Logger, state: Arc<State>, options: WsOptions, id: ConnectionId,
-	) -> Self
-	{
+	pub fn new(logger: Logger, state: Arc<State>, options: WsOptions, id: ConnectionId) -> Self {
 		let logger = logger.new(o!("id" => id.0.to_string()));
 		Self {
 			logger,
@@ -304,7 +304,8 @@ impl Ws {
 											id: JsPropertyId::ConnectionClientData(id),
 											prop: JsProperty::ConnectionClientData(info),
 											..
-										} = &mut e {
+										} = &mut e
+										{
 											if let Some(con) = &self.connection {
 												if let Ok(state) = con.get_state() {
 													if let Ok(stats) = con.get_network_stats() {
@@ -373,9 +374,11 @@ impl Ws {
 							self.send_message(
 								&MessageP2F::Result {
 									return_code: return_code.clone(),
-									ts_result: Some(e.id),
-									missing_permission: e.missing_permission_id,
-									description: None,
+									details: ResultDetails {
+										ts_result: Some(e.id),
+										missing_permission: e.missing_permission_id,
+										description: None,
+									},
 								},
 								ctx,
 							);
@@ -451,18 +454,8 @@ impl Ws {
 				}
 			}
 			TsStreamItem::MessageResult(handle, res) => {
-				let (ts_result, missing_permission) = if let Err(e) = res {
-					(Some(e.error), e.missing_permission)
-				} else {
-					(None, None)
-				};
 				self.send_message(
-					&MessageP2F::Result {
-						return_code: handle.0.to_string(),
-						ts_result,
-						missing_permission,
-						description: None,
-					},
+					&MessageP2F::Result { return_code: handle.0.to_string(), details: res.into() },
 					ctx,
 				);
 			}
@@ -483,7 +476,9 @@ impl Ws {
 		// TODO
 	}
 
-	fn fill_connection_info(info: &mut book_events::js_structs::ConnectionClientData, stats: &ConnectionStats) {
+	fn fill_connection_info(
+		info: &mut book_events::js_structs::ConnectionClientData, stats: &ConnectionStats,
+	) {
 		use tsclientlib::PacketStat;
 
 		// connected_time is missing, we do not know that
@@ -491,38 +486,63 @@ impl Ws {
 		info.ping = Some(stats.rtt.try_into().ok());
 		info.ping_deviation = Some(stats.rtt_dev.try_into().ok());
 
-		info.packets_sent_speech = Some(Some(u64::from(stats.total_packets[PacketStat::OutSpeech as usize])));
-		info.packets_sent_keepalive = Some(Some(u64::from(stats.total_packets[PacketStat::OutKeepalive as usize])));
-		info.packets_sent_control = Some(Some(u64::from(stats.total_packets[PacketStat::OutControl as usize])));
-		info.bytes_sent_speech = Some(Some(u64::from(stats.total_bytes[PacketStat::OutSpeech as usize])));
-		info.bytes_sent_keepalive = Some(Some(u64::from(stats.total_bytes[PacketStat::OutKeepalive as usize])));
-		info.bytes_sent_control = Some(Some(u64::from(stats.total_bytes[PacketStat::OutControl as usize])));
+		info.packets_sent_speech =
+			Some(Some(u64::from(stats.total_packets[PacketStat::OutSpeech as usize])));
+		info.packets_sent_keepalive =
+			Some(Some(u64::from(stats.total_packets[PacketStat::OutKeepalive as usize])));
+		info.packets_sent_control =
+			Some(Some(u64::from(stats.total_packets[PacketStat::OutControl as usize])));
+		info.bytes_sent_speech =
+			Some(Some(u64::from(stats.total_bytes[PacketStat::OutSpeech as usize])));
+		info.bytes_sent_keepalive =
+			Some(Some(u64::from(stats.total_bytes[PacketStat::OutKeepalive as usize])));
+		info.bytes_sent_control =
+			Some(Some(u64::from(stats.total_bytes[PacketStat::OutControl as usize])));
 
-		info.packets_received_speech = Some(Some(u64::from(stats.total_packets[PacketStat::InSpeech as usize])));
-		info.packets_received_keepalive = Some(Some(u64::from(stats.total_packets[PacketStat::InKeepalive as usize])));
-		info.packets_received_control = Some(Some(u64::from(stats.total_packets[PacketStat::InControl as usize])));
-		info.bytes_received_speech = Some(Some(u64::from(stats.total_bytes[PacketStat::InSpeech as usize])));
-		info.bytes_received_keepalive = Some(Some(u64::from(stats.total_bytes[PacketStat::InKeepalive as usize])));
-		info.bytes_received_control = Some(Some(u64::from(stats.total_bytes[PacketStat::InControl as usize])));
+		info.packets_received_speech =
+			Some(Some(u64::from(stats.total_packets[PacketStat::InSpeech as usize])));
+		info.packets_received_keepalive =
+			Some(Some(u64::from(stats.total_packets[PacketStat::InKeepalive as usize])));
+		info.packets_received_control =
+			Some(Some(u64::from(stats.total_packets[PacketStat::InControl as usize])));
+		info.bytes_received_speech =
+			Some(Some(u64::from(stats.total_bytes[PacketStat::InSpeech as usize])));
+		info.bytes_received_keepalive =
+			Some(Some(u64::from(stats.total_bytes[PacketStat::InKeepalive as usize])));
+		info.bytes_received_control =
+			Some(Some(u64::from(stats.total_bytes[PacketStat::InControl as usize])));
 
 		let bandwidth_last_second = stats.get_last_second_bytes();
-		info.bandwidth_sent_last_second_speech = Some(Some(u64::from(bandwidth_last_second[PacketStat::OutSpeech as usize])));
-		info.bandwidth_sent_last_second_keepalive = Some(Some(u64::from(bandwidth_last_second[PacketStat::OutKeepalive as usize])));
-		info.bandwidth_sent_last_second_control = Some(Some(u64::from(bandwidth_last_second[PacketStat::OutControl as usize])));
-		info.bandwidth_received_last_second_speech = Some(Some(u64::from(bandwidth_last_second[PacketStat::InSpeech as usize])));
-		info.bandwidth_received_last_second_keepalive = Some(Some(u64::from(bandwidth_last_second[PacketStat::InKeepalive as usize])));
-		info.bandwidth_received_last_second_control = Some(Some(u64::from(bandwidth_last_second[PacketStat::InControl as usize])));
+		info.bandwidth_sent_last_second_speech =
+			Some(Some(u64::from(bandwidth_last_second[PacketStat::OutSpeech as usize])));
+		info.bandwidth_sent_last_second_keepalive =
+			Some(Some(u64::from(bandwidth_last_second[PacketStat::OutKeepalive as usize])));
+		info.bandwidth_sent_last_second_control =
+			Some(Some(u64::from(bandwidth_last_second[PacketStat::OutControl as usize])));
+		info.bandwidth_received_last_second_speech =
+			Some(Some(u64::from(bandwidth_last_second[PacketStat::InSpeech as usize])));
+		info.bandwidth_received_last_second_keepalive =
+			Some(Some(u64::from(bandwidth_last_second[PacketStat::InKeepalive as usize])));
+		info.bandwidth_received_last_second_control =
+			Some(Some(u64::from(bandwidth_last_second[PacketStat::InControl as usize])));
 
 		let bandwidth_last_minute = stats.get_last_second_bytes();
-		info.bandwidth_sent_last_minute_speech = Some(Some(u64::from(bandwidth_last_minute[PacketStat::OutSpeech as usize])));
-		info.bandwidth_sent_last_minute_keepalive = Some(Some(u64::from(bandwidth_last_minute[PacketStat::OutKeepalive as usize])));
-		info.bandwidth_sent_last_minute_control = Some(Some(u64::from(bandwidth_last_minute[PacketStat::OutControl as usize])));
-		info.bandwidth_received_last_minute_speech = Some(Some(u64::from(bandwidth_last_minute[PacketStat::InSpeech as usize])));
-		info.bandwidth_received_last_minute_keepalive = Some(Some(u64::from(bandwidth_last_minute[PacketStat::InKeepalive as usize])));
-		info.bandwidth_received_last_minute_control = Some(Some(u64::from(bandwidth_last_minute[PacketStat::InControl as usize])));
+		info.bandwidth_sent_last_minute_speech =
+			Some(Some(u64::from(bandwidth_last_minute[PacketStat::OutSpeech as usize])));
+		info.bandwidth_sent_last_minute_keepalive =
+			Some(Some(u64::from(bandwidth_last_minute[PacketStat::OutKeepalive as usize])));
+		info.bandwidth_sent_last_minute_control =
+			Some(Some(u64::from(bandwidth_last_minute[PacketStat::OutControl as usize])));
+		info.bandwidth_received_last_minute_speech =
+			Some(Some(u64::from(bandwidth_last_minute[PacketStat::InSpeech as usize])));
+		info.bandwidth_received_last_minute_keepalive =
+			Some(Some(u64::from(bandwidth_last_minute[PacketStat::InKeepalive as usize])));
+		info.bandwidth_received_last_minute_control =
+			Some(Some(u64::from(bandwidth_last_minute[PacketStat::InControl as usize])));
 
 		info.server_to_client_packetloss_speech = Some(Some(stats.get_packetloss_s2c_speech()));
-		info.server_to_client_packetloss_keepalive = Some(Some(stats.get_packetloss_s2c_keepalive()));
+		info.server_to_client_packetloss_keepalive =
+			Some(Some(stats.get_packetloss_s2c_keepalive()));
 		info.server_to_client_packetloss_control = Some(Some(stats.get_packetloss_s2c_control()));
 		info.server_to_client_packetloss_total = Some(Some(stats.get_packetloss_s2c_total()));
 	}
@@ -703,20 +723,18 @@ impl Ws {
 								ctx,
 							);
 						}
-						Ok(state) => {
-							match change.to_packet(state) {
-								Ok(msg) => {
-									let _ = self.send_ts_message(msg, return_code.as_deref(), ctx);
-								}
-								Err(e) => {
-									self.send_error(
-										return_code.as_deref(),
-										format!("Failed to create packet for change: {}", e),
-										ctx,
-									);
-								}
+						Ok(state) => match change.to_packet(state) {
+							Ok(msg) => {
+								let _ = self.send_ts_message(msg, return_code.as_deref(), ctx);
 							}
-						}
+							Err(e) => {
+								self.send_error(
+									return_code.as_deref(),
+									format!("Failed to create packet for change: {}", e),
+									ctx,
+								);
+							}
+						},
 					}
 				}
 			}
@@ -737,9 +755,11 @@ impl Ws {
 			self.send_message(
 				&MessageP2F::Result {
 					return_code: code.into(),
-					ts_result: None,
-					missing_permission: None,
-					description: Some(error),
+					details: ResultDetails {
+						ts_result: None,
+						missing_permission: None,
+						description: Some(error),
+					},
 				},
 				ctx,
 			);
@@ -888,14 +908,14 @@ impl Ws {
 }
 
 impl Handler<DownloadFile> for Ws {
-	type Result = ResponseFuture<Result<(u64, TcpStream, EccKeyPubP256), Error>>;
+	type Result = ActorResponse<Self, (u64, TcpStream, EccKeyPubP256), Error>;
 	//type Error = Error;
 	fn handle(&mut self, msg: DownloadFile, _: &mut Self::Context) -> Self::Result {
 		if let Some(con) = &mut self.connection {
 			let public_key = match con.get_server_key() {
 				Ok(k) => k,
 				Err(e) => {
-					return Box::pin(futures::future::err(Error::NoUid(e)));
+					return ActorResponse::r#async(wrap_future(futures::future::err(Error::NoUid(e))));
 				}
 			};
 
@@ -903,24 +923,40 @@ impl Handler<DownloadFile> for Ws {
 			{
 				Ok(r) => r,
 				Err(e) => {
-					return Box::pin(futures::future::err(e.into()));
+					return ActorResponse::r#async(wrap_future(futures::future::err(e.into())));
 				}
 			};
+
 			let (send, recv) = oneshot::channel();
 			self.file_downloads.insert(handle, send);
-			Box::pin(recv.map(|r| match r {
-				Ok(Ok(r)) => Ok((r.size, r.stream, public_key)),
-				Ok(Err(e)) => Err(e.into()),
-				Err(e) => Err(e.into()),
+			ActorResponse::r#async(wrap_future(recv).map(|r, this: &mut Self, ctx| {
+				let result = match r {
+					Ok(Ok(r)) => Ok((r.size, r.stream, public_key)),
+					Ok(Err(e)) => Err(e.into()),
+					Err(e) => Err(e.into()),
+				};
+				if let Some(return_code) = msg.return_code {
+					this.send_message(
+						&MessageP2F::Result {
+							return_code,
+							details: (&result).try_into().unwrap_or_else(|e| {
+								ResultDetails::from_desc(format!("Download failed, {}", e))
+							}),
+						},
+						ctx,
+					);
+				}
+				result
 			}))
 		} else {
-			Box::pin(futures::future::err(Error::NoConnection))
+			ActorResponse::r#async(wrap_future(futures::future::err(Error::NoConnection)))
 		}
 	}
 }
 
 impl Handler<UploadFile> for Ws {
-	type Result = ResponseFuture<Result<TcpStream, Error>>;
+	type Result = ActorResponse<Self, TcpStream, Error>;
+
 	fn handle(&mut self, msg: UploadFile, _: &mut Self::Context) -> Self::Result {
 		if let Some(con) = &mut self.connection {
 			let handle = match con.upload_file(
@@ -933,18 +969,32 @@ impl Handler<UploadFile> for Ws {
 			) {
 				Ok(r) => r,
 				Err(e) => {
-					return Box::pin(futures::future::err(e.into()));
+					return ActorResponse::r#async(wrap_future(futures::future::err(e.into())));
 				}
 			};
 			let (send, recv) = oneshot::channel();
 			self.file_uploads.insert(handle, send);
-			Box::pin(recv.map(|r| match r {
-				Ok(Ok(r)) => Ok(r.stream),
-				Ok(Err(e)) => Err(e.into()),
-				Err(e) => Err(e.into()),
+			ActorResponse::r#async(wrap_future(recv).map(|r, this: &mut Self, ctx| {
+				let result = match r {
+					Ok(Ok(r)) => Ok(r.stream),
+					Ok(Err(e)) => Err(e.into()),
+					Err(e) => Err(e.into()),
+				};
+				if let Some(return_code) = msg.return_code {
+					this.send_message(
+						&MessageP2F::Result {
+							return_code,
+							details: (&result).try_into().unwrap_or_else(|e| {
+								ResultDetails::from_desc(format!("Upload failed, {}", e))
+							}),
+						},
+						ctx,
+					);
+				}
+				result
 			}))
 		} else {
-			Box::pin(futures::future::err(Error::NoConnection))
+			ActorResponse::r#async(wrap_future(futures::future::err(Error::NoConnection)))
 		}
 	}
 }
@@ -1152,7 +1202,10 @@ impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for Ws {
 					Ok(r) => r,
 					Err(e) => {
 						error!(self.logger, "json deserializing error"; "error" => %e);
-						self.send_message(&MessageP2F::Error(format!("json deserializing error: {}", e)), ctx);
+						self.send_message(
+							&MessageP2F::Error(format!("json deserializing error: {}", e)),
+							ctx,
+						);
 						return;
 					}
 				};
@@ -1163,7 +1216,10 @@ impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for Ws {
 					Ok(r) => r,
 					Err(e) => {
 						error!(self.logger, "msgpack deserializing error"; "error" => %e);
-						self.send_message(&MessageP2F::Error(format!("msgpack deserializing error: {}", e)), ctx);
+						self.send_message(
+							&MessageP2F::Error(format!("msgpack deserializing error: {}", e)),
+							ctx,
+						);
 						return;
 					}
 				};

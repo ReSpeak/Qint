@@ -1,7 +1,7 @@
 // tslint:disable: interface-name
 
 import { ClientId } from "../ts";
-import { Error, InMessage, OChange, PropertyId, PropertyValue, Reason, Version } from "../book_events";
+import { InMessage, OChange, PropertyId, PropertyValue, Reason, Version, TsError } from "../book_events";
 
 export type WsMessageTarget =
 	"Server"
@@ -95,7 +95,7 @@ interface InDisconnected {
 }
 
 interface InMsgError {
-	Error: Error;
+	Error: TsError;
 }
 
 interface InTalkersChanged {
@@ -115,7 +115,7 @@ interface InLoudness {
 }
 
 export interface ResultDetails {
-	tsResult?: string;
+	tsResult?: TsError;
 	missingPermission?: number;
 	description?: string;
 }
@@ -128,7 +128,7 @@ export interface InResult {
 
 export interface Invoker {
 	name: string;
-	id: number;
+	id: number; // TODO string ??
 	uid: string | undefined;
 }
 

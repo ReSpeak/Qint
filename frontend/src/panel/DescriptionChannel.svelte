@@ -41,8 +41,10 @@
 	}
 
 	// THIS IS NOT A FULL CHANNEL OBJECT
-	type EditProps = Omit<RequiredNN<Channel>,
-		"description" | "isUnencrypted" | "deleteDelay" | "channelType" | "isDefault"> & {
+	type EditProps = Omit<
+		RequiredNN<Channel>,
+		"description" | "isUnencrypted" | "deleteDelay" | "channelType" | "isDefault"
+	> & {
 		_description: string;
 		_isEncrypted: boolean;
 		_deleteDelay: Duration;
@@ -213,9 +215,7 @@
 			<span>Topic:</span>
 			{#if editing}
 				<input class="input" type="text" bind:value={chanEdit.topic} />
-			{:else}
-				{$channel.topic ?? ''}
-			{/if}
+			{:else}{$channel.topic ?? ''}{/if}
 		</div>
 		{#if editing}
 			<div class="dataLine">
@@ -305,7 +305,9 @@
 				{#if descRequestResult !== undefined}
 					<span style="color: red;">Missing permission</span>
 				{:else}
-					<RenderedText {connection} text={$channel.optionalData?.descriptionRendered ?? ''} />
+					<RenderedText
+						{connection}
+						text={$channel.optionalData?.descriptionRendered ?? ''} />
 				{/if}
 			{/await}
 		{/if}

@@ -5,9 +5,19 @@ import { get } from "svelte/store";
 import { app } from "./app";
 import { BUILD_ENV, BUILD_DAT } from "./util";
 import { ConnectData } from "./connect/connect";
+import debug from "debug";
+
+if (localStorage.getItem("debug") === null)
+	debug.enable("error:*");
+
+if ("qint" in window) {
+	// For snowpack hot reload: Disconnect previous connections
+	(window as any).qint.close();
+}
 
 (window as any).qint = app; // DEBUG
 (window as any).get = get; // DEBUG
+(window as any).debug = debug; // DEBUG
 console.log("BUILD", BUILD_ENV, BUILD_DAT);
 
 window.onbeforeunload = function (e: any) {

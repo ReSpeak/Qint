@@ -8,7 +8,8 @@ import { IPlugin } from "./plugins";
 import { ClientId } from "./ts";
 import { InMessage, Reason } from "./book_events";
 import { getClientIconPath } from "./ui/clientIcon";
-import { base64Decode } from "./util";
+import debug from "debug";
+const error = debug("error:NTFY");
 
 type NotificationArg = Book | Channel | Client | Invoker | Server | ServerGroup | string | null | undefined;
 
@@ -98,7 +99,7 @@ export function handleMessage(con: Connection, msg: InMsg, plugins: IPlugin[]) {
 			handler(con, msg, notif`Error`);
 		}
 	} catch (e) {
-		console.error("Failed to create notification for message", e);
+		error("Failed to create notification for message", e);
 	}
 }
 
@@ -404,7 +405,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHand
 			}
 		}
 	} catch (e) {
-		console.error("Failed to create notification for event", e);
+		error("Failed to create notification for event", e);
 	}
 }
 
@@ -421,7 +422,7 @@ function handleInMessage(con: Connection, msg: InMessage, handler: NotificationH
 			}
 		}
 	} catch (e) {
-		console.error("Failed to create notification for message", e);
+		error("Failed to create notification for message", e);
 	}
 }
 

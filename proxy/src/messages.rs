@@ -1,5 +1,7 @@
+use core::convert::TryFrom;
 use serde::{Deserialize, Serialize};
-use tsclientlib::{ClientId, DisconnectOptions, MessageTarget, Permission, TsError, Version};
+use tsclientlib::{ClientId, CommandError, DisconnectOptions, MessageTarget, Permission, TsError, Version, Error as TsclError};
+use super::websocket::{Error as WsError};
 
 use crate::book_events::{
 	deserialize_id, deserialize_some_u64, serialize_id, serialize_some_u64, JsEvent, JsInMessage,
@@ -71,14 +73,21 @@ pub enum MessageP2F {
 	Result {
 		#[serde(rename = "returnCode")]
 		return_code: String,
-		#[serde(default, rename = "tsResult", skip_serializing_if = "Option::is_none")]
-		ts_result: Option<TsError>,
-		#[serde(default, rename = "missingPermission", skip_serializing_if = "Option::is_none")]
-		missing_permission: Option<Permission>,
-		/// Description for non-ts errors
-		#[serde(default, skip_serializing_if = "Option::is_none")]
-		description: Option<String>,
+		#[serde(flatten)]
+		details: ResultDetails,
 	},
+}
+
+#[derive(Debug, Default, Serialize)]
+#[cfg_attr(test, derive(Deserialize))]
+#[serde(rename_all = "camelCase")]
+pub struct ResultDetails {
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub ts_result: Option<TsError>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub missing_permission: Option<Permission>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub description: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -139,6 +148,56 @@ impl Into<MessageTarget> for JsMessageTarget {
 			Self::Channel => MessageTarget::Channel,
 			Self::Client(id) => MessageTarget::Client(id),
 			Self::Poke(id) => MessageTarget::Poke(id),
+		}
+	}
+}
+
+impl ResultDetails {
+	pub fn ok() -> Self {
+		Self { ts_result: Some(TsError::Ok), ..Default::default() }
+	}
+	pub fn from_desc(error: String) -> Self {
+		Self { description: Some(error), ..Default::default() }
+	}
+}
+
+impl<'a, T> TryFrom<&'a Result<T, WsError>> for ResultDetails {
+	type Error = &'a WsError;
+	fn try_from(err: &'a Result<T, WsError>) -> Result<Self, &'a WsError> {
+		if let Err(wserr) = err {
+			if let WsError::TsError(TsclError::CommandError(ceerr)) = wserr {
+				Ok(ceerr.into())
+			} else {
+				Err(wserr)
+			}
+		} else {
+			Ok(Self::ok())
+		}
+	}
+}
+
+impl From<CommandError> for ResultDetails {
+	fn from(err: CommandError) -> Self {
+		(&err).into()
+	}
+}
+
+impl From<&CommandError> for ResultDetails {
+	fn from(err: &CommandError) -> Self {
+		Self {
+			ts_result: Some(err.error),
+			missing_permission: err.missing_permission,
+			description: None
+		}
+	}
+}
+
+impl<T> From<Result<T, CommandError>> for ResultDetails {
+	fn from(err: Result<T, CommandError>) -> Self {
+		if let Err(err) = err {
+			err.into()
+		} else {
+			Self::ok()
 		}
 	}
 }
