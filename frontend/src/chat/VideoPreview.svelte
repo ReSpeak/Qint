@@ -2,7 +2,7 @@
 	import Icon from "../ui/Icon.svelte";
 	import { HTML5VideoControl, SyncState, YoutubeVideoControl } from "./videoSync";
 	import type { IVideoControl } from "./videoSync";
-	import { onDestroy, onMount } from "svelte";
+	import { onDestroy, onMount, tick } from "svelte";
 	import type { NodeSelection } from "../app";
 	import { assert, youtubeUrlRegex } from "../util";
 	import type { EmbedTypes } from "./previewAnalyzer";
@@ -11,6 +11,7 @@
 	export let nodeSel: NodeSelection;
 	export let embed: EmbedTypes | undefined;
 
+	let preview_only = true;
 	let html5videoElem: HTMLVideoElement | undefined;
 	let youtubeVideoElem: HTMLIFrameElement | undefined;
 	let videoControl: IVideoControl | undefined | null;
@@ -42,7 +43,12 @@
 		return videoControl;
 	}
 
-	function toggleVSync() {
+	async function toggleVSync() {
+		if (preview_only) {
+			preview_only = false;
+			await tick();
+		}
+
 		if (vSync === undefined) {
 			const _videoControl = getVideoControl();
 			if (_videoControl === null) return;
@@ -70,16 +76,27 @@
 			Your browser does not support the video tag.
 		</video>
 	{:else if detectedType === 'youtube'}
-		<iframe
-			bind:this={youtubeVideoElem}
-			title="Youtube Video"
-			type="text/html"
-			width="640"
-			height="390"
-			src="https://www.youtube.com/embed/{video_key}?enablejsapi=1&rel=0&modestbranding=1&playsinline=1&controls=0"
-			frameborder="0"
-			allowfullscreen
-			playsinline />
+		{#if preview_only}
+			<img
+				class="fixedSize"
+				width="640"
+				height="390"
+				src="https://i.ytimg.com/vi/{video_key}/mqdefault.jpg"
+				alt="Click to load video"
+				on:click={() => (preview_only = false)} />
+		{:else}
+			<iframe
+				bind:this={youtubeVideoElem}
+				class="fixedSize"
+				title="Youtube Video"
+				type="text/html"
+				width="640"
+				height="390"
+				src="https://www.youtube.com/embed/{video_key}?enablejsapi=1&rel=0&modestbranding=1&playsinline=1&controls=1&autoplay=1"
+				frameborder="0"
+				allowfullscreen
+				playsinline />
+		{/if}
 	{/if}
 	<div class="videoTools">
 		<button
@@ -141,5 +158,10 @@
 
 	.syncOn {
 		background-color: $info;
+	}
+
+	.fixedSize {
+		width: 640px;
+		height: 390px;
 	}
 </style>
