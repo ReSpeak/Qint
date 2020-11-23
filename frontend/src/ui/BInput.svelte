@@ -8,7 +8,7 @@
 	export let value: string;
 	export let enterToSubmit = true;
 
-	const submitDispatch = createEventDispatcher<{ submit: undefined }>();
+	const dispatch = createEventDispatcher<{ submit: undefined; structureChanged: undefined }>();
 	let setValue: string | undefined;
 	let self: HTMLElement;
 	let expectQuickPaste = false;
@@ -38,8 +38,13 @@
 		if (tmp.endsWith("\n")) tmp = tmp.substring(0, tmp.length - 1);
 		setValue = tmp;
 		value = tmp;
-		hasContent = self.childNodes.length > 0;
-		log("value %s %o", value, getStructuredView());
+		hasContent =
+			self.childNodes.length > 0 &&
+			!(
+				self.childNodes.length === 1 &&
+				(self.childNodes[0] as HTMLElement)?.tagName === "BR"
+			);
+		dispatch("structureChanged");
 	}
 
 	export function getStructuredView(): StructuredData {
@@ -91,7 +96,7 @@
 
 	function onChatKeyDown(e: KeyboardEvent) {
 		if (enterToSubmit && e.key === "Enter" && !e.shiftKey && !e.ctrlKey) {
-			submitDispatch("submit");
+			dispatch("submit");
 			e.preventDefault();
 		}
 		expectQuickPaste = e.key.toLowerCase() === "v" && e.shiftKey && e.ctrlKey;
@@ -114,6 +119,7 @@
 		// processing clipboard data and inserting it
 		if (types.has("text/plain")) {
 			const text_plain = clipboardData.getData("text/plain");
+			log("pasting as text: %s", text_plain);
 			document.execCommand("insertText", false, text_plain);
 		} else if (types.has("image/png")) {
 			let hasHtmlNode = false;
@@ -123,7 +129,7 @@
 				const domparser = new DOMParser();
 				const dom = domparser.parseFromString(text_html, "text/html");
 				const domImg = dom.querySelector("img");
-				log("pasting as html", domImg);
+				log("pasting as html %o", domImg);
 				if (domImg !== null && domImg.src) {
 					const imgHtml = `<img src="${escapeHtml(domImg.src)}"/>`;
 					document.execCommand("insertHtml", false, imgHtml);
@@ -165,7 +171,7 @@
 		textChanged();
 
 		if (expectQuickPaste) {
-			submitDispatch("submit");
+			dispatch("submit");
 		}
 	}
 
