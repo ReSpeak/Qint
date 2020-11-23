@@ -16,7 +16,7 @@
 	import { getClientAvatarPath } from "../ui/clientIcon";
 	import { Reason } from "../book_events";
 	import { onMount } from "svelte";
-	import { NARROW_NO_BREAK_SPACE } from "../util";
+	import { NARROW_NO_BREAK_SPACE, on } from "../util";
 	import { Client } from "../book";
 	import BModal from "../ui/BModal.svelte";
 	import { tick } from "svelte";
@@ -65,27 +65,6 @@
 		},
 		options: {
 			scales: {
-				xAxes: [{
-					type: "realtime",
-					time: {
-						minUnit: "second",
-						unit: "second",
-						stepSize: 10,
-						displayFormats: {
-							second: "X",
-							minute: "X",
-							hour: "X",
-							day: "X"
-						}
-					},
-					ticks: {
-						callback: function(value) {
-							let seconds = moment().diff(moment(value, "X"), "seconds");
-							if (seconds < 1) return "0";
-							return `${seconds}s`;
-						}
-					}
-				}],
 				yAxes: [{
 					ticks: {
 						beginAtZero: true,
@@ -98,20 +77,13 @@
 				}, {
 					ticks: {
 						beginAtZero: true,
-						suggestedMax: 1,
+						suggestedMax: 5,
 						maxTicksLimit: 5,
 						callback: function(value) {
-							return `${Number(value) * 100}%`;
+							return `${Number(value)}%`;
 						}
 					}
 				}]
-			},
-			plugins: {
-				streaming: {
-					duration: 60000,
-					onRefresh: chartRefresh,
-					frameRate: 1
-				}
 			}
 		}
 	};
@@ -143,6 +115,11 @@
 		});
 	}
 
+	function clearChartData() {
+		console.log("clear");
+		chartConfig.data?.datasets?.forEach(ds => ds.data = []);
+	}
+
 	function createDataPoint(value: number | undefined): Chart.ChartPoint {
 		return {
 			x: Date.now(),
@@ -152,14 +129,15 @@
 
 	function packetLossToPercent(loss01: number | null | undefined): number | undefined {
 		if (!loss01) return undefined;
-		if (loss01 < 0.01) return undefined; // makes the chart look nicer
-		return loss01 * 100;
+		return loss01 * 100 * 100;
 	}
 
-	function chartRefresh(chart: Chart) {
-		chart.data.datasets![0].data!.push(createDataPoint(client.connectionData ? client.connectionData.ping?.asMilliseconds() : undefined));
-		chart.data.datasets![1].data!.push(createDataPoint(packetLossToPercent(client.connectionData?.clientToServerPacketlossTotal)));
-		chart.data.datasets![2].data!.push(createDataPoint(packetLossToPercent(client.connectionData?.serverToClientPacketlossTotal)));
+	function chartRefresh() {
+		console.log("bef");
+		chartConfig.data?.datasets![0].data?.push(createDataPoint(client.connectionData ? client.connectionData.ping?.asMilliseconds() : undefined));
+		chartConfig.data?.datasets![1].data?.push(createDataPoint(packetLossToPercent(client.connectionData?.clientToServerPacketlossTotal)));
+		chartConfig.data?.datasets![2].data?.push(createDataPoint(packetLossToPercent(client.connectionData?.serverToClientPacketlossTotal)));
+		console.log("after");
 	}
 
 	function changeServerGroup(e: Event, group: ServerGroupId, isMember: boolean) {
@@ -217,6 +195,7 @@
 	}
 
 	async function updateClientInfo() {
+		chartRefresh();
 		await connection
 			.sendChange({
 				ClientConnectionInfoRequest: {
