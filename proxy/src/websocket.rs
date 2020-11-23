@@ -25,7 +25,7 @@ use tsproto_packets::packets::{AudioData, OutCommand, OutPacket};
 use tsproto_types::crypto::EccKeyPubP256;
 
 use crate::db::{ChannelListMsg, ChatId, ChatType, SetClientVolumeMsg};
-use crate::messages::{self, MessageF2P, MessageP2F, ResultDetails};
+use crate::messages::{self, MessageF2P, MessageP2F, ResultDetails, ResultStruct};
 use crate::{audio, book_events, db, ConnectionId, State, Tristate, WsFormat, WsOptions};
 
 /// A websocket connection
@@ -372,14 +372,14 @@ impl Ws {
 					for e in error.iter() {
 						if let Some(return_code) = &e.return_code {
 							self.send_message(
-								&MessageP2F::Result {
+								&MessageP2F::Result(ResultStruct {
 									return_code: return_code.clone(),
 									details: ResultDetails {
 										ts_result: Some(e.id),
 										missing_permission: e.missing_permission_id,
 										description: None,
 									},
-								},
+								}),
 								ctx,
 							);
 						}
@@ -400,12 +400,10 @@ impl Ws {
 				let id = (self.id, from);
 				self.send_to_ts2a(audio::ts_to_audio::PlayMsg(id, audio));
 			}
-			TsStreamItem::AudioChange(change) => {
-				match change {
-					AudioEvent::CanSendAudio(can) => self.set_audio_input_active(ctx, can),
-					AudioEvent::CanReceiveAudio(can) => self.set_audio_output_active(ctx, can),
-				}
-			}
+			TsStreamItem::AudioChange(change) => match change {
+				AudioEvent::CanSendAudio(can) => self.set_audio_input_active(ctx, can),
+				AudioEvent::CanReceiveAudio(can) => self.set_audio_output_active(ctx, can),
+			},
 			TsStreamItem::IdentityLevelIncreased => {
 				if let Some(con) = &self.connection {
 					let event =
@@ -455,7 +453,10 @@ impl Ws {
 			}
 			TsStreamItem::MessageResult(handle, res) => {
 				self.send_message(
-					&MessageP2F::Result { return_code: handle.0.to_string(), details: res.into() },
+					&MessageP2F::Result(ResultStruct {
+						return_code: handle.0.to_string(),
+						details: res.into(),
+					}),
 					ctx,
 				);
 			}
@@ -753,14 +754,14 @@ impl Ws {
 	) {
 		if let Some(code) = return_code {
 			self.send_message(
-				&MessageP2F::Result {
+				&MessageP2F::Result(ResultStruct {
 					return_code: code.into(),
 					details: ResultDetails {
 						ts_result: None,
 						missing_permission: None,
 						description: Some(error),
 					},
-				},
+				}),
 				ctx,
 			);
 		} else {
@@ -909,13 +910,14 @@ impl Ws {
 
 impl Handler<DownloadFile> for Ws {
 	type Result = ActorResponse<Self, (u64, TcpStream, EccKeyPubP256), Error>;
-	//type Error = Error;
 	fn handle(&mut self, msg: DownloadFile, _: &mut Self::Context) -> Self::Result {
 		if let Some(con) = &mut self.connection {
 			let public_key = match con.get_server_key() {
 				Ok(k) => k,
 				Err(e) => {
-					return ActorResponse::r#async(wrap_future(futures::future::err(Error::NoUid(e))));
+					return ActorResponse::r#async(wrap_future(futures::future::err(
+						Error::NoUid(e),
+					)));
 				}
 			};
 
@@ -937,12 +939,12 @@ impl Handler<DownloadFile> for Ws {
 				};
 				if let Some(return_code) = msg.return_code {
 					this.send_message(
-						&MessageP2F::Result {
+						&MessageP2F::Result(ResultStruct {
 							return_code,
 							details: (&result).try_into().unwrap_or_else(|e| {
 								ResultDetails::from_desc(format!("Download failed, {}", e))
 							}),
-						},
+						}),
 						ctx,
 					);
 				}
@@ -956,7 +958,6 @@ impl Handler<DownloadFile> for Ws {
 
 impl Handler<UploadFile> for Ws {
 	type Result = ActorResponse<Self, TcpStream, Error>;
-
 	fn handle(&mut self, msg: UploadFile, _: &mut Self::Context) -> Self::Result {
 		if let Some(con) = &mut self.connection {
 			let handle = match con.upload_file(
@@ -982,12 +983,12 @@ impl Handler<UploadFile> for Ws {
 				};
 				if let Some(return_code) = msg.return_code {
 					this.send_message(
-						&MessageP2F::Result {
+						&MessageP2F::Result(ResultStruct {
 							return_code,
 							details: (&result).try_into().unwrap_or_else(|e| {
 								ResultDetails::from_desc(format!("Upload failed, {}", e))
 							}),
-						},
+						}),
 						ctx,
 					);
 				}

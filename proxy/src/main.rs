@@ -958,7 +958,7 @@ mod tests {
 	use rand::Rng;
 
 	use juniper::http::GraphQLRequest;
-	use tsclientlib::{ClientId, Version};
+	use tsclientlib::ClientId;
 
 	use super::*;
 	use messages::{ConnectOptions, JsMessageTarget, MessageF2P, MessageP2F};
@@ -994,7 +994,7 @@ mod tests {
 		async fn create_connection(&self) -> Result<Connection> {
 			let client = awc::Client::default();
 			let id = Uuid::new_v4();
-			let url = format!("ws://127.0.0.1:{}/con/{}/ws?format=Msgpack", self.port, id);
+			let url = format!("ws://127.0.0.1:{}/con/{}/ws?format=Json", self.port, id);
 			info!(self.logger, "Connecting to proxy"; "url" => &url);
 			let (_resp, socket) = client
 				.ws(url)
@@ -1191,7 +1191,6 @@ mod tests {
 			self.send(&MessageF2P::Connect(ConnectOptions {
 				address: "localhost".to_string(),
 				name: "Test".to_string(),
-				version: Some(Version::Linux_3_X_X),
 				..Default::default()
 			}))
 			.await?;
@@ -1208,7 +1207,7 @@ mod tests {
 		async fn send(&mut self, msg: &MessageF2P) -> Result<()> {
 			println!("Sending message to proxy: {}", serde_json::to_string(msg).unwrap());
 			self.socket
-				.send(ws::Message::Binary(rmp_serde::to_vec(msg)?.into()))
+				.send(ws::Message::Text(serde_json::to_string(msg)?))
 				.await
 				.map_err(|e| format_err!("Websocket client protocol error: {:?}", e))?;
 			Ok(())
@@ -1217,6 +1216,9 @@ mod tests {
 		async fn recv(&mut self) -> Result<MessageP2F> {
 			match self.socket.next().await {
 				Some(Ok(ws::Frame::Binary(msg))) => Ok(rmp_serde::from_read_ref(msg.as_ref())?),
+				Some(Ok(ws::Frame::Text(msg))) => {
+					Ok(serde_json::from_str(std::str::from_utf8(&msg)?)?)
+				}
 				f => bail!("Websocket client received unexpected packet: {:?}", f),
 			}
 		}

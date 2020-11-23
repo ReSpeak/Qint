@@ -144,6 +144,10 @@ pub mod js_structs {
 	use super::{serialize_some_date_time, serialize_some_duration, serialize_some_id,
 		serialize_some_set_id, serialize_some_some_duration, serialize_some_some_id,
 		serialize_some_some_u64, serialize_some_u64};
+	#[cfg(test)]
+	use super::{deserialize_some, deserialize_some_date_time, deserialize_some_duration,
+		deserialize_some_id, deserialize_some_set_id, deserialize_some_some_duration,
+		deserialize_some_some_id, deserialize_some_some_u64, deserialize_some_u64};
 
 <# for struc in &structs { #>
 #[derive(Debug, Default, Serialize)]
