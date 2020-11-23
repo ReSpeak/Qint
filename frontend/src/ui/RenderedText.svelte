@@ -2,7 +2,7 @@
 	import katex from "katex";
 	import { hljsHighlight } from "./hljs";
 	import { onMount } from "svelte";
-	import { parseScheme, schemeToLink } from "./renderedTextDecl";
+	import { parseTsScheme, schemeToLink } from "./renderedTextDecl";
 	import type { LinksMap } from "./renderedTextDecl";
 	import type { Connection } from "../connection";
 
@@ -55,12 +55,15 @@
 		for (const img of obj.querySelectorAll("img")) {
 			const src = img.src;
 			if (!src) continue;
-			const proxyFileSrc = schemeToLink(connection, parseScheme(src));
-			if (proxyFileSrc === null) {
-				img.parentElement?.removeChild(img);
-				continue;
-			} else {
-				img.src = proxyFileSrc;
+			const scheme = parseTsScheme(src);
+			if (scheme !== null) {
+				const proxyFileSrc = schemeToLink(connection, scheme);
+				if (proxyFileSrc === null) {
+					img.parentElement?.removeChild(img);
+					continue;
+				} else {
+					img.src = proxyFileSrc;
+				}
 			}
 		}
 

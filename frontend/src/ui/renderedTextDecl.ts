@@ -32,7 +32,7 @@ type Ts3ImageAtt = {
 	path: string
 }
 
-export function parseScheme(url: string): Ts3Scheme | null {
+export function parseTsScheme(url: string): Ts3Scheme | null {
 	const m = ts3Scheme.exec(url);
 	if (m === null) return null;
 	const schemeStr = m[1];
@@ -63,9 +63,8 @@ export function parseScheme(url: string): Ts3Scheme | null {
 	return null;
 }
 
-export function schemeToLink(con: Connection, scheme: Ts3Scheme | null): string | null {
-	if (scheme !== null
-		&& scheme.attrs.path) {
+export function schemeToLink(con: Connection, scheme: Ts3Scheme): string | null {
+	if (scheme.attrs.path) {
 		if (scheme.scheme === "ts3file") {
 			return `${con.backend.serverFileSrc}/file/${scheme.attrs.channel}${pathJoin(scheme.attrs.path, scheme.attrs.filename ?? "")}`;
 		} else if (scheme.scheme === "ts3image") {
