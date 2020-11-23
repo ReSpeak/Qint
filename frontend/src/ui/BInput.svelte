@@ -130,7 +130,7 @@
 				const dom = domparser.parseFromString(text_html, "text/html");
 				const domImg = dom.querySelector("img");
 				log("pasting as html %o", domImg);
-				if (domImg !== null && domImg.src) {
+				if (domImg !== null && domImg.src && !domImg.src.startsWith("file://")) {
 					const imgHtml = `<img src="${escapeHtml(domImg.src)}"/>`;
 					document.execCommand("insertHtml", false, imgHtml);
 					hasHtmlNode = true;
