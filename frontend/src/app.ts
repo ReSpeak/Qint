@@ -2,12 +2,13 @@ import { Writable, writable, get } from "svelte/store";
 import { Chat } from "./chat/chat";
 import { ITreeNode } from "./book";
 import { Connection } from "./connection";
-import { TransientSettings } from "./transientSettings";
+import { TransientSettings, DescriptionMode } from "./transientSettings";
 import { loadPlugins, IPlugin } from "./plugins";
 import { backend } from "./backend/backend";
-import { oneshot } from "./util";
+import { fnBroadcast, oneshot } from "./util";
 import { ConnectData } from "./connect/connect";
 import { DisplayPanel } from "./panel/panel";
+import { getIconPath } from "./ui/clientIcon";
 
 export class App {
 	public readonly connections: Writable<Connection[]> = writable([]);
@@ -24,17 +25,23 @@ export class App {
 	public readonly chat: Chat = new Chat(this.selectedNode);
 	public readonly transientSettings: TransientSettings = new TransientSettings();
 	public plugins: IPlugin[] = [];
+	public transientSettingsLoaded = fnBroadcast();
 
 	constructor() {
 		loadPlugins().then(x => this.plugins = x);
-		this.transientSettings.loadAsync(); // Async !!!!
+		this.transientSettings.loadAsync().then(_ => {
+			this.transientSettingsLoaded();
+		});
 		// TODO unsubscribe somewhere
 		this.selectedNode.subscribe(s => {
 			if (s !== undefined) {
-				const name = s.connection.book.server.name ?? s.connection.connectOptions.address;
+				const name = s.connection.book.server.name ?? get(s.connection.connectOptions).address;
 				backend.setTitle(name + " – Qint");
+				const iconPath = getIconPath(s.connection.book.server, s.connection);
+				backend.setIcon(iconPath);
 			} else {
 				backend.setTitle("Qint");
+				backend.setIcon(undefined);
 			}
 		});
 	}
@@ -63,7 +70,19 @@ export class App {
 		});
 	}
 
+	public setDescriptionMode(selected: NodeSelection, mode: DescriptionMode) {
+		app.selectNode(selected);
+		this.transientSettings.ui._descriptionMode.set(mode);
+		app.transientSettings.save("ui");
+	}
+
 	public connect(options: ConnectData): Connection {
+		if (options.inputMuted !== undefined)
+			this.transientSettings.ui.defaultInputMuted = options.inputMuted;
+		if (options.outputMuted !== undefined)
+			this.transientSettings.ui.defaultOutputMuted = options.outputMuted;
+		this.transientSettings.save("ui");
+
 		const con = new Connection(options);
 		oneshot(con.state, s => s.closed, () => {
 			this.connections.update(cs => {
@@ -82,6 +101,12 @@ export class App {
 		});
 		this.showSidebar.set(true);
 		return con;
+	}
+
+	public close() {
+		for (const con of get(this.connections)) {
+			con.close();
+		}
 	}
 }
 

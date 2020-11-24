@@ -1,4 +1,3 @@
-import { dataset_dev } from "svelte/internal";
 import { backend } from "../backend/backend";
 import { GraphQlClient } from "../book";
 // TODO Move to a common place

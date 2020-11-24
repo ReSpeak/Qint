@@ -13,14 +13,14 @@
 	<ServerName {connection} />
 </div>
 {#if server.hostmessageRendered && server.hostmessageRendered.length > 0}
-<div class="description">
-	<RenderedText text={server.hostmessageRendered} />
-</div>
+	<div class="description">
+		<RenderedText {connection} text={server.hostmessageRendered} />
+	</div>
 {/if}
 {#if server.welcomeMessageRendered && server.welcomeMessageRendered.length > 0}
-<div class="description">
-	<RenderedText text={server.welcomeMessageRendered} />
-</div>
+	<div class="description">
+		<RenderedText {connection} text={server.welcomeMessageRendered} />
+	</div>
 {/if}
 <ConnectionSettings {connection} />
 

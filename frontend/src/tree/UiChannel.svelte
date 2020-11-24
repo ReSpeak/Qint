@@ -10,13 +10,14 @@
 	import UiClient from "./UiClientWrap.svelte";
 	import UiChannel from "./UiChannelWrap.svelte";
 	import { Connection } from "../connection";
-	import { draggable, DragData } from "../ui/draggable";
+	import { draggable, DragData, MouseButton } from "../ui/draggable";
 	import { findParent, assert, flash, render_updates } from "../util";
 	import { SpacerType } from "./tree";
 	import { app, NodeSelection } from "../app";
 	import { ChannelType } from "../book_events";
 	import HoverMenu from "./HoverMenu.svelte";
 	import { DelayedHover } from "./delayedHover";
+	import { DescriptionMode } from "../transientSettings";
 
 	if (render_updates) afterUpdate(() => flash(div));
 
@@ -64,7 +65,7 @@
 		filterStartFromRoot: boolean,
 		channel: Channel,
 		channels: ITreeNode[],
-		clients: ITreeNode[],
+		clients: ITreeNode[]
 	) {
 		const children = channels.concat(clients);
 		assert(filter != null, "filter is null");
@@ -99,17 +100,29 @@
 		}
 	}
 
-	async function switchChannel() {
-		if (connection !== undefined) {
-			const res = await connection.switchChannel(channel);
-			if (res !== undefined) {
-				console.log("Failed to switch channel", res);
-			}
+	async function switchChannel(ev: MouseEvent) {
+		if (connection === undefined) return;
+		if (ev.button !== MouseButton.Main) return;
+		const res = await connection.switchChannel(channel);
+		if (res !== undefined) {
+			console.log("Failed to switch channel", res);
 		}
 	}
 
-	function setChat() {
-		if (connection !== undefined) app.select(connection, channel);
+	function preventScrollClick(ev: MouseEvent): any {
+		if (ev.button === MouseButton.Auxiliary) {
+			ev.preventDefault();
+			return false;
+		}
+	}
+
+	function setChat(ev: MouseEvent) {
+		if (connection === undefined) return;
+		if (ev.button === MouseButton.Main) {
+			app.setDescriptionMode(new NodeSelection(connection, channel), DescriptionMode.Info);
+		} else if (ev.button === MouseButton.Auxiliary) {
+			app.setDescriptionMode(new NodeSelection(connection, channel), DescriptionMode.Files);
+		}
 	}
 
 	function dragStart(ev: CustomEvent<DragData>) {
@@ -127,7 +140,6 @@
 			...ev.detail.customData.querySelectorAll(":hover"),
 		].reverse();
 		const dropTarget = hoverOpt.find((x) => x.dataset.type === "channel");
-		console.log(hoverOpt, dropTarget);
 		if (dropTarget !== undefined && connection !== undefined) {
 			const rect = dropTarget.getBoundingClientRect();
 			let clickY = ev.detail.mouseDrop.clientY - rect.top;
@@ -158,7 +170,7 @@
 				}
 			}
 
-			console.log("Would drop", channel.id, "to", dropTarget.dataset.key, "at", clickPerc);
+			//console.log("Would drop", channel.id, "to", dropTarget.dataset.key, "at", clickPerc);
 		}
 	}
 
@@ -214,7 +226,9 @@
 				class:spacerL={spacerType === SpacerType.LSpacer}
 				class:spacerR={spacerType === SpacerType.RSpacer}
 				class="nameBox"
+				on:mousedown={preventScrollClick}
 				on:click={setChat}
+				on:auxclick={setChat}
 				on:dblclick={switchChannel}>
 				{#if showId}
 					[<FilterString filter={thisFilter} content={$channel.id.toString()} />]
@@ -224,11 +238,7 @@
 			<span class="icons">
 				{#if $chat.unreadCount > 0}
 					<span class="unreadCount" title={$chat.unreadCount.toString()}>
-						{#if $chat.unreadCount >= 100}
-							99+
-						{:else}
-							{$chat.unreadCount}
-						{/if}
+						{#if $chat.unreadCount >= 100}99+{:else}{$chat.unreadCount}{/if}
 					</span>
 				{/if}
 			</span>

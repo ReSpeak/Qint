@@ -5,6 +5,7 @@
 	import { debounced } from "../util";
 	import { backend } from "../backend/backend";
 	import { onMount } from "svelte";
+	import type { Connection } from "../connection";
 
 	enum View {
 		Edit,
@@ -12,7 +13,9 @@
 		Rendered,
 	}
 
+	export let connection: Connection;
 	export let raw: string;
+
 	let view: View = View.Edit;
 	let rendered: string = "";
 	let mdRenderSocket: WebSocket | undefined;
@@ -62,7 +65,7 @@
 	{/if}
 	{#if view === View.Rendered || view === View.Both}
 		<div class="renderSide">
-			<RenderedText text={rendered} />
+			<RenderedText {connection} text={rendered} />
 		</div>
 	{/if}
 </div>

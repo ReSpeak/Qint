@@ -137,6 +137,9 @@ export class TransientSettingsUi {
 	private set developMode(val: boolean) { this._developMode.set(val); }
 	public readonly _descriptionMode = writable(DescriptionMode.None);
 	public readonly _developMode = writable(false);
+	/// If the default state is muted for new connections
+	public defaultInputMuted: boolean = false;
+	public defaultOutputMuted: boolean = false;
 
 	toJSON() {
 		const res: any = {};
@@ -176,5 +179,5 @@ export class TransientSettingsChat {
 
 export class TransientSettingsApp {
 	public askBeforeClosing: boolean = true;
-	public allowBrowserNotifications: boolean = false;
+	public allowBrowserNotifications: boolean | undefined = undefined;
 }

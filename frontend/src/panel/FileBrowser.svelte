@@ -32,8 +32,6 @@
 	let invalidateCache = true;
 	let fileSelection: FileTreeNode[] = [];
 	let createNewFolderName = "";
-	let uploadQueue: File[] = [];
-	let currentUploadTask: Promise<void> | undefined;
 
 	$: channelRaw = connection.book.channels.get(channelId)!;
 	$: channel = $channelRaw;
@@ -61,7 +59,6 @@
 		if (useCache && !invalidateCache) {
 			const cachedFolder = $fileTreeCache.get(cachePath, true);
 			if (cachedFolder !== null && cachedFolder.contentLoaded !== FolderState.Dummy) {
-				//console.log("cached");
 				return;
 			}
 		}
@@ -158,6 +155,15 @@
 		currentState = WorkState.None;
 	}
 
+	/// Sort first by type and then by f
+	function sortFoldersFirst(f: (a: FileTreeNode, b: FileTreeNode) => number): (a: FileTreeNode, b: FileTreeNode) => number {
+		return (a, b) => {
+			if (a.isFile !== b.isFile)
+				return a.isFile ? 1 : -1;
+			return f(a, b);
+		};
+	}
+
 	const sortOpt = { sensitivity: "base" };
 	const columns: IColumns<FileTreeNode> = [
 		{
@@ -171,21 +177,21 @@
 			key: "name",
 			title: "Name",
 			value: (v) => v.name,
-			sort: (a, b) => a.name.localeCompare(b.name, undefined, sortOpt),
+			sort: sortFoldersFirst((a, b) => a.name.localeCompare(b.name, undefined, sortOpt)),
 		},
 		{
 			key: "size",
 			title: "Size",
 			value: (v) => (v.isFile ? v.size : 0),
 			renderValue: (v) => (v.isFile ? formatBytes(v.size) : ""),
-			sort: (a, b) => (b.isFile ? b.size : -1) - (a.isFile ? a.size : -1),
+			sort: sortFoldersFirst((a, b) => (b.isFile ? b.size : -1) - (a.isFile ? a.size : -1)),
 		},
 		{
 			key: "lastModified",
 			title: "Last Modified",
 			value: (v) => v.lastModified,
 			renderValue: (v) => v.lastModified.format("D.M.YY HH:mm"),
-			sort: (a, b) => a.lastModified.isAfter(b.lastModified) ? 1 : -1,
+			sort: sortFoldersFirst((a, b) => a.lastModified.isAfter(b.lastModified) ? 1 : -1),
 		},
 	];
 	const rowOptions: IRowOptions<FileTreeNode> = {
@@ -197,24 +203,17 @@
 			Array.from(document.querySelectorAll("[data-type='folder']:not(.selected)")),
 	};
 
+	let currentUploadTask: any = undefined; // TODO
 	function uploadFiles(...files: File[]) {
-		uploadQueue.push(...files);
-		if (currentUploadTask === undefined) {
-			currentUploadTask = uploadTaskFn();
-		}
-	}
-
-	async function uploadTaskFn() {
-		while (true) {
-			if (uploadQueue.length === 0) break;
-			let file = uploadQueue.shift()!;
-			await connection.backend.fetch(`/file${pathJoin(channelId, ...path, file.name)}`, {
-				method: "PUT",
-				body: file,
-			});
-			refreshCurrentFolder(false); // TODO apply in chage instead
-		}
-		currentUploadTask = undefined;
+		connection.filetransferManager.uploadFiles(
+			...files.map((file) => {
+				return {
+					data: file,
+					channelId,
+					path: pathJoin(...path, file.name),
+				};
+			})
+		);
 	}
 
 	function dragEnter(e: DragEvent) {
@@ -449,8 +448,11 @@
 					<Icon name="folder" />
 				</td>
 				<td colspan="3">
-					<form on:submit|preventDefault={createNewFolder}
-						on:keydown={e => {if (e.key === "Escape") createNewFolderClick();}}
+					<form
+						on:submit|preventDefault={createNewFolder}
+						on:keydown={(e) => {
+							if (e.key === 'Escape') createNewFolderClick();
+						}}
 						class="flex">
 						<input
 							in:focus|local
@@ -466,7 +468,7 @@
 		{/if}
 		<tr slot="headerCell" let:col>
 			{#if col.key === 'type'}
-				<div on:click={() => goUp()} class="upIcon">
+				<div on:click={() => goUp()} class="upIcon" class:invisible={path.length === 0}>
 					<Icon name="arrow-up-circle-outline" />
 				</div>
 			{/if}

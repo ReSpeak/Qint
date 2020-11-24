@@ -8,15 +8,22 @@
 	import UiLazyList from "../ui/UiLazyList.svelte";
 	import BInput from "../ui/BInput.svelte";
 	import { onDestroy, onMount, tick } from "svelte";
-	import { Chat, Message } from "./chat";
+	import { Chat, Message, structuredViewToMd } from "./chat";
+	import type { MdFile, MdWithFiles } from "./chat";
 	import { ListFetchDir } from "../ui/lazyList";
 	import { Connection } from "../connection";
 	import { app, NodeSelection } from "../app";
 	import { Channel, Client, Server } from "../book";
-	import { writable } from "svelte/store";
+	import { get, writable } from "svelte/store";
 	import type { Readable, Writable } from "svelte/store";
 	import { on, SERVER_ICON } from "../util";
 	import type { ChatData } from "../bookBase";
+	import type { ChannelId } from "../ts";
+	import { pathJoin } from "../panel/fileUtil";
+	import { TsError } from "../book_events";
+	import debug from "debug";
+	const log = debug("CHAT"),
+		error = debug("error:CHAT");
 
 	export let chat: Chat;
 
@@ -30,6 +37,7 @@
 	let text = "";
 	let command = "";
 	let lastDisplayed: Message | undefined;
+	let sendError: string | undefined;
 
 	let canChatHere = false;
 
@@ -121,11 +129,85 @@
 		}
 	}
 
-	function sendMessage() {
-		if (!text) return;
-		chat.sendMessage(text);
-		text = "";
-		messageInput.focus();
+	async function sendMessage() {
+		const sel = $selected;
+		if (sel === undefined) return;
+		let textData = messageInput.getStructuredView();
+		if (textData.length === 0) return;
+		let channelId: ChannelId = get(sel.connection.book.ownClient)?.channel ?? "";
+		let mdData = structuredViewToMd(textData, channelId);
+		if (!mdData.text) return;
+		sendError = await tryUploadChatImage(sel.connection, mdData, channelId);
+		if (sendError === undefined) {
+			chat.sendMessage(mdData.text);
+			messageInput.clear();
+			messageInput.focus();
+		}
+	}
+
+	function chatboxContentChanged() {
+		sendError = undefined;
+	}
+
+	async function tryUploadChatImage(
+		connection: Connection,
+		mdData: MdWithFiles,
+		channelId: ChannelId
+	): Promise<string | undefined> {
+		if (mdData.files.length === 0) return undefined;
+
+		function tryUpload(file: MdFile) {
+			const [returnCode, promise] = connection.generateReturnCode();
+			const uploadDonePromise = connection.backend.fetch(
+				`/file${pathJoin(channelId, file.path, file.name)}?return_code=${returnCode}`,
+				{
+					method: "PUT",
+					body: file.blob,
+				}
+			);
+			return promise;
+			//return (await request.json()) as ResultDetails;
+		}
+
+		async function createFolder(file: MdFile) {
+			return await connection.sendChange({
+				ChannelCreateDirectory: {
+					id: channelId,
+					password: "", // TODO
+					path: file.path,
+				},
+			});
+		}
+
+		if (mdData.files.length >= 1) {
+			let file = mdData.files[0];
+			let uplRes = await tryUpload(file);
+
+			if (uplRes !== undefined && uplRes.tsResult !== TsError.Ok) {
+				if (uplRes.tsResult === TsError.PermissionsClientInsufficient) {
+					log("No permission to upload file");
+					return "No permission to upload files to this channel";
+				} else if (uplRes.tsResult === TsError.FileInvalidPath || uplRes.tsResult === TsError.FileNotFound) {
+					log("Creating folder for chat images");
+					let cresult = await createFolder(file);
+					if (cresult !== undefined) {
+						log("Could not create folder %o", cresult);
+						return "No permission to create folders in this channel";
+					}
+					uplRes = await tryUpload(file); // XXX log?
+				}
+				if (uplRes !== undefined && uplRes.tsResult !== TsError.Ok) {
+					log("Unknown error %o", uplRes);
+					return `Failed to upload images: ${uplRes.tsResult}`;
+				}
+			}
+
+			if (mdData.files.length > 1) {
+				let tasks = mdData.files.slice(1).map((file) => tryUpload(file));
+				await Promise.allSettled(tasks);
+			}
+		}
+		return undefined;
 	}
 
 	function sendCommand() {
@@ -144,7 +226,7 @@
 			const res = await chat.getMessages(idFrom, dir);
 			return res;
 		} catch (err) {
-			console.error("Failed to load messages", err);
+			error("Failed to load messages %o", err);
 			messagesError = err;
 			return Chat.EmptyFetch;
 		}
@@ -225,29 +307,41 @@
 				nodeSel={sel} />
 		</UiLazyList>
 		<form class="chat-form" class:hidden={!canChatHere} on:submit|preventDefault={sendMessage}>
-			<BInput bind:this={messageInput} bind:value={text} on:submit={sendMessage}>
-				<div slot="placeholder">
-					<span>Send to</span>
-					<!-- TODO: Remove 'sel !== undefined' when svelte-tool understands it -->
-					{#if sel !== undefined && sel.node instanceof Client}
-						<ClientName client={sel.node} />
-					{:else if sel !== undefined && sel.node instanceof Channel}
-						<span> your channel</span>
-					{:else if sel !== undefined && sel.node instanceof Server}
-						<ServerName connection={sel.connection} />
-					{/if}
-				</div>
-			</BInput>
-			<button
-				class="button outline-button"
-				name="send"
-				type="submit"
-				style="height: auto;">Send</button>
+			{#if sendError !== undefined}
+				<div class="sendError">{sendError}</div>
+			{/if}
+			<div class="sendCombo">
+				<BInput
+					bind:this={messageInput}
+					value={text}
+					on:submit={sendMessage}
+					on:structureChanged={chatboxContentChanged}>
+					<div slot="placeholder">
+						<span>Send to</span>
+						<!-- TODO: Remove 'sel !== undefined' when svelte-tool understands it -->
+						{#if sel !== undefined && sel.node instanceof Client}
+							<ClientName client={sel.node} />
+						{:else if sel !== undefined && sel.node instanceof Channel}
+							<span> your channel</span>
+						{:else if sel !== undefined && sel.node instanceof Server}
+							<ServerName connection={sel.connection} />
+						{/if}
+					</div>
+				</BInput>
+				<button
+					class="button outline-button"
+					name="send"
+					type="submit"
+					style="height: auto;">Send</button>
+			</div>
 		</form>
 		{#if $developMode}
 			<form class="chat-form" on:submit|preventDefault={sendCommand}>
-				<BInput bind:value={command} />
-				<button class="button" name="send" type="submit" style="height: auto;">Send Command</button>
+				<div class="sendCombo">
+					<BInput bind:value={command} />
+					<button class="button" name="send" type="submit" style="height: auto;">Send
+						Command</button>
+				</div>
 			</form>
 		{/if}
 	{:else}
@@ -274,14 +368,29 @@
 
 	.chat-form {
 		display: flex;
+		flex-direction: column;
 		height: auto;
 
 		margin: 0.5em;
 		margin-top: 0;
+
+		:global(img) {
+			max-height: min(50vh, 100%);
+			max-width: min(50vw, 100%);
+		}
 	}
 
-	.chat-form > :global(*) {
+	.sendCombo {
+		display: flex;
 		box-shadow: 0px -5px 20px -5px rgba(0, 0, 0, 0.3);
+		max-height: 50vh;
+	}
+
+	.sendError {
+		border-radius: 0.25em;
+		background-color: $red;
+		margin-bottom: 0.5em;
+		padding: 0.25em;
 	}
 
 	.chat :global(.scrollPane:last-child) {

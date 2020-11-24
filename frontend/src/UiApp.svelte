@@ -13,6 +13,9 @@
 	import { ConnectData } from "./connect/connect";
 	import { DescriptionMode } from "./transientSettings";
 	import { Channel } from "./book";
+	import { onMount } from "svelte";
+	import { derived, writable } from "svelte/store";
+	import type { Readable, Writable } from "svelte/store";
 
 	const connections = app.connections;
 	let filter: string = "";
@@ -35,14 +38,36 @@
 		columnStyle += " 1fr";
 	}
 
+	let connectStringDerived: Readable<string>;
+	$: {
+		if ($connections.length === 0) {
+			connectStringDerived = writable("");
+		} else {
+			connectStringDerived = derived($connections.map(c => c.connectOptions) as [Writable<ConnectData>], cs => {
+				return JSON.stringify(cs);
+			});
+		}
+	}
+
+	$: location.hash = $connectStringDerived;
+
 	function showConnect(data: ConnectData) {
 		connectData = data;
 		$displayPanel = DisplayPanel.Connect;
 	}
+
+	onMount(() => {
+		app.transientSettingsLoaded.subscribe(() => {
+			if (ui.defaultInputMuted && connectData.inputMuted === undefined)
+				connectData.inputMuted = ui.defaultInputMuted;
+			if (ui.defaultOutputMuted && connectData.outputMuted === undefined)
+				connectData.outputMuted = ui.defaultOutputMuted;
+		})
+	});
 </script>
 
 <div class="appContainer" style="grid-template-columns: {columnStyle}">
-	<Toolbar bind:showSidebar={$showSidebar} bind:displayPanel={$displayPanel} />
+	<Toolbar bind:showSidebar={$showSidebar} bind:displayPanel={$displayPanel} bind:connectData={connectData} />
 	<Searchbar bind:filter visible={$showSidebar} />
 	<Sidebar {connections} {filter} visible={$showSidebar} {showConnect} />
 	<div class="panel">
@@ -61,7 +86,7 @@
 			<!-- TODO consider something better ? -->
 			<UiGlobalSettings connection={$connections[0]} />
 		{:else if $displayPanel === DisplayPanel.Connect}
-			<Connect data={connectData} />
+			<Connect bind:data={connectData} />
 		{/if}
 	</div>
 </div>

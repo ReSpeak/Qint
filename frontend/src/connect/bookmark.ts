@@ -1,6 +1,6 @@
 import { Moment } from "moment";
 import { backend } from "../backend/backend";
-import { datetimeDeserialize, hexEncode, base64Decode } from "../util";
+import { datetimeDeserialize, urlBase64Encode } from "../util";
 
 interface BookmarkChannel {
 	id: string;
@@ -10,7 +10,7 @@ interface BookmarkChannel {
 interface BookmarkServer {
 	name: string;
 	publicKey: number[];
-	hexPublicKey: string;
+	urlBase64PublicKey: string;
 	icon: string | undefined;
 }
 
@@ -31,7 +31,7 @@ export class Bookmark {
 		if (this.server !== null) {
 			if (content.server?.icon !== undefined)
 				this.server.icon = content.server.icon;
-			this.server.hexPublicKey = hexEncode(this.server.publicKey);
+			this.server.urlBase64PublicKey = urlBase64Encode(this.server.publicKey);
 		}
 	}
 

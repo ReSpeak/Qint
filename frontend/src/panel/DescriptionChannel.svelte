@@ -41,8 +41,10 @@
 	}
 
 	// THIS IS NOT A FULL CHANNEL OBJECT
-	type EditProps = Omit<RequiredNN<Channel>,
-		"description" | "isUnencrypted" | "deleteDelay" | "channelType" | "isDefault"> & {
+	type EditProps = Omit<
+		RequiredNN<Channel>,
+		"description" | "isUnencrypted" | "deleteDelay" | "channelType" | "isDefault"
+	> & {
 		_description: string;
 		_isEncrypted: boolean;
 		_deleteDelay: Duration;
@@ -194,7 +196,10 @@
 			<div class="dataLine">
 				<div>Type:</div>
 				{#if $channel.isDefault}
-					<div title="Mark another channel as default to change this type">Default <i>(Permanent)</i></div>
+					<div title="Mark another channel as default to change this type">
+						Default
+						<i>(Permanent)</i>
+					</div>
 				{:else}
 					<BDropDown bind:selected={chanEdit._channelType} items={channelTypeOpt} />
 				{/if}
@@ -210,9 +215,7 @@
 			<span>Topic:</span>
 			{#if editing}
 				<input class="input" type="text" bind:value={chanEdit.topic} />
-			{:else}
-				{$channel.topic ?? ''}
-			{/if}
+			{:else}{$channel.topic ?? ''}{/if}
 		</div>
 		{#if editing}
 			<div class="dataLine">
@@ -295,14 +298,16 @@
 	<hr />
 	<div class="description">
 		{#if editing}
-			<RenderedTextEditor bind:raw={chanEdit._description} />
+			<RenderedTextEditor {connection} bind:raw={chanEdit._description} />
 		{:else}
 			{#await descRequest then descRequestResult}
 				<!-- Todo check properly -->
 				{#if descRequestResult !== undefined}
 					<span style="color: red;">Missing permission</span>
 				{:else}
-					<RenderedText text={$channel.optionalData?.descriptionRendered ?? ''} />
+					<RenderedText
+						{connection}
+						text={$channel.optionalData?.descriptionRendered ?? ''} />
 				{/if}
 			{/await}
 		{/if}

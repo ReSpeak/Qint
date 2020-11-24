@@ -26,6 +26,7 @@ export function draggable(node: HTMLElement, enabled: boolean = true) {
 
 	function handleMousedown(event: MouseEvent) {
 		if (!dd.enabled) return;
+		if (event.button !== MouseButton.Main) return;
 		dd.mouseStart = event;
 		dd.x = event.clientX;
 		dd.y = event.clientY;
@@ -90,4 +91,17 @@ export function draggable(node: HTMLElement, enabled: boolean = true) {
 				stopDrag();
 		}
 	};
+}
+
+export const enum MouseButton {
+	/** usually the left button or the un-initialized state */
+	Main = 0,
+	/** usually the wheel button or the middle button (if present) */
+	Auxiliary = 1,
+	/** usually the right button */
+	Secondary = 2,
+	/** typically the Browser Back button */
+	Fourth = 3,
+	/** typically the Browser Forward button */
+	Fifth = 4,
 }

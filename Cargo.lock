@@ -138,7 +138,7 @@ dependencies = [
  "serde_urlencoded",
  "sha-1 0.9.2",
  "slab",
- "time 0.2.22",
+ "time 0.2.23",
 ]
 
 [[package]]
@@ -304,7 +304,7 @@ dependencies = [
  "serde_json",
  "serde_urlencoded",
  "socket2",
- "time 0.2.22",
+ "time 0.2.23",
  "tinyvec 1.0.1",
  "url",
 ]
@@ -581,12 +581,6 @@ name = "base-x"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2734baf8ed08920ccecce1b48a2dfce4ac74a973144add031163bd21a1c5dab"
-
-[[package]]
-name = "base32"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23ce669cd6c8588f79e15cf450314f9638f967fc5770ff1c7c1deb0925ea7cfa"
 
 [[package]]
 name = "base64"
@@ -941,7 +935,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "784ad0fbab4f3e9cef09f20e0aea6000ae08d2cb98ac4c0abc53df18803d702f"
 dependencies = [
  "percent-encoding",
- "time 0.2.22",
+ "time 0.2.23",
  "version_check 0.9.2",
 ]
 
@@ -2619,17 +2613,6 @@ dependencies = [
 
 [[package]]
 name = "num-bigint"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "090c7f9998ee0ff65aa5b723e4009f7b217707f1fb5ea551329cc4d6231fb304"
-dependencies = [
- "autocfg 1.0.1",
- "num-integer",
- "num-traits",
-]
-
-[[package]]
-name = "num-bigint"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e9a41747ae4633fce5adffb4d2e81ffc5e89593cb19917f8fb2cc5ff76507bf"
@@ -3127,7 +3110,6 @@ dependencies = [
  "anyhow",
  "audiopus",
  "awc",
- "base32",
  "base64 0.13.0",
  "chrono",
  "diesel",
@@ -3140,7 +3122,6 @@ dependencies = [
  "futures",
  "git-testament",
  "heck",
- "hex",
  "juniper",
  "lazy_static",
  "libsqlite3-sys",
@@ -3170,7 +3151,8 @@ dependencies = [
  "t4rust-derive",
  "tauri",
  "tempfile",
- "time 0.2.22",
+ "thiserror",
+ "time 0.2.23",
  "tokio",
  "tokio-util",
  "toml",
@@ -3852,12 +3834,12 @@ dependencies = [
 
 [[package]]
 name = "simple_asn1"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "692ca13de57ce0613a363c8c2f1de925adebc81b04c923ac60c5488bb44abe4b"
+checksum = "39465bdea3e86aa6f95f69d1b7e3010634fdeda0bc4b6c9124cbcd7419873065"
 dependencies = [
  "chrono",
- "num-bigint 0.2.6",
+ "num-bigint",
  "num-traits",
 ]
 
@@ -4463,9 +4445,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.2.22"
+version = "0.2.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55b7151c9065e80917fbf285d9a5d1432f60db41d170ccafc749a136b41a93af"
+checksum = "bcdaeea317915d59b2b4cd3b5efcd156c309108664277793f5351700c02ce98b"
 dependencies = [
  "const_fn",
  "libc",
@@ -4694,7 +4676,7 @@ checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
 name = "ts-bookkeeping"
 version = "0.1.0"
 dependencies = [
- "base64 0.12.3",
+ "base64 0.13.0",
  "derive_more",
  "heck",
  "itertools",
@@ -4704,7 +4686,7 @@ dependencies = [
  "slog",
  "t4rust-derive",
  "thiserror",
- "time 0.2.22",
+ "time 0.2.23",
  "tsproto-packets",
  "tsproto-structs",
  "tsproto-types",
@@ -4715,7 +4697,7 @@ name = "tsclientlib"
 version = "0.1.0"
 dependencies = [
  "audiopus",
- "base64 0.12.3",
+ "base64 0.13.0",
  "futures",
  "git-testament",
  "itertools",
@@ -4728,7 +4710,7 @@ dependencies = [
  "slog-perf",
  "slog-term",
  "thiserror",
- "time 0.2.22",
+ "time 0.2.23",
  "tokio",
  "trust-dns-proto",
  "trust-dns-resolver",
@@ -4744,7 +4726,7 @@ name = "tsproto"
 version = "0.1.0"
 dependencies = [
  "aes",
- "base64 0.12.3",
+ "base64 0.13.0",
  "bitflags 1.2.1",
  "curve25519-dalek",
  "eax",
@@ -4752,7 +4734,7 @@ dependencies = [
  "futures",
  "generic-array 0.14.4",
  "git-testament",
- "num-bigint 0.3.1",
+ "num-bigint",
  "num-derive",
  "num-traits",
  "omnom",
@@ -4765,7 +4747,7 @@ dependencies = [
  "slog-term",
  "stable_deref_trait",
  "thiserror",
- "time 0.2.22",
+ "time 0.2.23",
  "tokio",
  "tsproto-packets",
  "tsproto-types",
@@ -4776,8 +4758,7 @@ dependencies = [
 name = "tsproto-packets"
 version = "0.1.0"
 dependencies = [
- "arrayref",
- "base64 0.12.3",
+ "base64 0.13.0",
  "bitflags 1.2.1",
  "num-derive",
  "num-traits",
@@ -4791,7 +4772,7 @@ dependencies = [
 name = "tsproto-structs"
 version = "0.1.0"
 dependencies = [
- "base64 0.12.3",
+ "base64 0.13.0",
  "csv",
  "heck",
  "lazy_static",
@@ -4804,14 +4785,13 @@ dependencies = [
 name = "tsproto-types"
 version = "0.1.0"
 dependencies = [
- "arrayref",
- "base64 0.12.3",
+ "base64 0.13.0",
  "bitflags 1.2.1",
  "curve25519-dalek",
  "flakebi-ring",
  "heck",
  "itertools",
- "num-bigint 0.2.6",
+ "num-bigint",
  "num-derive",
  "num-traits",
  "rand 0.7.3",
@@ -4819,7 +4799,7 @@ dependencies = [
  "simple_asn1",
  "t4rust-derive",
  "thiserror",
- "time 0.2.22",
+ "time 0.2.23",
  "tsproto-structs",
  "untrusted",
 ]

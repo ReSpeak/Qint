@@ -5,6 +5,11 @@ import { datetimeDeserialize, getDataColor, assert, Lazy } from "../util";
 import { ListFetchDir, FetchResult } from "../ui/lazyList";
 import { NodeSelection } from "../app";
 import { backend } from "../backend/backend";
+import { StructuredData } from "../ui/BInputDecl";
+import { ChannelId } from "../ts";
+import moment from "moment";
+import debug from "debug";
+const log = debug("CHAT"), error = debug("error:CHAT");
 
 export class Chat {
 	public static readonly EmptyFetch: FetchResult<Message> = {
@@ -47,7 +52,7 @@ export class Chat {
 		if (selected === undefined) return Chat.EmptyFetch;
 		let public_key = selected.connection.book.server.publicKey;
 		if (public_key === undefined) {
-			console.error("Cannot get messages for a non-existant connection");
+			error("Cannot get messages for a non-existant connection");
 			return Chat.EmptyFetch;
 		}
 
@@ -100,7 +105,7 @@ export class Chat {
 		if ("data" in res) {
 			// We never chatted here
 			if (!res.data.chat || res.data.chat.messages.length === 0) {
-				console.log("No chats here");
+				log("No chats here");
 				return Chat.EmptyFetch;
 			}
 
@@ -113,7 +118,7 @@ export class Chat {
 				msgs.push(new Message(msg.id, client, msg.invokerName,
 					msg.content, msg.rendered, datetimeDeserialize([msg.time, msg.timezone]), msg.status, msg.isPoke));
 			});
-			console.log("Fetching messages " + (loadAtBeginning ? "before" : "after"), [startTime, startId], "; got", msgs);
+			log("Fetching messages " + (loadAtBeginning ? "before" : "after"), [startTime, startId], "; got", msgs);
 
 			Chat.groupMessages(msgs, idFrom, dir);
 
@@ -123,7 +128,7 @@ export class Chat {
 				canLoadAfterEnd: dir !== ListFetchDir.New // Heuristic: when fetching new we start at the end
 			};
 		} else {
-			console.error("GetMessages result does not contain data", res);
+			error("GetMessages result does not contain data", res);
 			return Chat.EmptyFetch;
 		}
 	}
@@ -144,7 +149,7 @@ export class Chat {
 		if (selected === undefined) return;
 		let public_key = selected.connection.book.server.publicKey;
 		if (public_key === undefined) {
-			console.error("Cannot get messages for a non-existant connection");
+			error("Cannot get messages for a non-existant connection");
 			return;
 		}
 		const res = await backend.graphql(`mutation SetLastRead($chatType: GMessageTarget!, $server: [Int!]!, $chatId: ID,
@@ -205,4 +210,45 @@ export class Message {
 		}
 		return first.invoker.equals(second.invoker);
 	}
+}
+
+export interface MdWithFiles {
+	text: string;
+	files: MdFile[];
+}
+export interface MdFile {
+	path: string;
+	name: string;
+	blob: Blob;
+}
+
+const QINT_CHAT_FOLDER = "/.qint_chat";
+
+export function structuredViewToMd(data: StructuredData, channel: ChannelId): MdWithFiles {
+	let text = "";
+	let chainid = 0;
+	let date: { iso: string, unix: string } | undefined;
+	let files = [];
+	for (const part of data) {
+		if (typeof part === "string") {
+			text += part;
+		} else if ("src" in part) {
+			text += `![](${part.src})`;
+		} else if ("blob" in part) {
+			const blob = part.blob;
+			if (date === undefined){
+				const m = moment();
+				date = { iso: m.format("YYYY-MM-DD_HH-mm-ss-SSS"), unix: m.unix().toString() };
+			}
+			const file = part.blob.type === "image/jpeg" ? "jpg" : "png";
+			const name = `${date.iso}-${chainid++}.${file}`;
+			files.push({ blob, path: QINT_CHAT_FOLDER, name });
+			const tslink = `ts3file://server?port=${0}&serverUID=${''}&channel=${channel}&path=${encodeURIComponent(QINT_CHAT_FOLDER)}&filename=${encodeURIComponent(name)}&isDir=0&size=${blob.size}&fileDateTime=${date.unix}`;
+			text += `![](${tslink})`;
+		}
+	}
+	return {
+		text,
+		files
+	};
 }

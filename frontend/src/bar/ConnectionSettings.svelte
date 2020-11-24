@@ -4,8 +4,10 @@
 	import { Client } from "../book";
 	import type { OChangeConnectionClientUpdate } from "../book_events";
 	import { Connection } from "../connection";
+	import { ConnectData } from "../connect/connect";
 
-	export let connection: Connection;
+	export let connection: Connection | undefined = undefined;
+	export let connectData: ConnectData | undefined = undefined;
 
 	let inputMuted = false;
 	let outputMuted = false;
@@ -13,15 +15,37 @@
 
 	let ownClient: Writable<Client | undefined> | undefined;
 	$: {
-		ownClient = connection.book.ownClient;
-		inputMuted = $ownClient?.inputMuted ?? false;
-		outputMuted = $ownClient?.outputMuted ?? false;
-		const awayMessage = $ownClient?.awayMessage;
-		isAway = awayMessage !== undefined && awayMessage !== null;
+		if (connection !== undefined) {
+			ownClient = connection.book.ownClient;
+			inputMuted = $ownClient?.inputMuted ?? false;
+			outputMuted = $ownClient?.outputMuted ?? false;
+			const awayMessage = $ownClient?.awayMessage;
+			isAway = awayMessage !== undefined && awayMessage !== null;
+		} else if (connectData !== undefined) {
+			inputMuted = connectData.inputMuted ?? false;
+			outputMuted = connectData.outputMuted ?? false;
+			isAway = connectData.away !== undefined;
+		}
 	}
 
 	function changeOwnClient(change: OChangeConnectionClientUpdate["ConnectionClientUpdate"]) {
-		connection.sendMessage({
+		if (change.inputMuted !== undefined) {
+			inputMuted = change.inputMuted;
+			if (connectData !== undefined)
+				connectData.inputMuted = inputMuted;
+		}
+		if (change.outputMuted !== undefined) {
+			outputMuted = change.outputMuted;
+			if (connectData !== undefined)
+				connectData.outputMuted = outputMuted;
+		}
+		if (change.away !== undefined) {
+			isAway = change.away !== null;
+			if (connectData !== undefined)
+				connectData.away = isAway ? "" : undefined;
+		}
+
+		connection?.sendMessage({
 			Change: {
 				change: { ConnectionClientUpdate: change },
 			},

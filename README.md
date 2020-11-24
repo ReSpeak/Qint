@@ -64,5 +64,20 @@ yarn build
 
 Now, you can use the client at [http://localhost:4422](http://localhost:4422).
 
+### Enable logging in the frontend
+
+By default, only errors are logged.
+To change that, run one of the following in the browser console:
+```js
+// Log everything
+debug.enable("*")
+debug.enable("CHAT,BINPUT")
+debug.enable("*,-LL") // Everything but the lazy list
+debug.enable("error:*")
+
+// Set permanently
+localStorage.debug = "*"
+```
+
 ## License
 Licensed under the [Open Software License](LICENSE-OSL) and [GNU Affero General Public License v3](LICENSE-AGPL).

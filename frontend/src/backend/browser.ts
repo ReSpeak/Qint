@@ -31,6 +31,15 @@ export class BrowserBackend implements IBackend {
 	public setTitle(name: string): void {
 		document.title = name;
 	}
+
+	public setIcon(url: string | undefined): void {
+		// TODO Any??
+		const icon = document.querySelector("link[rel*='icon']") as any;
+		if (icon !== null)
+			icon.href = url ?? "icon.png";
+		else
+			console.log("Tried to set icon but did not find icon element");
+	}
 }
 
 export class BrowserBackendConnection implements IBackendConnection {
@@ -42,7 +51,7 @@ export class BrowserBackendConnection implements IBackendConnection {
 		private parent: BrowserBackend
 	) {
 		this.serverFileSrc = "";
-		this.id = createUuidV4();
+		this.id = "";
 	}
 
 	public send(data: OutMsg): void {
@@ -53,8 +62,8 @@ export class BrowserBackendConnection implements IBackendConnection {
 	public connect(onMsg: msgFn, onError: errorFn, onClose: closedFn): Promise<void> {
 		this.close();
 
+		this.id = createUuidV4();
 		this.serverFileSrc = `${BASE_ADDRESS}/con/${this.id}`;
-
 		this.socket = new WebSocket(`${this.parent.wsBaseAddress}/con/${this.id}/ws?format=Json`);
 		this.socket.onerror = (error) => onError(String(error));
 		this.socket.onclose = onClose;
@@ -67,7 +76,7 @@ export class BrowserBackendConnection implements IBackendConnection {
 	public close(): void {
 		if (this.socket)
 			this.socket.close();
-		this.id = createUuidV4();
+		this.id = "";
 		this.socket = undefined;
 	}
 

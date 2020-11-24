@@ -677,23 +677,30 @@ impl SearchResult {
 
 	/// Gives a rendered view of the content which contains parts of the content and highlighting.
 	fn highlighted_content(&self) -> String {
-		let mut sorted_hls = self.content_highlights.iter().map(|h| h.0.clone()).collect::<Vec<_>>();
+		let mut sorted_hls =
+			self.content_highlights.iter().map(|h| h.0.clone()).collect::<Vec<_>>();
 		sorted_hls.sort_by_key(|h| h.start);
-		let hl_strs = sorted_hls.iter().map(|h| {
-			let r = crate::search::char_to_byte_range(h.start, h.end, &self.message.msg.content);
-			&self.message.msg.content[r]
-		}).collect::<Vec<_>>();
+		let hl_strs = sorted_hls
+			.iter()
+			.map(|h| {
+				let r =
+					crate::search::char_to_byte_range(h.start, h.end, &self.message.msg.content);
+				&self.message.msg.content[r]
+			})
+			.collect::<Vec<_>>();
 
 		let rendered = crate::markdown::markdown(&self.message.msg.content);
 		let mut rendered_hls = Vec::new();
 		// Check if the highlighted parts are still in the rendered message
 		// TODO Search for highlighted parts only in body parts
-		if hl_strs.iter().all(|s| if let Some(i) = rendered.find(s) {
-			rendered_hls.push(Highlight(i..i + s.len()));
-			// !s.contains(&['>', '<', '&', '\'', '\"'])
-			false
-		} else {
-			false
+		if hl_strs.iter().all(|s| {
+			if let Some(i) = rendered.find(s) {
+				rendered_hls.push(Highlight(i..i + s.len()));
+				// !s.contains(&['>', '<', '&', '\'', '\"'])
+				false
+			} else {
+				false
+			}
 		}) {
 			rendered
 		} else {
@@ -875,7 +882,8 @@ impl Query {
 
 				let ids = search_res.results.iter().map(|d| d.num_id as i64).collect::<Vec<_>>();
 				// TODO is_poke is lost
-				let mut msgs = messages::table.filter(messages::id.eq_any(&ids))
+				let mut msgs = messages::table
+					.filter(messages::id.eq_any(&ids))
 					.load::<models::Message>(&db.con)?
 					.into_iter()
 					.map(|msg| (msg.id as u64, Message { msg, is_poke: false }))
@@ -888,7 +896,11 @@ impl Query {
 						results.push(SearchResult {
 							message: msg,
 							author_highlights: Vec::new(),
-							content_highlights: d.content_highlights.into_iter().map(Highlight).collect(),
+							content_highlights: d
+								.content_highlights
+								.into_iter()
+								.map(Highlight)
+								.collect(),
 						});
 					} else {
 						warn!(logger, "Message from search database not found";
@@ -896,10 +908,7 @@ impl Query {
 					}
 				}
 
-				GResult::Ok(SearchResults {
-					results,
-					count: search_res.count,
-				})
+				GResult::Ok(SearchResults { results, count: search_res.count })
 			}))
 			.await??;
 		Ok(res)

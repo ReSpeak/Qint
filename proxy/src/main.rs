@@ -16,17 +16,18 @@ use std::sync::{Arc, Mutex, RwLock};
 use actix::*;
 use actix_cors::Cors;
 use actix_files::Files;
-use actix_web::{web::Bytes, middleware::Condition};
 use actix_web::*;
 use actix_web::{
 	dev::{HttpResponseBuilder, Service},
 	web::Query,
 };
+use actix_web::{middleware::Condition, web::Bytes};
 use actix_web_actors::ws;
 use anyhow::{bail, Result};
 use futures::prelude::*;
 use futures::stream::Peekable;
 use http::{header::CACHE_CONTROL, header::ETAG, HeaderValue};
+use messages::ResultDetails;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use slog::{debug, error, info, o, warn, Drain, Logger};
@@ -392,6 +393,11 @@ async fn get_plugin(state: web::Data<Arc<State>>, name: web::Path<String>) -> im
 #[derive(Deserialize)]
 struct GetFileOptions {
 	dl: Option<String>,
+	return_code: Option<String>,
+}
+
+impl ResultDetails {
+	fn gone() -> Self { Self::from_desc("gone".into()) }
 }
 
 #[get("/con/{id}/file/{channel}/{path:.*}")]
@@ -410,10 +416,10 @@ async fn download_file(
 			Ok(Ok(r)) => r,
 			Ok(Err(e)) => {
 				error!(state.logger, "Failed to get server public key"; "error" => %e);
-				return HttpResponse::Gone().finish();
+				return HttpResponse::Gone().json(ResultDetails::gone());
 			}
 			Err(_) => {
-				return HttpResponse::Gone().finish();
+				return HttpResponse::Gone().json(ResultDetails::gone());
 			}
 		};
 		if let Some((len, stream)) = state.file_cache.get_cached_file(&server, channel, &path).await
@@ -424,24 +430,36 @@ async fn download_file(
 		}
 
 		debug!(state.logger, "Downloading file"; "channel" => channel.0, "path" => &path);
-		let (len, file_stream, server) =
-			match con.send(websocket::DownloadFile { channel, path: path.clone() }).await {
-				Err(_) => {
-					return HttpResponse::Gone().finish();
-				}
-				Ok(Err(e)) => {
-					if let Some(TsError::CommandError(err)) = e.downcast_ref::<TsError>() {
-						if err.error == tsclientlib::TsError::FileInvalidPath {
-							debug!(state.logger, "File not found"; "path" => &path);
-							return HttpResponse::NotFound().finish();
-						}
+		let (len, file_stream, server) = match con
+			.send(websocket::DownloadFile {
+				channel,
+				path: path.clone(),
+				return_code: query_opt.return_code.clone(),
+			})
+			.await
+		{
+			Err(_) => {
+				return HttpResponse::Gone().json(ResultDetails::gone());
+			}
+			Ok(Err(websocket::Error::TsError(TsError::CommandError(err)))) => {
+				debug!(state.logger, "File download error"; "error" => %err, "path" => &path);
+				return match err.error {
+					tsclientlib::TsError::FileInvalidPath => {
+						HttpResponse::NotFound().json::<ResultDetails>(err.into())
 					}
-					error!(state.logger, "File download failed"; "error" => %e, "path" => &path);
-					return HttpResponse::InternalServerError()
-						.body(format!("Failed to download file: {}", e));
-				}
-				Ok(Ok(r)) => r,
-			};
+					tsclientlib::TsError::PermissionsClientInsufficient => {
+						HttpResponse::Forbidden().json::<ResultDetails>(err.into())
+					}
+					_ => HttpResponse::BadRequest().json::<ResultDetails>(err.into()),
+				};
+			}
+			Ok(Err(e)) => {
+				error!(state.logger, "File download failed"; "error" => %e, "path" => &path);
+				return HttpResponse::InternalServerError()
+					.json(ResultDetails::from_desc(format!("Failed to download file: {}", e)));
+			}
+			Ok(Ok(r)) => r,
+		};
 
 		let stream =
 			FramedRead::new(file_stream, BytesCodec::new()).map(|r| r.map(web::BytesMut::freeze));
@@ -462,14 +480,19 @@ async fn download_file(
 			response.streaming(stream)
 		}
 	} else {
-		HttpResponse::Gone().finish()
+		HttpResponse::Gone().json(ResultDetails::gone())
 	}
+}
+
+#[derive(Deserialize)]
+struct PutFileOptions {
+	return_code: Option<String>,
 }
 
 #[put("/con/{id}/file/{channel}/{path:.*}")]
 async fn upload_file(
 	state: web::Data<Arc<State>>, web::Path((id, channel, path)): web::Path<(Uuid, u64, String)>,
-	req: web::HttpRequest, body: web::Payload,
+	req: web::HttpRequest, body: web::Payload, query_opt: Query<PutFileOptions>,
 ) -> impl Responder
 {
 	let channel = ChannelId(channel);
@@ -504,16 +527,29 @@ async fn upload_file(
 				size,
 				overwrite: true,
 				resume: false,
+				return_code: query_opt.return_code.clone(),
 			})
 			.await
 		{
 			Err(_) => {
-				return HttpResponse::Gone().finish();
+				return HttpResponse::Gone().json(ResultDetails::gone());
+			}
+			Ok(Err(websocket::Error::TsError(TsError::CommandError(err)))) => {
+				debug!(state.logger, "File upload error"; "error" => %err, "path" => &path);
+				return match err.error {
+					tsclientlib::TsError::FileInvalidPath => {
+						HttpResponse::NotFound().json::<ResultDetails>(err.into())
+					}
+					tsclientlib::TsError::PermissionsClientInsufficient => {
+						HttpResponse::Forbidden().json::<ResultDetails>(err.into())
+					}
+					_ => HttpResponse::BadRequest().json::<ResultDetails>(err.into()),
+				};
 			}
 			Ok(Err(e)) => {
 				error!(state.logger, "File upload failed"; "error" => %e, "path" => &path);
 				return HttpResponse::InternalServerError()
-					.body(format!("Failed to upload file: {}", e));
+					.json(ResultDetails::from_desc(format!("Failed to upload file: {}", e)));
 			}
 			Ok(Ok(r)) => r,
 		};
@@ -523,11 +559,12 @@ async fn upload_file(
 		}));
 		if let Err(e) = tokio::io::copy(&mut body_reader, &mut file_stream).await {
 			warn!(state.logger, "File upload aborted"; "error" => %e);
-			return HttpResponse::BadGateway().body(format!("Upload failed: {}", e));
+			return HttpResponse::BadGateway()
+				.json(ResultDetails::from_desc(format!("Upload failed: {}", e)));
 		}
-		HttpResponse::Ok().finish()
+		HttpResponse::Ok().json(ResultDetails::ok())
 	} else {
-		HttpResponse::Gone().finish()
+		HttpResponse::Gone().json(ResultDetails::gone())
 	}
 }
 
@@ -536,7 +573,7 @@ async fn upload_file(
 async fn download_cache_file(
 	state: web::Data<Arc<State>>, web::Path((id, channel, path)): web::Path<(String, u64, String)>,
 ) -> impl Responder {
-	let server = match hex::decode(&id) {
+	let server = match base64::decode_config(&id, base64::URL_SAFE_NO_PAD) {
 		Err(e) => {
 			return HttpResponse::BadRequest().body(format!("Not a valid server id: {}", e));
 		}
@@ -826,9 +863,7 @@ impl App {
 		}
 
 		if !args.browser {
-			tauri::AppBuilder::new()
-				.build()
-				.run();
+			tauri::AppBuilder::new().build().run();
 		} else {
 			let frontend_path = std::option_env!("FRONTEND_PATH").unwrap_or("../frontend/build/");
 			let is_production = std::option_env!("FRONTEND_PATH").is_some();
@@ -923,7 +958,7 @@ mod tests {
 	use rand::Rng;
 
 	use juniper::http::GraphQLRequest;
-	use tsclientlib::{ClientId, Version};
+	use tsclientlib::ClientId;
 
 	use super::*;
 	use messages::{ConnectOptions, JsMessageTarget, MessageF2P, MessageP2F};
@@ -959,7 +994,7 @@ mod tests {
 		async fn create_connection(&self) -> Result<Connection> {
 			let client = awc::Client::default();
 			let id = Uuid::new_v4();
-			let url = format!("ws://127.0.0.1:{}/con/{}/ws?format=Msgpack", self.port, id);
+			let url = format!("ws://127.0.0.1:{}/con/{}/ws?format=Json", self.port, id);
 			info!(self.logger, "Connecting to proxy"; "url" => &url);
 			let (_resp, socket) = client
 				.ws(url)
@@ -1156,13 +1191,7 @@ mod tests {
 			self.send(&MessageF2P::Connect(ConnectOptions {
 				address: "localhost".to_string(),
 				name: "Test".to_string(),
-				version: Version::Linux_3_X_X,
-				bookmark: None,
-				channel: None,
-				ignore_identity_mismatch: false,
-				log_commands: false,
-				log_packets: false,
-				log_udp_packets: false,
+				..Default::default()
 			}))
 			.await?;
 			loop {
@@ -1178,7 +1207,7 @@ mod tests {
 		async fn send(&mut self, msg: &MessageF2P) -> Result<()> {
 			println!("Sending message to proxy: {}", serde_json::to_string(msg).unwrap());
 			self.socket
-				.send(ws::Message::Binary(rmp_serde::to_vec(msg)?.into()))
+				.send(ws::Message::Text(serde_json::to_string(msg)?))
 				.await
 				.map_err(|e| format_err!("Websocket client protocol error: {:?}", e))?;
 			Ok(())
@@ -1187,6 +1216,9 @@ mod tests {
 		async fn recv(&mut self) -> Result<MessageP2F> {
 			match self.socket.next().await {
 				Some(Ok(ws::Frame::Binary(msg))) => Ok(rmp_serde::from_read_ref(msg.as_ref())?),
+				Some(Ok(ws::Frame::Text(msg))) => {
+					Ok(serde_json::from_str(std::str::from_utf8(&msg)?)?)
+				}
 				f => bail!("Websocket client received unexpected packet: {:?}", f),
 			}
 		}
@@ -1269,7 +1301,7 @@ mod tests {
 		con0.send(&MessageF2P::SendMessage {
 			target: JsMessageTarget::Client(con1_id),
 			message: msg.to_string(),
-			return_code: None
+			return_code: None,
 		})
 		.await?;
 

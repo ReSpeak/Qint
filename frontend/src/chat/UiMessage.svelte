@@ -5,13 +5,15 @@
 	import LinkPreview from "./LinkPreview.svelte";
 	import RenderedText from "../ui/RenderedText.svelte";
 	import type { NodeSelection } from "../app";
+	import type { LinksMap } from "../ui/renderedTextDecl";
 
 	export let unread: boolean;
 	export let message: Message;
 	export let nodeSel: NodeSelection;
 
 	let viewRaw = false;
-	let links: [string, string][] = [];
+	let links: LinksMap | undefined;
+	$: linksArr = links !== undefined ? Array.from(links.values()) : [];
 </script>
 
 <svelte:options immutable />
@@ -29,9 +31,9 @@
 			class:isPoke={message.isPoke}
 			class:viewRaw>
 			<div class="messageRendered">
-				<RenderedText text={message.rendered} bind:links />
-				{#each links as [link, text] (link)}
-					<LinkPreview {link} textContent={text} {nodeSel} />
+				<RenderedText connection={nodeSel.connection} text={message.rendered} bind:links />
+				{#each linksArr as { link, title } (link)}
+					<LinkPreview {link} textContent={title} {nodeSel} />
 				{/each}
 			</div>
 			<div class="messageRaw">
@@ -63,6 +65,7 @@
 	$row-pad: 0.25em;
 
 	.messageRow {
+		@extend %unselectable;
 		transition: background 2s;
 
 		&.unread {
@@ -131,11 +134,14 @@
 		padding-bottom: 0.5em;
 	}
 
-
 	.messageRendered :global(img),
 	.messageRendered :global(.chatVideo) {
 		//max-height: min(50vh, 30em);
 		max-height: min(30em);
+	}
+
+	.messageRendered, .messageRaw, .messageTime {
+		@include textselectable;
 	}
 
 	.tool-buttons {

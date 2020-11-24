@@ -12,6 +12,7 @@
 	@import "bulma/sass/components/breadcrumb";
 	@import "bulma/sass/components/media";
 	@import "bulma/sass/components/menu";
+	@import "bulma/sass/components/message";
 	@import "bulma/sass/components/tabs";
 	@import "bulma/sass/elements/box";
 	@import "bulma/sass/elements/button";
@@ -30,7 +31,7 @@
 	@import "bulma-slider/src/sass/index";
 	@import "bulma-switch/src/sass/index";
 	@import "bulmaswatch/cyborg/overrides";
-	
+
 	@import "./style/checkbox-switch";
 	@import "./style/global";
 </style>

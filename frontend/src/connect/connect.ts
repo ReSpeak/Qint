@@ -1,4 +1,4 @@
-import { getDefaultVersion } from "../util";
+import { assert, getDefaultVersion } from "../util";
 import { OMsgConnect } from "../backend/ws";
 import { ChannelId } from "../ts";
 
@@ -8,21 +8,15 @@ export class ConnectData {
 		public address: string,
 		public bookmark?: string,
 		public channel?: string,
-		public channelId?: ChannelId) { }
-
-	public static fromConString(name: string, address: string, bookmark?: string, channelId?: ChannelId): ConnectData {
-		const sep = address.indexOf("/");
-		let addr = address;
-		let channel = undefined;
-		if (sep !== -1) {
-			addr = address.slice(0, sep);
-			channel = address.slice(sep + 1);
-		}
-		return new ConnectData(name, addr, bookmark, channel, channelId);
-	}
+		public channelId?: ChannelId,
+		public inputMuted?: boolean,
+		public outputMuted?: boolean,
+		public away?: string) { }
 
 	public clone(): ConnectData {
-		return new ConnectData(this.name, this.address, this.bookmark, this.channel, this.channelId);
+		return new ConnectData(this.name, this.address, this.bookmark,
+			this.channel, this.channelId, this.inputMuted,
+			this.outputMuted, this.away);
 	}
 
 	public toConnectMsg(): OMsgConnect {
@@ -34,11 +28,53 @@ export class ConnectData {
 				name: this.name,
 				channel,
 				version: getDefaultVersion(),
+				inputMuted: this.inputMuted,
+				outputMuted: this.outputMuted,
+				away: this.away,
 				ignoreIdentityMismatch: false,
 				logCommands: false,
 				logPackets: false,
 				logUdpPackets: false,
 			}
 		};
+	}
+
+	public static fromJSON(data: string | any): ConnectData {
+		if (typeof data !== "string") {
+			assert("address" in data, "Connection needs an address");
+			assert("address" in data, "connection data needs an address");
+			if (!("name" in data))
+				data.name = "TeamSpeakUser";
+			return new ConnectData(data.name, data.address, data.bookmark,
+				data.channel, data.channelId, data.inputMuted, data.outputMuted,
+				data.away);
+		} else {
+			let start = data.indexOf("@");
+			let name = start === -1 ? "TeamSpeakUser" : data.substr(0, start);
+			start += 1;
+			let end = data.indexOf("/");
+			let channel = end === -1 ? "" : data.substr(end + 1);
+			let address = data.substr(start, end === -1 ? undefined : end);
+			return new ConnectData(name, address, undefined, channel);
+		}
+	}
+
+	public toJSON(): string | ConnectData {
+		if (this.bookmark === undefined &&
+			this.inputMuted === undefined &&
+			this.outputMuted === undefined &&
+			this.away === undefined) {
+			let s = "";
+			if (this.name !== "TeamSpeakUser")
+				s = this.name + "@";
+			s += this.address;
+			if (this.channel !== undefined)
+				s += "/" + this.channel;
+			else if (this.channelId !== undefined)
+				s += "//" + this.channelId;
+			return s;
+		} else {
+			return this;
+		}
 	}
 }

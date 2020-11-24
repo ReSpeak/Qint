@@ -2,7 +2,7 @@
 	import Icon from "../ui/Icon.svelte";
 	import { HTML5VideoControl, SyncState, YoutubeVideoControl } from "./videoSync";
 	import type { IVideoControl } from "./videoSync";
-	import { onDestroy, onMount } from "svelte";
+	import { onDestroy, onMount, tick } from "svelte";
 	import type { NodeSelection } from "../app";
 	import { assert, youtubeUrlRegex } from "../util";
 	import type { EmbedTypes } from "./previewAnalyzer";
@@ -11,6 +11,7 @@
 	export let nodeSel: NodeSelection;
 	export let embed: EmbedTypes | undefined;
 
+	let preview_only = true;
 	let html5videoElem: HTMLVideoElement | undefined;
 	let youtubeVideoElem: HTMLIFrameElement | undefined;
 	let videoControl: IVideoControl | undefined | null;
@@ -42,7 +43,12 @@
 		return videoControl;
 	}
 
-	function toggleVSync() {
+	async function toggleVSync() {
+		if (preview_only) {
+			preview_only = false;
+			await tick();
+		}
+
 		if (vSync === undefined) {
 			const _videoControl = getVideoControl();
 			if (_videoControl === null) return;
@@ -62,39 +68,62 @@
 	});
 </script>
 
-<div class="chatVideo">
-	{#if detectedType === 'media'}
-		<video bind:this={html5videoElem} controls>
-			<source src={videoSrc} />
-			<track kind="captions" />
-			Your browser does not support the video tag.
-		</video>
-	{:else if detectedType === 'youtube'}
-		<iframe
-			bind:this={youtubeVideoElem}
-			title="Youtube Video"
-			type="text/html"
-			width="640"
-			height="390"
-			src="https://www.youtube.com/embed/{video_key}?enablejsapi=1"
-			frameborder="0"
-			allowfullscreen />
-	{/if}
-	<div class="videoTools">
-		<button
-			class="videoButton"
-			class:syncOn={vSync?.enabled}
-			title="Sync video playback"
-			on:click={toggleVSync}>
-			<Icon name="account-multiple" />
-		</button>
-		<a class="videoButton" href={videoSrc} target="_blank">
-			<Icon name="open-in-new" />
-		</a>
+<div class="chatVideoWrap">
+	<div class="chatVideo">
+		{#if detectedType === 'media'}
+			<!-- svelte-ignore a11y-media-has-caption -->
+			<video bind:this={html5videoElem} controls playsinline allowfullscreen>
+				<source src={videoSrc} />
+				Your browser does not support the video tag.
+			</video>
+		{:else if detectedType === 'youtube'}
+			{#if preview_only}
+				<div class="playableOverlay" on:click={() => (preview_only = false)}>
+					<img
+						class="fixedSize"
+						src="https://i.ytimg.com/vi/{video_key}/mqdefault.jpg"
+						alt="Click to load video" />
+					<div class="playButton">
+						<Icon name="play" size="2em" />
+					</div>
+				</div>
+			{:else}
+				<iframe
+					bind:this={youtubeVideoElem}
+					class="fixedSize"
+					title="Youtube Video"
+					type="text/html"
+					src="https://www.youtube.com/embed/{video_key}?enablejsapi=1&rel=0&modestbranding=1&playsinline=1&controls=1&autoplay=1"
+					frameborder="0"
+					allowfullscreen
+					playsinline />
+			{/if}
+		{/if}
+		<div class="videoTools">
+			<button
+				class="videoButton"
+				class:syncOn={vSync?.enabled}
+				title="Sync video playback"
+				on:click={toggleVSync}>
+				<Icon name="account-multiple" />
+			</button>
+			<a
+				class="videoButton"
+				href={videoSrc}
+				target="_blank"
+				title="Open original link in new tab">
+				<Icon name="open-in-new" />
+			</a>
+		</div>
 	</div>
 </div>
 
 <style lang="scss">
+	// Adjusts the horizontal width of the box (including the command buttons)
+	.chatVideoWrap {
+		display: flex;
+	}
+
 	.chatVideo {
 		display: flex;
 		flex-direction: column;
@@ -140,5 +169,35 @@
 
 	.syncOn {
 		background-color: $info;
+	}
+
+	.fixedSize {
+		width: 640px;
+		height: 390px;
+	}
+
+	.playableOverlay {
+		cursor: pointer;
+		display: grid;
+		align-items: center;
+		justify-content: center;
+
+		> :global(*) {
+			grid-area: 1 / 1;
+		}
+
+		&:hover .playButton {
+			color: red;
+		}
+	}
+
+	.playButton {
+		text-align: center;
+		color: black;
+		-webkit-text-stroke-width: 3px;
+		-webkit-text-stroke-color: white;
+		font-size: 5em;
+
+		transition: color 0.2s ease;
 	}
 </style>

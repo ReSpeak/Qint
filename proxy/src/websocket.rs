@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{self, Poll};
@@ -6,25 +7,25 @@ use std::task::{self, Poll};
 use actix::fut::wrap_future;
 use actix::*;
 use actix_web_actors::ws;
-use anyhow::{bail, format_err, Error, Result};
+use anyhow::{bail, format_err, Result};
 use futures::prelude::*;
 use slog::{debug, error, o, warn, Logger};
+use thiserror::Error;
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
 use tsclientlib::events::Event as TsEvent;
 use tsclientlib::prelude::*;
 use tsclientlib::StreamItem as TsStreamItem;
 use tsclientlib::{
-	events, ChannelId, ClientId, Connection, DisconnectOptions, FileDownloadResult,
-	FileUploadResult, FiletransferHandle, InMessage, MessageTarget, Uid,
+	events, AudioEvent, ChannelId, ClientId, Connection, ConnectionStats, DisconnectOptions,
+	Error as TsclError, FileDownloadResult, FileUploadResult, FiletransferHandle, InMessage,
+	MessageTarget, Uid,
 };
-use tsproto::resend::PacketId;
 use tsproto_packets::packets::{AudioData, OutCommand, OutPacket};
 use tsproto_types::crypto::EccKeyPubP256;
 
-use crate::book_events::{ConnectionClientUpdate, JsM2B};
 use crate::db::{ChannelListMsg, ChatId, ChatType, SetClientVolumeMsg};
-use crate::messages::{self, MessageF2P, MessageP2F};
+use crate::messages::{self, MessageF2P, MessageP2F, ResultDetails, ResultStruct};
 use crate::{audio, book_events, db, ConnectionId, State, Tristate, WsFormat, WsOptions};
 
 /// A websocket connection
@@ -36,8 +37,8 @@ pub(crate) struct Ws {
 	connection: Option<Connection>,
 	connect_options: Option<messages::ConnectOptions>,
 	channel_list_finished_msg: Option<ChannelListMsg>,
-	file_downloads: HashMap<FiletransferHandle, oneshot::Sender<Result<FileDownloadResult>>>,
-	file_uploads: HashMap<FiletransferHandle, oneshot::Sender<Result<FileUploadResult>>>,
+	file_downloads: HashMap<FiletransferHandle, oneshot::Sender<Result<FileDownloadResult, Error>>>,
+	file_uploads: HashMap<FiletransferHandle, oneshot::Sender<Result<FileUploadResult, Error>>>,
 
 	websocket_closed: bool,
 	self_talking: bool,
@@ -66,6 +67,7 @@ pub(crate) struct SetChannelListMsgMsg(pub ChannelListMsg);
 pub(crate) struct DownloadFile {
 	pub channel: ChannelId,
 	pub path: String,
+	pub return_code: Option<String>,
 }
 
 pub(crate) struct UploadFile {
@@ -75,6 +77,19 @@ pub(crate) struct UploadFile {
 	pub size: u64,
 	pub overwrite: bool,
 	pub resume: bool,
+	pub return_code: Option<String>,
+}
+
+#[derive(Debug, Error)]
+pub(crate) enum Error {
+	#[error(transparent)]
+	TsError(#[from] TsclError),
+	#[error(transparent)]
+	RecvError(#[from] tokio::sync::oneshot::error::RecvError),
+	#[error("Connection does not exist")]
+	NoConnection,
+	#[error("Failed to get uid: {0}")]
+	NoUid(#[source] TsclError),
 }
 
 impl Actor for Ws {
@@ -110,7 +125,7 @@ impl Message for TalkersChangedMsg {
 	type Result = ();
 }
 impl Message for SendPacketMsg {
-	type Result = Result<PacketId>;
+	type Result = Result<()>;
 }
 impl Message for CaptureLoudnessMsg {
 	type Result = ();
@@ -132,17 +147,14 @@ impl Message for SetChannelListMsgMsg {
 }
 impl Message for DownloadFile {
 	/// The size of the file, the stream and the server key.
-	type Result = Result<(u64, TcpStream, EccKeyPubP256)>;
+	type Result = Result<(u64, TcpStream, EccKeyPubP256), Error>;
 }
 impl Message for UploadFile {
-	type Result = Result<TcpStream>;
+	type Result = Result<TcpStream, Error>;
 }
 
 impl Ws {
-	pub fn new(
-		logger: Logger, state: Arc<State>, options: WsOptions, id: ConnectionId,
-	) -> Self
-	{
+	pub fn new(logger: Logger, state: Arc<State>, options: WsOptions, id: ConnectionId) -> Self {
 		let logger = logger.new(o!("id" => id.0.to_string()));
 		Self {
 			logger,
@@ -225,8 +237,6 @@ impl Ws {
 				for e in &events {
 					if let TsEvent::PropertyAdded { id: events::PropertyId::Server, .. } = e {
 						// Connected
-						self.set_audio_input_active(ctx, true);
-
 						match self.connection.as_ref().and_then(|c| {
 							c.get_server_key()
 								.ok()
@@ -286,7 +296,27 @@ impl Ws {
 							events
 								.into_iter()
 								.filter_map(|e| {
-									if let Some(e) = book_events::convert_event(data, &e) {
+									if let Some(mut e) = book_events::convert_event(data, &e) {
+										use book_events::{JsEvent, JsProperty, JsPropertyId};
+
+										// Extend connection info packet for own client
+										if let JsEvent::PropertyChanged {
+											id: JsPropertyId::ConnectionClientData(id),
+											prop: JsProperty::ConnectionClientData(info),
+											..
+										} = &mut e
+										{
+											if let Some(con) = &self.connection {
+												if let Ok(state) = con.get_state() {
+													if let Ok(stats) = con.get_network_stats() {
+														if *id == state.own_client {
+															Self::fill_connection_info(info, stats);
+														}
+													}
+												}
+											}
+										}
+
 										Some(e)
 									} else {
 										warn!(self.logger, "Event could not be converted for \
@@ -325,8 +355,8 @@ impl Ws {
 								data,
 								&msg,
 							) {
-								error!(self.logger, "Database failed to handle \
-									message"; "error" => %e);
+								error!(self.logger, "Database failed to handle message";
+									"error" => %e);
 							}
 
 							// Subscribe to all channels
@@ -336,20 +366,25 @@ impl Ws {
 							}
 						}
 					}
-				} else if let InMessage::CommandError(error) = &msg {
-					for e in error.iter() {
-						if let Some(return_code) = &e.return_code {
-							self.send_message(&MessageP2F::Result {
-								return_code: return_code.clone(),
-								ts_result: Some(e.id),
-								missing_permission: e.missing_permission_id,
-								description: None,
-							}, ctx);
-						}
-					}
 				}
 
-				if let Some(m) = book_events::convert_message(&msg) {
+				if let InMessage::CommandError(error) = &msg {
+					for e in error.iter() {
+						if let Some(return_code) = &e.return_code {
+							self.send_message(
+								&MessageP2F::Result(ResultStruct {
+									return_code: return_code.clone(),
+									details: ResultDetails {
+										ts_result: Some(e.id),
+										missing_permission: e.missing_permission_id,
+										description: None,
+									},
+								}),
+								ctx,
+							);
+						}
+					}
+				} else if let Some(m) = book_events::convert_message(&msg) {
 					self.send_message(&MessageP2F::Message(m), ctx);
 				} else {
 					warn!(self.logger, "Message could not be converted for frontend";
@@ -365,6 +400,10 @@ impl Ws {
 				let id = (self.id, from);
 				self.send_to_ts2a(audio::ts_to_audio::PlayMsg(id, audio));
 			}
+			TsStreamItem::AudioChange(change) => match change {
+				AudioEvent::CanSendAudio(can) => self.set_audio_input_active(ctx, can),
+				AudioEvent::CanReceiveAudio(can) => self.set_audio_output_active(ctx, can),
+			},
 			TsStreamItem::IdentityLevelIncreased => {
 				if let Some(con) = &self.connection {
 					let event =
@@ -382,7 +421,6 @@ impl Ws {
 				}
 			}
 			TsStreamItem::DisconnectedTemporarily(_) => {
-				self.set_audio_input_active(ctx, false);
 				self.send_message(&MessageP2F::DisconnectedTemporarily(), ctx);
 				self.talkers.clear();
 				self.update_talkers(ctx);
@@ -414,23 +452,20 @@ impl Ws {
 				}
 			}
 			TsStreamItem::MessageResult(handle, res) => {
-				let (ts_result, missing_permission) = if let Err(e) = res {
-					(Some(e.error), e.missing_permission)
-				} else {
-					(None, None)
-				};
-				self.send_message(&MessageP2F::Result {
-					return_code: handle.0.to_string(),
-					ts_result,
-					missing_permission,
-					description: None,
-				}, ctx);
+				self.send_message(
+					&MessageP2F::Result(ResultStruct {
+						return_code: handle.0.to_string(),
+						details: res.into(),
+					}),
+					ctx,
+				);
 			}
 			_ => {}
 		}
 	}
 
 	fn set_audio_input_active(&mut self, ctx: &mut <Self as Actor>::Context, active: bool) {
+		// TODO Simplify to one message instead of two
 		if active {
 			self.send_to_a2ts(audio::audio_to_ts::AddListenerMsg(ctx.address()))
 		} else {
@@ -438,20 +473,104 @@ impl Ws {
 		}
 	}
 
+	fn set_audio_output_active(&mut self, _ctx: &mut <Self as Actor>::Context, _active: bool) {
+		// TODO
+	}
+
+	fn fill_connection_info(
+		info: &mut book_events::js_structs::ConnectionClientData, stats: &ConnectionStats,
+	) {
+		use tsclientlib::PacketStat;
+
+		// connected_time is missing, we do not know that
+
+		info.ping = Some(stats.rtt.try_into().ok());
+		info.ping_deviation = Some(stats.rtt_dev.try_into().ok());
+
+		info.packets_sent_speech =
+			Some(Some(u64::from(stats.total_packets[PacketStat::OutSpeech as usize])));
+		info.packets_sent_keepalive =
+			Some(Some(u64::from(stats.total_packets[PacketStat::OutKeepalive as usize])));
+		info.packets_sent_control =
+			Some(Some(u64::from(stats.total_packets[PacketStat::OutControl as usize])));
+		info.bytes_sent_speech =
+			Some(Some(u64::from(stats.total_bytes[PacketStat::OutSpeech as usize])));
+		info.bytes_sent_keepalive =
+			Some(Some(u64::from(stats.total_bytes[PacketStat::OutKeepalive as usize])));
+		info.bytes_sent_control =
+			Some(Some(u64::from(stats.total_bytes[PacketStat::OutControl as usize])));
+
+		info.packets_received_speech =
+			Some(Some(u64::from(stats.total_packets[PacketStat::InSpeech as usize])));
+		info.packets_received_keepalive =
+			Some(Some(u64::from(stats.total_packets[PacketStat::InKeepalive as usize])));
+		info.packets_received_control =
+			Some(Some(u64::from(stats.total_packets[PacketStat::InControl as usize])));
+		info.bytes_received_speech =
+			Some(Some(u64::from(stats.total_bytes[PacketStat::InSpeech as usize])));
+		info.bytes_received_keepalive =
+			Some(Some(u64::from(stats.total_bytes[PacketStat::InKeepalive as usize])));
+		info.bytes_received_control =
+			Some(Some(u64::from(stats.total_bytes[PacketStat::InControl as usize])));
+
+		let bandwidth_last_second = stats.get_last_second_bytes();
+		info.bandwidth_sent_last_second_speech =
+			Some(Some(u64::from(bandwidth_last_second[PacketStat::OutSpeech as usize])));
+		info.bandwidth_sent_last_second_keepalive =
+			Some(Some(u64::from(bandwidth_last_second[PacketStat::OutKeepalive as usize])));
+		info.bandwidth_sent_last_second_control =
+			Some(Some(u64::from(bandwidth_last_second[PacketStat::OutControl as usize])));
+		info.bandwidth_received_last_second_speech =
+			Some(Some(u64::from(bandwidth_last_second[PacketStat::InSpeech as usize])));
+		info.bandwidth_received_last_second_keepalive =
+			Some(Some(u64::from(bandwidth_last_second[PacketStat::InKeepalive as usize])));
+		info.bandwidth_received_last_second_control =
+			Some(Some(u64::from(bandwidth_last_second[PacketStat::InControl as usize])));
+
+		let bandwidth_last_minute = stats.get_last_second_bytes();
+		info.bandwidth_sent_last_minute_speech =
+			Some(Some(u64::from(bandwidth_last_minute[PacketStat::OutSpeech as usize])));
+		info.bandwidth_sent_last_minute_keepalive =
+			Some(Some(u64::from(bandwidth_last_minute[PacketStat::OutKeepalive as usize])));
+		info.bandwidth_sent_last_minute_control =
+			Some(Some(u64::from(bandwidth_last_minute[PacketStat::OutControl as usize])));
+		info.bandwidth_received_last_minute_speech =
+			Some(Some(u64::from(bandwidth_last_minute[PacketStat::InSpeech as usize])));
+		info.bandwidth_received_last_minute_keepalive =
+			Some(Some(u64::from(bandwidth_last_minute[PacketStat::InKeepalive as usize])));
+		info.bandwidth_received_last_minute_control =
+			Some(Some(u64::from(bandwidth_last_minute[PacketStat::InControl as usize])));
+
+		info.server_to_client_packetloss_speech = Some(Some(stats.get_packetloss_s2c_speech()));
+		info.server_to_client_packetloss_keepalive =
+			Some(Some(stats.get_packetloss_s2c_keepalive()));
+		info.server_to_client_packetloss_control = Some(Some(stats.get_packetloss_s2c_control()));
+		info.server_to_client_packetloss_total = Some(Some(stats.get_packetloss_s2c_total()));
+	}
+
 	fn disconnect(&mut self, ctx: &mut <Self as Actor>::Context) {
 		self.set_audio_input_active(ctx, false);
+		self.set_audio_output_active(ctx, false);
 		self.talkers.clear();
 		if let Some(con) = &mut self.connection {
-			if let Err(e) = con.disconnect(DisconnectOptions::new()) {
-				warn!(self.logger, "Failed to disconnect properly";
-					"error" => %e);
+			if con.get_state().is_ok() {
+				debug!(self.logger, "Sending disconnect packet");
+				if let Err(e) = con.disconnect(DisconnectOptions::new()) {
+					warn!(self.logger, "Failed to disconnect properly"; "error" => %e);
+					self.connection = None;
+				} else {
+					// Wait until disconnected
+					return;
+				}
+			} else {
 				self.connection = None;
-				self.disconnect(ctx);
 			}
-		} else if !self.websocket_closed {
+		}
+		if !self.websocket_closed {
 			debug!(self.logger, "Closing websocket");
 			ctx.close(None);
 		} else {
+			debug!(self.logger, "Stopping websocket");
 			ctx.stop();
 		}
 	}
@@ -477,14 +596,23 @@ impl Ws {
 							let mut options = tsclientlib::Connection::build(o.address.clone())
 								.name(o.name.clone())
 								.identity(id)
-								.version(o.version.clone())
 								.logger(actor.logger.clone())
 								.log_commands(o.log_commands || settings.verbosity > 0)
 								.log_packets(o.log_packets || settings.verbosity > 1)
-								.log_udp_packets(o.log_udp_packets || settings.verbosity > 2);
+								.log_udp_packets(o.log_udp_packets || settings.verbosity > 2)
+								.input_muted(o.input_muted.unwrap_or_default())
+								.output_muted(o.output_muted.unwrap_or_default());
+
+							if let Some(version) = &o.version {
+								options = options.version(version.clone());
+							}
 
 							if let Some(c) = &o.channel {
 								options = options.channel(c.clone());
+							}
+
+							if let Some(msg) = &o.away {
+								options = options.away(msg.clone());
 							}
 
 							if !o.ignore_identity_mismatch {
@@ -590,47 +718,24 @@ impl Ws {
 				if let Some(con) = &mut self.connection {
 					match con.get_state() {
 						Err(e) => {
-							self.send_error(return_code.as_deref(), format!("Failed to get state: {}", e), ctx);
+							self.send_error(
+								return_code.as_deref(),
+								format!("Failed to get state: {}", e),
+								ctx,
+							);
 						}
-						Ok(state) => {
-							let mut audio_active = None;
-							if let JsM2B::ConnectionClientUpdate(ConnectionClientUpdate {
-								input_muted,
-								output_muted,
-								away,
-								..
-							}) = &change
-							{
-								if input_muted.is_some() || output_muted.is_some() || away.is_some()
-								{
-									if let Some(client) = state.clients.get(&state.own_client) {
-										let input_muted =
-											input_muted.unwrap_or_else(|| client.input_muted);
-										let output_muted =
-											output_muted.unwrap_or_else(|| client.output_muted);
-										let is_away = away
-											.as_ref()
-											.map(|a| a.is_some())
-											.unwrap_or_else(|| client.away_message.is_some());
-
-										audio_active =
-											Some(!input_muted && !output_muted && !is_away);
-									}
-								}
+						Ok(state) => match change.to_packet(state) {
+							Ok(msg) => {
+								let _ = self.send_ts_message(msg, return_code.as_deref(), ctx);
 							}
-
-							match change.to_packet(state) {
-								Ok(msg) => {
-									let _ = self.send_ts_message(msg, return_code.as_deref(), ctx);
-								}
-								Err(e) => {
-									self.send_error(return_code.as_deref(), format!("Failed to create packet for change: {}", e), ctx);
-								}
+							Err(e) => {
+								self.send_error(
+									return_code.as_deref(),
+									format!("Failed to create packet for change: {}", e),
+									ctx,
+								);
 							}
-							if let Some(active) = audio_active {
-								self.set_audio_input_active(ctx, active);
-							}
-						}
+						},
 					}
 				}
 			}
@@ -644,20 +749,31 @@ impl Ws {
 		}
 	}
 
-	fn send_error(&mut self, return_code: Option<&str>, error: String, ctx: &mut <Self as Actor>::Context) {
+	fn send_error(
+		&mut self, return_code: Option<&str>, error: String, ctx: &mut <Self as Actor>::Context,
+	) {
 		if let Some(code) = return_code {
-			self.send_message(&MessageP2F::Result {
-				return_code: code.into(),
-				ts_result: None,
-				missing_permission: None,
-				description: Some(error),
-			}, ctx);
+			self.send_message(
+				&MessageP2F::Result(ResultStruct {
+					return_code: code.into(),
+					details: ResultDetails {
+						ts_result: None,
+						missing_permission: None,
+						description: Some(error),
+					},
+				}),
+				ctx,
+			);
 		} else {
 			warn!(self.logger, "Proxy error"; "error" => error);
 		}
 	}
 
-	fn send_chat_message(&mut self, target: MessageTarget, message: String, return_code: Option<&str>, ctx: &mut <Self as Actor>::Context) {
+	fn send_chat_message(
+		&mut self, target: MessageTarget, message: String, return_code: Option<&str>,
+		ctx: &mut <Self as Actor>::Context,
+	)
+	{
 		if let Some(con) = &mut self.connection {
 			match con.get_state() {
 				Err(e) => {
@@ -692,7 +808,11 @@ impl Ws {
 						if let Some(uid) = own_client.uid.as_ref() {
 							uid.clone()
 						} else {
-							self.send_error(return_code, "Failed to get own client uid".into(), ctx);
+							self.send_error(
+								return_code,
+								"Failed to get own client uid".into(),
+								ctx,
+							);
 							return;
 						}
 					} else {
@@ -755,7 +875,11 @@ impl Ws {
 		}
 	}
 
-	fn send_ts_message(&mut self, mut msg: OutCommand, return_code: Option<&str>, ctx: &mut <Self as Actor>::Context) -> Result<()> {
+	fn send_ts_message(
+		&mut self, mut msg: OutCommand, return_code: Option<&str>,
+		ctx: &mut <Self as Actor>::Context,
+	) -> Result<()>
+	{
 		if let Some(code) = &return_code {
 			msg.write_arg("return_code", code);
 		}
@@ -771,7 +895,9 @@ impl Ws {
 		}
 	}
 
-	fn send_command(&mut self, command: String, return_code: Option<&str>, ctx: &mut <Self as Actor>::Context) {
+	fn send_command(
+		&mut self, command: String, return_code: Option<&str>, ctx: &mut <Self as Actor>::Context,
+	) {
 		let cmd = tsproto_packets::packets::OutCommand::new(
 			tsproto_packets::packets::Direction::C2S,
 			tsproto_packets::packets::Flags::empty(),
@@ -783,13 +909,15 @@ impl Ws {
 }
 
 impl Handler<DownloadFile> for Ws {
-	type Result = ResponseFuture<Result<(u64, TcpStream, EccKeyPubP256)>>;
+	type Result = ActorResponse<Self, (u64, TcpStream, EccKeyPubP256), Error>;
 	fn handle(&mut self, msg: DownloadFile, _: &mut Self::Context) -> Self::Result {
 		if let Some(con) = &mut self.connection {
-			let public_key = match con.get_server_key().map_err(Error::from) {
+			let public_key = match con.get_server_key() {
 				Ok(k) => k,
 				Err(e) => {
-					return Box::pin(futures::future::err(format_err!("Failed to get uid: {}", e)));
+					return ActorResponse::r#async(wrap_future(futures::future::err(
+						Error::NoUid(e),
+					)));
 				}
 			};
 
@@ -797,27 +925,39 @@ impl Handler<DownloadFile> for Ws {
 			{
 				Ok(r) => r,
 				Err(e) => {
-					return Box::pin(futures::future::err(format_err!(
-						"Failed to download file: {}",
-						e
-					)));
+					return ActorResponse::r#async(wrap_future(futures::future::err(e.into())));
 				}
 			};
+
 			let (send, recv) = oneshot::channel();
 			self.file_downloads.insert(handle, send);
-			Box::pin(recv.map(|r| match r {
-				Ok(Ok(r)) => Ok((r.size, r.stream, public_key)),
-				Ok(Err(e)) => Err(e),
-				Err(e) => Err(e.into()),
+			ActorResponse::r#async(wrap_future(recv).map(|r, this: &mut Self, ctx| {
+				let result = match r {
+					Ok(Ok(r)) => Ok((r.size, r.stream, public_key)),
+					Ok(Err(e)) => Err(e.into()),
+					Err(e) => Err(e.into()),
+				};
+				if let Some(return_code) = msg.return_code {
+					this.send_message(
+						&MessageP2F::Result(ResultStruct {
+							return_code,
+							details: (&result).try_into().unwrap_or_else(|e| {
+								ResultDetails::from_desc(format!("Download failed, {}", e))
+							}),
+						}),
+						ctx,
+					);
+				}
+				result
 			}))
 		} else {
-			Box::pin(futures::future::err(format_err!("Connection does not exist")))
+			ActorResponse::r#async(wrap_future(futures::future::err(Error::NoConnection)))
 		}
 	}
 }
 
 impl Handler<UploadFile> for Ws {
-	type Result = ResponseFuture<Result<TcpStream>>;
+	type Result = ActorResponse<Self, TcpStream, Error>;
 	fn handle(&mut self, msg: UploadFile, _: &mut Self::Context) -> Self::Result {
 		if let Some(con) = &mut self.connection {
 			let handle = match con.upload_file(
@@ -830,21 +970,32 @@ impl Handler<UploadFile> for Ws {
 			) {
 				Ok(r) => r,
 				Err(e) => {
-					return Box::pin(futures::future::err(format_err!(
-						"Failed to upload file: {}",
-						e
-					)));
+					return ActorResponse::r#async(wrap_future(futures::future::err(e.into())));
 				}
 			};
 			let (send, recv) = oneshot::channel();
 			self.file_uploads.insert(handle, send);
-			Box::pin(recv.map(|r| match r {
-				Ok(Ok(r)) => Ok(r.stream),
-				Ok(Err(e)) => Err(e),
-				Err(e) => Err(e.into()),
+			ActorResponse::r#async(wrap_future(recv).map(|r, this: &mut Self, ctx| {
+				let result = match r {
+					Ok(Ok(r)) => Ok(r.stream),
+					Ok(Err(e)) => Err(e.into()),
+					Err(e) => Err(e.into()),
+				};
+				if let Some(return_code) = msg.return_code {
+					this.send_message(
+						&MessageP2F::Result(ResultStruct {
+							return_code,
+							details: (&result).try_into().unwrap_or_else(|e| {
+								ResultDetails::from_desc(format!("Upload failed, {}", e))
+							}),
+						}),
+						ctx,
+					);
+				}
+				result
 			}))
 		} else {
-			Box::pin(futures::future::err(format_err!("Connection does not exist")))
+			ActorResponse::r#async(wrap_future(futures::future::err(Error::NoConnection)))
 		}
 	}
 }
@@ -861,7 +1012,7 @@ impl Handler<GetPublicKeyMsg> for Ws {
 }
 
 impl Handler<GetClientVolumeMsg> for Ws {
-	type Result = ActorResponse<Self, f32, Error>;
+	type Result = ActorResponse<Self, f32, anyhow::Error>;
 	fn handle(
 		&mut self, GetClientVolumeMsg(client): GetClientVolumeMsg, _: &mut Self::Context,
 	) -> Self::Result {
@@ -947,12 +1098,13 @@ impl Handler<CaptureLoudnessMsg> for Ws {
 }
 
 impl Handler<SendPacketMsg> for Ws {
-	type Result = Result<PacketId>;
+	type Result = Result<()>;
 	fn handle(
 		&mut self, SendPacketMsg(packet): SendPacketMsg, _: &mut Self::Context,
 	) -> Self::Result {
 		if let Some(con) = &mut self.connection {
-			Ok(con.get_tsproto_client_mut()?.send_packet(packet)?)
+			con.send_audio(packet)?;
+			Ok(())
 		} else {
 			bail!("Connection does not exist")
 		}
@@ -962,7 +1114,7 @@ impl Handler<SendPacketMsg> for Ws {
 impl Handler<SetInputMutedMsg> for Ws {
 	type Result = Result<()>;
 	fn handle(
-		&mut self, SetInputMutedMsg(new): SetInputMutedMsg, ctx: &mut Self::Context,
+		&mut self, SetInputMutedMsg(new): SetInputMutedMsg, _: &mut Self::Context,
 	) -> Self::Result {
 		if let Some(con) = &mut self.connection {
 			let state = con.get_state()?;
@@ -974,7 +1126,6 @@ impl Handler<SetInputMutedMsg> for Ws {
 			};
 			let new_input_muted = new.get_value(old);
 			state.client_update().set_input_muted(new_input_muted).send(con)?;
-			self.set_audio_input_active(ctx, !new_input_muted);
 		} else {
 			bail!("Connection does not exist");
 		}
@@ -1052,7 +1203,10 @@ impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for Ws {
 					Ok(r) => r,
 					Err(e) => {
 						error!(self.logger, "json deserializing error"; "error" => %e);
-						self.send_message(&MessageP2F::Error(format!("json deserializing error: {}", e)), ctx);
+						self.send_message(
+							&MessageP2F::Error(format!("json deserializing error: {}", e)),
+							ctx,
+						);
 						return;
 					}
 				};
@@ -1063,7 +1217,10 @@ impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for Ws {
 					Ok(r) => r,
 					Err(e) => {
 						error!(self.logger, "msgpack deserializing error"; "error" => %e);
-						self.send_message(&MessageP2F::Error(format!("msgpack deserializing error: {}", e)), ctx);
+						self.send_message(
+							&MessageP2F::Error(format!("msgpack deserializing error: {}", e)),
+							ctx,
+						);
 						return;
 					}
 				};

@@ -2,13 +2,15 @@ import { Writable, writable, get, Readable } from "svelte/store";
 import { InBookChangeMsg, WsMessageTarget } from "./backend/ws";
 import { Connection } from "./connection";
 import { binarySearchBy,datetimeDeserialize, assert } from "./util";
-import { ChannelGroupId, ChannelId, ClientId, IconId, IpAddr, OffsetDateTime, ServerGroupId, TalkState, Uid } from "./ts";
+import { ChannelGroupId, ChannelId, ClientId, IconId, IpAddr, ServerGroupId, TalkState, Uid } from "./ts";
 import { Codec } from "./book_events";
 import * as book_events from "./book_events";
 import { Moment } from "moment";
 import moment from "moment";
 import { ClientBase, ServerBase } from "./bookBase";
 import { backend } from "./backend/backend";
+import debug from "debug";
+const error = debug("error:BOOK");
 
 export function codecToName(codec: Codec) {
 	switch (codec) {
@@ -115,7 +117,7 @@ export class Book {
 	public updateChannel(id: ChannelId, obj: Partial<Channel> | Partial<book_events.ChannelGen>) {
 		const channel = this.channels.get(id);
 		if (channel === undefined) {
-			console.error(`Cannot update non-existant channel ${id}`);
+			error(`Cannot update non-existant channel ${id}`);
 			return;
 		}
 		const oldParent = channel.parent;
@@ -172,7 +174,7 @@ export class Book {
 	public updateClient(id: ClientId, obj: Partial<Client> | Partial<book_events.ClientGen>) {
 		const client = this.getClient(id);
 		if (client === undefined) {
-			console.error(`Cannot update non-existant client ${id}`);
+			error(`Cannot update non-existant client ${id}`);
 			return;
 		}
 		const oldChannel = client.channel;
@@ -203,7 +205,7 @@ export class Book {
 	public addClientServerGroup(id: ClientId, group: ServerGroupId) {
 		const client = this.getClient(id);
 		if (client === undefined) {
-			console.error(`Cannot update non-existant client ${id}`);
+			error(`Cannot update non-existant client ${id}`);
 			return;
 		}
 		if (!client.serverGroups.includes(group)) {
@@ -215,7 +217,7 @@ export class Book {
 	public removeClientServerGroup(id: ClientId, group: ServerGroupId) {
 		const client = this.getClient(id);
 		if (client === undefined) {
-			console.error(`Cannot update non-existant client ${id}`);
+			error(`Cannot update non-existant client ${id}`);
 			return;
 		}
 		client.serverGroups.remove_item(group);
@@ -269,6 +271,8 @@ export class Book {
 		if (serverGroup === undefined)
 			return;
 		serverGroup.update((sg: ServerGroup) => sg.update(obj));
+		if ("sortId" in obj)
+			this.serverGroups.update(gs => gs);
 	}
 
 	public removeServerGroup(id: ServerGroupId) {
@@ -300,6 +304,21 @@ export class Book {
 		const sgStore = get(this.serverGroups).get(id);
 		if (sgStore === undefined) return undefined;
 		return get(sgStore);
+	}
+
+	public sortServerGroupIds(groups: ServerGroupId[]): ServerGroupId[] {
+		const grs = [...groups];
+		grs.sort((a, b) => {
+			const ag = this.getServerGroup(a);
+			const bg = this.getServerGroup(b);
+			if (ag === undefined || bg === undefined) {
+				console.warn("Didn't find server groups", a, b, ag, bg);
+				return 0;
+			}
+
+			return ag.cmp(bg);
+		});
+		return grs;
 	}
 
 	public messageHandler(msg: InBookChangeMsg) {
@@ -391,7 +410,7 @@ export class Book {
 			if (i === -1 || oldTalkers[i][1] !== isWhispering) {
 				const client = this.getClient(id);
 				if (client === undefined) {
-					console.error(`Cannot update non-existant client ${id}`);
+					error(`Cannot update non-existant client ${id}`);
 					continue;
 				}
 				client.update({ talking: isWhispering ? TalkState.Whisper : TalkState.Voice });
@@ -405,7 +424,7 @@ export class Book {
 		for (const [id,] of oldTalkers) {
 			const client = this.getClient(id);
 			if (client === undefined) {
-				console.error(`Cannot update non-existant client ${id}`);
+				error(`Cannot update non-existant client ${id}`);
 				continue;
 			}
 			client.update({ talking: TalkState.Off });
@@ -616,9 +635,13 @@ export class ServerGroup extends book_events.ServerGroupGen {
 
 	public cmp(other: ServerGroup): number {
 		// If the sortId is 0, the group id is taken
-		const ai = this.sortId === 0 ? BigInt(this.id) : BigInt(this.sortId);
-		const bi = other.sortId === 0 ? BigInt(other.id) : BigInt(other.sortId);
-		return ai === bi ? 0 : (ai < bi ? -1 : 1);
+		if (this.id === other.id)
+			return 0;
+		const aid = BigInt(this.id);
+		const bid = BigInt(other.id);
+		const ai = this.sortId === 0 ? aid : BigInt(this.sortId);
+		const bi = other.sortId === 0 ? bid : BigInt(other.sortId);
+		return ai === bi ? (aid < bid ? -1 : 1) : (ai < bi ? -1 : 1);
 	}
 }
 

@@ -2,9 +2,13 @@
 	import katex from "katex";
 	import { hljsHighlight } from "./hljs";
 	import { onMount } from "svelte";
+	import { parseTsScheme, schemeToLink } from "./renderedTextDecl";
+	import type { LinksMap } from "./renderedTextDecl";
+	import type { Connection } from "../connection";
 
+	export let connection: Connection;
 	export let text: string;
-	export let links: [string, string][] = [];
+	export let links: LinksMap = new Map();
 
 	let rendered!: HTMLElement;
 	$: renderedObj = render(text);
@@ -31,14 +35,41 @@
 				}
 			} catch {
 				console.error("Failed to render latex");
-				elem.innerText = code ?? "";
+				elem.textContent = code ?? "";
 			}
 		}
 
+		links.clear();
+
 		// Process links and images
-		links = [...obj.querySelectorAll("a")]
-			.filter((a) => !!a.href)
-			.map((a) => [a.href, a.innerText]);
+		for (const a of obj.querySelectorAll("a")) {
+			const href = a.href;
+			if (!href || links.has(href)) continue;
+			links.set(href, {
+				link: href,
+				title: a.textContent ?? "",
+			});
+		}
+
+		// process ts3file links
+		for (const img of obj.querySelectorAll("img")) {
+			const src = img.src;
+			if (!src) continue;
+			const scheme = parseTsScheme(src);
+			if (scheme !== null) {
+				const proxyFileSrc = schemeToLink(connection, scheme);
+				if (proxyFileSrc === null) {
+					img.parentElement?.removeChild(img);
+					continue;
+				} else {
+					img.src = proxyFileSrc;
+				}
+			}
+		}
+
+		if (links.size > 0) {
+			links = links;
+		}
 
 		if (rendered) {
 			rendered.innerHTML = "";

@@ -50,7 +50,10 @@ impl SitePeekCache {
 	}
 
 	async fn analyze_link(link: &str) -> Result<AnalyzeResult> {
-		let response = reqwest::get(link).await?;
+		// Include 'Bot' in the user agent to be able to load Twitter previews
+		// (https://mau.dev/maunium/synapse)
+		let client = reqwest::Client::builder().user_agent("Bot").build()?;
+		let response = client.get(link).send().await?;
 		let headers = response.headers();
 		let content_type =
 			headers.get(CONTENT_TYPE).ok_or_else(|| anyhow!("No content type"))?.to_str()?;
@@ -66,25 +69,31 @@ impl SitePeekCache {
 			// - <meta name="Description" content="Phoronix is the leading technology …">
 			// - <title>Open-Source RADV Vulkan Driver Is Seeing Work To … - Phoronix</title>
 			// - <link rel="icon" type="image/png" href="/android-chrome-192x192.png" sizes="192x192"> (pick biggest size)
-			let selector_title = Selector::parse(r#"meta[property='og:title']"#).unwrap();
-			let selector_image = Selector::parse(r#"meta[property='og:image']"#).unwrap();
-			let selector_descr = Selector::parse(r#"meta[property='og:description']"#).unwrap();
+			let selector_title = Selector::parse("meta[property='og:title']").unwrap();
+			let selector_image = Selector::parse("meta[property='og:image']").unwrap();
+			let selector_descr = Selector::parse("meta[property='og:description']").unwrap();
+			let title = Selector::parse("title").unwrap();
+			let favicon = Selector::parse("link[rel='icon']").unwrap();
+			let meta_descr = Selector::parse("meta[name='description']").unwrap();
 
 			let title = document
 				.select(&selector_title)
 				.next()
+				.or_else(|| document.select(&title).next())
 				.and_then(|e| e.value().attr("content"))
 				.map(|e| e.to_string())
 				.ok_or_else(|| anyhow!("No title"))?;
 			let image_src = document
 				.select(&selector_image)
 				.next()
+				.or_else(|| document.select(&favicon).next())
 				.and_then(|e| e.value().attr("content"))
 				.map(|e| e.to_string())
 				.ok_or_else(|| anyhow!("No image"))?;
 			let description = document
 				.select(&selector_descr)
 				.next()
+				.or_else(|| document.select(&meta_descr).next())
 				.and_then(|e| e.value().attr("content"))
 				.map(|e| e.to_string());
 			Ok(AnalyzeResult::Site(AnalyzeResultSite { title, image_src, description }))

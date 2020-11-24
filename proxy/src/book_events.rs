@@ -15,6 +15,7 @@ use tsclientlib::*;
 use tsproto_packets::packets::OutCommand;
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(test, derive(Deserialize))]
 pub enum JsEvent {
 	PropertyAdded {
 		id: JsPropertyId,
@@ -129,9 +130,10 @@ pub(crate) fn deserialize_date_time<'de, D: Deserializer<'de>>(
 pub(crate) fn serialize_date_time<S: Serializer>(
 	datetime: &OffsetDateTime, serializer: S,
 ) -> Result<S::Ok, S::Error> {
-	(datetime.timestamp(), datetime.offset()).serialize(serializer)
+	(datetime.unix_timestamp(), datetime.offset()).serialize(serializer)
 }
 
+#[cfg(test)]
 pub(crate) fn deserialize_some_date_time<'de, D: Deserializer<'de>>(
 	deserializer: D,
 ) -> Result<Option<OffsetDateTime>, D::Error> {
@@ -142,7 +144,7 @@ pub(crate) fn deserialize_some_date_time<'de, D: Deserializer<'de>>(
 pub(crate) fn serialize_some_date_time<S: Serializer>(
 	datetime: &Option<OffsetDateTime>, serializer: S,
 ) -> Result<S::Ok, S::Error> {
-	datetime.map(|d| (d.timestamp(), d.offset())).serialize(serializer)
+	datetime.map(|d| (d.unix_timestamp(), d.offset())).serialize(serializer)
 }
 
 // Serialize Duration as seconds + nanoseconds (default serializer)
@@ -170,6 +172,7 @@ pub(crate) fn serialize_some_duration<S: Serializer>(
 	datetime.serialize(serializer)
 }
 
+#[cfg(test)]
 pub(crate) fn deserialize_some_some_duration<'de, D: Deserializer<'de>>(
 	deserializer: D,
 ) -> Result<Option<Option<Duration>>, D::Error> {
@@ -213,6 +216,7 @@ pub(crate) fn serialize_some_u64<S: Serializer>(
 	i.map(|i| i.to_string()).serialize(serializer)
 }
 
+#[cfg(test)]
 pub(crate) fn deserialize_some_some_u64<'de, D: Deserializer<'de>>(
 	deserializer: D,
 ) -> Result<Option<Option<u64>>, D::Error> {
@@ -250,6 +254,7 @@ pub(crate) fn serialize_some_id<S: Serializer, T: Id>(
 	i.as_ref().map(|i| i.to_string_id()).serialize(serializer)
 }
 
+#[cfg(test)]
 pub(crate) fn deserialize_some_some_id<'de, D: Deserializer<'de>, T: Id>(
 	deserializer: D,
 ) -> Result<Option<Option<T>>, D::Error> {
@@ -263,6 +268,7 @@ pub(crate) fn serialize_some_some_id<S: Serializer, T: Id>(
 	i.as_ref().map(|i| i.as_ref().map(|i| i.to_string_id())).serialize(serializer)
 }
 
+#[cfg(test)]
 pub(crate) fn deserialize_some_set_id<'de, D: Deserializer<'de>, T: Eq + Hash + Id>(
 	deserializer: D,
 ) -> Result<Option<HashSet<T>>, D::Error> {

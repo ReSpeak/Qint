@@ -15,7 +15,6 @@ actix-web-actors = "3"
 actix-rt = "1"
 anyhow = "1"
 audiopus = "0.2"
-base32 = "0.4"
 base64 = "0.13"
 chrono = { version = "0.4", features = [ "serde" ] }
 diesel = { version = "1.4", features = [ "chrono", "sqlite" ] }
@@ -27,7 +26,6 @@ fancy-regex = "0.4"
 flakebi-ring = "0.16.9"
 futures = "0.3"
 git-testament = "0.1"
-hex = "0.4"
 juniper = { git = "https://github.com/graphql-rust/juniper" }
 lazy_static = "1"
 libsqlite3-sys = { version = "0.18", features = [ "bundled" ] }
@@ -52,6 +50,7 @@ slog-stdlog = "4"
 slog-term = "2"
 structopt = { version = "0.3", default-features = false }
 tauri = { version = "0.9", features = [ "all-api" ] }
+thiserror = "1"
 time = "0.2"
 toml = "0.5"
 tokio = { version = "0.2", features = [ "fs" ] }

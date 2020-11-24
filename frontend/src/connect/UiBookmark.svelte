@@ -5,6 +5,7 @@
 	import { ConnectData } from "./connect";
 	import { app } from "../app";
 
+	export let connectData: ConnectData;
 	export let bookmark: Bookmark;
 	let error: string | undefined = undefined;
 	let fullAddress: string;
@@ -19,16 +20,14 @@
 			bookmark.username !== undefined &&
 			bookmark.address !== undefined &&
 			bookmark.id !== undefined
-		)
-			app.connect(
-				new ConnectData(
-					bookmark.username,
-					bookmark.address,
-					bookmark.id,
-					bookmark.channel?.fullPath,
-					channel,
-				)
-			);
+		) {
+			connectData.name = bookmark.username;
+			connectData.address = bookmark.address;
+			connectData.bookmark = bookmark.id;
+			connectData.channel = bookmark.channel?.fullPath;
+			connectData.channelId = bookmark.channel === null ? undefined : bookmark.channel.id;
+			app.connect(connectData.clone());
+		}
 	}
 
 	function toggleBookmark() {
@@ -54,7 +53,7 @@
 		<TsIcon
 			type="server"
 			source={{ icon: bookmark.server?.icon }}
-			server={bookmark.server?.hexPublicKey} />
+			server={bookmark.server?.urlBase64PublicKey} />
 	</div>
 	<div class="bookmarkName">{bookmark.name || bookmark.server?.name}</div>
 	{#if bookmark.lastUsed}

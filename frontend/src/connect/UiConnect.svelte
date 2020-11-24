@@ -7,7 +7,7 @@
 	import { Book, Channel } from "../book";
 	import UiChannel from "../tree/UiChannel.svelte";
 	import type { ChannelId, Uid } from "../ts";
-	import { SERVER_ICON, CLIENT_ICON, focus, hexEncode } from "../util";
+	import { SERVER_ICON, CLIENT_ICON, focus, urlBase64Encode } from "../util";
 	import { app } from "../app";
 	import { backend } from "../backend/backend";
 
@@ -76,11 +76,11 @@
 
 	async function loadChannels(address: string): Promise<Channel[]> {
 		try {
-			const query = await backend.graphql<{serverByAddress:{uid: Uid, channels:Channel[]}}>(
+			const query = await backend.graphql<{serverByAddress:{publicKey: number[], channels:Channel[]}}>(
 				`
 					query GetChannels($address: String!) {
 						serverByAddress(address: $address) {
-							uid
+							publicKey
 							channels(includeDeleted: false) {
 								id
 								parent
@@ -95,8 +95,9 @@
 					address,
 				}
 			);
+			console.log(query.data.serverByAddress);
 			if (query.data.serverByAddress !== null) {
-				server = hexEncode(query.data.serverByAddress.uid);
+				server = urlBase64Encode(query.data.serverByAddress.publicKey);
 				let channels: Map<ChannelId, Channel> = new Map(
 					query.data.serverByAddress.channels.map((c: any) => {
 						let channel = Channel.fromGraphql(c);
@@ -217,7 +218,7 @@
 				<div class="viewContainer">
 					<div class="scollPane">
 						{#each bookmarks as item}
-							<UiBookmark bookmark={item} />
+							<UiBookmark bookmark={item} bind:connectData={data} />
 						{/each}
 					</div>
 				</div>
