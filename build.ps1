@@ -1,11 +1,15 @@
 $Env:FRONTEND_PATH = "./ui/"
 $workhome = Get-Location
+# Check if SDL exists
+if (-Not (Get-Item "./target/release/SDL2.dll")) {
+    ./install_sdl.ps1
+}
 # Build proxy
 Set-Location(Join-Path $workhome "proxy")
 cargo build --release
 # Build frontend
 Set-Location(Join-Path $workhome "frontend")
-yarn
+yarn fresh
 yarn build
 # package
 Set-Location($workhome)

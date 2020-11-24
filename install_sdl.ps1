@@ -1,8 +1,11 @@
 $version = "2.0.12"
+$zipDownloadPath = "./target/sdl.zip"
 # Reuse rust build dir
 New-Item -Path "./target" -ItemType "directory" -Force | Out-Null
 # Download zip
-Remove-Item "./target/sdl.zip" -Force
+if (Get-Item $zipDownloadPath -ErrorAction SilentlyContinue) {
+    Remove-Item $zipDownloadPath -Force
+}
 Invoke-WebRequest -Uri "https://www.libsdl.org/release/SDL2-devel-$version-VC.zip" -OutFile "./target/sdl.zip"
 # Extract and move all
 Expand-Archive -Path "./target/sdl.zip" -DestinationPath "./target/sdl/" -Force
