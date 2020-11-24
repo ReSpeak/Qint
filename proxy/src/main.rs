@@ -867,6 +867,7 @@ impl App {
 		} else {
 			let frontend_path = std::option_env!("FRONTEND_PATH").unwrap_or("../frontend/build/");
 			let is_production = std::option_env!("FRONTEND_PATH").is_some();
+			info!(state.logger, "Serving frontend"; "path" => frontend_path);
 			let state2 = state.clone();
 			HttpServer::new(move || {
 				let state = state2.clone();
