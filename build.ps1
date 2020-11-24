@@ -9,7 +9,8 @@ Set-Location(Join-Path $workhome "proxy")
 cargo build --release
 # Build frontend
 Set-Location(Join-Path $workhome "frontend")
-yarn fresh
+yarn
+yarn upgrade
 yarn build
 # package
 Set-Location($workhome)
