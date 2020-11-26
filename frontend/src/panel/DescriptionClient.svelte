@@ -31,6 +31,7 @@
 	let pokeInput: HTMLElement | undefined;
 	let pokeMessage: string = "";
 	let developMode = app.transientSettings.ui._developMode;
+	let chart: BChart | null = null;
 
 	const serverGroups = connection.book.serverGroups;
 	$: avatarPath = getClientAvatarPath($client, connection);
@@ -65,6 +66,23 @@
 		},
 		options: {
 			scales: {
+				xAxes: [{
+					type: "time",
+					time: {
+						unit: "second",
+						displayFormats: {
+							second: "X"
+						},
+						stepSize: 5
+					},
+					ticks: {
+						callback: function(value) {
+							let seconds = moment().diff(moment(value, "X"), "seconds");
+							if (seconds < 1) return "0";
+							return `${seconds}s`;
+						}
+					}
+				}],
 				yAxes: [{
 					ticks: {
 						beginAtZero: true,
@@ -129,11 +147,10 @@
 	}
 
 	function chartRefresh() {
-		console.log("bef");
 		chartConfig.data?.datasets![0].data?.push(createDataPoint(client.connectionData ? client.connectionData.ping?.asMilliseconds() : undefined));
 		chartConfig.data?.datasets![1].data?.push(createDataPoint(packetLossToPercent(client.connectionData?.clientToServerPacketlossTotal)));
 		chartConfig.data?.datasets![2].data?.push(createDataPoint(packetLossToPercent(client.connectionData?.serverToClientPacketlossTotal)));
-		console.log("after");
+		chart?.updateChart();
 	}
 
 	function changeServerGroup(e: Event, group: ServerGroupId, isMember: boolean) {
@@ -408,7 +425,7 @@
 			</div>
 		</div>
 		<div class="descGroup">
-			<BChart config={chartConfig} />
+			<BChart bind:this={chart} config={chartConfig} />
 		</div>
 		<div class="descGroup">
 			<div class="statsTable">

@@ -4,10 +4,15 @@
 
 	export let config: Chart.ChartConfiguration;
 	let chartCanvas: HTMLCanvasElement;
+	let chart: Chart;
+
+	export function updateChart()
+	{
+		chart.update();
+	}
 
 	onMount(() => {
-		console.log(config);
-		const chart = new Chart(chartCanvas, config);
+		chart = new Chart(chartCanvas, config);
 		return () => chart.destroy();
 	});
 </script>
