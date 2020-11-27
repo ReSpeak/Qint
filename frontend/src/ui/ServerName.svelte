@@ -13,7 +13,7 @@
 		{address}
 	</span>
 {:else}
-	<span class="serverName" style={$server.color}>
+	<span class="serverName" style="color:{$server.color};">
 		{$server.name}
 	</span>
 {/if}

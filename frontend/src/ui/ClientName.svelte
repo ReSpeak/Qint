@@ -24,4 +24,4 @@
 	$: [color, name] = refreshClient(client);
 </script>
 
-<span style={color}>{name}</span>
+<span style="color:{color};">{name}</span>

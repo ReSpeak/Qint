@@ -82,7 +82,7 @@ export function assert(condition: any, message: string, ...data: any[]): asserts
 
 export function getDataColor(data: number[] | string, lightBackground: boolean = false) {
 	if (data.length < 3) {
-		return lightBackground ? "color: black;" : "color: white;";
+		return lightBackground ? "black" : "white";
 	}
 	if (typeof data === "string") {
 		const dataTmp = [0, 0, 0];
@@ -94,7 +94,7 @@ export function getDataColor(data: number[] | string, lightBackground: boolean =
 	let color = chroma(data[0], data[1], data[2], 'rgb');
 	const setLum = lightBackground ? 35 : 65;
 	color = color.set("lab.l", setLum);
-	return `color: ${color.css()};`;
+	return color.css();
 }
 
 export function arraysEqual<T>(a: ArrayLike<T>, b: ArrayLike<T>): boolean {

@@ -37,8 +37,8 @@ export class Chat {
 
 		for (const message of messages) {
 			const previousDate = previousMessage?.date;
-			message.displayGroupHeader = !previousMessage || !GraphQlClient.equals(previousMessage.invoker, message.invoker);
 			message.displayDateSeparator = !previousDate || !previousDate.isSame(message.date, "day");
+			message.displayGroupHeader = message.displayDateSeparator || !previousMessage || !GraphQlClient.equals(previousMessage.invoker, message.invoker);
 			previousMessage = message;
 		}
 

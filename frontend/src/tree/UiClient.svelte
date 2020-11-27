@@ -107,7 +107,7 @@
 			data-key={$client.id}>
 			<div class:talking={$client.talking !== TalkState.Off} class="talkWave" />
 			<TsIcon type="client" source={$client} {connection} />
-			<span class="nameBox" style={$client.color}>
+			<span class="nameBox" style="color:{$client.color};">
 				{#if showId}
 					[<FilterString filter={thisFilter} content={$client.id.toString()} />]
 				{/if}

@@ -18,7 +18,7 @@
 
 <svelte:options immutable />
 <div class="messageRow" class:unread>
-	<div class="hover-container">
+	<div class="hover-container" style="border-color:{message.clientColor};">
 		<div class="messageTime chat-left-col">
 			<span title={message.date.format(LONG_DATETIME)}> {message.date.format('HH:mm')} </span>
 		</div>
@@ -76,8 +76,9 @@
 	.hover-container {
 		display: grid;
 		grid-template-columns: min-content minmax(0, 1fr);
-		padding: $row-pad $side-pad-width;
+		padding: $row-pad $side-pad-width $row-pad;
 		line-height: 1.1em;
+		border-left: solid $side-pad-width;
 
 		&:hover {
 			background-color: $highlight-weak;
