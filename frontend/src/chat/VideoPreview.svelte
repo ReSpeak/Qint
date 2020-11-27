@@ -6,6 +6,8 @@
 	import type { NodeSelection } from "../app";
 	import { assert, youtubeUrlRegex } from "../util";
 	import type { EmbedTypes } from "./previewAnalyzer";
+	import debug from "debug";
+	const log = debug("VIDEO");
 
 	export let videoSrc: string;
 	export let nodeSel: NodeSelection;
@@ -16,14 +18,39 @@
 	let youtubeVideoElem: HTMLIFrameElement | undefined;
 	let videoControl: IVideoControl | undefined | null;
 	let vSync: SyncState | undefined;
+	let additionalData : string;
 
 	let detectedType: "youtube" | "media";
 	let video_key: string;
 
+	additionalData = "";
 	let ytMatch = youtubeUrlRegex.exec(videoSrc);
 	if (ytMatch !== null) {
 		detectedType = "youtube";
-		video_key = ytMatch[5]; // ?
+		video_key = ytMatch[5];
+		if (ytMatch[6] !== undefined) {
+			const params = new Map<string, string>();
+			const queryStr = ytMatch[6].startsWith("?") ? ytMatch[6].substring(1) : ytMatch[6];
+			const queryParams = queryStr.split(/(&|\?)/g);
+			for (const param of queryParams) {
+				if (param.includes("=")) {
+					const [key, value] = param.split(/=/, 2);
+					params.set(key, value);
+				}
+			}
+			const startTime = params.get("t") ?? params.get("start");
+			if (startTime !== undefined) {
+				if (/^\d+$/.test(startTime)) {
+					additionalData += `&start=${startTime}`;
+				} else {
+					const ts = /^((\d+)h)?((\d+)m)?((\d+)s)?$/.exec(startTime);
+					if (ts !== null) {
+						const seconds = Number(ts[2] ?? 0) * 3600 + Number(ts[4] ?? 0) * 60 + Number(ts[6] ?? 0);
+						additionalData += `&start=${seconds}`;
+					}
+				}
+			}
+		}
 	} else {
 		detectedType = "media";
 		video_key = videoSrc;
@@ -52,7 +79,7 @@
 		if (vSync === undefined) {
 			const _videoControl = getVideoControl();
 			if (_videoControl === null) return;
-			//console.log(nodeSel, video_key, videoControl);
+			log("key:%s %o %o", video_key, nodeSel, videoControl);
 			vSync = new SyncState(nodeSel, video_key, _videoControl);
 		}
 		if (vSync.enabled) {
@@ -93,7 +120,7 @@
 					class="fixedSize"
 					title="Youtube Video"
 					type="text/html"
-					src="https://www.youtube.com/embed/{video_key}?enablejsapi=1&rel=0&modestbranding=1&playsinline=1&controls=1&autoplay=1"
+			src="https://www.youtube.com/embed/{video_key}?enablejsapi=1&rel=0&modestbranding=1&playsinline=1&controls=1&autoplay=1{additionalData}"
 					frameborder="0"
 					allowfullscreen
 					playsinline />
