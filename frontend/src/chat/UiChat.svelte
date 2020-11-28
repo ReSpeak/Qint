@@ -38,6 +38,7 @@
 	let command = "";
 	let lastDisplayed: Message | undefined;
 	let sendError: string | undefined;
+	let isSending = false;
 
 	let canChatHere = false;
 
@@ -130,18 +131,24 @@
 	}
 
 	async function sendMessage() {
-		const sel = $selected;
-		if (sel === undefined) return;
-		let textData = messageInput.getStructuredView();
-		if (textData.length === 0) return;
-		let channelId: ChannelId = get(sel.connection.book.ownClient)?.channel ?? "";
-		let mdData = structuredViewToMd(textData, channelId);
-		if (!mdData.text) return;
-		sendError = await tryUploadChatImage(sel.connection, mdData, channelId);
-		if (sendError === undefined) {
-			chat.sendMessage(mdData.text);
-			messageInput.clear();
-			messageInput.focus();
+		try {
+			if (isSending) return;
+			isSending = true;
+			const sel = $selected;
+			if (sel === undefined) return;
+			let textData = messageInput.getStructuredView();
+			if (textData.length === 0) return;
+			let channelId: ChannelId = get(sel.connection.book.ownClient)?.channel ?? "";
+			let mdData = structuredViewToMd(textData, channelId);
+			if (!mdData.text) return;
+			sendError = await tryUploadChatImage(sel.connection, mdData, channelId);
+			if (sendError === undefined) {
+				chat.sendMessage(mdData.text);
+				messageInput.clear();
+				messageInput.focus();
+			}
+		} finally {
+			isSending = false;
 		}
 	}
 
@@ -187,7 +194,10 @@
 				if (uplRes.tsResult === TsError.PermissionsClientInsufficient) {
 					log("No permission to upload file");
 					return "No permission to upload files to this channel";
-				} else if (uplRes.tsResult === TsError.FileInvalidPath || uplRes.tsResult === TsError.FileNotFound) {
+				} else if (
+					uplRes.tsResult === TsError.FileInvalidPath ||
+					uplRes.tsResult === TsError.FileNotFound
+				) {
 					log("Creating folder for chat images");
 					let cresult = await createFolder(file);
 					if (cresult !== undefined) {
@@ -330,6 +340,7 @@
 				</BInput>
 				<button
 					class="button outline-button"
+					class:is-loading={isSending}
 					name="send"
 					type="submit"
 					style="height: auto;">Send</button>
