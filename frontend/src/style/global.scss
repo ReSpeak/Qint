@@ -146,3 +146,11 @@ hr {
 	border: 1px solid #bb0;
 	border-radius: 0.2em;
 }
+
+.modal {
+	z-index: 1000 !important;
+}
+
+.previewImg {
+	cursor: pointer;
+}

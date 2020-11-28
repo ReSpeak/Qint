@@ -18,7 +18,7 @@
 	let youtubeVideoElem: HTMLIFrameElement | undefined;
 	let videoControl: IVideoControl | undefined | null;
 	let vSync: SyncState | undefined;
-	let additionalData : string;
+	let additionalData: string;
 
 	let detectedType: "youtube" | "media";
 	let video_key: string;
@@ -45,7 +45,10 @@
 				} else {
 					const ts = /^((\d+)h)?((\d+)m)?((\d+)s)?$/.exec(startTime);
 					if (ts !== null) {
-						const seconds = Number(ts[2] ?? 0) * 3600 + Number(ts[4] ?? 0) * 60 + Number(ts[6] ?? 0);
+						const seconds =
+							Number(ts[2] ?? 0) * 3600 +
+							Number(ts[4] ?? 0) * 60 +
+							Number(ts[6] ?? 0);
 						additionalData += `&start=${seconds}`;
 					}
 				}
@@ -95,8 +98,8 @@
 	});
 </script>
 
-<div class="chatVideoWrap">
-	<div class="chatVideo">
+<div class="chatVideoWrap padTop">
+	<div class="chatVideo limitChatSize">
 		{#if detectedType === 'media'}
 			<!-- svelte-ignore a11y-media-has-caption -->
 			<video bind:this={html5videoElem} controls playsinline allowfullscreen>
@@ -120,7 +123,7 @@
 					class="fixedSize"
 					title="Youtube Video"
 					type="text/html"
-			src="https://www.youtube.com/embed/{video_key}?enablejsapi=1&rel=0&modestbranding=1&playsinline=1&controls=1&autoplay=1{additionalData}"
+					src="https://www.youtube.com/embed/{video_key}?enablejsapi=1&rel=0&modestbranding=1&playsinline=1&controls=1&autoplay=1{additionalData}"
 					frameborder="0"
 					allowfullscreen
 					playsinline />

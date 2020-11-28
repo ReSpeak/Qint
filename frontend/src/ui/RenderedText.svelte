@@ -1,4 +1,5 @@
 <script lang="typescript">
+	import ImageModal from "../chat/ImageModal.svelte";
 	import katex from "katex";
 	import { hljsHighlight } from "./hljs";
 	import { onMount } from "svelte";
@@ -10,7 +11,9 @@
 	export let text: string;
 	export let links: LinksMap = new Map();
 
-	let rendered!: HTMLElement;
+	let showBig = false;
+	let showBigSrc ="";
+	let rendered: HTMLElement;
 	$: renderedObj = render(text);
 
 	function render(html: string) {
@@ -53,7 +56,7 @@
 
 		// process ts3file links
 		for (const img of obj.querySelectorAll("img")) {
-			const src = img.src;
+			let src = img.src;
 			if (!src) continue;
 			const scheme = parseTsScheme(src);
 			if (scheme !== null) {
@@ -62,9 +65,15 @@
 					img.parentElement?.removeChild(img);
 					continue;
 				} else {
+					src = proxyFileSrc;
 					img.src = proxyFileSrc;
 				}
 			}
+			img.classList.add("limitChatSize", "previewImg", "padTop");
+			img.onclick = () => {
+				showBigSrc = src;
+				showBig = true;
+			};
 		}
 
 		if (links.size > 0) {
@@ -85,6 +94,9 @@
 </script>
 
 <div class="textRendered content" bind:this={rendered} />
+{#if showBig}
+	<ImageModal src={showBigSrc} bind:visible={showBig} />
+{/if}
 
 <style lang="scss">
 	.textRendered {

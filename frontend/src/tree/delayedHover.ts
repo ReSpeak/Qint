@@ -1,6 +1,6 @@
 import { app } from "../app";
-import { derived, get, Writable, writable } from "svelte/store";
-import { debounced, oneshot } from "../util";
+import { Writable, writable } from "svelte/store";
+import { debounced } from "../util";
 
 /// Used for the hover menu of the channel tree.
 const hover_id: Writable<any | undefined> = writable(undefined);

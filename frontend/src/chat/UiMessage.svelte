@@ -97,8 +97,6 @@
 	}
 
 	.messageBody {
-		flex: 1;
-
 		// for tool buttons
 		position: relative;
 
@@ -106,7 +104,7 @@
 		:global(pre) {
 			position: relative;
 			padding: 0;
-			margin: 1em 1em 1em 0;
+			margin: 0 1em 0 0;
 			border-radius: 7px;
 
 			tab-size: 4;
@@ -131,12 +129,10 @@
 		margin: 0;
 	}
 
-	.messageRendered > :global(*:not(:last-child)) {
-		padding-bottom: 0.5em;
+	.messageRendered :global(.padTop:not(:first-child)) {
+		margin-top: 0.5em;
 	}
-
-	.messageRendered :global(img),
-	.messageRendered :global(.chatVideo) {
+	.messageRendered :global(.limitChatSize) {
 		//max-height: min(50vh, 30em);
 		max-height: min(30em);
 	}

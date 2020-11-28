@@ -1,6 +1,7 @@
 <script lang="typescript">
 	//import Loader from "../ui/Loader.svelte";
 	import VideoPreview from "./VideoPreview.svelte";
+	import ImageModal from "./ImageModal.svelte";
 	import { analyzeLink } from "./previewAnalyzer";
 	import { autoError } from "../util";
 	import type { NodeSelection } from "../app";
@@ -8,6 +9,8 @@
 	export let link: string;
 	export let textContent: string;
 	export let nodeSel: NodeSelection;
+
+	let showBig = false;
 
 	$: analyzeResult = analyzeLink(link);
 </script>
@@ -17,13 +20,20 @@
 	<!-- <Loader text="Loading preview..." /> -->
 {:then result}
 	{#if result.kind === 'image'}
-		<a href={link} target="_blank">
-			<img class="limitImg" src={result.imageSrc} alt={textContent} />
-		</a>
+		<!-- TODO add 'open original' button -->
+		<img
+			class="limitChatSize previewImg padTop"
+			src={result.imageSrc}
+			alt={textContent}
+			title="Click to enlage"
+			on:click={() => (showBig = true)} />
+		{#if showBig}
+			<ImageModal src={result.imageSrc} bind:visible={showBig} />
+		{/if}
 	{:else if result.kind === 'video'}
 		<VideoPreview videoSrc={result.videoSrc} embed={result.embed} {nodeSel} />
 	{:else if result.kind === 'site'}
-		<a href={link} target="_blank" class="box">
+		<a href={link} target="_blank" class="box padTop">
 			<div>
 				<div class="media-left">
 					<figure class="image is-48x48">
