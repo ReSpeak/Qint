@@ -12,7 +12,7 @@
 	export let links: LinksMap = new Map();
 
 	let showBig = false;
-	let showBigSrc ="";
+	let showBigSrc = "";
 	let rendered: HTMLElement;
 	$: renderedObj = render(text);
 
@@ -56,7 +56,8 @@
 
 		// process ts3file links
 		for (const img of obj.querySelectorAll("img")) {
-			let src = img.src;
+			const src = img.src;
+			let imageSrc = src;
 			if (!src) continue;
 			const scheme = parseTsScheme(src);
 			if (scheme !== null) {
@@ -65,13 +66,14 @@
 					img.parentElement?.removeChild(img);
 					continue;
 				} else {
-					src = proxyFileSrc;
+					imageSrc = proxyFileSrc;
 					img.src = proxyFileSrc;
+					img.dataset.qintimg = src;
 				}
 			}
 			img.classList.add("limitChatSize", "previewImg", "padTop");
 			img.onclick = () => {
-				showBigSrc = src;
+				showBigSrc = imageSrc;
 				showBig = true;
 			};
 		}

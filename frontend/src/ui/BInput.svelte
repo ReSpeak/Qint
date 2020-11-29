@@ -60,7 +60,9 @@
 							parts.push("\n");
 							break;
 						case "IMG":
-							let src = (node as HTMLImageElement).src;
+							let src =
+								(node as HTMLImageElement).dataset.qintimg ??
+								(node as HTMLImageElement).src;
 							if (src.startsWith("data:")) {
 								const blob = new Blob(
 									[
@@ -73,7 +75,7 @@
 								parts.push({ blob });
 							} else if (src.startsWith("blob:")) {
 								log("How did this blob end up here");
-							} else {
+							} else if (src) {
 								parts.push({ src });
 							}
 							break;
@@ -131,7 +133,10 @@
 				const domImg = dom.querySelector("img");
 				log("pasting as html %o", domImg);
 				if (domImg !== null && domImg.src && !domImg.src.startsWith("file://")) {
-					const imgHtml = `<img src="${escapeHtml(domImg.src)}"/>`;
+					let qintImg = domImg.dataset.qintimg
+						? ` data-qintimg="${escapeHtml(domImg.dataset.qintimg)}"`
+						: "";
+					const imgHtml = `<img src="${escapeHtml(domImg.src)}"${qintImg}/>`;
 					document.execCommand("insertHtml", false, imgHtml);
 					hasHtmlNode = true;
 				}
