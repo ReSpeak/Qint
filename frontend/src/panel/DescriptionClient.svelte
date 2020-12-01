@@ -16,7 +16,7 @@
 	import { getClientAvatarPath } from "../ui/clientIcon";
 	import { Reason } from "../book_events";
 	import { onMount } from "svelte";
-	import { NARROW_NO_BREAK_SPACE } from "../util";
+	import { NARROW_NO_BREAK_SPACE, on } from "../util";
 	import { Client, ServerGroup } from "../book";
 	import BModal from "../ui/BModal.svelte";
 	import { tick } from "svelte";
@@ -25,6 +25,8 @@
 
 	export let connection: Connection;
 	export let client: Client;
+
+	const CHART_ENTRY_COUNT = 61;
 
 	let statsOpen = false;
 	let pokeModalVisible = false;
@@ -40,6 +42,7 @@
 		if ($client.optionalData == null) getOptionalData();
 		if ($client.connectionData == null) getConnectionData();
 	}
+	$: on(client, clearChart());
 
 	let chartConfig: Chart.ChartConfiguration = {
 		type: "line",
@@ -136,21 +139,45 @@
 
 	function createDataPoint(value: number | undefined): Chart.ChartPoint {
 		return {
-			x: Date.now(),
+			x: moment(),
 			y: value,
 		};
 	}
 
 	function packetLossToPercent(loss01: number | null | undefined): number | undefined {
 		if (!loss01) return undefined;
-		return loss01 * 100 * 100;
+		return loss01 * 100;
+	}
+
+	function addChartValue(data: (number | number[] | null | undefined)[] | Chart.ChartPoint[] | undefined, newValue: number | undefined) {
+		if (!data) return;
+
+		data.push(createDataPoint(newValue));
+
+		while (data.length > CHART_ENTRY_COUNT) {
+			data.shift();
+		}
 	}
 
 	function chartRefresh() {
-		chartConfig.data?.datasets![0].data?.push(createDataPoint(client.connectionData ? client.connectionData.ping?.asMilliseconds() : undefined));
-		chartConfig.data?.datasets![1].data?.push(createDataPoint(packetLossToPercent(client.connectionData?.clientToServerPacketlossTotal)));
-		chartConfig.data?.datasets![2].data?.push(createDataPoint(packetLossToPercent(client.connectionData?.serverToClientPacketlossTotal)));
-		chart?.updateChart();
+		addChartValue(chartConfig.data?.datasets![0].data, client.connectionData ? client.connectionData.ping?.asMilliseconds() : undefined);
+		addChartValue(chartConfig.data?.datasets![1].data, packetLossToPercent(client.connectionData?.clientToServerPacketlossTotal));
+		addChartValue(chartConfig.data?.datasets![2].data, packetLossToPercent(client.connectionData?.serverToClientPacketlossTotal));
+		chart?.updateChart?.();
+	}
+
+	function clearChart() {
+		chartConfig.data?.datasets?.filter(dataset => dataset.data).forEach(dataset => {
+			dataset.data = [];
+			for (let i = CHART_ENTRY_COUNT; i > 0; i--) {
+				let entry = {
+					x: moment().subtract(i, "second"),
+					y: undefined
+				};
+				dataset.data.push(entry);
+			}
+		});
+		chart?.updateChart?.();
 	}
 
 	function changeServerGroup(e: Event, group: ServerGroupId, isMember: boolean) {
