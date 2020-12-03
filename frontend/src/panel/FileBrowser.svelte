@@ -3,7 +3,7 @@
 	import { Connection } from "../connection";
 	import Icon from "../ui/Icon.svelte";
 	import BTable from "../ui/BTable.svelte";
-	import type { IColumns, IRowOptions, ClickRowEvent, IDragOptions } from "../ui/table";
+	import type { IColumns, IRowOptions, ClickRowEvent, IDragOptions, TableSortFn } from "../ui/table";
 	import { FolderState } from "../fileTreeCache";
 	import type { FileTreeNode } from "../fileTreeCache";
 	import { extensionToIcon, formatBytes, pathJoin, pathSplit } from "./fileUtil";
@@ -156,11 +156,11 @@
 	}
 
 	/// Sort first by type and then by f
-	function sortFoldersFirst(f: (a: FileTreeNode, b: FileTreeNode) => number): (a: FileTreeNode, b: FileTreeNode) => number {
-		return (a, b) => {
+	function sortFoldersFirst(f: TableSortFn<FileTreeNode>): TableSortFn<FileTreeNode> {
+		return (a, b, order) => {
 			if (a.isFile !== b.isFile)
 				return a.isFile ? 1 : -1;
-			return f(a, b);
+			return f(a, b, order);
 		};
 	}
 
@@ -177,21 +177,21 @@
 			key: "name",
 			title: "Name",
 			value: (v) => v.name,
-			sort: sortFoldersFirst((a, b) => a.name.localeCompare(b.name, undefined, sortOpt)),
+			sort: sortFoldersFirst((a, b, order) => a.name.localeCompare(b.name, undefined, sortOpt) * order),
 		},
 		{
 			key: "size",
 			title: "Size",
 			value: (v) => (v.isFile ? v.size : 0),
 			renderValue: (v) => (v.isFile ? formatBytes(v.size) : ""),
-			sort: sortFoldersFirst((a, b) => (b.isFile ? b.size : -1) - (a.isFile ? a.size : -1)),
+			sort: sortFoldersFirst((a, b, order) => ((a.isFile ? a.size : -1) - (b.isFile ? b.size : -1)) * order),
 		},
 		{
 			key: "lastModified",
 			title: "Last Modified",
 			value: (v) => v.lastModified,
 			renderValue: (v) => v.lastModified.format("D.M.YY HH:mm"),
-			sort: sortFoldersFirst((a, b) => a.lastModified.isAfter(b.lastModified) ? 1 : -1),
+			sort: sortFoldersFirst((a, b, order) => a.lastModified.isAfter(b.lastModified) ? order : -order),
 		},
 	];
 	const rowOptions: IRowOptions<FileTreeNode> = {

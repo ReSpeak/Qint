@@ -55,7 +55,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		selected: boolean;
 		sortVal?: any;
 	};
-	type SortFun = (t: InternalRow) => string | number;
 
 	export let columns: IColumns<TRow>;
 	export let rows: IRows<TRow>;
@@ -96,7 +95,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		if (sortBy === "") return;
 		let sortFn = columnByKey[sortBy].sort;
 		if (sortFn === undefined) return;
-		c_rows = c_rows.sort((a, b) => sortFn!(a.t, b.t) * sortOrder);
+		c_rows = c_rows.sort((a, b) => sortFn!(a.t, b.t, sortOrder));
 		c_rows.forEach((r, i) => {
 			r.id = i;
 		});

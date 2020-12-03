@@ -7,7 +7,7 @@ export interface IColumn<T> {
 	title: string;
 	value: (t: T) => any;
 	renderValue?: (t: T) => string;
-	sort?: (a: T, b: T) => number;
+	sort?: TableSortFn<T>;
 	headerClass?: string;
 	class?: string;
 	customRender?: boolean;
@@ -25,6 +25,7 @@ export const enum SortOrder {
 	Desc = -1,
 	Asc = 1,
 }
+export type TableSortFn<T> = (a: T, b: T, order: SortOrder) => number;
 
 export type ClickRowEvent<T> = CustomEvent<ClickRowData<T>>;
 export type ClickRowData<T> = { event: MouseEvent; row: T; dblclick: boolean };
