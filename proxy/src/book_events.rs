@@ -41,41 +41,6 @@ pub enum JsEvent {
 	},
 }
 
-// TODO Remove
-/*#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub enum JsPropertyId {
-	Channel(
-		#[serde(deserialize_with = "deserialize_id", serialize_with = "serialize_id")] ChannelId,
-	),
-	ChannelGroup(
-		#[serde(deserialize_with = "deserialize_id", serialize_with = "serialize_id")]
-		ChannelGroupId,
-	),
-	Client(#[serde(deserialize_with = "deserialize_id", serialize_with = "serialize_id")] ClientId),
-	ClientServerGroup(
-		#[serde(deserialize_with = "deserialize_id", serialize_with = "serialize_id")] ClientId,
-		#[serde(deserialize_with = "deserialize_id", serialize_with = "serialize_id")]
-		ServerGroupId,
-	),
-	Server,
-	ServerIp(IpAddr),
-	ServerGroup(
-		#[serde(deserialize_with = "deserialize_id", serialize_with = "serialize_id")]
-		ServerGroupId,
-	),
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub enum JsProperty {
-	Channel(JsChannel),
-	ChannelGroup(JsChannelGroup),
-	Client(JsClient),
-	Server(JsServer),
-	IpAddr(IpAddr),
-	ServerGroup(JsServerGroup),
-	ServerGroupId(ServerGroupId),
-}*/
-
 pub(crate) trait Id {
 	fn to_string_id(&self) -> String;
 	fn parse_id(s: &str) -> Result<Self>

@@ -20,7 +20,7 @@ chrono = { version = "0.4", features = [ "serde" ] }
 diesel = { version = "1.4", features = [ "chrono", "sqlite" ] }
 diesel-derive-enum = { version = "1", features = [ "sqlite" ] }
 diesel_migrations = "1.4"
-directories = "3"
+directories-next = "1"
 ebur128 = "0.1"
 fancy-regex = "0.4"
 flakebi-ring = "0.16.9"

@@ -250,6 +250,7 @@
 	 * changing the scroll position.
 	 */
 	async function modifyElems(newElems: T[], isAtTop: boolean) {
+		if (!mounted) return;
 		const lastScrollHeight = pan.scrollHeight;
 		const lastScrollTop = pan.scrollTop;
 		log("Before change scrollHeight:%d scrollTop:%d", lastScrollHeight, pan.scrollTop);

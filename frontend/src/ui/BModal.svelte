@@ -15,10 +15,12 @@
 	onDestroy(() => app.modalVisible.set(false));
 </script>
 
+<!-- Tabindex to make the div focusable and trigger onkeydown -->
 <div
 	on:keydown={(e) => {
 		if (e.key === 'Escape') close(e);
 	}}
+	tabindex="0"
 	class="modal"
 	class:is-active={visible}>
 	<div on:click={close} class="modal-background" />

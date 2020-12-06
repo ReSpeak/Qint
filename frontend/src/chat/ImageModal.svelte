@@ -1,20 +1,26 @@
 <script lang="typescript">
-	import { onDestroy } from "svelte";
+	import { onDestroy, onMount } from "svelte";
 	import { app } from "../app";
 
 	export let src: string;
 	export let visible: boolean;
+	let div: HTMLElement;
 
 	$: app.modalVisible.set(visible);
 
+	onMount(() => div.focus());
 	onDestroy(() => app.modalVisible.set(false));
-
-	function sroll() {
-		console.log("asdfkajlsdfkjhasdf");
-	}
 </script>
 
-<div class="modal is-active" on:click={() => (visible = false)}>
+<!-- Tabindex to make the div focusable and trigger onkeydown -->
+<div bind:this={div} class="modal is-active" on:click={() => (visible = false)}
+	on:keydown={(e) => {
+		if (e.key === 'Escape') {
+			e.stopPropagation();
+			visible = false;
+		}
+	}}
+	tabindex="0">
 	<div class="modal-background" />
 	<!-- svelte-ignore a11y-missing-attribute -->
 	<div class="custom-content"><img {src} /></div>

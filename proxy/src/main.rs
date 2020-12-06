@@ -199,7 +199,7 @@ struct App;
 fn default_listen_address() -> SocketAddr { "127.0.0.1:4422".parse().unwrap() }
 
 fn default_cache_path() -> PathBuf {
-	let proj_dirs = match directories::ProjectDirs::from("", DIR_ORGANIZATION, DIR_PROJECT) {
+	let proj_dirs = match directories_next::ProjectDirs::from("", DIR_ORGANIZATION, DIR_PROJECT) {
 		Some(r) => r,
 		None => {
 			return Default::default();
@@ -700,7 +700,7 @@ impl App {
 		let config_path: PathBuf = if let Some(p) = args.config_path {
 			p
 		} else {
-			let proj_dirs = match directories::ProjectDirs::from("", DIR_ORGANIZATION, DIR_PROJECT)
+			let proj_dirs = match directories_next::ProjectDirs::from("", DIR_ORGANIZATION, DIR_PROJECT)
 			{
 				Some(r) => r,
 				None => bail!("Failed to get project directory"),
