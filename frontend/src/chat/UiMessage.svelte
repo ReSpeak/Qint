@@ -77,7 +77,6 @@
 		display: grid;
 		grid-template-columns: min-content minmax(0, 1fr);
 		padding: $row-pad $side-pad-width $row-pad;
-		line-height: 1.1em;
 		border-left: solid $side-pad-width;
 
 		&:hover {

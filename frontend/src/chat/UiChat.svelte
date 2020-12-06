@@ -368,7 +368,7 @@
 		display: flex;
 		flex-direction: column;
 		justify-content: flex-end;
-		line-height: 1.2;
+		line-height: initial;
 		border-right: none;
 
 		// The LazyList
