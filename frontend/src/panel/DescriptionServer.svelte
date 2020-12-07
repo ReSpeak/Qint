@@ -1,7 +1,11 @@
 <script lang="typescript">
 	import { Connection } from "../connection";
+	import type { ChangePromise } from "../connection";
+	import type { Server } from "../book";
 	import moment from "moment";
-	import { LONG_DATETIME } from "../util";
+	import { enumValues, LONG_DATETIME } from "../util";
+	import type { RequiredNN, Writeable } from "../util";
+	import BDropDown from "../ui/BDropDown.svelte";
 	import Icon from "../ui/Icon.svelte";
 	import PlatformIcon from "../ui/PlatformIcon.svelte";
 	import ServerName from "../ui/ServerName.svelte";
@@ -10,92 +14,283 @@
 	import StickySlot from "../ui/StickySlot.svelte";
 	import StickyHeader from "./StickyHeader.svelte";
 	import RenderedText from "../ui/RenderedText.svelte";
+	import RenderedTextEditor from "../ui/RenderedTextEditor.svelte";
+	import { CodecEncryptionMode, HostMessageMode, OptionalServerDataGen } from "../book_events";
 
 	export let connection: Connection;
-	const serverRaw = connection.book.server;
-	$: server = $serverRaw;
-	$: create_date = server.created !== undefined ? server.created : moment.unix(0);
+	export let server: Server;
 
-	$: connection.sendMessage({
-		Change: {
-			change: {
-				ServerVariablesRequest: {},
+	let editing = false;
+	$: create_date = $server.created !== undefined ? $server.created : moment.unix(0);
+
+	$: {
+		if ($server.optionalData == null) getOptionalData();
+	}
+
+	// THIS IS NOT A FULL SERVER OBJECT
+	type EditProps = Omit<Writeable<RequiredNN<Server>>,
+		""> & {
+		_password: string | undefined;
+	};
+	type EditPropsOpt = Writeable<RequiredNN<OptionalServerDataGen>>;
+	let [servEdit, servEditOpt] = createPropsCopy();
+	let changeRequest: ChangePromise | undefined;
+
+	function createPropsCopy(): [EditProps, EditPropsOpt] {
+		let serv: EditProps = {} as any;
+		let servOpt: EditPropsOpt = {} as any;
+		// *** General
+		serv.name = server.name;
+		serv.phoneticName = server.phoneticName;
+		serv.nickname = server.nickname ?? "";
+		serv._password = undefined;
+		serv.maxClients = server.maxClients;
+		servOpt.reservedSlots = server.optionalData?.reservedSlots ?? 0;
+		serv.icon = server.icon;
+		serv.welcomeMessage = server.welcomeMessage;
+		// *** Host
+		// Host Message
+		serv.hostmessage = server.hostmessage;
+		serv.hostmessageMode = server.hostmessageMode;
+		// Host Banner
+		serv.hostbannerGfxUrl = server.hostbannerGfxUrl;
+		serv.hostbannerUrl = server.hostbannerUrl;
+		serv.hostbannerGfxInterval = server.hostbannerGfxInterval;
+		serv.hostbannerMode = server.hostbannerMode;
+		// Host Button
+		serv.hostbuttonTooltip = server.hostbuttonTooltip;
+		serv.hostbuttonUrl = server.hostbuttonUrl;
+		// ? Icon URL missing ?
+		// *** Integrations (Meh)
+		// *** Transfers
+		// ? UP/DOWN limits missing x4 ?
+		// *** Anti-Flood
+		// ? Flood limits missing x3 ?
+		// *** Security
+		// ? Needed Sec Level missing ?
+		serv.codecEncryptionMode = server.codecEncryptionMode;
+		// *** Misc
+		// Default Groups
+		serv.defaultChannelGroup = server.defaultChannelGroup;
+		serv.defaultServerGroup = server.defaultServerGroup;
+		// ? Channel admin group missing ?
+		// Complain
+		// ? Complain missing x3 ?
+		// Other
+		// ? min before silence missing ?
+		serv.prioritySpeakerDimmModificator = server.prioritySpeakerDimmModificator;
+		serv.tempChannelDefaultDeleteDelay = server.tempChannelDefaultDeleteDelay;
+		// ? report to serverlist missing ?
+		// *** Logs
+		// ? logging missing x6 ?
+		return [serv, servOpt];
+	}
+
+	function getPropsDiff() {
+		let diff: Record<string, any> = {};
+		if (servEdit.nickname === "") servEdit.nickname = null!;
+		for (const [key, value] of Object.entries(servEdit)) {
+			if (key.startsWith("_")) continue;
+			if ((server as any)[key] !== value) {
+				diff[key] = value;
+			}
+		}
+		if (server.optionalData !== null) {
+			let optionalData = server.optionalData as any;
+			for (const [key, value] of Object.entries(servEditOpt)) {
+				if (key.startsWith("_")) continue;
+				if (optionalData[key] !== value) {
+					diff[key] = value;
+				}
+			}
+		}
+		return diff;
+	}
+
+	function clickEditMode() {
+		editing = true;
+		[servEdit, servEditOpt] = createPropsCopy();
+	}
+
+	function clickSaveChanges() {
+		editing = false;
+
+		let diff = getPropsDiff();
+		if (Object.keys(diff).length === 0) return;
+		changeRequest = connection.sendChange({
+			ServerEdit: {
+				...diff,
 			},
-		},
-	});
+		});
+	}
+
+	async function getOptionalData() {
+		await connection
+			.sendChange({
+				ServerVariablesRequest: {},
+			})
+			.catch((reason) => {
+				console.error("ServerVariablesRequest failed: ", reason);
+			});
+	}
 
 	function disconnect() {
 		connection.disconnect();
-	}
-
-	function editHostmessage(e: CustomEvent<{ text: string }>) {
-		connection.sendMessage({
-			Change: {
-				change: {
-					ServerEdit: {
-						hostmessage: e.detail.text,
-					},
-				},
-			},
-		});
-	}
-
-	function editWelcomeMessage(e: CustomEvent<{ text: string }>) {
-		connection.sendMessage({
-			Change: {
-				change: {
-					ServerEdit: {
-						welcomeMessage: e.detail.text,
-					},
-				},
-			},
-		});
 	}
 </script>
 
 <StickyList>
 	<StickySlot styled={false}>
-		<StickyHeader title="Info" />
+		<StickyHeader title="Info">
+			{#if editing}
+				<button
+					class="button is-small is-success"
+					on:click|stopPropagation={clickSaveChanges}>
+					<Icon name="check" />
+					<span>Save</span>
+				</button>
+				<button
+					class="button is-small is-danger"
+					on:click|stopPropagation={() => (editing = false)}>
+					<Icon name="close" />
+					<span>Cancel</span>
+				</button>
+			{:else}
+				<button
+					class="button is-small outline-button"
+					on:click|stopPropagation={clickEditMode}>
+					<Icon name="pencil" />
+					<span>Edit</span>
+				</button>
+			{/if}
+		</StickyHeader>
 	</StickySlot>
-	<div class="descGroup">
+	<div class="descGroup" class:editing>
+		{#await changeRequest then changeResult}
+			<!-- Todo check properly -->
+			{#if changeResult !== undefined}
+				<div class="notification is-danger">
+					<button
+						class="toolbutton is-small"
+						style="float: right;"
+						on:click={() => (changeRequest = undefined)}>
+						<Icon name="close" />
+					</button>
+					{JSON.stringify(changeResult)}
+				</div>
+			{/if}
+		{/await}
+
 		<div class="dataLine headLine">
-			<TsIcon type="server" source={server} {connection} />
-			<ServerName {connection} />
+			<TsIcon type="server" source={$server} {connection} />
+			{#if editing}
+				<input class="input" type="text" bind:value={servEdit.name} />
+			{:else}
+				<ServerName {connection} />
+			{/if}
 		</div>
+		{#if editing}
+			<div class="dataLine">
+				<label for="edit_phoneticName">Phonetic Name:</label>
+				<input
+					id="edit_phoneticName"
+					class="input"
+					bind:value={servEdit.phoneticName}
+					placeholder="(Same as Name by default)" />
+			</div>
+		{/if}
 		<div class="dataLine">
 			<div>IPs:</div>
-			<div>{server.ips?.join(', ') ?? ''}</div>
-			{#if server.nickname}
+			<div>{$server.ips?.join(', ') ?? ''}</div>
+			{#if $server.nickname && !editing}
 				<span style="margin-left:1em;">(Nickname: </span>
-				<code class="nick">{server.nickname}</code>
+				<code class="nick">{$server.nickname}</code>
 				<span>)</span>
 			{/if}
 		</div>
+		{#if editing}
+			<div class="dataLine">
+				<label for="edit_nickname">Nickname:</label>
+				<input id="edit_nickname" class="input" bind:value={servEdit.nickname} />
+			</div>
+		{/if}
 		<div class="dataLine">
 			<div>License:</div>
-			<div>{server.license}</div>
+			<div>{$server.license}</div>
 		</div>
 		<div class="dataLine">
 			<div>Version:</div>
-			<PlatformIcon platform={server.platform} version={server.version} />
+			<PlatformIcon platform={$server.platform} version={$server.version} />
 		</div>
 		<div class="dataLine">
 			<div>Host message:</div>
-			<RenderedText {connection} text={server.hostmessageRendered ?? ''} />
+			{#if editing}
+				<RenderedTextEditor {connection} bind:raw={servEdit.hostmessage} />
+			{:else}
+				<RenderedText {connection} text={$server.hostmessageRendered ?? ''} />
+			{/if}
 		</div>
 		<div class="dataLine">
 			<div>Welcome message:</div>
-			<RenderedText {connection} text={server.welcomeMessageRendered ?? ''} />
+			{#if editing}
+				<RenderedTextEditor {connection} bind:raw={servEdit.welcomeMessage} />
+			{:else}
+				<RenderedText {connection} text={$server.welcomeMessageRendered ?? ''} />
+			{/if}
 		</div>
 		<div class="dataLine">
 			<div>Created:</div>
 			<div>{create_date.format(LONG_DATETIME)}</div>
 		</div>
-		<div class="dataLine">
-			<div>Current Clients:</div>
-			<div>{'?'} / {server.maxClients}</div>
-		</div>
+		{#if editing}
+			<div class="dataLine">
+				<div>Max Clients:</div>
+				<input class="input" type="number" bind:value={servEdit.maxClients} />
+			</div>
+			<div class="dataLine">
+				<div>Reserved Slots:</div>
+				<input class="input" type="number" bind:value={servEditOpt.reservedSlots} />
+			</div>
+		{:else}
+			<div class="dataLine">
+				<div>Current Clients:</div>
+				<div>{'?'} / {$server.maxClients}</div>
+				{#if $server.optionalData !== null && $server.optionalData.reservedSlots > 0}
+					<div style="margin-left:0.5em;">
+						(-{$server.optionalData.reservedSlots}
+						reserved)
+					</div>
+				{/if}
+			</div>
+		{/if}
 	</div>
+	{#if editing}
+		<StickySlot>Host</StickySlot>
+		<div class="descGroup" class:editing>
+			<div class="dataLine">
+				<div>Hostmessage:</div>
+				<RenderedTextEditor {connection} bind:raw={servEdit.hostmessage} />
+			</div>
+
+			<div class="dataLine">
+				<div>Hostmessage Mode:</div>
+				<BDropDown
+					bind:selected={servEdit.hostmessageMode}
+					items={enumValues(HostMessageMode)} />
+			</div>
+			(TODO) More ...
+		</div>
+
+		<StickySlot>Security</StickySlot>
+		<div class="descGroup" class:editing>
+			<div class="dataLine">
+				<div>Audio Encryption Mode:</div>
+				<BDropDown
+					bind:selected={servEdit.codecEncryptionMode}
+					items={enumValues(CodecEncryptionMode)} />
+			</div>
+		</div>
+	{/if}
 	<StickySlot>Actions</StickySlot>
 	<div class="descGroup">
 		<p class="buttons">

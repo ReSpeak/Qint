@@ -137,5 +137,7 @@
 		overflow-x: hidden;
 		background-color: #242424;
 		box-shadow: -3px 0 3px #0005;
+		display: flex;
+		flex-direction: column;
 	}
 </style>

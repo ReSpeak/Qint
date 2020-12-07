@@ -10,9 +10,10 @@ import { OChange, Reason, IMsgPluginCommandPart, TsError } from "./book_events";
 import moment from "moment";
 import { ChannelId, ClientId } from "./ts";
 import { FileTreeCache } from "./fileTreeCache";
-import { DescriptionMode } from "./transientSettings";
 import { FiletransferManager } from "./panel/filetransferManager";
 import debug from "debug";
+const log_raw_in = debug("RAW:IN");
+const log_raw_out = debug("RAW:OUT");
 const log = debug("CON"), error = debug("error:CON");
 const log_evt = log.extend("EVT"), log_msg = log.extend("MSG");
 
@@ -95,6 +96,7 @@ export class Connection {
 	}
 
 	public sendMessage(data: OutMsg) {
+		log_raw_out("%o", data);
 		this.backend.send(data);
 	}
 
@@ -230,6 +232,8 @@ export class Connection {
 	}
 
 	private messageHandler(msg: InMsg) {
+		log_raw_in("%o", msg);
+
 		// Plugins
 		for (const plugin of app.plugins) {
 			try {
@@ -348,40 +352,11 @@ export class Connection {
 			const message = msg.Message;
 			log_msg("%o", message);
 
-			if ("ChannelDescriptionChanged" in message) {
-				const curTarget = get(app.selectedNode);
-				if (curTarget !== undefined && curTarget.connection === this && curTarget.node.qlType === "CHANNEL"
-					&& get(app.transientSettings.ui._descriptionMode) === DescriptionMode.Info) {
-					for (const c of message.ChannelDescriptionChanged) {
-						if (c.channelId === curTarget.node.qlId) {
-							// Update channel description
-							this.sendMessage({
-								Change: {
-									change: {
-										ChannelDescriptionRequest: {
-											id: c.channelId,
-										},
-									}
-								}
-							});
-							break;
-						}
-					}
-				}
-			} else if ("ChannelListFinished" in message) {
+			if ("ChannelListFinished" in message) {
 				this._state.update(s => s.setChannelListFinished());
 				this.updateAllUnreadCounts();
 			} else if ("FileList" in message) {
 				this.fileTreeCache.update(ftc => ftc.applyFileList(message));
-			} else if ("ServerEdited" in message) {
-				// TODO We do not get this message because it is a book message...
-				this.sendMessage({
-					Change: {
-						change: {
-							ServerVariablesRequest: {},
-						}
-					}
-				});
 			} else if ("PluginCommand" in message) {
 				message.PluginCommand.forEach((pc) => this.pluginCmd(pc));
 			}

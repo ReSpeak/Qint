@@ -7,7 +7,7 @@
 	import { onMount } from "svelte";
 	import type { Connection } from "../connection";
 
-	enum View {
+	const enum View {
 		Edit,
 		Both,
 		Rendered,
@@ -36,41 +36,53 @@
 		mdRenderSocket.onmessage = (ev) => {
 			rendered = ev.data as string;
 		};
+		mdRenderSocket.onclose = (ev) => {
+			mdRenderSocket = undefined;
+		};
 
-		return () => mdRenderSocket?.close();
+		return () => {
+			mdRenderSocket?.close();
+			mdRenderSocket = undefined;
+		};
 	});
 </script>
 
-<div class="field has-addons">
-	<p class="control">
-		<button class="button" on:click={() => (view = View.Edit)}>
-			<Icon name="pencil" title="Source" />
-		</button>
-	</p>
-	<p class="control">
-		<button class="button" on:click={() => (view = View.Both)}>
-			<Icon name="flip-horizontal" title="Split view" />
-		</button>
-	</p>
-	<p class="control">
-		<button class="button" on:click={() => (view = View.Rendered)}>
-			<Icon name="eye" title="Preview" />
-		</button>
-	</p>
-</div>
+<div class="renderedTextEditor">
+	<div class="field has-addons">
+		<p class="control">
+			<button class="button" on:click={() => (view = View.Edit)}>
+				<Icon name="pencil" title="Source" />
+			</button>
+		</p>
+		<p class="control">
+			<button class="button" on:click={() => (view = View.Both)}>
+				<Icon name="flip-horizontal" title="Split view" />
+			</button>
+		</p>
+		<p class="control">
+			<button class="button" on:click={() => (view = View.Rendered)}>
+				<Icon name="eye" title="Preview" />
+			</button>
+		</p>
+	</div>
 
-<div class="editbox">
-	{#if view === View.Edit || view === View.Both}
-		<BInput enterToSubmit={false} bind:value={raw} />
-	{/if}
-	{#if view === View.Rendered || view === View.Both}
-		<div class="renderSide">
-			<RenderedText {connection} text={rendered} />
-		</div>
-	{/if}
+	<div class="editbox">
+		{#if view === View.Edit || view === View.Both}
+			<BInput enterToSubmit={false} bind:value={raw} />
+		{/if}
+		{#if view === View.Rendered || view === View.Both}
+			<div class="renderSide">
+				<RenderedText {connection} text={rendered} />
+			</div>
+		{/if}
+	</div>
 </div>
 
 <style lang="scss">
+	.renderedTextEditor {
+		width: 100%;
+	}
+
 	.editbox {
 		display: flex;
 

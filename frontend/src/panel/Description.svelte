@@ -15,7 +15,7 @@
 	{:else if selected !== undefined && selected.node instanceof Channel}
 		<DescriptionChannel connection={selected.connection} channel={selected.node} />
 	{:else if selected !== undefined && selected.node instanceof Server}
-		<DescriptionServer connection={selected.connection} />
+		<DescriptionServer connection={selected.connection} server={selected.node} />
 	{/if}
 {/if}
 
@@ -42,5 +42,10 @@
 
 	:global(.descGroup) {
 		padding: 1em;
+		white-space: nowrap;
+
+		&.editing > :global(*:not(:last-child)) {
+			margin-bottom: 0.5em;
+		}
 	}
 </style>

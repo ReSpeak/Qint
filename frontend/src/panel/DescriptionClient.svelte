@@ -243,8 +243,7 @@
 				},
 			})
 			.catch((reason) => {
-				console.error("Client info update failed: ");
-				console.error(reason);
+				console.error("Client info update failed: ", reason);
 			});
 	}
 
@@ -256,8 +255,7 @@
 				},
 			})
 			.catch((reason) => {
-				console.error("ClientVariablesRequest failed: ");
-				console.error(reason);
+				console.error("ClientVariablesRequest failed: ", reason);
 			});
 	}
 
@@ -269,8 +267,7 @@
 				},
 			})
 			.catch((reason) => {
-				console.error("ClientConnectionInfoRequest failed: ");
-				console.error(reason);
+				console.error("ClientConnectionInfoRequest failed: ", reason);
 			});
 	}
 

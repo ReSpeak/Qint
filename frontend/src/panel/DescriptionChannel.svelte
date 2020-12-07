@@ -5,11 +5,11 @@
 	import Icon from "../ui/Icon.svelte";
 	import StickyList from "../ui/StickyList.svelte";
 	import StickySlot from "../ui/StickySlot.svelte";
+	import StickyHeader from "./StickyHeader.svelte";
 	import { codecToName } from "../book";
 	import type { Channel } from "../book";
 	import RenderedText from "../ui/RenderedText.svelte";
 	import RenderedTextEditor from "../ui/RenderedTextEditor.svelte";
-	import StickyHeader from "./StickyHeader.svelte";
 	import BDropDown from "../ui/BDropDown.svelte";
 	import BSlider from "../ui/BSlider.svelte";
 	import BDurationPicker from "../ui/BDurationPicker.svelte";
@@ -253,9 +253,9 @@
 			<div class="dataLine">
 				<div>Codec:</div>
 				<div>{$channel.codec !== null ? codecToName($channel.codec) : 'unknown'}</div>
-				<div>&nbsp;@&nbsp;</div>
+				<div> @ </div>
 				<div>{$channel.codecQuality}</div>
-				<div>&nbsp;</div>
+				<div> </div>
 				{#if server.codecEncryptionMode === CodecEncryptionMode.ForcedOn}
 					<Icon name="lock-outline" title="Voice is encrypted (forced by server)" />
 				{:else if !channel.isUnencrypted}
@@ -275,8 +275,8 @@
 		{/if}
 		{#if editing}
 			<div class="dataLine">
-				<div>Phonetic name:</div>
-				<input class="input" bind:value={chanEdit.phoneticName} />
+				<label for="edit_phoneticName">Phonetic name:</label>
+				<input id="edit_phoneticName" class="input" bind:value={chanEdit.phoneticName} />
 			</div>
 		{/if}
 		{#if editing}
@@ -317,10 +317,6 @@
 <style lang="scss">
 	.description {
 		margin: 1em;
-	}
-
-	.descGroup.editing > *:not(:last-child) {
-		margin-bottom: 0.5em;
 	}
 
 	.disabled {

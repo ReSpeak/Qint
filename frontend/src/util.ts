@@ -3,7 +3,6 @@ import moment, { Duration } from "moment";
 import { Moment } from "moment";
 import { OffsetDateTime, RustDuration } from "./ts";
 import { Readable } from "svelte/store";
-import { ConnectData } from "./connect/connect";
 import { Version } from "./book_events";
 
 export const debug: boolean = true;
@@ -26,9 +25,8 @@ export const LONG_DATETIME = "dddd, MMMM Do YYYY, HH:mm:ss UTCZ";
 export const NARROW_NO_BREAK_SPACE = String.fromCharCode(0x202f);
 export const youtubeUrlRegex = /^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube\.com|youtu.be))(\/(?:[\w\-]+\?v=|embed\/|v\/)?)([\w\-]+)(\S+)?$/;
 
-export type RequiredNN<T> = {
-	[P in keyof T]: NonNullable<T[P]>;
-};
+export type RequiredNN<T> = { [P in keyof T]: NonNullable<T[P]> };
+export type Writeable<T> = { -readonly [P in keyof T]: Writeable<T[P]> };
 
 export async function sleep(timeout: number): Promise<void> {
 	return new Promise(resolve => setTimeout(resolve, timeout));
@@ -399,4 +397,8 @@ export function fnBroadcast<T extends unknown[] = []>() {
 	call.clear = clear;
 	call.subscribe = subscribe;
 	return call;
+}
+
+export function enumValues(e: object): (string | number)[] {
+	return Object.keys(e) as any;
 }

@@ -19,7 +19,7 @@ import { <#= base_structs.join(", ") #> } from "./bookBase";
 use tsproto_structs::{enums, errors, versions};
 
 for e in &enums::DATA.enums { #>
-export const enum <#= e.name #> {
+export enum <#= e.name #> {
 <# for v in &e.variants { #>
 	<#= v.name #> = "<#= v.name #>",
 <# } #>
