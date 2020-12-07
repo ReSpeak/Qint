@@ -76,7 +76,7 @@
 	.hover-container {
 		display: grid;
 		grid-template-columns: min-content minmax(0, 1fr);
-		padding: $row-pad $side-pad-width $row-pad;
+		padding: $row-pad 0;
 		border-left: solid $side-pad-width;
 
 		&:hover {
