@@ -1,19 +1,18 @@
-use std::collections::HashMap;
 use std::option::Option;
-use std::sync::Mutex;
+use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
 use percent_encoding::percent_decode_str;
 use reqwest::header::CONTENT_TYPE;
 use scraper::{ElementRef, Html, Selector};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use sled::Db;
 
-#[derive(Debug, Default)]
-pub struct SitePeekCache {
-	cache: Mutex<HashMap<String, AnalyzeResult>>,
+pub struct LinkPreviewer {
+	cache: Db,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum AnalyzeResult {
 	Unknown,
 	// Image,Video link, currently same as input, but might change later
@@ -22,22 +21,28 @@ pub enum AnalyzeResult {
 	Site { title: String, image_src: String, description: Option<String> },
 }
 
-impl SitePeekCache {
+impl LinkPreviewer {
+	pub fn new(mut cache_path: PathBuf) -> Self {
+		cache_path.push("urls.sled");
+		LinkPreviewer { cache: sled::open(cache_path).expect("(TODO) Could not create cache") }
+	}
+
 	pub async fn decode_and_analyze_link(&self, link: &str) -> AnalyzeResult {
-		{
-			let cache = self.cache.lock().unwrap();
-			if let Some(cached_value) = cache.get(link) {
-				return cached_value.clone();
-			}
+		if let Ok(Some(cached_value)) = self.cache.get(link) {
+			println!("CACHED {}", link);
+			let slice: &[u8] = cached_value.as_ref();
+			return rmp_serde::from_read_ref(slice).expect("temp err");
 		}
 		if let Ok(url) = percent_decode_str(link).decode_utf8() {
 			let result = Self::analyze_link(url.as_ref()).await.unwrap_or(AnalyzeResult::Unknown);
 			{
-				let mut cache = self.cache.lock().unwrap();
-				cache.insert(link.to_string(), result.clone());
+				println!("ADDING {}", link);
+				let cache_arr = rmp_serde::to_vec(&result).expect("weird seri err?");
+				self.cache.insert(link.as_bytes(), cache_arr.as_slice()).expect("db save err");
 			}
 			result
 		} else {
+			println!("FAILED {}", link);
 			AnalyzeResult::Unknown
 		}
 	}

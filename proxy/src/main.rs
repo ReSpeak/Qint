@@ -44,19 +44,20 @@ mod book_events;
 mod db;
 mod filecache;
 mod find_url;
+mod link_previewer;
 mod markdown;
 mod markdown_ws;
 mod messages;
 mod search;
 mod secret;
 mod shortcut;
-mod site_peek;
 mod websocket;
 
 use filecache::FileCache;
 use markdown_ws::MarkdownService;
 use secret::Secret;
 use websocket::Ws;
+use link_previewer::LinkPreviewer;
 
 const DIR_ORGANIZATION: &str = "ReSpeak";
 const DIR_PROJECT: &str = "Qint";
@@ -171,7 +172,7 @@ pub struct State {
 	database: Addr<db::DbHandler>,
 	graphql_schema: Arc<db::graphql::Schema>,
 	file_cache: Arc<FileCache>,
-	site_peek_cache: site_peek::SitePeekCache,
+	link_previewer: link_previewer::LinkPreviewer,
 	secret: Secret,
 	search: Arc<search::Search>,
 }
@@ -300,6 +301,16 @@ async fn guess_content_type<
 			response.content_type("image/jpeg");
 		} else if r.windows(3).any(|w| w == b"svg") {
 			response.content_type("image/svg+xml");
+		} else if r.starts_with(&[0x42, 0x4D]) {
+			response.content_type("image/bmp");
+		} else if r.starts_with(&[0x47, 0x49, 0x46, 0x38, 0x37, 0x61])
+			|| r.starts_with(&[0x47, 0x49, 0x46, 0x38, 0x39, 0x61])
+		{
+			response.content_type("image/gif");
+		} else if r
+			.starts_with(&[0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6F, 0x6D])
+		{
+			response.content_type("video/mp4");
 		}
 	}
 	(stream, response)
@@ -394,6 +405,8 @@ async fn get_plugin(state: web::Data<Arc<State>>, name: web::Path<String>) -> im
 struct GetFileOptions {
 	dl: Option<String>,
 	return_code: Option<String>,
+	#[serde(default)]
+	cache: bool,
 }
 
 impl ResultDetails {
@@ -408,6 +421,7 @@ async fn download_file(
 {
 	let channel = ChannelId(channel);
 	let cons = state.connections.lock().unwrap();
+	let GetFileOptions { dl, return_code, cache } = query_opt.into_inner();
 	if let Some(con) = cons.get(&ConnectionId(id)).cloned() {
 		drop(cons);
 
@@ -434,7 +448,7 @@ async fn download_file(
 			.send(websocket::DownloadFile {
 				channel,
 				path: path.clone(),
-				return_code: query_opt.return_code.clone(),
+				return_code,
 			})
 			.await
 		{
@@ -465,7 +479,7 @@ async fn download_file(
 			FramedRead::new(file_stream, BytesCodec::new()).map(|r| r.map(web::BytesMut::freeze));
 		let (stream, mut response) = guess_content_type(stream).await;
 		response.no_chunking(len);
-		if let Some(filename) = query_opt.dl.as_ref() {
+		if let Some(filename) = dl.as_ref() {
 			response.set_header(
 				"Content-Disposition",
 				format!("attachment; filename=\"{}\"", filename),
@@ -473,7 +487,7 @@ async fn download_file(
 		}
 
 		// Cache icons and avatars for offline usage
-		if channel.0 == 0 && (path.starts_with("icon_") || path.starts_with("avatar_")) {
+		if (cache && len < 5*1024*1024 /*5MB*/) || (channel.0 == 0 && (path.starts_with("icon_") || path.starts_with("avatar_"))) {
 			let stream = state.file_cache.cache_file(&server, channel, &path, stream).await;
 			response.streaming(stream)
 		} else {
@@ -591,7 +605,7 @@ async fn download_cache_file(
 
 #[get("/peek_link/{url}")]
 async fn get_link_preview(state: web::Data<Arc<State>>, url: web::Path<String>) -> impl Responder {
-	HttpResponse::Ok().json(state.site_peek_cache.decode_and_analyze_link(&url).await)
+	HttpResponse::Ok().json(state.link_previewer.decode_and_analyze_link(&url).await)
 }
 
 #[get("/render_md_service")]
@@ -700,11 +714,11 @@ impl App {
 		let config_path: PathBuf = if let Some(p) = args.config_path {
 			p
 		} else {
-			let proj_dirs = match directories_next::ProjectDirs::from("", DIR_ORGANIZATION, DIR_PROJECT)
-			{
-				Some(r) => r,
-				None => bail!("Failed to get project directory"),
-			};
+			let proj_dirs =
+				match directories_next::ProjectDirs::from("", DIR_ORGANIZATION, DIR_PROJECT) {
+					Some(r) => r,
+					None => bail!("Failed to get project directory"),
+				};
 			proj_dirs.config_dir().into()
 		};
 
@@ -820,7 +834,7 @@ impl App {
 		}
 
 		let graphql_schema = db::graphql::create_schema();
-		let site_peek_cache = Default::default();
+		let link_previewer = LinkPreviewer::new(settings.cache_path.clone());
 		let state = Arc::new(State {
 			logger,
 			connections,
@@ -831,7 +845,7 @@ impl App {
 			database,
 			graphql_schema,
 			file_cache,
-			site_peek_cache,
+			link_previewer,
 			secret,
 			search,
 		});
