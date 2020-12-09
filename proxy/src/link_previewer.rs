@@ -1,5 +1,5 @@
 use std::option::Option;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
 use percent_encoding::percent_decode_str;
@@ -7,8 +7,10 @@ use reqwest::header::CONTENT_TYPE;
 use scraper::{ElementRef, Html, Selector};
 use serde::{Deserialize, Serialize};
 use sled::Db;
+use slog::{warn, Logger};
 
 pub struct LinkPreviewer {
+	logger: Logger,
 	cache: Db,
 }
 
@@ -22,27 +24,28 @@ pub enum AnalyzeResult {
 }
 
 impl LinkPreviewer {
-	pub fn new(mut cache_path: PathBuf) -> Self {
+	pub fn new(logger: Logger, mut cache_path: PathBuf) -> Result<Self, sled::Error> {
 		cache_path.push("urls.sled");
-		LinkPreviewer { cache: sled::open(cache_path).expect("(TODO) Could not create cache") }
+		Ok(LinkPreviewer { logger, cache: sled::open(cache_path)? })
 	}
 
 	pub async fn decode_and_analyze_link(&self, link: &str) -> AnalyzeResult {
 		if let Ok(Some(cached_value)) = self.cache.get(link) {
-			println!("CACHED {}", link);
 			let slice: &[u8] = cached_value.as_ref();
-			return rmp_serde::from_read_ref(slice).expect("temp err");
+			if let Ok(result) = rmp_serde::from_read_ref(slice) {
+				return result;
+			}
 		}
 		if let Ok(url) = percent_decode_str(link).decode_utf8() {
 			let result = Self::analyze_link(url.as_ref()).await.unwrap_or(AnalyzeResult::Unknown);
-			{
-				println!("ADDING {}", link);
-				let cache_arr = rmp_serde::to_vec(&result).expect("weird seri err?");
-				self.cache.insert(link.as_bytes(), cache_arr.as_slice()).expect("db save err");
+
+			if let Ok(cache_arr) = rmp_serde::to_vec(&result) {
+				if let Err(err) = self.cache.insert(link.as_bytes(), cache_arr.as_slice()) {
+					warn!(self.logger, "Failed to insert into link cache"; "url" => link, "err" => %err);
+				}
 			}
 			result
 		} else {
-			println!("FAILED {}", link);
 			AnalyzeResult::Unknown
 		}
 	}

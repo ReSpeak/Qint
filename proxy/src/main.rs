@@ -54,10 +54,10 @@ mod shortcut;
 mod websocket;
 
 use filecache::FileCache;
+use link_previewer::LinkPreviewer;
 use markdown_ws::MarkdownService;
 use secret::Secret;
 use websocket::Ws;
-use link_previewer::LinkPreviewer;
 
 const DIR_ORGANIZATION: &str = "ReSpeak";
 const DIR_PROJECT: &str = "Qint";
@@ -445,11 +445,7 @@ async fn download_file(
 
 		debug!(state.logger, "Downloading file"; "channel" => channel.0, "path" => &path);
 		let (len, file_stream, server) = match con
-			.send(websocket::DownloadFile {
-				channel,
-				path: path.clone(),
-				return_code,
-			})
+			.send(websocket::DownloadFile { channel, path: path.clone(), return_code })
 			.await
 		{
 			Err(_) => {
@@ -487,7 +483,9 @@ async fn download_file(
 		}
 
 		// Cache icons and avatars for offline usage
-		if (cache && len < 5*1024*1024 /*5MB*/) || (channel.0 == 0 && (path.starts_with("icon_") || path.starts_with("avatar_"))) {
+		if (cache && len < 5 * 1024 * 1024/*5MB*/)
+			|| (channel.0 == 0 && (path.starts_with("icon_") || path.starts_with("avatar_")))
+		{
 			let stream = state.file_cache.cache_file(&server, channel, &path, stream).await;
 			response.streaming(stream)
 		} else {
@@ -834,7 +832,8 @@ impl App {
 		}
 
 		let graphql_schema = db::graphql::create_schema();
-		let link_previewer = LinkPreviewer::new(settings.cache_path.clone());
+		let link_previewer = LinkPreviewer::new(logger.clone(), settings.cache_path.clone())?;
+
 		let state = Arc::new(State {
 			logger,
 			connections,

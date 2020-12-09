@@ -20,7 +20,7 @@ chrono = { version = "0.4", features = [ "serde" ] }
 diesel = { version = "1.4", features = [ "chrono", "sqlite" ] }
 diesel-derive-enum = { version = "1", features = [ "sqlite" ] }
 diesel_migrations = "1.4"
-directories-next = "1"
+directories-next = "2"
 ebur128 = "0.1"
 fancy-regex = "0.4"
 flakebi-ring = "0.16.9"
@@ -30,7 +30,7 @@ juniper = { git = "https://github.com/graphql-rust/juniper" }
 lazy_static = "1"
 libsqlite3-sys = { version = "0.18", features = [ "bundled" ] }
 livesplit-hotkey = "0.5"
-meilisearch-core = { git = "https://github.com/meilisearch/MeiliSearch", version = "0.16.0" }
+meilisearch-core = { git = "https://github.com/meilisearch/MeiliSearch", version = "0.17.0" }
 nnnoiseless = "0.3"
 nom = "6"
 open = "1"
@@ -38,7 +38,7 @@ percent-encoding = "2.1"
 pulldown-cmark = "0.8"
 regex = "1"
 reqwest = "0.10"
-rmp-serde = "0.14"
+rmp-serde = "0.15"
 scraper = "0.12"
 sdl2 = "0.34"
 serde = { version = "1", features = [ "derive" ] }
@@ -50,7 +50,7 @@ slog-scope = "4"
 slog-stdlog = "4"
 slog-term = "2"
 structopt = { version = "0.3", default-features = false }
-tauri = { version = "0.9", features = [ "all-api" ] }
+tauri = { version = "0.10", features = [ "all-api" ] }
 thiserror = "1"
 time = "0.2"
 toml = "0.5"
