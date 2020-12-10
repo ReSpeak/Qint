@@ -7,10 +7,11 @@ use anyhow::format_err;
 use diesel::prelude::*;
 use futures::FutureExt;
 use meilisearch_core::{Database, DatabaseOptions, Schema};
+use meilisearch_core::Error as MError;
 use meilisearch_core::settings::{SettingsUpdate, UpdateState};
 use meilisearch_core::store::Index;
 use serde::{Deserialize, Serialize};
-use slog::{debug, error, trace, warn, Logger};
+use slog::{debug, error, info, trace, warn, Logger};
 
 use crate::{db, Result, State};
 
@@ -67,7 +68,16 @@ pub fn char_to_byte_range(index: usize, length: usize, text: &str) -> Range<usiz
 impl Search {
 	/// Creates a search databe and returns if it was newly created or not.
 	pub fn new(logger: Logger, path: &Path) -> Result<(Self, bool)> {
-		let database = Database::open_or_create(path, DatabaseOptions::default())?;
+		let database = match Database::open_or_create(path, DatabaseOptions::default()) {
+			Ok(r) => r,
+			Err(MError::VersionMismatch(msg)) => {
+				info!(logger, "Search database version mismatch, recreating database";
+					"old_version" => msg, "path" => ?path);
+				std::fs::remove_dir_all(path)?;
+				Database::open_or_create(path, DatabaseOptions::default())?
+			}
+			Err(e) => return Err(e.into()),
+		};
 		let (index, is_new) = match database.open_index(MESSAGES_INDEX) {
 			Some(index) => (index, false),
 			None => {
