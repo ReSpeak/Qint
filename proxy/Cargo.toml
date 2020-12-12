@@ -26,7 +26,7 @@ fancy-regex = "0.4"
 flakebi-ring = "0.16.9"
 futures = "0.3"
 git-testament = "0.1"
-juniper = { git = "https://github.com/graphql-rust/juniper" }
+juniper = "0.15"
 lazy_static = "1"
 libsqlite3-sys = { version = "0.18", features = [ "bundled" ] }
 livesplit-hotkey = "0.5"
