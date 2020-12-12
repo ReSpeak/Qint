@@ -11,7 +11,8 @@ use slog::{warn, Logger};
 
 pub struct LinkPreviewer {
 	logger: Logger,
-	cache: Db,
+	/// Only one process can open the database at a time, if it failed at startup, this is `None`.
+	cache: Option<Db>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -24,13 +25,21 @@ pub enum AnalyzeResult {
 }
 
 impl LinkPreviewer {
-	pub fn new(logger: Logger, mut cache_path: PathBuf) -> Result<Self, sled::Error> {
+	pub fn new(logger: Logger, mut cache_path: PathBuf) -> Self {
 		cache_path.push("urls.sled");
-		Ok(LinkPreviewer { logger, cache: sled::open(cache_path)? })
+		let cache = match sled::open(cache_path) {
+			Ok(r) => Some(r),
+			Err(e) => {
+				warn!(logger, "Failed to open url cache database, running without cache";
+					"error" => %e);
+				None
+			}
+		};
+		LinkPreviewer { logger, cache, }
 	}
 
 	pub async fn decode_and_analyze_link(&self, link: &str) -> AnalyzeResult {
-		if let Ok(Some(cached_value)) = self.cache.get(link) {
+		if let Some(cached_value) = self.cache.as_ref().and_then(|c| c.get(link).ok().flatten()) {
 			let slice: &[u8] = cached_value.as_ref();
 			if let Ok(result) = rmp_serde::from_read_ref(slice) {
 				return result;
@@ -40,8 +49,11 @@ impl LinkPreviewer {
 			let result = Self::analyze_link(url.as_ref()).await.unwrap_or(AnalyzeResult::Unknown);
 
 			if let Ok(cache_arr) = rmp_serde::to_vec(&result) {
-				if let Err(err) = self.cache.insert(link.as_bytes(), cache_arr.as_slice()) {
-					warn!(self.logger, "Failed to insert into link cache"; "url" => link, "err" => %err);
+				if let Some(cache) = &self.cache {
+					if let Err(err) = cache.insert(link.as_bytes(), cache_arr.as_slice()) {
+						warn!(self.logger, "Failed to insert into link cache"; "url" => link,
+							"error" => %err);
+					}
 				}
 			}
 			result

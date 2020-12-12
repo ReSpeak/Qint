@@ -1,7 +1,7 @@
 use actix::*;
 use actix_web_actors::ws;
 
-use crate::markdown::markdown;
+use proxy_codegen::markdown::markdown;
 
 pub(crate) struct MarkdownService {}
 

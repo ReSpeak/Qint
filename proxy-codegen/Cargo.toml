@@ -1,0 +1,25 @@
+[package]
+name = "proxy-codegen"
+version = "0.1.0"
+authors = ["Flakebi <flakebi@t-online.de>"]
+edition = "2018"
+build = "build/build.rs"
+
+[dependencies]
+anyhow = "1"
+fancy-regex = "0.4"
+lazy_static = "1"
+nom = "6"
+pulldown-cmark = "0.8"
+serde = { version = "1", features = [ "derive" ] }
+time = "0.2"
+tsclientlib = { path = "../../tsclientlib/tsclientlib", features = [ "unstable" ] }
+tsproto = { path = "../../tsclientlib/tsproto" }
+tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }
+tsproto-types = { path = "../../tsclientlib/utils/tsproto-types" }
+url = "2"
+
+[build-dependencies]
+heck = "0.3"
+t4rust-derive = "0.3"
+tsproto-structs = { path = "../../tsclientlib/utils/tsproto-structs", version = "=0.1.0" }

@@ -3,7 +3,6 @@ name = "qint-proxy"
 version = "0.1.0"
 authors = [ "Flakebi <flakebi@t-online.de>" ]
 edition = "2018"
-build = "build/build.rs"
 description = "Qint is a TeamSpeak client"
 
 [dependencies]
@@ -35,6 +34,7 @@ nnnoiseless = "0.3"
 nom = "6"
 open = "1"
 percent-encoding = "2.1"
+proxy-codegen = { path = "../proxy-codegen" }
 pulldown-cmark = "0.8"
 regex = "1"
 reqwest = "0.10"
@@ -50,7 +50,6 @@ slog-scope = "4"
 slog-stdlog = "4"
 slog-term = "2"
 structopt = { version = "0.3", default-features = false }
-tauri = { version = "0.10", features = [ "all-api" ] }
 thiserror = "1"
 time = "0.2"
 toml = "0.5"
@@ -82,7 +81,3 @@ awc = "2"
 rand = "0.7"
 tempfile = "3"
 uuid = { version = "0.8", features = [ "v4" ] }
-
-[features]
-embedded-server = [ "tauri/embedded-server" ]
-no-server = [ "tauri/no-server" ]

@@ -9,6 +9,7 @@ use actix::*;
 use actix_web_actors::ws;
 use anyhow::{bail, format_err, Result};
 use futures::prelude::*;
+use proxy_codegen::book_events;
 use slog::{debug, error, o, warn, Logger};
 use thiserror::Error;
 use tokio::net::TcpStream;
@@ -26,7 +27,7 @@ use tsproto_types::crypto::EccKeyPubP256;
 
 use crate::db::{ChannelListMsg, ChatId, ChatType, SetClientVolumeMsg};
 use crate::messages::{self, MessageF2P, MessageP2F, ResultDetails, ResultStruct};
-use crate::{audio, book_events, db, ConnectionId, State, Tristate, WsFormat, WsOptions};
+use crate::{audio, db, ConnectionId, State, Tristate, WsFormat, WsOptions};
 
 /// A websocket connection
 pub(crate) struct Ws {

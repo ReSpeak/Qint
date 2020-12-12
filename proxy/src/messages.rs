@@ -1,4 +1,10 @@
 use core::convert::TryFrom;
+
+#[cfg(test)]
+use proxy_codegen::book_events::serialize_some_u64;
+use proxy_codegen::book_events::{
+	deserialize_id, deserialize_some_u64, serialize_id, JsEvent, JsInMessage, JsM2B,
+};
 use serde::{Deserialize, Serialize};
 use tsclientlib::{
 	ClientId, CommandError, DisconnectOptions, Error as TsclError, MessageTarget, Permission,
@@ -6,11 +12,6 @@ use tsclientlib::{
 };
 
 use super::websocket::Error as WsError;
-#[cfg(test)]
-use crate::book_events::serialize_some_u64;
-use crate::book_events::{
-	deserialize_id, deserialize_some_u64, serialize_id, JsEvent, JsInMessage, JsM2B,
-};
 
 /// A message sent over a websocket connection from the frontend to the proxy.
 #[derive(Clone, Debug, Deserialize)]

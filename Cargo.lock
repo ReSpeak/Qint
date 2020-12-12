@@ -3122,6 +3122,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "proxy-codegen"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fancy-regex",
+ "heck",
+ "lazy_static",
+ "nom 6.0.1",
+ "pulldown-cmark",
+ "serde",
+ "t4rust-derive",
+ "time 0.2.23",
+ "tsclientlib",
+ "tsproto",
+ "tsproto-packets",
+ "tsproto-structs",
+ "tsproto-types",
+ "url",
+]
+
+[[package]]
 name = "pulldown-cmark"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3131,6 +3152,25 @@ dependencies = [
  "getopts",
  "memchr",
  "unicase",
+]
+
+[[package]]
+name = "qint"
+version = "0.1.0"
+dependencies = [
+ "actix-rt",
+ "anyhow",
+ "log",
+ "qint-proxy",
+ "slog",
+ "slog-async",
+ "slog-envlogger",
+ "slog-scope",
+ "slog-stdlog",
+ "slog-term",
+ "structopt",
+ "tauri",
+ "tokio",
 ]
 
 [[package]]
@@ -3169,6 +3209,7 @@ dependencies = [
  "nom 6.0.1",
  "open",
  "percent-encoding",
+ "proxy-codegen",
  "pulldown-cmark",
  "rand 0.7.3",
  "regex",
@@ -3187,7 +3228,6 @@ dependencies = [
  "slog-term",
  "structopt",
  "t4rust-derive",
- "tauri",
  "tempfile",
  "thiserror",
  "time 0.2.23",

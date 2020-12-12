@@ -1,9 +1,12 @@
-use std::net::{IpAddr, SocketAddr};
+// Don't show terminal in release mode
+#![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
+
+use std::net::SocketAddr;
 use std::path::PathBuf;
 
 use anyhow::Result;
 use qint_proxy::App;
-use slog::{debug, error, o, Drain};
+use slog::{o, Drain};
 use structopt::StructOpt;
 
 #[derive(Clone, Debug, StructOpt)]
@@ -37,9 +40,6 @@ struct Args {
 	// single thread, which does not work well with parallel tests.
 	#[structopt(long)]
 	no_audio: bool,
-	/// Open the frontend in the browser on start.
-	#[structopt(long)]
-	no_open: bool,
 	/// How much log output do you want?
 	///
 	/// 0. Print nothing
@@ -85,31 +85,10 @@ async fn real_main() -> Result<()> {
 
 	// Parse command line options
 	let args = Args::from_args();
-	let no_open = args.no_open;
 
 	let app = App::new(logger.clone(), args.into()).await?;
 
-	if !no_open {
-		// Open browser
-		let addr = app.get_listen_address();
-		let port = addr.port();
-		actix::spawn(async move {
-			// Connect to localhost if == 0.0.0.0 or ::
-			let url = if addr.ip() == "0.0.0.0".parse::<IpAddr>().unwrap()
-				|| addr.ip() == "::".parse::<IpAddr>().unwrap()
-			{
-				format!("http://localhost:{}", port)
-			} else {
-				format!("http://{}", addr)
-			};
-			debug!(logger, "Opening url"; "url" => &url);
-			if let Err(e) = open::that(url) {
-				error!(logger, "Failed to open frontend in browser"; "error" => %e);
-			}
-		});
-	}
-
-	//tauri::AppBuilder::new().build().run();
+	std::thread::spawn(|| tauri::AppBuilder::new().build().run());
 
 	app.serve().await
 }

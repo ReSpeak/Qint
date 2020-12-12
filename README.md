@@ -39,7 +39,7 @@ git clone https://github.com/Flakebi/Qint.git
 ### Build and start the backend
 ```bash
 cd Qint/proxy
-env RUST_LOG=debug cargo run -- -b
+env RUST_LOG=debug cargo run
 # For release builds
 cargo build --release
 ```

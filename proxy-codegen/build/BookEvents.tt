@@ -160,11 +160,11 @@ pub struct <#= struc.name #> {
 		let name = p.name.to_snake_case();
 		#>
 	<#= attr #>
-	pub(crate) <#= name #>: Option<<#= struct_type #>>,
+	pub <#= name #>: Option<<#= struct_type #>>,
 	<#
 		if self.has_render(&struc.name, &name.to_camel_case()) { #>
 	#[serde(default, deserialize_with = "deserialize_some", skip_serializing_if = "Option::is_none")]
-	pub(crate) <#= name #>_rendered: Option<String>,
+	pub <#= name #>_rendered: Option<String>,
 		<# }
 	} #>
 }

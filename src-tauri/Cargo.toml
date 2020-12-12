@@ -1,0 +1,30 @@
+[package]
+name = "qint"
+version = "0.1.0"
+authors = ["Flakebi <flakebi@t-online.de>"]
+edition = "2018"
+
+[features]
+embedded-server = [ "tauri/embedded-server" ]
+no-server = [ "tauri/no-server" ]
+
+[dependencies]
+actix-rt = "1"
+anyhow = "1"
+qint-proxy = { path = "../proxy" }
+slog-async = "2"
+slog-envlogger = "2"
+slog-scope = "4"
+slog-stdlog = "4"
+slog-term = "2"
+structopt = { version = "0.3", default-features = false }
+tauri = { version = "0.10", features = [ "all-api" ] }
+tokio = "0.2"
+
+[dependencies.log]
+version = "0.4"
+features = [ "max_level_info", "release_max_level_info" ]
+
+[dependencies.slog]
+version = "2"
+features = [ "max_level_trace", "release_max_level_debug" ]

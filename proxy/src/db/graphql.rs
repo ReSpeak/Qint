@@ -535,7 +535,7 @@ impl Message {
 	}
 
 	/// Html of rendered markdown and bb code.
-	fn rendered(&self) -> String { crate::markdown::markdown(&self.msg.content) }
+	fn rendered(&self) -> String { proxy_codegen::markdown::markdown(&self.msg.content) }
 
 	/// Name of the invoker if we don't have their uid.
 	fn invoker_name(&self) -> Option<&str> { self.msg.invoker_name.as_deref() }
@@ -689,7 +689,7 @@ impl SearchResult {
 			})
 			.collect::<Vec<_>>();
 
-		let rendered = crate::markdown::markdown(&self.message.msg.content);
+		let rendered = proxy_codegen::markdown::markdown(&self.message.msg.content);
 		let mut rendered_hls = Vec::new();
 		// Check if the highlighted parts are still in the rendered message
 		// TODO Search for highlighted parts only in body parts
