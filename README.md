@@ -79,5 +79,31 @@ debug.enable("error:*")
 localStorage.debug = "*"
 ```
 
+## Settings
+
+### Configure Shortcuts
+
+On windows in `%appdata%\ReSpeak\config.toml`:
+```toml
+[[shortcuts.actions]]
+keycode = "F13"
+action = { InputMute = "Toggle" }
+
+[[shortcuts.actions]]
+keycode = "F12"
+action = { OutputMute = "True" }
+
+[[shortcuts.actions]]
+keycode = "F11"
+action = { Away = "False" }
+```
+
+On Linux/X11, shortcuts are currently not implemented.
+For Linux/wayland, configure your compositor to make http requests, e.g. by using curl:
+```bash
+curl -H "Content-Type: application/json" -X POST -d '{"InputMute":"Toggle"}' http://localhost:4422/shortcut
+curl -H "Content-Type: application/json" -X POST -d '{"Away":"True"}' http://localhost:4422/shortcut
+```
+
 ## License
 Licensed under the [Open Software License](LICENSE-OSL) and [GNU Affero General Public License v3](LICENSE-AGPL).
