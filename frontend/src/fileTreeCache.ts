@@ -51,7 +51,7 @@ class FileTreeFile {
 	constructor(entry: IMsgFileListPart) {
 		this.name = entry.name;
 		this.size = Number(entry.size);
-		this.lastModified = datetimeDeserialize(entry.dateTime);
+		this.lastModified = datetimeDeserialize(entry.dateTime).local();
 	}
 
 }
