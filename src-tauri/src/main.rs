@@ -88,7 +88,9 @@ async fn real_main() -> Result<()> {
 
 	let app = App::new(logger.clone(), args.into()).await?;
 
-	std::thread::spawn(|| tauri::AppBuilder::new().build().run());
+	//std::thread::spawn(|| tauri::AppBuilder::new().build().run());
+	//app.serve().await
 
-	app.serve().await
+	tauri::AppBuilder::new().build().run();
+	Ok(())
 }

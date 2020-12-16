@@ -5,6 +5,7 @@ authors = [ "Flakebi <flakebi@t-online.de>" ]
 edition = "2018"
 
 [features]
+default = [ "no-server" ]
 embedded-server = [ "tauri/embedded-server" ]
 no-server = [ "tauri/no-server" ]
 

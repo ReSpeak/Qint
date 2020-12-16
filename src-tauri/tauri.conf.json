@@ -1,6 +1,6 @@
 {
   "build": {
-    "distDir": "../frontend/public",
+    "distDir": "../frontend/build",
     "devPath": "http://127.0.0.1:4422",
     "beforeDevCommand": "",
     "beforeBuildCommand": ""

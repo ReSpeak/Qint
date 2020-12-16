@@ -15,3 +15,7 @@ opt-level = 3
 
 [profile.release]
 debug = true
+panic = "abort"
+
+[profile.dev]
+panic = "abort"
