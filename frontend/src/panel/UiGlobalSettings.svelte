@@ -11,10 +11,10 @@
 	import type { SettGroup } from "../transientSettings";
 	import { dbToFactor, factorToDb, MIN_VOLUME_DB } from "../util";
 
-	export let connection: Connection;
+	export let connection: Connection | undefined;
 
 	let tablistIndex: Writable<number>;
-	let loudness = connection.loudness;
+	let loudness = connection?.loudness;
 	const audioSett = app.transientSettings.audio;
 
 	let developMode = app.transientSettings.ui._developMode;
@@ -67,7 +67,7 @@
 
 	$: {
 		// Subscribe to loadness changes when on audio tab
-		connection.sendMessage({ SubscribeLoudness: $tablistIndex === 1 });
+		connection?.sendMessage({ SubscribeLoudness: $tablistIndex === 1 });
 	}
 
 	onMount(() => {
@@ -75,7 +75,7 @@
 	})
 
 	onDestroy(() => {
-		connection.sendMessage({ SubscribeLoudness: false });
+		connection?.sendMessage({ SubscribeLoudness: false });
 	});
 </script>
 
@@ -121,7 +121,10 @@
 						on:input={updateGlobalVolume} />
 				</div>
 			</BKeyValue>
-			<div>Loudness: {$loudness}</div>
+			{#if loudness !== undefined}
+				<!-- TODO Should be possible without a connection -->
+				<div>Loudness: {$loudness}</div>
+			{/if}
 			<BKeyValue label="Volume Capture Trigger">
 				<div class="volumeControl">
 					<BSlider

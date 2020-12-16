@@ -82,8 +82,7 @@
 					{/if}
 				</div>
 			{/if}
-		{:else if $displayPanel === DisplayPanel.Settings && $connections.length !== 0}
-			<!-- TODO consider something better ? -->
+		{:else if $displayPanel === DisplayPanel.Settings}
 			<UiGlobalSettings connection={$connections[0]} />
 		{:else if $displayPanel === DisplayPanel.Connect}
 			<Connect bind:data={connectData} />
