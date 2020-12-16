@@ -436,6 +436,8 @@ impl AudioCallback for SdlCallback {
 				trace!(self.logger, "Sending last empty packet");
 				let packet = OutAudio::new(&AudioData::C2S { id: 0, codec, data: &[] });
 				self.send_packet(Some((packet, true)), loudness);
+			} else {
+				self.send_packet(None, loudness);
 			}
 			self.last_buffer.resize(buffer.len(), 0.0);
 			self.last_buffer.copy_from_slice(buffer);

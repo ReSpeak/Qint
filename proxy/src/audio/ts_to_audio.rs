@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -19,6 +20,7 @@ type Id = (ConnectionId, ClientId);
 type AudioHandler = tsclientlib::audio::AudioHandler<Id>;
 
 pub struct PlayMsg(pub Id, pub InAudioBuf);
+pub struct SetGlobalVolumeMsg(pub f32);
 pub struct SetVolumeMsg(pub Id, pub f32);
 pub struct ResetMsg;
 
@@ -28,16 +30,24 @@ pub(crate) struct TsToAudio {
 	device: Option<AudioDevice<SdlCallback>>,
 	data: Arc<Mutex<AudioHandler>>,
 	connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
+	/// The global volume to multiply all output with.
+	///
+	/// This is actually a `f32`, there is no `AtomicF32` though.
+	global_volume: Arc<AtomicU32>,
 }
 
 struct SdlCallback {
 	data: Arc<Mutex<AudioHandler>>,
 	connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
 	handle: Handle,
+	global_volume: Arc<AtomicU32>,
 }
 
 impl Message for PlayMsg {
 	type Result = Result<()>;
+}
+impl Message for SetGlobalVolumeMsg {
+	type Result = ();
 }
 impl Message for SetVolumeMsg {
 	type Result = Result<()>;
@@ -76,13 +86,19 @@ impl Actor for TsToAudio {
 impl TsToAudio {
 	pub(crate) fn new(
 		logger: Logger, audio_subsystem: AudioSubsystem,
-		connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
-	) -> Result<Self>
-	{
+		connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>, global_volume: f32,
+	) -> Result<Self> {
 		let logger = logger.new(o!("pipeline" => "ts-to-audio"));
 		let data = Arc::new(Mutex::new(AudioHandler::new(logger.clone())));
 
-		Ok(Self { logger, audio_subsystem, device: None, data, connections })
+		Ok(Self {
+			logger,
+			audio_subsystem,
+			device: None,
+			data,
+			connections,
+			global_volume: Arc::new(AtomicU32::new(global_volume.to_bits())),
+		})
 	}
 
 	fn open_playback(&mut self) {
@@ -98,8 +114,14 @@ impl TsToAudio {
 		match self.audio_subsystem.open_playback(None, &desired_spec, |spec| {
 			// This spec will always be the desired spec, the sdl wrapper passes
 			// zero as `allowed_changes`.
-			debug!(logger, "Got playback spec"; "spec" => ?spec, "driver" => self.audio_subsystem.current_audio_driver());
-			SdlCallback { data, connections, handle: Handle::current() }
+			debug!(logger, "Got playback spec"; "spec" => ?spec,
+				"driver" => self.audio_subsystem.current_audio_driver());
+			SdlCallback {
+				data,
+				connections,
+				handle: Handle::current(),
+				global_volume: self.global_volume.clone(),
+			}
 		}) {
 			Ok(device) => self.device = Some(device),
 			Err(e) => {
@@ -158,6 +180,15 @@ impl Handler<PlayMsg> for TsToAudio {
 	}
 }
 
+impl Handler<SetGlobalVolumeMsg> for TsToAudio {
+	type Result = ();
+	fn handle(
+		&mut self, SetGlobalVolumeMsg(volume): SetGlobalVolumeMsg, _: &mut Self::Context,
+	) -> Self::Result {
+		self.global_volume.store(volume.to_bits(), Ordering::Relaxed);
+	}
+}
+
 impl Handler<SetVolumeMsg> for TsToAudio {
 	type Result = Result<()>;
 	fn handle(
@@ -189,6 +220,7 @@ impl AudioCallback for SdlCallback {
 		}
 
 		let mut data = self.data.lock().unwrap();
+		let has_connections = !data.get_queues().is_empty();
 		let removed = data.fill_buffer(buffer);
 		let message_connections = removed.iter().map(|i| i.0).collect::<HashSet<_>>();
 		if !message_connections.is_empty() {
@@ -204,6 +236,14 @@ impl AudioCallback for SdlCallback {
 				if let Some(con) = cons.get(&c) {
 					self.handle.spawn(con.send(TalkersChangedMsg(talkers)).map(|_| ()));
 				}
+			}
+		}
+
+		// Adjust with global volume
+		let global_volume = f32::from_bits(self.global_volume.load(Ordering::Relaxed));
+		if global_volume != 1.0 && has_connections {
+			for d in &mut *buffer {
+				*d *= global_volume;
 			}
 		}
 	}

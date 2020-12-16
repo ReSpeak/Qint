@@ -252,7 +252,7 @@
 		uploadFiles(...files);
 	}
 
-	function uploadSelected(e: Event) {
+	function uploadSelected() {
 		let files = dummyUploader.files;
 		if (files && files.length > 0) {
 			uploadFiles(...files);

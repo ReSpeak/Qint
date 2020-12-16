@@ -46,7 +46,7 @@ pub(crate) struct AudioData {
 }
 
 pub(crate) fn start(
-	logger: Logger, connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
+	logger: Logger, connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>, global_volume: f32,
 ) -> Result<AudioData> {
 	let sdl_context = sdl2::init().unwrap();
 
@@ -62,7 +62,8 @@ pub(crate) fn start(
 	// Create thread local runtime for non-send tasks
 	// A channel size of 1 leads to audio drops when cpu is fully used
 	let (spawn_send, mut spawn_recv) = mpsc::channel(5);
-	let ts2a = TsToAudio::new(logger.clone(), audio_subsystem.clone(), connections)?.start();
+	let ts2a = TsToAudio::new(logger.clone(), audio_subsystem.clone(), connections, global_volume)?
+		.start();
 	let a2ts = AudioToTs::new(logger.clone(), audio_subsystem, spawn_send)?.start();
 
 	let a2ts2 = a2ts.clone();

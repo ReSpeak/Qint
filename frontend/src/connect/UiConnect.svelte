@@ -6,7 +6,7 @@
 	import UiBookmark from "./UiBookmark.svelte";
 	import { Book, Channel } from "../book";
 	import UiChannel from "../tree/UiChannel.svelte";
-	import type { ChannelId, Uid } from "../ts";
+	import type { ChannelId } from "../ts";
 	import { SERVER_ICON, CLIENT_ICON, focus, urlBase64Encode } from "../util";
 	import { app } from "../app";
 	import { backend } from "../backend/backend";

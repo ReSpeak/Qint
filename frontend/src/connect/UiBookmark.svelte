@@ -15,7 +15,6 @@
 	}
 
 	function doConnect() {
-		const channel = bookmark.channel !== null ? bookmark.channel.id : undefined;
 		if (
 			bookmark.username !== undefined &&
 			bookmark.address !== undefined &&

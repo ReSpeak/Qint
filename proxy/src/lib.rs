@@ -209,10 +209,54 @@ impl juniper::Context for State {}
 impl State {
 	fn modify_transient_settings<R, T: FnOnce(&mut TransientSettings) -> R>(&self, f: T) -> R {
 		let mut settings = self.transient_settings.write().unwrap();
+		// Reload before changing to prevent overwriting changes from other processes
+		if let Err(e) = settings.load(&self.settings.read().unwrap().config_path) {
+			warn!(self.logger, "Failed to reload transient settings"; "error" => %e);
+		}
+		let old_loudness_threshold = settings.get_loudness_threshold();
+		let old_global_volume = settings.get_global_volume();
+
 		let r = f(&mut *settings);
 		if let Err(e) = settings.save(&self.settings.read().unwrap().config_path) {
 			error!(self.logger, "Failed to save transient settings"; "error" => %e);
 		}
+
+		// Apply audio changes
+		if let Some(v) = settings.get_loudness_threshold() {
+			if Some(v) != old_loudness_threshold {
+				let logger = self.logger.clone();
+				if let Some(ad) = &self.audio_data {
+					actix::spawn(
+						ad.a2ts.send(audio::audio_to_ts::SetLoudnessThresholdMsg(v)).map(
+							move |r| {
+								if let Err(e) = r {
+									error!(logger, "Failed to apply loudness threshold";
+										"error" => %e);
+								}
+							},
+						),
+					);
+				}
+			}
+		}
+
+		if let Some(v) = settings.get_global_volume() {
+			if Some(v) != old_global_volume {
+				let logger = self.logger.clone();
+				if let Some(ad) = &self.audio_data {
+					actix::spawn(
+						ad.ts2a.send(audio::ts_to_audio::SetGlobalVolumeMsg(v)).map(
+							move |r| {
+								if let Err(e) = r {
+									error!(logger, "Failed to apply global volume"; "error" => %e);
+								}
+							},
+						),
+					);
+				}
+			}
+		}
+
 		r
 	}
 }
@@ -228,8 +272,13 @@ impl Tristate {
 }
 
 impl TransientSettings {
+	fn load(&mut self, config_path: &Path) -> Result<()> {
+		let s = fs::read_to_string(&config_path.join(TRANSIENT_SETTINGS_FILENAME))?;
+		*self = toml::from_str(&s)?;
+		Ok(())
+	}
+
 	fn save(&self, config_path: &Path) -> Result<()> {
-		// TODO Could also be msgpack
 		let data = toml::to_string(self)?;
 		fs::write(&config_path.join(TRANSIENT_SETTINGS_FILENAME), data)?;
 		Ok(())
@@ -247,17 +296,20 @@ impl TransientSettings {
 		}
 	}
 
-	// TODO Should be part of the settings, not transient settings
-	fn get_loudness_threshold(&self) -> Option<f64> {
-		self.fields.get("loudness_threshold").and_then(|v| v.as_f64())
+	fn get_global_volume(&self) -> Option<f32> {
+		self.fields
+			.get("audio")
+			.and_then(Value::as_object)
+			.and_then(|a| a.get("globalVolume"))
+			.and_then(|v| v.as_f64().map(|f| f as f32))
 	}
 
-	fn set_loudness_threshold(&mut self, value: Option<f64>) {
-		if let Some(value) = value {
-			self.fields.insert("loudness_threshold".into(), value.into());
-		} else {
-			self.fields.remove("loudness_threshold");
-		}
+	fn get_loudness_threshold(&self) -> Option<f64> {
+		self.fields
+			.get("audio")
+			.and_then(Value::as_object)
+			.and_then(|a| a.get("loudnessThreshold"))
+			.and_then(|v| v.as_f64())
 	}
 }
 
@@ -299,8 +351,7 @@ async fn guess_content_type<
 async fn create_ws(
 	state: web::Data<Arc<State>>, uuid: web::Path<Uuid>, options: web::Query<WsOptions>,
 	req: HttpRequest, stream: web::Payload,
-) -> impl Responder
-{
+) -> impl Responder {
 	let id = ConnectionId(*uuid);
 
 	// Check that the id does not exist
@@ -396,8 +447,7 @@ impl ResultDetails {
 async fn download_file(
 	state: web::Data<Arc<State>>, web::Path((id, channel, path)): web::Path<(Uuid, u64, String)>,
 	query_opt: Query<GetFileOptions>,
-) -> impl Responder
-{
+) -> impl Responder {
 	let channel = ChannelId(channel);
 	let cons = state.connections.lock().unwrap();
 	let GetFileOptions { dl, return_code, cache } = query_opt.into_inner();
@@ -484,8 +534,7 @@ struct PutFileOptions {
 async fn upload_file(
 	state: web::Data<Arc<State>>, web::Path((id, channel, path)): web::Path<(Uuid, u64, String)>,
 	req: web::HttpRequest, body: web::Payload, query_opt: Query<PutFileOptions>,
-) -> impl Responder
-{
+) -> impl Responder {
 	let channel = ChannelId(channel);
 	let cons = state.connections.lock().unwrap();
 	if let Some(con) = cons.get(&ConnectionId(id)).cloned() {
@@ -708,14 +757,13 @@ impl App {
 			}
 		};
 
-		let transient_settings =
-			match fs::read_to_string(&config_path.join(TRANSIENT_SETTINGS_FILENAME)) {
-				Ok(r) => toml::from_str(&r)?,
-				Err(e) => {
-					info!(logger, "Failed to read transient settings, using defaults"; "error" => %e);
-					TransientSettings::default()
-				}
-			};
+		let transient_settings = {
+			let mut set = TransientSettings::default();
+			if let Err(e) = set.load(&config_path) {
+				info!(logger, "Failed to read transient settings, using defaults"; "error" => %e);
+			}
+			set
+		};
 
 		// Load secret key
 		let key_path = config_path.join("secret.key");
@@ -781,7 +829,11 @@ impl App {
 		let audio_data = if settings.no_audio {
 			None
 		} else {
-			Some(audio::start(logger.clone(), connections.clone())?)
+			Some(audio::start(
+				logger.clone(),
+				connections.clone(),
+				transient_settings.get_global_volume().unwrap_or(1.0),
+			)?)
 		};
 		let shortcut_config = settings.shortcuts.clone();
 		let shortcuts = shortcut::Shortcuts::new(shortcut_config)?;
@@ -794,6 +846,21 @@ impl App {
 						move |r| {
 							if let Err(e) = r {
 								error!(logger, "Failed to apply loudness threshold"; "error" => %e);
+							}
+						},
+					),
+				);
+			}
+		}
+
+		if let Some(volume) = transient_settings.get_global_volume() {
+			let logger = logger.clone();
+			if let Some(ad) = &audio_data {
+				actix::spawn(
+					ad.ts2a.send(audio::ts_to_audio::SetGlobalVolumeMsg(volume)).map(
+						move |r| {
+							if let Err(e) = r {
+								error!(logger, "Failed to apply global volume"; "error" => %e);
 							}
 						},
 					),

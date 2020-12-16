@@ -21,6 +21,7 @@ export const BUILD_ENV = "__buildEnv__";
 export const BUILD_DAT = "__buildDat__";
 export const IS_TAURI = "__TAURI_INVOKE_HANDLER__" in window;
 export const LONG_DATETIME = "dddd, MMMM Do YYYY, HH:mm:ss UTCZ";
+export const MIN_VOLUME_DB = -30;
 
 export const NARROW_NO_BREAK_SPACE = String.fromCharCode(0x202f);
 export const youtubeUrlRegex = /^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube\.com|youtu.be))(\/(?:[\w\-]+\?v=|embed\/|v\/)?)([\w\-]+)(\S+)?$/;
@@ -299,12 +300,30 @@ export function durationSerialize(time: Duration): RustDuration {
 }
 
 /**
+ * Convert a factor between 0–1 to a value in dB, which is more natural.
+ * See also https://www.dr-lex.be/info-stuff/volumecontrols.html
+ */
+export function factorToDb(factor: number): number {
+	return factor === 0 ? MIN_VOLUME_DB : Math.round(20 * Math.log10(factor));
+}
+
+/**
+ * Convert a value in dB to factor between 0–1, which is easier to use.
+ */
+export function dbToFactor(volume: number): number {
+	let factor = 0;
+	if (volume !== MIN_VOLUME_DB)
+		factor = Math.pow(10, volume / 20);
+	return factor;
+}
+
+/**
  * Works similar to Object.assign except that it doesn't overwrite existing
  * object structures. But instead merges them recursively
  */
 export function soft_merge(obj: any, merge: any) {
 	for (const [key, value] of Object.entries(merge)) {
-		if (typeof obj[key] === "object") {
+		if (typeof merge[key] === "object") {
 			soft_merge(obj[key], value);
 		} else {
 			obj[key] = value;

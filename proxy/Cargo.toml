@@ -26,7 +26,6 @@ flakebi-ring = "0.16.9"
 futures = "0.3"
 git-testament = "0.1"
 juniper = "0.15"
-lazy_static = "1"
 libsqlite3-sys = { version = "0.18", features = [ "bundled" ] }
 livesplit-hotkey = "0.5"
 meilisearch-core = { git = "https://github.com/meilisearch/MeiliSearch", version = "0.17.0" }
@@ -69,11 +68,6 @@ features = [ "max_level_info", "release_max_level_info" ]
 [dependencies.slog]
 version = "2"
 features = [ "max_level_trace", "release_max_level_debug" ]
-
-[build-dependencies]
-heck = "0.3"
-t4rust-derive = "0.3"
-tsproto-structs = { path = "../../tsclientlib/utils/tsproto-structs", version = "=0.1.0" }
 
 [dev-dependencies]
 actix-codec = "0.3"

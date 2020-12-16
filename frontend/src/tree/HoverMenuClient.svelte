@@ -1,10 +1,8 @@
 <script lang="typescript">
 	import Icon from "../ui/Icon.svelte";
 	import { Connection } from "../connection";
-	import type { ClientId } from "../ts";
 	import ClientName from "../ui/ClientName.svelte";
 	import ClientVolume from "../ui/ClientVolume.svelte";
-	import RenderedText from "../ui/RenderedText.svelte";
 	import { app } from "../app";
 	import { Client } from "../book";
 

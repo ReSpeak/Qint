@@ -1,7 +1,7 @@
 import { Writable, writable, get, Readable } from "svelte/store";
 import { InBookChangeMsg, WsMessageTarget } from "./backend/ws";
 import { Connection } from "./connection";
-import { binarySearchBy,datetimeDeserialize, assert } from "./util";
+import { binarySearchBy,datetimeDeserialize, assert, factorToDb } from "./util";
 import { ChannelGroupId, ChannelId, ClientId, IconId, IpAddr, ServerGroupId, TalkState, Uid } from "./ts";
 import { Codec } from "./book_events";
 import * as book_events from "./book_events";
@@ -542,9 +542,7 @@ export class Client extends book_events.ClientGen implements ITreeNode, Readable
 		});
 		if (res.data) {
 			const volume = res.data.client.volume;
-			// TODO Have a constant for the minimum volume
-			const scaledVol: number = volume === 0 ? -30 : Math.round(20 * Math.log10(volume));
-			this.volume.update(() => scaledVol);
+			this.volume.set(factorToDb(volume));
 		}
 	}
 }

@@ -10,7 +10,7 @@ export type WsMessageTarget =
 	| { Poke: ClientId };
 
 // Out Messages
-export type OutMsg = OMsgConnect | OMsgDisconnect | OMsgSendMessage | OMsgSendCommand | OMsgSetLoudnessThreshold
+export type OutMsg = OMsgConnect | OMsgDisconnect | OMsgSendMessage | OMsgSendCommand
 	| OMsgSubscribeLoudness | OMsgSetClientVolume | OMsgChange;
 
 export interface OMsgConnect {
@@ -50,10 +50,6 @@ interface OMsgSendCommand {
 		command: string;
 		returnCode?: string;
 	};
-}
-
-interface OMsgSetLoudnessThreshold {
-	SetLoudnessThreshold: number;
 }
 
 interface OMsgSubscribeLoudness {

@@ -646,14 +646,6 @@ impl Ws {
 					}
 				}
 			}
-			MessageF2P::SetLoudnessThreshold(threshold) => {
-				// Save in settings
-				self.state.modify_transient_settings(|settings| {
-					settings.set_loudness_threshold(Some(threshold));
-				});
-
-				self.send_to_a2ts(audio::audio_to_ts::SetLoudnessThresholdMsg(threshold));
-			}
 			MessageF2P::SubscribeLoudness(subscribe) => {
 				if subscribe {
 					self.send_to_a2ts(audio::audio_to_ts::AddLoudnessListenerMsg(ctx.address()));
@@ -1203,7 +1195,8 @@ impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for Ws {
 				let msg: MessageF2P = match serde_json::from_str(&msg) {
 					Ok(r) => r,
 					Err(e) => {
-						error!(self.logger, "json deserializing error"; "error" => %e);
+						error!(self.logger, "json deserializing error"; "error" => %e,
+							"message" => msg);
 						self.send_message(
 							&MessageP2F::Error(format!("json deserializing error: {}", e)),
 							ctx,

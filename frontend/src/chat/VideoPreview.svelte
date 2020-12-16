@@ -2,7 +2,7 @@
 	import Icon from "../ui/Icon.svelte";
 	import { HTML5VideoControl, SyncState, YoutubeVideoControl } from "./videoSync";
 	import type { IVideoControl } from "./videoSync";
-	import { onDestroy, onMount, tick } from "svelte";
+	import { onDestroy, tick } from "svelte";
 	import type { NodeSelection } from "../app";
 	import { assert, youtubeUrlRegex } from "../util";
 	import type { EmbedTypes } from "./previewAnalyzer";

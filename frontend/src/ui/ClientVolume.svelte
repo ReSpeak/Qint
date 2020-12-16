@@ -4,13 +4,12 @@
 	import { Client } from "../book";
 	import BSlider from "./BSlider.svelte";
 	import Icon from "./Icon.svelte";
-	import { debounced } from "../util";
+	import { dbToFactor, debounced, MIN_VOLUME_DB } from "../util";
 
 	export let connection: Connection;
 	export let client: Client;
-	// Volume is in dB, https://www.dr-lex.be/info-stuff/volumecontrols.html
-	let minVolume = -30;
-	let maxVolume = +30;
+	let minVolume = MIN_VOLUME_DB;
+	let maxVolume = -MIN_VOLUME_DB;
 	let clientVolume = client.volume;
 
 	async function loadVolume() {
@@ -27,11 +26,7 @@
 	}
 
 	let updateVolume = debounced(() => {
-		let vol = 0;
-		if ($clientVolume !== minVolume) {
-			vol = Math.pow(10, $clientVolume / 20);
-		}
-		client.updateVolume(connection, vol);
+		client.updateVolume(connection, dbToFactor($clientVolume));
 	}, 100);
 
 	onMount(() => {

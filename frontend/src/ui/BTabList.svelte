@@ -4,8 +4,8 @@
 	import { contextKey } from "./tabList";
 	import type { TabListContext } from "./tabList";
 
+	export let activeIndex = writable(0);
 	let items: string[] = [];
-	let activeIndex = writable(0);
 	let context: TabListContext = {
 		activeIndex,
 		registerPanel,

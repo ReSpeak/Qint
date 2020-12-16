@@ -88,13 +88,16 @@
 
 	function getPropsDiff() {
 		let diff: Record<string, any> = {};
-		if (servEdit.nickname === "") servEdit.nickname = null!;
+		if (servEdit.nickname === "" && server.nickname !== "")
+			servEdit.nickname = null!;
 		for (const [key, value] of Object.entries(servEdit)) {
 			if (key.startsWith("_")) continue;
 			if ((server as any)[key] !== value) {
 				diff[key] = value;
 			}
 		}
+		if (diff["nickname"] === null)
+			diff["nickname"] = "";
 		if (server.optionalData !== null) {
 			let optionalData = server.optionalData as any;
 			for (const [key, value] of Object.entries(servEditOpt)) {

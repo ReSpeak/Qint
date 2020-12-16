@@ -23,6 +23,7 @@ export class TransientSettings {
 	public ui = new TransientSettingsUi();
 	public chat = new TransientSettingsChat(this);
 	public app = new TransientSettingsApp();
+	public audio = new TransientSettingsAudio();
 
 	public async loadAsync() {
 		try {
@@ -180,4 +181,9 @@ export class TransientSettingsChat {
 export class TransientSettingsApp {
 	public askBeforeClosing: boolean = true;
 	public allowBrowserNotifications: boolean | undefined = undefined;
+}
+
+export class TransientSettingsAudio {
+	public globalVolume: number = 1.0;
+	public loudnessThreshold: number | null = null;
 }

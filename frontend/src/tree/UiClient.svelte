@@ -1,6 +1,5 @@
 <script lang="typescript">
 	import type { Readable } from "svelte/store";
-	import { get } from "svelte/store";
 	import TsIcon from "../ui/TsIcon.svelte";
 	import ServerGroupIcon from "../ui/ServerGroupIcon.svelte";
 	import FilterString from "../ui/FilterString.svelte";

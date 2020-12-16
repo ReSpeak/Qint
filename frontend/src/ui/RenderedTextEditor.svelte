@@ -36,7 +36,7 @@
 		mdRenderSocket.onmessage = (ev) => {
 			rendered = ev.data as string;
 		};
-		mdRenderSocket.onclose = (ev) => {
+		mdRenderSocket.onclose = () => {
 			mdRenderSocket = undefined;
 		};
 

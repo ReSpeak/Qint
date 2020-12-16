@@ -1,6 +1,5 @@
 <script lang="typescript">
 	import { CLIENT_ICON, LONG_DATETIME, SERVER_ICON } from "../util";
-	import TsIcon from "../ui/TsIcon.svelte";
 	import Icon from "../ui/Icon.svelte";
 	import ClientName from "../ui/ClientName.svelte";
 	import type { SearchResult } from "./search";
@@ -75,12 +74,6 @@
 		* {
 			color: mix($text, $background, 60%);
 		}
-	}
-
-	.invoker-row {
-		display: flex;
-		align-items: center;
-		@include block-margin;
 	}
 
 	.invoker-icon {

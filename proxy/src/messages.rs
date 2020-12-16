@@ -32,8 +32,6 @@ pub enum MessageF2P {
 		#[serde(default, rename = "returnCode", skip_serializing_if = "Option::is_none")]
 		return_code: Option<String>,
 	},
-	/// Set the loudness threshold for sending audio in LUFS.
-	SetLoudnessThreshold(f64),
 	/// Ask the proxy to send loudness data or not.
 	SubscribeLoudness(bool),
 	/// Change the volume of a client.

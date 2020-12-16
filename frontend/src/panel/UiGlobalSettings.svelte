@@ -1,5 +1,6 @@
 <script lang="typescript">
 	import { onDestroy, onMount } from "svelte";
+	import type { Writable } from "svelte/store";
 	import { Connection } from "../connection";
 	import { app } from "../app";
 	import BTabList from "../ui/BTabList.svelte";
@@ -7,30 +8,30 @@
 	import BDropDown from "../ui/BDropDown.svelte";
 	import BKeyValue from "../ui/BKeyValue.svelte";
 	import BSlider from "../ui/BSlider.svelte";
-	import type { SettGroup, TransientSettings } from "../transientSettings";
-	import { debounced } from "../util";
+	import type { SettGroup } from "../transientSettings";
+	import { dbToFactor, factorToDb, MIN_VOLUME_DB } from "../util";
 
 	export let connection: Connection;
+
+	let tablistIndex: Writable<number>;
 	let loudness = connection.loudness;
+	const audioSett = app.transientSettings.audio;
 
 	let developMode = app.transientSettings.ui._developMode;
+	let minGlobalVolume = MIN_VOLUME_DB;
+	let maxGlobalVolume = -MIN_VOLUME_DB;
 	let minLoudnessThreshold = -100;
-	let maxLoudnessThreshold = 0;
-	let loudnessThreshold = minLoudnessThreshold;
+	let maxLoudnessThreshold = 100;
 	let browserNotificationDenied = false;
 
-	connection.sendMessage({ SubscribeLoudness: true });
-
-	let updateLoudness = debounced(() => {
-			connection.sendMessage({ SetLoudnessThreshold: loudnessThreshold });
-	}, 100);
-
-	function syncSettings(group?: SettGroup) {
-		app.transientSettings.save(group);
-	}
+	let globalVolume = factorToDb(audioSett.globalVolume);
+	let loudnessThreshold = audioSett.loudnessThreshold ?? minLoudnessThreshold;
 
 	// Reload settings
-	app.transientSettings.loadAsync();
+	app.transientSettings.loadAsync().then(() => {
+		globalVolume = factorToDb(audioSett.globalVolume);
+		loudnessThreshold = audioSett.loudnessThreshold ?? loudnessThreshold;
+	});
 
 	// Text-to-Speech
 	const synthSett = app.transientSettings.synth;
@@ -41,11 +42,32 @@
 		synthSett.trySpeak(text);
 	}
 
+	function syncSettings(group?: SettGroup) {
+		app.transientSettings.save(group);
+	}
+
+	function updateLoudness() {
+		audioSett.loudnessThreshold = loudnessThreshold === minLoudnessThreshold ? null : loudnessThreshold;
+		syncSettings('audio');
+	}
+
+	function updateGlobalVolume() {
+		audioSett.globalVolume = dbToFactor(globalVolume);
+		syncSettings('audio');
+		// Update global volume instantly
+		app.transientSettings.flush();
+	}
+
 	function browserNotificationChanged() {
 		syncSettings('app');
 		if (app.transientSettings.app.allowBrowserNotifications && Notification.permission === "default") {
 			Notification.requestPermission();
 		}
+	}
+
+	$: {
+		// Subscribe to loadness changes when on audio tab
+		connection.sendMessage({ SubscribeLoudness: $tablistIndex === 1 });
 	}
 
 	onMount(() => {
@@ -58,7 +80,7 @@
 </script>
 
 <div class="settings">
-	<BTabList>
+	<BTabList bind:activeIndex={tablistIndex}>
 		<BTabSlot title="App">
 			<BKeyValue label="Ask before closing">
 				<input
@@ -87,16 +109,30 @@
 		</BTabSlot>
 
 		<BTabSlot title="Audio">
-			<BKeyValue label="Volume trigger">
-				<div>Loudness: {$loudness}</div>
-				<input
-					type="range"
-					min={minLoudnessThreshold}
-					max={maxLoudnessThreshold}
-					step="2"
-					bind:value={loudnessThreshold}
-					class="volume slider"
-					on:input={updateLoudness} />
+			<BKeyValue label="Global Volume">
+				<div class="volumeControl">
+					<BSlider
+						min={minGlobalVolume}
+						max={maxGlobalVolume}
+						step={1}
+						bind:value={globalVolume}
+						display={(n) => `${n} dB`}
+						tooltip={true}
+						on:input={updateGlobalVolume} />
+				</div>
+			</BKeyValue>
+			<div>Loudness: {$loudness}</div>
+			<BKeyValue label="Volume Capture Trigger">
+				<div class="volumeControl">
+					<BSlider
+						min={minLoudnessThreshold}
+						max={maxLoudnessThreshold}
+						step={1}
+						bind:value={loudnessThreshold}
+						display={(n) => `${n} LUFS`}
+						tooltip={true}
+						on:input={updateLoudness} />
+				</div>
 			</BKeyValue>
 		</BTabSlot>
 
@@ -144,6 +180,11 @@
 </div>
 
 <style lang="scss">
+	.volumeControl {
+		display: flex;
+		align-items: center;
+	}
+
 	.settings {
 		padding: 1em;
 	}
