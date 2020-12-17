@@ -1,7 +1,7 @@
 $Env:FRONTEND_PATH = "./ui/"
 $workhome = Get-Location
 # Check if SDL exists
-if (-Not (Get-Item "./proxy/SDL2.dll")) {
+if (-Not (Get-Item "./proxy-codegen/SDL2.dll")) {
     ./install_sdl.ps1
 }
 # Build proxy
@@ -18,6 +18,6 @@ New-Item "./target/publish/ui" -ItemType "directory" -Force | Out-Null
 Foreach ($file in "qint-proxy.exe", "WebView2Loader.dll") {
     Copy-Item -Path "./target/release/$file" -Destination "./target/publish/" -Force
 }
-Copy-Item -Path "./proxy/SDL2.dll" -Destination "./target/publish/" -Force
+Copy-Item -Path "./proxy-codegen/SDL2.dll" -Destination "./target/publish/" -Force
 # Copy frontend
 Copy-Item -Path "./frontend/build/*" -Destination (Join-Path "./target/publish/" $Env:FRONTEND_PATH -Resolve) -Recurse -Force

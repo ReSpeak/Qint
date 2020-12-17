@@ -1,12 +1,24 @@
 {
 	"folders": [
 		{
+			"name": "Assets",
+			"path": "assets"
+		},
+		{
 			"name": "Frontend",
 			"path": "frontend"
 		},
 		{
 			"name": "Proxy",
 			"path": "proxy"
+		},
+		{
+			"name": "Proxy Codegen",
+			"path": "proxy-codegen"
+		},
+		{
+			"name": "Tauri",
+			"path": "src-tauri"
 		},
 		{
 			"name": "Build Target",

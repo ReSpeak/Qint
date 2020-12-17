@@ -128,15 +128,24 @@
 		margin: 0;
 	}
 
-	.messageRendered :global(.padTop:not(:first-child)) {
-		margin-top: 0.5em;
-	}
-	.messageRendered :global(.limitChatSize) {
-		//max-height: min(50vh, 30em);
-		max-height: min(30em);
+	.messageRendered {
+		:global(.padTop) {
+			margin-bottom: 0; // overwrite bulma not-last
+
+			&:not(:first-child) {
+				margin-top: 0.5em;
+			}
+		}
+
+		:global(.limitChatSize) {
+			//max-height: min(50vh, 30em);
+			max-height: min(30em);
+		}
 	}
 
-	.messageRendered, .messageRaw, .messageTime {
+	.messageRendered,
+	.messageRaw,
+	.messageTime {
 		@include textselectable;
 	}
 
