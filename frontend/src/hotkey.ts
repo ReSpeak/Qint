@@ -29,14 +29,8 @@ export class HotkeySettings {
 }
 
 export function actionToString(action: Action): string {
-	if (!action) return "-";
-	let keyName = undefined;
-	for (let key in action) {
-		keyName = key;
-		break;
-	}
-	if (!keyName) return "-";
-	switch (keyName) {
+	if (!action || Object.keys(action).length === 0) return "-";
+	switch (Object.keys(action)[0]) {
 		case "Away": return "Away";
 		case "InputMute": return "Mute Input";
 		case "OutputMute": return "Mute Output";
@@ -45,14 +39,8 @@ export function actionToString(action: Action): string {
 }
 
 export function getActionState(action: Action): Tristate | null {
-	if (!action) return null;
-	let value = undefined;
-	for (let key in action) {
-		value = (action as any)[key];
-		break;
-	}
-	if (!value) return null;
-	return value;
+	if (!action || Object.values(action).length === 0) return null;
+	return Object.values(action)[0];
 }
 
 export function hotkeyToString(hotkey: Hotkey) {
