@@ -7,6 +7,7 @@
 	import BTabSlot from "../ui/BTabSlot.svelte";
 	import BDropDown from "../ui/BDropDown.svelte";
 	import BKeyValue from "../ui/BKeyValue.svelte";
+	import BHotkeyField from "../ui/BHotkeyField.svelte";
 	import BSlider from "../ui/BSlider.svelte";
 	import type { SettGroup } from "../transientSettings";
 	import { dbToFactor, factorToDb, MIN_VOLUME_DB } from "../util";
@@ -28,6 +29,7 @@
 	let loudnessThreshold = audioSett.loudnessThreshold ?? minLoudnessThreshold;
 
 	// Reload settings
+	app.hotkeySettings.loadAsync();
 	app.transientSettings.loadAsync().then(() => {
 		globalVolume = factorToDb(audioSett.globalVolume);
 		loudnessThreshold = audioSett.loudnessThreshold ?? loudnessThreshold;
@@ -178,6 +180,11 @@
 					</div>
 				</div>
 			</BKeyValue>
+		</BTabSlot>
+		<BTabSlot title="Hotkeys">
+			{#each app.hotkeySettings.actions as hotkeyAction}
+				<BHotkeyField hotkey={hotkeyAction} />
+			{/each}
 		</BTabSlot>
 	</BTabList>
 </div>

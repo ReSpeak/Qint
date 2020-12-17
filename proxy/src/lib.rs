@@ -698,6 +698,12 @@ async fn set_transient_setting(
 	}
 }
 
+#[get("/hotkey")]
+async fn get_hotkeys(state: web::Data<Arc<State>>) -> impl Responder {
+	let settings_state = (&**state).settings.read().unwrap().shortcuts.clone();
+	HttpResponse::Ok().json(settings_state)
+}
+
 fn merge_json(a: &mut Value, b: &Value) {
 	match (a, b) {
 		(&mut Value::Object(ref mut a), &Value::Object(ref b)) => {
@@ -917,6 +923,7 @@ impl App {
 				.service(download_cache_file)
 				.service(get_transient_setting)
 				.service(set_transient_setting)
+				.service(get_hotkeys)
 				.service(get_link_preview)
 				.service(render_md_service)
 				.service(db::graphql::db_graphql)

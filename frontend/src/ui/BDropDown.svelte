@@ -11,9 +11,15 @@
 
 	function selectedToIndex(selected: any) {
 		if (dd == null) return;
-		const newIndex = items.findIndex(i => i === selected);
-		if (newIndex !== -1) {
-			dd.selectedIndex = newIndex;
+		if (typeof selected === "string") {
+			let index = items.findIndex(it => it.value === selected);
+			if (index === -1) return;
+			dd.selectedIndex = index;
+		} else {
+			const newIndex = items.findIndex(i => i === selected);
+			if (newIndex !== -1) {
+				dd.selectedIndex = newIndex;
+			}
 		}
 	}
 
