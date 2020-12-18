@@ -1,16 +1,24 @@
 <script lang="typescript">
-	import { onDestroy, onMount } from "svelte";
+	import { createEventDispatcher, onDestroy, onMount } from "svelte";
+	import { actions, actionToName, valueToAction } from "../hotkey";
 	import type { Hotkey } from "../hotkey";
-	import { getActionState, actionToString, hotkeyToString } from "../hotkey";
+	import { getActionState, hotkeyToString } from "../hotkey";
 	import BDropDown from "./BDropDown.svelte";
+	import Icon from "../ui/Icon.svelte";
 	import BKeyValue from "./BKeyValue.svelte";
 
 	export let hotkey: Hotkey;
+	export let iconName: string;
+
+	const dispatch = createEventDispatcher();
 	
 	let input: HTMLInputElement;
-	let select: HTMLSelectElement;
 	
-	const selectOptions = [
+	let selectedAction = actionToName(hotkey.action);
+	let selectedState = getActionState(hotkey.action);
+
+	const stateOptions = [
+		{ value: "", text: "" },
 		{ value: "True", text: "On" },
 		{ value: "False", text: "Off" },
 		{ value: "Toggle", text: "Toggle" },
@@ -29,6 +37,20 @@
 		hotkey.meta = e.metaKey;
 
 		input.value = hotkey.toString();
+
+		dispatch("change", hotkey);
+	}
+
+	function onDropdownChange() {
+		console.log(selectedAction);
+		console.log(selectedState);
+		if (!selectedAction || !selectedState) return;
+		hotkey.action = valueToAction(selectedAction, selectedState);
+		dispatch("change", hotkey);
+	}
+
+	function onButtonPress(_: MouseEvent) {
+		dispatch("button", hotkey);
 	}
 
 	function translateJsKeyToWindows(jsKeyCode: string): string {
@@ -55,13 +77,21 @@
 	});
 </script>
 
-<BKeyValue label={actionToString(hotkey.action)} labelStyle="is-normal">
+<BKeyValue label="">
 	<div class="is-horizontal field">
 		<div class="control">
-			<BDropDown items={selectOptions} selected={getActionState(hotkey.action)}></BDropDown>
+			<BDropDown on:change={onDropdownChange} items={actions} bind:selected={selectedAction} />
 		</div>
 		<div class="control">
-			<input bind:this="{input}" class="input" value={hotkeyToString(hotkey)}>
+			<BDropDown on:change={onDropdownChange} items={stateOptions} bind:selected={selectedState} />
+		</div>
+		<div class="control">
+			<input bind:this={input} class="input" value={hotkeyToString(hotkey)}>
+		</div>
+		<div class="control">
+			<button on:click={onButtonPress} class="button">
+				<Icon name={iconName} />
+			</button>
 		</div>
 	</div>
 </BKeyValue>

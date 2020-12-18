@@ -11,8 +11,12 @@
 	import BSlider from "../ui/BSlider.svelte";
 	import type { SettGroup } from "../transientSettings";
 	import { dbToFactor, factorToDb, MIN_VOLUME_DB } from "../util";
+	import type { Hotkey } from "../hotkey";
+	import Icon from "../ui/Icon.svelte";
 
 	export let connection: Connection | undefined;
+
+	const hotkeyActions = app.hotkeySettings.actions;
 
 	let tablistIndex: Writable<number>;
 	let loudness = connection?.loudness;
@@ -46,6 +50,36 @@
 
 	function syncSettings(group?: SettGroup) {
 		app.transientSettings.save(group);
+	}
+
+	async function createHotkey() {
+		app.hotkeySettings.actions.update(actions => {
+			actions.push({
+				keycode: null,
+				ctrl: false,
+				shift: false,
+				alt: false,
+				meta: false,
+				action: null,
+			});
+			return actions;
+		});
+	}
+
+	async function changeHotkey(e: CustomEvent<Hotkey>) {
+		await app.hotkeySettings.saveHotkeyAsync(e.detail);
+	}
+
+	async function deleteHotkey(e: CustomEvent<Hotkey>) {
+		if (!e.detail.action || !e.detail.keycode) {
+			app.hotkeySettings.actions.update(actions => {
+				actions.remove_item(e.detail);
+				return actions;
+			});
+		} else {
+			await app.hotkeySettings.deleteHotkeyAsync(e.detail);
+			await app.hotkeySettings.loadAsync();
+		}
 	}
 
 	function updateLoudness() {
@@ -182,9 +216,15 @@
 			</BKeyValue>
 		</BTabSlot>
 		<BTabSlot title="Hotkeys">
-			{#each app.hotkeySettings.actions as hotkeyAction}
-				<BHotkeyField hotkey={hotkeyAction} />
+			{#each $hotkeyActions as hotkeyAction}
+				<BHotkeyField hotkey={hotkeyAction} on:change={changeHotkey} on:button={deleteHotkey} iconName="close" />
 			{/each}
+			
+			<BKeyValue label="Add shortcut" labelStyle="is-normal">
+				<button class="button" on:click={createHotkey}>
+					<Icon name="plus" />
+				</button>
+			</BKeyValue>
 		</BTabSlot>
 	</BTabList>
 </div>
