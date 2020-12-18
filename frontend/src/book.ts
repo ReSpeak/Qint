@@ -180,7 +180,7 @@ export class Book {
 		const oldChannel = client.channel;
 		client.update(obj as any);
 		// Update node in channel tree
-		if (client.channel !== oldChannel || "talk_power" in obj || "name" in obj) {
+		if (client.channel !== oldChannel || "talkPower" in obj || "name" in obj) {
 			let parent = this.getChannel(oldChannel);
 			if (parent !== undefined) {
 				parent.clients.update(pch => { pch.remove_item(client); return pch; });

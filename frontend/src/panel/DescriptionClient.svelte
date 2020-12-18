@@ -49,18 +49,21 @@
 		data: {
 			datasets: [{
 				label: "Ping",
+				yAxisID: "Ping",
 				data: [],
 				backgroundColor: "#87A23600",
 				borderColor: "#87A236FF",
 				pointRadius: 1
 			}, {
 				label: "Packet loss to Server",
+				yAxisID: "Packetloss",
 				data: [],
 				backgroundColor: "#9F354800",
 				borderColor: "#9F3548FF",
 				pointRadius: 1
 			}, {
 				label: "Packet loss from Server",
+				yAxisID: "Packetloss",
 				data: [],
 				backgroundColor: "#512C7300",
 				borderColor: "#512C73FF",
@@ -81,27 +84,29 @@
 					ticks: {
 						callback: function(value) {
 							let seconds = moment().diff(moment(value, "X"), "seconds");
-							if (seconds < 1) return "0";
-							return `${seconds}s`;
+							if (seconds < 1) seconds = 0;
+							return `${seconds}${NARROW_NO_BREAK_SPACE}s`;
 						}
 					}
 				}],
 				yAxes: [{
+					id: "Ping",
 					ticks: {
 						beginAtZero: true,
 						suggestedMax: 100,
 						maxTicksLimit: 5,
 						callback: function(value) {
-							return `${value}ms`;
+							return `${value}${NARROW_NO_BREAK_SPACE}ms`;
 						}
 					}
 				}, {
+					id: "Packetloss",
 					ticks: {
 						beginAtZero: true,
 						suggestedMax: 5,
 						maxTicksLimit: 5,
 						callback: function(value) {
-							return `${Number(value)}%`;
+							return `${Number(value)}${NARROW_NO_BREAK_SPACE}%`;
 						}
 					}
 				}]
@@ -130,11 +135,6 @@
 		groups.sort((a, b) => {
 			return a.inner.cmp(b.inner);
 		});
-	}
-
-	function clearChartData() {
-		console.log("clear");
-		chartConfig.data?.datasets?.forEach(ds => ds.data = []);
 	}
 
 	function createDataPoint(value: number | undefined): Chart.ChartPoint {
