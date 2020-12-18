@@ -6,7 +6,7 @@ use crate::{websocket, Tristate};
 
 pub use imp::{KeyCode, Shortcuts};
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Shortcut {
 	pub keycode: KeyCode,
 	pub action: Action,

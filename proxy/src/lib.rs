@@ -735,31 +735,33 @@ async fn get_hotkeys(state: web::Data<Arc<State>>) -> impl Responder {
 	HttpResponse::Ok().json2(&settings.shortcuts)
 }
 
-#[put("/hotkey/{key}")]
+#[put("/hotkey")]
 async fn set_hotkey(
-	state: web::Data<Arc<State>>, keycode: web::Path<shortcut::KeyCode>,
-	action: web::Json<shortcut::Action>,
+	state: web::Data<Arc<State>>, shortcut: web::Json<shortcut::Shortcut>,
 ) -> impl Responder {
-	let (_, res) = state.modify_settings(|settings| {
-		settings
-			.shortcuts
-			.actions
-			.push(shortcut::Shortcut { keycode: keycode.0, action: action.0 });
+	let (r, res) = state.modify_settings(|settings| {
+		if settings.shortcuts.actions.contains(&shortcut.0) {
+			bail!("The same shortcut already exists");
+		}
+		settings.shortcuts.actions.push(shortcut.0);
+		Ok(())
 	});
 
-	if let Err(e) = res {
+	if let Err(e) = r {
+		HttpResponse::BadRequest().body(e.to_string())
+	} else if let Err(e) = res {
 		HttpResponse::InternalServerError().body(e.to_string())
 	} else {
 		HttpResponse::Ok().finish()
 	}
 }
 
-#[delete("/hotkey/{key}")]
+#[delete("/hotkey")]
 async fn delete_hotkey(
-	state: web::Data<Arc<State>>, keycode: web::Path<shortcut::KeyCode>,
+	state: web::Data<Arc<State>>, shortcut: web::Json<shortcut::Shortcut>,
 ) -> impl Responder {
 	let (_, res) = state.modify_settings(|settings| {
-		settings.shortcuts.actions.retain(|s| s.keycode != keycode.0);
+		settings.shortcuts.actions.retain(|s| *s != shortcut.0);
 	});
 
 	if let Err(e) = res {
