@@ -1046,6 +1046,7 @@ mod tests {
 	use rand::Rng;
 
 	use juniper::http::GraphQLRequest;
+	use slog::{o, Drain};
 	use tsclientlib::ClientId;
 
 	use super::*;
@@ -1255,7 +1256,8 @@ mod tests {
 					no_audio: true,
 					verbosity: 1,
 				};
-				App::run(logger, args).await?;
+				let app = App::new(logger, args).await?;
+				app.serve().await?;
 				dir.close()?;
 				Ok(())
 			}

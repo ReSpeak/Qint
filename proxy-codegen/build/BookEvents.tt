@@ -131,9 +131,7 @@ pub mod js_structs {
 	use std::collections::HashSet;
 	use std::net::{IpAddr, SocketAddr};
 
-	use serde::Serialize;
-	#[cfg(test)]
-	use serde::Deserialize;
+	use serde::{Deserialize, Serialize};
 	use time::{Duration, OffsetDateTime};
 	use tsclientlib::{ChannelGroupId, ChannelId, ChannelPermissionHint, ChannelType, ClientDbId,
 		ClientId, ClientPermissionHint, ClientType, Codec, CodecEncryptionMode, GroupNamingMode,
@@ -141,17 +139,15 @@ pub mod js_structs {
 		TalkPowerRequest, Uid};
 	use tsproto_types::crypto::EccKeyPubP256;
 
-	use super::{serialize_some_date_time, serialize_some_duration, serialize_some_id,
-		serialize_some_set_id, serialize_some_some_duration, serialize_some_some_id,
-		serialize_some_some_u64, serialize_some_u64};
-	#[cfg(test)]
 	use super::{deserialize_some, deserialize_some_date_time, deserialize_some_duration,
 		deserialize_some_id, deserialize_some_set_id, deserialize_some_some_duration,
-		deserialize_some_some_id, deserialize_some_some_u64, deserialize_some_u64};
+		deserialize_some_some_id, deserialize_some_some_u64, deserialize_some_u64,
+		serialize_some_date_time, serialize_some_duration, serialize_some_id,
+		serialize_some_set_id, serialize_some_some_duration, serialize_some_some_id,
+		serialize_some_some_u64, serialize_some_u64};
 
 <# for struc in &structs { #>
-#[derive(Debug, Default, Serialize)]
-#[cfg_attr(test, derive(Deserialize))]
+#[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct <#= struc.name #> {
 	<# for p in &struc.properties {
@@ -216,8 +212,7 @@ impl From<&'_ tsclientlib::data::<#= struc.name #>> for <#= struc.name #> {
 <# } #>
 }
 
-#[derive(Clone, Debug, Serialize)]
-#[cfg_attr(test, derive(Deserialize))]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum JsPropertyId {
 <# for struc in &structs { #>
 	<#= struc.name #>(
@@ -240,8 +235,7 @@ pub enum JsPropertyId {
 	ServerIp(IpAddr),
 }
 
-#[derive(Debug, Serialize)]
-#[cfg_attr(test, derive(Deserialize))]
+#[derive(Debug, Deserialize, Serialize)]
 pub enum JsProperty {
 <# for struc in &structs { #>
 	<#= struc.name #>(js_structs::<#= struc.name #>),
