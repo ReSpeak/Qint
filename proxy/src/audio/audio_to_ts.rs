@@ -321,8 +321,7 @@ impl SdlCallback {
 	fn new(
 		logger: Logger, channels: audiopus::Channels, spawn_send: mpsc::Sender<PlayPacketMsg>,
 		loudness_threshold: Arc<AtomicU64>, packet_loss: Arc<AtomicU8>,
-	) -> Self
-	{
+	) -> Self {
 		let loudness = match EbuR128::new(1, super::SAMPLE_RATE as u32, ebur128::Mode::M) {
 			Ok(r) => Some(r),
 			Err(e) => {

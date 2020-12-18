@@ -6,10 +6,10 @@ use std::sync::Arc;
 use anyhow::format_err;
 use diesel::prelude::*;
 use futures::FutureExt;
-use meilisearch_core::{Database, DatabaseOptions, Schema};
-use meilisearch_core::Error as MError;
 use meilisearch_core::settings::{SettingsUpdate, UpdateState};
 use meilisearch_core::store::Index;
+use meilisearch_core::Error as MError;
+use meilisearch_core::{Database, DatabaseOptions, Schema};
 use serde::{Deserialize, Serialize};
 use slog::{debug, error, info, trace, warn, Logger};
 
@@ -86,7 +86,7 @@ impl Search {
 				database.main_write(|w| index.main.put_schema(w, &schema))?;
 				let settings = SettingsUpdate {
 					primary_key: UpdateState::Update("id".into()),
-					.. Default::default()
+					..Default::default()
 				};
 				database.update_write(|w| index.settings_update(w, settings))?;
 				(index, true)
@@ -101,67 +101,76 @@ impl Search {
 			}
 		}));
 
-		Ok((Self {
-			logger,
-			database,
-			index,
-		}, is_new))
+		Ok((Self { logger, database, index }, is_new))
 	}
 
 	/// Setup default database settings.
 	pub fn start_setup(state: &Arc<State>) {
 		let logger = state.logger.clone();
 		let state2 = state.clone();
-		actix::spawn(state.database.send(db::RunOnDbMsg(move |db| -> Result<()> {
-			use db::schema::{clients, messages};
+		actix::spawn(
+			state
+				.database
+				.send(db::RunOnDbMsg(move |db| -> Result<()> {
+					use db::schema::{clients, messages};
 
-			let search = &state2.search;
-			// TODO Use some stop words and synonyms
-			//search.database.update_write(|w| search.index.settings_update(w, settings))?;
+					let search = &state2.search;
+					// TODO Use some stop words and synonyms
+					//search.database.update_write(|w| search.index.settings_update(w, settings))?;
 
-			// Fetch all messages from the database
-			let mut offset = 0;
-			loop {
-				let query = messages::table
-					.left_outer_join(clients::table)
-					.select((messages::id, clients::name.nullable(), messages::invoker_name, messages::content))
-					.order(messages::id)
-					.offset(offset)
-					.limit(INIT_BATCH_SIZE as i64);
-				let res = query.load::<(i64, Option<String>, Option<String>, String)>(&db.con)?;
-				let len = res.len();
+					// Fetch all messages from the database
+					let mut offset = 0;
+					loop {
+						let query = messages::table
+							.left_outer_join(clients::table)
+							.select((
+								messages::id,
+								clients::name.nullable(),
+								messages::invoker_name,
+								messages::content,
+							))
+							.order(messages::id)
+							.offset(offset)
+							.limit(INIT_BATCH_SIZE as i64);
+						let res =
+							query.load::<(i64, Option<String>, Option<String>, String)>(&db.con)?;
+						let len = res.len();
 
-				// Insert into search database
-				let mut additions = search.index.documents_addition();
-				for r in res {
-					if let Some(author) = r.1.or(r.2) {
-						let doc = MessageDocument {
-							id: format!("m{}",  r.0 as u64),
-							author,
-							content: r.3,
-						};
-						additions.update_document(doc);
-					} else {
-						warn!(state2.logger, "Neither invoker nor invoker_name are set for message";
+						// Insert into search database
+						let mut additions = search.index.documents_addition();
+						for r in res {
+							if let Some(author) = r.1.or(r.2) {
+								let doc = MessageDocument {
+									id: format!("m{}", r.0 as u64),
+									author,
+									content: r.3,
+								};
+								additions.update_document(doc);
+							} else {
+								warn!(state2.logger, "Neither invoker nor invoker_name are set for message";
 							"id" => r.0 as u64);
-					}
-				}
-				search.database.update_write(|w| additions.finalize(w))?;
+							}
+						}
+						search.database.update_write(|w| additions.finalize(w))?;
 
-				debug!(state2.logger, "Writing messages into search db";
+						debug!(state2.logger, "Writing messages into search db";
 					"count" => offset as usize + len);
-				if len < INIT_BATCH_SIZE {
-					break;
-				}
-				offset += INIT_BATCH_SIZE as i64;
-			}
+						if len < INIT_BATCH_SIZE {
+							break;
+						}
+						offset += INIT_BATCH_SIZE as i64;
+					}
 
-			Ok(())
-		})).map(move |r| if let Err(e) = r {
-			warn!(logger, "Failed to setup search database"; "error" => %e);
-		} else if let Ok(Err(e)) = r {
-			warn!(logger, "Failed to fill search database"; "error" => %e);
-		}));
+					Ok(())
+				}))
+				.map(move |r| {
+					if let Err(e) = r {
+						warn!(logger, "Failed to setup search database"; "error" => %e);
+					} else if let Ok(Err(e)) = r {
+						warn!(logger, "Failed to fill search database"; "error" => %e);
+					}
+				}),
+		);
 	}
 
 	pub fn add_message(&self, msg: MessageDocument) -> Result<u64> {
@@ -179,15 +188,12 @@ impl Search {
 		let mut attrs = HashSet::new();
 		attrs.insert("id");
 
-		let schema = self.index.main.schema(&reader)?
-			.ok_or_else(|| format_err!("Schema not found"))?;
-		let content_attr = schema.id("content")
-			.ok_or_else(|| format_err!("Content not found in schema"))?.0;
+		let schema =
+			self.index.main.schema(&reader)?.ok_or_else(|| format_err!("Schema not found"))?;
+		let content_attr =
+			schema.id("content").ok_or_else(|| format_err!("Content not found in schema"))?.0;
 
-		let mut res = SearchResults {
-			results: Vec::new(),
-			count: result.nb_hits,
-		};
+		let mut res = SearchResults { results: Vec::new(), count: result.nb_hits };
 		for r in result.documents {
 			#[derive(Clone, Debug, Deserialize, Hash, Serialize)]
 			struct IdDocument {

@@ -35,7 +35,7 @@ impl LinkPreviewer {
 				None
 			}
 		};
-		LinkPreviewer { logger, cache, }
+		LinkPreviewer { logger, cache }
 	}
 
 	pub async fn decode_and_analyze_link(&self, link: &str) -> AnalyzeResult {

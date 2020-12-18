@@ -60,7 +60,9 @@ pub struct GetClientVolumeMsg(pub Uid);
 #[derive(Clone, Debug)]
 pub struct SetClientVolumeMsg(pub Uid, pub f32);
 pub struct UpdateIdentityMsg(pub Identity);
-pub struct RunOnDbMsg<I: 'static, E: 'static, F: FnOnce(&mut DbHandler) -> result::Result<I, E>>(pub F);
+pub struct RunOnDbMsg<I: 'static, E: 'static, F: FnOnce(&mut DbHandler) -> result::Result<I, E>>(
+	pub F,
+);
 
 /// After we connected successfully to a server.
 pub struct ConnectedMsg {
@@ -152,7 +154,8 @@ impl Message for RunMsg {
 
 impl DbHandler {
 	pub(crate) fn new(
-		logger: Logger, file_cache: Arc<FileCache>, search: Arc<Search>, settings: &Settings, secret: Secret,
+		logger: Logger, file_cache: Arc<FileCache>, search: Arc<Search>, settings: &Settings,
+		secret: Secret,
 	) -> Result<Self> {
 		let database_url = settings.config_path.join("storage.sqlite");
 		let con = SqliteConnection::establish(database_url.to_str().unwrap())?;
@@ -164,10 +167,10 @@ impl DbHandler {
 		// Enable wal mode for more concurrency and faster writes
 		// Use busy_timeout to retry operations when the database is locked (timeout in
 		// milliseconds)
-		con.batch_execute("PRAGMA synchronous = NORMAL; \
-			PRAGMA journal_mode = WAL; \
-			PRAGMA foreign_keys = ON; \
-			PRAGMA busy_timeout = 1000")?;
+		con.batch_execute(
+			"PRAGMA synchronous = NORMAL; PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; \
+			 PRAGMA busy_timeout = 1000",
+		)?;
 
 		// Run migrations
 		let mut s = Vec::new();
@@ -405,9 +408,8 @@ impl Handler<SetClientVolumeMsg> for DbHandler {
 	type Result = Result<()>;
 	fn handle(&mut self, msg: SetClientVolumeMsg, _: &mut Self::Context) -> Self::Result {
 		use schema::clients::dsl::*;
-		let res = diesel::update(clients.find(&msg.0.0))
-			.set(volume.eq(msg.1))
-			.execute(&self.con)?;
+		let res =
+			diesel::update(clients.find(&msg.0.0)).set(volume.eq(msg.1)).execute(&self.con)?;
 		if res != 1 {
 			bail!("Failed to find client in database");
 		}
@@ -477,10 +479,7 @@ impl Handler<WriteMessageMsg> for DbHandler {
 		};
 		let message_id = self.con.transaction::<_, diesel::result::Error, _>(|| {
 			diesel::insert_into(messages::table).values(&msg).execute(&self.con)?;
-			messages::table
-				.order(messages::id.desc())
-				.select(messages::id)
-				.first::<i64>(&self.con)
+			messages::table.order(messages::id.desc()).select(messages::id).first::<i64>(&self.con)
 		})?;
 		// Add to search db
 		// TODO Get invoker name or don't save in search db?
@@ -725,8 +724,7 @@ impl DbHandler {
 	pub(crate) fn handle_events(
 		logger: &Logger, state: &State, con: &TsConnection, data: &TsData, events: &[Event],
 		connected_msg: Option<ConnectedMsg>, ws: Addr<crate::websocket::Ws>,
-	) -> Result<()>
-	{
+	) -> Result<()> {
 		let handler = EventHandler::new(logger, state, con, data);
 
 		for e in events {
@@ -829,8 +827,7 @@ impl DbHandler {
 
 	pub(crate) fn handle_message(
 		logger: &Logger, state: &State, con: &TsConnection, data: &TsData, msg: &InMessage,
-	) -> Result<()>
-	{
+	) -> Result<()> {
 		let handler = EventHandler::new(logger, state, con, data);
 		if let InMessage::ChannelListFinished(_) = msg {
 			handler.handle_channellistfinished()
@@ -838,7 +835,6 @@ impl DbHandler {
 			Ok(())
 		}
 	}
-
 
 	pub fn create_client(
 		logger: &Logger, state: &State, con: &TsConnection, data: &TsData, client: &Client,
@@ -1474,21 +1470,21 @@ impl<'a> EventHandler<'a> {
 				let start_check_time = utc_time - Duration::seconds(1);
 
 				// Compare uid and name: messages::invoker == invoker_uid
-        		// But with null == null
-        		//
-        		// https://stackoverflow.com/questions/10416789/how-to-rewrite-is-distinct-from-and-is-not-distinct-from
-        		// a IS NOT DISTINCT FROM b can be rewritten as:
-        		// (NOT (a <> b OR a IS NULL OR b IS NULL) OR (a IS NULL AND b IS NULL))
-        		let invoker_cmp = not(messages::invoker
-            		.ne(&invoker_uid)
-            		.or(messages::invoker.is_null())
-            		.or(invoker_uid.is_none()))
-        		.or(messages::invoker.is_null().and(invoker_uid.is_none()));
-        		let name_cmp = not(messages::invoker_name
-            		.ne(&invoker_name)
-            		.or(messages::invoker_name.is_null())
-            		.or(invoker_name.is_none()))
-        		.or(messages::invoker_name.is_null().and(invoker_name.is_none()));
+				// But with null == null
+				//
+				// https://stackoverflow.com/questions/10416789/how-to-rewrite-is-distinct-from-and-is-not-distinct-from
+				// a IS NOT DISTINCT FROM b can be rewritten as:
+				// (NOT (a <> b OR a IS NULL OR b IS NULL) OR (a IS NULL AND b IS NULL))
+				let invoker_cmp = not(messages::invoker
+					.ne(&invoker_uid)
+					.or(messages::invoker.is_null())
+					.or(invoker_uid.is_none()))
+				.or(messages::invoker.is_null().and(invoker_uid.is_none()));
+				let name_cmp = not(messages::invoker_name
+					.ne(&invoker_name)
+					.or(messages::invoker_name.is_null())
+					.or(invoker_name.is_none()))
+				.or(messages::invoker_name.is_null().and(invoker_name.is_none()));
 
 				let cmp = messages::chat
 					.eq(chat)

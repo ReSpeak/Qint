@@ -326,8 +326,7 @@ impl Chat {
 	async fn messages(
 		&self, state: &State, start_time: Option<NaiveDateTime>, start_id: Option<ID>,
 		before_start: Option<bool>,
-	) -> GResult<Vec<Message>>
-	{
+	) -> GResult<Vec<Message>> {
 		let start_id = start_id.map(|i| i.parse::<u64>().map(|i| i as i64)).transpose()?;
 		let start = match (start_time, start_id, before_start) {
 			(Some(t), Some(i), Some(b)) => Some((t, i, b)),

@@ -65,9 +65,7 @@ impl Into<qint_proxy::Args> for Args {
 }
 
 #[actix_rt::main]
-async fn main() -> Result<()> {
-	real_main().await
-}
+async fn main() -> Result<()> { real_main().await }
 
 async fn real_main() -> Result<()> {
 	let logger = {

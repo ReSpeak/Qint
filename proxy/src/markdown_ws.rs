@@ -17,8 +17,7 @@ impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for Mark
 	fn handle(
 		&mut self, msg: std::result::Result<ws::Message, ws::ProtocolError>,
 		ctx: &mut Self::Context,
-	)
-	{
+	) {
 		match msg {
 			Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
 			Ok(ws::Message::Text(msg)) => {

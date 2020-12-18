@@ -765,8 +765,7 @@ impl Ws {
 	fn send_chat_message(
 		&mut self, target: MessageTarget, message: String, return_code: Option<&str>,
 		ctx: &mut <Self as Actor>::Context,
-	)
-	{
+	) {
 		if let Some(con) = &mut self.connection {
 			match con.get_state() {
 				Err(e) => {
@@ -871,8 +870,7 @@ impl Ws {
 	fn send_ts_message(
 		&mut self, mut msg: OutCommand, return_code: Option<&str>,
 		ctx: &mut <Self as Actor>::Context,
-	) -> Result<()>
-	{
+	) -> Result<()> {
 		if let Some(code) = &return_code {
 			msg.write_arg("return_code", code);
 		}
@@ -1187,8 +1185,7 @@ impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for Ws {
 	fn handle(
 		&mut self, msg: std::result::Result<ws::Message, ws::ProtocolError>,
 		ctx: &mut Self::Context,
-	)
-	{
+	) {
 		match msg {
 			Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
 			Ok(ws::Message::Text(msg)) => {
@@ -1236,8 +1233,7 @@ impl ActorFuture for ConnectionPoller {
 	fn poll(
 		self: Pin<&mut Self>, actor: &mut Self::Actor, ctx: &mut <Self::Actor as Actor>::Context,
 		task: &mut task::Context,
-	) -> Poll<Self::Output>
-	{
+	) -> Poll<Self::Output> {
 		loop {
 			let res = if let Some(con) = &mut actor.connection {
 				con.events().poll_next_unpin(task)

@@ -41,9 +41,7 @@ struct FileWriter<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin> {
 impl FileCache {
 	pub fn new(logger: Logger, cache_path: PathBuf) -> Self { Self { logger, cache_path } }
 
-	fn path_encode(data: &[u8]) -> String {
-		base64::encode_config(data, base64::URL_SAFE_NO_PAD)
-	}
+	fn path_encode(data: &[u8]) -> String { base64::encode_config(data, base64::URL_SAFE_NO_PAD) }
 
 	fn get_path(&self, server: &EccKeyPubP256, channel: ChannelId, path: &str) -> Result<PathBuf> {
 		let mut p = self.cache_path.clone();
@@ -56,8 +54,7 @@ impl FileCache {
 	pub async fn cache_file(
 		&self, server: &EccKeyPubP256, channel: ChannelId, path: &str,
 		file: impl Stream<Item = Result<Bytes, std::io::Error>> + Unpin,
-	) -> impl Stream<Item = Result<Bytes, std::io::Error>>
-	{
+	) -> impl Stream<Item = Result<Bytes, std::io::Error>> {
 		let path = match self.get_path(server, channel, path) {
 			Ok(r) => r,
 			Err(e) => {
