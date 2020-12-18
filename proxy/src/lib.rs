@@ -188,6 +188,89 @@ fn default_cache_path() -> PathBuf {
 	proj_dirs.cache_dir().into()
 }
 
+impl juniper::Context for State {}
+
+impl State {
+	fn modify_transient_settings<R, T: FnOnce(&mut TransientSettings) -> R>(
+		&self, f: T,
+	) -> (R, Result<()>) {
+		let mut settings = self.transient_settings.write().unwrap();
+		// Reload before changing to prevent overwriting changes from other processes
+		if let Err(e) = settings.load(&self.settings.read().unwrap().config_path) {
+			warn!(self.logger, "Failed to reload transient settings"; "error" => %e);
+		}
+		let old_loudness_threshold = settings.get_loudness_threshold();
+		let old_global_volume = settings.get_global_volume();
+
+		let r = f(&mut *settings);
+		let res = settings.save(&self.settings.read().unwrap().config_path);
+		if let Err(e) = &res {
+			error!(self.logger, "Failed to save transient settings"; "error" => %e);
+		}
+
+		// Apply audio changes
+		if let Some(v) = settings.get_loudness_threshold() {
+			if Some(v) != old_loudness_threshold {
+				let logger = self.logger.clone();
+				if let Some(ad) = &self.audio_data {
+					actix::spawn(ad.a2ts.send(audio::audio_to_ts::SetLoudnessThresholdMsg(v)).map(
+						move |r| {
+							if let Err(e) = r {
+								error!(logger, "Failed to apply loudness threshold";
+										"error" => %e);
+							}
+						},
+					));
+				}
+			}
+		}
+
+		if let Some(v) = settings.get_global_volume() {
+			if Some(v) != old_global_volume {
+				let logger = self.logger.clone();
+				if let Some(ad) = &self.audio_data {
+					actix::spawn(ad.ts2a.send(audio::ts_to_audio::SetGlobalVolumeMsg(v)).map(
+						move |r| {
+							if let Err(e) = r {
+								error!(logger, "Failed to apply global volume"; "error" => %e);
+							}
+						},
+					));
+				}
+			}
+		}
+
+		(r, res)
+	}
+
+	fn modify_settings<R, T: FnOnce(&mut Settings) -> R>(&self, f: T) -> (R, Result<()>) {
+		let mut settings = self.settings.write().unwrap();
+		// Reload before changing to prevent overwriting changes from other processes
+		let config_path = settings.config_path.clone();
+		if let Err(e) = settings.load(&config_path) {
+			warn!(self.logger, "Failed to reload settings"; "error" => %e);
+		}
+
+		let r = f(&mut *settings);
+		let res = settings.save(&config_path);
+		if let Err(e) = &res {
+			error!(self.logger, "Failed to save settings"; "error" => %e);
+		}
+
+		(r, res)
+	}
+}
+
+impl Tristate {
+	pub fn get_value(&self, old: bool) -> bool {
+		match self {
+			Tristate::True => true,
+			Tristate::False => false,
+			Tristate::Toggle => !old,
+		}
+	}
+}
+
 impl Default for Settings {
 	fn default() -> Self {
 		Self {
@@ -204,70 +287,17 @@ impl Default for Settings {
 	}
 }
 
-impl juniper::Context for State {}
-
-impl State {
-	fn modify_transient_settings<R, T: FnOnce(&mut TransientSettings) -> R>(&self, f: T) -> R {
-		let mut settings = self.transient_settings.write().unwrap();
-		// Reload before changing to prevent overwriting changes from other processes
-		if let Err(e) = settings.load(&self.settings.read().unwrap().config_path) {
-			warn!(self.logger, "Failed to reload transient settings"; "error" => %e);
-		}
-		let old_loudness_threshold = settings.get_loudness_threshold();
-		let old_global_volume = settings.get_global_volume();
-
-		let r = f(&mut *settings);
-		if let Err(e) = settings.save(&self.settings.read().unwrap().config_path) {
-			error!(self.logger, "Failed to save transient settings"; "error" => %e);
-		}
-
-		// Apply audio changes
-		if let Some(v) = settings.get_loudness_threshold() {
-			if Some(v) != old_loudness_threshold {
-				let logger = self.logger.clone();
-				if let Some(ad) = &self.audio_data {
-					actix::spawn(
-						ad.a2ts.send(audio::audio_to_ts::SetLoudnessThresholdMsg(v)).map(
-							move |r| {
-								if let Err(e) = r {
-									error!(logger, "Failed to apply loudness threshold";
-										"error" => %e);
-								}
-							},
-						),
-					);
-				}
-			}
-		}
-
-		if let Some(v) = settings.get_global_volume() {
-			if Some(v) != old_global_volume {
-				let logger = self.logger.clone();
-				if let Some(ad) = &self.audio_data {
-					actix::spawn(
-						ad.ts2a.send(audio::ts_to_audio::SetGlobalVolumeMsg(v)).map(
-							move |r| {
-								if let Err(e) = r {
-									error!(logger, "Failed to apply global volume"; "error" => %e);
-								}
-							},
-						),
-					);
-				}
-			}
-		}
-
-		r
+impl Settings {
+	fn load(&mut self, config_path: &Path) -> Result<()> {
+		let s = fs::read_to_string(&config_path.join(SETTINGS_FILENAME))?;
+		*self = toml::from_str(&s)?;
+		Ok(())
 	}
-}
 
-impl Tristate {
-	pub fn get_value(&self, old: bool) -> bool {
-		match self {
-			Tristate::True => true,
-			Tristate::False => false,
-			Tristate::Toggle => !old,
-		}
+	fn save(&self, config_path: &Path) -> Result<()> {
+		let data = toml::to_string(self)?;
+		fs::write(&config_path.join(SETTINGS_FILENAME), data)?;
+		Ok(())
 	}
 }
 
@@ -670,10 +700,14 @@ async fn get_transient_setting(
 	}
 }
 
-fn set_transient_setting_internal(state: &State, req: &str, body: Value) -> Result<()> {
-	state.modify_transient_settings(|transient_values| {
+#[put("/transient/{key}")]
+async fn set_transient_setting(
+	state: web::Data<Arc<State>>, data: web::Path<String>, body: web::Json<Value>,
+) -> impl Responder {
+	let req = data.as_str();
+	let (r, res) = state.modify_transient_settings(|transient_values| {
 		if req == "*" {
-			if let Value::Object(obj) = body {
+			if let Value::Object(obj) = body.0 {
 				for (k, v) in obj.into_iter() {
 					transient_values.set(k, v);
 				}
@@ -681,18 +715,15 @@ fn set_transient_setting_internal(state: &State, req: &str, body: Value) -> Resu
 				bail!("*-assign must be an object");
 			}
 		} else {
-			transient_values.set(req.to_string(), body);
+			transient_values.set(req.to_string(), body.0);
 		}
 		Ok(())
-	})
-}
+	});
 
-#[put("/transient/{key}")]
-async fn set_transient_setting(
-	state: web::Data<Arc<State>>, data: web::Path<String>, body: web::Json<Value>,
-) -> impl Responder {
-	if let Err(e) = set_transient_setting_internal(&**state, data.as_str(), body.0) {
+	if let Err(e) = r {
 		HttpResponse::BadRequest().body(e.to_string())
+	} else if let Err(e) = res {
+		HttpResponse::InternalServerError().body(e.to_string())
 	} else {
 		HttpResponse::Ok().finish()
 	}
@@ -700,8 +731,42 @@ async fn set_transient_setting(
 
 #[get("/hotkey")]
 async fn get_hotkeys(state: web::Data<Arc<State>>) -> impl Responder {
-	let settings_state = (&**state).settings.read().unwrap().shortcuts.clone();
-	HttpResponse::Ok().json(settings_state)
+	let settings = state.settings.read().unwrap();
+	HttpResponse::Ok().json2(&settings.shortcuts)
+}
+
+#[put("/hotkey/{key}")]
+async fn set_hotkey(
+	state: web::Data<Arc<State>>, keycode: web::Path<shortcut::KeyCode>,
+	action: web::Json<shortcut::Action>,
+) -> impl Responder {
+	let (_, res) = state.modify_settings(|settings| {
+		settings
+			.shortcuts
+			.actions
+			.push(shortcut::Shortcut { keycode: keycode.0, action: action.0 });
+	});
+
+	if let Err(e) = res {
+		HttpResponse::InternalServerError().body(e.to_string())
+	} else {
+		HttpResponse::Ok().finish()
+	}
+}
+
+#[delete("/hotkey/{key}")]
+async fn delete_hotkey(
+	state: web::Data<Arc<State>>, keycode: web::Path<shortcut::KeyCode>,
+) -> impl Responder {
+	let (_, res) = state.modify_settings(|settings| {
+		settings.shortcuts.actions.retain(|s| s.keycode != keycode.0);
+	});
+
+	if let Err(e) = res {
+		HttpResponse::InternalServerError().body(e.to_string())
+	} else {
+		HttpResponse::Ok().finish()
+	}
 }
 
 fn merge_json(a: &mut Value, b: &Value) {
@@ -751,17 +816,12 @@ impl App {
 		};
 
 		// Load settings
-		let mut settings = match fs::read_to_string(&config_path.join(SETTINGS_FILENAME)) {
-			Ok(r) => toml::from_str(&r)?,
-			Err(e) => {
-				// Only a soft error
-				info!(logger, "Failed to read settings, using defaults"; "error" => %e);
-				// Create settings directory
-				fs::create_dir_all(&config_path)?;
-
-				Settings::default()
-			}
-		};
+		let mut settings = Settings::default();
+		if let Err(e) = settings.load(&config_path) {
+			info!(logger, "Failed to read settings, using defaults"; "error" => %e);
+			// Create settings directory
+			fs::create_dir_all(&config_path)?;
+		}
 
 		let transient_settings = {
 			let mut set = TransientSettings::default();
@@ -862,15 +922,13 @@ impl App {
 		if let Some(volume) = transient_settings.get_global_volume() {
 			let logger = logger.clone();
 			if let Some(ad) = &audio_data {
-				actix::spawn(
-					ad.ts2a.send(audio::ts_to_audio::SetGlobalVolumeMsg(volume)).map(
-						move |r| {
-							if let Err(e) = r {
-								error!(logger, "Failed to apply global volume"; "error" => %e);
-							}
-						},
-					),
-				);
+				actix::spawn(ad.ts2a.send(audio::ts_to_audio::SetGlobalVolumeMsg(volume)).map(
+					move |r| {
+						if let Err(e) = r {
+							error!(logger, "Failed to apply global volume"; "error" => %e);
+						}
+					},
+				));
 			}
 		}
 
@@ -924,6 +982,8 @@ impl App {
 				.service(get_transient_setting)
 				.service(set_transient_setting)
 				.service(get_hotkeys)
+				.service(set_hotkey)
+				.service(delete_hotkey)
 				.service(get_link_preview)
 				.service(render_md_service)
 				.service(db::graphql::db_graphql)

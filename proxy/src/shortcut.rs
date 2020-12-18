@@ -3,19 +3,18 @@ use serde::{Deserialize, Serialize};
 use slog::warn;
 
 use crate::{websocket, Tristate};
-use imp::*;
 
-pub use imp::Shortcuts;
+pub use imp::{KeyCode, Shortcuts};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Shortcut {
-	keycode: KeyCode,
-	action: Action,
+	pub keycode: KeyCode,
+	pub action: Action,
 }
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct ShortcutConfig {
-	actions: Vec<Shortcut>,
+	pub actions: Vec<Shortcut>,
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Deserialize, Serialize)]
