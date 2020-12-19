@@ -344,14 +344,18 @@
 		switch (dir) {
 			case ListFetchDir.After:
 				// This case adds elements at the end => trim start
-				await modifyElems([...elems, ...newElems], false); // modification is at the end => safe
-				await tryTrimStart();
+				if (newElems.length > 0) {
+					await modifyElems([...elems, ...newElems], false); // modification is at the end => safe
+					await tryTrimStart();
+				}
 				break;
 
 			case ListFetchDir.Before:
 				// This case adds elements at the start => trim end
-				await modifyElems([...newElems, ...elems], true); // mofification at start => helper
-				await tryTrimEnd();
+				if (newElems.length > 0) {
+					await modifyElems([...newElems, ...elems], true); // mofification at start => helper
+					await tryTrimEnd();
+				}
 				break;
 
 			case ListFetchDir.New:

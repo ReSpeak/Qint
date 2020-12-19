@@ -39,6 +39,8 @@
 	let lastDisplayed: Message | undefined;
 	let sendError: string | undefined;
 	let isSending = false;
+	// The id of the message that is set as last read. (To prevent unnecessary many messages)
+	let isSettingLastRead: string | undefined = undefined;
 
 	let canChatHere = false;
 
@@ -244,7 +246,11 @@
 
 	async function markRead() {
 		if (chatData === undefined || lastDisplayed === undefined) return;
-		if (document.hasFocus() && lastDisplayed.date > $chatData.lastRead) {
+		if (document.hasFocus() &&
+			lastDisplayed.date.unix() >= $chatData.lastRead.unix() &&
+			$chatData.unreadCount > 0 &&
+			isSettingLastRead !== lastDisplayed.id) {
+			isSettingLastRead = lastDisplayed.id;
 			await chat.setLastRead(lastDisplayed.id, lastDisplayed.date);
 		}
 	}
