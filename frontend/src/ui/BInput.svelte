@@ -7,12 +7,15 @@
 
 	export let value: string;
 	export let enterToSubmit = true;
+	export let hasHistory = false;
 
-	const dispatch = createEventDispatcher<{ submit: undefined; structureChanged: undefined }>();
+	const dispatch = createEventDispatcher<{ submit: undefined; structureChanged: undefined; historyMove: number; }>();
 	let setValue: string | undefined;
 	let self: HTMLElement;
 	let expectQuickPaste = false;
 	let hasContent = false;
+	// Index into history (triggered by arrow up/down), positive
+	let historyIndex: number | undefined;
 
 	$: if (value !== setValue) {
 		applyValue(value);
@@ -34,6 +37,7 @@
 	}
 
 	function textChanged() {
+		if (self === undefined) return;
 		let tmp = self.innerText;
 		if (tmp.endsWith("\n")) tmp = tmp.substring(0, tmp.length - 1);
 		setValue = tmp;
@@ -93,6 +97,7 @@
 		if (val !== setValue) {
 			setValue = val;
 			if (self) self.textContent = val;
+			textChanged();
 		}
 	}
 
@@ -100,7 +105,29 @@
 		if (enterToSubmit && e.key === "Enter" && !e.shiftKey && !e.ctrlKey) {
 			dispatch("submit");
 			e.preventDefault();
+			return;
 		}
+		if (hasHistory) {
+			if (e.key === "ArrowDown" && historyIndex !== undefined && historyIndex !== 0) {
+				historyIndex -= 1;
+				if (historyIndex === 0)
+					value = "";
+				else
+					dispatch("historyMove", historyIndex);
+				e.preventDefault();
+				return;
+			}
+			if (e.key === "ArrowUp" && (historyIndex !== undefined || value.length === 0)) {
+				if (historyIndex === undefined)
+					historyIndex = 1;
+				else
+					historyIndex += 1;
+				dispatch("historyMove", historyIndex);
+				e.preventDefault();
+				return;
+			}
+		}
+		historyIndex = undefined;
 		expectQuickPaste = e.key.toLowerCase() === "v" && e.shiftKey && e.ctrlKey;
 	}
 

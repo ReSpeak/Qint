@@ -16,7 +16,7 @@
 	import { Channel, Client, Server } from "../book";
 	import { get, writable } from "svelte/store";
 	import type { Readable, Writable } from "svelte/store";
-	import { SERVER_ICON } from "../util";
+	import { arraysEqual, assert, SERVER_ICON } from "../util";
 	import type { ChatData } from "../bookBase";
 	import type { ChannelId } from "../ts";
 	import { pathJoin } from "../panel/fileUtil";
@@ -39,6 +39,7 @@
 	let lastDisplayed: Message | undefined;
 	let sendError: string | undefined;
 	let isSending = false;
+	let chatListElems: Message[];
 	// The id of the message that is set as last read. (To prevent unnecessary many messages)
 	let isSettingLastRead: string | undefined = undefined;
 
@@ -156,6 +157,25 @@
 
 	function chatboxContentChanged() {
 		sendError = undefined;
+	}
+
+	function chatboxHistoryMove(e: CustomEvent<number>) {
+		let historyId = e.detail;
+		assert(historyId > 0, "History id should be at least 1");
+		if (connection === undefined)
+			return;
+		let ownUid = get(connection.book.ownClient)?.uid;
+		if (ownUid === undefined || ownUid === null)
+			return;
+		for (let i = chatListElems.length - 1; i >= 0; i--) {
+			let msg: Message = chatListElems[i];
+			let uid = msg.invoker?.uid;
+			if (uid && arraysEqual(uid, ownUid)) {
+				historyId--;
+				if (historyId === 0)
+					text = msg.raw;
+			}
+		}
 	}
 
 	async function tryUploadChatImage(
@@ -285,6 +305,7 @@
 		<UiLazyList
 			on:viewchanged={viewchanged}
 			bind:this={chatList}
+			bind:elems={chatListElems}
 			{fetchElements}
 			suggestJumpEnd={true}
 			notifyViewChanged={chatData !== undefined && $chatData.unreadCount > 0}
@@ -329,9 +350,11 @@
 			<div class="sendCombo">
 				<BInput
 					bind:this={messageInput}
-					value={text}
+					bind:value={text}
+					hasHistory={true}
 					on:submit={sendMessage}
-					on:structureChanged={chatboxContentChanged}>
+					on:structureChanged={chatboxContentChanged}
+					on:historyMove={chatboxHistoryMove}>
 					<div slot="placeholder">
 						<span>Send to</span>
 						<!-- TODO: Remove 'sel !== undefined' when svelte-tool understands it -->
