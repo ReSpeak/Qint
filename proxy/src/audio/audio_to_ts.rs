@@ -17,11 +17,12 @@ use tsproto_packets::packets::{AudioData, CodecType, OutAudio, OutPacket};
 
 use super::*;
 use crate::websocket::{CaptureLoudnessMsg, SendPacketMsg, SetSelfTalkingMsg, Ws};
+use crate::loudness_ws::LoudnessService;
 
 pub(crate) struct AddListenerMsg(pub Addr<Ws>);
 pub(crate) struct RemoveListenerMsg(pub Addr<Ws>);
-pub(crate) struct AddLoudnessListenerMsg(pub Addr<Ws>);
-pub(crate) struct RemoveLoudnessListenerMsg(pub Addr<Ws>);
+pub(crate) struct AddLoudnessListenerMsg(pub Addr<LoudnessService>);
+pub(crate) struct RemoveLoudnessListenerMsg(pub Addr<LoudnessService>);
 pub(crate) struct SetPacketlossMsg(pub f32);
 /// An audio packet and `true` if this is the last packet.
 pub(crate) struct PlayPacketMsg(Option<(OutPacket, bool)>, Option<f64>);
@@ -37,12 +38,15 @@ const DEFAULT_LOUDNESS_THRESHOLD: f64 = -50.0;
 /// threshold.
 const TALKING_TIME: u8 = 5;
 
+/// Magic value sent if the client stopped talking.
+const LOUDNESS_END_MAGIC: f64 = -1000.0;
+
 pub struct AudioToTs {
 	logger: Logger,
 	audio_subsystem: AudioSubsystem,
 	spawn_send: mpsc::Sender<PlayPacketMsg>,
 	connections: HashSet<Addr<Ws>>,
-	loudness_cons: HashSet<Addr<Ws>>,
+	loudness_cons: HashSet<Addr<LoudnessService>>,
 	/// The loudness threshold in LUFS (Loudness Unit Full Scale).
 	///
 	/// This is actually a `f64`, there is no `AtomicF64` though.
@@ -191,6 +195,15 @@ impl Handler<PlayPacketMsg> for AudioToTs {
 							warn!(logger2, "Failed to send audio packet"; "error" => %e);
 						}
 					}));
+
+					if let Some(loudness) = loudness {
+						let logger2 = logger.clone();
+						tokio::spawn(con.send(CaptureLoudnessMsg(loudness)).map(move |r| {
+							if let Err(e) = r {
+								warn!(logger2, "Failed to send loudness"; "error" => %e);
+							}
+						}));
+					}
 
 					true
 				}
@@ -361,6 +374,22 @@ impl SdlCallback {
 			warn!(self.logger, "Failed to send audio packet"; "error" => %e);
 		}
 	}
+
+	fn measure_loudness(&mut self, buffer: &[f32]) -> Option<f64> {
+		if let Some(ebur128) = &mut self.loudness {
+			if let Err(e) = ebur128.add_frames_f32(buffer) {
+				warn!(self.logger, "Failed to measure loudness with new data"; "error" => %e);
+			} else {
+				match ebur128.loudness_momentary() {
+					Err(e) => {
+						warn!(self.logger, "Failed to measure loudness"; "error" => %e);
+					}
+					Ok(lufs) => return Some(lufs),
+				}
+			}
+		}
+		None
+	}
 }
 
 impl AudioCallback for SdlCallback {
@@ -397,21 +426,12 @@ impl AudioCallback for SdlCallback {
 			}
 		}
 
-		if let Some(ebur128) = &mut self.loudness {
-			// Measure loudness
-			if let Err(e) = ebur128.add_frames_f32(buffer) {
-				warn!(self.logger, "Failed to measure loudness with new data"; "error" => %e);
-			} else {
-				match ebur128.loudness_momentary() {
-					Err(e) => {
-						warn!(self.logger, "Failed to measure loudness"; "error" => %e);
-					}
-					Ok(lufs) => {
-						loudness = Some(lufs);
-						if lufs < f64::from_bits(self.loudness_threshold.load(Ordering::Relaxed)) {
-							should_talk = false;
-						}
-					}
+		if should_talk {
+			// Additionally measure loudness, it has to be over the threshold
+			if let Some(lufs) = self.measure_loudness(buffer) {
+				loudness = Some(lufs);
+				if lufs < f64::from_bits(self.loudness_threshold.load(Ordering::Relaxed)) {
+					should_talk = false;
 				}
 			}
 		}
@@ -422,6 +442,11 @@ impl AudioCallback for SdlCallback {
 
 		if !should_talk {
 			self.is_talking = self.is_talking.saturating_sub(1);
+
+			if self.is_talking != 0 {
+				// Measure loudness so the frontend can display it
+				loudness = self.measure_loudness(buffer);
+			}
 		}
 
 		let codec = if self.channels == audiopus::Channels::Mono {
@@ -434,8 +459,8 @@ impl AudioCallback for SdlCallback {
 				// Send empty packet to signal end
 				trace!(self.logger, "Sending last empty packet");
 				let packet = OutAudio::new(&AudioData::C2S { id: 0, codec, data: &[] });
-				self.send_packet(Some((packet, true)), loudness);
-			} else {
+				self.send_packet(Some((packet, true)), Some(LOUDNESS_END_MAGIC));
+			} else if loudness.is_some() {
 				self.send_packet(None, loudness);
 			}
 			self.last_buffer.resize(buffer.len(), 0.0);

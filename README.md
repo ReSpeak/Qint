@@ -75,7 +75,7 @@ debug.enable("CHAT,BINPUT")
 debug.enable("*,-LL") // Everything but the lazy list
 debug.enable("error:*")
 
-// Set permanently
+// debug.enable is saved in local storage
 localStorage.debug = "*"
 ```
 

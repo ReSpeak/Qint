@@ -28,7 +28,7 @@ export class HotkeySettings {
 			const data = await resp.json();
 			this.actions.set(data.actions as Array<Hotkey>);
 		} catch (e) {
-			console.error("Failed to load hotkeys");
+			console.error("Failed to load hotkeys", e);
 		}
 	}
 

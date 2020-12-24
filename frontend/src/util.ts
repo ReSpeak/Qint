@@ -26,6 +26,13 @@ export const MIN_VOLUME_DB = -30;
 export const NARROW_NO_BREAK_SPACE = String.fromCharCode(0x202f);
 export const youtubeUrlRegex = /^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube\.com|youtu.be))(\/(?:[\w\-]+\?v=|embed\/|v\/)?)([\w\-]+)(\S+)?$/;
 
+export const LOUDNESS_MIN = -100;
+export const LOUDNESS_MAX = 10;
+export const LOUDNESS_END_MAGIC = -1000;
+export const LOUDNESS_HISTORY = 100;
+export const LOUDNESS_UPDATE_MS = 20;
+
+
 export type RequiredNN<T> = { [P in keyof T]: NonNullable<T[P]> };
 export type Writeable<T> = { -readonly [P in keyof T]: Writeable<T[P]> };
 

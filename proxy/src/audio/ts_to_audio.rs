@@ -1,3 +1,4 @@
+use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
@@ -5,6 +6,7 @@ use std::time::Duration;
 
 use actix::*;
 use anyhow::{format_err, Result};
+use ebur128::EbuR128;
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired, AudioStatus};
 use sdl2::AudioSubsystem;
 use slog::{debug, error, o, warn, Logger};
@@ -13,7 +15,7 @@ use tsclientlib::ClientId;
 use tsproto_packets::packets::InAudioBuf;
 
 use super::*;
-use crate::websocket::{GetClientVolumeMsg, TalkersChangedMsg, Ws};
+use crate::websocket::{GetClientVolumeMsg, LoudnessesMsg, TalkersChangedMsg, Ws};
 use crate::ConnectionId;
 
 type Id = (ConnectionId, ClientId);
@@ -37,8 +39,10 @@ pub(crate) struct TsToAudio {
 }
 
 struct SdlCallback {
+	logger: Logger,
 	data: Arc<Mutex<AudioHandler>>,
 	connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
+	loudness: HashMap<Id, EbuR128>,
 	handle: Handle,
 	global_volume: Arc<AtomicU32>,
 }
@@ -117,8 +121,10 @@ impl TsToAudio {
 			debug!(logger, "Got playback spec"; "spec" => ?spec,
 				"driver" => self.audio_subsystem.current_audio_driver());
 			SdlCallback {
+				logger,
 				data,
 				connections,
+				loudness: Default::default(),
 				handle: Handle::current(),
 				global_volume: self.global_volume.clone(),
 			}
@@ -221,7 +227,34 @@ impl AudioCallback for SdlCallback {
 
 		let mut data = self.data.lock().unwrap();
 		let has_connections = !data.get_queues().is_empty();
-		let removed = data.fill_buffer(buffer);
+		let loudness = &mut self.loudness;
+		// Collect loudness per client per connection
+		let mut loudnesses = HashMap::new();
+		let logger = &self.logger;
+		let removed = data.fill_buffer_with_proc(buffer, |id, buf| {
+			let ebur128 = match loudness.entry(id.clone()) {
+				Entry::Occupied(e) => e.into_mut(),
+				Entry::Vacant(e) => {
+					match EbuR128::new(2, super::SAMPLE_RATE as u32, ebur128::Mode::M) {
+						Err(e) => {
+							warn!(logger, "Failed to create loudness measurement"; "error" => %e);
+							return;
+						}
+						Ok(r) => e.insert(r),
+					}
+				}
+			};
+			if let Err(e) = ebur128.add_frames_f32(buf) {
+				warn!(logger, "Failed to measure loudness of client"; "error" => %e);
+			}
+			match ebur128.loudness_momentary() {
+				Err(e) => warn!(logger, "Failed to measure loudness"; "error" => %e),
+				Ok(lufs) => {
+					let ls = loudnesses.entry(id.0).or_insert_with(HashMap::new);
+					ls.insert(id.1, lufs);
+				}
+			}
+		});
 		let message_connections = removed.iter().map(|i| i.0).collect::<HashSet<_>>();
 		if !message_connections.is_empty() {
 			let cons = self.connections.lock().unwrap();
@@ -237,6 +270,20 @@ impl AudioCallback for SdlCallback {
 					self.handle.spawn(con.send(TalkersChangedMsg(talkers)).map(|_| ()));
 				}
 			}
+		}
+
+		// Send loudnesses
+		if !loudnesses.is_empty() {
+			let cons = self.connections.lock().unwrap();
+			for (c, ls) in loudnesses {
+				if let Some(con) = cons.get(&c) {
+					self.handle.spawn(con.send(LoudnessesMsg(ls)).map(|_| ()));
+				}
+			}
+		}
+
+		for id in &removed {
+			self.loudness.remove(&id);
 		}
 
 		// Adjust with global volume

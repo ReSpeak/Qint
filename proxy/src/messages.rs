@@ -1,4 +1,5 @@
-use core::convert::TryFrom;
+use std::convert::TryFrom;
+use std::collections::HashMap;
 
 #[cfg(test)]
 use proxy_codegen::book_events::serialize_some_u64;
@@ -32,8 +33,6 @@ pub enum MessageF2P {
 		#[serde(default, rename = "returnCode", skip_serializing_if = "Option::is_none")]
 		return_code: Option<String>,
 	},
-	/// Ask the proxy to send loudness data or not.
-	SubscribeLoudness(bool),
 	/// Change the volume of a client.
 	SetClientVolume {
 		/// Client uid
@@ -72,7 +71,8 @@ pub enum MessageP2F {
 	Events(Vec<JsEvent>),
 	/// The connection received a message.
 	Message(JsInMessage),
-	Loudness(f64),
+	/// Loudness of clients that are currently talking.
+	Loudnesses(HashMap<String, f32>),
 	Result(ResultStruct),
 }
 

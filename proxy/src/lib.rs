@@ -39,6 +39,7 @@ mod audio;
 mod db;
 mod filecache;
 mod link_previewer;
+mod loudness_ws;
 mod markdown_ws;
 mod messages;
 mod search;
@@ -48,6 +49,7 @@ mod websocket;
 
 use filecache::FileCache;
 use link_previewer::LinkPreviewer;
+use loudness_ws::LoudnessService;
 use markdown_ws::MarkdownService;
 use secret::Secret;
 use websocket::Ws;
@@ -664,6 +666,20 @@ async fn get_link_preview(state: web::Data<Arc<State>>, url: web::Path<String>) 
 	HttpResponse::Ok().json(state.link_previewer.decode_and_analyze_link(&url).await)
 }
 
+#[get("/loudness")]
+async fn loudness_service(
+	state: web::Data<Arc<State>>, req: HttpRequest, stream: web::Payload,
+) -> impl Responder {
+	let ws = LoudnessService::new(Arc::clone(&state));
+	match ws::start_with_addr(ws, &req, stream) {
+		Err(e) => {
+			error!(state.logger, "Failed to create websocket actor"; "error" => %e);
+			Either::A(HttpResponse::InternalServerError().body("Failed to start connection"))
+		}
+		Ok((_, ws)) => Either::B(ws),
+	}
+}
+
 #[get("/render_md_service")]
 async fn render_md_service(
 	state: web::Data<Arc<State>>, req: HttpRequest, stream: web::Payload,
@@ -987,6 +1003,7 @@ impl App {
 				.service(set_hotkey)
 				.service(delete_hotkey)
 				.service(get_link_preview)
+				.service(loudness_service)
 				.service(render_md_service)
 				.service(db::graphql::db_graphql)
 				.service(db::graphql::graphiql)

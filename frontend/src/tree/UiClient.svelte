@@ -1,16 +1,17 @@
 <script lang="typescript">
 	import type { Readable } from "svelte/store";
+	import { writable } from "svelte/store";
 	import TsIcon from "../ui/TsIcon.svelte";
 	import ServerGroupIcon from "../ui/ServerGroupIcon.svelte";
 	import FilterString from "../ui/FilterString.svelte";
 	import Icon from "../ui/Icon.svelte";
+	import SimpleDiagram from "../ui/UiSimpleDiagram.svelte";
 	import { Connection } from "../connection";
 	import { Channel, Client } from "../book";
 	import { draggable, DragData } from "../ui/draggable";
-	import { findParent, flash, on, render_updates } from "../util";
+	import { findParent, flash, LOUDNESS_HISTORY, LOUDNESS_MAX, LOUDNESS_MIN, on, render_updates } from "../util";
 	import { afterUpdate, onMount } from "svelte";
 	import { app, NodeSelection } from "../app";
-	import { TalkState } from "../ts";
 	import type { ServerGroupId } from "../ts";
 	import HoverMenu from "./HoverMenu.svelte";
 	import { DelayedHover } from "./delayedHover";
@@ -34,6 +35,8 @@
 	$: filterShow = applyFilter(filter, $client);
 	let ownClient = client.id === connection.book.ownClientId;
 	let div: HTMLElement;
+	let loudnessDiagram: SimpleDiagram;
+	let loudness = writable(LOUDNESS_MIN);
 
 	let sortedServerGroups: ServerGroupId[];
 	$: {
@@ -88,7 +91,17 @@
 		hover = new DelayedHover(div, [div]);
 		hovered = hover.hovered;
 
-		return () => hover.unregister();
+		connection.loudnesses[client.id] = loudness;
+		loudness.subscribe(l => {
+			if (loudnessDiagram !== undefined)
+				loudnessDiagram.addValue(l);
+		});
+
+		return () => {
+			hover.unregister();
+
+			delete connection.loudnesses[client.id];
+		};
 	});
 </script>
 
@@ -104,7 +117,15 @@
 			on:svddrop={dragDrop}
 			data-type="client"
 			data-key={$client.id}>
-			<div class:talking={$client.talking !== TalkState.Off} class="talkWave" />
+			<!--<div class:talking={$client.talking !== TalkState.Off} class="talkWave" />-->
+			<div class="talkWave talking">
+				<SimpleDiagram bind:this={loudnessDiagram}
+					style="width: 100%; height: 100%"
+					min={LOUDNESS_MIN}
+					max={LOUDNESS_MAX}
+					count={LOUDNESS_HISTORY}
+				/>
+			</div>
 			<TsIcon type="client" source={$client} {connection} />
 			<span class="nameBox" style="color:{$client.color};">
 				{#if showId}
@@ -163,7 +184,7 @@
 		bottom: 0;
 		left: 0;
 
-		background-image: url("/talking.svg");
+		//background-image: url("/talking.svg");
 		background-size: 100% auto;
 		//-webkit-mask-image: radial-gradient(rgba(0, 0, 0, 1), rgba(0, 0, 0, 0));
 		//mask-image: radial-gradient(rgba(0, 0, 0, 1), rgba(0, 0, 0, 0));

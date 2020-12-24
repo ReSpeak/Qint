@@ -1,14 +1,14 @@
 import { ResultDetails, OutMsg, InMsg } from "./backend/ws";
 import { get, writable, Writable, Readable } from "svelte/store";
 import { Book, Channel, ChatData, Client } from "./book";
-import { oneshot, fnBroadcast } from "./util";
+import { oneshot, fnBroadcast, LOUDNESS_MIN, LOUDNESS_HISTORY, LOUDNESS_UPDATE_MS } from "./util";
 import { handleMessage } from "./notification";
 import { backend, IBackendConnection } from "./backend/backend";
 import { app } from "./app";
 import { ConnectData } from "./connect/connect";
 import { OChange, Reason, IMsgPluginCommandPart, TsError } from "./book_events";
 import moment from "moment";
-import { ChannelId, ClientId } from "./ts";
+import { ChannelId, ClientId, TalkState } from "./ts";
 import { FileTreeCache } from "./fileTreeCache";
 import { FiletransferManager } from "./panel/filetransferManager";
 import debug from "debug";
@@ -42,6 +42,13 @@ export class Connection {
 	public readonly loudness: Writable<number> = writable(0);
 	public readonly connectOptions: Writable<ConnectData>;
 	public pluginCmd = fnBroadcast<[IMsgPluginCommandPart]>();
+
+	/// List of last talking clients with a counter from LOUDNESS_HISTORY to 0 until they are not
+	/// updated anymore.
+	private lastTalking: Record<ClientId, number> = {};
+	private lastTalkingTimer: number | undefined = undefined;
+	/// Listeners for loudness from the ui.
+	public readonly loudnesses: Record<ClientId, Writable<number>> = {};
 
 	constructor(connectOptions: ConnectData) {
 		this.connectOptions = writable(connectOptions);
@@ -231,6 +238,50 @@ export class Connection {
 			client.updateChat(ChatData.fromGraphql(clientData.data.chat));
 	}
 
+	private applyHistoryLoudnesses(loudnesses?: Record<ClientId, number>) {
+		// Update from history
+		let hasChange = false;
+		for (const [client, counter] of Object.entries(this.lastTalking)) {
+			if (loudnesses !== undefined && client in loudnesses)
+				continue;
+
+			const l = this.loudnesses[client];
+			if (l === undefined || counter === 0) {
+				delete this.lastTalking[client];
+			} else {
+				// We need to set a new value every time
+				l.set(LOUDNESS_MIN - counter);
+				this.lastTalking[client] = counter - 1;
+				hasChange = true;
+			}
+		}
+
+		// Remove timer in here if nothing changed
+		if (!hasChange) {
+			clearInterval(this.lastTalkingTimer);
+			this.lastTalkingTimer = undefined;
+		}
+	}
+
+	private applyLoudnesses(loudnesses: Record<ClientId, number>) {
+		if (this.lastTalkingTimer !== undefined) {
+			clearInterval(this.lastTalkingTimer);
+			this.lastTalkingTimer = undefined;
+		}
+
+		for (let [client, loudness] of Object.entries(loudnesses)) {
+			const l = this.loudnesses[client];
+			if (l !== undefined) {
+				loudness = Math.max(loudness, LOUDNESS_MIN + 2);
+				// The value has to change every time
+				l.update(l => l === loudness ? loudness + 0.01 : loudness);
+				this.lastTalking[client] = LOUDNESS_HISTORY;
+			}
+		}
+
+		this.applyHistoryLoudnesses(loudnesses);
+	}
+
 	private messageHandler(msg: InMsg) {
 		log_raw_in("%o", msg);
 
@@ -362,6 +413,15 @@ export class Connection {
 			}
 		} else if ("TalkersChanged" in msg) {
 			this.book.talkersHandler(msg.TalkersChanged);
+
+			// Update loudness when everyone stopped talking
+			// Also when only our own client is left talking
+			if (this.lastTalkingTimer === undefined &&
+				(msg.TalkersChanged.length === 0 ||
+					(msg.TalkersChanged.length === 1 && msg.TalkersChanged[0][0] === this.book.ownClientId)))
+				this.lastTalkingTimer = setInterval(() => {
+					this.applyHistoryLoudnesses();
+				}, LOUDNESS_UPDATE_MS);
 		} else if ("Error" in msg) {
 			log("Con Error: %o", msg.Error);
 			if (this.getState().connecting) {
@@ -370,8 +430,8 @@ export class Connection {
 			} else {
 				this.close();
 			}
-		} else if ("Loudness" in msg) {
-			this.loudness.set(msg.Loudness);
+		} else if ("Loudnesses" in msg) {
+			this.applyLoudnesses(msg.Loudnesses);
 		} else if ("Result" in msg) {
 			const ret = this.returnCodes.get(msg.Result.returnCode);
 			if (ret !== undefined) {

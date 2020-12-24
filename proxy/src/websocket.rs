@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{VecDeque, HashMap};
 use std::convert::TryInto;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -43,6 +43,7 @@ pub(crate) struct Ws {
 
 	websocket_closed: bool,
 	self_talking: bool,
+	own_loudness: VecDeque<f64>,
 	talkers: Vec<(ClientId, bool)>,
 }
 
@@ -54,6 +55,7 @@ pub(crate) struct GetClientVolumeMsg(pub ClientId);
 /// Audio detection tells us if we are talking.
 pub(crate) struct SetSelfTalkingMsg(pub bool);
 pub(crate) struct TalkersChangedMsg(pub Vec<(ClientId, bool)>);
+pub(crate) struct LoudnessesMsg(pub HashMap<ClientId, f64>);
 pub(crate) struct SendPacketMsg(pub OutPacket);
 pub(crate) struct CaptureLoudnessMsg(pub f64);
 #[derive(Clone)]
@@ -125,6 +127,9 @@ impl Message for SetSelfTalkingMsg {
 impl Message for TalkersChangedMsg {
 	type Result = ();
 }
+impl Message for LoudnessesMsg {
+	type Result = ();
+}
 impl Message for SendPacketMsg {
 	type Result = Result<()>;
 }
@@ -170,6 +175,7 @@ impl Ws {
 
 			websocket_closed: false,
 			self_talking: false,
+			own_loudness: Default::default(),
 			talkers: Default::default(),
 		}
 	}
@@ -209,10 +215,9 @@ impl Ws {
 	where audio::audio_to_ts::AudioToTs: Handler<T> {
 		if let Some(ad) = &self.state.audio_data {
 			let logger = self.logger.clone();
-			actix::spawn(ad.a2ts.send(msg).map(move |r| match r {
-				Ok(()) => {}
-				Err(_) => {
-					warn!(logger, "Failed to send audio to handler");
+			actix::spawn(ad.a2ts.send(msg).map(move |r| {
+				if let Err(e) = r {
+					warn!(logger, "Failed to send audio to handler: {}", e);
 				}
 			}));
 		}
@@ -222,10 +227,9 @@ impl Ws {
 	where audio::audio_to_ts::AudioToTs: Handler<T> {
 		if let Some(ad) = &self.state.audio_data {
 			let logger = self.logger.clone();
-			actix::spawn(ad.a2ts.send(msg).map(move |r| match r {
-				Ok(_) => {}
-				Err(_) => {
-					warn!(logger, "Failed to send message to audio input handler");
+			actix::spawn(ad.a2ts.send(msg).map(move |r| {
+				if let Err(e) = r {
+					warn!(logger, "Failed to send message to audio input handler: {}", e);
 				}
 			}));
 		}
@@ -646,15 +650,6 @@ impl Ws {
 					}
 				}
 			}
-			MessageF2P::SubscribeLoudness(subscribe) => {
-				if subscribe {
-					self.send_to_a2ts(audio::audio_to_ts::AddLoudnessListenerMsg(ctx.address()));
-				} else {
-					self.send_to_a2ts_r(audio::audio_to_ts::RemoveLoudnessListenerMsg(
-						ctx.address(),
-					));
-				}
-			}
 			MessageF2P::SetClientVolume { client, volume } => {
 				let client = Uid(client);
 
@@ -1063,6 +1058,9 @@ impl Handler<SetSelfTalkingMsg> for Ws {
 		if self.self_talking != talking {
 			self.self_talking = talking;
 			self.update_talkers(ctx);
+			if !talking {
+				self.own_loudness.clear();
+			}
 		}
 	}
 }
@@ -1079,12 +1077,44 @@ impl Handler<TalkersChangedMsg> for Ws {
 	}
 }
 
+impl Handler<LoudnessesMsg> for Ws {
+	type Result = ();
+	fn handle(
+		&mut self, LoudnessesMsg(loudnesses): LoudnessesMsg, ctx: &mut Self::Context,
+	) -> Self::Result {
+		let mut loudnesses = loudnesses
+			.into_iter()
+			.map(|(id, l)| (id.to_string(), l as f32))
+			.collect::<HashMap<_, _>>();
+		if let Some(own_loudness) = self.own_loudness.pop_front() {
+			if let Some(con) = &self.connection {
+				if let Ok(state) = con.get_state() {
+					loudnesses.insert(state.own_client.to_string(), own_loudness as f32);
+				}
+			}
+		}
+		self.send_message(&MessageP2F::Loudnesses(loudnesses), ctx);
+	}
+}
+
 impl Handler<CaptureLoudnessMsg> for Ws {
 	type Result = ();
 	fn handle(
 		&mut self, CaptureLoudnessMsg(loudness): CaptureLoudnessMsg, ctx: &mut Self::Context,
 	) -> Self::Result {
-		self.send_message(&MessageP2F::Loudness(loudness), ctx);
+		// If nobody else is talking, sent it as a packet.
+		if self.talkers.is_empty() {
+			self.own_loudness.clear();
+			if let Some(con) = &self.connection {
+				if let Ok(state) = con.get_state() {
+					let mut loudnesses = HashMap::new();
+					loudnesses.insert(state.own_client.to_string(), loudness as f32);
+					self.send_message(&MessageP2F::Loudnesses(loudnesses), ctx);
+				}
+			}
+		} else {
+			self.own_loudness.push_back(loudness);
+		}
 	}
 }
 

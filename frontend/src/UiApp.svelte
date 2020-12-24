@@ -83,7 +83,7 @@
 				</div>
 			{/if}
 		{:else if $displayPanel === DisplayPanel.Settings}
-			<UiGlobalSettings connection={$connections[0]} />
+			<UiGlobalSettings />
 		{:else if $displayPanel === DisplayPanel.Connect}
 			<Connect bind:data={connectData} />
 		{/if}

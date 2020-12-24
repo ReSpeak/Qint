@@ -11,7 +11,7 @@ export type WsMessageTarget =
 
 // Out Messages
 export type OutMsg = OMsgConnect | OMsgDisconnect | OMsgSendMessage | OMsgSendCommand
-	| OMsgSubscribeLoudness | OMsgSetClientVolume | OMsgChange;
+	| OMsgSetClientVolume | OMsgChange;
 
 export interface OMsgConnect {
 	Connect: {
@@ -52,10 +52,6 @@ interface OMsgSendCommand {
 	};
 }
 
-interface OMsgSubscribeLoudness {
-	SubscribeLoudness: boolean;
-}
-
 interface OMsgSetClientVolume {
 	SetClientVolume: {
 		client: number[],
@@ -72,7 +68,8 @@ interface OMsgChange {
 
 
 // In Messages
-export type InMsg = InMsgConnected | InDisconnectedTemporarily | InDisconnected | InMsgError | InTalkersChanged | InMsgEvents | InMsgMessage | InLoudness | InResult;
+export type InMsg = InMsgConnected | InDisconnectedTemporarily | InDisconnected | InMsgError
+	| InTalkersChanged | InMsgEvents | InMsgMessage | InLoudnesses | InResult;
 
 interface InMsgConnected {
 	Connected: {
@@ -106,8 +103,8 @@ interface InMsgMessage {
 	Message: InMessage;
 }
 
-interface InLoudness {
-	Loudness: number;
+interface InLoudnesses {
+	Loudnesses: Record<ClientId, number>;
 }
 
 export interface ResultDetails {

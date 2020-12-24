@@ -33,6 +33,7 @@
 
 	export function clear() {
 		self.innerText = "";
+		historyIndex = undefined;
 		textChanged();
 	}
 
