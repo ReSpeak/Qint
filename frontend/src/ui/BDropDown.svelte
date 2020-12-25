@@ -11,7 +11,7 @@
 
 	function selectedToIndex(selected: any) {
 		if (dd == null || items.length === 0) return;
-		if ("value" in items[0]) {
+		if ("value" in Object.keys(items[0])) {
 			let index = items.findIndex(it => it.value === selected);
 			if (index === -1) return;
 			dd.selectedIndex = index;
@@ -25,7 +25,7 @@
 
 	function indexToSelected() {
 		if (dd == null || items.length === 0) return;
-		if ("value" in items[0]) {
+		if ("value" in Object.keys(items[0])) {
 			selected = items[dd.selectedIndex].value;
 		} else {
 			selected = items[dd.selectedIndex];

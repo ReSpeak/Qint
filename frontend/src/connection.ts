@@ -246,7 +246,7 @@ export class Connection {
 				continue;
 
 			const l = this.loudnesses[client];
-			if (l === undefined || counter === 0) {
+			if (l === undefined || counter <= 0) {
 				delete this.lastTalking[client];
 			} else {
 				// We need to set a new value every time
@@ -257,14 +257,14 @@ export class Connection {
 		}
 
 		// Remove timer in here if nothing changed
-		if (!hasChange) {
+		if (!hasChange && this.lastTalkingTimer !== undefined) {
 			clearInterval(this.lastTalkingTimer);
 			this.lastTalkingTimer = undefined;
 		}
 	}
 
 	private applyLoudnesses(loudnesses: Record<ClientId, number>) {
-		if (this.lastTalkingTimer !== undefined) {
+		if (this.lastTalkingTimer !== undefined && this.book.currentTalkers.length !== 0) {
 			clearInterval(this.lastTalkingTimer);
 			this.lastTalkingTimer = undefined;
 		}
@@ -396,7 +396,7 @@ export class Connection {
 						}
 					}
 				} catch (err) {
-					console.error("Failed to handle event", tsevt, err);
+					error("Failed to handle event", tsevt, err);
 				}
 			}
 		} else if ("Message" in msg) {
@@ -416,12 +416,11 @@ export class Connection {
 
 			// Update loudness when everyone stopped talking
 			// Also when only our own client is left talking
-			if (this.lastTalkingTimer === undefined &&
-				(msg.TalkersChanged.length === 0 ||
-					(msg.TalkersChanged.length === 1 && msg.TalkersChanged[0][0] === this.book.ownClientId)))
+			if (this.lastTalkingTimer === undefined) {
 				this.lastTalkingTimer = setInterval(() => {
 					this.applyHistoryLoudnesses();
 				}, LOUDNESS_UPDATE_MS);
+			}
 		} else if ("Error" in msg) {
 			log("Con Error: %o", msg.Error);
 			if (this.getState().connecting) {

@@ -1082,18 +1082,23 @@ impl Handler<LoudnessesMsg> for Ws {
 	fn handle(
 		&mut self, LoudnessesMsg(loudnesses): LoudnessesMsg, ctx: &mut Self::Context,
 	) -> Self::Result {
-		let mut loudnesses = loudnesses
-			.into_iter()
-			.map(|(id, l)| (id.to_string(), l as f32))
-			.collect::<HashMap<_, _>>();
+		let mut ls;
+		if self.talkers.is_empty() {
+			ls = HashMap::new();
+		} else {
+			ls = loudnesses
+				.into_iter()
+				.map(|(id, l)| (id.to_string(), l as f32))
+				.collect::<HashMap<_, _>>();
+		}
 		if let Some(own_loudness) = self.own_loudness.pop_front() {
 			if let Some(con) = &self.connection {
 				if let Ok(state) = con.get_state() {
-					loudnesses.insert(state.own_client.to_string(), own_loudness as f32);
+					ls.insert(state.own_client.to_string(), own_loudness as f32);
 				}
 			}
 		}
-		self.send_message(&MessageP2F::Loudnesses(loudnesses), ctx);
+		self.send_message(&MessageP2F::Loudnesses(ls), ctx);
 	}
 }
 

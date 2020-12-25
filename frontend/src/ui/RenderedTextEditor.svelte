@@ -23,7 +23,11 @@
 
 	const renderRequest = debounced(
 		(text: string) => {
-			mdRenderSocket?.send(text);
+			try {
+				mdRenderSocket?.send(text);
+			} catch (e) {
+				console.error("Failed to render text", e);
+			}
 		},
 		100,
 		{

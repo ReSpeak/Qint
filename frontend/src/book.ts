@@ -30,7 +30,7 @@ export class Book {
 	public channels: Map<ChannelId, Channel> = new Map();
 	public channelGroups: Writable<Map<ChannelGroupId, Writable<ChannelGroup>>> = writable(new Map());
 	public serverGroups: Writable<Map<ServerGroupId, Writable<ServerGroup>>> = writable(new Map());
-	private currentTalkers: [ClientId, boolean][] = [];
+	public currentTalkers: [ClientId, boolean][] = [];
 	public ownClientId?: ClientId;
 	public ownClient: Writable<Client | undefined> = writable(undefined);
 
