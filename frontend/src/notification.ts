@@ -130,7 +130,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHand
 						badge: "/icon.png"
 					});
 				}
-			} else {
+			} else if (msg.Message.invoker.id.toString() !== ownClientId) {
 				if (longMessage)
 					handler(con, msg, notif`${msg.Message.invoker} wrote a message`);
 				else

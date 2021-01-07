@@ -61,14 +61,24 @@ export class Connection {
 			},
 			() => this.onClose(),
 		).then(() => {
-			this.backend.send(connectOptions.toConnectMsg());
+			let connectMsg = connectOptions.toConnectMsg();
+			const [returnCode, promise] = this.generateReturnCode();
+			connectMsg.Connect.returnCode = returnCode;
+			this.backend.send(connectMsg);
 			oneshot(this.state, s => s.channelListFinished, () => {
 				const ownClient = get(this.book.ownClient);
 				if (ownClient === undefined) return;
 				const ownChannel = this.book.getChannel(ownClient.channel);
 				if (ownChannel === undefined) return;
 				app.select(this, ownChannel);
-			})
+			});
+
+			promise.then(res => {
+				if (res !== undefined) {
+					this.backend.close();
+					this._state.update(s => s.setError(res.tsResult ?? res.description ?? "Failed to connect"));
+				}
+			});
 		});
 	}
 
@@ -423,12 +433,7 @@ export class Connection {
 			}
 		} else if ("Error" in msg) {
 			log("Con Error: %o", msg.Error);
-			if (this.getState().connecting) {
-				this.backend.close(); // TODO call general close
-				this._state.update(s => s.setError(msg.Error));
-			} else {
-				this.close();
-			}
+			this.close();
 		} else if ("Loudnesses" in msg) {
 			this.applyLoudnesses(msg.Loudnesses);
 		} else if ("Result" in msg) {

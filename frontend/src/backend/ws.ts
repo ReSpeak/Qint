@@ -23,10 +23,13 @@ export interface OMsgConnect {
 		inputMuted?: boolean;
 		outputMuted?: boolean;
 		away?: string;
+		password?: string;
+		channelPassword?: string;
 		ignoreIdentityMismatch: boolean;
 		logCommands: boolean;
 		logPackets: boolean;
 		logUdpPackets: boolean;
+		returnCode?: string;
 	};
 }
 

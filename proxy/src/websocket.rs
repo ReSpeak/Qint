@@ -1,4 +1,4 @@
-use std::collections::{VecDeque, HashMap};
+use std::collections::{HashMap, VecDeque};
 use std::convert::TryInto;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -242,6 +242,22 @@ impl Ws {
 				for e in &events {
 					if let TsEvent::PropertyAdded { id: events::PropertyId::Server, .. } = e {
 						// Connected
+						if let Some(return_code) =
+							self.connect_options.as_ref().and_then(|o| o.return_code.clone())
+						{
+							self.send_message(
+								&MessageP2F::Result(ResultStruct {
+									return_code,
+									details: ResultDetails {
+										ts_result: None,
+										missing_permission: None,
+										description: None,
+									},
+								}),
+								ctx,
+							);
+						}
+
 						match self.connection.as_ref().and_then(|c| {
 							c.get_server_key()
 								.ok()
@@ -273,6 +289,7 @@ impl Ws {
 									username: opts.name.clone(),
 									address: opts.address.clone(),
 									channel: opts.channel.clone(),
+									// TODO Server/channel password
 									identity: id as i64,
 									server_key,
 								});
@@ -293,8 +310,7 @@ impl Ws {
 							connected_msg,
 							ctx.address(),
 						) {
-							error!(self.logger, "Database failed to handle \
-								events"; "error" => %e);
+							error!(self.logger, "Database failed to handle events"; "error" => %e);
 						}
 
 						let msg = &MessageP2F::Events(
@@ -611,15 +627,18 @@ impl Ws {
 							if let Some(version) = &o.version {
 								options = options.version(version.clone());
 							}
-
 							if let Some(c) = &o.channel {
 								options = options.channel(c.clone());
 							}
-
 							if let Some(msg) = &o.away {
 								options = options.away(msg.clone());
 							}
-
+							if let Some(pw) = &o.channel_password {
+								options = options.channel_password(pw.clone());
+							}
+							if let Some(pw) = &o.password {
+								options = options.password(pw.clone());
+							}
 							if !o.ignore_identity_mismatch {
 								if let Some(server) = server {
 									options = options.server(server);
@@ -1286,7 +1305,31 @@ impl ActorFuture for ConnectionPoller {
 				Poll::Ready(Some(Err(e))) => {
 					error!(actor.state.logger, "Connection failed"; "error" => %e);
 					actor.connection = None;
-					actor.send_message(&MessageP2F::Error("Connection failed".to_string()), ctx);
+
+					// Send to frontend
+					if let Some(return_code) =
+						actor.connect_options.as_ref().and_then(|o| o.return_code.clone())
+					{
+						let mut ts_result = None;
+						let mut description = None;
+						if let TsclError::ConnectTs(e) = &e {
+							ts_result = Some(*e);
+						} else {
+							description = Some(e.to_string());
+						}
+
+						actor.send_message(
+							&MessageP2F::Result(ResultStruct {
+								return_code,
+								details: ResultDetails {
+									ts_result,
+									missing_permission: None,
+									description,
+								},
+							}),
+							ctx,
+						);
+					}
 					break Poll::Ready(());
 				}
 				Poll::Ready(Some(Ok(item))) => {

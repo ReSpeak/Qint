@@ -7,7 +7,7 @@
 	import { Book, Channel } from "../book";
 	import UiChannel from "../tree/UiChannel.svelte";
 	import type { ChannelId } from "../ts";
-	import { SERVER_ICON, CLIENT_ICON, focus, urlBase64Encode } from "../util";
+	import { SERVER_ICON, CLIENT_ICON, focus, urlBase64Encode, CHANNEL_ICON } from "../util";
 	import { app } from "../app";
 	import { backend } from "../backend/backend";
 
@@ -21,6 +21,7 @@
 	// The channels directly under the server, sub-channels are stored as children.
 	let channels: Channel[] = [];
 	let address: string = "";
+	let showDetails = data.password !== undefined || data.channelPassword !== undefined;
 
 	$: {
 		address =
@@ -189,11 +190,49 @@
 				</p>
 			</div>
 			<div>
+				<button
+					class="button collapseButton noBut"
+					type="button"
+					on:click={e => showDetails = !showDetails}>
+					<Icon name="chevron-right{!showDetails ? '' : ' mdi-rotate-90'}" />
+					Details
+				</button>
+			</div>
+			<div class="detailsPane" class:hidden={!showDetails}>
+				<div>
+					<p class="control has-icons-left">
+						<input
+							bind:value={data.password}
+							name="serverPassword"
+							id="serverPassword"
+							class="input"
+							type="text"
+							title="Server password"
+							placeholder="Server password" />
+						<Icon name={SERVER_ICON} isLeft />
+					</p>
+				</div>
+				<div>
+					<p class="control has-icons-left">
+						<input
+							bind:value={data.channelPassword}
+							name="channelPassword"
+							id="channelPassword"
+							class="input"
+							type="text"
+							title="Channel password"
+							placeholder="Channel password" />
+						<Icon name={CHANNEL_ICON} isLeft />
+					</p>
+				</div>
+			</div>
+			<div>
 				<button class="button is-primary" name="connect" type="submit">
 					Connect
 				</button>
 			</div>
 		</form>
+
 		{#if channelPart !== ''}
 			<div class="menu channel-list">
 				<ul class="menu-list">
@@ -307,6 +346,25 @@
 		left: 0;
 		right: 0;
 		margin: 1em;
+	}
+
+	.connect-form > .detailsPane {
+		margin: 0;
+	}
+
+	.detailsPane > div {
+		box-sizing: border-box;
+		left: 0;
+		right: 0;
+		margin: 1em;
+	}
+
+	.connect-form > div button.collapseButton {
+		width: auto;
+	}
+
+	button.collapseButton > :global(.icon:first-child) {
+		margin-right: 0;
 	}
 
 	.connect-form > div input:not([type="checkbox"]),

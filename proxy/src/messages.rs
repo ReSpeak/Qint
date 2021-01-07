@@ -86,6 +86,8 @@ pub struct ResultStruct {
 	pub details: ResultDetails,
 }
 
+/// Usually, either `ts_result` (and optionally `missing_permission`) or `description` is set.
+/// If all are `None`, the result is success.
 #[derive(Debug, Default, Serialize)]
 #[cfg_attr(test, derive(Deserialize))]
 #[serde(rename_all = "camelCase")]
@@ -137,11 +139,16 @@ pub struct ConnectOptions {
 	pub output_muted: Option<bool>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub away: Option<String>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub password: Option<String>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub channel_password: Option<String>,
 	/// Ignore if the identity of the server changed.
 	pub ignore_identity_mismatch: bool,
 	pub log_commands: bool,
 	pub log_packets: bool,
 	pub log_udp_packets: bool,
+	pub return_code: Option<String>,
 }
 
 impl From<MessageTarget> for JsMessageTarget {

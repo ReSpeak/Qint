@@ -11,12 +11,14 @@ export class ConnectData {
 		public channelId?: ChannelId,
 		public inputMuted?: boolean,
 		public outputMuted?: boolean,
-		public away?: string) { }
+		public away?: string,
+		public password?: string,
+		public channelPassword?: string) { }
 
 	public clone(): ConnectData {
 		return new ConnectData(this.name, this.address, this.bookmark,
 			this.channel, this.channelId, this.inputMuted,
-			this.outputMuted, this.away);
+			this.outputMuted, this.away, this.password, this.channelPassword);
 	}
 
 	public toConnectMsg(): OMsgConnect {
@@ -31,6 +33,8 @@ export class ConnectData {
 				inputMuted: this.inputMuted,
 				outputMuted: this.outputMuted,
 				away: this.away,
+				password: this.password,
+				channelPassword: this.channelPassword,
 				ignoreIdentityMismatch: false,
 				logCommands: false,
 				logPackets: false,
@@ -47,7 +51,7 @@ export class ConnectData {
 				data.name = "TeamSpeakUser";
 			return new ConnectData(data.name, data.address, data.bookmark,
 				data.channel, data.channelId, data.inputMuted, data.outputMuted,
-				data.away);
+				data.away, data.password, data.channelPassword);
 		} else {
 			let start = data.indexOf("@");
 			let name = start === -1 ? "TeamSpeakUser" : data.substr(0, start);
@@ -63,7 +67,9 @@ export class ConnectData {
 		if (this.bookmark === undefined &&
 			this.inputMuted === undefined &&
 			this.outputMuted === undefined &&
-			this.away === undefined) {
+			this.away === undefined &&
+			this.password === undefined &&
+			this.channelPassword === undefined) {
 			let s = "";
 			if (this.name !== "TeamSpeakUser")
 				s = this.name + "@";
