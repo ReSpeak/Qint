@@ -140,15 +140,16 @@ export class Connection {
 		this.sendMessage({ Disconnect: { reason, message } });
 	}
 
-	public switchChannel(channel: Channel): ChangePromise {
-		return this.moveClient(this.book.ownClientId!, channel.id);
+	public switchChannel(channel: Channel, password?: string): ChangePromise {
+		return this.moveClient(this.book.ownClientId!, channel.id, password);
 	}
 
-	public moveClient(clientId: ClientId, channelId: ChannelId): ChangePromise {
+	public moveClient(clientId: ClientId, channelId: ChannelId, password?: string): ChangePromise {
 		return this.sendChange({
 			ClientMove: {
 				id: clientId,
 				channel: channelId,
+				password,
 			},
 		});
 	}

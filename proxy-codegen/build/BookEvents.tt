@@ -136,7 +136,7 @@ pub mod js_structs {
 	use tsclientlib::{ChannelGroupId, ChannelId, ChannelPermissionHint, ChannelType, ClientDbId,
 		ClientId, ClientPermissionHint, ClientType, Codec, CodecEncryptionMode, GroupNamingMode,
 		GroupType, HostBannerMode, HostMessageMode, IconId, LicenseType, MaxClients, ServerGroupId,
-		TalkPowerRequest, Uid};
+		TalkPowerRequest, UidBuf};
 	use tsproto_types::crypto::EccKeyPubP256;
 
 	use super::{deserialize_some, deserialize_some_date_time, deserialize_some_duration,

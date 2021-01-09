@@ -15,7 +15,7 @@ use tsclientlib::data::Client;
 use tsclientlib::data::Connection as TsData;
 use tsclientlib::events::{Event, PropertyId, PropertyValue};
 use tsclientlib::Connection as TsConnection;
-use tsclientlib::{ChannelId, ClientId, Identity, InMessage, Invoker, MessageTarget, Uid};
+use tsclientlib::{ChannelId, ClientId, Identity, InMessage, Invoker, MessageTarget, UidBuf};
 use tsproto_types::crypto::EccKeyPubP256;
 
 use crate::filecache::FileCache;
@@ -56,9 +56,9 @@ pub struct GetIdentityAndServerMsg {
 	pub address: String,
 }
 #[derive(Clone, Debug)]
-pub struct GetClientVolumeMsg(pub Uid);
+pub struct GetClientVolumeMsg(pub UidBuf);
 #[derive(Clone, Debug)]
-pub struct SetClientVolumeMsg(pub Uid, pub f32);
+pub struct SetClientVolumeMsg(pub UidBuf, pub f32);
 pub struct UpdateIdentityMsg(pub Identity);
 pub struct RunOnDbMsg<I: 'static, E: 'static, F: FnOnce(&mut DbHandler) -> result::Result<I, E>>(
 	pub F,
@@ -84,14 +84,14 @@ pub enum ChannelListMsg {
 
 pub struct ClientData {
 	pub name: String,
-	pub uid: Uid,
+	pub uid: UidBuf,
 	pub icon: Option<i32>,
 	pub avatar: Option<String>,
 }
 
 pub struct WriteMessageMsg {
 	pub message: String,
-	pub invoker_uid: Uid,
+	pub invoker_uid: UidBuf,
 	pub chat: ChatId,
 	pub client_data: Option<ClientData>,
 }
@@ -123,7 +123,7 @@ impl Actor for DbHandler {
 }
 
 impl Message for GetIdentityAndServerMsg {
-	type Result = Result<(Identity, Option<Uid>)>;
+	type Result = Result<(Identity, Option<UidBuf>)>;
 }
 impl Message for GetClientVolumeMsg {
 	type Result = Result<Option<f32>>;
@@ -347,7 +347,7 @@ impl DbHandler {
 }
 
 impl Handler<GetIdentityAndServerMsg> for DbHandler {
-	type Result = Result<(Identity, Option<Uid>)>;
+	type Result = Result<(Identity, Option<UidBuf>)>;
 	fn handle(&mut self, msg: GetIdentityAndServerMsg, _: &mut Self::Context) -> Self::Result {
 		use schema::bookmarks;
 		use schema::identities::dsl::*;
@@ -359,7 +359,7 @@ impl Handler<GetIdentityAndServerMsg> for DbHandler {
 			.first::<Option<Vec<u8>>>(&self.con)
 			.optional()?
 			.flatten()
-			.map(|key| EccKeyPubP256::from_short(key).get_uid_no_base64().map(Uid))
+			.map(|key| EccKeyPubP256::from_short(key).get_uid_no_base64().map(UidBuf))
 			.transpose()?;
 
 		// Search identity

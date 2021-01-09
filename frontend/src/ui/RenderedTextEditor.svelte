@@ -51,35 +51,33 @@
 	});
 </script>
 
-<div class="renderedTextEditor">
-	<div class="field has-addons">
-		<p class="control">
-			<button class="button" on:click={() => (view = View.Edit)}>
-				<Icon name="pencil" title="Source" />
-			</button>
-		</p>
-		<p class="control">
-			<button class="button" on:click={() => (view = View.Both)}>
-				<Icon name="flip-horizontal" title="Split view" />
-			</button>
-		</p>
-		<p class="control">
-			<button class="button" on:click={() => (view = View.Rendered)}>
-				<Icon name="eye" title="Preview" />
-			</button>
-		</p>
-	</div>
+<div class="field has-addons">
+	<p class="control">
+		<button class="button" on:click={() => (view = View.Edit)}>
+			<Icon name="pencil" title="Source" />
+		</button>
+	</p>
+	<p class="control">
+		<button class="button" on:click={() => (view = View.Both)}>
+			<Icon name="flip-horizontal" title="Split view" />
+		</button>
+	</p>
+	<p class="control">
+		<button class="button" on:click={() => (view = View.Rendered)}>
+			<Icon name="eye" title="Preview" />
+		</button>
+	</p>
+</div>
 
-	<div class="editbox">
-		{#if view === View.Edit || view === View.Both}
-			<BInput enterToSubmit={false} bind:value={raw} />
-		{/if}
-		{#if view === View.Rendered || view === View.Both}
-			<div class="renderSide">
-				<RenderedText {connection} text={rendered} />
-			</div>
-		{/if}
-	</div>
+<div class="editbox">
+	{#if view === View.Edit || view === View.Both}
+		<BInput enterToSubmit={false} bind:value={raw} />
+	{/if}
+	{#if view === View.Rendered || view === View.Both}
+		<div class="renderSide">
+			<RenderedText {connection} text={rendered} />
+		</div>
+	{/if}
 </div>
 
 <style lang="scss">

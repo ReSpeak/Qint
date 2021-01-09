@@ -178,7 +178,7 @@ fn get_to_owned(p: &Property) -> String {
 	let to_owned = if p.type_s == "str" {
 		"val.to_string()"
 	} else if p.type_s == "Uid" {
-		"Uid(val.0.to_vec())"
+		"UidBuf(val.0.to_vec())"
 	} else if p.type_s == "TalkPowerRequest" || p.type_s == "EccKeyPubP256" {
 		"(*val).clone()"
 	} else {
@@ -412,7 +412,7 @@ impl RustTypeExt for InnerRustType {
 			{
 				write!(f, "string")?
 			}
-			Self::Struct(s) if s == "UidRef" => write!(f, "Uid")?,
+			Self::Struct(s) if s == "UidBuf" => write!(f, "Uid")?,
 			Self::Primitive(s) if s == "u64" => write!(f, "string")?,
 			Self::Primitive(s)
 				if s.starts_with('i') || s.starts_with('u') || s.starts_with('f') =>
@@ -423,7 +423,7 @@ impl RustTypeExt for InnerRustType {
 			Self::Primitive(s) if s == "OffsetDateTime" && convert => write!(f, "Moment")?,
 			Self::Primitive(s) if s == "Duration" && !convert => write!(f, "RustDuration")?,
 			Self::Primitive(s) | Self::Struct(s) => write!(f, "{}", s)?,
-			Self::Ref(i) => i.fmt_ts_opts(f, convert)?,
+			Self::Ref(i) | Self::Cow(i) => i.fmt_ts_opts(f, convert)?,
 			Self::Option(i) => {
 				i.fmt_ts_opts(f, convert)?;
 				write!(f, " | null")?;

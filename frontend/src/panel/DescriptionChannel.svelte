@@ -14,9 +14,10 @@
 	import BSlider from "../ui/BSlider.svelte";
 	import BDurationPicker from "../ui/BDurationPicker.svelte";
 	import { ChannelType, Codec, CodecEncryptionMode } from "../book_events";
-	import { durationSerialize, on } from "../util";
-	import type { RequiredNN } from "../util";
+	import { CLEAR_ICON, durationSerialize, on, PASSWORD_PLACEHOLDER } from "../util";
+	import type { RequiredNN, Writeable } from "../util";
 	import type { Duration } from "moment";
+	import UiChangeResult from "../ui/UiChangeResult.svelte";
 
 	export let connection: Connection;
 	export let channel: Channel;
@@ -42,13 +43,14 @@
 
 	// THIS IS NOT A FULL CHANNEL OBJECT
 	type EditProps = Omit<
-		RequiredNN<Channel>,
+		Writeable<RequiredNN<Channel>>,
 		"description" | "isUnencrypted" | "deleteDelay" | "channelType" | "isDefault"
 	> & {
 		_description: string;
 		_isEncrypted: boolean;
 		_deleteDelay: Duration;
 		_channelType: ChannelType | "Default";
+		_password: string;
 	};
 	let chanEdit: EditProps = createPropsCopy();
 	let changeRequest: ChangePromise | undefined;
@@ -79,6 +81,7 @@
 			_channelType: channel.isDefault ? "Default" : channel.channelType,
 			_isEncrypted: !channel.isUnencrypted,
 			_deleteDelay: channel.deleteDelay,
+			_password: "",
 			neededTalkPower: channel.neededTalkPower,
 			phoneticName: channel.phoneticName,
 			icon: channel.icon,
@@ -105,7 +108,22 @@
 			diff.channelType = chanEdit._channelType;
 		if (chanEdit._description !== channel.optionalData?.description)
 			diff.description = chanEdit._description;
+		if (chanEdit._password !== "") {
+			diff.password = chanEdit._password;
+			delete diff.hasPassword;
+		} else if (diff.hasPassword !== undefined) {
+			// Ignore when password is empty
+			if (diff.hasPassword)
+				delete diff.hasPassword;
+			else
+				diff.password = null;
+		}
 		return diff;
+	}
+
+	function editClearPasword() {
+		chanEdit.hasPassword = false;
+		chanEdit._password = "";
 	}
 
 	function clickEditMode() {
@@ -172,7 +190,7 @@
 						on:click={() => (changeRequest = undefined)}>
 						<Icon name="close" />
 					</button>
-					{JSON.stringify(changeResult)}
+					<UiChangeResult result={changeResult} />
 				</div>
 			{/if}
 		{/await}
@@ -294,6 +312,27 @@
 				<div>{clientCount} / {formatMaxClients}</div>
 			</div>
 		{/if}
+		{#if editing}
+			<div class="dataLine">
+				<div>Password:</div>
+				<div class="field has-addons">
+					<div class="control">
+						<input
+							id="edit_password"
+							class="input"
+							type="password"
+							bind:value={chanEdit._password}
+							placeholder={channel.hasPassword && chanEdit.hasPassword !== false ? PASSWORD_PLACEHOLDER : ""}
+						/>
+					</div>
+					{#if channel.hasPassword && chanEdit.hasPassword !== false}
+						<div class="control">
+							<button class="button" on:click={editClearPasword}><Icon name={CLEAR_ICON} /></button>
+						</div>
+					{/if}
+				</div>
+			</div>
+		{/if}
 	</div>
 	<hr />
 	<div class="description">
@@ -317,6 +356,10 @@
 <style lang="scss">
 	.description {
 		margin: 1em;
+
+		:global(.editbox) {
+			height: 100%;
+		}
 	}
 
 	.disabled {

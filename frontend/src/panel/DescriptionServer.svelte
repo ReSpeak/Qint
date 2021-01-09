@@ -3,7 +3,7 @@
 	import type { ChangePromise } from "../connection";
 	import type { Server } from "../book";
 	import moment from "moment";
-	import { enumValues, LONG_DATETIME } from "../util";
+	import { CLEAR_ICON, enumValues, LONG_DATETIME, PASSWORD_PLACEHOLDER } from "../util";
 	import type { RequiredNN, Writeable } from "../util";
 	import BDropDown from "../ui/BDropDown.svelte";
 	import Icon from "../ui/Icon.svelte";
@@ -16,6 +16,7 @@
 	import RenderedText from "../ui/RenderedText.svelte";
 	import RenderedTextEditor from "../ui/RenderedTextEditor.svelte";
 	import { CodecEncryptionMode, HostMessageMode, OptionalServerDataGen } from "../book_events";
+	import UiChangeResult from "../ui/UiChangeResult.svelte";
 
 	export let connection: Connection;
 	export let server: Server;
@@ -30,7 +31,7 @@
 	// THIS IS NOT A FULL SERVER OBJECT
 	type EditProps = Omit<Writeable<RequiredNN<Server>>,
 		""> & {
-		_password: string | undefined;
+		_password: string;
 	};
 	type EditPropsOpt = Writeable<RequiredNN<OptionalServerDataGen>>;
 	let [servEdit, servEditOpt] = createPropsCopy();
@@ -43,7 +44,7 @@
 		serv.name = server.name;
 		serv.phoneticName = server.phoneticName;
 		serv.nickname = server.nickname ?? "";
-		serv._password = undefined;
+		serv._password = "";
 		serv.maxClients = server.maxClients;
 		servOpt.reservedSlots = server.optionalData?.reservedSlots ?? 0;
 		serv.icon = server.icon;
@@ -96,8 +97,8 @@
 				diff[key] = value;
 			}
 		}
-		if (diff["nickname"] === null)
-			diff["nickname"] = "";
+		if (diff.nickname === null)
+			diff.nickname = "";
 		if (server.optionalData !== null) {
 			let optionalData = server.optionalData as any;
 			for (const [key, value] of Object.entries(servEditOpt)) {
@@ -107,7 +108,22 @@
 				}
 			}
 		}
+		if (servEdit._password !== "") {
+			diff.password = servEdit._password;
+			delete diff.hasPassword;
+		} else if (diff.hasPassword !== undefined) {
+			// Ignore when password is empty
+			if (diff.hasPassword)
+				delete diff.hasPassword;
+			else
+				diff.password = null;
+		}
 		return diff;
+	}
+
+	function editClearPasword() {
+		servEditOpt.hasPassword = false;
+		servEdit._password = "";
 	}
 
 	function clickEditMode() {
@@ -179,7 +195,7 @@
 						on:click={() => (changeRequest = undefined)}>
 						<Icon name="close" />
 					</button>
-					{JSON.stringify(changeResult)}
+					<UiChangeResult result={changeResult} />
 				</div>
 			{/if}
 		{/await}
@@ -225,15 +241,13 @@
 			<div>Version:</div>
 			<PlatformIcon platform={$server.platform} version={$server.version} />
 		</div>
-		<div class="dataLine">
-			<div>Host message:</div>
-			{#if editing}
-				<RenderedTextEditor {connection} bind:raw={servEdit.hostmessage} />
-			{:else}
+		{#if !editing}
+			<div class="dataLine">
+				<div>Host message:</div>
 				<RenderedText {connection} text={$server.hostmessageRendered ?? ''} />
-			{/if}
-		</div>
-		<div class="dataLine">
+			</div>
+		{/if}
+		<div class="dataLine large" class:editing>
 			<div>Welcome message:</div>
 			{#if editing}
 				<RenderedTextEditor {connection} bind:raw={servEdit.welcomeMessage} />
@@ -270,13 +284,13 @@
 	{#if editing}
 		<StickySlot>Host</StickySlot>
 		<div class="descGroup" class:editing>
-			<div class="dataLine">
-				<div>Hostmessage:</div>
+			<div class="dataLine large" class:editing>
+				<div>Host message:</div>
 				<RenderedTextEditor {connection} bind:raw={servEdit.hostmessage} />
 			</div>
 
 			<div class="dataLine">
-				<div>Hostmessage Mode:</div>
+				<div>Host message Mode:</div>
 				<BDropDown
 					bind:selected={servEdit.hostmessageMode}
 					items={enumValues(HostMessageMode)} />
@@ -292,6 +306,26 @@
 					bind:selected={servEdit.codecEncryptionMode}
 					items={enumValues(CodecEncryptionMode)} />
 			</div>
+
+			<div class="dataLine">
+				<div>Password:</div>
+				<div class="field has-addons">
+					<div class="control">
+						<input
+							id="edit_password"
+							class="input"
+							type="password"
+							bind:value={servEdit._password}
+							placeholder={server.optionalData?.hasPassword && servEditOpt.hasPassword !== false ? PASSWORD_PLACEHOLDER : ""}
+						/>
+					</div>
+					{#if server.optionalData?.hasPassword && servEditOpt.hasPassword !== false}
+						<div class="control">
+							<button class="button" on:click={editClearPasword}><Icon name={CLEAR_ICON} /></button>
+						</div>
+					{/if}
+				</div>
+			</div>
 		</div>
 	{/if}
 	<StickySlot>Actions</StickySlot>
@@ -306,6 +340,14 @@
 </StickyList>
 
 <style lang="scss">
+	.dataLine .field {
+		width: 100%;
+	}
+
+	.dataLine .field .control:first-child {
+		width: 100%;
+	}
+
 	.nick {
 		padding: 0 0.3em;
 		margin: 0 0.3em;

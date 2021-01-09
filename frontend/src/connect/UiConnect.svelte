@@ -206,7 +206,7 @@
 							name="serverPassword"
 							id="serverPassword"
 							class="input"
-							type="text"
+							type="password"
 							title="Server password"
 							placeholder="Server password" />
 						<Icon name={SERVER_ICON} isLeft />
@@ -219,7 +219,7 @@
 							name="channelPassword"
 							id="channelPassword"
 							class="input"
-							type="text"
+							type="password"
 							title="Channel password"
 							placeholder="Channel password" />
 						<Icon name={CHANNEL_ICON} isLeft />

@@ -30,6 +30,18 @@
 		}
 	}
 
+	// Multiline text areas
+	:global(.dataLine.large.editing) {
+		align-items: inherit;
+		display: grid;
+		grid-template-columns: auto 1fr;
+		grid-gap: 0.5em;
+
+		:global(.editbox) {
+			grid-area: 1 / 2 / 3 / 2;
+		}
+	}
+
 	:global(.descTable) {
 		display: grid;
 		grid-template-columns: max-content max-content;

@@ -14,6 +14,7 @@ export const CLIENT_ICON = "account-outline";
 export const BOOKMARK_ON = "star";
 export const BOOKMARK_OFF = "star-outline";
 export const EDIT_ICON = "pencil-outline";
+export const CLEAR_ICON = "broom";
 
 export const IS_SNOWPACK = (import.meta as any).hot;
 export const BASE_ADDRESS = IS_SNOWPACK ? "http://localhost:4422" : "";
@@ -22,6 +23,7 @@ export const BUILD_DAT = "__buildDat__";
 export const IS_TAURI = "__TAURI_INVOKE_HANDLER__" in window;
 export const LONG_DATETIME = "dddd, MMMM Do YYYY, HH:mm:ss UTCZ";
 export const MIN_VOLUME_DB = -30;
+export const PASSWORD_PLACEHOLDER = "**********";
 
 export const NARROW_NO_BREAK_SPACE = String.fromCharCode(0x202f);
 export const youtubeUrlRegex = /^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube\.com|youtu.be))(\/(?:[\w\-]+\?v=|embed\/|v\/)?)([\w\-]+)(\S+)?$/;

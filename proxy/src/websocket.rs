@@ -20,7 +20,7 @@ use tsclientlib::StreamItem as TsStreamItem;
 use tsclientlib::{
 	events, AudioEvent, ChannelId, ClientId, Connection, ConnectionStats, DisconnectOptions,
 	Error as TsclError, FileDownloadResult, FileUploadResult, FiletransferHandle, InMessage,
-	MessageTarget, Uid,
+	MessageTarget, UidBuf,
 };
 use tsproto_packets::packets::{AudioData, OutCommand, OutPacket};
 use tsproto_types::crypto::EccKeyPubP256;
@@ -670,7 +670,7 @@ impl Ws {
 				}
 			}
 			MessageF2P::SetClientVolume { client, volume } => {
-				let client = Uid(client);
+				let client = UidBuf(client);
 
 				if let Some(con) = &self.connection {
 					if let Ok(state) = con.get_state() {
@@ -1024,7 +1024,7 @@ impl Handler<GetClientVolumeMsg> for Ws {
 		if let Some(con) = &self.connection {
 			match con.get_state() {
 				Ok(state) => {
-					let uid_fut: Box<dyn ActorFuture<Actor = Self, Output = Result<Uid>> + Unpin>;
+					let uid_fut: Box<dyn ActorFuture<Actor = Self, Output = Result<UidBuf>> + Unpin>;
 					if let Some(client) = state.clients.get(&client) {
 						uid_fut = Box::new(wrap_future(future::ready(
 							client

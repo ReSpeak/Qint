@@ -5,19 +5,22 @@
 	import Icon from "../ui/Icon.svelte";
 	import TsIcon from "../ui/TsIcon.svelte";
 	import FilterString from "../ui/FilterString.svelte";
+	import type { ResultDetails } from "../backend/ws";
 	import { Channel } from "../book";
 	import type { ITreeNode } from "../book";
 	import UiClient from "./UiClientWrap.svelte";
 	import UiChannel from "./UiChannelWrap.svelte";
 	import { Connection } from "../connection";
 	import { draggable, DragData, MouseButton } from "../ui/draggable";
-	import { findParent, assert, flash, render_updates } from "../util";
+	import { findParent, assert, flash, focus, render_updates } from "../util";
 	import { SpacerType } from "./tree";
 	import { app, NodeSelection } from "../app";
-	import { ChannelType } from "../book_events";
+	import { ChannelType, TsError } from "../book_events";
 	import HoverMenu from "./HoverMenu.svelte";
 	import { DelayedHover } from "./delayedHover";
 	import { DescriptionMode } from "../transientSettings";
+	import HoverContainer from "./HoverContainer.svelte";
+	import UiChangeResult from "../ui/UiChangeResult.svelte";
 
 	if (render_updates) afterUpdate(() => flash(div));
 
@@ -34,6 +37,8 @@
 	let childrenFilter = "";
 	let hover: DelayedHover;
 	let hovered: Writable<boolean>;
+	let askPassword: string | undefined
+	let error: ResultDetails | undefined;
 
 	$: isSelected = $channel.isSelected;
 	$: channels = channel.channels;
@@ -100,13 +105,31 @@
 		}
 	}
 
-	async function switchChannel(ev: MouseEvent) {
+	async function switchChannel(ev?: MouseEvent) {
 		if (connection === undefined) return;
-		if (ev.button !== MouseButton.Main) return;
-		const res = await connection.switchChannel(channel);
+		if (ev !== undefined && ev.button !== MouseButton.Main) return;
+		const res = await connection.switchChannel(channel, askPassword);
 		if (res !== undefined) {
 			console.log("Failed to switch channel", res);
+			error = res;
+			if (res.tsResult === TsError.ChannelInvalidPassword) {
+				if (askPassword === undefined)
+					askPassword = "";
+			}
 		}
+	}
+
+	function switchWithPassword() {
+		error = undefined;
+		switchChannel();
+		askPassword = undefined;
+		hovered.set(false);
+	}
+
+	function closeAskPassword() {
+		error = undefined;
+		askPassword = undefined;
+		hovered.set(false);
 	}
 
 	function preventScrollClick(ev: MouseEvent): any {
@@ -243,7 +266,43 @@
 				{/if}
 			</span>
 		</div>
-		{#if connection !== undefined && $hovered}
+		{#if askPassword !== undefined}
+			<div class="askPasswordHoverContainer"
+				on:keydown={(e) => {
+					if (e.key === 'Escape')
+						closeAskPassword();
+				}}
+				tabindex="0">
+				<HoverContainer {div} closeButton={true} on:close={closeAskPassword}>
+					{#if error !== undefined}
+						<UiChangeResult result={error} />
+					{/if}
+					<form class="field has-addons" on:submit|preventDefault={switchWithPassword}>
+						<div class="control">
+							<input
+								bind:value={askPassword}
+								in:focus|local
+								name="password"
+								class="input"
+								type="password"
+								title="Password"
+								placeholder="Password" />
+						</div>
+						<div class="control">
+							<button class="button" name="switch" type="submit">
+								<Icon name="check" />
+							</button>
+						</div>
+					</form>
+				</HoverContainer>
+			</div>
+		{:else if error !== undefined}
+			<div class="errorHoverContainer">
+				<HoverContainer {div} closeButton={true} on:close={() => { error = undefined; hovered.set(false); }}>
+					<UiChangeResult result={error} />
+				</HoverContainer>
+			</div>
+		{:else if connection !== undefined && $hovered}
 			<HoverMenu {div} selected={new NodeSelection(connection, channel)} />
 		{/if}
 	</div>
@@ -342,5 +401,37 @@
 	.spacerR {
 		@include spacer;
 		text-align: end;
+	}
+
+	.errorHoverContainer :global(.hover), .errorHoverContainer :global(.hover .corner) {
+		background-color: mix($background, $danger, 50) !important;
+	}
+
+	.errorHoverContainer :global(.hover) {
+		align-items: center;
+		margin-top: 1em;
+	}
+
+	.errorHoverContainer :global(.hover .corner) {
+		top: 1em !important;
+	}
+
+	.errorHoverContainer :global(.hover), .askPasswordHoverContainer :global(.hover) {
+		display: grid !important;
+		grid-template-columns: 1fr auto;
+	}
+
+	.askPasswordHoverContainer :global(.hover) {
+		:global(.closeButton) {
+			grid-row: 1;
+			grid-column: 2;
+		}
+		:global(.changeResult) {
+			grid-row: 1;
+			grid-column: 1;
+		}
+		:global(:last-child) {
+			grid-column: 1 / 3;
+		}
 	}
 </style>
