@@ -51,7 +51,7 @@ export class BrowserBackendConnection implements IBackendConnection {
 		private parent: BrowserBackend
 	) {
 		this.serverFileSrc = "";
-		this.id = "";
+		this.id = createUuidV4();
 	}
 
 	public send(data: OutMsg): void {
@@ -62,7 +62,6 @@ export class BrowserBackendConnection implements IBackendConnection {
 	public connect(onMsg: msgFn, onError: errorFn, onClose: closedFn): Promise<void> {
 		this.close();
 
-		this.id = createUuidV4();
 		this.serverFileSrc = `${BASE_ADDRESS}/con/${this.id}`;
 		this.socket = new WebSocket(`${this.parent.wsBaseAddress}/con/${this.id}/ws?format=Json`);
 		this.socket.onerror = (error) => onError(String(error));
@@ -76,7 +75,6 @@ export class BrowserBackendConnection implements IBackendConnection {
 	public close(): void {
 		if (this.socket)
 			this.socket.close();
-		this.id = "";
 		this.socket = undefined;
 	}
 
