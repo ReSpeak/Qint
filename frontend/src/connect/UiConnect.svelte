@@ -7,7 +7,7 @@
 	import { Book, Channel } from "../book";
 	import UiChannel from "../tree/UiChannel.svelte";
 	import type { ChannelId } from "../ts";
-	import { SERVER_ICON, CLIENT_ICON, focus, urlBase64Encode, CHANNEL_ICON } from "../util";
+	import { SERVER_ICON, CLIENT_ICON, focus, urlBase64Encode, CHANNEL_ICON, on } from "../util";
 	import { app } from "../app";
 	import { backend } from "../backend/backend";
 
@@ -23,14 +23,16 @@
 	let address: string = "";
 	let showDetails = data.password !== undefined || data.channelPassword !== undefined;
 
-	$: {
+	$: on(data, dataChanged());
+
+	async function dataChanged() {
 		address =
 			data.address +
 			(data.channel !== undefined ? "/" + data.channel
 			: data.channelId !== undefined ? "//" + data.channelId
 			: "");
 		if (addressInput !== undefined) {
-			changeChannels();
+			await changeChannels();
 		}
 	}
 
@@ -61,7 +63,7 @@
 		if (
 			sep !== -1 &&
 			addressInput.selectionStart !== null &&
-			addressInput.selectionStart >= sep
+			addressInput.selectionStart > sep
 		) {
 			// Show channel popup
 			const addr = address.substr(0, sep);
@@ -96,7 +98,6 @@
 					address,
 				}
 			);
-			console.log(query.data.serverByAddress);
 			if (query.data.serverByAddress !== null) {
 				server = urlBase64Encode(query.data.serverByAddress.publicKey);
 				let channels: Map<ChannelId, Channel> = new Map(
