@@ -181,7 +181,6 @@
 	</StickySlot>
 	<div class="descGroup" class:editing>
 		{#await changeRequest then changeResult}
-			<!-- Todo check properly -->
 			{#if changeResult !== undefined}
 				<div class="notification is-danger">
 					<button

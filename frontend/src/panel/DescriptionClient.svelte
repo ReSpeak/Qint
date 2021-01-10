@@ -1,6 +1,7 @@
 <script lang="typescript">
 	import { get } from "svelte/store";
 	import { Connection } from "../connection";
+	import type { ChangePromise } from "../connection";
 	import type { ServerGroupId } from "../ts";
 	import moment from "moment";
 	import type { Duration } from "moment";
@@ -16,12 +17,15 @@
 	import { getClientAvatarPath } from "../ui/clientIcon";
 	import { Reason } from "../book_events";
 	import { onMount } from "svelte";
-	import { NARROW_NO_BREAK_SPACE, on } from "../util";
+	import { hexEncode, NARROW_NO_BREAK_SPACE, on } from "../util";
 	import { Client, ServerGroup } from "../book";
 	import BModal from "../ui/BModal.svelte";
 	import { tick } from "svelte";
 	import BChart from "../ui/BChart.svelte";
+	import UiChangeResult from "../ui/UiChangeResult.svelte";
+	import UiEmojiString from "../ui/UiEmojiString.svelte";
 	import { app } from "../app";
+	import { pathJoin } from "./fileUtil";
 
 	export let connection: Connection;
 	export let client: Client;
@@ -34,6 +38,8 @@
 	let pokeMessage: string = "";
 	let developMode = app.transientSettings.ui._developMode;
 	let chart: BChart | null = null;
+	let editing = false;
+	let dummyUploader: HTMLInputElement;
 
 	const serverGroups = connection.book.serverGroups;
 	$: avatarPath = getClientAvatarPath($client, connection);
@@ -42,7 +48,19 @@
 		if ($client.optionalData == null) getOptionalData();
 		if ($client.connectionData == null) getConnectionData();
 	}
-	$: on(client, clearChart());
+	$: on(client, onClientChanged());
+
+	// THIS IS NOT A FULL CLIENT OBJECT
+	type EditProps = {
+		description: string;
+	};
+	// Can only be changed for own client or overwritten locally for other clients
+	type SpecialEditProps = {
+		name: string;
+		phoneticName: string;
+	};
+	let [clientEdit, clientSpecialEdit] = createPropsCopy();
+	let changeRequest: ChangePromise | undefined;
 
 	let chartConfig: Chart.ChartConfiguration = {
 		type: "line",
@@ -166,7 +184,8 @@
 		chart?.updateChart?.();
 	}
 
-	function clearChart() {
+	function onClientChanged() {
+		editing = false;
 		chartConfig.data?.datasets?.filter(dataset => dataset.data).forEach(dataset => {
 			dataset.data = [];
 			for (let i = CHART_ENTRY_COUNT; i > 0; i--) {
@@ -337,6 +356,102 @@
 		return `${asDay}d ${floorHour}h ${floorMin}m ${floorSec}s`;
 	}
 
+	async function uploadSelectedAvatar() {
+		let files = dummyUploader.files;
+		if (files && files.length > 0) {
+			const file = files[0];
+			dummyUploader.value = null!;
+			await connection.backend.fetch("/file/0/avatar", {
+				method: "PUT",
+				body: file,
+			});
+			let hash = file.size.toString();
+			// Use SHA-256 hash and fall back to file size if not available
+			if (crypto.subtle) {
+				const hashBuffer = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+				hash = hexEncode(Array.from(new Uint8Array(hashBuffer)));
+			}
+			changeRequest = connection.sendChange({
+				ConnectionClientUpdate: {
+					avatarHash: hash,
+				},
+			});
+		}
+	}
+
+	function deleteAvatar() {
+		changeRequest = connection.sendChange({
+			ServerDeleteFile: {
+				path: `/avatar_${client.uidStr}`,
+			},
+		});
+	}
+
+	function createPropsCopy(): [EditProps, SpecialEditProps] {
+		return [{
+			description: client.description,
+		}, {
+			name: client.name,
+			phoneticName: client.phoneticName,
+		}];
+	}
+
+	function getPropsDiff() {
+		let diff: Record<string, any> = {};
+		for (const [key, value] of Object.entries(clientEdit)) {
+			if (key.startsWith("_")) continue;
+			if ((client as any)[key] !== value) {
+				diff[key] = value;
+			}
+		}
+		return diff;
+	}
+
+	function getSpecialPropsDiff() {
+		let diff: Record<string, any> = {};
+		for (const [key, value] of Object.entries(clientSpecialEdit)) {
+			if (key.startsWith("_")) continue;
+			if ((client as any)[key] !== value) {
+				diff[key] = value;
+			}
+		}
+		return diff;
+	}
+
+	function clickEditMode() {
+		editing = true;
+		let [e, specialE] = createPropsCopy();
+		clientEdit = e;
+		clientSpecialEdit = specialE;
+	}
+
+	function clickSaveChanges() {
+		editing = false;
+
+		let diff = getPropsDiff();
+		if (Object.keys(diff).length !== 0) {
+			changeRequest = connection.sendChange({
+				ClientEdit: {
+					id: client.id,
+					...diff,
+				},
+			});
+		}
+
+		diff = getSpecialPropsDiff();
+		if (Object.keys(diff).length !== 0) {
+			if (ownClient) {
+				changeRequest = connection.sendChange({
+					ConnectionClientUpdate: {
+						...diff,
+					},
+				});
+			} else {
+				// TODO Save custom name and phonetic name for other clients
+			}
+		}
+	}
+
 	onMount(() => {
 		updateClientInfo();
 		let timer = setInterval(updateClientInfo, 1000);
@@ -347,12 +462,53 @@
 
 <StickyList>
 	<StickySlot styled={false}>
-		<StickyHeader title="Info" />
+		<StickyHeader title="Info">
+			{#if editing}
+				<button
+					class="button is-small is-success"
+					on:click|stopPropagation={clickSaveChanges}>
+					<Icon name="check" />
+					<span>Save</span>
+				</button>
+				<button
+					class="button is-small is-danger"
+					on:click|stopPropagation={() => (editing = false)}>
+					<Icon name="close" />
+					<span>Cancel</span>
+				</button>
+			{:else}
+				<button
+					class="button is-small outline-button"
+					on:click|stopPropagation={clickEditMode}>
+					<Icon name="pencil" />
+					<span>Edit</span>
+				</button>
+			{/if}
+		</StickyHeader>
 	</StickySlot>
-	<div class="descGroup">
+	<div class="descGroup" class:editing>
+		{#await changeRequest then changeResult}
+			{#if changeResult !== undefined}
+				<div class="notification is-danger">
+					<button
+						class="toolbutton is-small"
+						style="float: right;"
+						on:click={() => (changeRequest = undefined)}>
+						<Icon name="close" />
+					</button>
+					<UiChangeResult result={changeResult} />
+				</div>
+			{/if}
+		{/await}
+
 		<div class="dataLine headLine">
 			<TsIcon type="client" source={{ icon: $client.icon }} {connection} />
-			<ClientName client={$client} />
+			{#if editing}
+				{#if !ownClient}<Icon name="information-outline" title="Change is not visible for others" style="margin-right: 0.5em;" />{/if}
+				<input class="input" type="text" bind:value={clientSpecialEdit.name} />
+			{:else}
+				<ClientName client={$client} />
+			{/if}
 			<span class="countryFlag" title={$client.countryCode}>{countryCodeToEmojis($client.countryCode)}</span>
 			<div style="flex: 1;" />
 			{#if $client.optionalData !== null}
@@ -361,12 +517,51 @@
 		</div>
 
 		<div class="descTable">
+			{#if editing}
+				<div>
+					Phonetic name{#if !ownClient}<Icon name="information-outline" title="Change is not visible for others" />{/if}:
+				</div>
+				<div>
+					<input class="input" type="text" bind:value={clientSpecialEdit.phoneticName} />
+				</div>
+			{/if}
 			<div>Description:</div>
-			<div>{$client.description}</div>
+			<div>
+				{#if editing}
+					<input class="input" type="text" bind:value={clientEdit.description} />
+				{:else}{$client.description}{/if}
+			</div>
 			<div>Online:</div>
 			<div>{formatDuration($client.connectionData?.connectedTime)}</div>
 			<div>Last active:</div>
 			<div>{formatAgo($client.connectionData?.idleTime, true)}</div>
+			{#if $developMode}
+				{#if $client.uid !== null}
+					<div>Uid:</div>
+					<div>{$client.uidStr}</div>
+					<div>Uid (emoji):</div>
+					<div>
+						<UiEmojiString data={$client.uid} />
+					</div>
+				{/if}
+				<div>Id:</div>
+				<div>{$client.id}</div>
+			{/if}
+			{#if editing}
+				<div>Avatar:</div>
+				<div>
+					{#if ownClient}
+						<input
+							title="Dummy Uploader"
+							style="display: none;"
+							bind:this={dummyUploader}
+							on:change={uploadSelectedAvatar}
+							type="file" />
+						<button class="button is-small is-info" on:click={() => dummyUploader.click()}>Upload</button>
+					{/if}
+					{#if avatarPath}<button class="button is-small is-danger" on:click={deleteAvatar}>Delete</button>{/if}
+				</div>
+			{/if}
 		</div>
 		{#if avatarPath}<img class="clientAvatar" src={avatarPath} alt="Client avatar" />{/if}
 		<div class="serverGroups">

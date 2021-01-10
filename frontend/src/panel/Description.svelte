@@ -45,7 +45,8 @@
 	:global(.descTable) {
 		display: grid;
 		grid-template-columns: max-content max-content;
-		gap: 0 1em;
+		gap: 0.5em 1em;
+		align-items: center;
 	}
 
 	:global(.headLine) {

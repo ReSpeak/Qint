@@ -4,6 +4,7 @@ import { Moment } from "moment";
 import { OffsetDateTime, RustDuration } from "./ts";
 import { Readable } from "svelte/store";
 import { Version } from "./book_events";
+import EMOJI_ENCODING from "./sas-emoji.json";
 
 export const debug: boolean = true;
 export const render_updates: boolean = false;
@@ -38,9 +39,18 @@ export const LOUDNESS_UPDATE_MS = 20;
 export type RequiredNN<T> = { [P in keyof T]: NonNullable<T[P]> };
 export type Writeable<T> = { -readonly [P in keyof T]: Writeable<T[P]> };
 
+export interface EmojiData {
+	number: number,
+	emoji: string,
+	description: string,
+	unicode: string,
+	translated_descriptions: Record<string, string>,
+};
+
 export async function sleep(timeout: number): Promise<void> {
 	return new Promise(resolve => setTimeout(resolve, timeout));
 }
+
 export function flash(element: HTMLElement) {
 	if (!element) return;
 	requestAnimationFrame(() => {
@@ -289,6 +299,21 @@ export function hexEncode(data: number[]): string {
 	let res = "";
 	for (let i = 0; i < data.length; i++)
 		res += data[i].toString(16).padStart(2, "0");
+	return res;
+}
+
+// Emoji encoding from Matrix: https://matrix.org/docs/spec/client_server/latest#sas-method-emoji
+// Declarations from here: https://github.com/matrix-org/matrix-doc/blob/master/data-definitions/sas-emoji.json
+
+export function emojiEncode(data: number[]): EmojiData[] {
+	const BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+	const b64 = base64Encode(data);
+	let res = [];
+	for (let i = 0; i < b64.length; i++) {
+		const bi = BASE64_CHARS.indexOf(b64[i]);
+		if (bi !== 64)
+			res.push(EMOJI_ENCODING[bi] as EmojiData);
+	}
 	return res;
 }
 

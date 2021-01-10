@@ -17,10 +17,13 @@
 	import RenderedTextEditor from "../ui/RenderedTextEditor.svelte";
 	import { CodecEncryptionMode, HostMessageMode, OptionalServerDataGen } from "../book_events";
 	import UiChangeResult from "../ui/UiChangeResult.svelte";
+	import UiEmojiString from "../ui/UiEmojiString.svelte";
+	import { app } from "../app";
 
 	export let connection: Connection;
 	export let server: Server;
 
+	let developMode = app.transientSettings.ui._developMode;
 	let editing = false;
 	$: create_date = $server.created !== undefined ? $server.created : moment.unix(0);
 
@@ -186,7 +189,6 @@
 	</StickySlot>
 	<div class="descGroup" class:editing>
 		{#await changeRequest then changeResult}
-			<!-- Todo check properly -->
 			{#if changeResult !== undefined}
 				<div class="notification is-danger">
 					<button
@@ -278,6 +280,18 @@
 						reserved)
 					</div>
 				{/if}
+			</div>
+		{/if}
+		{#if $developMode}
+			<div class="dataLine">
+				<div>Uid:</div>
+				<div>{$server.uidStr}</div>
+			</div>
+			<div class="dataLine">
+				<div>Uid (emoji):</div>
+				<div>
+					<UiEmojiString data={$server.uid} />
+				</div>
 			</div>
 		{/if}
 	</div>
