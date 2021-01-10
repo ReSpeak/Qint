@@ -1,7 +1,7 @@
 $Env:FRONTEND_PATH = "./ui/"
 $workhome = Get-Location
 # Check if SDL exists
-if (-Not (Get-Item "./proxy-codegen/SDL2.dll")) {
+if (-Not (Get-Item "./proxy-codegen/SDL2.dll" -ErrorAction SilentlyContinue)) {
     ./install_sdl.ps1
 }
 # Build proxy
