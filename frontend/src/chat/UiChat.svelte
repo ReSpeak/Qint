@@ -39,7 +39,6 @@
 	let lastDisplayed: Message | undefined;
 	let sendError: string | undefined;
 	let isSending = false;
-	let chatListElems: Message[];
 	// The id of the message that is set as last read. (To prevent unnecessary many messages)
 	let isSettingLastRead: string | undefined = undefined;
 
@@ -159,7 +158,7 @@
 		sendError = undefined;
 	}
 
-	function chatboxHistoryMove(e: CustomEvent<number>) {
+	async function chatboxHistoryMove(e: CustomEvent<number>) {
 		let historyId = e.detail;
 		assert(historyId > 0, "History id should be at least 1");
 		if (connection === undefined)
@@ -167,14 +166,11 @@
 		let ownUid = get(connection.book.ownClient)?.uid;
 		if (ownUid === undefined || ownUid === null)
 			return;
-		for (let i = chatListElems.length - 1; i >= 0; i--) {
-			let msg: Message = chatListElems[i];
-			let uid = msg.invoker?.uid;
-			if (uid && arraysEqual(uid, ownUid)) {
-				historyId--;
-				if (historyId === 0)
-					text = msg.raw;
-			}
+		const data = await chat.getSendHistory(ownUid, historyId - 1);
+		if (data !== undefined) {
+			text = data;
+			await tick();
+			messageInput.moveCursorToEnd();
 		}
 	}
 
@@ -305,7 +301,6 @@
 		<UiLazyList
 			on:viewchanged={viewchanged}
 			bind:this={chatList}
-			bind:elems={chatListElems}
 			{fetchElements}
 			suggestJumpEnd={true}
 			notifyViewChanged={chatData !== undefined && $chatData.unreadCount > 0}

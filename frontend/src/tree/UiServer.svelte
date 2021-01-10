@@ -13,6 +13,7 @@
 	import { app, NodeSelection } from "../app";
 	import HoverMenu from "./HoverMenu.svelte";
 	import { DelayedHover } from "./delayedHover";
+	import UiChangeResult from "../ui/UiChangeResult.svelte";
 
 	let div: HTMLElement;
 	if (render_updates) afterUpdate(() => flash(div));
@@ -81,7 +82,11 @@
 	<div class="statusField">
 		<div class="notification" class:is-danger={$state.errored}>
 			{#if $state.errored}
-				{$state.error}
+				{#if typeof $state.error === "string"}
+					{$state.error}
+				{:else}
+					<UiChangeResult result={$state.error} />
+				{/if}
 			{:else}
 				<Loader text={'Connecting ...'} />
 			{/if}

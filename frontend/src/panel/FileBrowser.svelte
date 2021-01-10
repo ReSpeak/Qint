@@ -47,6 +47,7 @@
 	$: {
 		on(path);
 		const cachePath = getCachePath();
+		channel.lastFilePath = path;
 		displayChannel = $fileTreeCache.get(cachePath, true);
 		let childrenIter = displayChannel?.children?.values();
 		displayChildren = childrenIter !== undefined ? Array.from(childrenIter) : [];
@@ -54,7 +55,7 @@
 	$: on(channelId, path, refreshCurrentFolder(true));
 
 	function channelChanged() {
-		path = [];
+		path = channel.lastFilePath;
 		invalidateCache = true;
 	}
 

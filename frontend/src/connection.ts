@@ -76,7 +76,7 @@ export class Connection {
 			promise.then(res => {
 				if (res !== undefined) {
 					this.backend.close();
-					this._state.update(s => s.setError(res.tsResult ?? res.description ?? "Failed to connect"));
+					this._state.update(s => s.setError(res));
 				}
 			});
 		});
@@ -463,7 +463,7 @@ export enum ConnectionStateEnum {
 
 export class ConnectionState {
 	public rawState: ConnectionStateEnum = ConnectionStateEnum.Uninitialized;
-	public error: string | undefined;
+	public error: string | ResultDetails | undefined;
 	public get channelListFinished() { return this.rawState === ConnectionStateEnum.ChannelListFinished; }
 	public get connecting() { return this.rawState === ConnectionStateEnum.Connecting; }
 	public get connected() {
@@ -501,7 +501,7 @@ export class ConnectionState {
 		return this;
 	}
 
-	public setError(msg: string): this {
+	public setError(msg: string | ResultDetails): this {
 		this.rawState = ConnectionStateEnum.Errored;
 		this.error = msg;
 		return this;

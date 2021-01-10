@@ -37,7 +37,7 @@
 	let visObs: CustomIntersectionObserver;
 
 	// the data elements held by this list
-	export let elems: T[] = [];
+	let elems: T[] = [];
 
 	let pxBeforeLoad = 500; // TODO? could be adjusted dynamically
 	/** The minimum amout of items that must be at least `minPxDistanceToRemove`

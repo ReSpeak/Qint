@@ -37,6 +37,16 @@
 		textChanged();
 	}
 
+	export function moveCursorToEnd() {
+		// https://stackoverflow.com/questions/1125292/how-to-move-cursor-to-end-of-contenteditable-entity
+		let range = document.createRange();
+		range.selectNodeContents(self);
+		range.collapse(false);
+		let selection = window.getSelection();
+		selection?.removeAllRanges();
+		selection?.addRange(range);
+	}
+
 	function textChanged() {
 		if (self === undefined) return;
 		let tmp = self.innerText;

@@ -32,6 +32,14 @@ export const enum TsError {
 <# } #>
 }
 
+export function TsErrorDescription(error: TsError): string {
+	switch (error) {
+	<# for v in &errors::DATA.0 { #>
+		case TsError.<#= v.name.to_camel_case() #>: return "<#= v.doc #>";
+	<# } #>
+	}
+}
+
 export const enum Version {
 <# for v in &versions::DATA.0 { #>
 	<#= v.get_enum_name() #> = "<#= v.get_enum_name() #>",

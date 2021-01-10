@@ -551,6 +551,8 @@ export class Channel extends book_events.ChannelGen implements ITreeNode, Readab
 	public readonly clients: Writable<Client[]> = writable([]);
 	// ITreeParent
 	public readonly channels: Writable<Channel[]> = writable([]);
+	// Cache last path in file browser
+	public lastFilePath: string[] = [];
 
 	protected constructor() {
 		super();

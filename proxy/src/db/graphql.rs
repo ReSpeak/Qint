@@ -406,6 +406,46 @@ impl Chat {
 			.await??;
 		Ok(res.try_into()?)
 	}
+
+	/// Travel through the history of sent messages.
+	///
+	/// Used when pressing <arrow-up> in the chat window.
+	/// `id = 0` references the last sent message, an increasing value the one before that, etc.
+	/// `from` is the author’s uid for the searched messages.
+	async fn send_history(
+		&self, state: &State, from: Vec<i32>, id: i32,
+	) -> GResult<Option<Message>> {
+		let from = from.into_iter().map(|i| i as u8).collect::<Vec<_>>();
+		// Ignore pokes
+		let ids = self
+			.0
+			.iter()
+			.filter_map(|(c, p)| if !*p { Some(c.id) } else { None })
+			.collect::<Vec<_>>();
+		let res = state
+			.database
+			.send(RunOnDbMsg(move |db| {
+				use schema::{chats, messages};
+
+				let query = messages::table
+					.inner_join(chats::table)
+					.filter(chats::id.eq_any(ids).and(messages::invoker.eq(&from)))
+					// Deduplicate messages
+					.group_by(messages::content)
+					.order((messages::time.desc(), messages::id.desc()))
+					.offset(i64::from(id))
+					.select(messages::all_columns);
+
+				GResult::Ok(
+					query
+						.first::<models::Message>(&db.con)
+						.optional()?
+						.map(|msg| Message { msg, is_poke: false }),
+				)
+			}))
+			.await??;
+		Ok(res)
+	}
 }
 
 #[juniper::graphql_object(Context = State)]

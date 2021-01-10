@@ -6,7 +6,7 @@ import { ListFetchDir, FetchResult } from "../ui/lazyList";
 import { NodeSelection } from "../app";
 import { backend } from "../backend/backend";
 import { StructuredData } from "../ui/BInputDecl";
-import { ChannelId } from "../ts";
+import { ChannelId, Uid } from "../ts";
 import moment from "moment";
 import debug from "debug";
 const log = debug("CHAT"), error = debug("error:CHAT");
@@ -162,6 +162,44 @@ export class Chat {
 			message: messageId,
 		});
 		selected.node.updateChat(new ChatData(lastRead, res.data.setLastRead));
+	}
+
+	public async getSendHistory(from: Uid, id: number): Promise<string | undefined> {
+		const selected = get(this.selectedChat);
+		if (selected === undefined) return undefined;
+		let public_key = selected.connection.book.server.publicKey;
+		if (public_key === undefined) {
+			error("Cannot get send history for a non-existant connection");
+			return undefined;
+		}
+
+		const res = await backend.graphql<{chat:{sendHistory:{content: string}}}>(
+			`query GetSendHistory($chatType: GMessageTarget!, $server: [Int!]!, $chatId: ID,
+					$from: [Int!]!, $id: Int!) {
+				chat(typ: $chatType, server: $server, id: $chatId) {
+					sendHistory(from: $from, id: $id) {
+						content
+					}
+				}
+			}`, {
+			chatType: selected.node.qlType,
+			server: public_key,
+			chatId: selected.node.qlId,
+			from,
+			id,
+		});
+		if ("data" in res) {
+			// We never chatted here
+			if (!res.data.chat || !res.data.chat.sendHistory) {
+				log("No messages here");
+				return undefined;
+			}
+
+			return res.data.chat.sendHistory.content;
+		} else {
+			error("GetSendHistory result does not contain data", res);
+			return undefined;
+		}
 	}
 }
 
