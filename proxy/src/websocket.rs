@@ -289,7 +289,8 @@ impl Ws {
 									username: opts.name.clone(),
 									address: opts.address.clone(),
 									channel: opts.channel.clone(),
-									// TODO Server/channel password
+									password: opts.password.clone(),
+									channel_password: opts.channel_password.clone(),
 									identity: id as i64,
 									server_key,
 								});

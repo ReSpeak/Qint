@@ -71,6 +71,8 @@ pub struct ConnectedMsg {
 	pub address: String,
 	pub channel: Option<String>,
 	pub identity: i64,
+	pub password: Option<String>,
+	pub channel_password: Option<String>,
 	pub server_key: EccKeyPubP256,
 }
 
@@ -384,6 +386,7 @@ impl Handler<GetIdentityAndServerMsg> for DbHandler {
 					name: "TeamSpeakUser",
 					public_key: Some(pub_key.to_short()),
 					custom_name: None,
+					custom_phonetic_name: None,
 				};
 				diesel::insert_into(schema::clients::table).values(&cli).execute(&self.con)?;
 
@@ -617,6 +620,8 @@ impl Handler<ConnectedMsg> for DbHandler {
 					bookmark: false,
 					last_used: Some(utc_time),
 					timezone: utc_to_local_offset,
+					password: msg.password.as_deref(),
+					channel_password: msg.channel_password.as_deref(),
 					server: Some(&server),
 				};
 				let id = self.con.transaction::<_, diesel::result::Error, _>(|| {
@@ -666,6 +671,8 @@ impl Handler<ChannelListMsg> for DbHandler {
 								bookmark: false,
 								last_used: Some(utc_time),
 								timezone: utc_to_local_offset,
+								password: data.password.as_deref(),
+								channel_password: data.channel_password.as_deref(),
 								server: Some(&server),
 							};
 							diesel::insert_into(bookmarks::table)
@@ -888,6 +895,7 @@ impl DbHandler {
 				name: &client.name,
 				public_key: None,
 				custom_name: None,
+				custom_phonetic_name: None,
 			};
 			diesel::insert_into(schema::clients::table).values(&client).execute(&self.con)?;
 		}

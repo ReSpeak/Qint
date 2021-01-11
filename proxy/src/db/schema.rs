@@ -10,6 +10,8 @@ table! {
 		last_used -> Nullable<Timestamp>,
 		timezone -> Integer,
 		server -> Nullable<Binary>,
+		password -> Nullable<Text>,
+		channel_password -> Nullable<Text>,
 	}
 }
 
@@ -64,6 +66,7 @@ table! {
 		public_key -> Nullable<Binary>,
 		custom_name -> Nullable<Text>,
 		volume -> Float,
+		custom_phonetic_name -> Nullable<Text>,
 	}
 }
 

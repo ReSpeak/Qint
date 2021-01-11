@@ -17,6 +17,7 @@ pub struct Client {
 	pub public_key: Option<Vec<u8>>,
 	pub custom_name: Option<String>,
 	pub volume: f32,
+	pub custom_phonetic_name: Option<String>,
 }
 
 #[derive(Insertable)]
@@ -26,6 +27,7 @@ pub struct ClientInsert<'a> {
 	pub name: &'a str,
 	pub public_key: Option<&'a [u8]>,
 	pub custom_name: Option<&'a str>,
+	pub custom_phonetic_name: Option<&'a str>,
 }
 
 #[derive(Clone, Identifiable, Queryable)]
@@ -96,6 +98,8 @@ pub struct BookmarkInsert<'a> {
 	/// Time of last successful connection
 	pub last_used: Option<NaiveDateTime>,
 	pub timezone: i32,
+	pub password: Option<&'a str>,
+	pub channel_password: Option<&'a str>,
 	/// Reference to the server if we already connected once
 	pub server: Option<&'a [u8]>,
 }
@@ -205,6 +209,8 @@ pub struct Bookmark {
 	pub last_used: Option<NaiveDateTime>,
 	pub timezone: i32,
 	pub server: Option<Vec<u8>>,
+	pub password: Option<String>,
+	pub channel_password: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Queryable, Serialize)]
