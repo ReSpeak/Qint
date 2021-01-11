@@ -1,5 +1,5 @@
-use std::convert::TryFrom;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 
 #[cfg(test)]
 use proxy_codegen::book_events::serialize_some_u64;

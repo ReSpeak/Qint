@@ -16,8 +16,8 @@ use tokio::sync::mpsc;
 use tsproto_packets::packets::{AudioData, CodecType, OutAudio, OutPacket};
 
 use super::*;
-use crate::websocket::{CaptureLoudnessMsg, SendPacketMsg, SetSelfTalkingMsg, Ws};
 use crate::loudness_ws::LoudnessService;
+use crate::websocket::{CaptureLoudnessMsg, SendPacketMsg, SetSelfTalkingMsg, Ws};
 
 pub(crate) struct AddListenerMsg(pub Addr<Ws>);
 pub(crate) struct RemoveListenerMsg(pub Addr<Ws>);

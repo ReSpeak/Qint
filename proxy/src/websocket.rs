@@ -1024,7 +1024,9 @@ impl Handler<GetClientVolumeMsg> for Ws {
 		if let Some(con) = &self.connection {
 			match con.get_state() {
 				Ok(state) => {
-					let uid_fut: Box<dyn ActorFuture<Actor = Self, Output = Result<UidBuf>> + Unpin>;
+					let uid_fut: Box<
+						dyn ActorFuture<Actor = Self, Output = Result<UidBuf>> + Unpin,
+					>;
 					if let Some(client) = state.clients.get(&client) {
 						uid_fut = Box::new(wrap_future(future::ready(
 							client
