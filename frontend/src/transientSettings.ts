@@ -1,14 +1,7 @@
-import { soft_merge } from "./util";
+import { soft_diff, soft_merge } from "./util";
 import { backend } from "./backend/backend";
 import { NodeSelection } from "./app";
 import { get, writable } from "svelte/store";
-
-type FilterFlags<Base, Condition> = {
-	[Key in keyof Base]: Base[Key] extends Condition ? never : Key
-};
-type AllowedNames<Base, Condition> = FilterFlags<Base, Condition>[keyof Base];
-type SubType<Base, Condition> = Pick<Base, AllowedNames<Base, Condition>>;
-export type SettGroup = NonNullable<keyof SubType<TransientSettings, Function>>;
 
 export const enum DescriptionMode {
 	None = "None",
@@ -18,7 +11,8 @@ export const enum DescriptionMode {
 
 export class TransientSettings {
 	private _syncDebounceTimer: number | undefined;
-	private _syncDebounceGroup: SettGroup | undefined;
+	/// Value from last save
+	private _lastSave: any;
 	public synth = new TransientSettingsSynth();
 	public ui = new TransientSettingsUi();
 	public chat = new TransientSettingsChat(this);
@@ -27,42 +21,39 @@ export class TransientSettings {
 
 	public async loadAsync() {
 		try {
-			const resp = await backend.fetch(`/transient/*`);
+			const resp = await backend.fetch(`/transient`);
 			const data = await resp.json();
+			this._lastSave = data;
 			soft_merge(this, data);
 		} catch (e) {
 			console.error("Failed to load transient settings", e);
 		}
 	}
 
-	public save(group?: SettGroup) {
-		if (this._syncDebounceTimer === undefined) {
-			this._syncDebounceGroup = group;
+	public save() {
+		if (this._syncDebounceTimer === undefined)
 			this._syncDebounceTimer = setTimeout(() => this.saveAsync(), 5000);
-		} else if (this._syncDebounceGroup !== group) {
-			this._syncDebounceGroup = undefined;
-		}
 	}
 
 	public flush() {
-		if (this._syncDebounceTimer !== undefined) {
+		if (this._syncDebounceTimer !== undefined)
 			this.saveAsync();
-		}
 	}
 
 	private async saveAsync() {
 		this._syncDebounceTimer = undefined;
-		const group = this._syncDebounceGroup;
 
-		let [path, obj] = group !== undefined
-			? [group, this[group]]
-			: ["*", this];
+		let newSave = JSON.parse(JSON.stringify(this, (k, v) => k.startsWith('_') ? undefined : v));
+		// Diff to last save
+		let diff = soft_diff(this._lastSave, newSave);
+
+		this._lastSave = newSave;
 
 		try {
-			await backend.fetch(`/transient/${path}`, {
+			await backend.fetch(`/transient`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(obj, (k, v) => k.startsWith('_') ? undefined : v)
+				body: JSON.stringify(diff),
 			});
 		} catch (e) {
 			console.error("Failed to save transient settings", e);
@@ -167,7 +158,7 @@ export class TransientSettingsChat {
 		const storeText = !text ? null : text;
 		if (storeText !== oldVal) {
 			(this as any)[key] = storeText;
-			this._parent.save("chat");
+			this._parent.save();
 		}
 	}
 

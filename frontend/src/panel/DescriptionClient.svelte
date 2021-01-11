@@ -25,7 +25,6 @@
 	import UiChangeResult from "../ui/UiChangeResult.svelte";
 	import UiEmojiString from "../ui/UiEmojiString.svelte";
 	import { app } from "../app";
-	import { pathJoin } from "./fileUtil";
 
 	export let connection: Connection;
 	export let client: Client;

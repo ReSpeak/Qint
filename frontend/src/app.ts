@@ -76,7 +76,7 @@ export class App {
 	public setDescriptionMode(selected: NodeSelection, mode: DescriptionMode) {
 		app.selectNode(selected);
 		this.transientSettings.ui._descriptionMode.set(mode);
-		app.transientSettings.save("ui");
+		app.transientSettings.save();
 	}
 
 	public connect(options: ConnectData): Connection {
@@ -84,7 +84,7 @@ export class App {
 			this.transientSettings.ui.defaultInputMuted = options.inputMuted;
 		if (options.outputMuted !== undefined)
 			this.transientSettings.ui.defaultOutputMuted = options.outputMuted;
-		this.transientSettings.save("ui");
+		this.transientSettings.save();
 
 		const con = new Connection(options);
 		oneshot(con.state, s => s.closed, () => {

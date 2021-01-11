@@ -37,7 +37,7 @@
 			$descriptionMode = mode;
 			app.selectNode(selected);
 		}
-		app.transientSettings.save("ui");
+		app.transientSettings.save();
 	}
 
 	function disconnect() {
@@ -82,10 +82,6 @@
 </HoverContainer>
 
 <style lang="scss">
-	.buttons {
-		margin-bottom: 0.2em;
-	}
-
 	:global(.hover) > :global(.description) {
 		font-size: 0.85em;
 	}

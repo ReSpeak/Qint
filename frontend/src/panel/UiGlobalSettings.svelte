@@ -9,7 +9,6 @@
 	import BHotkeyField from "../ui/BHotkeyField.svelte";
 	import SimpleDiagram from "../ui/UiSimpleDiagram.svelte";
 	import BSlider from "../ui/BSlider.svelte";
-	import type { SettGroup } from "../transientSettings";
 	import { dbToFactor, factorToDb, LOUDNESS_END_MAGIC, LOUDNESS_MAX, LOUDNESS_MIN, LOUDNESS_UPDATE_MS, MIN_VOLUME_DB } from "../util";
 	import type { Hotkey } from "../hotkey";
 	import Icon from "../ui/Icon.svelte";
@@ -73,8 +72,8 @@
 		synthSett.trySpeak(text);
 	}
 
-	function syncSettings(group?: SettGroup) {
-		app.transientSettings.save(group);
+	function syncSettings() {
+		app.transientSettings.save();
 	}
 
 	async function createHotkey() {
@@ -109,18 +108,18 @@
 
 	function updateLoudness() {
 		audioSett.loudnessThreshold = loudnessThreshold === minLoudnessThreshold ? null : loudnessThreshold;
-		syncSettings('audio');
+		syncSettings();
 	}
 
 	function updateGlobalVolume() {
 		audioSett.globalVolume = dbToFactor(globalVolume);
-		syncSettings('audio');
+		syncSettings();
 		// Update global volume instantly
 		app.transientSettings.flush();
 	}
 
 	function browserNotificationChanged() {
-		syncSettings('app');
+		syncSettings();
 		if (app.transientSettings.app.allowBrowserNotifications && Notification.permission === "default") {
 			Notification.requestPermission();
 		}
@@ -160,14 +159,14 @@
 					type="checkbox"
 					class="checkbox-switch is-info"
 					bind:checked={app.transientSettings.app.askBeforeClosing}
-					on:change={() => syncSettings('app')} />
+					on:change={() => syncSettings()} />
 			</BKeyValue>
 			<BKeyValue label="Developer Mode">
 				<input
 					type="checkbox"
 					class="checkbox-switch is-info"
 					bind:checked={$developMode}
-					on:change={() => syncSettings('ui')} />
+					on:change={() => syncSettings()} />
 			</BKeyValue>
 			<BKeyValue
 				label="Browser notifications"
@@ -223,7 +222,7 @@
 					items={voices}
 					display={(v) => v.name}
 					bind:selected={synthSett.voice}
-					on:change={() => syncSettings('synth')} />
+					on:change={() => syncSettings()} />
 			</BKeyValue>
 			<BKeyValue label="Speed" labelStyle="is-normal">
 				<BSlider
@@ -232,7 +231,7 @@
 					step={0.1}
 					bind:value={synthSett.speed}
 					tooltip={true}
-					on:change={() => syncSettings('synth')} />
+					on:change={() => syncSettings()} />
 			</BKeyValue>
 			<BKeyValue label="Volume" labelStyle="is-normal">
 				<BSlider
@@ -241,7 +240,7 @@
 					step={0.05}
 					bind:value={synthSett.volume}
 					tooltip={true}
-					on:change={() => syncSettings('synth')} />
+					on:change={() => syncSettings()} />
 			</BKeyValue>
 			<BKeyValue label="Preview" narrow={false} labelStyle="is-normal">
 				<div class="is-horizontal field">

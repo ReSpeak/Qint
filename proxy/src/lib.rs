@@ -26,7 +26,7 @@ use futures::stream::Peekable;
 use http::{header::CACHE_CONTROL, header::ETAG, HeaderValue};
 use messages::ResultDetails;
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
+use serde_json::Value;
 use slog::{debug, error, info, warn, Logger};
 use tokio::time::{self, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
@@ -57,7 +57,7 @@ use websocket::Ws;
 const DIR_ORGANIZATION: &str = "ReSpeak";
 const DIR_PROJECT: &str = "Qint";
 const SETTINGS_FILENAME: &str = "config.toml";
-const TRANSIENT_SETTINGS_FILENAME: &str = "transient.toml";
+const TRANSIENT_SETTINGS_FILENAME: &str = "transient.json";
 
 // The build environment of qint.
 git_testament::git_testament!(TESTAMENT);
@@ -104,10 +104,7 @@ pub struct Args {
 /// sidebar, which panes were last visible, the last entered, unsent text from the message field,
 /// etc. In general, settings that change often.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-struct TransientSettings {
-	#[serde(flatten, serialize_with = "toml::ser::tables_last")]
-	fields: Map<String, Value>,
-}
+struct TransientSettings(Value);
 
 /// The settings in this struct are saved to the main settings file.
 ///
@@ -306,39 +303,33 @@ impl Settings {
 impl TransientSettings {
 	fn load(&mut self, config_path: &Path) -> Result<()> {
 		let s = fs::read_to_string(&config_path.join(TRANSIENT_SETTINGS_FILENAME))?;
-		*self = toml::from_str(&s)?;
+		*self = serde_json::from_str(&s)?;
 		Ok(())
 	}
 
 	fn save(&self, config_path: &Path) -> Result<()> {
-		let data = toml::to_string(self)?;
+		let data = serde_json::to_string(self)?;
 		fs::write(&config_path.join(TRANSIENT_SETTINGS_FILENAME), data)?;
 		Ok(())
 	}
 
-	fn set(&mut self, k: String, v: Value) {
-		if let Value::Null = v {
-			self.fields.remove(&k);
-		} else if let Some(value) = self.fields.get_mut(&k) {
-			merge_json(value, &v);
-		} else {
-			let mut new_obj = Value::Object(Map::<_, _>::new());
-			merge_json(&mut new_obj, &v);
-			self.fields.insert(k, new_obj);
-		}
+	fn merge(&mut self, v: &Value) {
+		merge_json(&mut self.0, v);
 	}
 
 	fn get_global_volume(&self) -> Option<f32> {
-		self.fields
-			.get("audio")
+		self.0
+			.as_object()
+			.and_then(|a| a.get("audio"))
 			.and_then(Value::as_object)
 			.and_then(|a| a.get("globalVolume"))
 			.and_then(|v| v.as_f64().map(|f| f as f32))
 	}
 
 	fn get_loudness_threshold(&self) -> Option<f64> {
-		self.fields
-			.get("audio")
+		self.0
+			.as_object()
+			.and_then(|a| a.get("audio"))
 			.and_then(Value::as_object)
 			.and_then(|a| a.get("loudnessThreshold"))
 			.and_then(|v| v.as_f64())
@@ -694,44 +685,21 @@ async fn render_md_service(
 	}
 }
 
-fn get_transient_setting_internal(state: &State, req: &str) -> Option<Value> {
+#[get("/transient")]
+async fn get_transient_setting(state: web::Data<Arc<State>>) -> impl Responder {
 	let transient_values = state.transient_settings.read().unwrap();
-	if req == "*" {
-		Some(serde_json::to_value(&*transient_values).unwrap())
-	} else if let Some(value) = transient_values.fields.get(req) {
-		Some(value.clone())
-	} else {
-		None
-	}
+	HttpResponse::Ok().json(serde_json::to_value(&*transient_values).unwrap())
 }
 
-#[get("/transient/{key}")]
-async fn get_transient_setting(
-	state: web::Data<Arc<State>>, data: web::Path<String>,
-) -> impl Responder {
-	if let Some(res) = get_transient_setting_internal(&**state, data.as_str()) {
-		HttpResponse::Ok().json(res)
-	} else {
-		HttpResponse::NotFound().body("Unknown key")
-	}
-}
-
-#[put("/transient/{key}")]
+#[put("/transient")]
 async fn set_transient_setting(
-	state: web::Data<Arc<State>>, data: web::Path<String>, body: web::Json<Value>,
+	state: web::Data<Arc<State>>, body: web::Json<Value>,
 ) -> impl Responder {
-	let req = data.as_str();
 	let (r, res) = state.modify_transient_settings(|transient_values| {
-		if req == "*" {
-			if let Value::Object(obj) = body.0 {
-				for (k, v) in obj.into_iter() {
-					transient_values.set(k, v);
-				}
-			} else {
-				bail!("*-assign must be an object");
-			}
+		if body.is_object() {
+			transient_values.merge(&body.0);
 		} else {
-			transient_values.set(req.to_string(), body.0);
+			bail!("body must be an object");
 		}
 		Ok(())
 	});
@@ -798,15 +766,7 @@ fn merge_json(a: &mut Value, b: &Value) {
 				}
 			}
 		}
-		(a, b) => {
-			if b.is_object() {
-				let mut new_a = Value::Object(Map::<_, _>::new());
-				merge_json(&mut new_a, b);
-				*a = new_a;
-			} else {
-				*a = b.clone();
-			}
-		}
+		(a, b) => *a = b.clone(),
 	}
 }
 

@@ -16,7 +16,7 @@
 	import { Channel, Client, Server } from "../book";
 	import { get, writable } from "svelte/store";
 	import type { Readable, Writable } from "svelte/store";
-	import { arraysEqual, assert, SERVER_ICON } from "../util";
+	import { assert, SERVER_ICON } from "../util";
 	import type { ChatData } from "../bookBase";
 	import type { ChannelId } from "../ts";
 	import { pathJoin } from "../panel/fileUtil";

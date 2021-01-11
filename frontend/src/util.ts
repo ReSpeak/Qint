@@ -357,12 +357,40 @@ export function dbToFactor(volume: number): number {
  */
 export function soft_merge(obj: any, merge: any) {
 	for (const [key, value] of Object.entries(merge)) {
-		if (typeof merge[key] === "object") {
+		if (typeof value === "object" && typeof obj[key] === "object") {
 			soft_merge(obj[key], value);
 		} else {
 			obj[key] = value;
 		}
 	}
+}
+
+/**
+ * Returns an object with all properties in `to` that are not already equal in from.
+ * Properties in `from` that are not in `to` will be return `null`.
+ */
+export function soft_diff(from: any, to: any) {
+	if (from === undefined) return to;
+	if (to === undefined) return null;
+	if (typeof from !== typeof to) return to;
+	if (typeof to !== "object" || to === null) {
+		if (from === to)
+			return undefined;
+		return to;
+	}
+	let res: any = {};
+	// Check existing and new entries
+	for (const [key, value] of Object.entries(to)) {
+		res[key] = soft_diff(from[key], value);
+	}
+	// Check removed entries
+	for (const key of Object.keys(from)) {
+		if (!(key in to))
+			res[key] = null;
+	}
+	if (Object.keys(res).length === 0)
+		return undefined;
+	return res;
 }
 
 export function on(..._: any[]) { }

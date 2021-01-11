@@ -202,7 +202,7 @@
 				<span class="headLine">{$channel.name}</span>
 
 				<div style="flex: 1;" />
-				<span class="tag is-primary is-rounded">
+				<span class="tag is-rounded">
 					{#if $channel.isDefault}
 						<Icon name="home" title="Default channel" />
 					{:else}{$channel.channelType}{/if}
