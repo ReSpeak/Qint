@@ -47,7 +47,7 @@ export class CustomIntersectionObserver extends IntersectionObserver {
 	}
 	public observeNodes(nodes: ArrayLike<Element>) {
 		for (let i = 0; i < nodes.length; i++) {
-			super.observe(nodes[i]);
+			this.observe(nodes[i]);
 		}
 	}
 	public unobserve(node: Element) {

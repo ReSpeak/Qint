@@ -359,13 +359,12 @@
 				break;
 
 			case ListFetchDir.New:
-				elems = newElems;
+				if (loadAnchored === ListFetchDir.After) {
+					docked = true;
+				}
+				await modifyElems([...elems, ...newElems], false);
 				if (loadAnchored === ListFetchDir.Before) {
 					scrollToStart();
-				} else if (loadAnchored === ListFetchDir.After) {
-					//await tick();
-					//scrollToEnd();
-					docked = true;
 				}
 				break;
 
