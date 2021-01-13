@@ -124,7 +124,7 @@ export interface InResult {
 
 export interface Invoker {
 	name: string;
-	id: number; // TODO string ??
+	id: number;
 	uid: string | undefined;
 }
 

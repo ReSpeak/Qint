@@ -6,7 +6,7 @@ import { handleMessage } from "./notification";
 import { backend, IBackendConnection } from "./backend/backend";
 import { app } from "./app";
 import { ConnectData } from "./connect/connect";
-import { OChange, Reason, IMsgPluginCommandPart, TsError } from "./book_events";
+import { OChange, Reason, IMsgPluginCommandPart, TsError, IMsgServerLogPart, IMsgServerLog } from "./book_events";
 import moment from "moment";
 import { ChannelId, ClientId, TalkState } from "./ts";
 import { FileTreeCache } from "./fileTreeCache";
@@ -42,6 +42,7 @@ export class Connection {
 	public readonly loudness: Writable<number> = writable(0);
 	public readonly connectOptions: Writable<ConnectData>;
 	public pluginCmd = fnBroadcast<[IMsgPluginCommandPart]>();
+	public serverLogCmd = fnBroadcast<[IMsgServerLogPart[]]>();
 
 	/// List of last talking clients with a counter from LOUDNESS_HISTORY to 0 until they are not
 	/// updated anymore.
@@ -421,6 +422,8 @@ export class Connection {
 				this.fileTreeCache.update(ftc => ftc.applyFileList(message));
 			} else if ("PluginCommand" in message) {
 				message.PluginCommand.forEach((pc) => this.pluginCmd(pc));
+			} else if ("ServerLog" in message) {
+				this.serverLogCmd(message.ServerLog);
 			}
 		} else if ("TalkersChanged" in msg) {
 			this.book.talkersHandler(msg.TalkersChanged);

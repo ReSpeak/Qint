@@ -19,12 +19,14 @@
 	import UiChangeResult from "../ui/UiChangeResult.svelte";
 	import UiEmojiString from "../ui/UiEmojiString.svelte";
 	import { app } from "../app";
+	import ServerLog from "./ServerLog.svelte";
 
 	export let connection: Connection;
 	export let server: Server;
 
 	let developMode = app.transientSettings.ui._developMode;
 	let editing = false;
+	let logOpen = false;
 	$: create_date = $server.created !== undefined ? $server.created : moment.unix(0);
 
 	$: {
@@ -194,7 +196,7 @@
 					<button
 						class="toolbutton is-small"
 						style="float: right;"
-						on:click={() => (changeRequest = undefined)}>
+						on:click={() => changeRequest = undefined}>
 						<Icon name="close" />
 					</button>
 					<UiChangeResult result={changeResult} />
@@ -276,7 +278,7 @@
 				<div>{'?'} / {$server.maxClients}</div>
 				{#if $server.optionalData !== null && $server.optionalData.reservedSlots > 0}
 					<div style="margin-left:0.5em;">
-						(-{$server.optionalData.reservedSlots}
+						({$server.optionalData.reservedSlots}
 						reserved)
 					</div>
 				{/if}
@@ -342,6 +344,17 @@
 			</div>
 		</div>
 	{/if}
+	<StickySlot on:click={() => (logOpen = true)}>
+		<button class="button iconButton" on:click|stopPropagation={() => logOpen = !logOpen}>
+			<Icon name="chevron-right{logOpen ? ' mdi-rotate-90' : ''}" />
+		</button>
+		<span>Log</span>
+	</StickySlot>
+	{#if logOpen}
+		<div class="descGroup serverLog">
+			<ServerLog {connection} />
+		</div>
+	{/if}
 	<StickySlot>Actions</StickySlot>
 	<div class="descGroup">
 		<p class="buttons">
@@ -366,5 +379,9 @@
 		padding: 0 0.3em;
 		margin: 0 0.3em;
 		border-radius: 5px;
+	}
+
+	.serverLog > :global(.serverLog) {
+		max-height: calc(100vh - 15em);
 	}
 </style>
