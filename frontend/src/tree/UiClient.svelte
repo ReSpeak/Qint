@@ -33,6 +33,7 @@
 	$: isSelected = $client.isSelected;
 	$: chat = client.chat;
 	$: filterShow = applyFilter(filter, $client);
+	$: clientProperties = getClientProperties($client, channel !== undefined ? $channel : undefined);
 	let ownClient = client.id === connection.book.ownClientId;
 	let div: HTMLElement;
 	let loudnessDiagram: SimpleDiagram;
@@ -43,6 +44,35 @@
 		// Also depend on server groups
 		on($serverGroups);
 		sortedServerGroups = connection.book.sortServerGroupIds($client.serverGroups);
+	}
+
+	function getClientProperties(client: Client, channel: Channel | undefined): [string, string, string] | undefined {
+		const properties: [boolean, string, string, string][] = [
+			[client.awayMessage !== null, "sleep", "color: rgb(70,180,255)", client.awayMessage === "" ? "Away" : client.awayMessage ?? ""],
+			[!client.outputHardwareEnabled, "microphone-off", "color: red;", "Speaker disabled"],
+			[client.outputMuted, "volume-off", "color: red;", "Deaf"],
+			[channel !== undefined && channel.neededTalkPower !== null && client.talkPower < channel.neededTalkPower,
+				"microphone-off", "color: gray;", "Not enough talk power"],
+			[!client.inputHardwareEnabled, "microphone-off", "color: red;", "Microphone disabled"],
+			[client.inputMuted, "microphone-off", "color: red;", "Muted"],
+		];
+		let resEntry: [string, string] | undefined;
+		let resDescription = "";
+		for (const p of properties) {
+			if (p[0]) {
+				if (resEntry === undefined) {
+					resEntry = [p[1], p[2]];
+					resDescription = p[3];
+				} else {
+					resDescription += " | ";
+					resDescription += p[3];
+				}
+			}
+		}
+
+		if (resEntry === undefined)
+			return undefined;
+		return [resEntry[0], resEntry[1], resDescription];
 	}
 
 	function setChat() {
@@ -134,17 +164,8 @@
 				<FilterString filter={showId ? '' : thisFilter} content={$client.name} />
 			</span>
 			<span class="icons">
-				{#if $client.inputMuted}
-					<Icon name="microphone-off" style="color: red;" title="Muted" />
-				{/if}
-				{#if $client.outputMuted}
-					<Icon name="volume-off" style="color: red;" title="Deaf" />
-				{/if}
-				{#if $client.awayMessage !== null}
-					<Icon name="sleep" style="color: rgb(70,180,255);" title="Away" />
-				{/if}
-				{#if channel !== undefined && $channel.neededTalkPower !== null && $client.talkPower < $channel.neededTalkPower}
-					<Icon name="microphone-off" style="color: gray;" title="Not enough talk power" />
+				{#if clientProperties !== undefined}
+					<Icon name={clientProperties[0]} style={clientProperties[1]} title={clientProperties[2]} />
 				{/if}
 				{#each sortedServerGroups as grp (grp)}
 					<ServerGroupIcon id={grp} {connection} />
