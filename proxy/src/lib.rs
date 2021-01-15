@@ -534,10 +534,8 @@ async fn download_file(
 			);
 		}
 
-		// Cache icons and avatars for offline usage
-		if (cache && len < 5 * 1024 * 1024/*5MB*/)
-			|| (channel.0 == 0 && (path.starts_with("icon_") || path.starts_with("avatar_")))
-		{
+		// Cache for offline usage if smaller than 5 MiB
+		if cache && len < 5 * 1024 * 1024 {
 			let stream = state.file_cache.cache_file(&server, channel, &path, stream).await;
 			response.streaming(stream)
 		} else {

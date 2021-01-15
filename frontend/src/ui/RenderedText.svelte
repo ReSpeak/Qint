@@ -61,7 +61,8 @@
 			if (!src) continue;
 			const scheme = parseTsScheme(src);
 			if (scheme !== null) {
-				const proxyFileSrc = schemeToLink(connection, scheme);
+				// Cache images in text fields
+				const proxyFileSrc = schemeToLink(connection, scheme) + "?cache=true";
 				if (proxyFileSrc === null) {
 					img.parentElement?.removeChild(img);
 					continue;

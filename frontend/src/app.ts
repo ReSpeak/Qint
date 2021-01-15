@@ -103,6 +103,7 @@ export class App {
 			return cs;
 		});
 		this.showSidebar.set(true);
+		this.displayPanel.set(DisplayPanel.Main);
 		return con;
 	}
 

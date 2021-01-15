@@ -25,9 +25,9 @@ export function getClientIconPath(client: IconSourceLike | null | undefined, con
 
 	if (connection) {
 		if (client.avatarHash && client.avatarHash !== "" && client.uid)
-			return `${connection.backend.serverFileSrc}/file/0/avatar_${client.getAvatarUid!()}?hash=${client.avatarHash}`;
+			return `${connection.backend.serverFileSrc}/file/0/avatar_${client.getAvatarUid!()}?hash=${client.avatarHash}?cache=true`;
 		else if (client.icon && client.icon !== "0")
-			return `${connection.backend.serverFileSrc}/file/0/icon_${client.icon}`;
+			return `${connection.backend.serverFileSrc}/file/0/icon_${client.icon}?cache=true`;
 	} else if (server) {
 		if (client.avatarHash && client.avatarHash !== "" && client.uid)
 			return `${backend.cacheFileSrc}/${server}/0/avatar_${client.getAvatarUid!()}`;
@@ -47,7 +47,7 @@ export function getClientAvatarPath(client: IconSourceLike | null | undefined, c
 
 	if (connection) {
 		if (client.avatarHash !== "" && client.uid)
-			return `${connection.backend.serverFileSrc}/file/0/avatar_${client.getAvatarUid!()}?hash=${client.avatarHash}`;
+			return `${connection.backend.serverFileSrc}/file/0/avatar_${client.getAvatarUid!()}?hash=${client.avatarHash}?cache=true`;
 	} else if (server) {
 		if (client.avatarHash !== "" && client.uid)
 			return `${backend.cacheFileSrc}/${server}/0/avatar_${client.getAvatarUid!()}`;
@@ -71,7 +71,7 @@ export function getIconPath(source: IconSource, connection?: Connection, server?
 	else if (i === "600") return "alpha-v-circle-outline";
 
 	if (connection) {
-		return `${connection.backend.serverFileSrc}/file/0/icon_${i}`;
+		return `${connection.backend.serverFileSrc}/file/0/icon_${i}?cache=true`;
 	} else if (server) {
 		return `${backend.cacheFileSrc}/${server}/0/icon_${i}`;
 	}
