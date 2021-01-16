@@ -28,7 +28,7 @@ git-testament = "0.1"
 juniper = "0.15"
 libsqlite3-sys = { version = "0.18", features = [ "bundled" ] }
 livesplit-hotkey = "0.5"
-meilisearch-core = { git = "https://github.com/meilisearch/MeiliSearch", version = "0.17.0" }
+meilisearch-core = { git = "https://github.com/meilisearch/MeiliSearch", rev = "ff38220b6821e7bf394f8e807f410a8a701414c9", version = "0.18" }
 nnnoiseless = "0.3"
 nom = "6"
 open = "1"
