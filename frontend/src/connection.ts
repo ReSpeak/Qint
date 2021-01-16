@@ -437,7 +437,8 @@ export class Connection {
 			}
 		} else if ("Error" in msg) {
 			log("Con Error: %o", msg.Error);
-			this.close();
+			this.backend.close();
+			this._state.update(s => s.setError(msg.Error));
 		} else if ("Loudnesses" in msg) {
 			this.applyLoudnesses(msg.Loudnesses);
 		} else if ("Result" in msg) {

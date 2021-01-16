@@ -243,7 +243,7 @@ impl Ws {
 					if let TsEvent::PropertyAdded { id: events::PropertyId::Server, .. } = e {
 						// Connected
 						if let Some(return_code) =
-							self.connect_options.as_ref().and_then(|o| o.return_code.clone())
+							self.connect_options.as_mut().and_then(|o| o.return_code.take())
 						{
 							self.send_message(
 								&MessageP2F::Result(ResultStruct {
@@ -1311,7 +1311,7 @@ impl ActorFuture for ConnectionPoller {
 
 					// Send to frontend
 					if let Some(return_code) =
-						actor.connect_options.as_ref().and_then(|o| o.return_code.clone())
+						actor.connect_options.as_mut().and_then(|o| o.return_code.take())
 					{
 						let mut ts_result = None;
 						let mut description = None;
@@ -1332,6 +1332,8 @@ impl ActorFuture for ConnectionPoller {
 							}),
 							ctx,
 						);
+					} else {
+						actor.send_message(&MessageP2F::Error(e.to_string()), ctx);
 					}
 					break Poll::Ready(());
 				}
