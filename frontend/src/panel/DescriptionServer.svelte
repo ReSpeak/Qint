@@ -19,7 +19,7 @@
 	import UiChangeResult from "../ui/UiChangeResult.svelte";
 	import UiEmojiString from "../ui/UiEmojiString.svelte";
 	import { app } from "../app";
-	import ServerLog from "./ServerLog.svelte";
+	import UiServerLog from "./UiServerLog.svelte";
 
 	export let connection: Connection;
 	export let server: Server;
@@ -352,7 +352,7 @@
 	</StickySlot>
 	{#if logOpen}
 		<div class="descGroup serverLog">
-			<ServerLog {connection} />
+			<UiServerLog {connection} />
 		</div>
 	{/if}
 	<StickySlot>Actions</StickySlot>

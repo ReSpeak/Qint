@@ -1383,7 +1383,7 @@ dependencies = [
 [[package]]
 name = "eax"
 version = "0.3.0"
-source = "git+https://github.com/RustCrypto/AEADs#0d928ca0c6cecfc00d9596859ab60fe802513e99"
+source = "git+https://github.com/RustCrypto/AEADs?rev=9a6dc685ae4f4f23c628cedab46480baf5ed475d#9a6dc685ae4f4f23c628cedab46480baf5ed475d"
 dependencies = [
  "aead",
  "cipher",
