@@ -1,4 +1,4 @@
-import { soft_diff, soft_merge } from "./util";
+import { deep_diff, deep_merge } from "./util";
 import { backend } from "./backend/backend";
 import { NodeSelection } from "./app";
 import { get, writable } from "svelte/store";
@@ -24,7 +24,7 @@ export class TransientSettings {
 			const resp = await backend.fetch(`/transient`);
 			const data = await resp.json();
 			this._lastSave = data;
-			soft_merge(this, data);
+			deep_merge(this, data);
 		} catch (e) {
 			console.error("Failed to load transient settings", e);
 		}
@@ -45,7 +45,7 @@ export class TransientSettings {
 
 		let newSave = JSON.parse(JSON.stringify(this, (k, v) => k.startsWith('_') ? undefined : v));
 		// Diff to last save
-		let diff = soft_diff(this._lastSave, newSave);
+		let diff = deep_diff(this._lastSave, newSave);
 
 		this._lastSave = newSave;
 

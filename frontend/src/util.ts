@@ -355,10 +355,10 @@ export function dbToFactor(volume: number): number {
  * Works similar to Object.assign except that it doesn't overwrite existing
  * object structures. But instead merges them recursively
  */
-export function soft_merge(obj: any, merge: any) {
+export function deep_merge(obj: any, merge: any): void {
 	for (const [key, value] of Object.entries(merge)) {
 		if (typeof value === "object" && typeof obj[key] === "object") {
-			soft_merge(obj[key], value);
+			deep_merge(obj[key], value);
 		} else {
 			obj[key] = value;
 		}
@@ -367,11 +367,14 @@ export function soft_merge(obj: any, merge: any) {
 
 /**
  * Returns an object with all properties in `to` that are not already equal in from.
- * Properties in `from` that are not in `to` will be return `null`.
+ * Properties in `from` that are not in `to` will be returned as `null`.
+ * Returns `undefined` when both objects are identical.
+ * Returns `null` if the value was deleted.
+ * Returns the diff object otherwise.
  */
-export function soft_diff(from: any, to: any) {
-	if (from === undefined) return to;
-	if (to === undefined) return null;
+export function deep_diff(from: any, to: any): object | null | undefined {
+	if (from == null) return to;
+	if (to == null) return null;
 	if (typeof from !== typeof to) return to;
 	if (typeof to !== "object" || to === null) {
 		if (from === to)
@@ -381,7 +384,7 @@ export function soft_diff(from: any, to: any) {
 	let res: any = {};
 	// Check existing and new entries
 	for (const [key, value] of Object.entries(to)) {
-		res[key] = soft_diff(from[key], value);
+		res[key] = deep_diff(from[key], value);
 	}
 	// Check removed entries
 	for (const key of Object.keys(from)) {
