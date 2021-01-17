@@ -283,7 +283,7 @@ impl Ws {
 
 								// Save in database
 								let opts = self.connect_options.as_ref().unwrap();
-								let id = self.state.settings.read().unwrap().default_identity;
+								let id = self.state.launch_config.read().unwrap().default_identity;
 								connected_msg = Some(db::ConnectedMsg {
 									bookmark: opts.bookmark.map(|i| i as i64),
 									username: opts.name.clone(),
@@ -600,7 +600,7 @@ impl Ws {
 	fn handle_ws_message(&mut self, msg: MessageF2P, ctx: &mut <Self as Actor>::Context) {
 		match msg {
 			MessageF2P::Connect(o) => {
-				let id = self.state.settings.read().unwrap().default_identity;
+				let id = self.state.launch_config.read().unwrap().default_identity;
 				ctx.spawn(
 					wrap_future(
 						self.state
@@ -614,14 +614,14 @@ impl Ws {
 					)
 					.map(move |res, actor: &mut Self, ctx| {
 						res.and_then(|(id, server)| {
-							let settings = actor.state.settings.read().unwrap();
+							let launch_config = actor.state.launch_config.read().unwrap();
 							let mut options = tsclientlib::Connection::build(o.address.clone())
 								.name(o.name.clone())
 								.identity(id)
 								.logger(actor.logger.clone())
-								.log_commands(o.log_commands || settings.verbosity > 0)
-								.log_packets(o.log_packets || settings.verbosity > 1)
-								.log_udp_packets(o.log_udp_packets || settings.verbosity > 2)
+								.log_commands(o.log_commands || launch_config.verbosity > 0)
+								.log_packets(o.log_packets || launch_config.verbosity > 1)
+								.log_udp_packets(o.log_udp_packets || launch_config.verbosity > 2)
 								.input_muted(o.input_muted.unwrap_or_default())
 								.output_muted(o.output_muted.unwrap_or_default());
 

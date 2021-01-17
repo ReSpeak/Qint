@@ -57,8 +57,9 @@ use websocket::Ws;
 
 const DIR_ORGANIZATION: &str = "ReSpeak";
 const DIR_PROJECT: &str = "Qint";
-const SETTINGS_FILENAME: &str = "config.toml";
-const TRANSIENT_SETTINGS_FILENAME: &str = "transient.json";
+const LAUNCH_CONFIG_FILENAME: &str = "config.toml";
+// TODO Rename to settings settings.json
+const SETTINGS_FILENAME: &str = "transient.json";
 
 // The build environment of qint.
 git_testament::git_testament!(TESTAMENT);
@@ -99,14 +100,13 @@ pub struct Args {
 	pub verbosity: u8,
 }
 
-/// The settings in this struct are saved to the transient settings file.
+/// The settings in this struct are saved to the settings file.
 ///
 /// Settings in this struct are meant to be save the little convenient things like size of the
 /// sidebar, which panes were last visible, the last entered, unsent text from the message field,
 /// etc. In general, settings that change often.
-// TODO Rename to settings
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-struct TransientSettings(Value);
+struct Settings(Value);
 
 /// The settings in this struct are saved to the main settings file.
 ///
@@ -114,8 +114,7 @@ struct TransientSettings(Value);
 /// this settings file read-only.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-// TODO Rename to launch config
-struct Settings {
+struct LaunchConfig {
 	#[serde(default = "default_listen_address")]
 	listen_address: SocketAddr,
 	#[serde(skip)]
@@ -146,8 +145,8 @@ pub struct State {
 	connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
 	audio_data: Option<audio::AudioData>,
 	shortcuts: shortcut::Shortcuts,
+	launch_config: RwLock<LaunchConfig>,
 	settings: RwLock<Settings>,
-	transient_settings: RwLock<TransientSettings>,
 	database: Addr<db::DbHandler>,
 	graphql_schema: Arc<db::graphql::Schema>,
 	file_cache: Arc<FileCache>,
@@ -191,21 +190,19 @@ fn default_cache_path() -> PathBuf {
 impl juniper::Context for State {}
 
 impl State {
-	fn modify_transient_settings<R, T: FnOnce(&mut TransientSettings) -> R>(
-		&self, f: T,
-	) -> (R, Result<()>) {
-		let mut settings = self.transient_settings.write().unwrap();
+	fn modify_settings<R, T: FnOnce(&mut Settings) -> R>(&self, f: T) -> (R, Result<()>) {
+		let mut settings = self.settings.write().unwrap();
 		// Reload before changing to prevent overwriting changes from other processes
-		if let Err(e) = settings.load(&self.settings.read().unwrap().config_path) {
-			warn!(self.logger, "Failed to reload transient settings"; "error" => %e);
+		if let Err(e) = settings.load(&self.launch_config.read().unwrap().config_path) {
+			warn!(self.logger, "Failed to reload settings"; "error" => %e);
 		}
 		let old_loudness_threshold = settings.get_loudness_threshold();
 		let old_global_volume = settings.get_global_volume();
 
 		let r = f(&mut *settings);
-		let res = settings.save(&self.settings.read().unwrap().config_path);
+		let res = settings.save(&self.launch_config.read().unwrap().config_path);
 		if let Err(e) = &res {
-			error!(self.logger, "Failed to save transient settings"; "error" => %e);
+			error!(self.logger, "Failed to save settings"; "error" => %e);
 		}
 
 		// Apply audio changes
@@ -254,7 +251,7 @@ impl Tristate {
 	}
 }
 
-impl Default for Settings {
+impl Default for LaunchConfig {
 	fn default() -> Self {
 		Self {
 			listen_address: default_listen_address(),
@@ -269,24 +266,24 @@ impl Default for Settings {
 	}
 }
 
-impl Settings {
+impl LaunchConfig {
 	fn load(&mut self, config_path: &Path) -> Result<()> {
-		let s = fs::read_to_string(&config_path.join(SETTINGS_FILENAME))?;
+		let s = fs::read_to_string(&config_path.join(LAUNCH_CONFIG_FILENAME))?;
 		*self = toml::from_str(&s)?;
 		Ok(())
 	}
 }
 
-impl TransientSettings {
+impl Settings {
 	fn load(&mut self, config_path: &Path) -> Result<()> {
-		let s = fs::read_to_string(&config_path.join(TRANSIENT_SETTINGS_FILENAME))?;
+		let s = fs::read_to_string(&config_path.join(SETTINGS_FILENAME))?;
 		*self = serde_json::from_str(&s)?;
 		Ok(())
 	}
 
 	fn save(&self, config_path: &Path) -> Result<()> {
 		let data = serde_json::to_string(self)?;
-		fs::write(&config_path.join(TRANSIENT_SETTINGS_FILENAME), data)?;
+		fs::write(&config_path.join(SETTINGS_FILENAME), data)?;
 		Ok(())
 	}
 
@@ -304,9 +301,9 @@ impl TransientSettings {
 		Ok(shortcut::ShortcutConfig::deserialize(
 			self.0
 				.as_object()
-				.ok_or_else(|| format_err!("TransientSettings root is no object"))?
+				.ok_or_else(|| format_err!("Settings root is no object"))?
 				.get("shortcuts")
-				.ok_or_else(|| format_err!("shortcuts not found in transient settings"))?
+				.ok_or_else(|| format_err!("shortcuts not found in settings"))?
 				.clone()
 				.into_deserializer(),
 		)?)
@@ -402,7 +399,7 @@ async fn audio_reset(state: web::Data<Arc<State>>) -> impl Responder {
 }
 
 fn list_plugins_intern(state: &State) -> Vec<String> {
-	let path = &state.settings.read().unwrap().plugin_path;
+	let path = &state.launch_config.read().unwrap().plugin_path;
 	let mut res = Vec::new();
 	let dir = match path.read_dir() {
 		Ok(r) => r,
@@ -426,7 +423,7 @@ async fn list_plugins(state: web::Data<Arc<State>>) -> impl Responder {
 
 #[get("/plugins/{name}")]
 async fn get_plugin(state: web::Data<Arc<State>>, name: web::Path<String>) -> impl Responder {
-	let path = state.settings.read().unwrap().plugin_path.join(&*name);
+	let path = state.launch_config.read().unwrap().plugin_path.join(&*name);
 	fs::read_to_string(path)
 		.with_header(http::header::CONTENT_TYPE, "application/javascript; charset=utf-8")
 }
@@ -660,19 +657,20 @@ async fn render_md_service(
 	}
 }
 
+// TODO Rename endpoint
 #[get("/transient")]
-async fn get_transient_setting(state: web::Data<Arc<State>>) -> impl Responder {
-	let transient_values = state.transient_settings.read().unwrap();
-	HttpResponse::Ok().json(serde_json::to_value(&*transient_values).unwrap())
+async fn get_setting(state: web::Data<Arc<State>>) -> impl Responder {
+	let values = state.settings.read().unwrap();
+	HttpResponse::Ok().json(serde_json::to_value(&*values).unwrap())
 }
 
 #[put("/transient")]
-async fn set_transient_setting(
+async fn set_setting(
 	state: web::Data<Arc<State>>, body: web::Json<Value>,
 ) -> impl Responder {
-	let (r, res) = state.modify_transient_settings(|transient_values| {
+	let (r, res) = state.modify_settings(|values| {
 		if body.is_object() {
-			transient_values.merge(&body.0);
+			values.merge(&body.0);
 		} else {
 			bail!("body must be an object");
 		}
@@ -727,17 +725,17 @@ impl App {
 		};
 
 		// Load settings
-		let mut settings = Settings::default();
-		if let Err(e) = settings.load(&config_path) {
-			debug!(logger, "Failed to read settings, using defaults"; "error" => %e);
+		let mut launch_config = LaunchConfig::default();
+		if let Err(e) = launch_config.load(&config_path) {
+			debug!(logger, "Failed to read launch config, using defaults"; "error" => %e);
 			// Create settings directory
 			fs::create_dir_all(&config_path)?;
 		}
 
-		let transient_settings = {
-			let mut set = TransientSettings::default();
+		let settings = {
+			let mut set = Settings::default();
 			if let Err(e) = set.load(&config_path) {
-				info!(logger, "Failed to read transient settings, using defaults"; "error" => %e);
+				info!(logger, "Failed to read settings, using defaults"; "error" => %e);
 			}
 			set
 		};
@@ -758,36 +756,36 @@ impl App {
 			}
 		};
 
-		settings.config_path = config_path;
+		launch_config.config_path = config_path;
 		// Override settings with args
 		if let Some(a) = args.cache_path {
-			settings.cache_path = a;
+			launch_config.cache_path = a;
 		}
 		if let Some(a) = args.plugin_path {
-			settings.plugin_path = a.into();
+			launch_config.plugin_path = a.into();
 		}
 		if let Some(a) = args.listen_address {
-			settings.listen_address = a;
+			launch_config.listen_address = a;
 		}
 		if let Some(a) = args.default_identity {
-			settings.default_identity = a;
+			launch_config.default_identity = a;
 		}
 		if args.no_audio {
-			settings.no_audio = true;
+			launch_config.no_audio = true;
 		}
-		if args.verbosity > settings.verbosity {
-			settings.verbosity = args.verbosity;
-		}
-
-		if settings.plugin_path.to_str() == Some("") {
-			settings.plugin_path = settings.config_path.join("plugins");
+		if args.verbosity > launch_config.verbosity {
+			launch_config.verbosity = args.verbosity;
 		}
 
-		let file_cache = Arc::new(FileCache::new(logger.clone(), settings.cache_path.clone()));
+		if launch_config.plugin_path.to_str() == Some("") {
+			launch_config.plugin_path = launch_config.config_path.join("plugins");
+		}
+
+		let file_cache = Arc::new(FileCache::new(logger.clone(), launch_config.cache_path.clone()));
 
 		// Open search database
 		let (search, search_is_new) =
-			search::Search::new(logger.clone(), &settings.cache_path.join("search.db"))?;
+			search::Search::new(logger.clone(), &launch_config.cache_path.join("search.db"))?;
 		let search = Arc::new(search);
 
 		// Open database
@@ -795,7 +793,7 @@ impl App {
 			logger.clone(),
 			file_cache.clone(),
 			search.clone(),
-			&settings,
+			&launch_config,
 			secret.clone(),
 		)?
 		.start();
@@ -803,16 +801,16 @@ impl App {
 		let connections = Arc::new(Mutex::new(HashMap::new()));
 
 		// Start sound
-		let audio_data = if settings.no_audio {
+		let audio_data = if launch_config.no_audio {
 			None
 		} else {
 			Some(audio::start(
 				logger.clone(),
 				connections.clone(),
-				transient_settings.get_global_volume().unwrap_or(1.0),
+				settings.get_global_volume().unwrap_or(1.0),
 			)?)
 		};
-		let shortcut_config = match transient_settings.get_shortcut_config() {
+		let shortcut_config = match settings.get_shortcut_config() {
 			Ok(r) => r,
 			Err(e) => {
 				debug!(logger, "Failed to read shortcut config, ignoring"; "error" => %e);
@@ -821,7 +819,7 @@ impl App {
 		};
 		let shortcuts = shortcut::Shortcuts::new(shortcut_config)?;
 
-		if let Some(threshold) = transient_settings.get_loudness_threshold() {
+		if let Some(threshold) = settings.get_loudness_threshold() {
 			let logger = logger.clone();
 			if let Some(ad) = &audio_data {
 				actix::spawn(
@@ -836,7 +834,7 @@ impl App {
 			}
 		}
 
-		if let Some(volume) = transient_settings.get_global_volume() {
+		if let Some(volume) = settings.get_global_volume() {
 			let logger = logger.clone();
 			if let Some(ad) = &audio_data {
 				actix::spawn(ad.ts2a.send(audio::ts_to_audio::SetGlobalVolumeMsg(volume)).map(
@@ -850,15 +848,15 @@ impl App {
 		}
 
 		let graphql_schema = db::graphql::create_schema();
-		let link_previewer = LinkPreviewer::new(logger.clone(), settings.cache_path.clone());
+		let link_previewer = LinkPreviewer::new(logger.clone(), launch_config.cache_path.clone());
 
 		let state = Arc::new(State {
 			logger,
 			connections,
 			audio_data,
 			shortcuts,
+			launch_config: RwLock::new(launch_config),
 			settings: RwLock::new(settings),
-			transient_settings: RwLock::new(transient_settings),
 			database,
 			graphql_schema,
 			file_cache,
@@ -903,8 +901,8 @@ impl App {
 				.service(download_file)
 				.service(upload_file)
 				.service(download_cache_file)
-				.service(get_transient_setting)
-				.service(set_transient_setting)
+				.service(get_setting)
+				.service(set_setting)
 				.service(get_link_preview)
 				.service(loudness_service)
 				.service(render_md_service)
@@ -954,7 +952,7 @@ impl App {
 	}
 
 	pub fn get_listen_address(&self) -> SocketAddr {
-		let settings = self.0.settings.read().unwrap();
+		let settings = self.0.launch_config.read().unwrap();
 		settings.listen_address
 	}
 }

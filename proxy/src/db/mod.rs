@@ -21,7 +21,7 @@ use tsproto_types::crypto::EccKeyPubP256;
 use crate::filecache::FileCache;
 use crate::search::Search;
 use crate::secret::Secret;
-use crate::{Settings, State};
+use crate::{LaunchConfig, State};
 use models::MessageStatus;
 
 pub(crate) mod graphql;
@@ -156,14 +156,14 @@ impl Message for RunMsg {
 
 impl DbHandler {
 	pub(crate) fn new(
-		logger: Logger, file_cache: Arc<FileCache>, search: Arc<Search>, settings: &Settings,
-		secret: Secret,
+		logger: Logger, file_cache: Arc<FileCache>, search: Arc<Search>,
+		launch_config: &LaunchConfig, secret: Secret,
 	) -> Result<Self> {
-		let database_url = settings.config_path.join("storage.sqlite");
+		let database_url = launch_config.config_path.join("storage.sqlite");
 		let con = SqliteConnection::establish(database_url.to_str().unwrap())?;
 
 		// The database can be opened successfully, create backup
-		fs::copy(database_url, settings.config_path.join("storage.sqlite.bak"))?;
+		fs::copy(database_url, launch_config.config_path.join("storage.sqlite.bak"))?;
 
 		// Enforce foreign keys constraints
 		// Enable wal mode for more concurrency and faster writes
