@@ -20,11 +20,12 @@ use actix_web::{
 };
 use actix_web::{middleware::Condition, web::Bytes};
 use actix_web_actors::ws;
-use anyhow::{bail, Result};
+use anyhow::{bail, format_err, Result};
 use futures::prelude::*;
 use futures::stream::Peekable;
 use http::{header::CACHE_CONTROL, header::ETAG, HeaderValue};
 use messages::ResultDetails;
+use serde::de::IntoDeserializer;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use slog::{debug, error, info, warn, Logger};
@@ -103,6 +104,7 @@ pub struct Args {
 /// Settings in this struct are meant to be save the little convenient things like size of the
 /// sidebar, which panes were last visible, the last entered, unsent text from the message field,
 /// etc. In general, settings that change often.
+// TODO Rename to settings
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct TransientSettings(Value);
 
@@ -112,6 +114,7 @@ struct TransientSettings(Value);
 /// this settings file read-only.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+// TODO Rename to launch config
 struct Settings {
 	#[serde(default = "default_listen_address")]
 	listen_address: SocketAddr,
@@ -135,8 +138,6 @@ struct Settings {
 	/// 3. Print udp packets
 	#[serde(default)]
 	verbosity: u8,
-
-	shortcuts: shortcut::ShortcutConfig,
 }
 
 pub struct State {
@@ -241,23 +242,6 @@ impl State {
 
 		(r, res)
 	}
-
-	fn modify_settings<R, T: FnOnce(&mut Settings) -> R>(&self, f: T) -> (R, Result<()>) {
-		let mut settings = self.settings.write().unwrap();
-		// Reload before changing to prevent overwriting changes from other processes
-		let config_path = settings.config_path.clone();
-		if let Err(e) = settings.load(&config_path) {
-			warn!(self.logger, "Failed to reload settings"; "error" => %e);
-		}
-
-		let r = f(&mut *settings);
-		let res = settings.save(&config_path);
-		if let Err(e) = &res {
-			error!(self.logger, "Failed to save settings"; "error" => %e);
-		}
-
-		(r, res)
-	}
 }
 
 impl Tristate {
@@ -281,7 +265,6 @@ impl Default for Settings {
 			no_audio: Default::default(),
 			no_open: Default::default(),
 			verbosity: Default::default(),
-			shortcuts: Default::default(),
 		}
 	}
 }
@@ -290,12 +273,6 @@ impl Settings {
 	fn load(&mut self, config_path: &Path) -> Result<()> {
 		let s = fs::read_to_string(&config_path.join(SETTINGS_FILENAME))?;
 		*self = toml::from_str(&s)?;
-		Ok(())
-	}
-
-	fn save(&self, config_path: &Path) -> Result<()> {
-		let data = toml::to_string(self)?;
-		fs::write(&config_path.join(SETTINGS_FILENAME), data)?;
 		Ok(())
 	}
 }
@@ -313,26 +290,26 @@ impl TransientSettings {
 		Ok(())
 	}
 
-	fn merge(&mut self, v: &Value) {
-		merge_json(&mut self.0, v);
-	}
+	fn merge(&mut self, v: &Value) { merge_json(&mut self.0, v); }
 
 	fn get_global_volume(&self) -> Option<f32> {
-		self.0
-			.as_object()
-			.and_then(|a| a.get("audio"))
-			.and_then(Value::as_object)
-			.and_then(|a| a.get("globalVolume"))
-			.and_then(|v| v.as_f64().map(|f| f as f32))
+		Some(self.0.as_object()?.get("audio")?.as_object()?.get("globalVolume")?.as_f64()? as f32)
 	}
 
 	fn get_loudness_threshold(&self) -> Option<f64> {
-		self.0
-			.as_object()
-			.and_then(|a| a.get("audio"))
-			.and_then(Value::as_object)
-			.and_then(|a| a.get("loudnessThreshold"))
-			.and_then(|v| v.as_f64())
+		self.0.as_object()?.get("audio")?.as_object()?.get("loudnessThreshold")?.as_f64()
+	}
+
+	fn get_shortcut_config(&self) -> Result<shortcut::ShortcutConfig> {
+		Ok(shortcut::ShortcutConfig::deserialize(
+			self.0
+				.as_object()
+				.ok_or_else(|| format_err!("TransientSettings root is no object"))?
+				.get("shortcuts")
+				.ok_or_else(|| format_err!("shortcuts not found in transient settings"))?
+				.clone()
+				.into_deserializer(),
+		)?)
 	}
 }
 
@@ -711,48 +688,6 @@ async fn set_transient_setting(
 	}
 }
 
-#[get("/hotkey")]
-async fn get_hotkeys(state: web::Data<Arc<State>>) -> impl Responder {
-	let settings = state.settings.read().unwrap();
-	HttpResponse::Ok().json2(&settings.shortcuts)
-}
-
-#[put("/hotkey")]
-async fn set_hotkey(
-	state: web::Data<Arc<State>>, shortcut: web::Json<shortcut::Shortcut>,
-) -> impl Responder {
-	let (r, res) = state.modify_settings(|settings| {
-		if settings.shortcuts.actions.contains(&shortcut.0) {
-			bail!("The same shortcut already exists");
-		}
-		settings.shortcuts.actions.push(shortcut.0);
-		Ok(())
-	});
-
-	if let Err(e) = r {
-		HttpResponse::BadRequest().body(e.to_string())
-	} else if let Err(e) = res {
-		HttpResponse::InternalServerError().body(e.to_string())
-	} else {
-		HttpResponse::Ok().finish()
-	}
-}
-
-#[delete("/hotkey")]
-async fn delete_hotkey(
-	state: web::Data<Arc<State>>, shortcut: web::Json<shortcut::Shortcut>,
-) -> impl Responder {
-	let (_, res) = state.modify_settings(|settings| {
-		settings.shortcuts.actions.retain(|s| *s != shortcut.0);
-	});
-
-	if let Err(e) = res {
-		HttpResponse::InternalServerError().body(e.to_string())
-	} else {
-		HttpResponse::Ok().finish()
-	}
-}
-
 fn merge_json(a: &mut Value, b: &Value) {
 	match (a, b) {
 		(&mut Value::Object(ref mut a), &Value::Object(ref b)) => {
@@ -794,7 +729,7 @@ impl App {
 		// Load settings
 		let mut settings = Settings::default();
 		if let Err(e) = settings.load(&config_path) {
-			info!(logger, "Failed to read settings, using defaults"; "error" => %e);
+			debug!(logger, "Failed to read settings, using defaults"; "error" => %e);
 			// Create settings directory
 			fs::create_dir_all(&config_path)?;
 		}
@@ -877,7 +812,13 @@ impl App {
 				transient_settings.get_global_volume().unwrap_or(1.0),
 			)?)
 		};
-		let shortcut_config = settings.shortcuts.clone();
+		let shortcut_config = match transient_settings.get_shortcut_config() {
+			Ok(r) => r,
+			Err(e) => {
+				debug!(logger, "Failed to read shortcut config, ignoring"; "error" => %e);
+				shortcut::ShortcutConfig::default()
+			}
+		};
 		let shortcuts = shortcut::Shortcuts::new(shortcut_config)?;
 
 		if let Some(threshold) = transient_settings.get_loudness_threshold() {
@@ -945,6 +886,13 @@ impl App {
 		HttpServer::new(move || {
 			let state = state2.clone();
 			actix_web::App::new()
+				//.wrap(middleware::Logger::default())
+				// Return error messages
+				.app_data(web::JsonConfig::default().error_handler(|err, _| {
+					let err_string = err.to_string();
+					error::InternalError::from_response(
+						err, HttpResponse::BadRequest().body(err_string)).into()
+				}))
 				.wrap(Condition::new(!is_production, Cors::permissive().max_age(3600)))
 				.data(state)
 				.service(create_ws)
@@ -957,9 +905,6 @@ impl App {
 				.service(download_cache_file)
 				.service(get_transient_setting)
 				.service(set_transient_setting)
-				.service(get_hotkeys)
-				.service(set_hotkey)
-				.service(delete_hotkey)
 				.service(get_link_preview)
 				.service(loudness_service)
 				.service(render_md_service)

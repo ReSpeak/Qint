@@ -1,7 +1,7 @@
+import { get, writable } from "svelte/store";
 import { deep_diff, deep_merge } from "./util";
 import { backend } from "./backend/backend";
 import { NodeSelection } from "./app";
-import { get, writable } from "svelte/store";
 
 export const enum DescriptionMode {
 	None = "None",
@@ -18,6 +18,7 @@ export class TransientSettings {
 	public chat = new TransientSettingsChat(this);
 	public app = new TransientSettingsApp();
 	public audio = new TransientSettingsAudio();
+	public shortcuts = new TransientSettingsShortcuts(this);
 
 	public async loadAsync() {
 		try {
@@ -177,4 +178,58 @@ export class TransientSettingsApp {
 export class TransientSettingsAudio {
 	public globalVolume: number = 1.0;
 	public loudnessThreshold: number | null = null;
+}
+
+export const enum Tristate {
+	True = "True",
+	False = "False",
+	Toggle = "Toggle",
+}
+
+export type ShortcutAction = { Away: Tristate }
+			| { InputMute: Tristate }
+			| { OutputMute: Tristate };
+
+export interface Shortcut {
+	keycode: string;
+	action: ShortcutAction;
+}
+
+export class TransientSettingsShortcuts {
+	private _parent: TransientSettings;
+	public actions: Shortcut[] = [];
+
+	constructor(parent: TransientSettings) {
+		this._parent = parent;
+	}
+
+	public addShortcut(shortcut: Shortcut) {
+		if (!shortcut.action || !shortcut.keycode) {
+			console.log(`Not saving incomplete shortcut: ${JSON.stringify(shortcut)}`);
+			return;
+		}
+		this.actions.push(shortcut);
+		this._parent.save();
+	}
+
+	private static actionEquals(a: ShortcutAction, b: ShortcutAction): boolean {
+		if ("Away" in a && "Away" in b)
+			return a.Away === b.Away;
+		if ("InputMute" in a && "InputMute" in b)
+			return a.InputMute === b.InputMute;
+		if ("OutputMute" in a && "OutputMute" in b)
+			return a.OutputMute === b.OutputMute;
+		return false;
+	}
+
+	public deleteShortcut(shortcut: Shortcut) {
+		for (let i = 0; i < this.actions.length; i++) {
+			const s = this.actions[i];
+			if (s.keycode === shortcut.keycode && TransientSettingsShortcuts.actionEquals(s.action, shortcut.action)) {
+				this.actions.splice(i, 1);
+				this._parent.save();
+				break;
+			}
+		}
+	}
 }

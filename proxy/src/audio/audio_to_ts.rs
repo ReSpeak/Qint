@@ -30,7 +30,7 @@ pub(crate) struct SetLoudnessThresholdMsg(pub f64);
 pub(crate) struct ResetMsg;
 
 /// Threshold for voice activation detection.
-const VAD_THRESHOLD: f32 = 0.2;
+const VAD_THRESHOLD: f32 = 0.3;
 /// The default minimum loudness for voice activation detection.
 const DEFAULT_LOUDNESS_THRESHOLD: f64 = -50.0;
 

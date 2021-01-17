@@ -10,11 +10,14 @@
 	import SimpleDiagram from "../ui/UiSimpleDiagram.svelte";
 	import BSlider from "../ui/BSlider.svelte";
 	import { dbToFactor, factorToDb, LOUDNESS_END_MAGIC, LOUDNESS_MAX, LOUDNESS_MIN, LOUDNESS_UPDATE_MS, MIN_VOLUME_DB } from "../util";
+	import { hotkeyToShortcut, shortcutToHotkey } from "../hotkey";
 	import type { Hotkey } from "../hotkey";
 	import Icon from "../ui/Icon.svelte";
 	import { backend } from "../backend/backend";
 
-	const hotkeyActions = app.hotkeySettings.actions;
+	const shortcuts = app.transientSettings.shortcuts;
+	const hotkeyActions = shortcuts.actions;
+	let incompleteHotkey: Hotkey | undefined;
 
 	let tablistIndex: Writable<number>;
 	const audioSett = app.transientSettings.audio;
@@ -57,7 +60,6 @@
 	}
 
 	// Reload settings
-	app.hotkeySettings.loadAsync();
 	app.transientSettings.loadAsync().then(() => {
 		globalVolume = factorToDb(audioSett.globalVolume);
 		loudnessThreshold = audioSett.loudnessThreshold ?? loudnessThreshold;
@@ -77,33 +79,32 @@
 	}
 
 	async function createHotkey() {
-		app.hotkeySettings.actions.update(actions => {
-			actions.push({
+		if (incompleteHotkey === undefined) {
+			incompleteHotkey = {
 				keycode: null,
 				ctrl: false,
 				shift: false,
 				alt: false,
 				meta: false,
 				action: null,
-			});
-			return actions;
-		});
-	}
-
-	async function changeHotkey(e: CustomEvent<Hotkey>) {
-		await app.hotkeySettings.saveHotkeyAsync(e.detail);
-	}
-
-	async function deleteHotkey(e: CustomEvent<Hotkey>) {
-		if (!e.detail.action || !e.detail.keycode) {
-			app.hotkeySettings.actions.update(actions => {
-				actions.remove_item(e.detail);
-				return actions;
-			});
-		} else {
-			await app.hotkeySettings.deleteHotkeyAsync(e.detail);
-			await app.hotkeySettings.loadAsync();
+			};
 		}
+	}
+
+	function changeHotkey(e: CustomEvent<Hotkey>) {
+		const shortcut = hotkeyToShortcut(e.detail);
+		if (shortcut !== undefined)
+			shortcuts.addShortcut(shortcut);
+		else
+			console.log("Ignoring incomplete hotkey", e.detail);
+	}
+
+	function deleteHotkey(e: CustomEvent<Hotkey>) {
+		const shortcut = hotkeyToShortcut(e.detail);
+		if (shortcut !== undefined)
+			shortcuts.deleteShortcut(shortcut);
+		else
+			console.log("Ignoring incomplete hotkey", e.detail);
 	}
 
 	function updateLoudness() {
@@ -257,9 +258,12 @@
 			</BKeyValue>
 		</BTabSlot>
 		<BTabSlot title="Hotkeys">
-			{#each $hotkeyActions as hotkeyAction}
-				<BHotkeyField hotkey={hotkeyAction} on:change={changeHotkey} on:button={deleteHotkey} iconName="close" />
+			{#each hotkeyActions as hotkeyAction}
+				<BHotkeyField hotkey={shortcutToHotkey(hotkeyAction)} on:change={changeHotkey} on:button={deleteHotkey} iconName="close" />
 			{/each}
+			{#if incompleteHotkey !== undefined}
+				<BHotkeyField hotkey={incompleteHotkey} on:change={changeHotkey} on:button={deleteHotkey} iconName="close" />
+			{/if}
 
 			<BKeyValue label="Add shortcut" labelStyle="is-normal">
 				<button class="button" on:click={createHotkey}>

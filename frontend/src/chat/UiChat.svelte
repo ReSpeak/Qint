@@ -282,7 +282,8 @@
 	});
 
 	onDestroy(() => {
-		chatChanged();
+		// TODO Was there a reason for this?
+		//chatChanged();
 		window.removeEventListener("focus", markRead);
 	});
 </script>

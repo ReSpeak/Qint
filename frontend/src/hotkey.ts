@@ -1,11 +1,4 @@
-import { writable } from "svelte/store";
-import { backend } from "./backend/backend";
-
-export enum Tristate {
-	True = "True",
-	False = "False",
-	Toggle = "Toggle",
-}
+import { Shortcut, ShortcutAction, Tristate } from "./transientSettings";
 
 export const actions = [
 	{ value: "", text: "" },
@@ -14,73 +7,45 @@ export const actions = [
 	{ value: "OutputMute", text: "Mute Output" },
 ];
 
-export type Action = { Away: Tristate }
-			| { InputMute: Tristate }
-			| { OutputMute: Tristate }
-			| null;
-
-export class HotkeySettings {
-	actions = writable<Array<Hotkey>>([]);
-
-	public async loadAsync() {
-		try {
-			const resp = await backend.fetch("/hotkey");
-			const data = await resp.json();
-			this.actions.set(data.actions as Array<Hotkey>);
-		} catch (e) {
-			console.error("Failed to load hotkeys", e);
-		}
-	}
-
-	public async saveHotkeyAsync(hotkey: Hotkey) {
-		if (!hotkey.action || !hotkey.keycode) {
-			console.log(`Not saving incomplete hotkey: ${JSON.stringify(hotkey)}`);
-			return;
-		}
-		try {
-			await backend.fetch("/hotkey", {
-				method: "PUT",
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({action: hotkey.action, keycode: hotkey.keycode}), // TODO: just send hotkey once the backend supports modifier keys
-			});
-		} catch (e) {
-			console.error(`Failed to save hotkey ${JSON.stringify(hotkey)}`);
-		}
-	}
-
-	public async deleteHotkeyAsync(hotkey: Hotkey) {
-		try {
-			await backend.fetch("/hotkey", {
-				method: "DELETE",
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(hotkey),
-			});
-		} catch (e) {
-			console.error(`Failed to delete hotkey ${JSON.stringify(hotkey)}`);
-		}
-	}
-}
-
-export function valueToAction(actionName: string, actionState: Tristate): Action | null {
+export function valueToAction(actionName: string, actionState: Tristate): ShortcutAction | null {
 	if (!actionName || !actions.map(a => a.value).includes(actionName)) return null;
 	let obj: any = {};
 	obj[actionName] = actionState;
 	return obj;
 }
 
-export function actionToText(action: Action): string {
+export function shortcutToHotkey(shortcut: Shortcut): Hotkey {
+	return {
+		keycode: shortcut.keycode,
+		ctrl: false,
+		shift: false,
+		alt: false,
+		meta: false,
+		action: shortcut.action,
+	};
+}
+
+export function hotkeyToShortcut(hotkey: Hotkey): Shortcut | undefined {
+	if (hotkey.keycode === null || hotkey.action === null) return undefined;
+	return {
+		keycode: hotkey.keycode,
+		action: hotkey.action,
+	};
+}
+
+export function actionToText(action: ShortcutAction | null): string {
 	if (!action || Object.keys(action).length === 0) return "-";
 	let actionData = actions.find(a => Object.keys(action)[0] === a.text);
 	return actionData?.text ?? "-";
 }
 
-export function actionToName(action: Action): string {
+export function actionToName(action: ShortcutAction | null): string {
 	if (!action || Object.keys(action).length === 0) return "-";
 	let actionData = actions.find(a => Object.keys(action)[0] === a.value);
 	return actionData?.value ?? "-";
 }
 
-export function getActionState(action: Action): Tristate | null {
+export function getActionState(action: ShortcutAction | null): Tristate | null {
 	if (!action || Object.values(action).length === 0) return null;
 	return Object.values(action)[0];
 }
@@ -101,5 +66,5 @@ export interface Hotkey {
 	shift: boolean;
 	alt: boolean;
 	meta: boolean;
-	action: Action;
+	action: ShortcutAction | null;
 }

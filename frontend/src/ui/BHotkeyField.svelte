@@ -11,9 +11,9 @@
 	export let iconName: string;
 
 	const dispatch = createEventDispatcher();
-	
+
 	let input: HTMLInputElement;
-	
+
 	let selectedAction = actionToName(hotkey.action);
 	let selectedState = getActionState(hotkey.action);
 

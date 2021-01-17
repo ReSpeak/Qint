@@ -9,7 +9,6 @@ import { fnBroadcast, oneshot } from "./util";
 import { ConnectData } from "./connect/connect";
 import { DisplayPanel } from "./panel/panel";
 import { getIconPath } from "./ui/clientIcon";
-import { HotkeySettings } from "./hotkey";
 
 export class App {
 	public readonly connections: Writable<Connection[]> = writable([]);
@@ -24,14 +23,12 @@ export class App {
 	public readonly modalVisible = writable(false);
 
 	public readonly chat: Chat = new Chat(this.selectedNode);
-	public readonly hotkeySettings: HotkeySettings = new HotkeySettings();
 	public readonly transientSettings: TransientSettings = new TransientSettings();
 	public plugins: IPlugin[] = [];
 	public transientSettingsLoaded = fnBroadcast();
 
 	constructor() {
 		loadPlugins().then(x => this.plugins = x);
-		this.hotkeySettings.loadAsync();
 		this.transientSettings.loadAsync().then(_ => {
 			this.transientSettingsLoaded();
 		});
