@@ -4,7 +4,6 @@
 	import Searchbar from "./bar/Searchbar.svelte";
 	import Sidebar from "./bar/Sidebar.svelte";
 	import Toolbar from "./bar/Toolbar.svelte";
-	import ConnectionSettings from "./bar/ConnectionSettings.svelte";
 	import Description from "./panel/Description.svelte";
 	import FileBrowser from "./panel/FileBrowser.svelte";
 	import { DisplayPanel } from "./panel/panel";
@@ -36,9 +35,7 @@
 		columnStyle = "";
 		if ($showSidebar) columnStyle += " var(--channel-tree-width)";
 		else columnStyle += " 0";
-		columnStyle += " 3fr";
-		if ($showSidebar || $displayPanel !== DisplayPanel.Connect) columnStyle += " 1fr";
-		else columnStyle += " 0";
+		columnStyle += " 1fr";
 	}
 
 	let connectStringDerived: Readable<string>;
@@ -70,9 +67,8 @@
 </script>
 
 <div class="appContainer" style="grid-template-columns: {columnStyle}">
-	<ConnectionSettings connection={$connections.length > 0 ? $connections[0] : undefined} bind:connectData={connectData} visible={$showSidebar} />
-	<Toolbar bind:showSidebar={$showSidebar} bind:displayPanel={$displayPanel} />
-	<Searchbar bind:filter visible={$showSidebar || $displayPanel !== DisplayPanel.Connect} />
+	<Toolbar bind:showSidebar={$showSidebar} bind:displayPanel={$displayPanel} bind:connectData={connectData} />
+	<Searchbar bind:filter visible={$showSidebar} />
 	<Sidebar {connections} {filter} visible={$showSidebar} {showConnect} />
 	<div class="panel">
 		{#if $displayPanel === DisplayPanel.Main}
@@ -107,17 +103,13 @@
 		left: 0;
 		height: 100%;
 
-		> :global(.toolbuttons) {
-			grid-row: 1;
-			grid-column: 1;
-		}
 		> :global(.toolbar) {
 			grid-row: 1;
 			grid-column: 2;
 		}
 		> :global(.searchbar) {
 			grid-row: 1;
-			grid-column: 3;
+			grid-column: 1;
 		}
 		> :global(.sidebar) {
 			grid-row: 2;
@@ -125,12 +117,8 @@
 		}
 		> .panel {
 			grid-row: 2;
-			grid-column: 2 / 4;
+			grid-column: 2;
 		}
-	}
-
-	.appContainer > :global(.toolbuttons) {
-		background-color: $box-background-color;
 	}
 
 	.panel {

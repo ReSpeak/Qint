@@ -8,7 +8,6 @@
 
 	export let connection: Connection | undefined = undefined;
 	export let connectData: ConnectData | undefined = undefined;
-	export let visible: boolean = true;
 
 	let inputMuted = false;
 	let outputMuted = false;
@@ -54,7 +53,7 @@
 	}
 </script>
 
-<div class="toolbuttons" class:hidden={!visible}>
+<div class="toolbuttons">
 	<button
 		class="toolbutton"
 		class:active={inputMuted}
