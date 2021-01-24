@@ -1,16 +1,30 @@
 import { backend } from "../backend/backend";
-import { GraphQlClient } from "../book";
+import { Channel, GraphQlClient, GraphQlServer } from "../book";
 // TODO Move to a common place
 import { Message } from "../chat/chat";
 import { FetchResult } from "../ui/lazyList";
-import { datetimeDeserialize } from "../util";
+import { datetimeDeserialize, urlBase64Encode } from "../util";
 
 type GraphQlSearchResult = {
 	count: number;
-	results: { highlightedContent: string; message: any; }[];
+	results: {
+		highlightedContent: string | null;
+		highlightedName: string | null;
+		highlightedAddress: string | null;
+		message: any | null;
+		channel: any | null;
+		client: any | null;
+		server: any | null;
+	}[];
 };
 
-export let EmptyFetch: FetchResult<SearchResult> = {
+export let EmptyMessageFetch: FetchResult<MessageSearchResult> = {
+	items: [],
+	canLoadBeforeStart: false,
+	canLoadAfterEnd: false
+};
+
+export let EmptyOtherFetch: FetchResult<OtherSearchResult> = {
 	items: [],
 	canLoadBeforeStart: false,
 	canLoadAfterEnd: false
@@ -21,10 +35,16 @@ export async function search(s: string, start: number = 0): Promise<SearchResult
 			search(query: $query, start: $start) {
 				count
 				results {
-					highlightedContent
+					highlightedContent: highlightedAttribute(attribute: "content")
+					highlightedName: highlightedAttribute(attribute: "name")
+					highlightedAddress: highlightedAttribute(attribute: "address")
+
 					message {
 						id
 						invoker {
+							server {
+								publicKey
+							}
 							client {
 								uid
 								name
@@ -41,6 +61,33 @@ export async function search(s: string, start: number = 0): Promise<SearchResult
 						time
 						timezone
 					}
+
+					channel {
+						id
+						server {
+							publicKey
+							uid
+							name
+							address
+							icon
+						}
+						name
+						icon
+					}
+
+					client {
+						uid
+						name
+						customName
+					}
+
+					server {
+						publicKey
+						uid
+						name
+						address
+						icon
+					}
 				}
 			}
 		}`, {
@@ -48,42 +95,93 @@ export async function search(s: string, start: number = 0): Promise<SearchResult
 		start,
 	});
 	if ("data" in res) {
-		const results: SearchResult[] = [];
+		const messages: MessageSearchResult[] = [];
+		const others: OtherSearchResult[] = [];
 
 		let id = start;
 		res.data.search.results.forEach(res => {
 			let client;
-			const msg = res.message;
-			if (msg.invoker) {
-				client = GraphQlClient.fromGraphqlInvoker(msg.invoker);
+			if (res.message !== null) {
+				const msg = res.message;
+				if (msg.invoker) {
+					client = GraphQlClient.fromGraphqlInvoker(msg.invoker);
+				}
+				const message = new Message(msg.id, client, msg.invokerName,
+					msg.content, msg.rendered, datetimeDeserialize([msg.time, msg.timezone]), msg.status, msg.isPoke);
+				const server = urlBase64Encode(msg.invoker.server.publicKey);
+				messages.push({
+					id,
+					message,
+					server,
+					highlightedContent: res.highlightedContent,
+				});
+			} else if (res.channel !== null) {
+				const channel = res.channel;
+				others.push({ id, Channel: {
+					channel: Channel.fromGraphql(channel),
+					server: GraphQlServer.fromGraphql(channel.server),
+					highlightedName: res.highlightedName,
+				}})
+			} else if (res.client !== null) {
+				const client = res.client;
+				others.push({ id, Client: {
+					client: GraphQlClient.fromGraphql(client),
+					highlightedName: res.highlightedName,
+				}})
+			} else if (res.server !== null) {
+				const server = res.server;
+				others.push({ id, Server: {
+					server: GraphQlServer.fromGraphql(server),
+					highlightedAddress: res.highlightedAddress,
+					highlightedName: res.highlightedName,
+				}})
 			}
-			const message = new Message(msg.id, client, msg.invokerName,
-				msg.content, msg.rendered, datetimeDeserialize([msg.time, msg.timezone]), msg.status, msg.isPoke);
-			results.push({
-				id,
-				message,
-				highlightedContent: res.highlightedContent,
-			});
 			id++;
 		});
 
 		return {
 			count: res.data.search.count,
-			results,
+			messages,
+			others,
 		};
 	} else {
 		console.error("Search result does not contain data", res);
-		return { results: [], count: 0 };
+		return { messages: [], others: [], count: 0 };
 	}
 }
 
 export interface SearchResults {
-	results: SearchResult[];
+	messages: MessageSearchResult[];
+	others: OtherSearchResult[];
 	count: number;
 }
 
-export interface SearchResult {
+export interface MessageSearchResult {
 	id: number,
 	message: Message;
-	highlightedContent: string;
+	server: string,
+	highlightedContent: string | null;
 }
+
+export interface ChannelSearchResult {
+	server: GraphQlServer,
+	channel: Channel;
+	highlightedName: string | null;
+}
+
+export interface ClientSearchResult {
+	client: GraphQlClient;
+	highlightedName: string | null;
+}
+
+export interface ServerSearchResult {
+	server: GraphQlServer;
+	highlightedAddress: string | null;
+	highlightedName: string | null;
+}
+
+export interface OtherSearchResultCommon {
+	id: number,
+}
+
+export type OtherSearchResult = OtherSearchResultCommon & ({ Channel: ChannelSearchResult } | { Client: ClientSearchResult } | { Server: ServerSearchResult });

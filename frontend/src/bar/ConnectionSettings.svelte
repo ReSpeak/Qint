@@ -8,6 +8,7 @@
 
 	export let connection: Connection | undefined = undefined;
 	export let connectData: ConnectData | undefined = undefined;
+	export let visible: boolean = true;
 
 	let inputMuted = false;
 	let outputMuted = false;
@@ -53,7 +54,7 @@
 	}
 </script>
 
-<div class="toolbuttons">
+<div class="toolbuttons" class:hidden={!visible}>
 	<button
 		class="toolbutton"
 		class:active={inputMuted}
@@ -76,6 +77,3 @@
 		<Icon name={isAway ? 'sleep' : 'sleep-off'} />
 	</button>
 </div>
-
-<style lang="scss">
-</style>

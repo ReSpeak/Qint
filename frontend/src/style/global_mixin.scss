@@ -9,6 +9,24 @@
 	}
 }
 
+// For containing a lazylist in a scrollable region
+@mixin lazylistContainer {
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-end;
+	line-height: initial;
+	border-right: none;
+
+	// The LazyList
+	> :global(.lazyList) {
+		flex: 1;
+
+		> :global(.lazyListView) {
+			overflow-x: scroll;
+		}
+	}
+}
 
 @mixin linkLike {
 	color: #57a4e8;

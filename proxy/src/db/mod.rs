@@ -89,6 +89,8 @@ pub struct ClientData {
 	pub uid: UidBuf,
 	pub icon: Option<i32>,
 	pub avatar: Option<String>,
+	pub phonetic_name: Option<String>,
+	pub description: Option<String>,
 }
 
 pub struct WriteMessageMsg {
@@ -484,18 +486,14 @@ impl Handler<WriteMessageMsg> for DbHandler {
 			diesel::insert_into(messages::table).values(&msg).execute(&self.con)?;
 			messages::table.order(messages::id.desc()).select(messages::id).first::<i64>(&self.con)
 		})?;
-		// Add to search db
-		// TODO Get invoker name or don't save in search db?
-		self.search.add_message(crate::search::MessageDocument {
-			id: format!("m{}", message_id as u64),
-			author: "".into(),
-			content: message.message,
-		})?;
 
 		// Update last read from the chat
 		diesel::update(chats::table.find(chat))
 			.set((chats::last_read.eq(&utc_time), chats::timezone.eq(utc_to_local_offset)))
 			.execute(&self.con)?;
+
+		// Add to search db
+		self.search.add_message(message_id as u64, message.message)?;
 
 		Ok(())
 	}
@@ -900,6 +898,16 @@ impl DbHandler {
 			diesel::insert_into(schema::clients::table).values(&client).execute(&self.con)?;
 		}
 
+		// Add to search db
+		self.search.add_client(
+			&client.uid,
+			client.name.clone(),
+			client.phonetic_name.clone(),
+			None,
+			None,
+			client.description.clone(),
+		)?;
+
 		let (utc_time, utc_to_local_offset) = EventHandler::get_now();
 		let server_client = models::ServersClientsInsert {
 			server: server.to_short(),
@@ -971,11 +979,14 @@ impl<'a> EventHandler<'a> {
 	}
 
 	fn handle_connected(&self) -> Result<()> {
+		let search = self.state.search.clone();
 		let key = self.con.get_server_key()?;
 		let icon_id =
 			if self.data.server.icon.0 != 0 { Some(self.data.server.icon.0 as i32) } else { None };
 		let server_name = self.data.server.name.clone();
 		let addr = self.con.get_options().get_address().to_string();
+		let host_msg = self.data.server.hostmessage.clone();
+		let welcome_msg = self.data.server.welcome_message.clone();
 
 		self.run(move |db, _| {
 			use schema::servers::dsl::*;
@@ -994,6 +1005,9 @@ impl<'a> EventHandler<'a> {
 				};
 				diesel::insert_into(schema::servers::table).values(&server).execute(&db.con)?;
 			}
+			// Add to search db
+			search.add_server(key, addr, server_name, Some(host_msg), Some(welcome_msg))?;
+
 			Ok(())
 		});
 		Ok(())
@@ -1048,6 +1062,8 @@ impl<'a> EventHandler<'a> {
 						uid: uid.clone(),
 						icon: None,
 						avatar: None,
+						phonetic_name: None,
+						description: None,
 					})
 				} else {
 					Ok(())
@@ -1070,6 +1086,16 @@ impl<'a> EventHandler<'a> {
 			uid: client_uid,
 			icon,
 			avatar,
+			phonetic_name: if client.phonetic_name != "" {
+				Some(client.phonetic_name.clone())
+			} else {
+				None
+			},
+			description: if client.description != "" {
+				Some(client.description.clone())
+			} else {
+				None
+			},
 		})
 	}
 
@@ -1234,6 +1260,7 @@ impl<'a> EventHandler<'a> {
 	}
 
 	fn handle_add_channel(&self, ch_id: ChannelId) -> Result<()> {
+		let search = self.state.search.clone();
 		let ch_server = self.con.get_server_key()?;
 		let channel = match self.data.channels.get(&ch_id) {
 			Some(c) => c,
@@ -1243,6 +1270,7 @@ impl<'a> EventHandler<'a> {
 		let icon_id = channel.icon.and_then(|i| if i.0 == 0 { None } else { Some(i.0 as i32) });
 		let ch_name = channel.name.clone();
 		let ch_order = if channel.order.0 == 0 { None } else { Some(channel.order.0 as i64) };
+		let ch_topic = channel.topic.clone();
 
 		self.run(move |db, _| {
 			use schema::channels::dsl::*;
@@ -1273,6 +1301,10 @@ impl<'a> EventHandler<'a> {
 				};
 				diesel::replace_into(schema::channels::table).values(&channel).execute(&db.con)?;
 			}
+
+			// Add to search db
+			search.add_channel(ch_server, ch_id.0, ch_name, ch_topic, None)?;
+
 			Ok(())
 		});
 		Ok(())
@@ -1528,11 +1560,7 @@ impl<'a> EventHandler<'a> {
 					.first::<i64>(&db.con)
 			})?;
 			// Add to search db
-			search.add_message(crate::search::MessageDocument {
-				id: format!("m{}", db.last_message_id as u64),
-				author: "".into(),
-				content: message,
-			})?;
+			search.add_message(db.last_message_id as u64, message)?;
 
 			Ok(())
 		});

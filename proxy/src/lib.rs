@@ -60,6 +60,7 @@ const DIR_PROJECT: &str = "Qint";
 const LAUNCH_CONFIG_FILENAME: &str = "config.toml";
 // TODO Rename to settings settings.json
 const SETTINGS_FILENAME: &str = "transient.json";
+const SEARCH_FILENAME: &str = "search.db";
 
 // The build environment of qint.
 git_testament::git_testament!(TESTAMENT);
@@ -785,7 +786,7 @@ impl App {
 
 		// Open search database
 		let (search, search_is_new) =
-			search::Search::new(logger.clone(), &launch_config.cache_path.join("search.db"))?;
+			search::Search::new(logger.clone(), &launch_config.cache_path.join(SEARCH_FILENAME))?;
 		let search = Arc::new(search);
 
 		// Open database

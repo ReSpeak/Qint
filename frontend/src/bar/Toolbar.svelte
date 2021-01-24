@@ -3,14 +3,9 @@
 	import { DisplayPanel } from "../panel/panel";
 	import { SERVER_ICON } from "../util";
 	import { app, NodeSelection } from "../app";
-	import ConnectionSettings from "./ConnectionSettings.svelte";
-	import { ConnectData } from "../connect/connect";
 
 	export let displayPanel: DisplayPanel;
 	export let showSidebar: boolean;
-	export let connectData: ConnectData;
-
-	const cons = app.connections;
 
 	function toggleSidebar(show: boolean) {
 		showSidebar = show;
@@ -60,9 +55,6 @@
 		</button>
 	</div>
 	<div class="spacer" />
-	<div class="rightButtons">
-		<ConnectionSettings connection={$cons.length > 0 ? $cons[0] : undefined} bind:connectData={connectData} />
-	</div>
 </div>
 
 <style lang="scss">

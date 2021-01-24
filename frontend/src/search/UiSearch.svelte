@@ -3,13 +3,15 @@
 	import { ListFetchDir } from "../ui/lazyList";
 	import type { FetchResult } from "../ui/lazyList";
 	import Icon from "../ui/Icon.svelte";
-	import UiSearchResult from "./UiSearchResult.svelte";
-	import { EmptyFetch, search } from "./search";
-	import type { SearchResult } from "./search";
+	import UiMessageSearchResult from "./UiMessageSearchResult.svelte";
+	import UiOtherSearchResult from "./UiOtherSearchResult.svelte";
+	import { EmptyMessageFetch, EmptyOtherFetch, search } from "./search";
+	import type { MessageSearchResult, OtherSearchResult } from "./search";
 
 	export let filter: string;
 
 	let searchList: UiLazyList | undefined;
+	let otherSearchList: UiLazyList | undefined;
 	let searchError: unknown | undefined;
 	let resultCount = 0;
 
@@ -22,9 +24,17 @@
 				searchList.clear();
 			}
 		}
+		if (otherSearchList) {
+			if (filter.length >= 2) {
+				if (otherSearchList.sourceChanged)
+				otherSearchList.sourceChanged(ListFetchDir.New, ListFetchDir.Before);
+			} else if (otherSearchList.clear) {
+				otherSearchList.clear();
+			}
+		}
 	}
 
-	async function fetchElements(idFrom: SearchResult | undefined, dir: ListFetchDir): Promise<FetchResult<SearchResult>> {
+	async function fetchOtherElements(idFrom: OtherSearchResult | undefined, dir: ListFetchDir): Promise<FetchResult<OtherSearchResult>> {
 		searchError = undefined;
 		try {
 			let res;
@@ -34,30 +44,67 @@
 				const start = Math.max(0, idFrom.id - 50);
 				canLoadBeforeStart = start !== 0;
 				res = await search(filter, start);
-				res.results = res.results.slice(0, idFrom.id - start);
+				res.others = res.others.slice(0, idFrom.id - start);
 				resultCount = res.count;
 			} else {
 				if (idFrom !== undefined)
 					canLoadBeforeStart = idFrom.id !== 0;
 				res = await search(filter, idFrom !== undefined ? idFrom.id + 1 : undefined);
 				resultCount = res.count;
-				if (res.results.length < 50)
+				if (res.others.length < 50)
 					canLoadAfterEnd = false;
 			}
-			if (res.results.length === 0) {
+			if (res.others.length === 0) {
 				canLoadBeforeStart = false;
 				canLoadAfterEnd = false;
 			}
-			console.log("loading search", idFrom, dir, "gives", res.results);
+			console.log("loading other search", idFrom, dir, "gives", res.others);
 			return {
-				items: res.results,
+				items: res.others,
 				canLoadAfterEnd,
 				canLoadBeforeStart,
 			};
 		} catch (err) {
-			console.error("Failed to load search results", err);
+			console.error("Failed to load other search results", err);
 			searchError = err;
-			return EmptyFetch;
+			return EmptyOtherFetch;
+		}
+	}
+
+	async function fetchMessageElements(idFrom: MessageSearchResult | undefined, dir: ListFetchDir): Promise<FetchResult<MessageSearchResult>> {
+		searchError = undefined;
+		try {
+			let res;
+			let canLoadAfterEnd = true;
+			let canLoadBeforeStart = true;
+			if (dir === ListFetchDir.Before && idFrom) {
+				const start = Math.max(0, idFrom.id - 50);
+				canLoadBeforeStart = start !== 0;
+				res = await search(filter, start);
+				res.messages = res.messages.slice(0, idFrom.id - start);
+				resultCount = res.count;
+			} else {
+				if (idFrom !== undefined)
+					canLoadBeforeStart = idFrom.id !== 0;
+				res = await search(filter, idFrom !== undefined ? idFrom.id + 1 : undefined);
+				resultCount = res.count;
+				if (res.messages.length < 50)
+					canLoadAfterEnd = false;
+			}
+			if (res.messages.length === 0) {
+				canLoadBeforeStart = false;
+				canLoadAfterEnd = false;
+			}
+			console.log("loading message search", idFrom, dir, "gives", res.messages);
+			return {
+				items: res.messages,
+				canLoadAfterEnd,
+				canLoadBeforeStart,
+			};
+		} catch (err) {
+			console.error("Failed to load message search results", err);
+			searchError = err;
+			return EmptyMessageFetch;
 		}
 	}
 </script>
@@ -74,8 +121,8 @@
 		</div>
 	{:else if filter.length >= 2}
 		<UiLazyList
-			bind:this={searchList}
-			{fetchElements}
+			bind:this={otherSearchList}
+			fetchElements={fetchOtherElements}
 			suggestJumpStart={true}
 			let:item>
 			<div slot="loading" class="searchFiller">
@@ -83,7 +130,20 @@
 				<Icon name="orbit mdi-spin" />
 			</div>
 			<div slot="empty" class="searchFiller">No results ¯\_(ツ)_/¯</div>
-			<UiSearchResult content={item} />
+			<UiOtherSearchResult content={item} />
+		</UiLazyList>
+
+		<UiLazyList
+			bind:this={searchList}
+			fetchElements={fetchMessageElements}
+			suggestJumpStart={true}
+			let:item>
+			<div slot="loading" class="searchFiller">
+				<span>Loading ...</span>
+				<Icon name="orbit mdi-spin" />
+			</div>
+			<div slot="empty" class="searchFiller">No results ¯\_(ツ)_/¯</div>
+			<UiMessageSearchResult content={item} />
 		</UiLazyList>
 	{:else}
 		<div class="searchFiller"></div>
@@ -91,8 +151,10 @@
 </div>
 
 <style lang="scss">
+	@import "../style/global_mixin";
+
 	.searchResults {
-		max-height: 100%;
+		@include lazylistContainer;
 	}
 
 	.searchFiller {

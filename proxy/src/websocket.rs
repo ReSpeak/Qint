@@ -302,6 +302,7 @@ impl Ws {
 
 				if let Some(con) = &self.connection {
 					if let Ok(data) = con.get_state() {
+						// Send to database
 						if let Err(e) = db::DbHandler::handle_events(
 							&self.logger,
 							&self.state,
@@ -314,6 +315,7 @@ impl Ws {
 							error!(self.logger, "Database failed to handle events"; "error" => %e);
 						}
 
+						// Extend connection info packet for own client
 						let msg = &MessageP2F::Events(
 							events
 								.into_iter()
@@ -321,7 +323,6 @@ impl Ws {
 									if let Some(mut e) = book_events::convert_event(data, &e) {
 										use book_events::{JsEvent, JsProperty, JsPropertyId};
 
-										// Extend connection info packet for own client
 										if let JsEvent::PropertyChanged {
 											id: JsPropertyId::ConnectionClientData(id),
 											prop: JsProperty::ConnectionClientData(info),
@@ -843,7 +844,22 @@ impl Ws {
 							} else {
 								Some(c.avatar_hash.clone())
 							};
-							db::ClientData { name: c.name.clone(), uid: uid.clone(), icon, avatar }
+							db::ClientData {
+								name: c.name.clone(),
+								uid: uid.clone(),
+								icon,
+								avatar,
+								phonetic_name: if c.phonetic_name != "" {
+									Some(c.phonetic_name.clone())
+								} else {
+									None
+								},
+								description: if c.description != "" {
+									Some(c.description.clone())
+								} else {
+									None
+								},
+							}
 						});
 						if let Some(uid) = uid {
 							if let MessageTarget::Client(_) = target {

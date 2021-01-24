@@ -1,9 +1,10 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 use std::path::Path;
+use std::str::FromStr;
 use std::sync::Arc;
 
-use anyhow::format_err;
+use anyhow::{format_err, Error};
 use diesel::prelude::*;
 use futures::FutureExt;
 use meilisearch_core::settings::{SettingsUpdate, UpdateState};
@@ -12,12 +13,26 @@ use meilisearch_core::Error as MError;
 use meilisearch_core::{Database, DatabaseOptions, Schema};
 use serde::{Deserialize, Serialize};
 use slog::{debug, error, info, trace, warn, Logger};
+use tsclientlib::Uid;
+use tsproto_types::crypto::EccKeyPubP256;
 
 use crate::{db, Result, State};
 
 const MESSAGES_INDEX: &str = "messages";
 /// Add documents in batches when creating the database.
 const INIT_BATCH_SIZE: usize = 1000;
+const CHANNEL_PREFIX: &str = "ch";
+const CLIENT_PREFIX: &str = "cl";
+const MESSAGES_PREFIX: &str = "m";
+const SERVER_PREFIX: &str = "s";
+
+#[derive(Clone, Debug, Deserialize, Hash, Serialize)]
+pub enum SearchResultId {
+	Channel { server: Vec<u8>, id: u64 },
+	Client { id: Vec<u8> },
+	Message { id: u64 },
+	Server { id: Vec<u8> },
+}
 
 pub struct Search {
 	logger: Logger,
@@ -25,44 +40,105 @@ pub struct Search {
 	index: Index,
 }
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug)]
 pub struct SearchResult {
-	pub id: String,
-	pub num_id: u64,
-	pub author_highlights: Vec<Range<usize>>,
-	pub content_highlights: Vec<Range<usize>>,
+	pub id: SearchResultId,
+	/// Maps attribute name to highlights for this field.
+	pub highlights: HashMap<&'static str, Vec<Range<usize>>>,
 }
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug)]
 pub struct SearchResults {
 	pub results: Vec<SearchResult>,
 	pub count: usize,
 }
 
 #[derive(Clone, Debug, Deserialize, Hash, Serialize)]
-pub struct MessageDocument {
-	/// Needs to be "m<database u64 id>"
+pub struct ChannelDocument {
+	/// Needs to be "<prefix><database u64 id>"
 	pub id: String,
-	pub author: String,
+	pub name: String,
+	pub topic: Option<String>,
+	pub description: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Hash, Serialize)]
+pub struct ClientDocument {
+	pub id: String,
+	pub uid: String,
+	pub name: String,
+	pub phonetic_name: Option<String>,
+	pub custom_name: Option<String>,
+	pub custom_phonetic_name: Option<String>,
+	pub description: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Hash, Serialize)]
+pub struct MessageDocument {
+	pub id: String,
 	pub content: String,
 }
 
-pub fn char_to_byte_range(index: usize, length: usize, text: &str) -> Range<usize> {
-	let mut byte_index = 0;
-	let mut byte_length = 0;
+#[derive(Clone, Debug, Deserialize, Hash, Serialize)]
+pub struct ServerDocument {
+	pub id: String,
+	pub uid: String,
+	pub address: String,
+	pub name: String,
+	pub host_message: Option<String>,
+	pub welcome_message: Option<String>,
+}
 
-	for (n, (i, c)) in text.char_indices().enumerate() {
-		if n == index {
-			byte_index = i;
-		}
+/// The highlight ranges of meilisearch are not with respect to the real source string, so try to
+/// guess the right range.
+pub fn meili_to_byte_range(index: usize, length: usize, text: &str) -> Range<usize> {
+	let mut start = index;
+	let mut end = index + length;
 
-		if n + 1 == index + length {
-			byte_length = i - byte_index + c.len_utf8();
-			break;
-		}
+	if start > text.len() {
+		start = text.len();
+	}
+	if end > text.len() {
+		end = text.len();
 	}
 
-	Range { start: byte_index, end: byte_index + byte_length }
+	// Round down to char boundaries
+	while !text.is_char_boundary(start) {
+		start -= 1;
+	}
+	while !text.is_char_boundary(end) {
+		end -= 1;
+	}
+
+	Range { start, end }
+}
+
+impl FromStr for SearchResultId {
+	type Err = Error;
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		if s.starts_with(MESSAGES_PREFIX) {
+			Ok(SearchResultId::Message { id: s[1..].parse()? })
+		} else if s.starts_with(CHANNEL_PREFIX) {
+			let split =
+				s.find('_').ok_or_else(|| format_err!("No '_' found in channel search id"))?;
+			let channel = &s[2..split];
+			let server = &s[split + 1..];
+			Ok(SearchResultId::Channel {
+				server: base64::decode_config(server, base64::URL_SAFE_NO_PAD)?,
+				id: channel.parse()?,
+			})
+		} else if s.starts_with(CLIENT_PREFIX) {
+			Ok(SearchResultId::Client {
+				id: base64::decode_config(&s[2..], base64::URL_SAFE_NO_PAD)?,
+			})
+		} else if s.starts_with(SERVER_PREFIX) {
+			Ok(SearchResultId::Server {
+				id: base64::decode_config(&s[1..], base64::URL_SAFE_NO_PAD)?,
+			})
+		} else {
+			Err(format_err!("Unknown search result id type {:?}", s))
+		}
+	}
 }
 
 impl Search {
@@ -112,8 +188,6 @@ impl Search {
 			state
 				.database
 				.send(db::RunOnDbMsg(move |db| -> Result<()> {
-					use db::schema::{clients, messages};
-
 					let search = &state2.search;
 					// TODO Use some stop words and synonyms
 					//search.database.update_write(|w| search.index.settings_update(w, settings))?;
@@ -121,40 +195,147 @@ impl Search {
 					// Fetch all messages from the database
 					let mut offset = 0;
 					loop {
+						use db::schema::messages;
+
 						let query = messages::table
-							.left_outer_join(clients::table)
-							.select((
-								messages::id,
-								clients::name.nullable(),
-								messages::invoker_name,
-								messages::content,
-							))
+							.select((messages::id, messages::content))
 							.order(messages::id)
 							.offset(offset)
 							.limit(INIT_BATCH_SIZE as i64);
-						let res =
-							query.load::<(i64, Option<String>, Option<String>, String)>(&db.con)?;
+						let res = query.load::<(i64, String)>(&db.con)?;
 						let len = res.len();
 
 						// Insert into search database
 						let mut additions = search.index.documents_addition();
 						for r in res {
-							if let Some(author) = r.1.or(r.2) {
-								let doc = MessageDocument {
-									id: format!("m{}", r.0 as u64),
-									author,
-									content: r.3,
-								};
-								additions.update_document(doc);
-							} else {
-								warn!(state2.logger, "Neither invoker nor invoker_name are set for message";
-							"id" => r.0 as u64);
-							}
+							let doc = MessageDocument {
+								id: format!("{}{}", MESSAGES_PREFIX, r.0 as u64),
+								content: r.1,
+							};
+							additions.update_document(doc);
 						}
 						search.database.update_write(|w| additions.finalize(w))?;
 
 						debug!(state2.logger, "Writing messages into search db";
-					"count" => offset as usize + len);
+							"count" => offset as usize + len);
+						if len < INIT_BATCH_SIZE {
+							break;
+						}
+						offset += INIT_BATCH_SIZE as i64;
+					}
+
+					// Fetch all channels from the database
+					offset = 0;
+					loop {
+						use db::schema::channels;
+
+						let query = channels::table
+							.select((channels::server, channels::id, channels::name))
+							.order(channels::id)
+							.offset(offset)
+							.limit(INIT_BATCH_SIZE as i64);
+						let res = query.load::<(Vec<u8>, i64, String)>(&db.con)?;
+						let len = res.len();
+
+						// Insert into search database
+						let mut additions = search.index.documents_addition();
+						for r in res {
+							let server = base64::encode_config(&r.0, base64::URL_SAFE_NO_PAD);
+							let doc = ChannelDocument {
+								id: format!("{}{}_{}", CHANNEL_PREFIX, r.1 as u64, server),
+								name: r.2,
+								topic: None,
+								description: None,
+							};
+							additions.update_document(doc);
+						}
+						search.database.update_write(|w| additions.finalize(w))?;
+
+						debug!(state2.logger, "Writing channels into search db";
+							"count" => offset as usize + len);
+						if len < INIT_BATCH_SIZE {
+							break;
+						}
+						offset += INIT_BATCH_SIZE as i64;
+					}
+
+					// Fetch all clients from the database
+					offset = 0;
+					loop {
+						use db::schema::clients;
+
+						let query = clients::table
+							.select((
+								clients::uid,
+								clients::name,
+								clients::custom_name.nullable(),
+								clients::custom_phonetic_name.nullable(),
+							))
+							.order(clients::uid)
+							.offset(offset)
+							.limit(INIT_BATCH_SIZE as i64);
+						let res = query
+							.load::<(Vec<u8>, String, Option<String>, Option<String>)>(&db.con)?;
+						let len = res.len();
+
+						// Insert into search database
+						let mut additions = search.index.documents_addition();
+						for r in res {
+							let uid = base64::encode_config(&r.0, base64::URL_SAFE_NO_PAD);
+							let doc = ClientDocument {
+								id: format!("{}{}", CLIENT_PREFIX, uid),
+								uid: uid,
+								name: r.1,
+								phonetic_name: None,
+								custom_name: r.2,
+								custom_phonetic_name: r.3,
+								description: None,
+							};
+							additions.update_document(doc);
+						}
+						search.database.update_write(|w| additions.finalize(w))?;
+
+						debug!(state2.logger, "Writing clients into search db";
+							"count" => offset as usize + len);
+						if len < INIT_BATCH_SIZE {
+							break;
+						}
+						offset += INIT_BATCH_SIZE as i64;
+					}
+
+					// Fetch all servers from the database
+					offset = 0;
+					loop {
+						use db::schema::servers;
+
+						let query = servers::table
+							.select((servers::public_key, servers::address, servers::name))
+							.order(servers::public_key)
+							.offset(offset)
+							.limit(INIT_BATCH_SIZE as i64);
+						let res = query.load::<(Vec<u8>, String, String)>(&db.con)?;
+						let len = res.len();
+
+						// Insert into search database
+						let mut additions = search.index.documents_addition();
+						for r in res {
+							let str_key = base64::encode_config(&r.0, base64::URL_SAFE_NO_PAD);
+							let public_key = EccKeyPubP256::from_short(r.0);
+							let uid = public_key.get_uid()?;
+							let doc = ServerDocument {
+								id: format!("{}{}", SERVER_PREFIX, str_key),
+								uid: uid,
+								address: r.1,
+								name: r.2,
+								host_message: None,
+								welcome_message: None,
+							};
+							additions.update_document(doc);
+						}
+						search.database.update_write(|w| additions.finalize(w))?;
+
+						debug!(state2.logger, "Writing servers into search db";
+							"count" => offset as usize + len);
 						if len < INIT_BATCH_SIZE {
 							break;
 						}
@@ -173,9 +354,64 @@ impl Search {
 		);
 	}
 
-	pub fn add_message(&self, msg: MessageDocument) -> Result<u64> {
+	pub fn add_channel(
+		&self, server: EccKeyPubP256, id: u64, name: String, topic: Option<String>,
+		description: Option<String>,
+	) -> Result<u64> {
+		let server = base64::encode_config(server.to_short(), base64::URL_SAFE_NO_PAD);
 		let mut additions = self.index.documents_addition();
-		additions.update_document(msg);
+		additions.update_document(ChannelDocument {
+			id: format!("{}{}_{}", CHANNEL_PREFIX, id, server),
+			name,
+			topic,
+			description,
+		});
+		let update_id = self.database.update_write(|w| additions.finalize(w))?;
+		Ok(update_id)
+	}
+
+	pub fn add_client(
+		&self, uid: &Uid, name: String, phonetic_name: Option<String>, custom_name: Option<String>,
+		custom_phonetic_name: Option<String>, description: Option<String>,
+	) -> Result<u64> {
+		let uid = base64::encode_config(&uid.0, base64::URL_SAFE_NO_PAD);
+		let mut additions = self.index.documents_addition();
+		additions.update_document(ClientDocument {
+			id: format!("{}{}", CLIENT_PREFIX, uid),
+			uid,
+			name,
+			phonetic_name,
+			custom_name,
+			custom_phonetic_name,
+			description,
+		});
+		let update_id = self.database.update_write(|w| additions.finalize(w))?;
+		Ok(update_id)
+	}
+
+	pub fn add_message(&self, id: u64, content: String) -> Result<u64> {
+		let mut additions = self.index.documents_addition();
+		additions
+			.update_document(MessageDocument { id: format!("{}{}", MESSAGES_PREFIX, id), content });
+		let update_id = self.database.update_write(|w| additions.finalize(w))?;
+		Ok(update_id)
+	}
+
+	pub fn add_server(
+		&self, public_key: EccKeyPubP256, address: String, name: String,
+		host_message: Option<String>, welcome_message: Option<String>,
+	) -> Result<u64> {
+		let uid = public_key.get_uid()?;
+		let server = base64::encode_config(public_key.to_short(), base64::URL_SAFE_NO_PAD);
+		let mut additions = self.index.documents_addition();
+		additions.update_document(ServerDocument {
+			id: format!("{}{}", SERVER_PREFIX, server),
+			uid,
+			address,
+			name,
+			host_message,
+			welcome_message,
+		});
 		let update_id = self.database.update_write(|w| additions.finalize(w))?;
 		Ok(update_id)
 	}
@@ -190,8 +426,29 @@ impl Search {
 
 		let schema =
 			self.index.main.schema(&reader)?.ok_or_else(|| format_err!("Schema not found"))?;
-		let content_attr =
-			schema.id("content").ok_or_else(|| format_err!("Content not found in schema"))?.0;
+		let mut attr_map = HashMap::<u16, &'static str>::new();
+		// All attributes of search structs except id
+		for a in &[
+			"name",
+			"topic",
+			"description",
+			"uid",
+			"phonetic_name",
+			"custom_name",
+			"custom_phonetic_name",
+			"content",
+			"address",
+			"name",
+			"host_message",
+			"welcome_message",
+		] {
+			// Attributes do not exist if there is no entry using it
+			if let Some(attr) = schema.id(a) {
+				attr_map.insert(attr.0, a);
+			} else {
+				debug!(self.logger, "Attribute not found in search schema"; "attribute" => a);
+			}
+		}
 
 		let mut res = SearchResults { results: Vec::new(), count: result.nb_hits };
 		for r in result.documents {
@@ -201,23 +458,23 @@ impl Search {
 			}
 
 			if let Some(id) = self.index.document::<IdDocument>(&reader, Some(&attrs), r.id)? {
-				let num_id = id.id[1..].parse::<u64>()?;
-				let author_highlights = Vec::new();
-				let mut content_highlights = Vec::new();
+				let id: SearchResultId = id.id.parse()?;
+				let mut highlights = HashMap::new();
 
 				for h in &r.highlights {
-					if h.attribute == content_attr {
-						//content_highlights.push(h.char_index as usize..h.char_index as usize + h.char_length as usize);
-						content_highlights.push(h.char_index as usize..h.char_length as usize);
+					if let Some(attr) = attr_map.get(&h.attribute) {
+						let hs = highlights.entry(*attr).or_insert_with(Vec::new);
+						hs.push(h.char_index as usize..h.char_length as usize);
+					} else if h.attribute != 0 {
+						// 0 is id
+						warn!(self.logger, "Unknown attribute in search"; "attr" => h.attribute);
 					}
 				}
 
-				res.results.push(SearchResult {
-					id: id.id,
-					num_id,
-					author_highlights,
-					content_highlights,
-				});
+				if !highlights.is_empty() {
+					// Only add if there are highlights in known attributes (ignore id)
+					res.results.push(SearchResult { id, highlights });
+				}
 			} else {
 				warn!(self.logger, "Search document not found"; "id" => ?r.id);
 			}

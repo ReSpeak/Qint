@@ -1,6 +1,6 @@
 <script lang="typescript">
 	export let filter: string;
-	export let visible: boolean;
+	export let visible: boolean = true;
 </script>
 
 <aside class="searchbar" class:hidden={!visible}>

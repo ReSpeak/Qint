@@ -13,12 +13,13 @@ use diesel::prelude::*;
 use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
 use juniper::{EmptySubscription, FieldError, RootNode, ID};
-use slog::warn;
+use slog::trace;
 use tsproto_types::crypto::EccKeyPubP256;
 
 use super::models::MessageStatus;
 use super::schema::bookmarks;
 use super::{models, schema, DbHandler, RunOnDbMsg};
+use crate::search::SearchResultId;
 use crate::State;
 
 const BOOKMARKS_LIMIT: i64 = 20;
@@ -53,9 +54,8 @@ struct ServerClient(models::ServersClients);
 
 struct Highlight(Range<usize>);
 struct SearchResult {
-	message: Message,
-	author_highlights: Vec<Highlight>,
-	content_highlights: Vec<Highlight>,
+	id: SearchResultId,
+	highlights: HashMap<&'static str, Vec<Highlight>>,
 }
 
 struct SearchResults {
@@ -708,27 +708,179 @@ impl Highlight {
 	fn end(&self) -> i32 { self.0.end as i32 }
 }
 
+impl SearchResult {
+	async fn get_attribute(&self, state: &State, attr: &str) -> GResult<Option<String>> {
+		match self.id {
+			SearchResultId::Message { id } => {
+				if attr != "content" {
+					return Ok(None);
+				}
+				// TODO Cache message for .get_attribute and .message
+				Ok(Some(
+					state
+						.database
+						.send(RunOnDbMsg(move |db| {
+							use schema::messages;
+
+							GResult::Ok(
+								messages::table
+									.find(id as i64)
+									.select(messages::content)
+									.first::<String>(&db.con)?,
+							)
+						}))
+						.await??,
+				))
+			}
+			SearchResultId::Channel { ref server, id } => {
+				let server = server.clone();
+				match attr {
+					"name" => Ok(Some(
+						state
+							.database
+							.send(RunOnDbMsg(move |db| {
+								use schema::channels;
+
+								GResult::Ok(
+									channels::table
+										.find((server, id as i64))
+										.select(channels::name)
+										.first::<String>(&db.con)?,
+								)
+							}))
+							.await??,
+					)),
+					// TODO topic, description
+					_ => Ok(None),
+				}
+			}
+			SearchResultId::Client { ref id } => {
+				let id = id.clone();
+				match attr {
+					"uid" => Ok(Some(base64::encode(&id))),
+					"name" => Ok(Some(
+						state
+							.database
+							.send(RunOnDbMsg(move |db| {
+								use schema::clients;
+
+								GResult::Ok(
+									clients::table
+										.find(id)
+										.select(clients::name)
+										.first::<String>(&db.con)?,
+								)
+							}))
+							.await??,
+					)),
+					"custom_name" => Ok(state
+						.database
+						.send(RunOnDbMsg(move |db| {
+							use schema::clients;
+
+							GResult::Ok(
+								clients::table
+									.find(id)
+									.select(clients::custom_name.nullable())
+									.first::<Option<String>>(&db.con)?,
+							)
+						}))
+						.await??),
+					"custom_phonetic_name" => Ok(state
+						.database
+						.send(RunOnDbMsg(move |db| {
+							use schema::clients;
+
+							GResult::Ok(
+								clients::table
+									.find(id)
+									.select(clients::custom_phonetic_name.nullable())
+									.first::<Option<String>>(&db.con)?,
+							)
+						}))
+						.await??),
+					// TODO phonetic_name, description
+					_ => Ok(None),
+				}
+			}
+			SearchResultId::Server { ref id } => {
+				let id = id.clone();
+				match attr {
+					"uid" => {
+						let public_key = EccKeyPubP256::from_short(id);
+						Ok(Some(public_key.get_uid()?))
+					}
+					"name" => Ok(Some(
+						state
+							.database
+							.send(RunOnDbMsg(move |db| {
+								use schema::servers;
+
+								GResult::Ok(
+									servers::table
+										.find(id)
+										.select(servers::name)
+										.first::<String>(&db.con)?,
+								)
+							}))
+							.await??,
+					)),
+					"address" => Ok(Some(
+						state
+							.database
+							.send(RunOnDbMsg(move |db| {
+								use schema::servers;
+
+								GResult::Ok(
+									servers::table
+										.find(id)
+										.select(servers::address)
+										.first::<String>(&db.con)?,
+								)
+							}))
+							.await??,
+					)),
+					// TODO host_message, welcome_message
+					_ => Ok(None),
+				}
+			}
+		}
+	}
+}
+
 #[juniper::graphql_object(Context = State)]
 impl SearchResult {
-	fn message(&self) -> &Message { &self.message }
-	fn author_highlights(&self) -> &[Highlight] { &self.author_highlights }
-	fn content_highlights(&self) -> &[Highlight] { &self.content_highlights }
+	fn highlights(&self, attribute: String) -> Option<&[Highlight]> {
+		self.highlights.get(attribute.as_str()).map(|v| v.as_slice())
+	}
+
+	async fn attribute(&self, state: &State, attribute: String) -> GResult<Option<String>> {
+		Ok(self.get_attribute(state, &attribute).await?)
+	}
 
 	/// Gives a rendered view of the content which contains parts of the content and highlighting.
-	fn highlighted_content(&self) -> String {
-		let mut sorted_hls =
-			self.content_highlights.iter().map(|h| h.0.clone()).collect::<Vec<_>>();
+	async fn highlighted_attribute(
+		&self, state: &State, attribute: String,
+	) -> GResult<Option<String>> {
+		let highlights = match self.highlights.get(attribute.as_str()) {
+			Some(r) => r,
+			None => return Ok(None),
+		};
+		let attr: String = match self.get_attribute(state, &attribute).await? {
+			Some(r) => r,
+			None => return Ok(None),
+		};
+		let mut sorted_hls = highlights.iter().map(|h| h.0.clone()).collect::<Vec<_>>();
 		sorted_hls.sort_by_key(|h| h.start);
 		let hl_strs = sorted_hls
 			.iter()
 			.map(|h| {
-				let r =
-					crate::search::char_to_byte_range(h.start, h.end, &self.message.msg.content);
-				&self.message.msg.content[r]
+				let r = crate::search::meili_to_byte_range(h.start, h.end, &attr);
+				&attr[r]
 			})
 			.collect::<Vec<_>>();
 
-		let rendered = proxy_codegen::markdown::markdown(&self.message.msg.content);
+		let rendered = proxy_codegen::markdown::markdown(&attr);
 		let mut rendered_hls = Vec::new();
 		// Check if the highlighted parts are still in the rendered message
 		// TODO Search for highlighted parts only in body parts
@@ -741,41 +893,114 @@ impl SearchResult {
 				false
 			}
 		}) {
-			rendered
+			Ok(Some(rendered))
 		} else {
-			// Highlight and cut out highlights
-			let src = &self.message.msg.content;
+			// Highlight
+			let src = &attr;
 			let mut res = String::new();
 			let mut last_end = 0;
 			for h in &sorted_hls {
-				let r = crate::search::char_to_byte_range(h.start, h.end, src);
-				if r.start - last_end > 20 {
-					res.push('…');
-				} else {
-					res.push_str(&src[last_end..r.start]);
-				}
-				res.push_str(r#"<span class="filterHighlight"><span>"#);
+				let r = crate::search::meili_to_byte_range(h.start, h.end, src);
+				res.push_str(&src[last_end..r.start]);
+				res.push_str(r#"<span class="filterHighlight">"#);
 				res.push_str(&src[r.clone()]);
-				res.push_str("</span></span>");
+				res.push_str("</span>");
 				last_end = r.end;
-				if res.len() > 100 {
-					break;
-				}
 			}
 			if last_end < src.len() {
-				if res.len() < 100 {
-					if src.len() - last_end < 20 {
-						res.push_str(&src[last_end..]);
-					} else {
-						res.push_str(&src[last_end..last_end + 20]);
-						res.push('…');
-					}
-				} else {
-					res.push('…');
-				}
+				res.push_str(&src[last_end..]);
 			}
-			res
+			Ok(Some(res))
 		}
+	}
+
+	/// Get as message
+	async fn message(&self, state: &State) -> GResult<Option<Message>> {
+		let id = if let SearchResultId::Message { id } = self.id {
+			id as i64
+		} else {
+			return Ok(None);
+		};
+
+		Ok(Some(
+			state
+				.database
+				.send(RunOnDbMsg(move |db| {
+					use schema::messages;
+
+					// TODO is_poke is lost
+					GResult::Ok(
+						messages::table
+							.find(id)
+							.first::<models::Message>(&db.con)
+							.map(|msg| Message { msg, is_poke: false })?,
+					)
+				}))
+				.await??,
+		))
+	}
+
+	async fn channel(&self, state: &State) -> GResult<Option<Channel>> {
+		let id = if let SearchResultId::Channel { server, id } = &self.id {
+			(server.clone(), *id as i64)
+		} else {
+			return Ok(None);
+		};
+
+		Ok(Some(
+			state
+				.database
+				.send(RunOnDbMsg(move |db| {
+					use schema::channels;
+
+					GResult::Ok(
+						channels::table.find(id).first::<models::Channel>(&db.con).map(Channel)?,
+					)
+				}))
+				.await??,
+		))
+	}
+
+	async fn client(&self, state: &State) -> GResult<Option<Client>> {
+		let id = if let SearchResultId::Client { id } = &self.id {
+			id.clone()
+		} else {
+			return Ok(None);
+		};
+
+		Ok(Some(
+			state
+				.database
+				.send(RunOnDbMsg(move |db| {
+					use schema::clients;
+
+					GResult::Ok(
+						clients::table.find(id).first::<models::Client>(&db.con).map(Client)?,
+					)
+				}))
+				.await??,
+		))
+	}
+
+	async fn server(&self, state: &State) -> GResult<Option<Server>> {
+		let id = if let SearchResultId::Server { id } = &self.id {
+			id.clone()
+		} else {
+			return Ok(None);
+		};
+
+		Ok(Some(
+			state
+				.database
+				.send(RunOnDbMsg(move |db| {
+					use schema::servers;
+
+					GResult::Ok(
+						servers::table.find(id).first::<models::Server>(&db.con).map(Server)?,
+					)
+				}))
+				.await??,
+		))
 	}
 }
 
@@ -913,44 +1138,19 @@ impl Query {
 	async fn search(state: &State, query: String, start: Option<i32>) -> GResult<SearchResults> {
 		let start = start.unwrap_or_default() as usize;
 		let search_res = state.search.search(&query, start..start + MESSAGES_LIMIT as usize)?;
-		let logger = state.logger.clone();
-		let res = state
-			.database
-			.send(RunOnDbMsg(move |db| {
-				use schema::messages;
-
-				let ids = search_res.results.iter().map(|d| d.num_id as i64).collect::<Vec<_>>();
-				// TODO is_poke is lost
-				let mut msgs = messages::table
-					.filter(messages::id.eq_any(&ids))
-					.load::<models::Message>(&db.con)?
+		let results = search_res
+			.results
+			.into_iter()
+			.map(|r| SearchResult {
+				id: r.id,
+				highlights: r
+					.highlights
 					.into_iter()
-					.map(|msg| (msg.id as u64, Message { msg, is_poke: false }))
-					.collect::<HashMap<u64, Message>>();
-
-				// Order by search results
-				let mut results = Vec::new();
-				for d in search_res.results {
-					if let Some(msg) = msgs.remove(&d.num_id) {
-						results.push(SearchResult {
-							message: msg,
-							author_highlights: Vec::new(),
-							content_highlights: d
-								.content_highlights
-								.into_iter()
-								.map(Highlight)
-								.collect(),
-						});
-					} else {
-						warn!(logger, "Message from search database not found";
-							"id" => d.id);
-					}
-				}
-
-				GResult::Ok(SearchResults { results, count: search_res.count })
-			}))
-			.await??;
-		Ok(res)
+					.map(|(k, v)| (k, v.into_iter().map(Highlight).collect()))
+					.collect(),
+			})
+			.collect();
+		Ok(SearchResults { results, count: search_res.count })
 	}
 }
 

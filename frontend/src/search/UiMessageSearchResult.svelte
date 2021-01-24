@@ -1,18 +1,17 @@
 <script lang="typescript">
-	import { CLIENT_ICON, LONG_DATETIME, SERVER_ICON } from "../util";
+	import { LONG_DATETIME, SERVER_ICON } from "../util";
 	import Icon from "../ui/Icon.svelte";
+	import TsIcon from "../ui/TsIcon.svelte";
 	import ClientName from "../ui/ClientName.svelte";
-	import type { SearchResult } from "./search";
+	import type { MessageSearchResult } from "./search";
 
-	export let content: SearchResult;
+	export let content: MessageSearchResult;
 </script>
 
 <div class="searchResult">
 	<div class="invoker-icon chat-left-col">
 		{#if content.message.invoker}
-			<!-- TODO Needs server -->
-			<!--<TsIcon type="client" source={content.message.invoker} />-->
-			<Icon name={CLIENT_ICON} />
+			<TsIcon type="client" source={content.message.invoker} server={content.server} />
 		{:else}
 			<Icon name={SERVER_ICON} />
 		{/if}
@@ -29,7 +28,11 @@
 	</div>
 	<div class="messageBody">
 		<div class="messageRendered">
-			{@html content.highlightedContent}
+			{#if content.highlightedContent !== null}
+				{@html content.highlightedContent}
+			{:else}
+				{@html content.message.rendered}
+			{/if}
 		</div>
 	</div>
 </div>
@@ -81,5 +84,4 @@
 		justify-content: center;
 		text-align: center;
 	}
-
 </style>

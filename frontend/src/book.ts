@@ -1,7 +1,7 @@
 import { Writable, writable, get, Readable } from "svelte/store";
 import { InBookChangeMsg, WsMessageTarget } from "./backend/ws";
 import { Connection } from "./connection";
-import { binarySearchBy,datetimeDeserialize, assert, factorToDb } from "./util";
+import { binarySearchBy,datetimeDeserialize, assert, factorToDb, Cached, urlBase64Encode } from "./util";
 import { ChannelGroupId, ChannelId, ClientId, IconId, IpAddr, ServerGroupId, TalkState, Uid } from "./ts";
 import { Codec } from "./book_events";
 import * as book_events from "./book_events";
@@ -489,8 +489,12 @@ export class GraphQlClient extends ClientBase {
 		if (icon !== undefined) this.icon = icon;
 	}
 
+	public static fromGraphql(obj: any): GraphQlClient {
+		return new GraphQlClient(obj.uid, obj.customName ?? obj.name, "0", "");
+	}
+
 	public static fromGraphqlInvoker(obj: any): GraphQlClient {
-		return new GraphQlClient(obj.client.uid, obj.client.customName ?? obj.client.name, obj.icon ?? 0, obj.avatar ?? "");
+		return new GraphQlClient(obj.client.uid, obj.client.customName ?? obj.client.name, obj.icon ?? "0", obj.avatar ?? "");
 	}
 }
 
@@ -582,19 +586,24 @@ export class Channel extends book_events.ChannelGen implements ITreeNode, Readab
 }
 
 export class GraphQlServer extends ServerBase {
-	public readonly public_key!: number[];
+	public readonly publicKey!: number[];
 	public readonly name!: string;
+	public readonly address!: string;
 	public readonly icon!: IconId;
+	private readonly _publicKeyStr: Cached<number[], string>;
+	public get publicKeyStr() { return this._publicKeyStr.get(); }
 
-	protected constructor(public_key?: number[] | undefined, uid?: number[], name?: string, icon?: IconId) {
+	protected constructor(publicKey?: number[] | undefined, uid?: number[], name?: string, address?: string, icon?: IconId) {
 		super(uid);
-		if (public_key !== undefined) this.public_key = public_key;
+		this._publicKeyStr = new Cached(() => this.publicKey, u => urlBase64Encode(u));
+		if (publicKey !== undefined) this.publicKey = publicKey;
+		if (address !== undefined) this.address = address;
 		if (name !== undefined) this.name = name;
 		if (icon !== undefined) this.icon = icon;
 	}
 
 	public static fromGraphql(obj: any): GraphQlServer {
-		return new GraphQlServer(obj.server.publicKey, obj.server.uid, obj.server.name, obj.server.icon);
+		return new GraphQlServer(obj.publicKey, obj.uid, obj.name, obj.address, obj.icon);
 	}
 
 	public equals(other: this): boolean {

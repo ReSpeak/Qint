@@ -32,9 +32,9 @@
 		box-shadow: 3px 0 3px #0006;
 		overflow-y: auto;
 		z-index: 400; // Required to be over the chat and sticky headers
-	}
 
-	.sidebar > .menu .menu-list li {
-		margin: 2em;
+		:global(.searchResults) {
+			max-height: calc(100vh - 7em);
+		}
 	}
 </style>

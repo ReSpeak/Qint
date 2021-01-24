@@ -71,21 +71,9 @@
 </div>
 
 <style lang="scss">
+	@import "../style/global_mixin";
+
 	.serverLog {
-		overflow: hidden;
-		display: flex;
-		flex-direction: column;
-		justify-content: flex-end;
-		line-height: initial;
-		border-right: none;
-
-		// The LazyList
-		> :global(.lazyList) {
-			flex: 1;
-
-			> :global(.lazyListView) {
-				overflow-x: scroll;
-			}
-		}
+		@include lazylistContainer;
 	}
 </style>
