@@ -1,5 +1,6 @@
 export enum DisplayPanel {
 	Main,
 	Settings,
-	Connect
+	Connect,
+	Search,
 }

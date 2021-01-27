@@ -1,7 +1,6 @@
 <script lang="typescript">
 	import type { Writable } from "svelte/store";
 	import UiServer from "../tree/UiServerWrap.svelte";
-	import UiSearch from "../search/UiSearch.svelte";
 	import StickyList from "../ui/StickyList.svelte";
 	import StickySlot from "../ui/StickySlot.svelte";
 	import { Connection } from "../connection";
@@ -20,7 +19,6 @@
 		{/each}
 
 		<StickySlot>Notifications</StickySlot>
-		<UiSearch {filter} />
 	</StickyList>
 </aside>
 

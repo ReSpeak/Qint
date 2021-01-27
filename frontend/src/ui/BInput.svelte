@@ -139,7 +139,7 @@
 			}
 		}
 		historyIndex = undefined;
-		expectQuickPaste = e.key.toLowerCase() === "v" && e.shiftKey && e.ctrlKey;
+		expectQuickPaste = e.key?.toLowerCase() === "v" && e.shiftKey && e.ctrlKey;
 	}
 
 	function handlePaste(e: ClipboardEvent) {

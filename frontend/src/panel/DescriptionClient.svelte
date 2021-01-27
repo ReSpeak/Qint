@@ -320,7 +320,7 @@
 		if (filteredLosses.length === 0) {
 			return "unknown";
 		} else {
-			const reduced = filteredLosses.reduce((a, b) => a + b);
+			const reduced = packetLossToPercent(filteredLosses.reduce((a, b) => a + b))!;
 			const totalLoss = Math.round(reduced * 10) / 10;
 			return `${totalLoss}${NARROW_NO_BREAK_SPACE}%`;
 		}

@@ -13,7 +13,7 @@ use diesel::prelude::*;
 use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
 use juniper::{EmptySubscription, FieldError, RootNode, ID};
-use slog::trace;
+use proxy_codegen::markdown::markdown_highlighted;
 use tsproto_types::crypto::EccKeyPubP256;
 
 use super::models::MessageStatus;
@@ -870,48 +870,13 @@ impl SearchResult {
 			Some(r) => r,
 			None => return Ok(None),
 		};
-		let mut sorted_hls = highlights.iter().map(|h| h.0.clone()).collect::<Vec<_>>();
-		sorted_hls.sort_by_key(|h| h.start);
-		let hl_strs = sorted_hls
+		let mut sorted_hls = highlights
 			.iter()
-			.map(|h| {
-				let r = crate::search::meili_to_byte_range(h.start, h.end, &attr);
-				&attr[r]
-			})
+			.map(|h| crate::search::meili_to_byte_range(h.0.start, h.0.end, &attr))
 			.collect::<Vec<_>>();
+		sorted_hls.sort_by_key(|h| h.start);
 
-		let rendered = proxy_codegen::markdown::markdown(&attr);
-		let mut rendered_hls = Vec::new();
-		// Check if the highlighted parts are still in the rendered message
-		// TODO Search for highlighted parts only in body parts
-		if hl_strs.iter().all(|s| {
-			if let Some(i) = rendered.find(s) {
-				rendered_hls.push(Highlight(i..i + s.len()));
-				// !s.contains(&['>', '<', '&', '\'', '\"'])
-				false
-			} else {
-				false
-			}
-		}) {
-			Ok(Some(rendered))
-		} else {
-			// Highlight
-			let src = &attr;
-			let mut res = String::new();
-			let mut last_end = 0;
-			for h in &sorted_hls {
-				let r = crate::search::meili_to_byte_range(h.start, h.end, src);
-				res.push_str(&src[last_end..r.start]);
-				res.push_str(r#"<span class="filterHighlight">"#);
-				res.push_str(&src[r.clone()]);
-				res.push_str("</span>");
-				last_end = r.end;
-			}
-			if last_end < src.len() {
-				res.push_str(&src[last_end..]);
-			}
-			Ok(Some(res))
-		}
+		Ok(Some(markdown_highlighted(&attr, &sorted_hls)))
 	}
 
 	/// Get as message

@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt;
+use std::ops::Range;
 
 use lazy_static::lazy_static;
 use nom::{
@@ -13,6 +14,8 @@ use nom::{
 	IResult,
 };
 use pulldown_cmark::{Alignment, CodeBlockKind, Event, LinkType, Options, Parser, Tag};
+
+use super::{escape_html_attribute, escape_html_body};
 
 #[derive(Debug, Clone)]
 enum VNode {
@@ -36,6 +39,7 @@ struct Render<TStack> {
 
 	table_state: TableState,
 	text_builder: String,
+	text_builder_highlights: Vec<Range<usize>>,
 	text_state: TextKind,
 }
 
@@ -57,45 +61,6 @@ enum TextKind {
 	None,
 	Normal(bool), // bool:code mode (when true, text wont be bb processed)
 	Latex(bool),  // bool:display mode
-}
-
-/// Escapes a string so it can be put into html (between tags).
-///
-/// # Escapes
-///
-/// - & to &amp;
-/// - < to &lt;
-/// - > to &gt;
-/// - " to &quot;
-/// - ' to &#x27;
-/// - / to &#x2F;
-///
-/// Reference: https://www.owasp.org/index.php/XSS_(Cross_Site_Scripting)_Prevention_Cheat_Sheet#RULE_.231_-_HTML_Escape_Before_Inserting_Untrusted_Data_into_HTML_Element_Content
-fn escape_html_body(s: &str) -> String {
-	s.replace('&', "&amp;")
-		.replace('<', "&lt;")
-		.replace('>', "&gt;")
-		.replace('"', "&quot;")
-		.replace('\'', "&#x27;")
-		.replace('/', "&#x2F;")
-}
-
-/// Escape a string so it can be put into a html attribute.
-///
-/// # Example
-///
-/// Put a string into `<inupt value="*your string goes here*"/>`. You need to
-/// use double quotes then.
-///
-/// # Escapes
-///
-/// - & to &amp;
-/// - < to &lt;
-/// - " to &quot;
-///
-/// Reference: https://stackoverflow.com/a/9189067
-fn escape_html_attribute(s: &str) -> String {
-	s.replace('&', "&amp;").replace('<', "&lt;").replace('"', "&quot;")
 }
 
 impl From<VTag> for VNode {
@@ -131,6 +96,29 @@ impl VNode {
 		inner.add_class("mdi-18px");
 		tag.add_child(inner.into());
 		tag.into()
+	}
+
+	fn highlighted_str(s: &str, highlights: &[Range<usize>]) -> Self {
+		if highlights.is_empty() {
+			Self::VText(s.to_string())
+		} else {
+			let mut nodes = Vec::new();
+			let mut cur_pos = 0; // Position in s
+			for h in highlights {
+				if h.start > cur_pos {
+					nodes.push(Self::VText(s[cur_pos..h.start].to_string()));
+				}
+				let mut tag = VTag::new("span");
+				tag.add_class("filterHighlight");
+				tag.add_child(Self::VText(s[h.clone()].to_string()));
+				nodes.push(tag.into());
+				cur_pos = h.end;
+			}
+			if cur_pos < s.len() {
+				nodes.push(Self::VText(s[cur_pos..].to_string()));
+			}
+			Self::VGroup(nodes)
+		}
 	}
 }
 
@@ -205,17 +193,38 @@ impl TextKind {
 	fn when_none(&self, alt: TextKind) -> TextKind { if self.is_none() { alt } else { *self } }
 }
 
-pub fn markdown(raw: &str) -> String { RenderMd::new().markdown(raw).to_string() }
+pub fn markdown(raw: &str) -> String { RenderMd::new().markdown(raw, &[]).to_string() }
+
+/// Marks highlighted text ranges with `.filterHighlight`.
+pub fn markdown_highlighted(raw: &str, highlights: &[Range<usize>]) -> String {
+	RenderMd::new().markdown(raw, highlights).to_string()
+}
 
 // General
+
+/// Trims all highlights that end before the specified range and returns the highlights inside the
+/// range.
+fn highlights_for_range<'a>(
+	highlights: &mut &'a [Range<usize>], r: Range<usize>,
+) -> &'a [Range<usize>] {
+	// Remove previous highlights
+	while highlights.first().map(|h| r.start >= h.end).unwrap_or_default() {
+		*highlights = &highlights[1..];
+	}
+
+	// Highlights of the current range
+	let matching_highlight_count = highlights.iter().take_while(|h| r.end > h.start).count();
+	&highlights[..matching_highlight_count]
+}
 
 impl<TStack> Render<TStack> {
 	fn new() -> Self {
 		Self {
-			elems: vec![],
-			spine: vec![],
+			elems: Default::default(),
+			spine: Default::default(),
 			table_state: TableState::Head,
-			text_builder: String::new(),
+			text_builder: Default::default(),
+			text_builder_highlights: Default::default(),
 			text_state: TextKind::None,
 		}
 	}
@@ -225,9 +234,9 @@ impl<TStack> Render<TStack> {
 		VNode::VGroup(self.elems)
 	}
 
-	fn push_text(&mut self, text: &str) {
+	fn push_text(&mut self, text: &str, highlights: &[Range<usize>]) {
 		if !text.is_empty() {
-			self.push_node(text.to_string().into());
+			self.push_node(VNode::highlighted_str(text, highlights));
 		}
 	}
 	fn push_vtag(&mut self, elem: VTag) { self.push_node(elem.into()); }
@@ -251,11 +260,25 @@ impl<TStack> Render<TStack> {
 	/// Should do stuff like
 	/// - Finding urls
 	/// - Processing special urls like client:// ts3file:// etc.
-	fn process_text(&mut self, text: &str) {
+	fn process_text(&mut self, text: &str, mut highlights: &[Range<usize>]) {
 		let mut last_url = 0;
 		for (m, url) in crate::find_url::find_urls(text) {
 			if !text[m.start..].to_lowercase().ends_with("[/img]") {
-				self.push_text(&text[last_url..m.start]);
+				// Remove previous highlights
+				while highlights.first().map(|h| last_url > h.end).unwrap_or_default() {
+					highlights = &highlights[1..];
+				}
+
+				let r = Range { start: last_url, end: m.start };
+				let matching_highlights = highlights_for_range(&mut highlights, r.clone())
+					.iter()
+					.map(|h| Range {
+						start: h.start.saturating_sub(r.start),
+						end: std::cmp::min(h.end - r.start, text.len()),
+					})
+					.collect::<Vec<_>>();
+
+				self.push_text(&text[r], &matching_highlights);
 				last_url = m.end;
 				let mut a = Self::make_link();
 				a.add_attribute("href", Self::link_add_scheme(&url.to_string()).as_ref());
@@ -264,7 +287,18 @@ impl<TStack> Render<TStack> {
 			}
 		}
 
-		self.push_text(&text[last_url..]);
+		// Remove previous highlights
+		while highlights.first().map(|h| last_url > h.end).unwrap_or_default() {
+			highlights = &highlights[1..];
+		}
+
+		// Highlights of the current range
+		let matching_highlights = highlights
+			.iter()
+			.map(|h| Range { start: h.start - last_url, end: h.end - last_url })
+			.collect::<Vec<_>>();
+
+		self.push_text(&text[last_url..], &matching_highlights);
 	}
 
 	fn make_link() -> VTag {
@@ -282,9 +316,12 @@ impl RenderMd {
 			TextKind::None => return,
 			TextKind::Normal(code) => {
 				if code {
-					self.push_node(self.text_builder.to_string().into());
+					self.push_node(VNode::highlighted_str(
+						&self.text_builder,
+						&self.text_builder_highlights,
+					));
 				} else {
-					self.push_node(bb(&self.text_builder));
+					self.push_node(bb(&self.text_builder, &self.text_builder_highlights));
 				}
 			}
 			TextKind::Latex(dm) => {
@@ -294,10 +331,11 @@ impl RenderMd {
 			}
 		}
 		self.text_builder.clear();
+		self.text_builder_highlights.clear();
 		self.text_state = TextKind::None;
 	}
 
-	fn markdown(mut self, raw: &str) -> VNode {
+	fn markdown(mut self, raw: &str, mut highlights: &[Range<usize>]) -> VNode {
 		lazy_static! {
 			static ref MD_OPTIONS: Options = {
 				let mut options = Options::empty();
@@ -310,10 +348,12 @@ impl RenderMd {
 
 		let parser = Parser::new_ext(raw, *MD_OPTIONS);
 
-		for ev in parser {
+		for (ev, offset) in parser.into_offset_iter() {
 			if !is_textlike(&ev) {
 				self.done_text();
 			}
+
+			let matching_highlights = highlights_for_range(&mut highlights, offset.clone());
 
 			match ev {
 				Event::Start(tag) => {
@@ -331,12 +371,26 @@ impl RenderMd {
 						false
 					};
 					self.text_state = self.text_state.when_none(TextKind::Normal(is_code));
+					let cur_len = self.text_builder.len();
+					self.text_builder_highlights.extend(matching_highlights.iter().map(|h| {
+						Range {
+							start: h.start.saturating_sub(offset.start) + cur_len,
+							end: std::cmp::min(h.end - offset.start, text.len()) + cur_len,
+						}
+					}));
 					self.text_builder.push_str(&text);
 				}
 				// This only covers inline code blocks
 				Event::Code(text) => {
 					let mut code = VTag::new("code");
-					code.add_child(text.to_string().into());
+					let hls: Vec<_> = matching_highlights
+						.iter()
+						.map(|h| Range {
+							start: h.start.saturating_sub(offset.start),
+							end: std::cmp::min(h.end - offset.start, text.len()),
+						})
+						.collect();
+					code.add_child(VNode::highlighted_str(&text, &hls));
 					self.push_vtag(code);
 				}
 				Event::Html(text) => {
@@ -348,11 +402,18 @@ impl RenderMd {
 						self.done_text();
 					} else {
 						self.text_state = self.text_state.when_none(TextKind::Normal(false));
+						let cur_len = self.text_builder.len();
+						self.text_builder_highlights.extend(matching_highlights.iter().map(|h| {
+							Range {
+								start: h.start.saturating_sub(offset.start) + cur_len,
+								end: std::cmp::min(h.end - offset.start, text.len()) + cur_len,
+							}
+						}));
 						self.text_builder.push_str(&text);
 					}
 				}
 				Event::FootnoteReference(_) => {}
-				Event::SoftBreak => self.push_text("\n"),
+				Event::SoftBreak => self.push_text("\n", &[]),
 				Event::HardBreak => self.push_vtag(VTag::new("br")),
 				Event::Rule => self.push_vtag(VTag::new("hr")),
 				Event::TaskListMarker(checked) => {
@@ -512,13 +573,13 @@ fn is_html(ev: &Event) -> bool { matches!(ev, Event::Html(_)) }
 
 #[derive(Debug)]
 enum BBSegment<'a> {
-	Text(&'a str),
+	Text(&'a str, Range<usize>),
 	Open(BBTag, Option<&'a str>),
 	Close(BBTag),
 }
 
 impl<'a> BBSegment<'a> {
-	fn is_text(&self) -> bool { matches!(self, BBSegment::Text(_)) }
+	fn is_text(&self) -> bool { matches!(self, BBSegment::Text(_, _)) }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -532,24 +593,24 @@ enum BBTag {
 	Img,
 }
 
-fn bb(raw: &str) -> VNode { RenderBb::new().mini_bb(raw) }
+fn bb(raw: &str, highlights: &[Range<usize>]) -> VNode { RenderBb::new().mini_bb(raw, highlights) }
 
 impl RenderBb {
 	fn done_text(&mut self) {
 		if self.text_state == TextKind::None {
 			return;
 		}
-		let text = self.text_builder.clone(); // TODO remove clone somehow
+		let text = std::mem::replace(&mut self.text_builder, String::new());
+		let highlights = std::mem::replace(&mut self.text_builder_highlights, Default::default());
 		if self.spine.is_empty() {
-			self.process_text(&text);
+			self.process_text(&text, &highlights);
 		} else {
-			self.push_text(&text);
+			self.push_text(&text, &highlights);
 		}
-		self.text_builder.clear();
 		self.text_state = TextKind::None;
 	}
 
-	fn mini_bb(mut self, raw: &str) -> VNode {
+	fn mini_bb(mut self, raw: &str, mut highlights: &[Range<usize>]) -> VNode {
 		let seg_list = nom_bb_read(raw);
 
 		for seg in seg_list {
@@ -558,7 +619,16 @@ impl RenderBb {
 			}
 
 			match seg {
-				BBSegment::Text(text) => {
+				BBSegment::Text(text, offset) => {
+					let matching_highlights = highlights_for_range(&mut highlights, offset.clone());
+
+					let cur_len = self.text_builder.len();
+					self.text_builder_highlights.extend(matching_highlights.iter().map(|h| {
+						Range {
+							start: h.start.saturating_sub(offset.start) + cur_len,
+							end: std::cmp::min(h.end - offset.start, text.len()) + cur_len,
+						}
+					}));
 					self.text_builder.push_str(&text);
 					self.text_state = TextKind::Normal(false);
 				}
@@ -628,15 +698,19 @@ fn nom_bb_read(bb: &str) -> Vec<BBSegment> {
 	let mut segs = vec![];
 	let mut cur = bb;
 	while !cur.is_empty() {
+		let pos = bb.len() - cur.len();
 		if let Ok((s, text)) = nom_bb_text(cur) {
-			segs.push(BBSegment::Text(text));
+			let r = Range { start: pos, end: text.len() + pos };
+			segs.push(BBSegment::Text(text, r));
 			cur = s;
 		}
+		let pos = bb.len() - cur.len();
 		if let Ok((s, tag)) = nom_bb_tag(cur) {
 			segs.push(tag);
 			cur = s;
 		} else if let Ok((s, c)) = nom_bb_skip(cur) {
-			segs.push(BBSegment::Text(c));
+			let r = Range { start: pos, end: c.len() + pos };
+			segs.push(BBSegment::Text(c, r));
 			cur = s;
 		}
 	}

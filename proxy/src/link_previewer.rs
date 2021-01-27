@@ -27,7 +27,10 @@ pub enum AnalyzeResult {
 impl LinkPreviewer {
 	pub fn new(logger: Logger, mut cache_path: PathBuf) -> Self {
 		cache_path.push("urls.sled");
-		let cache = match sled::open(cache_path) {
+
+		let config = sled::Config::default().path(cache_path).flush_every_ms(Some(1000));
+
+		let cache = match config.open() {
 			Ok(r) => Some(r),
 			Err(e) => {
 				warn!(logger, "Failed to open url cache database, running without cache";
@@ -50,9 +53,11 @@ impl LinkPreviewer {
 
 			if let Ok(cache_arr) = rmp_serde::to_vec(&result) {
 				if let Some(cache) = &self.cache {
-					if let Err(err) = cache.insert(link.as_bytes(), cache_arr.as_slice()) {
+					if let Err(e) = cache.insert(link.as_bytes(), cache_arr.as_slice()) {
 						warn!(self.logger, "Failed to insert into link cache"; "url" => link,
-							"error" => %err);
+							"error" => %e);
+					} else if let Err(e) = cache.flush_async().await {
+						warn!(self.logger, "Failed to flush link cache"; "error" => %e);
 					}
 				}
 			}

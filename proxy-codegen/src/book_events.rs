@@ -191,9 +191,7 @@ pub fn serialize_some_some_u64<S: Serializer>(
 	i.map(|i| i.map(|i| i.to_string())).serialize(serializer)
 }
 
-pub fn deserialize_id<'de, D: Deserializer<'de>, T: Id>(
-	deserializer: D,
-) -> Result<T, D::Error> {
+pub fn deserialize_id<'de, D: Deserializer<'de>, T: Id>(deserializer: D) -> Result<T, D::Error> {
 	let s: String = Deserialize::deserialize(deserializer)?;
 	Ok(T::parse_id(&s).map_err(SerdeError::custom)?)
 }

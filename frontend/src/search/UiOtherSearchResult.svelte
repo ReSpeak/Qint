@@ -19,7 +19,7 @@
 			<Icon name={SERVER_ICON} />
 		{/if}
 	</div>
-	<div class="result-name has-text-weight-bold">
+	<div class="resultName has-text-weight-bold">
 		{#if "Channel" in content}
 			{content.Channel.channel.name}
 		{:else if "Client" in content}
@@ -32,7 +32,9 @@
 	</div>
 	<div class="resultBody">
 		{#if "Channel" in content}
-			<ServerName server={content.Channel.server} /> ({content.Channel.server.address})
+			<TsIcon type="server" source={content.Channel.server} server={content.Channel.server.publicKeyStr} />
+			<ServerName server={content.Channel.server} />
+			<span class="serverAddress">({content.Channel.server.address})</span>
 		{:else if "Server" in content}
 			{content.Server.server.address}
 		{/if}
@@ -56,5 +58,15 @@
 		&:hover {
 			background-color: $highlight-weak;
 		}
+	}
+
+	.resultName {
+		align-self: center;
+	}
+
+	.resultBody {
+		display: flex;
+		align-items: center;
+		gap: 0.5em;
 	}
 </style>

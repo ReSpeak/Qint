@@ -666,9 +666,7 @@ async fn get_setting(state: web::Data<Arc<State>>) -> impl Responder {
 }
 
 #[put("/transient")]
-async fn set_setting(
-	state: web::Data<Arc<State>>, body: web::Json<Value>,
-) -> impl Responder {
+async fn set_setting(state: web::Data<Arc<State>>, body: web::Json<Value>) -> impl Responder {
 	let (r, res) = state.modify_settings(|values| {
 		if body.is_object() {
 			values.merge(&body.0);

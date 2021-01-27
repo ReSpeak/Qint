@@ -6,6 +6,7 @@
 	import Toolbar from "./bar/Toolbar.svelte";
 	import Description from "./panel/Description.svelte";
 	import FileBrowser from "./panel/FileBrowser.svelte";
+	import UiSearch from "./search/UiSearch.svelte";
 	import { DisplayPanel } from "./panel/panel";
 	import { app } from "./app";
 	import Connect from "./connect/UiConnect.svelte";
@@ -38,6 +39,8 @@
 		columnStyle += " 1fr";
 	}
 
+	$: filterChanged(filter);
+
 	let connectStringDerived: Readable<string>;
 	$: {
 		if ($connections.length === 0) {
@@ -54,6 +57,13 @@
 	function showConnect(data: ConnectData) {
 		connectData = data;
 		$displayPanel = DisplayPanel.Connect;
+	}
+
+	function filterChanged(filter: string) {
+		if (filter !== "") {
+			// Show search panel
+			$displayPanel = DisplayPanel.Search;
+		}
 	}
 
 	onMount(() => {
@@ -86,6 +96,8 @@
 			<UiGlobalSettings />
 		{:else if $displayPanel === DisplayPanel.Connect}
 			<Connect bind:data={connectData} />
+		{:else if $displayPanel === DisplayPanel.Search}
+			<UiSearch {filter} />
 		{/if}
 	</div>
 </div>
