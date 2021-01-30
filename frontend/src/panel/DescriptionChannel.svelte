@@ -240,7 +240,7 @@
 				<BDropDown bind:selected={chanEdit.codec} items={codecOpt} display={codecToName} />
 			</div>
 			<div class="dataLine">
-				<div>Codec Quality:</div>
+				<div>Codec quality:</div>
 				<div class="flex1">
 					<BSlider
 						min={1}
@@ -282,7 +282,7 @@
 		{/if}
 		{#if $channel.neededTalkPower !== 0 || editing}
 			<div class="dataLine">
-				<span>Required Talk Power:</span>
+				<span>Required talk power:</span>
 				{#if editing}
 					<input class="input" type="number" bind:value={chanEdit.neededTalkPower} />
 				{:else}
@@ -298,16 +298,16 @@
 		{/if}
 		{#if editing}
 			<div class="dataLine">
-				<div>Max Clients:</div>
+				<div>Max clients:</div>
 				<div>{chanEdit.maxClients} (TODO)</div>
 			</div>
 			<div class="dataLine">
-				<div>Max Family Clients:</div>
+				<div>Max family clients:</div>
 				<div>{chanEdit.maxFamilyClients} (TODO)</div>
 			</div>
 		{:else}
 			<div class="dataLine">
-				<div>Current Clients:</div>
+				<div>Current clients:</div>
 				<div>{clientCount} / {formatMaxClients}</div>
 			</div>
 		{/if}

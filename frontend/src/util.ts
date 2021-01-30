@@ -29,7 +29,7 @@ export const PASSWORD_PLACEHOLDER = "**********";
 export const NARROW_NO_BREAK_SPACE = String.fromCharCode(0x202f);
 export const youtubeUrlRegex = /^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube\.com|youtu.be))(\/(?:[\w\-]+\?v=|embed\/|v\/)?)([\w\-]+)(\S+)?$/;
 
-export const LOUDNESS_MIN = -30;
+export const LOUDNESS_MIN = -40;
 export const LOUDNESS_MAX = 0;
 export const LOUDNESS_END_MAGIC = -1000;
 export const LOUDNESS_HISTORY = 100;

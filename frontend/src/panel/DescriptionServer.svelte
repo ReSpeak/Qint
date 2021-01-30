@@ -15,7 +15,7 @@
 	import StickyHeader from "./StickyHeader.svelte";
 	import RenderedText from "../ui/RenderedText.svelte";
 	import RenderedTextEditor from "../ui/RenderedTextEditor.svelte";
-	import { CodecEncryptionMode, HostMessageMode, OptionalServerDataGen } from "../book_events";
+	import { CodecEncryptionMode, HostMessageMode, licenseTypeGetDoc, OptionalServerDataGen } from "../book_events";
 	import UiChangeResult from "../ui/UiChangeResult.svelte";
 	import UiEmojiString from "../ui/UiEmojiString.svelte";
 	import { app } from "../app";
@@ -214,12 +214,12 @@
 		</div>
 		{#if editing}
 			<div class="dataLine">
-				<label for="edit_phoneticName">Phonetic Name:</label>
+				<label for="edit_phoneticName">Phonetic name:</label>
 				<input
 					id="edit_phoneticName"
 					class="input"
 					bind:value={servEdit.phoneticName}
-					placeholder="(Same as Name by default)" />
+					placeholder="Same as name by default" />
 			</div>
 		{/if}
 		<div class="dataLine">
@@ -239,7 +239,7 @@
 		{/if}
 		<div class="dataLine">
 			<div>License:</div>
-			<div>{$server.license}</div>
+			<div title={licenseTypeGetDoc($server.license)}>{$server.license}</div>
 		</div>
 		<div class="dataLine">
 			<div>Version:</div>
@@ -265,16 +265,16 @@
 		</div>
 		{#if editing}
 			<div class="dataLine">
-				<div>Max Clients:</div>
+				<div>Max clients:</div>
 				<input class="input" type="number" bind:value={servEdit.maxClients} />
 			</div>
 			<div class="dataLine">
-				<div>Reserved Slots:</div>
+				<div>Reserved slots:</div>
 				<input class="input" type="number" bind:value={servEditOpt.reservedSlots} />
 			</div>
 		{:else}
 			<div class="dataLine">
-				<div>Current Clients:</div>
+				<div>Current clients:</div>
 				<div>{'?'} / {$server.maxClients}</div>
 				{#if $server.optionalData !== null && $server.optionalData.reservedSlots > 0}
 					<div style="margin-left:0.5em;">
@@ -306,7 +306,7 @@
 			</div>
 
 			<div class="dataLine">
-				<div>Host message Mode:</div>
+				<div>Host message mode:</div>
 				<BDropDown
 					bind:selected={servEdit.hostmessageMode}
 					items={enumValues(HostMessageMode)} />
@@ -317,7 +317,7 @@
 		<StickySlot>Security</StickySlot>
 		<div class="descGroup" class:editing>
 			<div class="dataLine">
-				<div>Audio Encryption Mode:</div>
+				<div>Audio encryption mode:</div>
 				<BDropDown
 					bind:selected={servEdit.codecEncryptionMode}
 					items={enumValues(CodecEncryptionMode)} />

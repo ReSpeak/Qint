@@ -48,7 +48,7 @@
 
 	function getClientProperties(client: Client, channel: Channel | undefined): [string, string, string] | undefined {
 		const properties: [boolean, string, string, string][] = [
-			[client.awayMessage !== null, "sleep", "color: rgb(70,180,255)", client.awayMessage === "" ? "Away" : client.awayMessage ?? ""],
+			[client.awayMessage !== null, "sleep", "color: rgb(70,180,255)", client.awayMessage === "" ? "Away" : ("Away: " + client.awayMessage ?? "")],
 			[!client.outputHardwareEnabled, "microphone-off", "color: red;", "Speaker disabled"],
 			[client.outputMuted, "volume-off", "color: red;", "Deaf"],
 			[channel !== undefined && channel.neededTalkPower !== null && client.talkPower < channel.neededTalkPower,
@@ -170,9 +170,12 @@
 				{#each sortedServerGroups as grp (grp)}
 					<ServerGroupIcon id={grp} {connection} />
 				{/each}
+				{#if $client.isChannelCommander}
+					<Icon name="apple-keyboard-command" title="Channel commander" />
+				{/if}
 				{#if $client.clientType !== "Normal"}
 					{#if $client.clientType.Query.admin}
-						<Icon name="robot-outline" title="Admin Serverquery" />
+						<Icon name="robot-outline" title="Admin serverquery" />
 					{:else}
 						<Icon name="robot-outline" title="Serverquery" />
 					{/if}

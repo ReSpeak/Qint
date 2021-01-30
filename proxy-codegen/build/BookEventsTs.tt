@@ -25,6 +25,15 @@ export enum <#= e.name #> {
 <# } #>
 }
 
+export function <#= e.name.to_mixed_case() #>GetDoc(v: <#= e.name #>): string {
+	switch(v) {
+<# for v in &e.variants { #>
+		case <#= e.name #>.<#= v.name #>:
+			return "<#= v.doc #>";
+<# } #>
+	}
+}
+
 <# } #>
 export const enum TsError {
 <# for v in &errors::DATA.0 { #>

@@ -39,6 +39,7 @@
 	let chart: BChart | null = null;
 	let editing = false;
 	let dummyUploader: HTMLInputElement;
+	let timer: number | undefined;
 
 	const serverGroups = connection.book.serverGroups;
 	$: avatarPath = getClientAvatarPath($client, connection);
@@ -49,6 +50,8 @@
 	}
 	$: on(client, onClientChanged());
 
+	$: on(statsOpen, updateTimer());
+
 	// THIS IS NOT A FULL CLIENT OBJECT
 	type EditProps = {
 		description: string;
@@ -57,6 +60,7 @@
 	type SpecialEditProps = {
 		name: string;
 		phoneticName: string;
+		isChannelCommander: boolean;
 	};
 	let [clientEdit, clientSpecialEdit] = createPropsCopy();
 	let changeRequest: ChangePromise | undefined;
@@ -198,56 +202,44 @@
 		chart?.updateChart?.();
 	}
 
-	function changeServerGroup(e: Event, group: ServerGroupId, isMember: boolean) {
+	async function changeServerGroup(e: Event, group: ServerGroupId, isMember: boolean) {
 		if (e.target instanceof HTMLInputElement) e.target.disabled = true;
 
 		if (isMember) {
-			connection.sendMessage({
-				Change: {
-					change: {
-						ClientAddServerGroup: {
-							id: client.id,
-							serverGroup: group,
-						},
-					},
+			// TODO Handle result
+			await connection.sendChange({
+				ClientAddServerGroup: {
+					id: client.id,
+					serverGroup: group,
 				},
 			});
 		} else {
-			connection.sendMessage({
-				Change: {
-					change: {
-						ClientRemoveServerGroup: {
-							id: client.id,
-							serverGroup: group,
-						},
-					},
+			// TODO Handle result
+			await connection.sendChange({
+				ClientRemoveServerGroup: {
+					id: client.id,
+					serverGroup: group,
 				},
 			});
 		}
 	}
 
-	function kickFromChannel() {
-		connection.sendMessage({
-			Change: {
-				change: {
-					ClientKick: {
-						id: client.id,
-						reason: Reason.KickChannel,
-					},
-				},
+	async function kickFromChannel() {
+		// TODO Handle result
+		await connection.sendChange({
+			ClientKick: {
+				id: client.id,
+				reason: Reason.KickChannel,
 			},
 		});
 	}
 
-	function kickFromServer() {
-		connection.sendMessage({
-			Change: {
-				change: {
-					ClientKick: {
-						id: client.id,
-						reason: Reason.KickServer,
-					},
-				},
+	async function kickFromServer() {
+		// TODO Handle result
+		await connection.sendChange({
+			ClientKick: {
+				id: client.id,
+				reason: Reason.KickServer,
 			},
 		});
 	}
@@ -392,6 +384,7 @@
 		}, {
 			name: client.name,
 			phoneticName: client.phoneticName,
+			isChannelCommander: client.isChannelCommander,
 		}];
 	}
 
@@ -451,11 +444,18 @@
 		}
 	}
 
+	function updateTimer() {
+		if (timer !== undefined) clearInterval(timer);
+		// Throttle when stats are not open, we still need to update last active and online time
+		timer = setInterval(updateClientInfo, statsOpen ? 1000 : 10000);
+	}
+
 	onMount(() => {
 		updateClientInfo();
-		let timer = setInterval(updateClientInfo, 1000);
 		// onDestroy handler
-		return () => clearInterval(timer);
+		return () => {
+			if (timer !== undefined) clearInterval(timer);
+		};
 	});
 </script>
 
@@ -547,6 +547,15 @@
 				<div>{$client.id}</div>
 			{/if}
 			{#if editing}
+				<div>
+					<label for="client_channel_commander">Channel commander:</label></div>
+				<div>
+					<input
+						id="client_channel_commander"
+						type="checkbox"
+						class="checkbox-switch is-info"
+						bind:checked={clientSpecialEdit.isChannelCommander} />
+				</div>
 				<div>Avatar:</div>
 				<div>
 					{#if ownClient}
