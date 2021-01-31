@@ -7,7 +7,6 @@ use anyhow::Result;
 use futures::FutureExt;
 use slog::{error, Logger};
 use tokio::runtime::{Handle, Runtime};
-use tokio::stream::StreamExt;
 use tokio::sync::mpsc;
 use tokio::task;
 
@@ -72,7 +71,7 @@ pub(crate) fn start(
 
 		// Run the local task set.
 		local.block_on(&mut runtime, async move {
-			while let Some(msg) = spawn_recv.next().await {
+			while let Some(msg) = spawn_recv.recv().await {
 				let logger = logger.clone();
 				task::spawn_local(a2ts2.send(msg).map(move |r| match r {
 					Ok(()) => {}

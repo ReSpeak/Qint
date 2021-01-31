@@ -409,7 +409,7 @@ impl Ws {
 					}
 				} else if let Some(m) = book_events::convert_message(&msg) {
 					self.send_message(&MessageP2F::Message(m), ctx);
-				} else {
+				} else if !matches!(msg, InMessage::ClientNeededPermissions(_)) {
 					warn!(self.logger, "Message could not be converted for frontend";
 						"mesage" => ?msg);
 				}
@@ -931,7 +931,7 @@ impl Ws {
 }
 
 impl Handler<DownloadFile> for Ws {
-	type Result = ActorResponse<Self, (u64, TcpStream, EccKeyPubP256), Error>;
+	type Result = ActorResponse<Self, Result<(u64, TcpStream, EccKeyPubP256), Error>>;
 	fn handle(&mut self, msg: DownloadFile, _: &mut Self::Context) -> Self::Result {
 		if let Some(con) = &mut self.connection {
 			let public_key = match con.get_server_key() {
@@ -979,7 +979,7 @@ impl Handler<DownloadFile> for Ws {
 }
 
 impl Handler<UploadFile> for Ws {
-	type Result = ActorResponse<Self, TcpStream, Error>;
+	type Result = ActorResponse<Self, Result<TcpStream, Error>>;
 	fn handle(&mut self, msg: UploadFile, _: &mut Self::Context) -> Self::Result {
 		if let Some(con) = &mut self.connection {
 			let handle = match con.upload_file(
@@ -1034,7 +1034,7 @@ impl Handler<GetPublicKeyMsg> for Ws {
 }
 
 impl Handler<GetClientVolumeMsg> for Ws {
-	type Result = ActorResponse<Self, f32, anyhow::Error>;
+	type Result = ActorResponse<Self, Result<f32>>;
 	fn handle(
 		&mut self, GetClientVolumeMsg(client): GetClientVolumeMsg, _: &mut Self::Context,
 	) -> Self::Result {
@@ -1265,8 +1265,9 @@ impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for Ws {
 				let msg: MessageF2P = match serde_json::from_str(&msg) {
 					Ok(r) => r,
 					Err(e) => {
+						let msg_str: &str = msg.as_ref();
 						error!(self.logger, "json deserializing error"; "error" => %e,
-							"message" => msg);
+							"message" => msg_str);
 						self.send_message(
 							&MessageP2F::Error(format!("json deserializing error: {}", e)),
 							ctx,

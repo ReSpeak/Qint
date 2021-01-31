@@ -18,7 +18,8 @@ use actix_web::{
 	dev::{HttpResponseBuilder, Service},
 	web::Query,
 };
-use actix_web::{middleware::Condition, web::Bytes};
+use actix_web::middleware::Condition;
+use actix_web::web::Bytes;
 use actix_web_actors::ws;
 use anyhow::{bail, format_err, Result};
 use futures::prelude::*;
@@ -58,7 +59,7 @@ use websocket::Ws;
 const DIR_ORGANIZATION: &str = "ReSpeak";
 const DIR_PROJECT: &str = "Qint";
 const LAUNCH_CONFIG_FILENAME: &str = "config.toml";
-// TODO Rename to settings settings.json
+// TODO Rename to settings.json
 const SETTINGS_FILENAME: &str = "transient.json";
 const SEARCH_FILENAME: &str = "search.db";
 
@@ -590,7 +591,7 @@ async fn upload_file(
 			Ok(Ok(r)) => r,
 		};
 		// Upload
-		let mut body_reader = tokio::io::stream_reader(body.map_err(|e| {
+		let mut body_reader = tokio_util::io::StreamReader::new(body.map_err(|e| {
 			std::io::Error::new(std::io::ErrorKind::Other, format!("Payload error {}", e))
 		}));
 		if let Err(e) = tokio::io::copy(&mut body_reader, &mut file_stream).await {
@@ -944,7 +945,7 @@ impl App {
 					break;
 				}
 			}
-			time::delay_for(Duration::from_millis(10)).await;
+			time::sleep(Duration::from_millis(10)).await;
 		}
 
 		Ok(())

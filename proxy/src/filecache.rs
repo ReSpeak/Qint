@@ -153,7 +153,7 @@ impl<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin> Stream for FileWri
 					this.buf = None;
 					break;
 				}
-				match Pin::new(&mut this.file.as_mut().unwrap()).poll_write_buf(cx, buf) {
+				match Pin::new(this.file.as_mut().unwrap()).poll_write(cx, buf) {
 					Poll::Pending => return Poll::Pending,
 					Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e))),
 					Poll::Ready(Ok(_)) => {}

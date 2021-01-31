@@ -23,7 +23,7 @@ export class BrowserBackend implements IBackend {
 		const val = await this.fetch(`/db`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ query, variables })
+			body: JSON.stringify({ query, variables }),
 		});
 		return await val.json();
 	}
