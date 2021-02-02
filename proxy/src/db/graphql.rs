@@ -10,7 +10,6 @@ use actix_web::*;
 use anyhow::format_err;
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
-use futures::FutureExt;
 use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
 use juniper::{EmptySubscription, FieldError, RootNode, ID};

@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use actix_web::web::{self, Bytes};
+use actix_web::web::{self, Buf, Bytes};
 use anyhow::Result;
 use futures::prelude::*;
 use slog::{debug, error, Logger};
@@ -156,7 +156,7 @@ impl<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin> Stream for FileWri
 				match Pin::new(this.file.as_mut().unwrap()).poll_write(cx, buf) {
 					Poll::Pending => return Poll::Pending,
 					Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e))),
-					Poll::Ready(Ok(_)) => {}
+					Poll::Ready(Ok(n)) => buf.advance(n),
 				}
 			}
 

@@ -65,7 +65,8 @@ import { onMount } from "svelte";
 			ctx.lineTo(getX(0), getY(history[0]));
 
 			for (let i = 1; i < history.length - 1; i++)
-				ctx.quadraticCurveTo(getX(i - 1), getY(history[i - 1]), getX(i + 1), getY(history[i + 1]));
+				ctx.lineTo(getX(i), getY(history[i]));
+				//ctx.quadraticCurveTo(getX(i - 1), getY(history[i - 1]), getX(i + 1), getY(history[i + 1]));
 			ctx.lineTo(realWidth, getY(history[history.length - 1]));
 			ctx.lineTo(realWidth, realHeight);
 			ctx.closePath();
