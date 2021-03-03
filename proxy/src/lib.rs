@@ -1215,7 +1215,7 @@ mod tests {
 		async fn send(&mut self, msg: &MessageF2P) -> Result<()> {
 			println!("Sending message to proxy: {}", serde_json::to_string(msg).unwrap());
 			self.socket
-				.send(ws::Message::Text(serde_json::to_string(msg)?))
+				.send(ws::Message::Text(serde_json::to_string(msg)?.into()))
 				.await
 				.map_err(|e| format_err!("Websocket client protocol error: {:?}", e))?;
 			Ok(())
@@ -1246,11 +1246,11 @@ mod tests {
 		let proxy = TestProxy::new(create_logger());
 		actix::spawn(proxy.run_log_errors());
 		// Wait for server to come up
-		time::delay_for(Duration::from_millis(100)).await;
+		time::sleep(Duration::from_millis(100)).await;
 		let mut con = proxy.create_connection().await?;
 		con.connect().await?;
 		// Wait for saving the connection in the database
-		time::delay_for(Duration::from_millis(100)).await;
+		time::sleep(Duration::from_millis(100)).await;
 		drop(con);
 
 		#[derive(Deserialize)]
@@ -1298,7 +1298,7 @@ mod tests {
 		let proxy1 = TestProxy::new(logger);
 		actix::spawn(proxy1.run_log_errors());
 		// Wait for server to come up
-		time::delay_for(Duration::from_millis(100)).await;
+		time::sleep(Duration::from_millis(100)).await;
 		let mut con0 = proxy0.create_connection().await?;
 		con0.connect().await?;
 		let mut con1 = proxy1.create_connection().await?;
@@ -1314,7 +1314,7 @@ mod tests {
 		.await?;
 
 		// Wait for saving the message in the database
-		time::delay_for(Duration::from_millis(100)).await;
+		time::sleep(Duration::from_millis(100)).await;
 		drop(con0);
 		drop(con1);
 

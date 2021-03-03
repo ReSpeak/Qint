@@ -15,8 +15,8 @@ module.exports = {
 			includePaths: ['src', 'node_modules'],
 			// prependData is for preproc >= 4.X
 			prependData: `
-			@import "bulmaswatch/cyborg/variables";
-			@import "bulma/sass/utilities/all";
+			@import "bulmaswatch/cyborg/_variables";
+			@import "bulma/sass/utilities/_all";
 			`,
 		},
 	}),

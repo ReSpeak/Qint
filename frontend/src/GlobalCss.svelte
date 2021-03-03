@@ -31,7 +31,7 @@
 	@import "bulma/sass/helpers/typography";
 	@import "bulma-slider/src/sass/index";
 	@import "bulma-switch/src/sass/index";
-	@import "bulmaswatch/cyborg/overrides";
+	@import "bulmaswatch/cyborg/_overrides";
 
 	@import "./style/checkbox-switch";
 	@import "./style/global";

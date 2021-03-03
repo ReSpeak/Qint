@@ -786,7 +786,7 @@ fn katex_render_code(code: &str, display_mode: bool) -> Option<VNode> {
 mod tests {
 	use super::*;
 
-	fn bb_str(text: &str) -> String { bb(text).to_string() }
+	fn bb_str(text: &str) -> String { bb(text, &[]).to_string() }
 	fn p(text: &str) -> String { format!("<p>{}</p>", text) }
 
 	#[test]

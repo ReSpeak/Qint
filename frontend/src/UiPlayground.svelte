@@ -46,7 +46,7 @@
 <style lang="scss" global>
 	@import "bulma/bulma";
 	@import "bulma-slider/src/sass/index";
-	@import "bulmaswatch/cyborg/overrides";
+	@import "bulmaswatch/cyborg/_overrides";
 
 	.testingList {
 		border: 1px lightblue solid;
