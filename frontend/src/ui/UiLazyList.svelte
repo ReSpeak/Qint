@@ -122,13 +122,18 @@
 
 	// *** Private functions ***
 
+	function setPanScrollTop(scrollTop: number) {
+		// Why?, you might ask. Because `pan.scollTop = x;` will cause svelte to invalidate `pan`.
+		const panl = pan;
+		panl.scrollTop = scrollTop;
+	}
 	function scrollToStart() {
 		if (!mounted) return;
-		pan.scrollTop = 0;
+		setPanScrollTop(0);
 	}
 	function scrollToEnd() {
 		if (!mounted) return;
-		pan.scrollTop = pan.scrollHeight - pan.clientHeight;
+		setPanScrollTop(pan.scrollHeight - pan.clientHeight);
 	}
 	function getFirstElem() {
 		return elems.length !== 0 ? elems[0] : undefined;
@@ -245,116 +250,119 @@
 		await applyElements(result.items, dir);
 	}
 
-	/**
-	 * Utility method to replace the current list with a new list without
-	 * changing the scroll position.
-	 */
-	async function modifyElems(newElems: T[], isAtTop: boolean) {
+	async function oneForAllReplace(newElems: T[]) {
 		if (!mounted) return;
-		const lastScrollHeight = pan.scrollHeight;
-		const lastScrollTop = pan.scrollTop;
-		log("Before change scrollHeight:%d scrollTop:%d", lastScrollHeight, pan.scrollTop);
 
-		triggerResizing();
+		elems = [...newElems];
+		await tick();
+
+		lockIndex = undefined;
+
+		oneForAllReregister();
+	}
+
+	async function oneForAllPrepend(prepend: T[]) {
+		if (!mounted) return;
+
+		const childList = getHtmlElements();
+		let newElems = [...prepend, ...elems];
+
+		if (elems.length > minItemsToRemove) {
+			const distFn = (e: HTMLElement) => {
+				// The top of the element within our list (unscrolled)
+				const topStaticOffset = e.offsetTop;
+				// The top of the element without our list (with scroll offset)
+				const topCurrentOffset = topStaticOffset - pan.scrollTop;
+				return topCurrentOffset;
+			};
+
+			const removeDistance = pan.offsetHeight + minPxDistanceToRemove;
+			const removeIndex = childList.length - minItemsToRemove;
+			const res = binarySearchByKey(childList, removeDistance, distFn, 0, removeIndex + 1);
+
+			if (res.index <= removeIndex) {
+				newElems = newElems.slice(0, prepend.length + res.index);
+				canLoadAfterEnd = true;
+			}
+		}
+
+		visObs.clear();
 
 		elems = newElems;
 		await tick();
 
+		if (lockIndex !== undefined) lockIndex = prepend.length + lockIndex;
+
+		oneForAllReregister();
+	}
+
+	async function oneForAllAppend(append: T[]) {
+		if (!mounted) return;
+
 		const childList = getHtmlElements();
-		visObs.observeReplace(childList);
+		let newElems = [...elems, ...append];
+
+		if (elems.length > minItemsToRemove) {
+			const distFn = (e: HTMLElement) => {
+				// The bottom of the element within our list (unscrolled)
+				const bottomStaticOffset = e.offsetTop + e.offsetHeight;
+				// The top of the element without our list (with scroll offset)
+				const bottomCurrentOffset = bottomStaticOffset - pan.scrollTop;
+				return bottomCurrentOffset;
+			};
+
+			const res = binarySearchByKey(
+				childList,
+				-minPxDistanceToRemove,
+				distFn,
+				minItemsToRemove - 1,
+				undefined
+			);
+
+			log("tryTrimStart %o %o", res, res.index >= minItemsToRemove);
+			// We are trimming index-1 since the result item is the first element
+			// that is _smaller_ than our threshold distance.
+			if (res.index >= minItemsToRemove) {
+				const sliceStart = res.index - 1;
+				newElems = newElems.slice(sliceStart);
+				if (lockIndex !== undefined) lockIndex -= sliceStart;
+				canLoadBeforeStart = true;
+			}
+		}
+
+		visObs.clear();
+
+		elems = newElems;
+		await tick();
+
+		oneForAllReregister();
+	}
+
+	function oneForAllReregister() {
+		triggerResizing();
+
+		const childList = getHtmlElements();
+		visObs.observeNodes(childList);
 		lastViewStart = undefined;
 		lastViewEnd = undefined;
-
-		if (isAtTop) {
-			const scrollAdjust = pan.scrollHeight - lastScrollHeight;
-			pan.scrollTop = lastScrollTop + scrollAdjust;
-			log("isAtTop sH:%d sT:%d adjust:%d", pan.scrollHeight, pan.scrollTop, scrollAdjust);
-		}
-	}
-
-	/**
-	 * Checks if a block at the end of the list is far enough out of view and
-	 * removes it.
-	 */
-	async function tryTrimEnd() {
-		if (elems.length <= minItemsToRemove) return;
-		if (elems.length === 0) return;
-		const childList = getHtmlElements();
-
-		const distFn = (e: HTMLElement) => {
-			// The top of the element within our list (unscrolled)
-			const topStaticOffset = e.offsetTop;
-			// The top of the element without our list (with scroll offset)
-			const topCurrentOffset = topStaticOffset - pan.scrollTop;
-			return topCurrentOffset;
-		};
-
-		const removeDistance = pan.offsetHeight + minPxDistanceToRemove;
-		const removeIndex = childList.length - minItemsToRemove;
-		const res = binarySearchByKey(childList, removeDistance, distFn, 0, removeIndex + 1);
-
-		log("tryTrimEnd %o %o", res, res.index <= removeIndex);
-		if (res.index <= removeIndex) {
-			// modification is at the end => safe
-			await modifyElems(elems.slice(0, res.index), false);
-			canLoadAfterEnd = true;
-		}
-	}
-
-	/**
-	 * Checks if a block at the start of the list is far enough out of view and
-	 * removes it.
-	 */
-	async function tryTrimStart() {
-		if (elems.length <= minItemsToRemove) return;
-		if (elems.length === 0) return;
-		const childList = getHtmlElements();
-
-		const distFn = (e: HTMLElement) => {
-			// The bottom of the element within our list (unscrolled)
-			const bottomStaticOffset = e.offsetTop + e.offsetHeight;
-			// The top of the element without our list (with scroll offset)
-			const bottomCurrentOffset = bottomStaticOffset - pan.scrollTop;
-			return bottomCurrentOffset;
-		};
-
-		const res = binarySearchByKey(
-			childList,
-			-minPxDistanceToRemove,
-			distFn,
-			minItemsToRemove - 1,
-			undefined
-		);
-
-		log("tryTrimStart %o %o", res, res.index >= minItemsToRemove);
-		// We are trimming index-1 since the result item is the first element
-		// that is _smaller_ than our threshold distance.
-		if (res.index >= minItemsToRemove) {
-			// mofification at start => helper
-			await modifyElems(elems.slice(res.index - 1), true);
-			canLoadBeforeStart = true;
-		}
 	}
 
 	/**
 	 * Appends/Prepends or replaces the list with the new passed list.
 	 */
 	async function applyElements(newElems: T[], dir: ListFetchDir) {
-		// TODO:not sure, but I think add + trim could be done in one step
 		switch (dir) {
 			case ListFetchDir.After:
 				// This case adds elements at the end => trim start
 				if (newElems.length > 0) {
-					await modifyElems([...elems, ...newElems], false); // modification is at the end => safe
-					await tryTrimStart();
+					await oneForAllAppend(newElems);
 				}
 				break;
 
 			case ListFetchDir.Before:
 				// This case adds elements at the start => trim end
 				if (newElems.length > 0) {
-					await modifyElems([...newElems, ...elems], true); // mofification at start => helper
-					await tryTrimEnd();
+					await oneForAllPrepend(newElems);
 				}
 				break;
 
@@ -362,7 +370,7 @@
 				if (loadAnchored === ListFetchDir.After) {
 					docked = true;
 				}
-				await modifyElems([...elems, ...newElems], false);
+				await oneForAllReplace(newElems);
 				if (loadAnchored === ListFetchDir.Before) {
 					scrollToStart();
 				}
@@ -376,36 +384,35 @@
 
 	// Resize/Scroll events
 	let docked = false;
-	let resizing = false;
+	let allowRelock = true;
 
-	let lockElem: HTMLElement | undefined;
+	let lockIndex: number | undefined;
 	let lockPos: number | undefined;
 
-	const resizingTimeout = debounced(
-		() => {
-			resizing = false;
-			start_fill();
-		},
-		200,
-		{ resetOnCall: true }
-	);
+	function tryGetLockElem() {
+		if (lockIndex === undefined) return undefined;
+		const helems = getHtmlElements();
+		return helems[lockIndex];
+	}
 
 	function triggerResizing() {
+		allowRelock = false;
 		if (docked) {
-			pan.scrollTop = pan.scrollHeight;
+			setPanScrollTop(pan.scrollHeight);
 		} else {
-			if (lockElem && lockPos !== undefined) {
-				pan.scrollTop = lockElem.offsetTop - lockPos;
+			let lockElem = tryGetLockElem();
+			if (lockElem !== undefined && lockPos !== undefined) {
+				assert(lockElem.parentElement, "lockElem must be in DOM to jump to");
+				setPanScrollTop(lockElem.offsetTop - lockPos);
 				log("jumping %d %d %d", lockElem.offsetTop - lockPos, lockElem.offsetTop, lockPos);
 			}
 		}
-
-		resizing = true;
-		resizingTimeout();
 	}
 
 	function handle_scroll() {
-		if (!resizing) {
+		//console.log("scroll", "locked", lockIndex);
+		if (allowRelock)
+		{
 			setLockPos();
 			if (pan.scrollTop === pan.scrollHeight - pan.clientHeight) {
 				//if (docked === false) log("docked");
@@ -437,13 +444,19 @@
 		}
 	}
 
-	function setLockPos(elem?: HTMLElement) {
-		if (resizing) return;
-		if (elem) {
-			lockElem = elem;
-		} else if (!lockElem) {
+	function setLockPos(index?: number) {
+		if (!allowRelock) return;
+		if (index !== undefined) {
+			lockIndex = index;
+		} else if (lockIndex === undefined) {
 			return;
 		}
+
+		let lockElem = tryGetLockElem();
+		if (lockElem === undefined) {
+			return;
+		}
+		assert(lockElem.parentElement, "lockElem must be in DOM to lock to");
 		lockPos = lockElem.offsetTop - pan.scrollTop;
 	}
 
@@ -482,7 +495,12 @@
 		const startChanged = oldIdStart !== lastViewStart;
 		const endChanged = oldIdEnd !== lastViewEnd;
 		if (startChanged && newLockElem !== undefined) {
-			setLockPos(newLockElem);
+			let newLockIndex = Number(newLockElem.dataset.index);
+			//console.log("Insersec Loc", newLockIndex, allowRelock);
+			if (allowRelock) {
+				setLockPos(newLockIndex);
+			}
+			allowRelock = true;
 		}
 		if (notifyViewChanged && (startChanged || endChanged)) {
 			dispatch("viewchanged", {
@@ -495,7 +513,12 @@
 	onMount(() => {
 		start_fill();
 
-		const resizeObserver = new ResizeObserver(() => triggerResizing());
+		const resizeObserver = new ResizeObserver(
+			(entries: ResizeObserverEntry[], observer: ResizeObserver) => {
+				//console.log(entries, "locked", lockIndex);
+				triggerResizing();
+			}
+		);
 		resizeObserver.observe(pan);
 		resizeObserver.observe(scrollPane);
 
