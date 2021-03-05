@@ -70,6 +70,7 @@ export class TransientSettingsSynth {
 	public speed: number = 1;
 	private _voiceIdCache?: string
 	private _voiceCache?: SpeechSynthesisVoice
+	private _previousUtter: SpeechSynthesisUtterance | undefined;
 	public get voice(): SpeechSynthesisVoice | undefined {
 		if (this._voiceIdCache !== this.voiceId) {
 			if (synth) {
@@ -108,8 +109,19 @@ export class TransientSettingsSynth {
 		if (synth) {
 			const utter = this.getNewUtter();
 			utter.text = text;
-			synth.cancel();
-			synth.speak(utter);
+			// Due to a weird bug when calling
+			// speak(..), cancel(), speak(..)
+			// the second speak will be canceled too.
+			// This is a weird workaround for that.
+			if (synth.speaking && this._previousUtter) {
+				this._previousUtter.onend = () => {
+					synth.speak(utter);
+				}
+				synth.cancel();
+			} else {
+				synth.speak(utter);
+			}
+			this._previousUtter = utter;
 		}
 	}
 
