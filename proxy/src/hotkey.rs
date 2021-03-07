@@ -290,7 +290,6 @@ mod imp {
 
 	#[derive(Debug)]
 	pub struct Hotkeys {
-		config: HotkeyConfig,
 	}
 
 	pub fn _key_list() -> Vec<String> { Vec::new() }

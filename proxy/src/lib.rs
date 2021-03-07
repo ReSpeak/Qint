@@ -201,12 +201,13 @@ impl State {
 		state: &Arc<Self>, f: T,
 	) -> (Result<SettingsUpdate>, Result<()>) {
 		let mut settings = state.settings.write().unwrap();
+		let old_loudness_threshold = settings.get_loudness_threshold();
+		let old_global_volume = settings.get_global_volume();
+
 		// Reload before changing to prevent overwriting changes from other processes
 		if let Err(e) = settings.load(&state.launch_config.read().unwrap().config_path) {
 			warn!(state.logger, "Failed to reload settings"; "error" => %e);
 		}
-		let old_loudness_threshold = settings.get_loudness_threshold();
-		let old_global_volume = settings.get_global_volume();
 
 		let r = f(&mut *settings);
 		let res = settings.save(&state.launch_config.read().unwrap().config_path);
