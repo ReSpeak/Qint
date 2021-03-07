@@ -1,6 +1,6 @@
 <script lang="typescript">
 	import { createEventDispatcher, onMount } from "svelte";
-	export let items: any[];
+	export let items: readonly any[];
 	export let selected: any;
 	export let display: (item: any) => string = displayFn;
 	export let id: string | undefined = undefined;
@@ -11,7 +11,7 @@
 
 	function selectedToIndex(selected: any) {
 		if (dd == null || items.length === 0) return;
-		if ("value" in Object.keys(items[0])) {
+		if ("value" in items[0]) {
 			let index = items.findIndex(it => it.value === selected);
 			if (index === -1) return;
 			dd.selectedIndex = index;
@@ -24,11 +24,12 @@
 	}
 
 	function indexToSelected() {
-		if (dd == null || items.length === 0) return;
-		if ("value" in Object.keys(items[0])) {
-			selected = items[dd.selectedIndex].value;
+		if (dd == null || dd.selectedIndex >= items.length) return;
+		const pickedItem = items[dd.selectedIndex];
+		if ("value" in pickedItem) {
+			selected = pickedItem.value;
 		} else {
-			selected = items[dd.selectedIndex];
+			selected = pickedItem;
 		}
 		dispatch("change", selected);
 	}

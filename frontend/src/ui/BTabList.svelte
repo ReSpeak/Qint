@@ -4,10 +4,12 @@
 	import { contextKey } from "./tabList";
 	import type { TabListContext } from "./tabList";
 
-	export let activeIndex = writable(0);
+	export let activeIndex: number = 0;
+	const indexStore = writable(activeIndex);
+	$: indexStore.set(activeIndex);
 	let items: string[] = [];
 	let context: TabListContext = {
-		activeIndex,
+		activeIndex: indexStore,
 		registerPanel,
 	};
 	setContext(contextKey, context);
@@ -23,11 +25,11 @@
 	<div class="tabs">
 		<ul>
 			{#each items as item, index}
-				<li class:is-active={index === $activeIndex}>
+				<li class:is-active={index === activeIndex}>
 					<!-- svelte-ignore a11y-missing-attribute -->
 					<a
 						on:click={() => {
-							$activeIndex = index;
+							activeIndex = index;
 						}}>
 						{item}
 					</a>

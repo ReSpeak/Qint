@@ -1,6 +1,5 @@
 <script lang="typescript">
 	import { onMount } from "svelte";
-	import type { Writable } from "svelte/store";
 	import { app } from "../app";
 	import BTabList from "../ui/BTabList.svelte";
 	import BTabSlot from "../ui/BTabSlot.svelte";
@@ -9,17 +8,20 @@
 	import BHotkeyField from "../ui/BHotkeyField.svelte";
 	import SimpleDiagram from "../ui/UiSimpleDiagram.svelte";
 	import BSlider from "../ui/BSlider.svelte";
-	import { dbToFactor, factorToDb, LOUDNESS_END_MAGIC, LOUDNESS_MAX, LOUDNESS_MIN, LOUDNESS_UPDATE_MS, MIN_VOLUME_DB } from "../util";
-	import { hotkeyToShortcut, shortcutToHotkey } from "../hotkey";
-	import type { Hotkey } from "../hotkey";
+	import {
+		dbToFactor,
+		factorToDb,
+		LOUDNESS_END_MAGIC,
+		LOUDNESS_MAX,
+		LOUDNESS_MIN,
+		LOUDNESS_UPDATE_MS,
+		MIN_VOLUME_DB,
+	} from "../util";
 	import Icon from "../ui/Icon.svelte";
 	import { backend } from "../backend/backend";
+	import { isHotkeyComplete } from "../hotkey";
 
-	const shortcuts = app.transientSettings.shortcuts;
-	const hotkeyActions = shortcuts.actions;
-	let incompleteHotkey: Hotkey | undefined;
-
-	let tablistIndex: Writable<number>;
+	let tablistIndex: number;
 	const audioSett = app.transientSettings.audio;
 
 	let developMode = app.transientSettings.ui._developMode;
@@ -78,37 +80,34 @@
 		app.transientSettings.save();
 	}
 
-	async function createHotkey() {
-		if (incompleteHotkey === undefined) {
-			incompleteHotkey = {
-				keycode: null,
-				ctrl: false,
-				shift: false,
-				alt: false,
-				meta: false,
-				action: null,
-			};
-		}
+	let localHotkeys = [...app.transientSettings.hotkeys.actions];
+	function syncHotkeys() {
+		app.transientSettings.hotkeys.actions = localHotkeys.filter(isHotkeyComplete);
+		app.transientSettings.save();
+		app.transientSettings.flush();
 	}
 
-	function changeHotkey(e: CustomEvent<Hotkey>) {
-		const shortcut = hotkeyToShortcut(e.detail);
-		if (shortcut !== undefined)
-			shortcuts.addShortcut(shortcut);
-		else
-			console.log("Ignoring incomplete hotkey", e.detail);
+	function deleteHotkey(index: number) {
+		localHotkeys.splice(index, 1);
+		localHotkeys = localHotkeys;
+		syncHotkeys();
 	}
 
-	function deleteHotkey(e: CustomEvent<Hotkey>) {
-		const shortcut = hotkeyToShortcut(e.detail);
-		if (shortcut !== undefined)
-			shortcuts.deleteShortcut(shortcut);
-		else
-			console.log("Ignoring incomplete hotkey", e.detail);
+	function createHotkey() {
+		localHotkeys.push({
+			keycode: null,
+			_ctrl: false,
+			_shift: false,
+			_alt: false,
+			_meta: false,
+			action: null,
+		});
+		localHotkeys = localHotkeys;
 	}
 
 	function updateLoudness() {
-		audioSett.loudnessThreshold = loudnessThreshold === minLoudnessThreshold ? null : loudnessThreshold;
+		audioSett.loudnessThreshold =
+			loudnessThreshold === minLoudnessThreshold ? null : loudnessThreshold;
 		syncSettings();
 	}
 
@@ -121,14 +120,17 @@
 
 	function browserNotificationChanged() {
 		syncSettings();
-		if (app.transientSettings.app.allowBrowserNotifications && Notification.permission === "default") {
+		if (
+			app.transientSettings.app.allowBrowserNotifications &&
+			Notification.permission === "default"
+		) {
 			Notification.requestPermission();
 		}
 	}
 
 	$: {
 		// Subscribe to loadness changes when on audio tab
-		if ($tablistIndex === 1) {
+		if (tablistIndex === 1) {
 			loudnessSocket = new WebSocket(`${backend.wsBaseAddress}/loudness`);
 			loudnessSocket.binaryType = "arraybuffer";
 			loudnessSocket.onmessage = (ev) => {
@@ -149,7 +151,7 @@
 			loudnessSocket?.close();
 			loudnessSocket = undefined;
 		};
-	})
+	});
 </script>
 
 <div class="settings">
@@ -171,13 +173,15 @@
 			</BKeyValue>
 			<BKeyValue
 				label="Browser notifications"
-				title={browserNotificationDenied ? "Your browser blocked notifications for this page. If you want to use them, enable notifications in your browser settings and reload the page." : ""}>
+				title={browserNotificationDenied
+					? "Your browser blocked notifications for this page. If you want to use them, enable notifications in your browser settings and reload the page."
+					: ""}>
 				<input
 					type="checkbox"
 					class="checkbox-switch is-info"
 					disabled={browserNotificationDenied}
 					bind:checked={app.transientSettings.app.allowBrowserNotifications}
-					on:change={browserNotificationChanged}>
+					on:change={browserNotificationChanged} />
 			</BKeyValue>
 		</BTabSlot>
 
@@ -195,14 +199,17 @@
 				</div>
 			</BKeyValue>
 			<div>Loudness:</div>
-			<SimpleDiagram bind:this={loudnessDiagram}
+			<SimpleDiagram
+				bind:this={loudnessDiagram}
 				width={LOUDNESS_WIDTH}
 				height={LOUDNESS_HEIGHT}
 				min={LOUDNESS_MIN}
 				max={LOUDNESS_MAX}
 				count={LOUDNESS_COUNT}
-				lines={[[-14, "#555555"], [loudnessThreshold, "#aa3333"]]}
-			/>
+				lines={[
+					[-14, "#555555"],
+					[loudnessThreshold, "#aa3333"],
+				]} />
 			<BKeyValue label="Volume Capture Trigger">
 				<div class="volumeControl">
 					<BSlider
@@ -258,14 +265,14 @@
 			</BKeyValue>
 		</BTabSlot>
 		<BTabSlot title="Hotkeys">
-			{#each hotkeyActions as hotkeyAction}
-				<BHotkeyField hotkey={shortcutToHotkey(hotkeyAction)} on:change={changeHotkey} on:button={deleteHotkey} iconName="close" />
+			{#each localHotkeys as hotkey, index}
+				<BHotkeyField
+					{hotkey}
+					on:change={() => syncHotkeys()}
+					on:remove={() => deleteHotkey(index)} />
 			{/each}
-			{#if incompleteHotkey !== undefined}
-				<BHotkeyField hotkey={incompleteHotkey} on:change={changeHotkey} on:button={deleteHotkey} iconName="close" />
-			{/if}
 
-			<BKeyValue label="Add shortcut" labelStyle="is-normal">
+			<BKeyValue label="Add hotkey" labelStyle="is-normal">
 				<button class="button" on:click={createHotkey}>
 					<Icon name="plus" />
 				</button>

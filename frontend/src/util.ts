@@ -372,28 +372,52 @@ export function deep_merge(obj: any, merge: any): void {
  * Returns `null` if the value was deleted.
  * Returns the diff object otherwise.
  */
-export function deep_diff(from: any, to: any): object | null | undefined {
+export function deep_diff(from: any, to: any): any | undefined {
 	if (from == null) return to;
 	if (to == null) return null;
 	if (typeof from !== typeof to) return to;
-	if (typeof to !== "object" || to === null) {
-		if (from === to)
+	if (typeof to !== "object" || to === null || Array.isArray(to)) {
+		if (deep_equals(from, to))
 			return undefined;
 		return to;
 	}
-	let res: any = {};
+	let hasChanges = false;
+	let res: Record<string, any> = {};
 	// Check existing and new entries
 	for (const [key, value] of Object.entries(to)) {
-		res[key] = deep_diff(from[key], value);
+		const diff = deep_diff(from[key], value);
+		if (diff !== undefined) {
+			hasChanges = true;
+			res[key] = diff;
+		}
 	}
 	// Check removed entries
 	for (const key of Object.keys(from)) {
-		if (!(key in to))
+		if (!(key in to)) {
+			hasChanges = true;
 			res[key] = null;
+		}
 	}
-	if (Object.keys(res).length === 0)
+	if (!hasChanges)
 		return undefined;
 	return res;
+}
+(window as any).deep_diff = deep_diff;
+
+export function deep_equals(a: any, b: any): boolean {
+	if (a === b) return true;
+	if (typeof a !== typeof b)
+		return false;
+	if (typeof a !== "object") return false;
+	if (Array.isArray(a) && a.length !== b.length) return false;
+	const a_entries = Object.entries(a);
+	const b_keys = Object.keys(b);
+	if (a_entries.length !== b_keys.length) return false;
+	for (const [key, value] of a_entries) {
+		if (!deep_equals(value, b[key]))
+			return false;
+	}
+	return true;
 }
 
 export function on(..._: any[]) { }
@@ -454,8 +478,16 @@ export function debounced<T extends unknown[] = []>(fn: FuncTyp<T>, timeout: num
 		}
 	}
 
+	function flush() {
+		if (timer !== undefined) {
+			cancel();
+			fn(...lastArgs);
+		}
+	}
+
 	call.cancel = cancel;
 	call.call = call;
+	call.flush = flush;
 	return call;
 }
 

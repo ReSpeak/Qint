@@ -4,17 +4,17 @@ use slog::warn;
 
 use crate::{websocket, Tristate};
 
-pub use imp::{KeyCode, Shortcuts};
+pub use imp::{KeyCode, Hotkeys};
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-pub struct Shortcut {
+pub struct Hotkey {
 	pub keycode: KeyCode,
 	pub action: Action,
 }
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
-pub struct ShortcutConfig {
-	pub actions: Vec<Shortcut>,
+pub struct HotkeyConfig {
+	pub actions: Vec<Hotkey>,
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Deserialize, Serialize)]
@@ -51,20 +51,20 @@ impl Action {
 
 #[cfg(windows)]
 mod imp {
-	use std::sync::Arc;
+	use std::sync::{Arc, Mutex};
 
 	use anyhow::Result;
 	use livesplit_hotkey::*;
 	use tokio::runtime::Handle;
 
-	use super::ShortcutConfig;
+	use super::HotkeyConfig;
 	use crate::State;
 
 	pub use livesplit_hotkey::KeyCode;
 
-	pub struct Shortcuts {
-		config: ShortcutConfig,
+	pub struct Hotkeys {
 		hook: Hook,
+		registered: Mutex<Vec<KeyCode>>,
 	}
 
 	pub fn _key_list() -> Vec<String> {
@@ -246,13 +246,19 @@ mod imp {
 		.collect()
 	}
 
-	impl Shortcuts {
-		pub fn new(config: ShortcutConfig) -> Result<Self> {
-			Ok(Self { config, hook: Hook::new()? })
+	impl Hotkeys {
+		pub fn new() -> Result<Self> {
+			Ok(Self { hook: Hook::new()?, registered: Vec::new().into() })
 		}
 
-		pub fn apply_config(&self, state: &Arc<State>) -> Result<()> {
-			for a in &self.config.actions {
+		pub fn apply_config(&self, state: &Arc<State>, config: HotkeyConfig) -> Result<()> {
+			let mut reg = self.registered.lock().unwrap();
+			for key in &*reg {
+				let _ = self.hook.unregister(*key);
+			}
+			reg.clear();
+
+			for a in config.actions {
 				let action = a.action;
 				let state = state.clone();
 				let handle = Handle::current();
@@ -262,6 +268,7 @@ mod imp {
 						action.run(&state).await;
 					});
 				})?;
+				reg.push(a.keycode);
 			}
 			Ok(())
 		}
@@ -275,22 +282,22 @@ mod imp {
 	use anyhow::Result;
 	use serde::{Deserialize, Serialize};
 
-	use super::ShortcutConfig;
+	use super::HotkeyConfig;
 	use crate::State;
 
 	#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Deserialize, Serialize)]
 	pub enum KeyCode {}
 
 	#[derive(Debug)]
-	pub struct Shortcuts {
-		config: ShortcutConfig,
+	pub struct Hotkeys {
+		config: HotkeyConfig,
 	}
 
 	pub fn _key_list() -> Vec<String> { Vec::new() }
 
-	impl Shortcuts {
-		pub fn new(config: ShortcutConfig) -> Result<Self> { Ok(Self { config }) }
+	impl Hotkeys {
+		pub fn new() -> Result<Self> { Ok(Self {}) }
 
-		pub fn apply_config(&self, _: &Arc<State>) -> Result<()> { Ok(()) }
+		pub fn apply_config(&self, state: &Arc<State>, config: HotkeyConfig) -> Result<()> { Ok(()) }
 	}
 }

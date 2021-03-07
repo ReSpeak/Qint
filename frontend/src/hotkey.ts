@@ -1,70 +1,62 @@
-import { Shortcut, ShortcutAction, Tristate } from "./transientSettings";
+import { Hotkey, HotkeyAction, HotkeySubject, Tristate } from "./transientSettings";
 
-export const actions = [
+type Option<T> = Readonly<{ value: T | "", text: string }>;
+type StateOptions = Tristate;
+export const hotkeySubjects: readonly Option<HotkeySubject>[] = [
 	{ value: "", text: "" },
 	{ value: "Away", text: "Away" },
 	{ value: "InputMute", text: "Mute Input" },
 	{ value: "OutputMute", text: "Mute Output" },
 ];
 
-export function valueToAction(actionName: string, actionState: Tristate): ShortcutAction | null {
-	if (!actionName || !actions.map(a => a.value).includes(actionName)) return null;
-	let obj: any = {};
-	obj[actionName] = actionState;
+export const hotkeyValueFns: readonly Option<StateOptions>[] = [
+	{ value: "", text: "" },
+	{ value: Tristate.True, text: "On" },
+	{ value: Tristate.False, text: "Off" },
+	{ value: Tristate.Toggle, text: "Toggle" },
+]
+
+export function isHotkeyComplete(hotkey: Hotkey): boolean {
+	return hotkey.keycode != null && hotkey.action != null;
+}
+
+export function buildAction(subject: HotkeySubject, valueFn: Tristate): HotkeyAction | null {
+	if (!subject || !valueFn) return null;
+	let obj: HotkeyAction = {};
+	obj[subject] = valueFn;
 	return obj;
 }
 
-export function shortcutToHotkey(shortcut: Shortcut): Hotkey {
-	return {
-		keycode: shortcut.keycode,
-		ctrl: false,
-		shift: false,
-		alt: false,
-		meta: false,
-		action: shortcut.action,
-	};
+export function getActionSubject(action: HotkeyAction | null): HotkeySubject | null {
+	if (!action) return null;
+	return Object.keys(action)[0] as HotkeySubject | undefined ?? null;
 }
 
-export function hotkeyToShortcut(hotkey: Hotkey): Shortcut | undefined {
-	if (hotkey.keycode === null || hotkey.action === null) return undefined;
-	return {
-		keycode: hotkey.keycode,
-		action: hotkey.action,
-	};
-}
-
-export function actionToText(action: ShortcutAction | null): string {
-	if (!action || Object.keys(action).length === 0) return "-";
-	let actionData = actions.find(a => Object.keys(action)[0] === a.text);
-	return actionData?.text ?? "-";
-}
-
-export function actionToName(action: ShortcutAction | null): string {
-	if (!action || Object.keys(action).length === 0) return "-";
-	let actionData = actions.find(a => Object.keys(action)[0] === a.value);
-	return actionData?.value ?? "-";
-}
-
-export function getActionState(action: ShortcutAction | null): Tristate | null {
-	if (!action || Object.values(action).length === 0) return null;
-	return Object.values(action)[0];
+export function getActionValueFn(action: HotkeyAction | null): Tristate | null {
+	if (!action) return null;
+	return Object.values(action)[0] ?? null;
 }
 
 export function hotkeyToString(hotkey: Hotkey) {
 	let content = [];
-	if (hotkey.ctrl)  content.push("Ctrl");
-	if (hotkey.shift) content.push("Shift");
-	if (hotkey.alt)   content.push("Alt");
-	if (hotkey.meta)  content.push("Meta");
+	if (hotkey._ctrl) content.push("Ctrl");
+	if (hotkey._shift) content.push("Shift");
+	if (hotkey._alt) content.push("Alt");
+	if (hotkey._meta) content.push("Meta");
 	content.push(hotkey.keycode);
 	return content.join(" + ");
 }
 
-export interface Hotkey {
-	keycode: string | null;
-	ctrl: boolean;
-	shift: boolean;
-	alt: boolean;
-	meta: boolean;
-	action: ShortcutAction | null;
+export function translateJsKeyToWindows(jsKeyCode: string): string {
+	// Too lazy to map the rest, have fun with this:
+	// https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/code/code_values
+	// https://github.com/LiveSplit/livesplit-core/blob/master/crates/livesplit-hotkey/src/windows/key_code.rs
+	if (["ControlLeft", "ControlRight", "ShiftLeft", "ShiftRight", "AltLeft", "AltRight", "MetaLeft", "MetaRight"].includes(jsKeyCode))
+		return jsKeyCode;
+	switch (jsKeyCode) {
+		case "ScrollLock": return "Scroll";
+	}
+	if (jsKeyCode.startsWith("Digit")) return jsKeyCode.replace("Digit", "D");
+	if (jsKeyCode.startsWith("Key")) return jsKeyCode.replace("Key", "");
+	return jsKeyCode;
 }

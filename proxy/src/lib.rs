@@ -13,13 +13,13 @@ use std::sync::{Arc, Mutex, RwLock};
 use actix::*;
 use actix_cors::Cors;
 use actix_files::Files;
+use actix_web::middleware::Condition;
+use actix_web::web::Bytes;
 use actix_web::*;
 use actix_web::{
 	dev::{HttpResponseBuilder, Service},
 	web::Query,
 };
-use actix_web::middleware::Condition;
-use actix_web::web::Bytes;
 use actix_web_actors::ws;
 use anyhow::{bail, format_err, Result};
 use futures::prelude::*;
@@ -40,13 +40,13 @@ use uuid::Uuid;
 mod audio;
 mod db;
 mod filecache;
+mod hotkey;
 mod link_previewer;
 mod loudness_ws;
 mod markdown_ws;
 mod messages;
 mod search;
 mod secret;
-mod shortcut;
 mod websocket;
 
 use filecache::FileCache;
@@ -110,6 +110,11 @@ pub struct Args {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct Settings(Value);
 
+#[derive(Debug, Default)]
+struct SettingsUpdate {
+	hotkeys_changed: bool,
+}
+
 /// The settings in this struct are saved to the main settings file.
 ///
 /// All settings here are meant to be edited by hand, e.g. for the case that a user wants to have
@@ -146,7 +151,7 @@ pub struct State {
 	/// The list of all currently existing connections
 	connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
 	audio_data: Option<audio::AudioData>,
-	shortcuts: shortcut::Shortcuts,
+	hotkeys: hotkey::Hotkeys,
 	launch_config: RwLock<LaunchConfig>,
 	settings: RwLock<Settings>,
 	database: Addr<db::DbHandler>,
@@ -192,26 +197,28 @@ fn default_cache_path() -> PathBuf {
 impl juniper::Context for State {}
 
 impl State {
-	fn modify_settings<R, T: FnOnce(&mut Settings) -> R>(&self, f: T) -> (R, Result<()>) {
-		let mut settings = self.settings.write().unwrap();
+	fn modify_settings<T: FnOnce(&mut Settings) -> Result<SettingsUpdate>>(
+		state: &Arc<Self>, f: T,
+	) -> (Result<SettingsUpdate>, Result<()>) {
+		let mut settings = state.settings.write().unwrap();
 		// Reload before changing to prevent overwriting changes from other processes
-		if let Err(e) = settings.load(&self.launch_config.read().unwrap().config_path) {
-			warn!(self.logger, "Failed to reload settings"; "error" => %e);
+		if let Err(e) = settings.load(&state.launch_config.read().unwrap().config_path) {
+			warn!(state.logger, "Failed to reload settings"; "error" => %e);
 		}
 		let old_loudness_threshold = settings.get_loudness_threshold();
 		let old_global_volume = settings.get_global_volume();
 
 		let r = f(&mut *settings);
-		let res = settings.save(&self.launch_config.read().unwrap().config_path);
+		let res = settings.save(&state.launch_config.read().unwrap().config_path);
 		if let Err(e) = &res {
-			error!(self.logger, "Failed to save settings"; "error" => %e);
+			error!(state.logger, "Failed to save settings"; "error" => %e);
 		}
 
 		// Apply audio changes
 		if let Some(v) = settings.get_loudness_threshold() {
 			if Some(v) != old_loudness_threshold {
-				let logger = self.logger.clone();
-				if let Some(ad) = &self.audio_data {
+				let logger = state.logger.clone();
+				if let Some(ad) = &state.audio_data {
 					actix::spawn(ad.a2ts.send(audio::audio_to_ts::SetLoudnessThresholdMsg(v)).map(
 						move |r| {
 							if let Err(e) = r {
@@ -226,8 +233,8 @@ impl State {
 
 		if let Some(v) = settings.get_global_volume() {
 			if Some(v) != old_global_volume {
-				let logger = self.logger.clone();
-				if let Some(ad) = &self.audio_data {
+				let logger = state.logger.clone();
+				if let Some(ad) = &state.audio_data {
 					actix::spawn(ad.ts2a.send(audio::ts_to_audio::SetGlobalVolumeMsg(v)).map(
 						move |r| {
 							if let Err(e) = r {
@@ -239,6 +246,15 @@ impl State {
 			}
 		}
 
+		if let Ok(changes) = &r {
+			if changes.hotkeys_changed {
+				if let Ok(hotkeys) = settings.get_hotkeys_config() {
+					if let Err(e) = state.hotkeys.apply_config(state, hotkeys) {
+						error!(state.logger, "Failed to apply new hotkeys"; "error" => %e);
+					}
+				}
+			}
+		}
 		(r, res)
 	}
 }
@@ -277,6 +293,8 @@ impl LaunchConfig {
 }
 
 impl Settings {
+	const KEY_HOTKEYS: &'static str = "hotkeys";
+
 	fn load(&mut self, config_path: &Path) -> Result<()> {
 		let s = fs::read_to_string(&config_path.join(SETTINGS_FILENAME))?;
 		*self = serde_json::from_str(&s)?;
@@ -299,13 +317,13 @@ impl Settings {
 		self.0.as_object()?.get("audio")?.as_object()?.get("loudnessThreshold")?.as_f64()
 	}
 
-	fn get_shortcut_config(&self) -> Result<shortcut::ShortcutConfig> {
-		Ok(shortcut::ShortcutConfig::deserialize(
+	fn get_hotkeys_config(&self) -> Result<hotkey::HotkeyConfig> {
+		Ok(hotkey::HotkeyConfig::deserialize(
 			self.0
 				.as_object()
 				.ok_or_else(|| format_err!("Settings root is no object"))?
-				.get("shortcuts")
-				.ok_or_else(|| format_err!("shortcuts not found in settings"))?
+				.get(Settings::KEY_HOTKEYS)
+				.ok_or_else(|| format_err!("hotkeys not found in settings"))?
 				.clone()
 				.into_deserializer(),
 		)?)
@@ -375,9 +393,9 @@ async fn create_ws(
 	}
 }
 
-#[post("/shortcut")]
-async fn run_shortcut(
-	state: web::Data<Arc<State>>, action: web::Json<shortcut::Action>,
+#[post("/hotkey")]
+async fn run_hotkey(
+	state: web::Data<Arc<State>>, action: web::Json<hotkey::Action>,
 ) -> impl Responder {
 	action.run(&state).await;
 	HttpResponse::Ok()
@@ -668,13 +686,15 @@ async fn get_setting(state: web::Data<Arc<State>>) -> impl Responder {
 
 #[put("/transient")]
 async fn set_setting(state: web::Data<Arc<State>>, body: web::Json<Value>) -> impl Responder {
-	let (r, res) = state.modify_settings(|values| {
-		if body.is_object() {
+	let (r, res) = State::modify_settings(&state.into_inner(), |values| {
+		let hotkeys_changed;
+		if let Value::Object(o) = &body.0 {
+			hotkeys_changed = o.contains_key(Settings::KEY_HOTKEYS);
 			values.merge(&body.0);
 		} else {
 			bail!("body must be an object");
 		}
-		Ok(())
+		Ok(SettingsUpdate { hotkeys_changed })
 	});
 
 	if let Err(e) = r {
@@ -810,14 +830,16 @@ impl App {
 				settings.get_global_volume().unwrap_or(1.0),
 			)?)
 		};
-		let shortcut_config = match settings.get_shortcut_config() {
+
+		// Read hotkeys config
+		let hotkey_config = match settings.get_hotkeys_config() {
 			Ok(r) => r,
 			Err(e) => {
-				debug!(logger, "Failed to read shortcut config, ignoring"; "error" => %e);
-				shortcut::ShortcutConfig::default()
+				debug!(logger, "Failed to read hotkey config, ignoring"; "error" => %e);
+				hotkey::HotkeyConfig::default()
 			}
 		};
-		let shortcuts = shortcut::Shortcuts::new(shortcut_config)?;
+		let hotkeys = hotkey::Hotkeys::new()?;
 
 		if let Some(threshold) = settings.get_loudness_threshold() {
 			let logger = logger.clone();
@@ -854,7 +876,7 @@ impl App {
 			logger,
 			connections,
 			audio_data,
-			shortcuts,
+			hotkeys,
 			launch_config: RwLock::new(launch_config),
 			settings: RwLock::new(settings),
 			database,
@@ -865,7 +887,7 @@ impl App {
 			search,
 		});
 
-		state.shortcuts.apply_config(&state)?;
+		state.hotkeys.apply_config(&state, hotkey_config)?;
 
 		if search_is_new {
 			search::Search::start_setup(&state);
@@ -894,7 +916,7 @@ impl App {
 				.wrap(Condition::new(!is_production, Cors::permissive().max_age(3600)))
 				.data(state)
 				.service(create_ws)
-				.service(run_shortcut)
+				.service(run_hotkey)
 				.service(audio_reset)
 				.service(list_plugins)
 				.service(get_plugin)

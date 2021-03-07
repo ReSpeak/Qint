@@ -1,7 +1,9 @@
 import { get, writable } from "svelte/store";
-import { deep_diff, deep_merge } from "./util";
+import { debounced, deep_diff, deep_merge } from "./util";
 import { backend } from "./backend/backend";
 import { NodeSelection } from "./app";
+import debug from "debug";
+const log = debug("TRANSIENT");
 
 export const enum DescriptionMode {
 	None = "None",
@@ -10,7 +12,7 @@ export const enum DescriptionMode {
 }
 
 export class TransientSettings {
-	private _syncDebounceTimer: number | undefined;
+	private _syncDebounced = debounced(() => this.saveAsync(), 5000);
 	/// Value from last save
 	private _lastSave: any;
 	public synth = new TransientSettingsSynth();
@@ -18,7 +20,7 @@ export class TransientSettings {
 	public chat = new TransientSettingsChat(this);
 	public app = new TransientSettingsApp();
 	public audio = new TransientSettingsAudio();
-	public shortcuts = new TransientSettingsShortcuts(this);
+	public hotkeys = new TransientSettingsHotkeys();
 
 	public async loadAsync() {
 		try {
@@ -32,21 +34,21 @@ export class TransientSettings {
 	}
 
 	public save() {
-		if (this._syncDebounceTimer === undefined)
-			this._syncDebounceTimer = setTimeout(() => this.saveAsync(), 5000);
+		
+		this._syncDebounced();
 	}
 
 	public flush() {
-		if (this._syncDebounceTimer !== undefined)
-			this.saveAsync();
+		this._syncDebounced.flush();
 	}
 
 	private async saveAsync() {
-		this._syncDebounceTimer = undefined;
-
 		let newSave = JSON.parse(JSON.stringify(this, (k, v) => k.startsWith('_') ? undefined : v));
 		// Diff to last save
 		let diff = deep_diff(this._lastSave, newSave);
+		log("Syncing:\nOld: %j\nNew: %j\nDiff: %j", this._lastSave, newSave, diff);
+		if (diff === undefined)
+			return;
 
 		this._lastSave = newSave;
 
@@ -62,8 +64,6 @@ export class TransientSettings {
 	}
 }
 
-const synth: SpeechSynthesis | undefined = window.speechSynthesis;
-
 export class TransientSettingsSynth {
 	public voiceId?: string;
 	public volume: number = 1;
@@ -73,6 +73,7 @@ export class TransientSettingsSynth {
 	private _previousUtter: SpeechSynthesisUtterance | undefined;
 	public get voice(): SpeechSynthesisVoice | undefined {
 		if (this._voiceIdCache !== this.voiceId) {
+			const synth = window.speechSynthesis;
 			if (synth) {
 				const voices = synth.getVoices();
 				this._voiceCache = voices.find(v => v.voiceURI === this.voiceId) ?? voices.find(_ => true);
@@ -95,7 +96,7 @@ export class TransientSettingsSynth {
 		}
 	}
 
-	public readonly canSpeak = synth !== undefined;
+	public canSpeak() { return window.speechSynthesis !== undefined; }
 
 	private getNewUtter(): SpeechSynthesisUtterance {
 		const utter = new SpeechSynthesisUtterance();
@@ -106,6 +107,7 @@ export class TransientSettingsSynth {
 	}
 
 	public trySpeak(text: string) {
+		const synth = window.speechSynthesis;
 		if (synth) {
 			const utter = this.getNewUtter();
 			utter.text = text;
@@ -126,6 +128,7 @@ export class TransientSettingsSynth {
 	}
 
 	public getVoices(): SpeechSynthesisVoice[] {
+		const synth = window.speechSynthesis;
 		if (synth) {
 			return synth.getVoices();
 		} else {
@@ -154,8 +157,8 @@ export class TransientSettingsUi {
 		return res;
 	}
 }
-Object.defineProperty(TransientSettingsUi.prototype, 'descriptionMode', {enumerable: true});
-Object.defineProperty(TransientSettingsUi.prototype, 'developMode', {enumerable: true});
+Object.defineProperty(TransientSettingsUi.prototype, 'descriptionMode', { enumerable: true });
+Object.defineProperty(TransientSettingsUi.prototype, 'developMode', { enumerable: true });
 
 export class TransientSettingsChat {
 	private _parent: TransientSettings;
@@ -198,50 +201,22 @@ export const enum Tristate {
 	Toggle = "Toggle",
 }
 
-export type ShortcutAction = { Away: Tristate }
-			| { InputMute: Tristate }
-			| { OutputMute: Tristate };
+export type HotkeySubject = "Away" | "InputMute" | "OutputMute";
 
-export interface Shortcut {
-	keycode: string;
-	action: ShortcutAction;
+export type HotkeyAction = {
+	[P in HotkeySubject]?: Tristate
+};
+
+export interface Hotkey {
+	action: HotkeyAction | null;
+	keycode: string | null;
+	// keep underscored for now so they dont get saved until feature is used
+	_ctrl?: boolean;
+	_shift?: boolean;
+	_alt?: boolean;
+	_meta?: boolean;
 }
 
-export class TransientSettingsShortcuts {
-	private _parent: TransientSettings;
-	public actions: Shortcut[] = [];
-
-	constructor(parent: TransientSettings) {
-		this._parent = parent;
-	}
-
-	public addShortcut(shortcut: Shortcut) {
-		if (!shortcut.action || !shortcut.keycode) {
-			console.log(`Not saving incomplete shortcut: ${JSON.stringify(shortcut)}`);
-			return;
-		}
-		this.actions.push(shortcut);
-		this._parent.save();
-	}
-
-	private static actionEquals(a: ShortcutAction, b: ShortcutAction): boolean {
-		if ("Away" in a && "Away" in b)
-			return a.Away === b.Away;
-		if ("InputMute" in a && "InputMute" in b)
-			return a.InputMute === b.InputMute;
-		if ("OutputMute" in a && "OutputMute" in b)
-			return a.OutputMute === b.OutputMute;
-		return false;
-	}
-
-	public deleteShortcut(shortcut: Shortcut) {
-		for (let i = 0; i < this.actions.length; i++) {
-			const s = this.actions[i];
-			if (s.keycode === shortcut.keycode && TransientSettingsShortcuts.actionEquals(s.action, shortcut.action)) {
-				this.actions.splice(i, 1);
-				this._parent.save();
-				break;
-			}
-		}
-	}
+export class TransientSettingsHotkeys {
+	public actions: Hotkey[] = [];
 }
