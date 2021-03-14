@@ -265,7 +265,7 @@ impl<TStack> Render<TStack> {
 		for (m, url) in crate::find_url::find_urls(text) {
 			if !text[m.start..].to_lowercase().ends_with("[/img]") {
 				// Remove previous highlights
-				while highlights.first().map(|h| last_url > h.end).unwrap_or_default() {
+				while highlights.first().map(|h| last_url >= h.end).unwrap_or_default() {
 					highlights = &highlights[1..];
 				}
 
@@ -282,20 +282,28 @@ impl<TStack> Render<TStack> {
 				last_url = m.end;
 				let mut a = Self::make_link();
 				a.add_attribute("href", Self::link_add_scheme(&url.to_string()).as_ref());
-				a.add_child(text[m].to_string().into());
+				let matching_highlights = highlights_for_range(&mut highlights, m.clone())
+					.iter()
+					.map(|h| Range {
+						start: h.start.saturating_sub(m.start),
+						end: std::cmp::min(h.end - m.start, text.len()), // TODO is text.len() right here?
+					})
+					.collect::<Vec<_>>();
+
+				a.add_child(VNode::highlighted_str(&text[m], &matching_highlights));
 				self.push_node(a.into());
 			}
 		}
 
 		// Remove previous highlights
-		while highlights.first().map(|h| last_url > h.end).unwrap_or_default() {
+		while highlights.first().map(|h| last_url >= h.end).unwrap_or_default() {
 			highlights = &highlights[1..];
 		}
 
 		// Highlights of the current range
 		let matching_highlights = highlights
 			.iter()
-			.map(|h| Range { start: h.start - last_url, end: h.end - last_url })
+			.map(|h| Range { start: h.start.saturating_sub(last_url), end: h.end - last_url })
 			.collect::<Vec<_>>();
 
 		self.push_text(&text[last_url..], &matching_highlights);
