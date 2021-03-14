@@ -4,7 +4,7 @@ use slog::warn;
 
 use crate::{websocket, Tristate};
 
-pub use imp::{KeyCode, Hotkeys};
+pub use imp::{Hotkeys, KeyCode};
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Hotkey {
@@ -289,14 +289,13 @@ mod imp {
 	pub enum KeyCode {}
 
 	#[derive(Debug)]
-	pub struct Hotkeys {
-	}
+	pub struct Hotkeys {}
 
 	pub fn _key_list() -> Vec<String> { Vec::new() }
 
 	impl Hotkeys {
 		pub fn new() -> Result<Self> { Ok(Self {}) }
 
-		pub fn apply_config(&self, state: &Arc<State>, config: HotkeyConfig) -> Result<()> { Ok(()) }
+		pub fn apply_config(&self, _: &Arc<State>, _: HotkeyConfig) -> Result<()> { Ok(()) }
 	}
 }

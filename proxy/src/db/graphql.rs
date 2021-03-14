@@ -589,7 +589,7 @@ impl Server {
 	/// The public key of the server as a byte array.
 	fn public_key(&self) -> Vec<i32> { self.0.public_key.iter().map(|i| *i as i32).collect() }
 	fn uid(&self) -> GResult<Vec<i32>> {
-		let key = EccKeyPubP256::from_short(self.0.public_key.clone());
+		let key = EccKeyPubP256::from_short(&self.0.public_key)?;
 		Ok(key.get_uid_no_base64()?.into_iter().map(|i| i as i32).collect())
 	}
 	fn name(&self) -> &str { &self.0.name }
@@ -804,42 +804,47 @@ impl SearchResult {
 				}
 			}
 			SearchResultId::Server { ref id } => {
-				let id = id.clone();
 				match attr {
 					"uid" => {
-						let public_key = EccKeyPubP256::from_short(id);
+						let public_key = EccKeyPubP256::from_short(id.as_slice())?;
 						Ok(Some(public_key.get_uid()?))
 					}
-					"name" => Ok(Some(
-						state
-							.database
-							.send(RunOnDbMsg(move |db| {
-								use schema::servers;
+					"name" => {
+						let id = id.clone();
+						Ok(Some(
+							state
+								.database
+								.send(RunOnDbMsg(|db| {
+									use schema::servers;
 
-								GResult::Ok(
-									servers::table
-										.find(id)
-										.select(servers::name)
-										.first::<String>(&db.con)?,
-								)
-							}))
-							.await??,
-					)),
-					"address" => Ok(Some(
-						state
-							.database
-							.send(RunOnDbMsg(move |db| {
-								use schema::servers;
+									GResult::Ok(
+										servers::table
+											.find(id)
+											.select(servers::name)
+											.first::<String>(&db.con)?,
+									)
+								}))
+								.await??,
+						))
+					}
+					"address" => {
+						let id = id.clone();
+						Ok(Some(
+							state
+								.database
+								.send(RunOnDbMsg(|db| {
+									use schema::servers;
 
-								GResult::Ok(
-									servers::table
-										.find(id)
-										.select(servers::address)
-										.first::<String>(&db.con)?,
-								)
-							}))
-							.await??,
-					)),
+									GResult::Ok(
+										servers::table
+											.find(id)
+											.select(servers::address)
+											.first::<String>(&db.con)?,
+									)
+								}))
+								.await??,
+						))
+					}
 					// TODO host_message, welcome_message
 					_ => Ok(None),
 				}

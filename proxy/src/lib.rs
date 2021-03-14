@@ -629,11 +629,14 @@ async fn upload_file(
 async fn download_cache_file(
 	state: web::Data<Arc<State>>, web::Path((id, channel, path)): web::Path<(String, u64, String)>,
 ) -> impl Responder {
-	let server = match base64::decode_config(&id, base64::URL_SAFE_NO_PAD) {
+	let server = match base64::decode_config(&id, base64::URL_SAFE_NO_PAD)
+		.map_err(|e| e.into())
+		.and_then(|id| EccKeyPubP256::from_short(&id))
+	{
 		Err(e) => {
 			return HttpResponse::BadRequest().body(format!("Not a valid server id: {}", e));
 		}
-		Ok(id) => EccKeyPubP256::from_short(id),
+		Ok(id) => id,
 	};
 	let channel = ChannelId(channel);
 	if let Some((len, stream)) = state.file_cache.get_cached_file(&server, channel, &path).await {

@@ -654,9 +654,10 @@ impl Ws {
 						})
 					})
 					.map(move |r, actor: &mut Self, ctx| {
-						if r.is_err() {
+						if let Err(e) = r {
+							warn!(actor.logger, "Failed to connect"; "error" => %e);
 							actor.send_message(
-								&MessageP2F::Error("Failed to connect".to_string()),
+								&MessageP2F::Error(format!("Failed to connect ({})", e)),
 								ctx,
 							);
 						}

@@ -320,7 +320,7 @@ impl Search {
 						let mut additions = search.index.documents_addition();
 						for r in res {
 							let str_key = base64::encode_config(&r.0, base64::URL_SAFE_NO_PAD);
-							let public_key = EccKeyPubP256::from_short(r.0);
+							let public_key = EccKeyPubP256::from_short(&r.0)?;
 							let uid = public_key.get_uid()?;
 							let doc = ServerDocument {
 								id: format!("{}{}", SERVER_PREFIX, str_key),
@@ -358,7 +358,7 @@ impl Search {
 		&self, server: EccKeyPubP256, id: u64, name: String, topic: Option<String>,
 		description: Option<String>,
 	) -> Result<u64> {
-		let server = base64::encode_config(server.to_short(), base64::URL_SAFE_NO_PAD);
+		let server = base64::encode_config(server.to_short().as_slice(), base64::URL_SAFE_NO_PAD);
 		let mut additions = self.index.documents_addition();
 		additions.update_document(ChannelDocument {
 			id: format!("{}{}_{}", CHANNEL_PREFIX, id, server),
@@ -402,7 +402,8 @@ impl Search {
 		host_message: Option<String>, welcome_message: Option<String>,
 	) -> Result<u64> {
 		let uid = public_key.get_uid()?;
-		let server = base64::encode_config(public_key.to_short(), base64::URL_SAFE_NO_PAD);
+		let server =
+			base64::encode_config(public_key.to_short().as_slice(), base64::URL_SAFE_NO_PAD);
 		let mut additions = self.index.documents_addition();
 		additions.update_document(ServerDocument {
 			id: format!("{}{}", SERVER_PREFIX, server),
