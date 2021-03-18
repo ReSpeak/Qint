@@ -1,7 +1,9 @@
 <script lang="typescript">
+	import { hasProperty } from "../util";
 	import { createEventDispatcher, onMount } from "svelte";
-	export let items: readonly any[];
-	export let selected: any;
+	type DDObjElement = { value: any };
+	export let items: readonly unknown[];
+	export let selected: unknown;
 	export let display: (item: any) => string = displayFn;
 	export let id: string | undefined = undefined;
 	let dd: HTMLSelectElement;
@@ -11,12 +13,12 @@
 
 	function selectedToIndex(selected: any) {
 		if (dd == null || items.length === 0) return;
-		if ("value" in items[0]) {
-			let index = items.findIndex(it => it.value === selected);
+		if (hasProperty(items[0], "value")) {
+			let index = (items as DDObjElement[]).findIndex(it => it.value === selected);
 			if (index === -1) return;
 			dd.selectedIndex = index;
 		} else {
-			const newIndex = items.findIndex(i => i === selected);
+			const newIndex = (items as string[]).findIndex(i => i === selected);
 			if (newIndex !== -1) {
 				dd.selectedIndex = newIndex;
 			}
@@ -26,8 +28,8 @@
 	function indexToSelected() {
 		if (dd == null || dd.selectedIndex >= items.length) return;
 		const pickedItem = items[dd.selectedIndex];
-		if ("value" in pickedItem) {
-			selected = pickedItem.value;
+		if (hasProperty(pickedItem, "value")) {
+			selected = (pickedItem as DDObjElement).value;
 		} else {
 			selected = pickedItem;
 		}

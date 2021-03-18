@@ -127,6 +127,11 @@ export function arraysEqual<T>(a: ArrayLike<T>, b: ArrayLike<T>): boolean {
 	return true;
 }
 
+export function hasProperty(obj: unknown, propName: string): boolean {
+	if (typeof obj !== "object" || obj === null) return false;
+	return propName in obj;
+}
+
 export function escapeHtml(s: string) {
 	return s.replace('&', "&amp;")
 		.replace('<', "&lt;")
