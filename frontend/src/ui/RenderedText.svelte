@@ -7,7 +7,8 @@
 	import type { LinksMap } from "./renderedTextDecl";
 	import type { Connection } from "../connection";
 
-	export let connection: Connection;
+	export let connection: Connection | undefined;
+	export let server: string | undefined = undefined;
 	export let text: string;
 	export let links: LinksMap = new Map();
 
@@ -62,7 +63,9 @@
 			const scheme = parseTsScheme(src);
 			if (scheme !== null) {
 				// Cache images in text fields
-				const proxyFileSrc = schemeToLink(connection, scheme) + "?cache=true";
+				let proxyFileSrc = schemeToLink(connection, server, scheme);
+				if (connection !== undefined)
+					proxyFileSrc += "?cache=true";
 				if (proxyFileSrc === null) {
 					img.parentElement?.removeChild(img);
 					continue;

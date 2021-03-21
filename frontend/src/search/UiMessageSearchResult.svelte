@@ -1,8 +1,9 @@
 <script lang="typescript">
-	import { LONG_DATETIME, SERVER_ICON } from "../util";
+	import { SERVER_ICON } from "../util";
 	import Icon from "../ui/Icon.svelte";
 	import TsIcon from "../ui/TsIcon.svelte";
 	import ClientName from "../ui/ClientName.svelte";
+	import UiMessage from "../chat/UiMessage.svelte";
 	import type { MessageSearchResult } from "./search";
 
 	export let content: MessageSearchResult;
@@ -23,18 +24,8 @@
 			Server
 		{/if}
 	</div>
-	<div class="messageTime chat-left-col">
-		<span title={content.message.date.format(LONG_DATETIME)}> {content.message.date.format('HH:mm')} </span>
-	</div>
-	<div class="messageBody">
-		<div class="messageRendered">
-			{#if content.highlightedContent !== null}
-				{@html content.highlightedContent}
-			{:else}
-				{@html content.message.rendered}
-			{/if}
-		</div>
-	</div>
+	<UiMessage unread={false} message={content.message} server={content.server}
+		messageHighlightedContent={content.highlightedContent === null ? undefined : content.highlightedContent} />
 </div>
 
 <style lang="scss">
@@ -45,37 +36,14 @@
 	}
 
 	.searchResult {
-		display: grid;
+		/*display: grid;
 		grid-template-columns: min-content minmax(0, 1fr);
 		line-height: 1.1em;
-		grid-gap: 0.3em;
+		grid-gap: 0.3em;*/
 		padding: 0.3em;
 
 		&:hover {
 			background-color: $highlight-weak;
-		}
-	}
-
-	.messageBody {
-		flex: 1;
-
-		// Overwrite bulma default
-		:global(pre) {
-			position: relative;
-			padding: 0;
-			margin: 1em 1em 1em 0;
-			border-radius: 7px;
-
-			tab-size: 4;
-			-moz-tab-size: 4;
-			// TODO Prevent scrollbar
-		}
-	}
-
-	.messageTime {
-		font-size: 0.8em;
-		* {
-			color: mix($text, $background, 60%);
 		}
 	}
 

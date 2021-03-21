@@ -9,7 +9,9 @@
 
 	export let unread: boolean;
 	export let message: Message;
-	export let nodeSel: NodeSelection;
+	export let messageHighlightedContent: string | undefined = undefined;
+	export let nodeSel: NodeSelection | undefined = undefined;
+	export let server: string | undefined = undefined;
 
 	let viewRaw = false;
 	let links: LinksMap | undefined;
@@ -31,7 +33,7 @@
 			class:isPoke={message.isPoke}
 			class:viewRaw>
 			<div class="messageRendered">
-				<RenderedText connection={nodeSel.connection} text={message.rendered} bind:links />
+				<RenderedText connection={nodeSel?.connection} {server} text={messageHighlightedContent || message.rendered} bind:links />
 				{#each linksArr as { link, title } (link)}
 					<LinkPreview {link} textContent={title} {nodeSel} />
 				{/each}

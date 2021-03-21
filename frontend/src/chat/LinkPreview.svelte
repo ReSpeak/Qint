@@ -8,7 +8,7 @@
 
 	export let link: string;
 	export let textContent: string;
-	export let nodeSel: NodeSelection;
+	export let nodeSel: NodeSelection | undefined;
 
 	let showBig = false;
 

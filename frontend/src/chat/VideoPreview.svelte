@@ -10,7 +10,7 @@
 	const log = debug("VIDEO");
 
 	export let videoSrc: string;
-	export let nodeSel: NodeSelection;
+	export let nodeSel: NodeSelection | undefined;
 	export let embed: EmbedTypes | undefined;
 
 	let preview_only = true;
@@ -74,6 +74,7 @@
 	}
 
 	async function toggleVSync() {
+		if (nodeSel === undefined) return;
 		if (preview_only) {
 			preview_only = false;
 			await tick();
@@ -130,13 +131,15 @@
 			{/if}
 		{/if}
 		<div class="videoTools">
-			<button
-				class="videoButton"
-				class:syncOn={vSync?.enabled}
-				title="Sync video playback"
-				on:click={toggleVSync}>
-				<Icon name="account-multiple" />
-			</button>
+			{#if nodeSel !== undefined}
+				<button
+					class="videoButton"
+					class:syncOn={vSync?.enabled}
+					title="Sync video playback"
+					on:click={toggleVSync}>
+					<Icon name="account-multiple" />
+				</button>
+			{/if}
 			<a
 				class="videoButton"
 				href={videoSrc}

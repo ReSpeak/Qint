@@ -1,3 +1,4 @@
+import { backend } from "../backend/backend";
 import { Connection } from "../connection";
 import { pathJoin } from "../panel/fileUtil";
 
@@ -63,12 +64,22 @@ export function parseTsScheme(url: string): Ts3Scheme | null {
 	return null;
 }
 
-export function schemeToLink(con: Connection, scheme: Ts3Scheme): string | null {
+export function schemeToLink(con: Connection | undefined, server: string | undefined, scheme: Ts3Scheme): string | null {
+	if (!con && !server) {
+		console.error("schemeToLink needs either connection or server");
+		return null;
+	}
 	if (scheme.attrs.path) {
+		let path;
 		if (scheme.scheme === "ts3file") {
-			return `${con.backend.serverFileSrc}/file/${scheme.attrs.channel}${pathJoin(scheme.attrs.path, scheme.attrs.filename ?? "")}`;
+			path = `${scheme.attrs.channel}${pathJoin(scheme.attrs.path, scheme.attrs.filename ?? "")}`;
 		} else if (scheme.scheme === "ts3image") {
-			return `${con.backend.serverFileSrc}/file/${scheme.attrs.channel}${pathJoin(scheme.attrs.path, scheme.file)}`;
+			path = `${scheme.attrs.channel}${pathJoin(scheme.attrs.path, scheme.file)}`;
+		}
+		if (con) {
+			return `${con.backend.serverFileSrc}/file/${path}`;
+		} else {
+			return `${backend.cacheFileSrc}/${server}/${path}`;
 		}
 	}
 	return null;
