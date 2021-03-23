@@ -17,7 +17,7 @@
 	import { getClientAvatarPath } from "../ui/clientIcon";
 	import { Reason } from "../book_events";
 	import { onMount } from "svelte";
-	import { hexEncode, NARROW_NO_BREAK_SPACE, on } from "../util";
+	import { formatSi, hexEncode, NARROW_NO_BREAK_SPACE, on } from "../util";
 	import { Client, ServerGroup } from "../book";
 	import BModal from "../ui/BModal.svelte";
 	import { tick } from "svelte";
@@ -312,18 +312,13 @@
 		if (filteredLosses.length === 0) {
 			return "unknown";
 		} else {
-			const reduced = packetLossToPercent(filteredLosses.reduce((a, b) => a + b))!;
-			const totalLoss = Math.round(reduced * 10) / 10;
-			return `${totalLoss}${NARROW_NO_BREAK_SPACE}%`;
+			const reduced = packetLossToPercent(filteredLosses.reduce((a, b) => a + b)) ?? 0;
+			return `${reduced.toFixed(1)}${NARROW_NO_BREAK_SPACE}%`;
 		}
 	}
 
 	function formatPacketCount(...packetCounts: (string | null | undefined)[]) {
-		let totalCount =
-			Math.round(
-				packetCounts.map((x) => (x ? parseInt(x) : 0)).reduce((a, b) => a + b) / 100
-			) / 10;
-		return `${totalCount}${NARROW_NO_BREAK_SPACE}k`;
+		return formatSi(packetCounts.map((x) => (x ? parseInt(x) : 0)).reduce((a, b) => a + b), 1);
 	}
 
 	function formatAgo(duration: Duration | null | undefined, ago: boolean): string {

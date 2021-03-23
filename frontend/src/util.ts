@@ -523,3 +523,13 @@ export function fnBroadcast<T extends unknown[] = []>() {
 export function enumValues(e: object): (string | number)[] {
 	return Object.keys(e) as any;
 }
+
+const SiName: readonly string[] = ["", "k", "M", "G", "T", "P", "E", "Z", "Y"];
+
+export function formatSi(num: number, decimals: number = 0): string {
+	const sign = Math.sign(num);
+	let unit = Math.floor(Math.log(Math.abs(num)) / Math.log(1000));
+	unit = Math.max(Math.min(unit, SiName.length - 1), 0);
+	let divided = num / Math.pow(1000, unit);
+	return (sign * divided).toFixed(unit === 0 ? 0 : decimals) + (unit === 0 ? "" : NARROW_NO_BREAK_SPACE + SiName[unit]);
+}
