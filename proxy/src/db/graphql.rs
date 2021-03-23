@@ -1106,21 +1106,25 @@ impl Query {
 	///
 	/// A start offset can be specified to fetch further results.
 	async fn search(state: &State, query: String, start: Option<i32>) -> GResult<SearchResults> {
-		let start = start.unwrap_or_default() as usize;
-		let search_res = state.search.search(&query, start..start + MESSAGES_LIMIT as usize)?;
-		let results = search_res
-			.results
-			.into_iter()
-			.map(|r| SearchResult {
-				id: r.id,
-				highlights: r
-					.highlights
-					.into_iter()
-					.map(|(k, v)| (k, v.into_iter().map(Highlight).collect()))
-					.collect(),
-			})
-			.collect();
-		Ok(SearchResults { results, count: search_res.count })
+		if let Some(search) = &state.search {
+			let start = start.unwrap_or_default() as usize;
+			let search_res = search.search(&query, start..start + MESSAGES_LIMIT as usize)?;
+			let results = search_res
+				.results
+				.into_iter()
+				.map(|r| SearchResult {
+					id: r.id,
+					highlights: r
+						.highlights
+						.into_iter()
+						.map(|(k, v)| (k, v.into_iter().map(Highlight).collect()))
+						.collect(),
+				})
+				.collect();
+			Ok(SearchResults { results, count: search_res.count })
+		} else {
+			Ok(SearchResults { results: Vec::new(), count: 0 })
+		}
 	}
 }
 

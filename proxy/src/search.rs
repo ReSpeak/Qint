@@ -184,11 +184,17 @@ impl Search {
 	pub fn start_setup(state: &Arc<State>) {
 		let logger = state.logger.clone();
 		let state2 = state.clone();
+		let search = if let Some(search) = state.search.clone() {
+			search
+		} else {
+			error!(state.logger, "Cannot setup database if it is not connected");
+			return;
+		};
 		actix::spawn(
 			state
 				.database
 				.send(db::RunOnDbMsg(move |db| -> Result<()> {
-					let search = &state2.search;
+					info!(state2.logger, "Setup search db");
 					// TODO Use some stop words and synonyms
 					//search.database.update_write(|w| search.index.settings_update(w, settings))?;
 

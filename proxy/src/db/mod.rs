@@ -35,7 +35,7 @@ diesel_migrations::embed_migrations!();
 pub struct DbHandler {
 	logger: Logger,
 	file_cache: Arc<FileCache>,
-	search: Arc<Search>,
+	search: Option<Arc<Search>>,
 	secret: Secret,
 	pub con: SqliteConnection,
 	last_message_id: i64,
@@ -158,7 +158,7 @@ impl Message for RunMsg {
 
 impl DbHandler {
 	pub(crate) fn new(
-		logger: Logger, file_cache: Arc<FileCache>, search: Arc<Search>,
+		logger: Logger, file_cache: Arc<FileCache>, search: Option<Arc<Search>>,
 		launch_config: &LaunchConfig, secret: Secret,
 	) -> Result<Self> {
 		let database_url = launch_config.config_path.join("storage.sqlite");
@@ -511,7 +511,9 @@ impl Handler<WriteMessageMsg> for DbHandler {
 			.execute(&self.con)?;
 
 		// Add to search db
-		self.search.add_message(message_id as u64, message.message)?;
+		if let Some(search) = &self.search {
+			search.add_message(message_id as u64, message.message)?;
+		}
 
 		Ok(())
 	}
@@ -917,14 +919,16 @@ impl DbHandler {
 		}
 
 		// Add to search db
-		self.search.add_client(
-			&client.uid,
-			client.name.clone(),
-			client.phonetic_name.clone(),
-			None,
-			None,
-			client.description.clone(),
-		)?;
+		if let Some(search) = &self.search {
+			search.add_client(
+				&client.uid,
+				client.name.clone(),
+				client.phonetic_name.clone(),
+				None,
+				None,
+				client.description.clone(),
+			)?;
+		}
 
 		let (utc_time, utc_to_local_offset) = EventHandler::get_now();
 		let server_key = server.to_short();
@@ -1029,7 +1033,9 @@ impl<'a> EventHandler<'a> {
 				diesel::insert_into(schema::servers::table).values(&server).execute(&db.con)?;
 			}
 			// Add to search db
-			search.add_server(key, addr, server_name, Some(host_msg), Some(welcome_msg))?;
+			if let Some(search) = search {
+				search.add_server(key, addr, server_name, Some(host_msg), Some(welcome_msg))?;
+			}
 
 			Ok(())
 		});
@@ -1340,7 +1346,9 @@ impl<'a> EventHandler<'a> {
 			}
 
 			// Add to search db
-			search.add_channel(ch_server, ch_id.0, ch_name, ch_topic, None)?;
+			if let Some(search) = search {
+				search.add_channel(ch_server, ch_id.0, ch_name, ch_topic, None)?;
+			}
 
 			Ok(())
 		});
@@ -1617,7 +1625,9 @@ impl<'a> EventHandler<'a> {
 					.first::<i64>(&db.con)
 			})?;
 			// Add to search db
-			search.add_message(db.last_message_id as u64, message)?;
+			if let Some(search) = search {
+				search.add_message(db.last_message_id as u64, message)?;
+			}
 
 			Ok(())
 		});

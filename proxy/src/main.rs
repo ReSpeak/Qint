@@ -37,6 +37,12 @@ struct Args {
 	// single thread, which does not work well with parallel tests.
 	#[structopt(long)]
 	no_audio: bool,
+	/// Do not open database to search messages.
+	#[structopt(long)]
+	no_search: bool,
+	/// Do not cache link previews.
+	#[structopt(long)]
+	no_link_cache: bool,
 	/// Open the frontend in the browser on start.
 	#[structopt(long)]
 	no_open: bool,
@@ -59,6 +65,8 @@ impl Into<qint_proxy::Args> for Args {
 			cache_path: self.cache_path,
 			plugin_path: self.plugin_path,
 			no_audio: self.no_audio,
+			no_search: self.no_search,
+			no_link_cache: self.no_link_cache,
 			verbosity: self.verbosity,
 		}
 	}

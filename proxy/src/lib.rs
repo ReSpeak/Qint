@@ -93,6 +93,10 @@ pub struct Args {
 	// SDL must only be initialized once per process, at the same time, it can only be used from a
 	// single thread, which does not work well with parallel tests.
 	pub no_audio: bool,
+	/// Do not open database to search messages.
+	pub no_search: bool,
+	/// Do not cache link previews.
+	pub no_link_cache: bool,
 	/// How much log output do you want?
 	///
 	/// 0. Print nothing
@@ -135,6 +139,10 @@ struct LaunchConfig {
 	#[serde(default)]
 	no_audio: bool,
 	#[serde(default)]
+	no_search: bool,
+	#[serde(default)]
+	no_link_cache: bool,
+	#[serde(default)]
 	no_open: bool,
 	/// How much log output do you want?
 	///
@@ -159,7 +167,7 @@ pub struct State {
 	file_cache: Arc<FileCache>,
 	link_previewer: link_previewer::LinkPreviewer,
 	secret: Secret,
-	search: Arc<search::Search>,
+	search: Option<Arc<search::Search>>,
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, serde::Serialize, serde::Deserialize)]
@@ -279,6 +287,8 @@ impl Default for LaunchConfig {
 			plugin_path: Default::default(),
 			default_identity: Default::default(),
 			no_audio: Default::default(),
+			no_search: Default::default(),
+			no_link_cache: Default::default(),
 			no_open: Default::default(),
 			verbosity: Default::default(),
 		}
@@ -797,6 +807,12 @@ impl App {
 		if args.no_audio {
 			launch_config.no_audio = true;
 		}
+		if args.no_search {
+			launch_config.no_search = true;
+		}
+		if args.no_link_cache {
+			launch_config.no_link_cache = true;
+		}
 		if args.verbosity > launch_config.verbosity {
 			launch_config.verbosity = args.verbosity;
 		}
@@ -808,9 +824,12 @@ impl App {
 		let file_cache = Arc::new(FileCache::new(logger.clone(), launch_config.cache_path.clone()));
 
 		// Open search database
-		let (search, search_is_new) =
-			search::Search::new(logger.clone(), &launch_config.cache_path.join(SEARCH_FILENAME))?;
-		let search = Arc::new(search);
+		let (search, search_is_new) = if launch_config.no_search {
+			(None, false)
+		} else {
+			let (s, new) = search::Search::new(logger.clone(), &launch_config.cache_path.join(SEARCH_FILENAME))?;
+			(Some(Arc::new(s)), new)
+		};
 
 		// Open database
 		let database = db::DbHandler::new(
@@ -874,7 +893,7 @@ impl App {
 		}
 
 		let graphql_schema = db::graphql::create_schema();
-		let link_previewer = LinkPreviewer::new(logger.clone(), launch_config.cache_path.clone());
+		let link_previewer = LinkPreviewer::new(logger.clone(), if launch_config.no_link_cache { Some(launch_config.cache_path.clone()) } else { None });
 
 		let state = Arc::new(State {
 			logger,
@@ -1200,6 +1219,8 @@ mod tests {
 					cache_path: Some(dir.path().join("cache")),
 					plugin_path: None,
 					no_audio: true,
+					no_search: false,
+					no_link_cache: false,
 					verbosity: 1,
 				};
 				let app = App::new(logger, args).await?;

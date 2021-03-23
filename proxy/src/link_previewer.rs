@@ -25,19 +25,21 @@ pub enum AnalyzeResult {
 }
 
 impl LinkPreviewer {
-	pub fn new(logger: Logger, mut cache_path: PathBuf) -> Self {
-		cache_path.push("urls.sled");
+	pub fn new(logger: Logger, cache_path: Option<PathBuf>) -> Self {
+		let cache = cache_path.and_then(|mut cache_path| {
+			cache_path.push("urls.sled");
 
-		let config = sled::Config::default().path(cache_path).flush_every_ms(Some(1000));
+			let config = sled::Config::default().path(cache_path).flush_every_ms(Some(60_000));
 
-		let cache = match config.open() {
-			Ok(r) => Some(r),
-			Err(e) => {
-				warn!(logger, "Failed to open url cache database, running without cache";
-					"error" => %e);
-				None
+			match config.open() {
+				Ok(r) => Some(r),
+				Err(e) => {
+					warn!(logger, "Failed to open url cache database, running without cache";
+						"error" => %e);
+					None
+				}
 			}
-		};
+		});
 		LinkPreviewer { logger, cache }
 	}
 
