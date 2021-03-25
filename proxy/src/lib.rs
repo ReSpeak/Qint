@@ -827,7 +827,10 @@ impl App {
 		let (search, search_is_new) = if launch_config.no_search {
 			(None, false)
 		} else {
-			let (s, new) = search::Search::new(logger.clone(), &launch_config.cache_path.join(SEARCH_FILENAME))?;
+			let (s, new) = search::Search::new(
+				logger.clone(),
+				&launch_config.cache_path.join(SEARCH_FILENAME),
+			)?;
 			(Some(Arc::new(s)), new)
 		};
 
@@ -893,7 +896,10 @@ impl App {
 		}
 
 		let graphql_schema = db::graphql::create_schema();
-		let link_previewer = LinkPreviewer::new(logger.clone(), if launch_config.no_link_cache { Some(launch_config.cache_path.clone()) } else { None });
+		let link_previewer = LinkPreviewer::new(
+			logger.clone(),
+			if launch_config.no_link_cache { Some(launch_config.cache_path.clone()) } else { None },
+		);
 
 		let state = Arc::new(State {
 			logger,

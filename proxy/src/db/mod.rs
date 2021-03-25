@@ -223,10 +223,7 @@ impl DbHandler {
 
 						diesel::insert_into(server_chats::table)
 							.values(&(
-								server_chats::server.eq(id
-									.server
-									.to_short()
-									.as_slice()),
+								server_chats::server.eq(id.server.to_short().as_slice()),
 								server_chats::chat.eq(chat),
 							))
 							.execute(&self.con)?;
@@ -237,10 +234,7 @@ impl DbHandler {
 			ChatType::Channel(channel) => {
 				self.con.transaction::<_, diesel::result::Error, _>(|| {
 					if let Some(chat) = channel_chats::table
-						.find((
-							id.server.to_short().as_slice(),
-							*channel as i64,
-						))
+						.find((id.server.to_short().as_slice(), *channel as i64))
 						.select(channel_chats::chat)
 						.first::<i64>(&self.con)
 						.optional()?
@@ -252,10 +246,7 @@ impl DbHandler {
 
 						diesel::insert_into(channel_chats::table)
 							.values(&(
-								channel_chats::server.eq(id
-									.server
-									.to_short()
-									.as_slice()),
+								channel_chats::server.eq(id.server.to_short().as_slice()),
 								channel_chats::channel.eq(*channel as i64),
 								channel_chats::chat.eq(chat),
 							))
@@ -279,10 +270,7 @@ impl DbHandler {
 
 						diesel::insert_into(client_chats::table)
 							.values(&(
-								client_chats::server.eq(id
-									.server
-									.to_short()
-									.as_slice()),
+								client_chats::server.eq(id.server.to_short().as_slice()),
 								client_chats::client.eq(&client),
 								client_chats::chat.eq(chat),
 							))
@@ -306,10 +294,7 @@ impl DbHandler {
 
 						diesel::insert_into(client_pokes::table)
 							.values(&(
-								client_pokes::server.eq(id
-									.server
-									.to_short()
-									.as_slice()),
+								client_pokes::server.eq(id.server.to_short().as_slice()),
 								client_pokes::client.eq(&client),
 								client_pokes::chat.eq(chat),
 							))
@@ -1016,11 +1001,9 @@ impl<'a> EventHandler<'a> {
 			use schema::servers::dsl::*;
 
 			// Check if we already know that server, the update will return 1 changed row on success
-			if diesel::update(
-				servers.filter(public_key.eq(key.to_short().as_slice())),
-			)
-			.set((name.eq(&server_name), address.eq(&addr), icon.eq(&icon_id)))
-			.execute(&db.con)?
+			if diesel::update(servers.filter(public_key.eq(key.to_short().as_slice())))
+				.set((name.eq(&server_name), address.eq(&addr), icon.eq(&icon_id)))
+				.execute(&db.con)?
 				!= 1
 			{
 				let server_key = key.to_short();
@@ -1047,11 +1030,9 @@ impl<'a> EventHandler<'a> {
 		let server_name = self.data.server.name.clone();
 		self.run(move |db, _| {
 			use schema::servers::dsl::*;
-			if diesel::update(
-				servers.filter(public_key.eq(key.to_short().as_slice())),
-			)
-			.set(name.eq(&server_name))
-			.execute(&db.con)?
+			if diesel::update(servers.filter(public_key.eq(key.to_short().as_slice())))
+				.set(name.eq(&server_name))
+				.execute(&db.con)?
 				!= 1
 			{
 				bail!(
@@ -1071,11 +1052,9 @@ impl<'a> EventHandler<'a> {
 			if self.data.server.icon.0 != 0 { Some(self.data.server.icon.0 as i32) } else { None };
 		self.run(move |db, _| {
 			use schema::servers::dsl::*;
-			if diesel::update(
-				servers.filter(public_key.eq(key.to_short().as_slice())),
-			)
-			.set(icon.eq(&icon_id))
-			.execute(&db.con)?
+			if diesel::update(servers.filter(public_key.eq(key.to_short().as_slice())))
+				.set(icon.eq(&icon_id))
+				.execute(&db.con)?
 				!= 1
 			{
 				bail!("Failed to update server icon to {:?}, server {:?} not found", icon_id, key);
@@ -1234,9 +1213,7 @@ impl<'a> EventHandler<'a> {
 			// Update, ignored if not exists
 			diesel::update(
 				servers_clients.filter(
-					server
-						.eq(server_id.to_short().as_slice())
-						.and(client.eq(&client_uid.0)),
+					server.eq(server_id.to_short().as_slice()).and(client.eq(&client_uid.0)),
 				),
 			)
 			.set(avatar.eq(&client_avatar))
@@ -1263,11 +1240,8 @@ impl<'a> EventHandler<'a> {
 			use schema::servers_clients::dsl::*;
 			// Update, ignored if not exists
 			diesel::update(
-				servers_clients.filter(
-					server
-						.eq(server_id.to_short().as_slice())
-						.and(client.eq(&client_uid)),
-				),
+				servers_clients
+					.filter(server.eq(server_id.to_short().as_slice()).and(client.eq(&client_uid))),
 			)
 			.set(icon.eq(&client_icon))
 			.execute(&db.con)?;
@@ -1363,11 +1337,8 @@ impl<'a> EventHandler<'a> {
 
 			// Mark channel as deleted
 			if diesel::update(
-				channels.filter(
-					server
-						.eq(ch_server.to_short().as_slice())
-						.and(id.eq(ch_id.0 as i64)),
-				),
+				channels
+					.filter(server.eq(ch_server.to_short().as_slice()).and(id.eq(ch_id.0 as i64))),
 			)
 			.set(deleted.eq(true))
 			.execute(&db.con)?
@@ -1396,11 +1367,8 @@ impl<'a> EventHandler<'a> {
 			use schema::channels::dsl::*;
 			// Update, ignored if not exists
 			diesel::update(
-				channels.filter(
-					server
-						.eq(server_id.to_short().as_slice())
-						.and(id.eq(ch_id.0 as i64)),
-				),
+				channels
+					.filter(server.eq(server_id.to_short().as_slice()).and(id.eq(ch_id.0 as i64))),
 			)
 			.set(parent.eq(ch_parent.0 as i64))
 			.execute(&db.con)?;
@@ -1421,11 +1389,8 @@ impl<'a> EventHandler<'a> {
 			use schema::channels::dsl::*;
 			// Update, ignored if not exists
 			diesel::update(
-				channels.filter(
-					server
-						.eq(server_id.to_short().as_slice())
-						.and(id.eq(ch_id.0 as i64)),
-				),
+				channels
+					.filter(server.eq(server_id.to_short().as_slice()).and(id.eq(ch_id.0 as i64))),
 			)
 			.set(order_id.eq(ch_order.0 as i64))
 			.execute(&db.con)?;
@@ -1446,11 +1411,8 @@ impl<'a> EventHandler<'a> {
 			use schema::channels::dsl::*;
 			// Update, ignored if not exists
 			diesel::update(
-				channels.filter(
-					server
-						.eq(server_id.to_short().as_slice())
-						.and(id.eq(ch_id.0 as i64)),
-				),
+				channels
+					.filter(server.eq(server_id.to_short().as_slice()).and(id.eq(ch_id.0 as i64))),
 			)
 			.set(name.eq(&ch_name))
 			.execute(&db.con)?;
@@ -1471,11 +1433,8 @@ impl<'a> EventHandler<'a> {
 			use schema::channels::dsl::*;
 			// Update, ignored if not exists
 			diesel::update(
-				channels.filter(
-					server
-						.eq(server_id.to_short().as_slice())
-						.and(id.eq(ch_id.0 as i64)),
-				),
+				channels
+					.filter(server.eq(server_id.to_short().as_slice()).and(id.eq(ch_id.0 as i64))),
 			)
 			.set(icon.eq(&ch_icon))
 			.execute(&db.con)?;
