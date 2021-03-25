@@ -425,16 +425,21 @@ impl Chat {
 		let res = state
 			.database
 			.send(RunOnDbMsg(move |db| {
-				use schema::{chats, messages};
+				use diesel::dsl::sql;
+				use schema::messages;
 
 				let query = messages::table
-					.inner_join(chats::table)
-					.filter(chats::id.eq_any(ids).and(messages::invoker.eq(&from)))
+					.filter(messages::chat.eq_any(ids).and(messages::invoker.eq(&from)))
 					// Deduplicate messages
 					.group_by(messages::content)
 					.order((messages::time.desc(), messages::id.desc()))
 					.offset(i64::from(id))
-					.select(messages::all_columns);
+					.select((
+						sql::<diesel::sql_types::BigInt>("max(messages.id)"), messages::chat,
+						messages::invoker, messages::invoker_name, messages::content,
+						messages::status, sql::<diesel::sql_types::Timestamp>("max(messages.time)"),
+						messages::timezone,
+					));
 
 				GResult::Ok(
 					query
