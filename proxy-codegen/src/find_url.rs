@@ -63,7 +63,7 @@ pub fn find_urls(text: &str) -> Vec<(Range<usize>, Url)> {
 		let has_scheme = sub.contains("://");
 		let url = if !has_scheme { format!("http://{}", sub) } else { sub.into() };
 
-		if let Ok(url) = Url::parse(&url) {
+		if let Ok(mut url) = Url::parse(&url) {
 			if !has_scheme {
 				// If there is no scheme, check if ending is tld and there is no / before to detect file paths
 				if global_range.start > 0 && text.as_bytes()[global_range.start - 1] == b'/' {
@@ -94,6 +94,10 @@ pub fn find_urls(text: &str) -> Vec<(Range<usize>, Url)> {
 			} else if let Some(i) = url.scheme().find("http") {
 				// Cut off before http
 				global_range.start += i;
+				url = match Url::parse(&sub[i..]) {
+					Ok(r) => r,
+					Err(_) => continue,
+				};
 			}
 			results.push((global_range, url));
 		}
@@ -137,6 +141,12 @@ mod tests {
 	fn difficult_link() {
 		let res = find_urls("a x.org b");
 		assert_eq!(&res, &[(Range { start: 2, end: 7 }, "http://x.org".parse().unwrap())]);
+	}
+
+	#[test]
+	fn link_with_start() {
+		let res = find_urls("ahttp://example.com b");
+		assert_eq!(&res, &[(Range { start: 1, end: 19 }, "http://example.com".parse().unwrap())]);
 	}
 
 	#[test]
