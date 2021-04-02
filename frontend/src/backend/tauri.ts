@@ -80,8 +80,7 @@ export class TauriBackend implements IBackend {
 	}
 
 	public setIcon(url: string | undefined): void {
-		// TODO Any??
-		const icon = document.querySelector("link[rel*='icon']") as any;
+		const icon = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
 		if (icon !== null)
 			icon.href = url ?? "icon.png";
 		else

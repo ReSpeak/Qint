@@ -351,17 +351,16 @@
 					on:submit={sendMessage}
 					on:structureChanged={chatboxContentChanged}
 					on:historyMove={chatboxHistoryMove}>
-					<div slot="placeholder">
-						<span>Send to</span>
-						<!-- TODO: Remove 'sel !== undefined' when svelte-tool understands it -->
-						{#if sel !== undefined && sel.node instanceof Client}
+					<svelte:fragment slot="placeholder">
+						<span>Send&nbsp;to&nbsp;</span>
+						{#if sel.node instanceof Client}
 							<ClientName client={sel.node} />
-						{:else if sel !== undefined && sel.node instanceof Channel}
-							<span> your channel</span>
-						{:else if sel !== undefined && sel.node instanceof Server}
+						{:else if sel.node instanceof Channel}
+							<span>your channel</span>
+						{:else if sel.node instanceof Server}
 							<ServerName connection={sel.connection} />
 						{/if}
-					</div>
+					</svelte:fragment>
 				</BInput>
 				<button
 					class="button outline-button"

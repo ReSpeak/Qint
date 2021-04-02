@@ -22,13 +22,13 @@ diesel-derive-enum = { version = "1", features = [ "sqlite" ] }
 diesel_migrations = "1.4"
 directories-next = "2"
 ebur128 = "0.1"
-fancy-regex = "0.4"
+fancy-regex = "0.5"
 flakebi-ring = "0.16.9"
 futures = "0.3"
 git-testament = "0.1"
 juniper = "0.15"
 libsqlite3-sys = { version = "0.18", features = [ "bundled" ] }
-livesplit-hotkey = "0.5"
+livesplit-hotkey = { git = "https://github.com/LiveSplit/livesplit-core", rev = "624783aebf83fc23e040da174accffae44e5ed12", version = "0.5" }
 meilisearch-core = { git = "https://github.com/meilisearch/MeiliSearch", rev = "ff38220b6821e7bf394f8e807f410a8a701414c9", version = "0.18" }
 nnnoiseless = "0.3"
 nom = "6"
@@ -74,6 +74,6 @@ features = [ "max_level_trace", "release_max_level_debug" ]
 [dev-dependencies]
 actix-codec = "0.4.0-beta.1"
 awc = "3.0.0-beta.1"
-rand = "0.7"
+rand = "0.8"
 tempfile = "3"
 uuid = { version = "0.8", features = [ "v4" ] }
