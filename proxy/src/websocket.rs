@@ -1302,11 +1302,10 @@ impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for Ws {
 	}
 }
 
-impl ActorFuture for ConnectionPoller {
+impl ActorFuture<Ws> for ConnectionPoller {
 	type Output = ();
-	type Actor = Ws;
 	fn poll(
-		self: Pin<&mut Self>, actor: &mut Self::Actor, ctx: &mut <Self::Actor as Actor>::Context,
+		self: Pin<&mut Self>, actor: &mut Ws, ctx: &mut <Ws as Actor>::Context,
 		task: &mut task::Context,
 	) -> Poll<Self::Output> {
 		loop {

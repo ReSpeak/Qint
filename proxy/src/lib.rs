@@ -385,7 +385,7 @@ async fn create_ws(
 	// Check that the id does not exist
 	let mut cons = state.connections.lock().unwrap();
 	if cons.contains_key(&id) || uuid.is_nil() {
-		return Either::A(
+		return Either::Left(
 			HttpResponse::PreconditionFailed()
 				.body("Connection id is already occupied".to_string()),
 		);
@@ -395,11 +395,11 @@ async fn create_ws(
 	match ws::start_with_addr(ws_con, &req, stream) {
 		Err(e) => {
 			error!(state.logger, "Failed to create websocket actor"; "error" => %e);
-			Either::A(HttpResponse::InternalServerError().body("Failed to start connection"))
+			Either::Left(HttpResponse::InternalServerError().body("Failed to start connection"))
 		}
 		Ok((addr, ws)) => {
 			cons.insert(id, addr);
-			Either::B(ws)
+			Either::Right(ws)
 		}
 	}
 }
@@ -473,11 +473,12 @@ impl ResultDetails {
 
 #[get("/con/{id}/file/{channel}/{path:.*}")]
 async fn download_file(
-	state: web::Data<Arc<State>>, web::Path((id, channel, path)): web::Path<(Uuid, u64, String)>,
+	state: web::Data<Arc<State>>, path: web::Path<(Uuid, u64, String)>,
 	query_opt: Query<GetFileOptions>,
 ) -> impl Responder {
-	let channel = ChannelId(channel);
 	let cons = state.connections.lock().unwrap();
+	let (id, channel, path) = path.into_inner();
+	let channel = ChannelId(channel);
 	let GetFileOptions { dl, return_code, cache } = query_opt.into_inner();
 	if let Some(con) = cons.get(&ConnectionId(id)).cloned() {
 		drop(cons);
@@ -558,9 +559,10 @@ struct PutFileOptions {
 
 #[put("/con/{id}/file/{channel}/{path:.*}")]
 async fn upload_file(
-	state: web::Data<Arc<State>>, web::Path((id, channel, path)): web::Path<(Uuid, u64, String)>,
+	state: web::Data<Arc<State>>, path: web::Path<(Uuid, u64, String)>,
 	req: web::HttpRequest, body: web::Payload, query_opt: Query<PutFileOptions>,
 ) -> impl Responder {
+	let (id, channel, path) = path.into_inner();
 	let channel = ChannelId(channel);
 	let cons = state.connections.lock().unwrap();
 	if let Some(con) = cons.get(&ConnectionId(id)).cloned() {
@@ -637,8 +639,9 @@ async fn upload_file(
 /// Get a cached file by server id, channel and path.
 #[get("/filecache/{id}/{channel}/{path:.*}")]
 async fn download_cache_file(
-	state: web::Data<Arc<State>>, web::Path((id, channel, path)): web::Path<(String, u64, String)>,
+	state: web::Data<Arc<State>>, path: web::Path<(String, u64, String)>,
 ) -> impl Responder {
+	let (id, channel, path) = path.into_inner();
 	let server = match base64::decode_config(&id, base64::URL_SAFE_NO_PAD)
 		.map_err(|e| e.into())
 		.and_then(|id| EccKeyPubP256::from_short(&id))
@@ -671,9 +674,9 @@ async fn loudness_service(
 	match ws::start_with_addr(ws, &req, stream) {
 		Err(e) => {
 			error!(state.logger, "Failed to create websocket actor"; "error" => %e);
-			Either::A(HttpResponse::InternalServerError().body("Failed to start connection"))
+			Either::Left(HttpResponse::InternalServerError().body("Failed to start connection"))
 		}
-		Ok((_, ws)) => Either::B(ws),
+		Ok((_, ws)) => Either::Right(ws),
 	}
 }
 
@@ -685,9 +688,9 @@ async fn render_md_service(
 	match ws::start_with_addr(ws, &req, stream) {
 		Err(e) => {
 			error!(state.logger, "Failed to create websocket actor"; "error" => %e);
-			Either::A(HttpResponse::InternalServerError().body("Failed to start connection"))
+			Either::Left(HttpResponse::InternalServerError().body("Failed to start connection"))
 		}
-		Ok((_, ws)) => Either::B(ws),
+		Ok((_, ws)) => Either::Right(ws),
 	}
 }
 
