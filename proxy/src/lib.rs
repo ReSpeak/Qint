@@ -456,7 +456,7 @@ async fn list_plugins(state: web::Data<Arc<State>>) -> impl Responder {
 async fn get_plugin(state: web::Data<Arc<State>>, name: web::Path<String>) -> impl Responder {
 	let path = state.launch_config.read().unwrap().plugin_path.join(&*name);
 	fs::read_to_string(path)
-		.with_header(http::header::CONTENT_TYPE, "application/javascript; charset=utf-8")
+		.with_header((http::header::CONTENT_TYPE, "application/javascript; charset=utf-8"))
 }
 
 #[derive(Deserialize)]
@@ -513,12 +513,12 @@ async fn download_file(
 				debug!(state.logger, "File download error"; "error" => %err, "path" => &path);
 				return match err.error {
 					tsclientlib::TsError::FileInvalidPath => {
-						HttpResponse::NotFound().json::<ResultDetails>(err.into())
+						HttpResponse::NotFound().json(Into::<ResultDetails>::into(err))
 					}
 					tsclientlib::TsError::PermissionsClientInsufficient => {
-						HttpResponse::Forbidden().json::<ResultDetails>(err.into())
+						HttpResponse::Forbidden().json(Into::<ResultDetails>::into(err))
 					}
-					_ => HttpResponse::BadRequest().json::<ResultDetails>(err.into()),
+					_ => HttpResponse::BadRequest().json(Into::<ResultDetails>::into(err)),
 				};
 			}
 			Ok(Err(e)) => {
@@ -534,10 +534,10 @@ async fn download_file(
 		let (stream, mut response) = guess_content_type(stream).await;
 		response.no_chunking(len);
 		if let Some(filename) = dl.as_ref() {
-			response.set_header(
+			response.insert_header((
 				"Content-Disposition",
 				format!("attachment; filename=\"{}\"", filename),
-			);
+			));
 		}
 
 		// Cache for offline usage if smaller than 5 MiB
@@ -606,12 +606,12 @@ async fn upload_file(
 				debug!(state.logger, "File upload error"; "error" => %err, "path" => &path);
 				return match err.error {
 					tsclientlib::TsError::FileInvalidPath => {
-						HttpResponse::NotFound().json::<ResultDetails>(err.into())
+						HttpResponse::NotFound().json(Into::<ResultDetails>::into(err))
 					}
 					tsclientlib::TsError::PermissionsClientInsufficient => {
-						HttpResponse::Forbidden().json::<ResultDetails>(err.into())
+						HttpResponse::Forbidden().json(Into::<ResultDetails>::into(err))
 					}
-					_ => HttpResponse::BadRequest().json::<ResultDetails>(err.into()),
+					_ => HttpResponse::BadRequest().json(Into::<ResultDetails>::into(err)),
 				};
 			}
 			Ok(Err(e)) => {

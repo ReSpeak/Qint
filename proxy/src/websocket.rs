@@ -366,7 +366,7 @@ impl Ws {
 							Err(_) => {
 								warn!(logger, "Failed to send message to database");
 							}
-						}))
+						}));
 					}
 
 					if let Some(con) = &mut self.connection {
@@ -1043,7 +1043,7 @@ impl Handler<GetClientVolumeMsg> for Ws {
 			match con.get_state() {
 				Ok(state) => {
 					let uid_fut: Box<
-						dyn ActorFuture<Actor = Self, Output = Result<UidBuf>> + Unpin,
+						dyn ActorFuture<Self, Output = Result<UidBuf>> + Unpin,
 					>;
 					if let Some(client) = state.clients.get(&client) {
 						uid_fut = Box::new(wrap_future(future::ready(

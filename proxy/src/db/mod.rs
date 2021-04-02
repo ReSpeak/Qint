@@ -975,7 +975,7 @@ impl<'a> EventHandler<'a> {
 				error!(logger, "Failed to write to database"; "error" => %e);
 			}
 			_ => {}
-		}))
+		}));
 	}
 
 	/// Returns the current time in utc and the offset.
