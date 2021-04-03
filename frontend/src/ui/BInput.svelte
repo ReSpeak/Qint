@@ -1,5 +1,5 @@
 <script lang="typescript">
-	import { escapeHtml } from "../util";
+	import { Browser, BROWSER, escapeHtml } from "../util";
 	import { createEventDispatcher, onMount, tick } from "svelte";
 	import type { StructuredData } from "./BInputDecl";
 	import debug from "debug";
@@ -9,7 +9,11 @@
 	export let enterToSubmit = true;
 	export let hasHistory = false;
 
-	const dispatch = createEventDispatcher<{ submit: undefined; structureChanged: undefined; historyMove: number; }>();
+	const dispatch = createEventDispatcher<{
+		submit: undefined;
+		structureChanged: undefined;
+		historyMove: number;
+	}>();
 	let setValue: string | undefined;
 	let self: HTMLElement;
 	let expectQuickPaste = false;
@@ -59,6 +63,7 @@
 				self.childNodes.length === 1 &&
 				(self.childNodes[0] as HTMLElement)?.tagName === "BR"
 			);
+		log("setVal:%s val:%s content:%s", setValue, value, hasContent);
 		dispatch("structureChanged");
 	}
 
@@ -121,18 +126,14 @@
 		if (hasHistory) {
 			if (e.key === "ArrowDown" && historyIndex !== undefined && historyIndex !== 0) {
 				historyIndex -= 1;
-				if (historyIndex === 0)
-					value = "";
-				else
-					dispatch("historyMove", historyIndex);
+				if (historyIndex === 0) value = "";
+				else dispatch("historyMove", historyIndex);
 				e.preventDefault();
 				return;
 			}
 			if (e.key === "ArrowUp" && (historyIndex !== undefined || value.length === 0)) {
-				if (historyIndex === undefined)
-					historyIndex = 1;
-				else
-					historyIndex += 1;
+				if (historyIndex === undefined) historyIndex = 1;
+				else historyIndex += 1;
 				dispatch("historyMove", historyIndex);
 				e.preventDefault();
 				return;
@@ -140,6 +141,22 @@
 		}
 		historyIndex = undefined;
 		expectQuickPaste = e.key?.toLowerCase() === "v" && e.shiftKey && e.ctrlKey;
+		log("qick:%s shift:%s ctrl:%s", expectQuickPaste, e.shiftKey, e.ctrlKey);
+	}
+
+	function cleanNode(node: Node) {
+		for (const child of node.childNodes) {
+			if (child.nodeType === Node.ELEMENT_NODE) {
+				cleanNode(child);
+				if ((child as Element).tagName === "DIV") {
+					for (let unwrap of (child as Element).childNodes) {
+						node.insertBefore(document.createElement("BR"), child);
+						node.insertBefore(unwrap, child);
+					}
+					node.removeChild(child);
+				}
+			}
+		}
 	}
 
 	function handlePaste(e: ClipboardEvent) {
@@ -161,6 +178,9 @@
 			const text_plain = clipboardData.getData("text/plain");
 			log("pasting as text: %s", text_plain);
 			document.execCommand("insertText", false, text_plain);
+			if (BROWSER !== Browser.Firefox) {
+				cleanNode(self);
+			}
 		} else if (types.has("image/png")) {
 			let hasHtmlNode = false;
 			if (types.has("text/html")) {

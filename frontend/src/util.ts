@@ -34,6 +34,7 @@ export const LOUDNESS_MAX = 0;
 export const LOUDNESS_END_MAGIC = -1000;
 export const LOUDNESS_HISTORY = 100;
 export const LOUDNESS_UPDATE_MS = 20;
+export const BROWSER = detectBrowser();
 
 
 export type RequiredNN<T> = { [P in keyof T]: NonNullable<T[P]> };
@@ -532,4 +533,29 @@ export function formatSi(num: number, decimals: number = 0): string {
 	unit = Math.max(Math.min(unit, SiName.length - 1), 0);
 	let divided = num / Math.pow(1000, unit);
 	return (sign * divided).toFixed(unit === 0 ? 0 : decimals) + (unit === 0 ? "" : NARROW_NO_BREAK_SPACE + SiName[unit]);
+}
+
+export enum Browser {
+	Unknwon,
+	Opera,
+	Chrome,
+	Safari,
+	Firefox,
+	IE
+}
+
+function detectBrowser(): Browser {
+	if ((navigator.userAgent.indexOf("Opera") || navigator.userAgent.indexOf('OPR')) != -1) {
+		return Browser.Opera;
+	} else if (navigator.userAgent.indexOf("Chrome") != -1) {
+		return Browser.Chrome;
+	} else if (navigator.userAgent.indexOf("Safari") != -1) {
+		return Browser.Safari;
+	} else if (navigator.userAgent.indexOf("Firefox") != -1) {
+		return Browser.Firefox;
+	} else if ((navigator.userAgent.indexOf("MSIE") != -1) || (!!(document as any).documentMode == true)) {
+		return Browser.IE;
+	} else {
+		return Browser.Unknwon;
+	}
 }
