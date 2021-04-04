@@ -16,6 +16,7 @@ actix-service = "=2.0.0-beta.5"
 anyhow = "1"
 audiopus = "0.2"
 base64 = "0.13"
+chacha20poly1305 = "0.7"
 chrono = { version = "0.4", features = [ "serde" ] }
 diesel = { version = "1.4", features = [ "chrono", "sqlite" ] }
 diesel-derive-enum = { version = "1", features = [ "sqlite" ] }
@@ -23,8 +24,8 @@ diesel_migrations = "1.4"
 directories-next = "2"
 ebur128 = "0.1"
 fancy-regex = "0.5"
-flakebi-ring = "0.16.9"
 futures = "0.3"
+generic-array = "0.14"
 git-testament = "0.1"
 juniper = "0.15"
 libsqlite3-sys = { version = "0.18", features = [ "bundled" ] }
@@ -36,6 +37,7 @@ open = "1"
 percent-encoding = "2.1"
 proxy-codegen = { path = "../proxy-codegen" }
 pulldown-cmark = "0.8"
+rand = "0.8"
 regex = "1"
 reqwest = "0.11"
 rmp-serde = "0.15"

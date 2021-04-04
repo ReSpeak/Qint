@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::{Arc, Mutex, RwLock};
 
-use actix::*;
+use actix::{Actor, Addr};
 use actix_cors::Cors;
 use actix_files::Files;
 use actix_web::middleware::Condition;
@@ -780,13 +780,13 @@ impl App {
 		// Load secret key
 		let key_path = config_path.join("secret.key");
 		let secret = match fs::read(&key_path) {
-			Ok(r) => Secret(r),
+			Ok(r) => Secret::from_slice(&r)?,
 			Err(e) => {
 				warn!(logger, "Failed to read secret key, all your current \
 					identities cannot be used anymore, creating new secret";
 					"error" => %e);
 
-				let secret = Secret::new()?;
+				let secret = Secret::new();
 				fs::write(&key_path, &secret.0)?;
 
 				secret
@@ -1051,7 +1051,7 @@ mod tests {
 	impl TestProxy {
 		fn new(logger: Logger) -> Self {
 			let mut rng = rand::thread_rng();
-			Self { logger, port: rng.gen_range(1025, 65535) }
+			Self { logger, port: rng.gen_range(1025..=65535) }
 		}
 
 		async fn create_connection(&self) -> Result<Connection> {

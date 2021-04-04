@@ -1,71 +1,48 @@
 use anyhow::{format_err, Result};
-use flakebi_ring::aead::CHACHA20_POLY1305 as ALG;
-use flakebi_ring::aead::*;
-use flakebi_ring::error::Unspecified;
-use flakebi_ring::rand::{SecureRandom, SystemRandom};
+use chacha20poly1305::{ChaCha20Poly1305, Key};
+use chacha20poly1305::aead::{AeadInPlace, NewAead};
+use rand::Rng;
 
 #[derive(Clone)]
-pub struct Secret(pub Vec<u8>);
-
-struct SingleNonce(Option<Nonce>);
-
-impl NonceSequence for SingleNonce {
-	fn advance(&mut self) -> std::result::Result<Nonce, Unspecified> {
-		self.0.take().map(Ok).unwrap_or(Err(Unspecified))
-	}
-}
+pub struct Secret(pub Key);
 
 impl Secret {
-	pub fn new() -> Result<Self> {
-		let rand = SystemRandom::new();
-		let mut key = vec![0; ALG.key_len()];
-		rand.fill(&mut key).map_err(|_| format_err!("Failed to create random numbers"))?;
-		Ok(Self(key))
+	pub fn new() -> Self {
+		let key = rand::thread_rng().gen::<[u8; 32]>();
+		Self(key.into())
+	}
+
+	pub fn from_slice(key: &[u8]) -> Result<Self> {
+		if key.len() != 32 {
+			return Err(format_err!("Invalid key length"));
+		}
+		Ok(Self(generic_array::GenericArray::clone_from_slice(key)))
 	}
 
 	/// Encrypt and mac
 	pub fn seal(&self, mut data: Vec<u8>) -> Result<Vec<u8>> {
-		let rand = SystemRandom::new();
-		let mut nonce_data = [0; 12];
-		rand.fill(&mut nonce_data[..])
-			.map_err(|_| format_err!("Failed to create random numbers"))?;
-		let nonce = Nonce::assume_unique_for_key(nonce_data);
-		let nonce = SingleNonce(Some(nonce));
-
-		let mut key = SealingKey::new(
-			UnboundKey::new(&ALG, &self.0).map_err(|_| format_err!("Failed to create key"))?,
-			nonce,
-		);
-
-		key.seal_in_place_append_tag(Aad::empty(), &mut data)
-			.map_err(|_| format_err!("Failed to create key"))?;
-		data.extend_from_slice(&nonce_data);
-
+		let cipher = ChaCha20Poly1305::new(&self.0);
+		let nonce = rand::thread_rng().gen::<[u8; 12]>();
+		let nonce = nonce.into();
+		cipher.encrypt_in_place(&nonce, &[], &mut data)
+			.map_err(|_| format_err!("Failed to encrypt secret"))?;
+		data.extend_from_slice(nonce.as_slice());
 		Ok(data)
 	}
 
 	/// Mac and decrypt
 	pub fn open(&self, mut data: Vec<u8>) -> Result<Vec<u8>> {
-		let mut nonce_data = [0; 12];
-		let nonce_len = nonce_data.len();
-		if data.len() < nonce_data.len() {
+		let cipher = ChaCha20Poly1305::new(&self.0);
+		let mut nonce = [0; 12];
+		let nonce_len = nonce.len();
+		if data.len() < nonce_len {
 			return Err(format_err!("Cannot decrypt too short data"));
 		}
-		nonce_data.copy_from_slice(&data[data.len() - nonce_len..]);
-		let nonce = Nonce::assume_unique_for_key(nonce_data);
-		let nonce = SingleNonce(Some(nonce));
+		nonce.copy_from_slice(&data[data.len() - nonce_len..]);
 		data.truncate(data.len() - nonce_len);
 
-		let mut key = OpeningKey::new(
-			UnboundKey::new(&ALG, &self.0).map_err(|_| format_err!("Failed to create key"))?,
-			nonce,
-		);
-
-		let len = key
-			.open_in_place(Aad::empty(), &mut data)
-			.map_err(|_| format_err!("Failed to create key"))?
-			.len();
-		data.truncate(len);
+		cipher.decrypt_in_place(&nonce.into(), &[], &mut data)
+			.map_err(|_| format_err!("Failed to decrypt secret"))?;
 		Ok(data)
 	}
 }
