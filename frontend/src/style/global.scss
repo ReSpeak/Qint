@@ -11,6 +11,16 @@ html {
 	scrollbar-color: gray transparent;
 }
 
+*::-webkit-scrollbar {
+	width: 1em;
+}
+*::-webkit-scrollbar-track {
+	background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+	background-color: gray;
+}
+
 a {
 	@include linkLike;
 

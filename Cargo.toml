@@ -4,6 +4,8 @@ members = ["proxy-codegen", "proxy", "src-tauri"]
 [patch.crates-io]
 # Use master branch to fix reserving 200 G disk space on windows
 lmdb-rkv-sys = { git = "https://github.com/Flakebi/lmdb-rs" }
+# Alternative branch uses cmake instead of autoconf, which works better for cross compilation
+audiopus = { git = "https://github.com/DoumanAsh/audiopus", rev = "775541995a33060dcf060cc71bacaaa033e72561" }
 
 # Compile in release mode to speed up
 [profile.dev.package.audiopus]
