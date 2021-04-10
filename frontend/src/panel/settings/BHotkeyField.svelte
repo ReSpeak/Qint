@@ -9,8 +9,8 @@
 		hotkeyValueFns,
 		translateJsKeyToWindows,
 		isHotkeyComplete,
-	} from "../hotkey";
-	import type { Hotkey } from "../transientSettings";
+	} from "./hotkey";
+	import type { Hotkey } from "../../transientSettings";
 	import BDropDown from "./BDropDown.svelte";
 	import Icon from "../ui/Icon.svelte";
 	import BKeyValue from "./BKeyValue.svelte";

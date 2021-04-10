@@ -1,10 +1,6 @@
 {
 	"folders": [
 		{
-			"name": "Assets",
-			"path": "assets"
-		},
-		{
 			"name": "Frontend",
 			"path": "frontend"
 		},
@@ -23,6 +19,10 @@
 		{
 			"name": "Build Target",
 			"path": "target"
+		},
+		{
+			"name": "Assets",
+			"path": "assets"
 		}
 	],
 	"settings": {

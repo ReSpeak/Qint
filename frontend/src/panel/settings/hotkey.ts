@@ -1,4 +1,4 @@
-import { Hotkey, HotkeyAction, HotkeySubject, Tristate } from "./transientSettings";
+import { Hotkey, HotkeyAction, HotkeySubject, Tristate } from "../../transientSettings";
 
 type Option<T> = Readonly<{ value: T | "", text: string }>;
 type StateOptions = Tristate;

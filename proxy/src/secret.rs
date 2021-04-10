@@ -16,7 +16,7 @@ impl Secret {
 		if key.len() != 32 {
 			return Err(format_err!("Invalid key length"));
 		}
-		Ok(Self(generic_array::GenericArray::clone_from_slice(key)))
+		Ok(Self(Key::clone_from_slice(key)))
 	}
 
 	/// Encrypt and mac

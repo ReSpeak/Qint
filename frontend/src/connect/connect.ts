@@ -2,7 +2,10 @@ import { assert, getDefaultVersion } from "../util";
 import { OMsgConnect } from "../backend/ws";
 import { ChannelId } from "../ts";
 
+const DEFAULT_NAME: string = "QintUser";
+
 export class ConnectData {
+
 	constructor(
 		public name: string,
 		public address: string,
@@ -48,13 +51,13 @@ export class ConnectData {
 			assert("address" in data, "Connection needs an address");
 			assert("address" in data, "connection data needs an address");
 			if (!("name" in data))
-				data.name = "TeamSpeakUser";
+				data.name = DEFAULT_NAME;
 			return new ConnectData(data.name, data.address, data.bookmark,
 				data.channel, data.channelId, data.inputMuted, data.outputMuted,
 				data.away, data.password, data.channelPassword);
 		} else {
 			let start = data.indexOf("@");
-			let name = start === -1 ? "TeamSpeakUser" : data.substr(0, start);
+			let name = start === -1 ? DEFAULT_NAME : data.substr(0, start);
 			start += 1;
 			let end = data.indexOf("/");
 			let channel = end === -1 ? "" : data.substr(end + 1);
@@ -71,7 +74,7 @@ export class ConnectData {
 			this.password === undefined &&
 			this.channelPassword === undefined) {
 			let s = "";
-			if (this.name !== "TeamSpeakUser")
+			if (this.name !== DEFAULT_NAME)
 				s = this.name + "@";
 			s += this.address;
 			if (this.channel !== undefined)
