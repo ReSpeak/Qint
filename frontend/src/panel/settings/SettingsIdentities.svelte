@@ -100,11 +100,6 @@
 			</div>
 		</div>
 
-		<!-- <div><b>{identity.name}</b></div>
-						<div>(Uid: {base64Encode(identity.uid)})</div>
-						<UiEmojiString data={identity.uid} />
-						<div>(level: {identity.level})</div> -->
-
 		<form class="identOption" on:submit|preventDefault={updateIdentity}>
 			{#if editIdentity !== undefined}
 				<BKeyValue label="Name" labelStyle="is-normal">
