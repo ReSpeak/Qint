@@ -14,6 +14,7 @@
 	@import "bulma/sass/components/menu";
 	@import "bulma/sass/components/message";
 	@import "bulma/sass/components/modal";
+	@import "bulma/sass/components/panel";
 	@import "bulma/sass/components/tabs";
 	@import "bulma/sass/elements/box";
 	@import "bulma/sass/elements/button";

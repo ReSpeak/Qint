@@ -2,9 +2,8 @@
 	import { app } from "../../app";
 	import BTabSlot from "../../ui/BTabSlot.svelte";
 	import BKeyValue from "../../ui/BKeyValue.svelte";
-	import BHotkeyField from "../../ui/BHotkeyField.svelte";
+	import BHotkeyField from "./BHotkeyField.svelte";
 	import Icon from "../../ui/Icon.svelte";
-
 	import { isHotkeyComplete } from "./hotkey";
 
 	let localHotkeys = [...app.transientSettings.hotkeys.actions];

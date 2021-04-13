@@ -22,9 +22,11 @@ use actix_web::{
 };
 use actix_web_actors::ws;
 use anyhow::{bail, format_err, Result};
+use db::{models::UpdateIdentity, FindIdentity, GetIdentitiesMsg, UpdateIdentityMsg};
 use futures::prelude::*;
 use futures::stream::Peekable;
 use http::{header::CACHE_CONTROL, header::ETAG, HeaderValue};
+use identities::import_ts_identities_from_string;
 use messages::ResultDetails;
 use serde::de::IntoDeserializer;
 use serde::{Deserialize, Serialize};
@@ -41,6 +43,7 @@ mod audio;
 mod db;
 mod filecache;
 mod hotkey;
+mod identities;
 mod link_previewer;
 mod loudness_ws;
 mod markdown_ws;
@@ -559,8 +562,8 @@ struct PutFileOptions {
 
 #[put("/con/{id}/file/{channel}/{path:.*}")]
 async fn upload_file(
-	state: web::Data<Arc<State>>, path: web::Path<(Uuid, u64, String)>,
-	req: web::HttpRequest, body: web::Payload, query_opt: Query<PutFileOptions>,
+	state: web::Data<Arc<State>>, path: web::Path<(Uuid, u64, String)>, req: web::HttpRequest,
+	body: web::Payload, query_opt: Query<PutFileOptions>,
 ) -> impl Responder {
 	let (id, channel, path) = path.into_inner();
 	let channel = ChannelId(channel);
@@ -720,6 +723,89 @@ async fn set_setting(state: web::Data<Arc<State>>, body: web::Json<Value>) -> im
 		HttpResponse::InternalServerError().body(e.to_string())
 	} else {
 		HttpResponse::Ok().finish()
+	}
+}
+
+// get /ident/all
+// get /ident/by_name/{name}
+// put /ident/{name}?nickname?phonetic_name
+// post /ident/import [Body:ini_file]
+
+#[get("/ident/all")]
+async fn get_ident_all(state: web::Data<Arc<State>>) -> impl Responder {
+	match state.database.send(GetIdentitiesMsg(FindIdentity::All)).await {
+		Ok(Ok(idents)) => HttpResponse::Ok().json(idents),
+		Ok(Err(err)) => HttpResponse::BadRequest().body(err.to_string()),
+		Err(_) => HttpResponse::Gone().finish(),
+	}
+}
+
+#[get("/ident/by_id/{id}")]
+async fn get_ident_by_id(state: web::Data<Arc<State>>, path: web::Path<u64>) -> impl Responder {
+	let id = path.into_inner();
+	get_single_ident_by(state, FindIdentity::ById(id)).await
+}
+
+#[get("/ident/by_name/{name}")]
+async fn get_ident_by_name(
+	state: web::Data<Arc<State>>, path: web::Path<String>,
+) -> impl Responder {
+	let name = path.into_inner();
+	get_single_ident_by(state, FindIdentity::ByName(name)).await
+}
+
+async fn get_single_ident_by(state: web::Data<Arc<State>>, by: FindIdentity) -> impl Responder {
+	match state.database.send(GetIdentitiesMsg(by)).await {
+		Ok(Ok(idents)) => {
+			if let Some(ident) = idents.first() {
+				HttpResponse::Ok().json(ident)
+			} else {
+				HttpResponse::NotFound().finish()
+			}
+		}
+		Ok(Err(err)) => HttpResponse::BadRequest().body(err.to_string()),
+		Err(_) => HttpResponse::Gone().finish(),
+	}
+}
+
+#[derive(Deserialize)]
+struct UpdateIdentityOptions {
+	name: Option<String>,
+}
+
+#[put("/ident/{id}")]
+async fn put_ident(
+	state: web::Data<Arc<State>>, path: web::Path<u64>, query_opt: Query<UpdateIdentityOptions>,
+) -> impl Responder {
+	let query = query_opt.into_inner();
+	match state
+		.database
+		.send(UpdateIdentityMsg(FindIdentity::ById(path.into_inner()), UpdateIdentity {
+			name: query.name,
+			..Default::default()
+		}))
+		.await
+	{
+		Ok(Ok(())) => HttpResponse::Ok().finish(),
+		Ok(Err(err)) => HttpResponse::BadRequest().body(err.to_string()),
+		Err(_) => HttpResponse::Gone().finish(),
+	}
+}
+
+#[delete("/ident/{id}")]
+async fn delete_ident(state: web::Data<Arc<State>>) -> impl Responder {
+	HttpResponse::ServiceUnavailable().finish()
+}
+
+#[post("/ident/import")]
+async fn post_ident_import(state: web::Data<Arc<State>>, body: web::Bytes) -> impl Responder {
+	if let Ok(import_str) = std::str::from_utf8(body.as_ref()) {
+		match import_ts_identities_from_string(&state, import_str).await {
+			Ok(_) => HttpResponse::Ok().finish(),
+			Err(e) => HttpResponse::BadRequest().body(e.to_string()),
+		}
+	} else {
+		HttpResponse::BadRequest().body("Invalid text data")
 	}
 }
 
@@ -960,6 +1046,12 @@ impl App {
 				.service(get_link_preview)
 				.service(loudness_service)
 				.service(render_md_service)
+				.service(get_ident_all)
+				.service(get_ident_by_id)
+				.service(get_ident_by_name)
+				.service(put_ident)
+				.service(delete_ident)
+				.service(post_ident_import)
 				.service(db::graphql::db_graphql)
 				.service(db::graphql::graphiql)
 				.service(Files::new("", frontend_path).index_file("index.html"))
@@ -992,7 +1084,7 @@ impl App {
 		}
 
 		// Wait at max a second and poll
-		for _ in 0u8..10 {
+		for _ in 0u8..100 {
 			{
 				let cons = self.0.connections.lock().unwrap();
 				if cons.is_empty() {

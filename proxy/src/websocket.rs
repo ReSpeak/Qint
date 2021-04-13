@@ -429,18 +429,22 @@ impl Ws {
 			},
 			TsStreamItem::IdentityLevelIncreased => {
 				if let Some(con) = &self.connection {
-					let event =
-						db::UpdateIdentityMsg(con.get_options().get_identity().unwrap().clone());
-					let logger = self.logger.clone();
-					actix::spawn(self.state.database.send(event).map(move |r| match r {
-						Ok(Ok(())) => {}
-						Ok(Err(e)) => {
-							error!(logger, "Failed to handle event in database"; "error" => %e);
-						}
-						Err(_) => {
-							error!(logger, "Failed to send event to database");
-						}
-					}));
+					let mut update_identity = db::models::UpdateIdentity::default();
+					if let Ok(find_key) = update_identity
+						.from_identity_with_find(con.get_options().get_identity().unwrap())
+					{
+						let event = db::UpdateIdentityMsg(find_key, update_identity);
+						let logger = self.logger.clone();
+						actix::spawn(self.state.database.send(event).map(move |r| match r {
+							Ok(Ok(())) => {}
+							Ok(Err(e)) => {
+								error!(logger, "Failed to handle event in database"; "error" => %e);
+							}
+							Err(_) => {
+								error!(logger, "Failed to send event to database");
+							}
+						}));
+					}
 				}
 			}
 			TsStreamItem::DisconnectedTemporarily(_) => {
@@ -601,24 +605,26 @@ impl Ws {
 	fn handle_ws_message(&mut self, msg: MessageF2P, ctx: &mut <Self as Actor>::Context) {
 		match msg {
 			MessageF2P::Connect(o) => {
-				let id = self.state.launch_config.read().unwrap().default_identity;
+				let identity_id = o
+					.identity_id
+					.unwrap_or_else(|| self.state.launch_config.read().unwrap().default_identity);
 				ctx.spawn(
 					wrap_future(
 						self.state
 							.database
 							.send(db::GetIdentityAndServerMsg {
-								id,
+								id: identity_id,
 								create: true,
 								address: o.address.clone(),
 							})
 							.map(|r| r.map_err(|e| e.into()).and_then(|r| r)),
 					)
 					.map(move |res, actor: &mut Self, ctx| {
-						res.and_then(|(id, server)| {
+						res.and_then(|(identity, server)| {
 							let launch_config = actor.state.launch_config.read().unwrap();
 							let mut options = tsclientlib::Connection::build(o.address.clone())
 								.name(o.name.clone())
-								.identity(id)
+								.identity(identity)
 								.logger(actor.logger.clone())
 								.log_commands(o.log_commands || launch_config.verbosity > 0)
 								.log_packets(o.log_packets || launch_config.verbosity > 1)
@@ -1042,9 +1048,7 @@ impl Handler<GetClientVolumeMsg> for Ws {
 		if let Some(con) = &self.connection {
 			match con.get_state() {
 				Ok(state) => {
-					let uid_fut: Box<
-						dyn ActorFuture<Self, Output = Result<UidBuf>> + Unpin,
-					>;
+					let uid_fut: Box<dyn ActorFuture<Self, Output = Result<UidBuf>> + Unpin>;
 					if let Some(client) = state.clients.get(&client) {
 						uid_fut = Box::new(wrap_future(future::ready(
 							client

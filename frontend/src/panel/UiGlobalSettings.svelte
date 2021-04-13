@@ -3,17 +3,17 @@
 	import SettingsAudio from "./settings/SettingsAudio.svelte";
 	import SettingsTts from "./settings/SettingsTts.svelte";
 	import SettingsHotkeys from "./settings/SettingsHotkeys.svelte";
+	import SettingsIdentities from "./settings/SettingsIdentities.svelte";
 	import BTabList from "../ui/BTabList.svelte";
-
-	let tablistIndex: number;
 </script>
 
 <div class="settings">
-	<BTabList bind:activeIndex={tablistIndex}>
+	<BTabList _style="height:100%;">
 		<SettingsApp />
 		<SettingsAudio />
 		<SettingsTts />
 		<SettingsHotkeys />
+		<SettingsIdentities />
 	</BTabList>
 </div>
 

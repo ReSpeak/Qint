@@ -14,6 +14,11 @@ interface BookmarkServer {
 	icon: string | undefined;
 }
 
+interface BookmarkIdentity {
+	id: string;
+	name: string;
+}
+
 export class Bookmark {
 	public id: string | undefined;
 	public name: string | undefined;
@@ -21,6 +26,7 @@ export class Bookmark {
 	public address: string | undefined;
 	public bookmark: boolean | undefined;
 	public lastUsed: Moment | undefined;
+	public identity: BookmarkIdentity | undefined;
 	public channel: BookmarkChannel | null = null;
 	public server: BookmarkServer | null = null;
 
@@ -43,7 +49,8 @@ export class Bookmark {
 				id: this.id,
 				name: this.name,
 				username: this.username,
-				bookmark: this.bookmark
+				bookmark: this.bookmark,
+				identity: this.identity?.id,
 			}
 		});
 	}
@@ -58,6 +65,10 @@ export class Bookmark {
 				bookmark
 				lastUsed
 				timezone
+				identity {
+					id,
+					name,
+				}
 				channel {
 					id
 					fullPath
@@ -83,6 +94,10 @@ export class Bookmark {
 				bookmark
 				lastUsed
 				timezone
+				identity {
+					id,
+					name,
+				}
 				channel {
 					id
 					fullPath

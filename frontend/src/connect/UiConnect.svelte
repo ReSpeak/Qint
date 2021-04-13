@@ -10,6 +10,8 @@
 	import { SERVER_ICON, CLIENT_ICON, focus, urlBase64Encode, CHANNEL_ICON, on } from "../util";
 	import { app } from "../app";
 	import { backend } from "../backend/backend";
+	import { loadIdentities } from "../panel/settings/identity";
+	import BDropDown from "../ui/BDropDown.svelte";
 
 	export let data: ConnectData;
 	let addressInput: HTMLInputElement;
@@ -28,9 +30,11 @@
 	async function dataChanged() {
 		address =
 			data.address +
-			(data.channel !== undefined ? "/" + data.channel
-			: data.channelId !== undefined ? "//" + data.channelId
-			: "");
+			(data.channel !== undefined
+				? "/" + data.channel
+				: data.channelId !== undefined
+				? "//" + data.channelId
+				: "");
 		if (addressInput !== undefined) {
 			await changeChannels();
 		}
@@ -79,7 +83,9 @@
 
 	async function loadChannels(address: string): Promise<Channel[]> {
 		try {
-			const query = await backend.graphql<{serverByAddress:{publicKey: number[], channels:Channel[]}}>(
+			const query = await backend.graphql<{
+				serverByAddress: { publicKey: number[]; channels: Channel[] };
+			}>(
 				`
 					query GetChannels($address: String!) {
 						serverByAddress(address: $address) {
@@ -142,8 +148,7 @@
 	onMount(async () => {
 		const recent = await Bookmark.getRecent();
 		if (recent) {
-			if (data.name === "")
-				data.name = recent.username ?? "";
+			if (data.name === "") data.name = recent.username ?? "";
 			if (address === "") {
 				data.address = recent.address ?? "";
 				if (recent.channel !== null) {
@@ -194,7 +199,7 @@
 				<button
 					class="button collapseButton noBut"
 					type="button"
-					on:click={e => showDetails = !showDetails}>
+					on:click={(e) => (showDetails = !showDetails)}>
 					<Icon name="chevron-right{!showDetails ? '' : ' mdi-rotate-90'}" />
 					Details
 				</button>
@@ -226,15 +231,25 @@
 						<Icon name={CHANNEL_ICON} isLeft />
 					</p>
 				</div>
+				<div>
+					{#await loadIdentities() then identities}
+						{#if identities !== undefined && identities.length > 1}
+							<BDropDown
+								items={identities}
+								display={(i) => i.name}
+								on:change={(i) => {
+									data.identityId = i.detail.id;
+								}} />
+						{/if}
+					{/await}
+				</div>
 			</div>
 			<div>
-				<button class="button is-primary" name="connect" type="submit">
-					Connect
-				</button>
+				<button class="button is-primary" name="connect" type="submit"> Connect </button>
 			</div>
 		</form>
 
-		{#if channelPart !== ''}
+		{#if channelPart !== ""}
 			<div class="menu channel-list">
 				<ul class="menu-list">
 					{#each channels as channel (channel.id)}

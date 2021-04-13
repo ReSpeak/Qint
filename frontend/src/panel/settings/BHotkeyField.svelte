@@ -11,9 +11,9 @@
 		isHotkeyComplete,
 	} from "./hotkey";
 	import type { Hotkey } from "../../transientSettings";
-	import BDropDown from "./BDropDown.svelte";
-	import Icon from "../ui/Icon.svelte";
-	import BKeyValue from "./BKeyValue.svelte";
+	import BDropDown from "../../ui/BDropDown.svelte";
+	import Icon from "../../ui/Icon.svelte";
+	import BKeyValue from "../../ui/BKeyValue.svelte";
 	import debug from "debug";
 	const log = debug("HOTKEY");
 

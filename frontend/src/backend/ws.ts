@@ -18,6 +18,7 @@ export interface OMsgConnect {
 		bookmark: string | undefined;
 		address: string;
 		name: string;
+		identityId?: string;
 		channel: string | undefined;
 		version: Version;
 		inputMuted?: boolean;

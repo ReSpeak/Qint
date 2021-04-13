@@ -78,6 +78,21 @@ export function autoError(element: HTMLImageElement) {
 	element.addEventListener("onerror", errFn);
 }
 
+export function clickToSelectAll(element: HTMLElement) {
+	if (!element) return;
+	let clickFn = function () {
+		let range = document.createRange();
+		range.selectNodeContents(element);
+		let sel = document.getSelection();
+		if (sel) {
+			sel.removeAllRanges();
+			sel.addRange(range);
+		}
+	}
+	element.onfocus = clickFn;
+	element.onclick = clickFn;
+}
+
 // See https://jsperf.com/node-uuid-performance/64 about how to generate a uuid fast
 export function createUuidV4(): string {
 	const d2h: string[] = [], vals = new Array(16);

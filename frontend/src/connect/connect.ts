@@ -10,6 +10,7 @@ export class ConnectData {
 		public name: string,
 		public address: string,
 		public bookmark?: string,
+		public identityId?: string,
 		public channel?: string,
 		public channelId?: ChannelId,
 		public inputMuted?: boolean,
@@ -20,7 +21,7 @@ export class ConnectData {
 
 	public clone(): ConnectData {
 		return new ConnectData(this.name, this.address, this.bookmark,
-			this.channel, this.channelId, this.inputMuted,
+			this.identityId, this.channel, this.channelId, this.inputMuted,
 			this.outputMuted, this.away, this.password, this.channelPassword);
 	}
 
@@ -29,6 +30,7 @@ export class ConnectData {
 		return {
 			Connect: {
 				bookmark: this.bookmark,
+				identityId: this.identityId,
 				address: this.address,
 				name: this.name,
 				channel,

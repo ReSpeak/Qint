@@ -1,5 +1,5 @@
 <script lang="typescript">
-	import { onMount } from "svelte";
+	import { onDestroy } from "svelte";
 	import { app } from "../../app";
 	import { backend } from "../../backend/backend";
 	import {
@@ -10,12 +10,14 @@
 		LOUDNESS_MIN,
 		LOUDNESS_UPDATE_MS,
 		MIN_VOLUME_DB,
+		on,
 	} from "../../util";
 	import BTabSlot from "../../ui/BTabSlot.svelte";
 	import BKeyValue from "../../ui/BKeyValue.svelte";
 	import BSlider from "../../ui/BSlider.svelte";
 	import SimpleDiagram from "../../ui/UiSimpleDiagram.svelte";
 
+	let selected: boolean;
 	const audioSett = app.transientSettings.audio;
 
 	let minGlobalVolume = MIN_VOLUME_DB;
@@ -63,7 +65,7 @@
 	function syncSettings() {
 		app.transientSettings.save();
 	}
-	
+
 	function updateLoudness() {
 		audioSett.loudnessThreshold =
 			loudnessThreshold === minLoudnessThreshold ? null : loudnessThreshold;
@@ -77,26 +79,36 @@
 		app.transientSettings.flush();
 	}
 
-	onMount(() => {
-		// TODO check how this behaves in our tablist
-		// Subscribe to loadness changes when this is mounted
-		loudnessSocket = new WebSocket(`${backend.wsBaseAddress}/loudness`);
-		loudnessSocket.binaryType = "arraybuffer";
-		loudnessSocket.onmessage = (ev) => {
-			loudness = new DataView(ev.data).getFloat64(0);
-		};
-		loudnessSocket.onclose = () => {
-			loudnessSocket = undefined;
-		};
+	$: on(selected, changeSelected());
 
-		return () => {
-			loudnessSocket?.close();
-			loudnessSocket = undefined;
-		};
+	function changeSelected() {
+		if (selected && loudnessSocket === undefined) {
+			console.log("mount audio");
+			loudnessSocket = new WebSocket(`${backend.wsBaseAddress}/loudness`);
+			loudnessSocket.binaryType = "arraybuffer";
+			loudnessSocket.onmessage = (ev) => {
+				loudness = new DataView(ev.data).getFloat64(0);
+			};
+			loudnessSocket.onclose = () => {
+				loudnessSocket = undefined;
+			};
+		} else {
+			closeSocket();
+		}
+	}
+
+	function closeSocket() {
+		console.log("unmount audio");
+		loudnessSocket?.close();
+		loudnessSocket = undefined;
+	}
+
+	onDestroy(() => {
+		closeSocket();
 	});
 </script>
 
-<BTabSlot title="Audio">
+<BTabSlot title="Audio" bind:selected>
 	<BKeyValue label="Global Volume">
 		<div class="volumeControl">
 			<BSlider
@@ -109,18 +121,19 @@
 				on:input={updateGlobalVolume} />
 		</div>
 	</BKeyValue>
-	<div>Loudness:</div>
-	<SimpleDiagram
-		bind:this={loudnessDiagram}
-		width={LOUDNESS_WIDTH}
-		height={LOUDNESS_HEIGHT}
-		min={LOUDNESS_MIN}
-		max={LOUDNESS_MAX}
-		count={LOUDNESS_COUNT}
-		lines={[
-			[-14, "#555555"],
-			[loudnessThreshold, "#aa3333"],
-		]} />
+	<BKeyValue label="Loudness">
+		<SimpleDiagram
+			bind:this={loudnessDiagram}
+			width={LOUDNESS_WIDTH}
+			height={LOUDNESS_HEIGHT}
+			min={LOUDNESS_MIN}
+			max={LOUDNESS_MAX}
+			count={LOUDNESS_COUNT}
+			lines={[
+				[-14, "Standard normalized volume (-14dB)", "#555555"],
+				[loudnessThreshold, "Your talking threshold", "#aa3333"],
+			]} />
+	</BKeyValue>
 	<BKeyValue label="Volume Capture Trigger">
 		<div class="volumeControl">
 			<BSlider

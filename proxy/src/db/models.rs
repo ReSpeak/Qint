@@ -7,7 +7,7 @@ use juniper::GraphQLEnum;
 use serde::{Deserialize, Serialize};
 use tsproto_types::crypto::EccKeyPrivP256;
 
-use super::schema::*;
+use super::{FindIdentity, schema::*};
 use crate::secret::Secret;
 
 #[derive(Queryable)]
@@ -160,7 +160,15 @@ pub struct NewIdentity<'a> {
 	/// `counter`).
 	pub max_counter: i64,
 	/// Client uid
-	pub client: &'a [u8],
+	pub client: Vec<u8>,
+}
+
+#[derive(AsChangeset, Default)]
+#[table_name="identities"]
+pub struct UpdateIdentity {
+    pub name: Option<String>,
+    pub counter: Option<i64>,
+	pub max_counter: Option<i64>,
 }
 
 #[derive(Debug, Queryable)]
@@ -249,14 +257,31 @@ impl Identity {
 }
 
 impl<'a> NewIdentity<'a> {
-	pub fn new(id: &tsclientlib::Identity, client_uid: &'a [u8], secret: &Secret) -> Result<Self> {
-		let private_key = secret.seal(id.key().to_short().to_vec())?;
+	pub fn new_default(identity: &tsclientlib::Identity, secret: &Secret) -> Result<Self> {
+		Self::new_with_name(identity, "Default", secret)
+	}
+
+	pub fn new_with_name(identity: &tsclientlib::Identity, name: &'a str, secret: &Secret) -> Result<Self> {
+		let private_key = secret.seal(identity.key().to_short().to_vec())?;
+		let client = identity.key().to_pub().get_uid_no_base64()?;
 		Ok(Self {
 			private_key,
-			name: "Default",
-			counter: id.counter() as i64,
-			max_counter: id.max_counter() as i64,
-			client: client_uid,
+			name,
+			counter: identity.counter() as i64,
+			max_counter: identity.max_counter() as i64,
+			client,
 		})
+	}
+}
+
+impl UpdateIdentity {
+	pub fn from_identity(&mut self, identity: &tsclientlib::Identity) {
+		self.counter = Some(identity.counter() as i64);
+		self.max_counter = Some(identity.max_counter() as i64);
+	}
+
+	pub fn from_identity_with_find(&mut self, identity: &tsclientlib::Identity) -> Result<FindIdentity> {
+		self.from_identity(&identity);
+		Ok(FindIdentity::ByUid(identity.key().to_pub().get_uid_no_base64()?))
 	}
 }

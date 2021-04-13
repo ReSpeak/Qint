@@ -127,6 +127,14 @@ pub struct ConnectOptions {
 		skip_serializing_if = "Option::is_none"
 	)]
 	pub bookmark: Option<u64>,
+	/// Id of the identity
+	#[serde(
+		default,
+		deserialize_with = "deserialize_some_u64",
+		serialize_with = "serialize_some_u64",
+		skip_serializing_if = "Option::is_none"
+	)]
+	pub identity_id: Option<u64>,
 	pub address: String,
 	pub name: String,
 	#[serde(skip_serializing_if = "Option::is_none")]

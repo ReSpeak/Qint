@@ -1,18 +1,22 @@
 <script lang="typescript">
-	import { getContext } from "svelte";
+	import { getContext, onDestroy } from "svelte";
 	import { contextKey } from "./tabList";
 	import type { TabListContext } from "./tabList";
 	import { assert } from "../util";
 
 	export let title: string;
+	export let selected: boolean = false;
 
 	let context: TabListContext = getContext(contextKey);
 	assert(context !== undefined, "TabSlot must be used within a TabList");
-	const ownIndex = context.registerPanel(title);
-	const activeIndex = context.activeIndex;
+	const ownId = context.registerPanel(title);
+	const activeId = context.activeId;
+	$: selected = $activeId === ownId;
+
+	onDestroy(() => context.unregisterPanel(ownId));
 </script>
 
 <svelte:options immutable="{true}" />
-{#if $activeIndex === ownIndex}
+{#if selected}
 	<slot />
 {/if}

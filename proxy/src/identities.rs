@@ -1,0 +1,61 @@
+use crate::{db::AddIdentityMsg, State};
+use anyhow::Result;
+use proxy_codegen::book_events::{serialize_u64, deserialize_u64};
+use serde::{Deserialize, Serialize};
+use serde_ini::de::from_str;
+
+// TODO multiidentity
+
+#[derive(Debug, Serialize, Deserialize)]
+struct TsExportIdentityFile {
+	#[serde(rename(deserialize = "Identity"))]
+	identity: TsExportIdentity,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct TsExportIdentity {
+	id: String,
+	identity: String,
+	nickname: String,
+	phonetic_nickname: String,
+}
+
+/// Used to get a nicely de-/serializable view of an identity to get from the
+/// web api.
+/// Does not include the private key for security and usability reasons.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ApiIdentity {
+	// Readonly
+	#[serde(deserialize_with = "deserialize_u64", serialize_with = "serialize_u64")]
+	pub id: u64,
+	pub name: String,
+	// Readonly
+	pub uid: Vec<u8>,
+	// Readonly
+	pub level: u8,
+}
+
+// TODO thiserror
+
+pub async fn import_ts_identities_from_string(state: &State, any: &str) -> Result<()> {
+	let import_result = if let Ok(exp) = from_str::<TsExportIdentityFile>(any) {
+		println!("exp {:?}", exp);
+		let exp = exp.identity;
+		match tsclientlib::Identity::new_from_str(&exp.identity.trim_matches('"')) {
+			Ok(identity) => Ok((identity, exp.id, exp.nickname, exp.phonetic_nickname)),
+			Err(err) => Err(err),
+		}
+	} else {
+		match tsclientlib::Identity::new_from_str(any) {
+			Ok(identity) => Ok((identity, "Import".into(), "QintUser".into(), "".into())), // TODO allow none
+			Err(err) => Err(err),
+		}
+	};
+
+	let (identity, id, nickname, phonetic_nickname) = import_result?;
+	let _ = state
+		.database
+		.send(AddIdentityMsg { identity, name: id, nickname, phonetic_nickname })
+		.await??;
+	Ok(())
+}

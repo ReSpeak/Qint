@@ -1,10 +1,9 @@
 <script lang="typescript">
-	import type { EmojiData } from "../util";
 	import { emojiEncode } from "../util";
 
 	export let data: number[];
-	let emoji: EmojiData[];
-	$: emoji = emojiEncode(data);
+	export let maxLength = 10;
+	$: emoji = emojiEncode(data).slice(0, maxLength);
 </script>
 
 <div class="emojiString">

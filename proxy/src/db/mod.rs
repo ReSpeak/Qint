@@ -25,7 +25,7 @@ use crate::{LaunchConfig, State};
 use models::MessageStatus;
 
 pub(crate) mod graphql;
-mod models;
+pub mod models;
 pub mod schema;
 
 type DieselResult<T> = std::result::Result<T, diesel::result::Error>;
@@ -55,11 +55,25 @@ pub struct GetIdentityAndServerMsg {
 	pub create: bool,
 	pub address: String,
 }
+#[derive(Debug)]
+pub struct AddIdentityMsg {
+	pub identity: tsclientlib::Identity,
+	pub name: String,
+	pub nickname: String,
+	pub phonetic_nickname: String,
+}
+pub struct GetIdentitiesMsg(pub FindIdentity);
+pub enum FindIdentity {
+	All,
+	ById(u64),
+	ByUid(Vec<u8>),
+	ByName(String),
+}
 #[derive(Clone, Debug)]
 pub struct GetClientVolumeMsg(pub UidBuf);
 #[derive(Clone, Debug)]
 pub struct SetClientVolumeMsg(pub UidBuf, pub f32);
-pub struct UpdateIdentityMsg(pub Identity);
+pub struct UpdateIdentityMsg(pub FindIdentity, pub models::UpdateIdentity);
 pub struct RunOnDbMsg<I: 'static, E: 'static, F: FnOnce(&mut DbHandler) -> result::Result<I, E>>(
 	pub F,
 );
@@ -129,6 +143,15 @@ impl Actor for DbHandler {
 impl Message for GetIdentityAndServerMsg {
 	type Result = Result<(Identity, Option<UidBuf>)>;
 }
+impl Message for GetIdentitiesMsg {
+	type Result = Result<Vec<crate::identities::ApiIdentity>>;
+}
+impl Message for AddIdentityMsg {
+	type Result = Result<()>;
+}
+impl Message for UpdateIdentityMsg {
+	type Result = Result<()>;
+}
 impl Message for GetClientVolumeMsg {
 	type Result = Result<Option<f32>>;
 }
@@ -139,9 +162,6 @@ impl<I: 'static, E: 'static, F: FnOnce(&mut DbHandler) -> result::Result<I, E>> 
 	for RunOnDbMsg<I, E, F>
 {
 	type Result = result::Result<I, E>;
-}
-impl Message for UpdateIdentityMsg {
-	type Result = Result<()>;
 }
 impl Message for WriteMessageMsg {
 	type Result = Result<()>;
@@ -380,6 +400,8 @@ impl Handler<GetIdentityAndServerMsg> for DbHandler {
 					bail!("No identity found");
 				}
 
+				// TODO check if identity already exists
+
 				// Create new identity
 				let identity = tsclientlib::Identity::create()?;
 				let pub_key = identity.key().to_pub();
@@ -388,19 +410,106 @@ impl Handler<GetIdentityAndServerMsg> for DbHandler {
 
 				let cli = models::ClientInsert {
 					uid: &uid,
-					name: "TeamSpeakUser",
+					name: "QintUser",
 					public_key: Some(client_key.as_slice()),
 					custom_name: None,
 					custom_phonetic_name: None,
 				};
 				diesel::insert_into(schema::clients::table).values(&cli).execute(&self.con)?;
 
-				let new_identity = models::NewIdentity::new(&identity, &uid, &self.secret)?;
+				let new_identity = models::NewIdentity::new_default(&identity, &self.secret)?;
 				diesel::insert_into(identities).values(&new_identity).execute(&self.con)?;
 
 				Ok((identity, server))
 			}
 		}
+	}
+}
+
+impl Handler<GetIdentitiesMsg> for DbHandler {
+	type Result = Result<Vec<crate::identities::ApiIdentity>>;
+	fn handle(&mut self, msg: GetIdentitiesMsg, _: &mut Self::Context) -> Self::Result {
+		use schema::identities::dsl::*;
+
+		let query = match msg.0 {
+			FindIdentity::All => identities.load::<models::Identity>(&self.con),
+			FindIdentity::ById(by_id) => {
+				identities.find(by_id as i64).load::<models::Identity>(&self.con)
+			}
+			FindIdentity::ByUid(by_uid) => {
+				identities.filter(client.eq(by_uid)).load::<models::Identity>(&self.con)
+			}
+			FindIdentity::ByName(by_name) => {
+				identities.filter(name.eq(by_name)).load::<models::Identity>(&self.con)
+			}
+		}?;
+
+		Ok(query
+			.into_iter()
+			.filter_map(|db_ident| {
+				let i_id = db_ident.id as u64;
+				let i_name = db_ident.name.clone();
+				let tscl_ident = db_ident.into_identity(&self.secret).ok()?;
+				Some(crate::identities::ApiIdentity {
+					id: i_id,
+					name: i_name,
+					uid: tscl_ident.key().to_pub().get_uid_no_base64().ok()?,
+					level: tscl_ident.level().ok()?,
+				})
+			})
+			.collect())
+	}
+}
+
+impl Handler<AddIdentityMsg> for DbHandler {
+	type Result = Result<()>;
+	fn handle(&mut self, msg: AddIdentityMsg, _: &mut Self::Context) -> Self::Result {
+		use schema::identities::dsl::*;
+
+		let identity = msg.identity;
+		let pub_key = identity.key().to_pub();
+		let uid = pub_key.get_uid_no_base64()?;
+		let client_key = pub_key.to_short();
+
+		let cli = models::ClientInsert {
+			uid: &uid,
+			name: &msg.nickname,
+			public_key: Some(client_key.as_slice()),
+			custom_name: None,
+			custom_phonetic_name: None,
+		};
+		diesel::insert_into(schema::clients::table).values(&cli).execute(&self.con)?;
+
+		let new_identity = models::NewIdentity::new_with_name(&identity, &msg.name, &self.secret)?;
+		diesel::insert_into(identities).values(&new_identity).execute(&self.con)?;
+
+		Ok(())
+	}
+}
+
+impl Handler<UpdateIdentityMsg> for DbHandler {
+	type Result = Result<()>;
+	fn handle(
+		&mut self, UpdateIdentityMsg(find, update): UpdateIdentityMsg, _: &mut Self::Context,
+	) -> Self::Result {
+		use schema::identities::dsl::*;
+
+		let result = match find {
+			FindIdentity::ById(ident_id) => {
+				diesel::update(identities.filter(id.eq(ident_id as i64)))
+					.set(&update)
+					.execute(&self.con)?
+			}
+			FindIdentity::ByUid(uid) => diesel::update(identities.filter(client.eq(&uid)))
+				.set(&update)
+				.execute(&self.con)?,
+			_ => bail!("Not allowed identity update key"),
+		};
+
+		if result != 1 {
+			bail!("Identity not found");
+		}
+		Ok(())
 	}
 }
 
@@ -431,29 +540,6 @@ impl<I: 'static, E: 'static, F: FnOnce(&mut DbHandler) -> result::Result<I, E>>
 	type Result = result::Result<I, E>;
 	fn handle(&mut self, msg: RunOnDbMsg<I, E, F>, _: &mut Self::Context) -> Self::Result {
 		msg.0(self)
-	}
-}
-
-impl Handler<UpdateIdentityMsg> for DbHandler {
-	type Result = Result<()>;
-	fn handle(
-		&mut self, UpdateIdentityMsg(identity): UpdateIdentityMsg, _: &mut Self::Context,
-	) -> Self::Result {
-		use schema::identities::dsl::*;
-
-		let pub_key = identity.key().to_pub();
-		let uid = pub_key.get_uid_no_base64()?;
-		if diesel::update(identities.filter(client.eq(uid)))
-			.set((
-				counter.eq(identity.counter() as i64),
-				max_counter.eq(identity.max_counter() as i64),
-			))
-			.execute(&self.con)?
-			!= 1
-		{
-			bail!("Identity not found");
-		}
-		Ok(())
 	}
 }
 

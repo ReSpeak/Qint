@@ -4,11 +4,12 @@
 	export let size: number | string = "1.2em";
 	export let name: string | undefined = undefined;
 	export let isLeft: boolean = false;
+	export let isRight: boolean = false;
 	export let style: string = "";
 	export let title: string | undefined = undefined;
 </script>
 
-<span class="icon {isLeft ? 'is-left' : ''}" {title}>
+<span class="icon{isLeft ? ' is-left' : ''}{isRight ? ' is-right' : ''}" {title}>
 	{#if raw}
 		{raw}
 	{:else}

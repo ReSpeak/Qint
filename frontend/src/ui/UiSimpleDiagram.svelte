@@ -7,7 +7,8 @@ import { onMount } from "svelte";
 	export let max: number;
 	export let count = 100;
 	export let fillStyle: string | CanvasGradient | CanvasPattern | undefined = undefined;
-	export let lines: [number, string | CanvasGradient | CanvasPattern][] = [];
+	// [height, description, color]
+	export let lines: [number, string, string | CanvasGradient | CanvasPattern][] = [];
 
 	export let width: number | undefined = undefined;
 	export let height: number | undefined = undefined;
@@ -83,8 +84,10 @@ import { onMount } from "svelte";
 		}
 
 		for (const l of lines) {
-			ctx.fillStyle = l[1];
-			ctx.fillRect(0, getY(l[0]), realWidth, 0.8);
+			ctx.fillStyle = l[2];
+			const lineY = getY(l[0]);
+			ctx.fillRect(0, lineY, realWidth, 0.8);
+			ctx.fillText(l[1], 5, lineY - 1);
 		}
 	}
 

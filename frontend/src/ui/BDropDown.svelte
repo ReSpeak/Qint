@@ -3,7 +3,7 @@
 	import { createEventDispatcher, onMount } from "svelte";
 	type DDObjElement = { value: any };
 	export let items: readonly unknown[];
-	export let selected: unknown;
+	export let selected: unknown = undefined;
 	export let display: (item: any) => string = displayFn;
 	export let id: string | undefined = undefined;
 	let dd: HTMLSelectElement;
