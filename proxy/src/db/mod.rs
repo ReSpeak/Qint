@@ -464,24 +464,34 @@ impl Handler<GetIdentitiesMsg> for DbHandler {
 impl Handler<AddIdentityMsg> for DbHandler {
 	type Result = Result<()>;
 	fn handle(&mut self, msg: AddIdentityMsg, _: &mut Self::Context) -> Self::Result {
-		use schema::identities::dsl::*;
-
 		let identity = msg.identity;
+		let nickname = msg.nickname.as_str();
 		let pub_key = identity.key().to_pub();
-		let uid = pub_key.get_uid_no_base64()?;
+		let client_uid = pub_key.get_uid_no_base64()?;
 		let client_key = pub_key.to_short();
 
-		let cli = models::ClientInsert {
-			uid: &uid,
-			name: &msg.nickname,
-			public_key: Some(client_key.as_slice()),
-			custom_name: None,
-			custom_phonetic_name: None,
-		};
-		diesel::insert_into(schema::clients::table).values(&cli).execute(&self.con)?;
+		//Check if a client with that uid already exists and create it if not
+		self.con.transaction::<_, diesel::result::Error, _>(|| {
+			match diesel::select(diesel::dsl::exists(schema::clients::table.filter(schema::clients::uid.eq(&client_uid))))
+				.get_result(&self.con)
+			{
+				Ok(false) => {
+					let cli = models::ClientInsert {
+						uid: &client_uid,
+						name: nickname,
+						public_key: Some(client_key.as_slice()),
+						custom_name: None,
+						custom_phonetic_name: None,
+					};
+					diesel::insert_into(schema::clients::table).values(&cli).execute(&self.con)
+				}
+				Ok(true) => Ok(0),
+				Err(err) => Err(err),
+			}
+		})?;
 
 		let new_identity = models::NewIdentity::new_with_name(&identity, &msg.name, &self.secret)?;
-		diesel::insert_into(identities).values(&new_identity).execute(&self.con)?;
+		diesel::insert_into(schema::identities::table).values(&new_identity).execute(&self.con)?;
 
 		Ok(())
 	}
