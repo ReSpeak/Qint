@@ -39,7 +39,6 @@ pub struct ApiIdentity {
 
 pub async fn import_ts_identities_from_string(state: &State, any: &str) -> Result<()> {
 	let import_result = if let Ok(exp) = from_str::<TsExportIdentityFile>(any) {
-		println!("exp {:?}", exp);
 		let exp = exp.identity;
 		match tsclientlib::Identity::new_from_str(&exp.identity.trim_matches('"')) {
 			Ok(identity) => Ok((identity, exp.id, exp.nickname, exp.phonetic_nickname)),

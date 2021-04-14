@@ -327,7 +327,7 @@ impl Search {
 						for r in res {
 							let str_key = base64::encode_config(&r.0, base64::URL_SAFE_NO_PAD);
 							let public_key = EccKeyPubP256::from_short(&r.0)?;
-							let uid = public_key.get_uid()?;
+							let uid = public_key.get_uid();
 							let doc = ServerDocument {
 								id: format!("{}{}", SERVER_PREFIX, str_key),
 								uid: uid,
@@ -407,7 +407,7 @@ impl Search {
 		&self, public_key: EccKeyPubP256, address: String, name: String,
 		host_message: Option<String>, welcome_message: Option<String>,
 	) -> Result<u64> {
-		let uid = public_key.get_uid()?;
+		let uid = public_key.get_uid();
 		let server =
 			base64::encode_config(public_key.to_short().as_slice(), base64::URL_SAFE_NO_PAD);
 		let mut additions = self.index.documents_addition();

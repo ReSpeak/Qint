@@ -263,7 +263,7 @@ impl<'a> NewIdentity<'a> {
 
 	pub fn new_with_name(identity: &tsclientlib::Identity, name: &'a str, secret: &Secret) -> Result<Self> {
 		let private_key = secret.seal(identity.key().to_short().to_vec())?;
-		let client = identity.key().to_pub().get_uid_no_base64()?;
+		let client = identity.key().to_pub().get_uid_no_base64();
 		Ok(Self {
 			private_key,
 			name,
@@ -280,8 +280,8 @@ impl UpdateIdentity {
 		self.max_counter = Some(identity.max_counter() as i64);
 	}
 
-	pub fn from_identity_with_find(&mut self, identity: &tsclientlib::Identity) -> Result<FindIdentity> {
+	pub fn from_identity_with_find(&mut self, identity: &tsclientlib::Identity) -> FindIdentity {
 		self.from_identity(&identity);
-		Ok(FindIdentity::ByUid(identity.key().to_pub().get_uid_no_base64()?))
+		FindIdentity::ByUid(identity.key().to_pub().get_uid_no_base64())
 	}
 }

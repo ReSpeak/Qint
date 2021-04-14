@@ -43,25 +43,19 @@ impl FileCache {
 
 	fn path_encode(data: &[u8]) -> String { base64::encode_config(data, base64::URL_SAFE_NO_PAD) }
 
-	fn get_path(&self, server: &EccKeyPubP256, channel: ChannelId, path: &str) -> Result<PathBuf> {
+	fn get_path(&self, server: &EccKeyPubP256, channel: ChannelId, path: &str) -> PathBuf {
 		let mut p = self.cache_path.clone();
-		p.push(Self::path_encode(&server.get_uid_no_base64()?));
+		p.push(Self::path_encode(&server.get_uid_no_base64()));
 		p.push(channel.0.to_string());
 		p.push(Self::path_encode(path.as_bytes()));
-		Ok(p)
+		p
 	}
 
 	pub async fn cache_file(
 		&self, server: &EccKeyPubP256, channel: ChannelId, path: &str,
 		file: impl Stream<Item = Result<Bytes, std::io::Error>> + Unpin,
 	) -> impl Stream<Item = Result<Bytes, std::io::Error>> {
-		let path = match self.get_path(server, channel, path) {
-			Ok(r) => r,
-			Err(e) => {
-				error!(self.logger, "Failed to get cache path"; "error" => %e);
-				return file.left_stream();
-			}
-		};
+		let path = self.get_path(server, channel, path);
 		if let Err(e) = fs::create_dir_all(&path.parent().unwrap()).await {
 			error!(self.logger, "Failed to create cache directory"; "error" => %e);
 			return file.left_stream();
@@ -82,7 +76,7 @@ impl FileCache {
 	pub fn delete_file(
 		&self, server: &EccKeyPubP256, channel: ChannelId, path: &str,
 	) -> Result<bool> {
-		let path = self.get_path(server, channel, path)?;
+		let path = self.get_path(server, channel, path);
 		if !path.exists() {
 			return Ok(false);
 		}
@@ -93,13 +87,7 @@ impl FileCache {
 	pub async fn get_cached_file(
 		&self, server: &EccKeyPubP256, channel: ChannelId, path: &str,
 	) -> Option<(u64, impl Stream<Item = Result<Bytes, std::io::Error>>)> {
-		let path = match self.get_path(server, channel, path) {
-			Ok(r) => r,
-			Err(e) => {
-				error!(self.logger, "Failed to get cache path"; "error" => %e);
-				return None;
-			}
-		};
+		let path = self.get_path(server, channel, path);
 		let meta = match fs::metadata(&path).await {
 			Ok(r) => r,
 			Err(e) => {

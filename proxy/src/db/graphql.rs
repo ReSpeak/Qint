@@ -505,7 +505,7 @@ impl Identity {
 	fn name(&self) -> &str { &self.0.name }
 
 	fn level(&self, state: &State) -> GResult<i32> {
-		Ok(i32::from(self.0.clone().into_identity(&state.secret)?.level()?))
+		Ok(i32::from(self.0.clone().into_identity(&state.secret)?.level()))
 	}
 
 	/// The publicly visible client associated with this identity.
@@ -595,7 +595,7 @@ impl Server {
 	fn public_key(&self) -> Vec<i32> { self.0.public_key.iter().map(|i| *i as i32).collect() }
 	fn uid(&self) -> GResult<Vec<i32>> {
 		let key = EccKeyPubP256::from_short(&self.0.public_key)?;
-		Ok(key.get_uid_no_base64()?.into_iter().map(|i| i as i32).collect())
+		Ok(key.get_uid_no_base64().into_iter().map(|i| i as i32).collect())
 	}
 	fn name(&self) -> &str { &self.0.name }
 	/// The last used address to connect to this server.
@@ -812,7 +812,7 @@ impl SearchResult {
 				match attr {
 					"uid" => {
 						let public_key = EccKeyPubP256::from_short(id.as_slice())?;
-						Ok(Some(public_key.get_uid()?))
+						Ok(Some(public_key.get_uid()))
 					}
 					"name" => {
 						let id = id.clone();

@@ -384,7 +384,7 @@ impl Handler<GetIdentityAndServerMsg> for DbHandler {
 			.optional()?
 			.flatten()
 			.map(|key| {
-				EccKeyPubP256::from_short(&key).and_then(|key| key.get_uid_no_base64()).map(UidBuf)
+				EccKeyPubP256::from_short(&key).map(|key| UidBuf(key.get_uid_no_base64()))
 			})
 			.transpose()?;
 
@@ -403,9 +403,9 @@ impl Handler<GetIdentityAndServerMsg> for DbHandler {
 				// TODO check if identity already exists
 
 				// Create new identity
-				let identity = tsclientlib::Identity::create()?;
+				let identity = tsclientlib::Identity::create();
 				let pub_key = identity.key().to_pub();
-				let uid = pub_key.get_uid_no_base64()?;
+				let uid = pub_key.get_uid_no_base64();
 				let client_key = pub_key.to_short();
 
 				let cli = models::ClientInsert {
@@ -453,8 +453,8 @@ impl Handler<GetIdentitiesMsg> for DbHandler {
 				Some(crate::identities::ApiIdentity {
 					id: i_id,
 					name: i_name,
-					uid: tscl_ident.key().to_pub().get_uid_no_base64().ok()?,
-					level: tscl_ident.level().ok()?,
+					uid: tscl_ident.key().to_pub().get_uid_no_base64(),
+					level: tscl_ident.level(),
 				})
 			})
 			.collect())
@@ -467,7 +467,7 @@ impl Handler<AddIdentityMsg> for DbHandler {
 		let identity = msg.identity;
 		let nickname = msg.nickname.as_str();
 		let pub_key = identity.key().to_pub();
-		let client_uid = pub_key.get_uid_no_base64()?;
+		let client_uid = pub_key.get_uid_no_base64();
 		let client_key = pub_key.to_short();
 
 		//Check if a client with that uid already exists and create it if not
@@ -618,6 +618,7 @@ impl Handler<ConnectedMsg> for DbHandler {
 				.set((
 					bookmarks::last_used.eq(Some(utc_time)),
 					bookmarks::timezone.eq(utc_to_local_offset),
+					// TODO Update server and channel password
 				))
 				.execute(&self.con)?
 				!= 1

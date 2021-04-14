@@ -793,7 +793,8 @@ async fn put_ident(
 }
 
 #[delete("/ident/{id}")]
-async fn delete_ident(state: web::Data<Arc<State>>) -> impl Responder {
+async fn delete_ident(_state: web::Data<Arc<State>>) -> impl Responder {
+	// TODO Implement deleting identities
 	HttpResponse::ServiceUnavailable().finish()
 }
 

@@ -265,21 +265,13 @@ impl Ws {
 						}) {
 							Some((server_key, own_client)) => {
 								// Send server uid and own client id
-								match server_key.get_uid_no_base64() {
-									Ok(server) => {
-										self.send_message(
-											&MessageP2F::Connected {
-												server,
-												own_client: own_client.to_string(),
-											},
-											ctx,
-										);
-									}
-									Err(e) => {
-										error!(self.logger, "Failed to get server uid";
-											"error" => %e);
-									}
-								}
+								self.send_message(
+									&MessageP2F::Connected {
+										server: server_key.get_uid_no_base64(),
+										own_client: own_client.to_string(),
+									},
+									ctx,
+								);
 
 								// Save in database
 								let opts = self.connect_options.as_ref().unwrap();
@@ -430,21 +422,19 @@ impl Ws {
 			TsStreamItem::IdentityLevelIncreased => {
 				if let Some(con) = &self.connection {
 					let mut update_identity = db::models::UpdateIdentity::default();
-					if let Ok(find_key) = update_identity
-						.from_identity_with_find(con.get_options().get_identity().unwrap())
-					{
-						let event = db::UpdateIdentityMsg(find_key, update_identity);
-						let logger = self.logger.clone();
-						actix::spawn(self.state.database.send(event).map(move |r| match r {
-							Ok(Ok(())) => {}
-							Ok(Err(e)) => {
-								error!(logger, "Failed to handle event in database"; "error" => %e);
-							}
-							Err(_) => {
-								error!(logger, "Failed to send event to database");
-							}
-						}));
-					}
+					let find_key = update_identity
+						.from_identity_with_find(con.get_options().get_identity().unwrap());
+					let event = db::UpdateIdentityMsg(find_key, update_identity);
+					let logger = self.logger.clone();
+					actix::spawn(self.state.database.send(event).map(move |r| match r {
+						Ok(Ok(())) => {}
+						Ok(Err(e)) => {
+							error!(logger, "Failed to handle event in database"; "error" => %e);
+						}
+						Err(_) => {
+							error!(logger, "Failed to send event to database");
+						}
+					}));
 				}
 			}
 			TsStreamItem::DisconnectedTemporarily(_) => {
