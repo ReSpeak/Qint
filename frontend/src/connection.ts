@@ -1,7 +1,7 @@
 import { ResultDetails, OutMsg, InMsg } from "./backend/ws";
 import { get, writable, Writable, Readable } from "svelte/store";
 import { Book, Channel, ChatData, Client } from "./book";
-import { oneshot, fnBroadcast, LOUDNESS_MIN, LOUDNESS_HISTORY, LOUDNESS_UPDATE_MS } from "./util";
+import { oneshot, fnBroadcast, LOUDNESS_MIN } from "./util";
 import { handleMessage } from "./notification";
 import { backend, IBackendConnection } from "./backend/backend";
 import { app } from "./app";
@@ -12,6 +12,7 @@ import { ChannelId, ClientId, TalkState } from "./ts";
 import { FileTreeCache } from "./fileTreeCache";
 import { FiletransferManager } from "./panel/filetransferManager";
 import debug from "debug";
+import SimpleDiagram from "./ui/UiSimpleDiagram.svelte";
 const log_raw_in = debug("RAW:IN");
 const log_raw_out = debug("RAW:OUT");
 const log = debug("CON"), error = debug("error:CON");
@@ -44,12 +45,9 @@ export class Connection {
 	public pluginCmd = fnBroadcast<[IMsgPluginCommandPart]>();
 	public serverLogCmd = fnBroadcast<[IMsgServerLogPart[]]>();
 
-	/// List of last talking clients with a counter from LOUDNESS_HISTORY to 0 until they are not
-	/// updated anymore.
-	private lastTalking: Record<ClientId, number> = {};
-	private lastTalkingTimer: number | undefined = undefined;
-	/// Listeners for loudness from the ui.
-	public readonly loudnesses: Record<ClientId, Writable<number>> = {};
+	/** Listeners for loudness from the ui. */
+	public readonly loudnesses: Map<ClientId, SimpleDiagram> = new Map();
+
 
 	constructor(connectOptions: ConnectData) {
 		this.connectOptions = writable(connectOptions);
@@ -250,48 +248,38 @@ export class Connection {
 			client.updateChat(ChatData.fromGraphql(clientData.data.chat));
 	}
 
-	private applyHistoryLoudnesses(loudnesses?: Record<ClientId, number>) {
-		// Update from history
-		let hasChange = false;
-		for (const [client, counter] of Object.entries(this.lastTalking)) {
-			if (loudnesses !== undefined && client in loudnesses)
-				continue;
-
-			const l = this.loudnesses[client];
-			if (l === undefined || counter <= 0) {
-				delete this.lastTalking[client];
-			} else {
-				// We need to set a new value every time
-				l.set(LOUDNESS_MIN - counter);
-				this.lastTalking[client] = counter - 1;
-				hasChange = true;
-			}
-		}
-
-		// Remove timer in here if nothing changed
-		if (!hasChange && this.lastTalkingTimer !== undefined) {
-			clearInterval(this.lastTalkingTimer);
-			this.lastTalkingTimer = undefined;
-		}
-	}
+	private renderRequested = false;
 
 	private applyLoudnesses(loudnesses: Record<ClientId, number>) {
-		if (this.lastTalkingTimer !== undefined && this.book.currentTalkers.length !== 0) {
-			clearInterval(this.lastTalkingTimer);
-			this.lastTalkingTimer = undefined;
-		}
+		const now = performance.now();
 
 		for (let [client, loudness] of Object.entries(loudnesses)) {
-			const l = this.loudnesses[client];
+			const l = this.loudnesses.get(client);
 			if (l !== undefined) {
 				loudness = Math.max(loudness, LOUDNESS_MIN + 2);
-				// The value has to change every time
-				l.update(l => l === loudness ? loudness + 0.01 : loudness);
-				this.lastTalking[client] = LOUDNESS_HISTORY;
+				l.addValue(loudness, now);
 			}
 		}
 
-		this.applyHistoryLoudnesses(loudnesses);
+		this.requestRenderLoudnessGraphs();
+	}
+
+	private requestRenderLoudnessGraphs() {
+		if (this.renderRequested) return;
+		this.renderRequested = true;
+		requestAnimationFrame((ts) => this.renderLoudnessGraphs(ts));
+	}
+
+	private renderLoudnessGraphs(timestamp: number) {
+		this.renderRequested = false;
+		let hasRequest = false;
+		for (const hist of this.loudnesses.values()) {
+			const requestNextFrame = hist.redraw(timestamp);
+			hasRequest ||= requestNextFrame;
+		}
+		if (hasRequest) {
+			this.requestRenderLoudnessGraphs();
+		}
 	}
 
 	private messageHandler(msg: InMsg) {
@@ -427,14 +415,7 @@ export class Connection {
 			}
 		} else if ("TalkersChanged" in msg) {
 			this.book.talkersHandler(msg.TalkersChanged);
-
-			// Update loudness when everyone stopped talking
-			// Also when only our own client is left talking
-			if (this.lastTalkingTimer === undefined) {
-				this.lastTalkingTimer = setInterval(() => {
-					this.applyHistoryLoudnesses();
-				}, LOUDNESS_UPDATE_MS);
-			}
+			this.requestRenderLoudnessGraphs();
 		} else if ("Error" in msg) {
 			log("Con Error: %o", msg.Error);
 			this.backend.close();
@@ -512,8 +493,6 @@ export class ConnectionState {
 	}
 
 	private throwTransition(newState: ConnectionStateEnum): never {
-		throw Error(`Cannot transition this connection from '${
-			ConnectionStateEnum[this.rawState]}' to ${
-			ConnectionStateEnum[newState]}`);
+		throw Error(`Cannot transition this connection from '${ConnectionStateEnum[this.rawState]}' to ${ConnectionStateEnum[newState]}`);
 	}
 }

@@ -1,11 +1,10 @@
 <script lang="typescript">
-import { onMount } from "svelte";
-
-	import { on } from "../util";
+	import { onMount } from "svelte";
+	import { LOUDNESS_UPDATE_MS, on } from "../util";
 
 	export let min = 0;
 	export let max: number;
-	export let count = 100;
+	export let count: number;
 	export let fillStyle: string | CanvasGradient | CanvasPattern | undefined = undefined;
 	// [height, description, color]
 	export let lines: [number, string, string | CanvasGradient | CanvasPattern][] = [];
@@ -14,61 +13,114 @@ import { onMount } from "svelte";
 	export let height: number | undefined = undefined;
 	export let style: string | undefined = undefined;
 
-	let history: number[] = [];
-
 	let canvas: HTMLCanvasElement;
 	let ctx: CanvasRenderingContext2D | null = null;
 
-	export function addValue(val: number) {
-		if (history.length > count)
-			history = [...history.slice(history.length - count), val];
-		else
-			history.push(val);
-		redraw();
+	const framelength = LOUDNESS_UPDATE_MS;
+	let historySize = count;
+	const bufferSize = 5;
+	let silence = min;
+	// Ring space
+	// [..........,....] % (historySize + bufferSize)
+	// \start     \end \end+buffer
+	// -> start is shifted right when time passes
+	//            -> buffer is filled from end to right
+	let history: number[] = [];
+	let lastRenderTs: number = 0;
+	let start: number = 0;
+	let bufferCount: number = 0;
+	let lengthWithData: number = 0;
+	let needRender: boolean = false;
+
+	$: on(min, max, count, build(), redrawNow());
+
+	function build() {
+		historySize = count;
+		silence = min;
+		history = new Array(historySize + bufferSize).fill(silence);
+		start = 0;
+		bufferCount = 0;
+		lengthWithData = 0;
+		needRender = true;
 	}
 
-	export function clear() {
-		history = [];
-		redraw();
-	}
-
-	$: cutDown(count);
-
-	$: on(min, max, fillStyle, lines, width, height, redraw());
-
-	function cutDown(count: number) {
-		if (history.length > count) {
-			history = history.slice(history.length - count);
-			redraw();
+	export function addValue(value: number, timestamp: number) {
+		move(timestamp);
+		if (bufferCount < bufferSize) {
+			history[(start + historySize + bufferCount) % history.length] = value;
+			bufferCount += 1;
+			if (lengthWithData === 0) lastRenderTs = timestamp;
+			lengthWithData = historySize + bufferCount;
+			needRender = true;
 		}
 	}
 
-	function redraw() {
-		if (ctx === null) return;
+	function move(timestamp: number): void {
+		if (lengthWithData === 0) return;
+		const elapsed = timestamp - lastRenderTs;
+		const elapsedFrames = Math.floor(elapsed / framelength);
+		if (elapsedFrames > 0) {
+			lastRenderTs += elapsedFrames * framelength;
+			for (let i = 0; i < Math.min(elapsedFrames, lengthWithData); i++) {
+				history[start] = silence;
+				start = (start + 1) % history.length;
+			}
+			bufferCount = Math.max(0, bufferCount - elapsedFrames);
+			lengthWithData = Math.max(0, lengthWithData - elapsedFrames);
+			if (lengthWithData === 0) {
+				start = 0;
+			}
+			needRender = true;
+		}
+	}
+
+	// returns true if another redraw for the next frame is requested
+	export function redraw(timestamp: number): boolean {
+		if (ctx === null) return false;
+
+		move(timestamp);
+		if (!needRender) return lengthWithData > 0;
+		needRender = false;
+
 		// Get size from component if not set
 		const realWidth = width ?? canvas.width;
 		const realHeight = height ?? canvas.height;
-		const X_STEP = realWidth / count;
+		const X_STEP = realWidth / historySize;
 		const Y_STEP = realHeight / (max - min);
 
 		function getX(val: number): number {
-			return X_STEP * (val + count - history.length);
+			return Math.floor(X_STEP * val);
 		}
 
 		function getY(val: number): number {
-			return realHeight - Y_STEP * (val - min);
+			return Math.floor(realHeight - Y_STEP * (val - min));
 		}
 
 		ctx.clearRect(0, 0, realWidth, realHeight);
-		if (history.length !== 0) {
+		if (lengthWithData > 0) {
 			ctx.beginPath();
 			ctx.moveTo(getX(0), realHeight);
-			ctx.lineTo(getX(0), getY(history[0]));
 
-			for (let i = 1; i < history.length - 1; i++)
-				ctx.lineTo(getX(i), getY(history[i]));
-				//ctx.quadraticCurveTo(getX(i - 1), getY(history[i - 1]), getX(i + 1), getY(history[i + 1]));
-			ctx.lineTo(realWidth, getY(history[history.length - 1]));
+			let startA, endA, endB;
+			startA = start;
+			let end = start + lengthWithData;
+			if (end > history.length) {
+				endA = history.length;
+				endB = end - history.length;
+			} else {
+				endA = end;
+				endB = 0;
+			}
+
+			for (let i = startA; i < endA; i++) {
+				ctx.lineTo(getX(i - startA), getY(history[i]));
+			}
+			let off = endA - startA;
+			for (let i = 0; i < endB; i++) {
+				ctx.lineTo(getX(i + off), getY(history[i]));
+			}
+			ctx.lineTo(getX(endB + off), getY(min));
+
 			ctx.lineTo(realWidth, realHeight);
 			ctx.closePath();
 			if (fillStyle !== undefined) {
@@ -89,12 +141,19 @@ import { onMount } from "svelte";
 			ctx.fillRect(0, lineY, realWidth, 0.8);
 			ctx.fillText(l[1], 5, lineY - 1);
 		}
+
+		return lengthWithData > 0;
+	}
+
+	export function redrawNow() {
+		redraw(performance.now());
 	}
 
 	onMount(() => {
 		ctx = canvas.getContext("2d");
-		redraw();
+		if (ctx) ctx.imageSmoothingEnabled = false;
+		redrawNow();
 	});
 </script>
 
-<canvas bind:this={canvas} width={width} height={height} style={style}></canvas>
+<canvas bind:this={canvas} {width} {height} {style} />

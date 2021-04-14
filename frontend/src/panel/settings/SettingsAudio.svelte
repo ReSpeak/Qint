@@ -27,34 +27,14 @@
 
 	let globalVolume = factorToDb(audioSett.globalVolume);
 	let loudnessThreshold = audioSett.loudnessThreshold ?? minLoudnessThreshold;
-	let loudnessDiagram: SimpleDiagram | undefined;
-	let loudnessSilenceTimer: number | undefined;
+	let loudnessDiagram: SimpleDiagram;
+	let renderRequested: boolean = false;
 
 	let loudnessSocket: WebSocket | undefined;
 	let loudness: number | undefined;
 	const LOUDNESS_WIDTH = 1000;
 	const LOUDNESS_HEIGHT = 300;
 	const LOUDNESS_COUNT = 500;
-
-	$: if (loudness && loudnessDiagram) {
-		loudnessDiagram.addValue(loudness);
-		if (loudness === LOUDNESS_END_MAGIC) {
-			if (loudnessSilenceTimer === undefined) {
-				let counter = LOUDNESS_COUNT;
-				loudnessSilenceTimer = setInterval(() => {
-					loudnessDiagram?.addValue(LOUDNESS_END_MAGIC);
-					counter--;
-					if (counter === 0) {
-						clearInterval(loudnessSilenceTimer);
-						loudnessSilenceTimer = undefined;
-					}
-				}, LOUDNESS_UPDATE_MS);
-			}
-		} else if (loudnessSilenceTimer !== undefined) {
-			clearInterval(loudnessSilenceTimer);
-			loudnessSilenceTimer = undefined;
-		}
-	}
 
 	// Reload settings
 	app.transientSettings.loadAsync().then(() => {
@@ -79,6 +59,20 @@
 		app.transientSettings.flush();
 	}
 
+	function requestRenderLoudnessGraphs() {
+		if (renderRequested) return;
+		renderRequested = true;
+		requestAnimationFrame((ts) => renderLoudnessGraphs(ts));
+	}
+
+	function renderLoudnessGraphs(timestamp: number) {
+		renderRequested = false;
+		let hasRequest = loudnessDiagram?.redraw(timestamp) ?? false;
+		if (hasRequest) {
+			requestRenderLoudnessGraphs();
+		}
+	}
+
 	$: on(selected, changeSelected());
 
 	function changeSelected() {
@@ -87,7 +81,12 @@
 			loudnessSocket = new WebSocket(`${backend.wsBaseAddress}/loudness`);
 			loudnessSocket.binaryType = "arraybuffer";
 			loudnessSocket.onmessage = (ev) => {
+				const now = performance.now();
 				loudness = new DataView(ev.data).getFloat64(0);
+				if (loudness !== LOUDNESS_END_MAGIC) {
+					loudnessDiagram?.addValue(loudness, now);
+					requestRenderLoudnessGraphs();
+				}
 			};
 			loudnessSocket.onclose = () => {
 				loudnessSocket = undefined;

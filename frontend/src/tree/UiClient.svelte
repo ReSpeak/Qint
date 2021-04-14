@@ -1,6 +1,5 @@
 <script lang="typescript">
 	import type { Readable } from "svelte/store";
-	import { writable } from "svelte/store";
 	import TsIcon from "../ui/TsIcon.svelte";
 	import ServerGroupIcon from "../ui/ServerGroupIcon.svelte";
 	import FilterString from "../ui/FilterString.svelte";
@@ -37,7 +36,6 @@
 	let ownClient = client.id === connection.book.ownClientId;
 	let div: HTMLElement;
 	let loudnessDiagram: SimpleDiagram;
-	let loudness = writable(LOUDNESS_MIN);
 
 	let sortedServerGroups: ServerGroupId[];
 	$: {
@@ -121,16 +119,12 @@
 		hover = new DelayedHover(div, [div]);
 		hovered = hover.hovered;
 
-		connection.loudnesses[client.id] = loudness;
-		loudness.subscribe(l => {
-			if (loudnessDiagram !== undefined)
-				loudnessDiagram.addValue(l);
-		});
+		connection.loudnesses.set(client.id, loudnessDiagram);
 
 		return () => {
 			hover.unregister();
 
-			delete connection.loudnesses[client.id];
+			connection.loudnesses.delete(client.id);
 		};
 	});
 </script>
