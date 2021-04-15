@@ -42,15 +42,9 @@
 	"scripts": {
 		"build": "vite build",
 		"fresh": "yarn install && yarn upgrade --latest",
-		"autobuild": "vite build --watch",
 		"dev": "vite",
 		"lint": "eslint --ignore-path .gitignore .",
 		"format": "prettier --write .",
 		"tauri": "tauri"
-	},
-	"comments": {
-		"devDependencies": {
-			"postcss": "postcss is a silent dependency of svelte-preprocess. Do NOT remove"
-		}
 	}
 }

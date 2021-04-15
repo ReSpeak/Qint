@@ -3,7 +3,6 @@ import UiApp from "./UiApp.svelte";
 //import App from "./UiPlayground.svelte";
 import { get } from "svelte/store";
 import { app } from "./app";
-import { BUILD_ENV, BUILD_DAT } from "./util";
 import { ConnectData } from "./connect/connect";
 import debug from "debug";
 
@@ -48,15 +47,3 @@ const uiApp = new UiApp({
 });
 
 export default uiApp;
-
-// Hot Module Replacement (HMR) - Remove this snippet to remove HMR.
-// Learn more: https://www.snowpack.dev/#hot-module-replacement
-if ((import.meta as any).hot) {
-	console.log("Aww, that's hot", import.meta);
-	(import.meta as any).hot.accept();
-	(import.meta as any).hot.dispose(() => {
-		uiApp.$destroy();
-		// Disconnect previous connections
-		app.close();
-	});
-}

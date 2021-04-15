@@ -1,8 +1,8 @@
 import chroma from "chroma-js";
 import moment, { Duration } from "moment";
-import { Moment } from "moment";
-import { OffsetDateTime, RustDuration } from "./ts";
-import { Readable } from "svelte/store";
+import type { Moment } from "moment";
+import type { OffsetDateTime, RustDuration } from "./ts";
+import type { Readable } from "svelte/store";
 import { Version } from "./book_events";
 import EMOJI_ENCODING from "./sas-emoji.json";
 
@@ -19,8 +19,6 @@ export const CLEAR_ICON = "broom";
 
 export const IS_SNOWPACK = (import.meta as any).hot;
 export const BASE_ADDRESS = IS_SNOWPACK ? "http://localhost:4422" : "";
-export const BUILD_ENV = "__buildEnv__";
-export const BUILD_DAT = "__buildDat__";
 export const IS_TAURI = "__TAURI_INVOKE_HANDLER__" in window;
 export const LONG_DATETIME = "dddd, MMMM Do YYYY, HH:mm:ss UTCZ";
 export const MIN_VOLUME_DB = -30;

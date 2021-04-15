@@ -37,9 +37,6 @@ RUSTFLAGS="-C link-args=-lssp -C link-args=-s" cargo build --release --target=x8
 
 cd ~/Qint/frontend
 yarn
-mkdir -p public/fonts
-cp ./node_modules/@mdi/font/fonts/* public/fonts
-cp ./node_modules/katex/dist/fonts/* public/fonts
 yarn build
 
 echo ">>> Packaging"
@@ -50,7 +47,7 @@ cp ~/Qint/target/x86_64-pc-windows-gnu/release/qint-proxy.exe ~/Qint/target/publ
 #cp ~/Qint/target/x86_64-pc-windows-gnu/release/WebView2Loader.dll ~/Qint/target/publish/
 cp ~/Qint/proxy-codegen/SDL2.dll ~/Qint/target/publish/
 cp /usr/lib/gcc/x86_64-w64-mingw32/10-win32/libssp-0.dll ~/Qint/target/publish/
-cp -r ~/Qint/frontend/build/* ~/Qint/target/publish/ui/
+cp -r ~/Qint/frontend/dist/* ~/Qint/target/publish/ui/
 cd ~/Qint/target/publish/
 rm ~/out/Qint.zip
 zip ~/out/Qint.zip ui qint-proxy.exe libssp-0.dll SDL2.dll -r -9
