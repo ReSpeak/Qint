@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { escapeHtml, ignoreCaseRegex } from "../util";
 	export let filter: string;
 	export let content: string;

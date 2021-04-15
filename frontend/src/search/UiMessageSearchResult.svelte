@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { SERVER_ICON } from "../util";
 	import Icon from "../ui/Icon.svelte";
 	import TsIcon from "../ui/TsIcon.svelte";

@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { onMount } from "svelte";
 	import { LOUDNESS_UPDATE_MS, on } from "../util";
 

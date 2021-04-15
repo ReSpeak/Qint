@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import Icon from "./Icon.svelte";
 	import { Connection } from "../connection";
 	import { getClientIconPath } from "./clientIcon";

@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { hasProperty } from "../util";
 	import { createEventDispatcher, onMount } from "svelte";
 	type DDObjElement = { value: any };

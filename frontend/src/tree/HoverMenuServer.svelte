@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { Connection } from "../connection";
 	import ServerName from "../ui/ServerName.svelte";
 	import RenderedText from "../ui/RenderedText.svelte";

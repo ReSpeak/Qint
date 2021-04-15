@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { BOOKMARK_OFF, BOOKMARK_ON, EDIT_ICON, LONG_DATETIME } from "../util";
 	import TsIcon from "../ui/TsIcon.svelte";
 	import { Bookmark } from "./bookmark";

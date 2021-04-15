@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { Channel } from "../book";
 	import { Connection } from "../connection";
 

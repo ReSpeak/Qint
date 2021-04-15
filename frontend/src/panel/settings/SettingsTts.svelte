@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { app } from "../../app";
 	import BTabSlot from "../../ui/BTabSlot.svelte";
 	import BKeyValue from "../../ui/BKeyValue.svelte";

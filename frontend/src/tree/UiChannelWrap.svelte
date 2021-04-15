@@ -1,6 +1,6 @@
 <svelte:options immutable={true}/>
 
-<script lang="typescript">
+<script lang="ts">
 	import { Channel } from "../book";
 	import { Connection } from "../connection";
 	import UiChannel from "./UiChannel.svelte";

@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import RenderedText from "./RenderedText.svelte";
 	import BInput from "./BInput.svelte";
 	import Icon from "./Icon.svelte";

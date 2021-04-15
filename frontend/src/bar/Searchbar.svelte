@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	export let filter: string;
 	export let visible: boolean = true;
 </script>

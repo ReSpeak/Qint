@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import type { Writable } from "svelte/store";
 	import UiServer from "../tree/UiServerWrap.svelte";
 	import StickyList from "../ui/StickyList.svelte";

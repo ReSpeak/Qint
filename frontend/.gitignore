@@ -1,11 +1,5 @@
-.DS_Store
-node_modules
-build/
-web_modules/
-public/bundle.*
-public/bulma.css
-public/fonts
-package-lock.json
+/node_modules
+/dist/
 yarn.lock
-.rpt2_cache
+yarn-error.log
 book_events.ts

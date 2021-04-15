@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { Connection } from "../connection";
 	import type { ChangePromise } from "../connection";
 	import type { Server } from "../book";

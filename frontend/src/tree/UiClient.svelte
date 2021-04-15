@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import type { Readable } from "svelte/store";
 	import TsIcon from "../ui/TsIcon.svelte";
 	import ServerGroupIcon from "../ui/ServerGroupIcon.svelte";

@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import UiLazyList from "../ui/UiLazyList.svelte";
 	import { ListFetchDir } from "../ui/lazyList";
 	import type { FetchResult } from "../ui/lazyList";

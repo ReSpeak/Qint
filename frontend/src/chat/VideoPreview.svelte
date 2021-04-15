@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import Icon from "../ui/Icon.svelte";
 	import { HTML5VideoControl, SyncState, YoutubeVideoControl } from "./videoSync";
 	import type { IVideoControl } from "./videoSync";

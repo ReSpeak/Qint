@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { onMount, onDestroy } from "svelte";
 	import { getContext } from "svelte";
 	export let styled: boolean = true;

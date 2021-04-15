@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	//import Loader from "../ui/Loader.svelte";
 	import VideoPreview from "./VideoPreview.svelte";
 	import ImageModal from "./ImageModal.svelte";

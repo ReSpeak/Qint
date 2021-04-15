@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { onDestroy } from "svelte";
 	import { app } from "../../app";
 	import { backend } from "../../backend/backend";
@@ -8,8 +8,8 @@
 		LOUDNESS_END_MAGIC,
 		LOUDNESS_MAX,
 		LOUDNESS_MIN,
-		LOUDNESS_UPDATE_MS,
 		MIN_VOLUME_DB,
+		NARROW_NO_BREAK_SPACE,
 		on,
 	} from "../../util";
 	import BTabSlot from "../../ui/BTabSlot.svelte";
@@ -129,7 +129,7 @@
 			max={LOUDNESS_MAX}
 			count={LOUDNESS_COUNT}
 			lines={[
-				[-14, "Standard normalized volume (-14dB)", "#555555"],
+				[-14, `Standard normalized volume (-14${NARROW_NO_BREAK_SPACE}dB)`, "#555555"],
 				[loudnessThreshold, "Your talking threshold", "#aa3333"],
 			]} />
 	</BKeyValue>

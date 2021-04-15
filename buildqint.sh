@@ -23,7 +23,7 @@ git -C Qint fetch
 git -C tsclientlib fetch
 
 echo ">>> Checking out '$QINT_SHA'"
-git -C Qint checkout "$QINT_SHA"
+git -C Qint checkout -f "$QINT_SHA"
 git -C tsclientlib checkout origin/master
 git -C tsclientlib submodule update --init --recursive
 

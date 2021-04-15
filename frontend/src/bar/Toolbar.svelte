@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import Icon from "../ui/Icon.svelte";
 	import { DisplayPanel } from "../panel/panel";
 	import { SERVER_ICON } from "../util";

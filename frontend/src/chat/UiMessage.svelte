@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { Message, MessageStatus } from "./chat";
 	import { LONG_DATETIME } from "../util";
 	import Icon from "../ui/Icon.svelte";

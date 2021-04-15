@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import UiChat from "./chat/UiChat.svelte";
 	import UiGlobalSettings from "./panel/UiGlobalSettings.svelte";
 	import Searchbar from "./bar/Searchbar.svelte";
@@ -11,6 +11,7 @@
 	import { app } from "./app";
 	import Connect from "./connect/UiConnect.svelte";
 	import GlobalCss from "./GlobalCss.svelte";
+	import GlobalScss from "./GlobalScss.svelte";
 	import { ConnectData } from "./connect/connect";
 	import { DescriptionMode } from "./transientSettings";
 	import { Channel } from "./book";
@@ -102,6 +103,7 @@
 	</div>
 </div>
 <GlobalCss />
+<GlobalScss />
 
 <style lang="scss">
 	.appContainer {

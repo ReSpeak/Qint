@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import type { ChannelId } from "../ts";
 	import { Connection } from "../connection";
 	import Icon from "../ui/Icon.svelte";

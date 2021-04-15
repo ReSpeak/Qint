@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { ClientBase } from "../bookBase";
 	import { Client, GraphQlClient } from "../book";
 	import { Message } from "../chat/chat";

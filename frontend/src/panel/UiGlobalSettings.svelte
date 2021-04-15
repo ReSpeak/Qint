@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import SettingsApp from "./settings/SettingsApp.svelte";
 	import SettingsAudio from "./settings/SettingsAudio.svelte";
 	import SettingsTts from "./settings/SettingsTts.svelte";

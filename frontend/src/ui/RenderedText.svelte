@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import ImageModal from "../chat/ImageModal.svelte";
 	import katex from "katex";
 	import { hljsHighlight } from "./hljs";

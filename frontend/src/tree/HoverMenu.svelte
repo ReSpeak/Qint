@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import HoverMenuClient from "./HoverMenuClient.svelte";
 	import HoverMenuChannel from "./HoverMenuChannel.svelte";
 	import HoverMenuServer from "./HoverMenuServer.svelte";

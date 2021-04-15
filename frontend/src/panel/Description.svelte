@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import DescriptionClient from "./DescriptionClient.svelte";
 	import DescriptionChannel from "./DescriptionChannel.svelte";
 	import DescriptionServer from "./DescriptionServer.svelte";

@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { base64Encode, clickToSelectAll } from "../../util";
 	import { backend } from "../../backend/backend";
 	import BTabSlot from "../../ui/BTabSlot.svelte";

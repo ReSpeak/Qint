@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { onMount } from "svelte";
 	import { Bookmark } from "./bookmark";
 	import { ConnectData } from "./connect";

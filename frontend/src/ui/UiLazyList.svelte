@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { CustomIntersectionObserver, ListFetchDir } from "./lazyList";
 	import type { FetchResult } from "./lazyList";
 	import { assert, binarySearchByKey, debounced } from "../util";

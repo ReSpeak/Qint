@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { createEventDispatcher, onDestroy, onMount } from "svelte";
 	import {
 		buildAction,

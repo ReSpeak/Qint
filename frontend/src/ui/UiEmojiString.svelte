@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { emojiEncode } from "../util";
 
 	export let data: number[];

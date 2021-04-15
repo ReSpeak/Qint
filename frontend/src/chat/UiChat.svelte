@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	// Use scroll-anchoring https://blog.eqrion.net/pin-to-bottom/
 	import UiMessage from "./UiMessage.svelte";
 	import Icon from "../ui/Icon.svelte";

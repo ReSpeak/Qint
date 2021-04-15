@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { getContext, onDestroy } from "svelte";
 	import { contextKey } from "./tabList";
 	import type { TabListContext } from "./tabList";

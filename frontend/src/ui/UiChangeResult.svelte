@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { TsErrorDescription } from "../book_events";
 	import type { ResultDetails } from "../backend/ws";
 

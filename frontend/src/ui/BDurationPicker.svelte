@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import moment from "moment";
 	import type { Duration } from "moment";
 

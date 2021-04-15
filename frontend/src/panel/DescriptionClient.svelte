@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { get } from "svelte/store";
 	import { Connection } from "../connection";
 	import type { ChangePromise } from "../connection";

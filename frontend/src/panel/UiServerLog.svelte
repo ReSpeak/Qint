@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { onDestroy } from "svelte";
 	import UiLazyList from "../ui/UiLazyList.svelte";
 	import UiChangeResult from "../ui/UiChangeResult.svelte";

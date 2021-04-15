@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import Icon from "../ui/Icon.svelte";
 	import type { Writable } from "svelte/store";
 	import { Client } from "../book";
@@ -45,10 +45,8 @@
 				connectData.away = isAway ? "" : undefined;
 		}
 
-		connection?.sendMessage({
-			Change: {
-				change: { ConnectionClientUpdate: change },
-			},
+		connection?.sendChange({
+			ConnectionClientUpdate: change,
 		});
 	}
 </script>

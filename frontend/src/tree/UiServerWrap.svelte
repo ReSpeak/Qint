@@ -1,5 +1,5 @@
 <svelte:options immutable />
-<script lang="typescript">
+<script lang="ts">
 	import UiServer from "./UiServer.svelte";
 	import type { Connection } from "../connection";
 	import { ConnectData } from "../connect/connect";

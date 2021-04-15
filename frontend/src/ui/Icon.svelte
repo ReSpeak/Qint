@@ -1,5 +1,5 @@
 <svelte:options immutable />
-<script lang="typescript">
+<script lang="ts">
 	export let raw: string | undefined = undefined;
 	export let size: number | string = "1.2em";
 	export let name: string | undefined = undefined;

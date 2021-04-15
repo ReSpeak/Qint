@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import type { Writable } from "svelte/store";
 	import StickySlot from "../ui/StickySlot.svelte";
 	import ServerName from "../ui/ServerName.svelte";

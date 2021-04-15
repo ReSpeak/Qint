@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { Browser, BROWSER, escapeHtml } from "../util";
 	import { createEventDispatcher, onMount, tick } from "svelte";
 	import type { StructuredData } from "./BInputDecl";

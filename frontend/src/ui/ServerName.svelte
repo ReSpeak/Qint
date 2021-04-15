@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { Connection } from "../connection";
 	import { get } from "svelte/store";
 	import { GraphQlServer } from "../book";

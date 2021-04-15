@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { afterUpdate, onMount } from "svelte";
 	import type { Writable } from "svelte/store";
 	import { get } from "svelte/store";

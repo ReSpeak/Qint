@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import Icon from "../ui/Icon.svelte";
 	import { Connection } from "../connection";
 	import ClientName from "../ui/ClientName.svelte";

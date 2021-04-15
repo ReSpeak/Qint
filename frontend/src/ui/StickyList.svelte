@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { onDestroy } from "svelte";
 	import ResizeObserver from 'resize-observer-polyfill';
 	import { setContext } from 'svelte';

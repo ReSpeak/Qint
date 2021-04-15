@@ -1,5 +1,5 @@
 <svelte:options immutable />
-<script lang="typescript">
+<script lang="ts">
 	import Icon from "./Icon.svelte";
 
 	export let text: string;

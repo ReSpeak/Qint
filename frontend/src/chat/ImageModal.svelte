@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import { onDestroy, onMount } from "svelte";
 	import { app } from "../app";
 
