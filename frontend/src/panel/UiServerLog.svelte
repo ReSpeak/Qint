@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy } from "svelte";
+	import { onDestroy, onMount } from "svelte";
 	import UiLazyList from "../ui/UiLazyList.svelte";
 	import UiChangeResult from "../ui/UiChangeResult.svelte";
 	import Icon from "../ui/Icon.svelte";
@@ -39,8 +39,9 @@
 		}
 	}
 
-	onDestroy(() => {
-		state.unsubscribe();
+	onMount(() => {
+		connectionChanged();
+		return () => state.unsubscribe();
 	});
 </script>
 

@@ -1,8 +1,8 @@
 import chroma from "chroma-js";
 import moment, { Duration } from "moment";
-import type { Moment } from "moment";
-import type { OffsetDateTime, RustDuration } from "./ts";
-import type { Readable } from "svelte/store";
+import { Moment } from "moment";
+import { OffsetDateTime, RustDuration } from "./ts";
+import { Readable } from "svelte/store";
 import { Version } from "./book_events";
 import EMOJI_ENCODING from "./sas-emoji.json";
 
