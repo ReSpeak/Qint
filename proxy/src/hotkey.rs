@@ -1,8 +1,10 @@
-use anyhow::Result;
+use actix::Addr;
+use futures::{future, StreamExt};
 use serde::{Deserialize, Serialize};
-use slog::warn;
+use tsclientlib::prelude::*;
 
-use crate::{websocket, Tristate};
+use crate::{websocket, MuteState};
+use websocket::Ws;
 
 pub use imp::{Hotkeys, KeyCode};
 
@@ -19,32 +21,156 @@ pub struct HotkeyConfig {
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Deserialize, Serialize)]
 pub enum Action {
-	Away(Tristate),
-	InputMute(Tristate),
-	OutputMute(Tristate),
+	Away,
+	InputMute,
+	OutputMute,
 }
 
-async fn h<T: Clone + Send + 'static>(state: &crate::State, t: T)
-where
-	websocket::Ws: actix::Handler<T>,
-	T: actix::Message<Result = Result<()>>,
-{
-	let cons = state.connections.lock().unwrap().values().cloned().collect::<Vec<_>>();
-	for c in cons {
-		match c.send(t.clone()).await {
-			Err(e) => warn!(state.logger, "Failed to run action"; "error" => %e),
-			Ok(Err(e)) => warn!(state.logger, "Failed to run action"; "error" => %e),
-			_ => {}
-		}
-	}
+/// Get input mute state for all current connections.
+/// The `bool` is `false` if the connection cannot talk, even if unmuted, because it is away or the
+/// output is disabled
+async fn get_input_mute_states(state: &crate::State) -> Vec<(MuteState, bool, Addr<Ws>)> {
+	state
+		.aggregate(|con, con_addr| {
+			// Ignore servers where output is muted or disabled or away
+			con.get_own_client().map(|c| {
+				(
+					if !c.input_hardware_enabled {
+						MuteState::Disabled
+					} else if c.input_muted {
+						MuteState::Muted
+					} else {
+						MuteState::None
+					},
+					!c.output_muted && c.output_hardware_enabled && c.away_message.is_none(),
+					con_addr,
+				)
+			})
+		})
+		.filter_map(|f| future::ready(f))
+		.collect()
+		.await
+}
+
+/// Get output mute state for all current connections.
+async fn get_output_mute_states(state: &crate::State) -> Vec<(MuteState, Addr<Ws>)> {
+	state
+		.aggregate(|con, con_addr| {
+			con.get_own_client().map(|c| {
+				(
+					if !c.output_hardware_enabled {
+						MuteState::Disabled
+					} else if c.output_muted {
+						MuteState::Muted
+					} else {
+						MuteState::None
+					},
+					con_addr,
+				)
+			})
+		})
+		.filter_map(|f| future::ready(f))
+		.collect()
+		.await
+}
+
+/// Get away state for all current connections.
+///
+/// Returns `true` for every connection that is muted.
+async fn get_away_states(state: &crate::State) -> Vec<(bool, Addr<Ws>)> {
+	state
+		.aggregate(|con, con_addr| {
+			con.get_own_client().map(|c| (c.away_message.is_some(), con_addr))
+		})
+		.filter_map(|f| future::ready(f))
+		.collect()
+		.await
 }
 
 impl Action {
 	pub async fn run(&self, state: &crate::State) {
 		match self {
-			Self::InputMute(b) => h(state, websocket::SetInputMutedMsg(*b)).await,
-			Self::OutputMute(b) => h(state, websocket::SetOutputMutedMsg(*b)).await,
-			Self::Away(b) => h(state, websocket::SetAwayMsg(*b)).await,
+			Self::InputMute => {
+				let states = get_input_mute_states(state).await;
+				// Filter out servers, where we cannot talk anyway (away or output muted), except
+				// if this is the case for all servers.
+				let states: Vec<_> = if states.iter().any(|(_, can_talk, _)| *can_talk) {
+					states
+						.into_iter()
+						.filter_map(|(s, can_talk, a)| if can_talk { Some((s, a)) } else { None })
+						.collect()
+				} else {
+					states.into_iter().map(|(s, _, a)| (s, a)).collect()
+				};
+				if states.iter().all(|(s, _)| *s == MuteState::Disabled) {
+					// If all servers have disabled input, enable input
+					state
+						.send_each_con(states.into_iter().map(|(_, c)| c), |c| {
+							Some(c.client_update().set_input_hardware_enabled(true))
+						})
+						.await;
+				} else {
+					// Toggle mute state, unless input is disabled
+					state
+						.send_each_con(
+							states.into_iter().filter_map(|(m, c)| {
+								if m == MuteState::Disabled { None } else { Some(c) }
+							}),
+							|c| {
+								c.clients.get(&c.own_client).and_then(|client| {
+									Some(c.client_update().set_input_muted(!client.input_muted))
+								})
+							},
+						)
+						.await;
+				}
+			}
+			Self::OutputMute => {
+				let states = get_output_mute_states(state).await;
+				if states.iter().all(|(s, _)| *s == MuteState::Disabled) {
+					// If all servers have disabled output, enable output
+					state
+						.send_each_con(states.into_iter().map(|(_, c)| c), |c| {
+							Some(c.client_update().set_output_hardware_enabled(true))
+						})
+						.await;
+				} else {
+					// Toggle mute state, unless output is disabled
+					state
+						.send_each_con(
+							states.into_iter().filter_map(|(m, c)| {
+								if m == MuteState::Disabled { None } else { Some(c) }
+							}),
+							|c| {
+								c.clients.get(&c.own_client).and_then(|client| {
+									Some(c.client_update().set_output_muted(!client.output_muted))
+								})
+							},
+						)
+						.await;
+				}
+			}
+			Self::Away => {
+				let states = get_away_states(state).await;
+				if states.iter().all(|(s, _)| *s) {
+					// If all servers are away, remove away
+					state
+						.send_each_con(states.into_iter().map(|(_, c)| c), |c| {
+							Some(c.client_update().set_away(None))
+						})
+						.await;
+				} else {
+					// Set the remaining servers as away
+					state
+						.send_each_con(
+							states
+								.into_iter()
+								.filter_map(|(away, c)| if !away { Some(c) } else { None }),
+							|c| Some(c.client_update().set_away(Some(""))),
+						)
+						.await;
+				}
+			}
 		}
 	}
 }

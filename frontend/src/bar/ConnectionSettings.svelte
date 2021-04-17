@@ -5,6 +5,8 @@
 	import type { OChangeConnectionClientUpdate } from "../book_events";
 	import { Connection } from "../connection";
 	import { ConnectData } from "../connect/connect";
+	import { backend } from "../backend/backend";
+	import { app } from "../app";
 
 	export let connection: Connection | undefined = undefined;
 	export let connectData: ConnectData | undefined = undefined;
@@ -17,8 +19,8 @@
 	$: {
 		if (connection !== undefined) {
 			ownClient = connection.book.ownClient;
-			inputMuted = $ownClient?.inputMuted ?? false;
-			outputMuted = $ownClient?.outputMuted ?? false;
+			inputMuted = ($ownClient?.inputMuted ?? false) || !($ownClient?.inputHardwareEnabled ?? true);
+			outputMuted = ($ownClient?.outputMuted ?? false) || !($ownClient?.outputHardwareEnabled ?? true);
 			const awayMessage = $ownClient?.awayMessage;
 			isAway = awayMessage !== undefined && awayMessage !== null;
 		} else if (connectData !== undefined) {
@@ -28,7 +30,7 @@
 		}
 	}
 
-	function changeOwnClient(change: OChangeConnectionClientUpdate["ConnectionClientUpdate"]) {
+	async function changeOwnClient(change: OChangeConnectionClientUpdate["ConnectionClientUpdate"]) {
 		if (change.inputMuted !== undefined) {
 			inputMuted = change.inputMuted;
 			if (connectData !== undefined)
@@ -45,9 +47,35 @@
 				connectData.away = isAway ? "" : undefined;
 		}
 
-		connection?.sendChange({
+		await connection?.sendChange({
 			ConnectionClientUpdate: change,
 		});
+
+		if (connection === undefined) {
+			// Send as shortcut
+			if (change.inputMuted !== undefined) {
+				await backend.fetch("/hotkey", {
+					method: "POST",
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ InputMute: null }),
+				});
+			}
+			if (change.outputMuted !== undefined) {
+				await backend.fetch("/hotkey", {
+					method: "POST",
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ OutputMute: null }),
+				});
+			}
+			if (change.away !== undefined) {
+				await backend.fetch("/hotkey", {
+					method: "POST",
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ Away: null }),
+				});
+			}
+		}
+		app.updateMuteState();
 	}
 </script>
 

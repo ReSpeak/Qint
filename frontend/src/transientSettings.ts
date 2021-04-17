@@ -34,7 +34,7 @@ export class TransientSettings {
 	}
 
 	public save() {
-		
+
 		this._syncDebounced();
 	}
 
@@ -148,6 +148,7 @@ export class TransientSettingsUi {
 	/// If the default state is muted for new connections
 	public defaultInputMuted: boolean = false;
 	public defaultOutputMuted: boolean = false;
+	public defaultAway: boolean = false;
 
 	toJSON() {
 		const res: any = {};

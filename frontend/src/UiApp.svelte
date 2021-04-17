@@ -15,6 +15,7 @@
 	import { ConnectData } from "./connect/connect";
 	import { DescriptionMode } from "./transientSettings";
 	import { Channel } from "./book";
+	import { backend } from "./backend/backend";
 	import { onMount } from "svelte";
 	import { derived, writable } from "svelte/store";
 	import type { Readable, Writable } from "svelte/store";
@@ -67,13 +68,33 @@
 		}
 	}
 
+	async function updateGlobalMuteState() {
+		const enum MuteState {
+			None = "None",
+			Muted = "Muted",
+			Disabled = "Disabled",
+		}
+
+		interface MuteStates {
+			input: MuteState,
+			output: MuteState,
+			away: boolean,
+		}
+
+		try {
+			const state: MuteStates = await (await backend.fetch("/mutestate")).json();
+			connectData.inputMuted = state.input !== MuteState.None;
+			connectData.outputMuted = state.output !== MuteState.None;
+			connectData.away = state.away ? "" : undefined;
+		} catch (e) {
+			console.log("Failed to get mute state", e);
+		}
+	}
+
 	onMount(() => {
-		app.transientSettingsLoaded.subscribe(() => {
-			if (ui.defaultInputMuted && connectData.inputMuted === undefined)
-				connectData.inputMuted = ui.defaultInputMuted;
-			if (ui.defaultOutputMuted && connectData.outputMuted === undefined)
-				connectData.outputMuted = ui.defaultOutputMuted;
-		})
+		updateGlobalMuteState();
+		const unsub = app.updateMuteState.subscribe(updateGlobalMuteState);
+		return unsub;
 	});
 </script>
 

@@ -47,7 +47,7 @@
 	function getClientProperties(client: Client, channel: Channel | undefined): [string, string, string] | undefined {
 		const properties: [boolean, string, string, string][] = [
 			[client.awayMessage !== null, "sleep", "color: rgb(70,180,255)", client.awayMessage === "" ? "Away" : ("Away: " + client.awayMessage ?? "")],
-			[!client.outputHardwareEnabled, "microphone-off", "color: red;", "Speaker disabled"],
+			[!client.outputHardwareEnabled, "volume-off", "color: red;", "Speaker disabled"],
 			[client.outputMuted, "volume-off", "color: red;", "Deaf"],
 			[channel !== undefined && channel.neededTalkPower !== null && client.talkPower < channel.neededTalkPower,
 				"microphone-off", "color: gray;", "Not enough talk power"],

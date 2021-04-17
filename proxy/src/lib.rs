@@ -24,7 +24,7 @@ use actix_web_actors::ws;
 use anyhow::{bail, format_err, Result};
 use db::{models::UpdateIdentity, FindIdentity, GetIdentitiesMsg, UpdateIdentityMsg};
 use futures::prelude::*;
-use futures::stream::Peekable;
+use futures::stream::{FuturesUnordered, Peekable};
 use http::{header::CACHE_CONTROL, header::ETAG, HeaderValue};
 use identities::import_ts_identities_from_string;
 use messages::ResultDetails;
@@ -173,13 +173,6 @@ pub struct State {
 	search: Option<Arc<search::Search>>,
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, serde::Serialize, serde::Deserialize)]
-pub enum Tristate {
-	True,
-	False,
-	Toggle,
-}
-
 #[derive(Clone, Copy, Debug, Deserialize)]
 enum WsFormat {
 	Msgpack,
@@ -189,6 +182,25 @@ enum WsFormat {
 #[derive(Clone, Debug, Deserialize)]
 struct WsOptions {
 	format: WsFormat,
+}
+
+/// Triple to represent input and output mute state.
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Deserialize, Serialize)]
+enum MuteState {
+	// Not muted
+	None,
+	// Normal muted
+	Muted,
+	// Hardware disabled
+	Disabled,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct MuteStates {
+	input: MuteState,
+	output: MuteState,
+	// True of away on all servers
+	away: bool,
 }
 
 pub struct App(Arc<State>);
@@ -269,15 +281,68 @@ impl State {
 		}
 		(r, res)
 	}
-}
 
-impl Tristate {
-	pub fn get_value(&self, old: bool) -> bool {
-		match self {
-			Tristate::True => true,
-			Tristate::False => false,
-			Tristate::Toggle => !old,
-		}
+	/// Run a function for every connected connection and send a packet.
+	async fn send_each_con<
+		P: tsclientlib::OutCommandExt,
+		F: FnOnce(&tsclientlib::data::Connection) -> Option<P> + Clone + Send + 'static,
+	>(
+		&self, cons: impl Iterator<Item = Addr<Ws>>, f: F,
+	) {
+		let fut: FuturesUnordered<_> = cons
+			.map(|c| {
+				let logger = self.logger.clone();
+				let f = f.clone();
+				async move {
+					let logger2 = logger.clone();
+					if let Err(e) = c
+						.send(websocket::RunOnConMsg(move |c| {
+							if let Some(con) = c.get_mut_connection() {
+								if let Ok(book) = con.get_state() {
+									if let Some(p) = f(book) {
+										if let Err(e) = p.send(con) {
+											warn!(logger2, "Failed to send message action";
+												"error" => %e);
+										}
+									}
+								}
+							}
+						}))
+						.await
+					{
+						warn!(logger, "Failed to run action"; "error" => %e);
+					}
+				}
+			})
+			.collect();
+		fut.collect::<()>().await;
+	}
+
+	/// Aggregate over all connections.
+	///
+	/// Ignore connections where sending the message fails.
+	fn aggregate<R: Send + 'static, F: FnOnce(&mut Ws, Addr<Ws>) -> R + Clone + Send + 'static>(
+		&self, f: F,
+	) -> impl Stream<Item = R> {
+		let cons = self.connections.lock().unwrap().values().cloned().collect::<Vec<_>>();
+		let fut: FuturesUnordered<_> = cons
+			.into_iter()
+			.map(|c| {
+				let logger = self.logger.clone();
+				let f = f.clone();
+				let c2 = c.clone();
+				async move {
+					match c.send(websocket::RunOnConMsg(|con| f(con, c2))).await {
+						Err(e) => {
+							warn!(logger, "Failed to run action"; "error" => %e);
+							None
+						}
+						Ok(r) => Some(r),
+					}
+				}
+			})
+			.collect();
+		fut.filter_map(|f| future::ready(f))
 	}
 }
 
@@ -341,6 +406,31 @@ impl Settings {
 				.clone()
 				.into_deserializer(),
 		)?)
+	}
+
+	fn get_default_mute_states(&self) -> MuteStates {
+		self.0.as_object().and_then(|p| p.get("audio")).and_then(|p| p.as_object())
+			.map(|ui| MuteStates {
+				input: if ui.get("defaultInputMuted").and_then(|p| p.as_bool()).unwrap_or_default() { MuteState::Muted } else { MuteState::None },
+				output: if ui.get("defaultOutputMuted").and_then(|p| p.as_bool()).unwrap_or_default() { MuteState::Muted } else { MuteState::None },
+				away: ui.get("defaultAway").and_then(|p| p.as_bool()).unwrap_or_default(),
+			}).unwrap_or(MuteStates {
+				input: MuteState::None,
+				output: MuteState::None,
+				away: false,
+			})
+	}
+}
+
+impl MuteState {
+	fn merge(self, other: Self) -> Self {
+		if self == Self::None || other == Self::None {
+			Self::None
+		} else if self == Self::Muted || other == Self::Muted {
+			Self::Muted
+		} else {
+			Self::Disabled
+		}
 	}
 }
 
@@ -810,6 +900,64 @@ async fn post_ident_import(state: web::Data<Arc<State>>, body: web::Bytes) -> im
 	}
 }
 
+#[get("/mutestate")]
+async fn get_mute_state(state: web::Data<Arc<State>>) -> impl Responder {
+	struct OptionMuteStates {
+		// Input state for servers, where we can talk (not away and output not muted)
+		input_can_talk: Option<MuteState>,
+		// Input state for servers, where we cannot talk
+		input_cannot_talk: Option<MuteState>,
+		output: MuteState,
+		away: bool,
+	}
+
+	let res = state.aggregate(|con, _| {
+		con.get_own_client().map(|c| MuteStates {
+			input: if !c.input_hardware_enabled {
+				MuteState::Disabled
+			} else if c.input_muted {
+				MuteState::Muted
+			} else {
+				MuteState::None
+			},
+			output: if !c.output_hardware_enabled {
+				MuteState::Disabled
+			} else if c.output_muted {
+				MuteState::Muted
+			} else {
+				MuteState::None
+			},
+			away: c.away_message.is_some(),
+		})
+	}).fold(None, |res: Option<OptionMuteStates>, state| {
+		future::ready(if let (Some(res), Some(state)) = (&res, &state) {
+			let can_talk = !state.away && state.output == MuteState::None;
+			Some(OptionMuteStates {
+				input_can_talk: if can_talk { if let Some(i) = res.input_can_talk { Some(i.merge(state.input)) } else { Some(state.input) } } else { res.input_can_talk },
+				input_cannot_talk: if !can_talk { if let Some(i) = res.input_can_talk { Some(i.merge(state.input)) } else { Some(state.input) } } else { res.input_can_talk },
+				output: res.output.merge(state.output),
+				away: res.away && state.away,
+			})
+		} else if let Some(state) = state {
+			let can_talk = !state.away && state.output == MuteState::None;
+			Some(OptionMuteStates {
+				input_can_talk: if can_talk { Some(state.input) } else { None },
+				input_cannot_talk: if !can_talk { Some(state.input) } else { None },
+				output: state.output,
+				away: state.away,
+			})
+		} else {
+			res
+		})
+	}).await;
+	let res = res.map(|res| MuteStates {
+		input: res.input_can_talk.or(res.input_cannot_talk).unwrap_or(MuteState::None),
+		output: res.output,
+		away: res.away,
+	}).unwrap_or_else(|| state.settings.read().unwrap().get_default_mute_states());
+	HttpResponse::Ok().json(res)
+}
+
 fn merge_json(a: &mut Value, b: &Value) {
 	match (a, b) {
 		(&mut Value::Object(ref mut a), &Value::Object(ref b)) => {
@@ -1053,6 +1201,7 @@ impl App {
 				.service(put_ident)
 				.service(delete_ident)
 				.service(post_ident_import)
+				.service(get_mute_state)
 				.service(db::graphql::db_graphql)
 				.service(db::graphql::graphiql)
 				.service(Files::new("", frontend_path).index_file("index.html"))

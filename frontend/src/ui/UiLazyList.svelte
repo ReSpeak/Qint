@@ -149,7 +149,7 @@
 	}
 
 	function start_fill() {
-		if (fetchTask || !mounted) {
+		if (fetchTask || !mounted || pan === null) {
 			return;
 		}
 		fetchTask = fill_loop();
@@ -170,7 +170,7 @@
 	 * @returns true when the list is satisfied with loading data
 	 */
 	async function fill_body(): Promise<boolean> {
-		if ((!canLoadAfterEnd && !canLoadBeforeStart) || !enableFetching) return true;
+		if ((!canLoadAfterEnd && !canLoadBeforeStart) || !enableFetching || pan === null) return true;
 
 		const holdIdStart = getFirstElem();
 		const holdIdEnd = getLastElem();
@@ -351,6 +351,7 @@
 	 * Appends/Prepends or replaces the list with the new passed list.
 	 */
 	async function applyElements(newElems: T[], dir: ListFetchDir) {
+		if (pan === null) return;
 		switch (dir) {
 			case ListFetchDir.After:
 				// This case adds elements at the end => trim start

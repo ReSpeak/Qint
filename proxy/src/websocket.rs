@@ -9,7 +9,7 @@ use actix::*;
 use actix_web_actors::ws;
 use anyhow::{bail, format_err, Result};
 use futures::prelude::*;
-use proxy_codegen::book_events;
+use proxy_codegen::book_events::{self, JsM2B};
 use slog::{debug, error, o, warn, Logger};
 use thiserror::Error;
 use tokio::net::TcpStream;
@@ -27,7 +27,7 @@ use tsproto_types::crypto::EccKeyPubP256;
 
 use crate::db::{ChannelListMsg, ChatId, ChatType, SetClientVolumeMsg};
 use crate::messages::{self, MessageF2P, MessageP2F, ResultDetails, ResultStruct};
-use crate::{audio, db, ConnectionId, State, Tristate, WsFormat, WsOptions};
+use crate::{audio, db, ConnectionId, State, WsFormat, WsOptions};
 
 /// A websocket connection
 pub(crate) struct Ws {
@@ -58,14 +58,9 @@ pub(crate) struct TalkersChangedMsg(pub Vec<(ClientId, bool)>);
 pub(crate) struct LoudnessesMsg(pub HashMap<ClientId, f64>);
 pub(crate) struct SendPacketMsg(pub OutPacket);
 pub(crate) struct CaptureLoudnessMsg(pub f64);
-#[derive(Clone)]
-pub(crate) struct SetInputMutedMsg(pub Tristate);
-#[derive(Clone)]
-pub(crate) struct SetOutputMutedMsg(pub Tristate);
-#[derive(Clone)]
-pub(crate) struct SetAwayMsg(pub Tristate);
 pub(crate) struct DisconnectMsg;
 pub(crate) struct SetChannelListMsgMsg(pub ChannelListMsg);
+pub(crate) struct RunOnConMsg<R: 'static, F: FnOnce(&mut Ws) -> R>(pub F);
 
 pub(crate) struct DownloadFile {
 	pub channel: ChannelId,
@@ -136,15 +131,6 @@ impl Message for SendPacketMsg {
 impl Message for CaptureLoudnessMsg {
 	type Result = ();
 }
-impl Message for SetInputMutedMsg {
-	type Result = Result<()>;
-}
-impl Message for SetOutputMutedMsg {
-	type Result = Result<()>;
-}
-impl Message for SetAwayMsg {
-	type Result = Result<()>;
-}
 impl Message for DisconnectMsg {
 	type Result = ();
 }
@@ -157,6 +143,9 @@ impl Message for DownloadFile {
 }
 impl Message for UploadFile {
 	type Result = Result<TcpStream, Error>;
+}
+impl<R: 'static, F: FnOnce(&mut Ws) -> R> Message for RunOnConMsg<R, F> {
+	type Result = R;
 }
 
 impl Ws {
@@ -180,17 +169,27 @@ impl Ws {
 		}
 	}
 
+	pub fn get_mut_connection(&mut self) -> Option<&mut tsclientlib::Connection> {
+		self.connection.as_mut()
+	}
+
+	pub fn get_book(&self) -> Option<&tsclientlib::data::Connection> {
+		self.connection.as_ref().and_then(|c| c.get_state().ok())
+	}
+
+	pub fn get_own_client(&self) -> Option<&tsclientlib::data::Client> {
+		self.get_book().and_then(|b| b.clients.get(&b.own_client))
+	}
+
 	fn update_talkers(&mut self, ctx: &mut <Self as Actor>::Context) {
-		if let Some(con) = &self.connection {
-			if let Ok(state) = con.get_state() {
-				let mut talkers = self.talkers.clone();
-				if self.self_talking {
-					talkers.push((state.own_client, false));
-				}
-				let talkers = talkers.into_iter().map(|(i, t)| (i.to_string(), t)).collect();
-				self.send_message(&MessageP2F::TalkersChanged(talkers), ctx);
-				return;
+		if let Some(state) = self.get_book() {
+			let mut talkers = self.talkers.clone();
+			if self.self_talking {
+				talkers.push((state.own_client, false));
 			}
+			let talkers = talkers.into_iter().map(|(i, t)| (i.to_string(), t)).collect();
+			self.send_message(&MessageP2F::TalkersChanged(talkers), ctx);
+			return;
 		}
 		self.send_message(&MessageP2F::TalkersChanged(Vec::new()), ctx);
 	}
@@ -321,12 +320,10 @@ impl Ws {
 											..
 										} = &mut e
 										{
-											if let Some(con) = &self.connection {
-												if let Ok(state) = con.get_state() {
-													if let Ok(stats) = con.get_network_stats() {
-														if *id == state.own_client {
-															Self::fill_connection_info(info, stats);
-														}
+											if let Some(state) = self.get_book() {
+												if let Ok(stats) = con.get_network_stats() {
+													if *id == state.own_client {
+														Self::fill_connection_info(info, stats);
 													}
 												}
 											}
@@ -671,33 +668,29 @@ impl Ws {
 			MessageF2P::SetClientVolume { client, volume } => {
 				let client = UidBuf(client);
 
-				if let Some(con) = &self.connection {
-					if let Ok(state) = con.get_state() {
-						let mut created = false;
-						for c in state.clients.values() {
-							if c.uid.as_ref() == Some(&client) {
-								let id = (self.id, c.id);
-								self.send_to_ts2a(audio::ts_to_audio::SetVolumeMsg(id, volume));
-								if !created {
-									created = true;
-									if let Err(e) = db::DbHandler::create_client(
-										&self.logger,
-										&self.state,
-										con,
-										state,
-										c,
-									) {
-										error!(self.logger, "Failed to create client in database";
-											"error" => %e);
-									}
+				if let Some(state) = self.get_book() {
+					let mut created = false;
+					for c in state.clients.values() {
+						if c.uid.as_ref() == Some(&client) {
+							let id = (self.id, c.id);
+							self.send_to_ts2a(audio::ts_to_audio::SetVolumeMsg(id, volume));
+							if !created {
+								created = true;
+								if let Err(e) = db::DbHandler::create_client(
+									&self.logger,
+									&self.state,
+									self.connection.as_ref().unwrap(),
+									state,
+									c,
+								) {
+									error!(self.logger, "Failed to create client in database";
+										"error" => %e);
 								}
 							}
 						}
-					} else {
-						error!(self.logger, "Connection is not connected")
 					}
 				} else {
-					error!(self.logger, "Connection does not exist")
+					error!(self.logger, "Connection is not connected")
 				}
 
 				let logger = self.logger.clone();
@@ -720,29 +713,107 @@ impl Ws {
 			MessageF2P::SendCommand { command, return_code } => {
 				self.send_command(command, return_code.as_deref(), ctx)
 			}
-			MessageF2P::Change { change, return_code } => {
-				if let Some(con) = &mut self.connection {
-					match con.get_state() {
+			MessageF2P::Change { mut change, return_code } => {
+				if let Some(state) = self.get_book() {
+					if let JsM2B::ConnectionClientUpdate(change) = &mut change {
+						if let Some(client) = state.clients.get(&state.own_client) {
+							let has_multiple_cons = self.state.connections.lock().unwrap().len() > 1;
+							if let Some(c) = change.input_muted {
+								if c {
+									// Mute, change to disable if there is more than one
+									// connection.
+									if has_multiple_cons {
+										change.input_muted = None;
+										change.input_hardware_enabled = Some(false);
+									}
+								} else {
+									// Unmute, also enable hardware if currently disabled
+									if !client.input_hardware_enabled {
+										change.input_hardware_enabled = Some(true);
+									}
+									if !client.input_muted {
+										change.input_muted = None;
+									}
+
+									// Change all other muted servers to disabled
+									let cons = self.state.connections.lock().unwrap().iter()
+										.filter_map(|(id, addr)| if *id != self.id {
+											Some(addr.clone())
+										} else {
+											None
+										}).collect::<Vec<_>>();
+									let state = self.state.clone();
+									tokio::spawn(async move {
+										state.send_each_con(cons.into_iter(), |con| {
+											if let Some(client) = con.clients.get(&con.own_client) {
+												if client.input_muted && client.input_hardware_enabled {
+													return Some(con.client_update()
+														.set_input_muted(false)
+														.set_input_hardware_enabled(false));
+												}
+											}
+											None
+										}).await
+									});
+								}
+							}
+
+							if let Some(c) = change.output_muted {
+								if c {
+									// Mute, change to disable if there is more than one
+									// connection.
+									if has_multiple_cons {
+										change.output_muted = None;
+										change.output_hardware_enabled = Some(false);
+									}
+								} else {
+									// Unmute, also enable hardware if currently disabled
+									if !client.output_hardware_enabled {
+										change.output_hardware_enabled = Some(true);
+									}
+									if !client.output_muted {
+										change.output_muted = None;
+									}
+
+									// Change all other muted servers to disabled
+									let cons = self.state.connections.lock().unwrap().iter()
+										.filter_map(|(id, addr)| if *id != self.id {
+											Some(addr.clone())
+										} else {
+											None
+										}).collect::<Vec<_>>();
+									let state = self.state.clone();
+									tokio::spawn(async move {
+										state.send_each_con(cons.into_iter(), |con| {
+											if let Some(client) = con.clients.get(&con.own_client) {
+												if client.output_muted && client.output_hardware_enabled {
+													return Some(con.client_update()
+														.set_output_muted(false)
+														.set_output_hardware_enabled(false));
+												}
+											}
+											None
+										}).await
+									});
+								}
+							}
+						}
+					}
+
+					match change.to_packet(state) {
+						Ok(msg) => {
+							let _ = self.send_ts_message(msg, return_code.as_deref(), ctx);
+						}
 						Err(e) => {
 							self.send_error(
 								return_code.as_deref(),
-								format!("Failed to get state: {}", e),
+								format!("Failed to create packet for change: {}", e),
 								ctx,
 							);
 						}
-						Ok(state) => match change.to_packet(state) {
-							Ok(msg) => {
-								let _ = self.send_ts_message(msg, return_code.as_deref(), ctx);
-							}
-							Err(e) => {
-								self.send_error(
-									return_code.as_deref(),
-									format!("Failed to create packet for change: {}", e),
-									ctx,
-								);
-							}
-						},
 					}
+				} else {
+					self.send_error(return_code.as_deref(), format!("Failed to get state"), ctx);
 				}
 			}
 		}
@@ -779,119 +850,111 @@ impl Ws {
 		&mut self, target: MessageTarget, message: String, return_code: Option<&str>,
 		ctx: &mut <Self as Actor>::Context,
 	) {
-		if let Some(con) = &mut self.connection {
-			match con.get_state() {
-				Err(e) => {
-					self.send_error(return_code, format!("Failed to get state: {}", e), ctx);
-					return;
-				}
-				Ok(state) => {
-					let msg = state.send_message(target, &message);
-					if self.send_ts_message(msg, return_code, ctx).is_err() {
+		if let Some(state) = self.get_book() {
+			let msg = state.send_message(target, &message);
+			if self.send_ts_message(msg, return_code, ctx).is_err() {
+				return;
+			}
+		} else {
+			self.send_error(return_code.as_deref(), format!("Failed to get state"), ctx);
+			return;
+		}
+
+		// Reborrow
+		let con = self.connection.as_mut().unwrap();
+		let server = match con.get_server_key() {
+			Ok(key) => key,
+			Err(e) => {
+				self.send_error(return_code, format!("Failed to get server key: {}", e), ctx);
+				return;
+			}
+		};
+
+		// Reborrow
+		if let Some(state) = self.get_book() {
+			let own_channel;
+			let invoker_uid = {
+				if let Some(own_client) = state.clients.get(&state.own_client) {
+					own_channel = own_client.channel.0;
+					if let Some(uid) = own_client.uid.as_ref() {
+						uid.clone()
+					} else {
+						self.send_error(
+							return_code,
+							"Failed to get own client uid".into(),
+							ctx,
+						);
 						return;
 					}
-				}
-			}
-
-			// Reborrow
-			let con = self.connection.as_mut().unwrap();
-			let server = match con.get_server_key() {
-				Ok(key) => key,
-				Err(e) => {
-					self.send_error(return_code, format!("Failed to get server key: {}", e), ctx);
+				} else {
+					self.send_error(return_code, "Failed to get own client".into(), ctx);
 					return;
 				}
 			};
 
-			// Reborrow
-			let con = self.connection.as_mut().unwrap();
-			if let Ok(state) = con.get_state() {
-				let own_channel;
-				let invoker_uid = {
-					if let Some(own_client) = state.clients.get(&state.own_client) {
-						own_channel = own_client.channel.0;
-						if let Some(uid) = own_client.uid.as_ref() {
-							uid.clone()
+			let mut client_data = None;
+			let chat_type = match target {
+				MessageTarget::Server => ChatType::Server,
+				MessageTarget::Channel => ChatType::Channel(own_channel),
+				MessageTarget::Client(id) | MessageTarget::Poke(id) => {
+					let client = state.clients.get(&id);
+					let uid = client.and_then(|c| c.uid.as_ref());
+					client_data = uid.map(|uid| {
+						let c = client.unwrap();
+						let icon = if c.icon.0 == 0 { None } else { Some(c.icon.0 as i32) };
+						let avatar = if c.avatar_hash.is_empty() {
+							None
 						} else {
-							self.send_error(
-								return_code,
-								"Failed to get own client uid".into(),
-								ctx,
-							);
-							return;
+							Some(c.avatar_hash.clone())
+						};
+						db::ClientData {
+							name: c.name.clone(),
+							uid: uid.clone(),
+							icon,
+							avatar,
+							phonetic_name: if c.phonetic_name != "" {
+								Some(c.phonetic_name.clone())
+							} else {
+								None
+							},
+							description: if c.description != "" {
+								Some(c.description.clone())
+							} else {
+								None
+							},
+						}
+					});
+					if let Some(uid) = uid {
+						if let MessageTarget::Client(_) = target {
+							ChatType::Client(uid.0.clone())
+						} else {
+							ChatType::Poke(uid.0.clone())
 						}
 					} else {
-						self.send_error(return_code, "Failed to get own client".into(), ctx);
+						self.send_error(return_code, "Failed to get uid of client".into(), ctx);
 						return;
 					}
-				};
+				}
+			};
 
-				let mut client_data = None;
-				let chat_type = match target {
-					MessageTarget::Server => ChatType::Server,
-					MessageTarget::Channel => ChatType::Channel(own_channel),
-					MessageTarget::Client(id) | MessageTarget::Poke(id) => {
-						let client = state.clients.get(&id);
-						let uid = client.and_then(|c| c.uid.as_ref());
-						client_data = uid.map(|uid| {
-							let c = client.unwrap();
-							let icon = if c.icon.0 == 0 { None } else { Some(c.icon.0 as i32) };
-							let avatar = if c.avatar_hash.is_empty() {
-								None
-							} else {
-								Some(c.avatar_hash.clone())
-							};
-							db::ClientData {
-								name: c.name.clone(),
-								uid: uid.clone(),
-								icon,
-								avatar,
-								phonetic_name: if c.phonetic_name != "" {
-									Some(c.phonetic_name.clone())
-								} else {
-									None
-								},
-								description: if c.description != "" {
-									Some(c.description.clone())
-								} else {
-									None
-								},
-							}
-						});
-						if let Some(uid) = uid {
-							if let MessageTarget::Client(_) = target {
-								ChatType::Client(uid.0.clone())
-							} else {
-								ChatType::Poke(uid.0.clone())
-							}
-						} else {
-							self.send_error(return_code, "Failed to get uid of client".into(), ctx);
-							return;
-						}
-					}
-				};
-
-				let msg = db::WriteMessageMsg {
-					message,
-					invoker_uid,
-					chat: ChatId { server, chat_type },
-					client_data,
-				};
-				let logger = self.logger.clone();
-				actix::spawn(self.state.database.send(msg).map(move |r| match r {
-					Ok(Ok(())) => {}
-					Ok(Err(e)) => {
-						error!(logger, "Failed to handle event in database"; "error" => %e);
-					}
-					Err(_) => {
-						error!(logger, "Failed to send event to database");
-					}
-				}));
-			} else {
-				self.send_error(return_code, "Failed to get connection state".into(), ctx);
-			}
+			let msg = db::WriteMessageMsg {
+				message,
+				invoker_uid,
+				chat: ChatId { server, chat_type },
+				client_data,
+			};
+			let logger = self.logger.clone();
+			actix::spawn(self.state.database.send(msg).map(move |r| match r {
+				Ok(Ok(())) => {}
+				Ok(Err(e)) => {
+					error!(logger, "Failed to handle event in database"; "error" => %e);
+				}
+				Err(_) => {
+					error!(logger, "Failed to send event to database");
+				}
+			}));
 		} else {
-			self.send_error(return_code, "Not connected".into(), ctx);
+			self.send_error(return_code, "Failed to get connection state".into(), ctx);
 		}
 	}
 
@@ -1035,46 +1098,41 @@ impl Handler<GetClientVolumeMsg> for Ws {
 	fn handle(
 		&mut self, GetClientVolumeMsg(client): GetClientVolumeMsg, _: &mut Self::Context,
 	) -> Self::Result {
-		if let Some(con) = &self.connection {
-			match con.get_state() {
-				Ok(state) => {
-					let uid_fut: Box<dyn ActorFuture<Self, Output = Result<UidBuf>> + Unpin>;
-					if let Some(client) = state.clients.get(&client) {
-						uid_fut = Box::new(wrap_future(future::ready(
-							client
-								.uid
-								.as_ref()
-								.map(|u| u.clone())
-								.ok_or_else(|| format_err!("Client has no uid")),
-						)));
-					} else {
-						// TODO Get uid from server
-						uid_fut =
-							Box::new(wrap_future(future::err(format_err!("Not yet implemented"))));
-					}
-					// Get volume from db
-					ActorResponse::r#async(
-						uid_fut
-							.then(|uid, this, _| match uid {
-								Ok(uid) => wrap_future(
-									this.state
-										.database
-										.send(db::GetClientVolumeMsg(uid))
-										.map_err(|e| e.into())
-										.left_future(),
-								),
-								Err(e) => wrap_future(future::err(e).right_future()),
-							})
-							.map(|res, _, _| match res {
-								Ok(Ok(Some(v))) => Ok(v),
-								Ok(Ok(None)) => Ok(1.0),
-								Ok(Err(e)) => Err(e),
-								Err(e) => Err(e),
-							}),
-					)
-				}
-				Err(e) => ActorResponse::r#async(wrap_future(future::err(e.into()))),
+		if let Some(state) = self.get_book() {
+			let uid_fut: Box<dyn ActorFuture<Self, Output = Result<UidBuf>> + Unpin>;
+			if let Some(client) = state.clients.get(&client) {
+				uid_fut = Box::new(wrap_future(future::ready(
+					client
+						.uid
+						.as_ref()
+						.map(|u| u.clone())
+						.ok_or_else(|| format_err!("Client has no uid")),
+				)));
+			} else {
+				// TODO Get uid from server
+				uid_fut =
+					Box::new(wrap_future(future::err(format_err!("Not yet implemented"))));
 			}
+			// Get volume from db
+			ActorResponse::r#async(
+				uid_fut
+					.then(|uid, this, _| match uid {
+						Ok(uid) => wrap_future(
+							this.state
+								.database
+								.send(db::GetClientVolumeMsg(uid))
+								.map_err(|e| e.into())
+								.left_future(),
+						),
+						Err(e) => wrap_future(future::err(e).right_future()),
+					})
+					.map(|res, _, _| match res {
+						Ok(Ok(Some(v))) => Ok(v),
+						Ok(Ok(None)) => Ok(1.0),
+						Ok(Err(e)) => Err(e),
+						Err(e) => Err(e),
+					}),
+			)
 		} else {
 			ActorResponse::r#async(wrap_future(future::err(format_err!(
 				"Connection does not exist"
@@ -1125,10 +1183,8 @@ impl Handler<LoudnessesMsg> for Ws {
 				.collect::<HashMap<_, _>>();
 		}
 		if let Some(own_loudness) = self.own_loudness.pop_front() {
-			if let Some(con) = &self.connection {
-				if let Ok(state) = con.get_state() {
-					ls.insert(state.own_client.to_string(), own_loudness as f32);
-				}
+			if let Some(state) = self.get_book() {
+				ls.insert(state.own_client.to_string(), own_loudness as f32);
 			}
 		}
 		self.send_message(&MessageP2F::Loudnesses(ls), ctx);
@@ -1143,12 +1199,10 @@ impl Handler<CaptureLoudnessMsg> for Ws {
 		// If nobody else is talking, sent it as a packet.
 		if self.talkers.is_empty() {
 			self.own_loudness.clear();
-			if let Some(con) = &self.connection {
-				if let Ok(state) = con.get_state() {
-					let mut loudnesses = HashMap::new();
-					loudnesses.insert(state.own_client.to_string(), loudness as f32);
-					self.send_message(&MessageP2F::Loudnesses(loudnesses), ctx);
-				}
+			if let Some(state) = self.get_book() {
+				let mut loudnesses = HashMap::new();
+				loudnesses.insert(state.own_client.to_string(), loudness as f32);
+				self.send_message(&MessageP2F::Loudnesses(loudnesses), ctx);
 			}
 		} else {
 			self.own_loudness.push_back(loudness);
@@ -1170,71 +1224,6 @@ impl Handler<SendPacketMsg> for Ws {
 	}
 }
 
-impl Handler<SetInputMutedMsg> for Ws {
-	type Result = Result<()>;
-	fn handle(
-		&mut self, SetInputMutedMsg(new): SetInputMutedMsg, _: &mut Self::Context,
-	) -> Self::Result {
-		if let Some(con) = &mut self.connection {
-			let state = con.get_state()?;
-			let own_client = state.own_client;
-			let old: bool = if let Some(own_client) = state.clients.get(&own_client) {
-				own_client.input_muted
-			} else {
-				bail!("Failed to get own client");
-			};
-			let new_input_muted = new.get_value(old);
-			state.client_update().set_input_muted(new_input_muted).send(con)?;
-		} else {
-			bail!("Connection does not exist");
-		}
-		Ok(())
-	}
-}
-
-impl Handler<SetOutputMutedMsg> for Ws {
-	type Result = Result<()>;
-	fn handle(
-		&mut self, SetOutputMutedMsg(new): SetOutputMutedMsg, _: &mut Self::Context,
-	) -> Self::Result {
-		if let Some(con) = &mut self.connection {
-			let state = con.get_state()?;
-			let own_client = state.own_client;
-			let old: bool = if let Some(own_client) = state.clients.get(&own_client) {
-				own_client.output_muted
-			} else {
-				bail!("Failed to get own client");
-			};
-			state.client_update().set_output_muted(new.get_value(old)).send(con)?;
-		} else {
-			bail!("Connection does not exist");
-		}
-		Ok(())
-	}
-}
-
-impl Handler<SetAwayMsg> for Ws {
-	type Result = Result<()>;
-	fn handle(&mut self, SetAwayMsg(new): SetAwayMsg, _: &mut Self::Context) -> Self::Result {
-		if let Some(con) = &mut self.connection {
-			let state = con.get_state()?;
-			let own_client = state.own_client;
-			let old: bool = if let Some(own_client) = state.clients.get(&own_client) {
-				own_client.away_message.is_some()
-			} else {
-				bail!("Failed to get own client");
-			};
-			state
-				.client_update()
-				.set_away(if new.get_value(old) { Some("") } else { None })
-				.send(con)?;
-		} else {
-			bail!("Connection does not exist");
-		}
-		Ok(())
-	}
-}
-
 impl Handler<DisconnectMsg> for Ws {
 	type Result = ();
 	fn handle(&mut self, _: DisconnectMsg, ctx: &mut Self::Context) -> Self::Result {
@@ -1249,9 +1238,16 @@ impl Handler<SetChannelListMsgMsg> for Ws {
 	}
 }
 
-impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for Ws {
+impl<R: 'static, F: FnOnce(&mut Ws) -> R> Handler<RunOnConMsg<R, F>> for Ws {
+	type Result = MessageResult<RunOnConMsg<R, F>>;
+	fn handle(&mut self, msg: RunOnConMsg<R, F>, _: &mut Self::Context) -> Self::Result {
+		MessageResult(msg.0(self))
+	}
+}
+
+impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 	fn handle(
-		&mut self, msg: std::result::Result<ws::Message, ws::ProtocolError>,
+		&mut self, msg: Result<ws::Message, ws::ProtocolError>,
 		ctx: &mut Self::Context,
 	) {
 		match msg {

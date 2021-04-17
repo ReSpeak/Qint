@@ -26,6 +26,7 @@ export class App {
 	public readonly transientSettings: TransientSettings = new TransientSettings();
 	public plugins: IPlugin[] = [];
 	public transientSettingsLoaded = fnBroadcast();
+	public updateMuteState = fnBroadcast();
 
 	constructor() {
 		loadPlugins().then(x => this.plugins = x);

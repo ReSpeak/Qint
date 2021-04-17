@@ -61,7 +61,7 @@
 	</div>
 	<div class="spacer" />
 	<div class="rightButtons">
-		<ConnectionSettings connection={$cons.length > 0 ? $cons[0] : undefined} bind:connectData={connectData} />
+		<ConnectionSettings bind:connectData={connectData} />
 	</div>
 </div>
 

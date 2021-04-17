@@ -10,6 +10,11 @@ export interface ApiIdentity {
 }
 
 export async function loadIdentities(): Promise<ApiIdentity[]> {
-	const req = await backend.fetch("/ident/all");
-	return (await req.json()) as ApiIdentity[];
+	try {
+		const req = await backend.fetch("/ident/all");
+		return (await req.json()) as ApiIdentity[];
+	} catch(err) {
+		console.log("Failed to load identities", err);
+		return [];
+	}
 }
