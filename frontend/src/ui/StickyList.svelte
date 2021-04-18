@@ -33,7 +33,7 @@
 		obs = new ResizeObserver(() => updateChildSize());
 		for (let i = 0; i < stickyChildren.length; i++) {
 			stickyChildren[i].onclick = () => {
-				let nextElement = stickyChildren[i].nextElementSibling! as HTMLElement;
+				const nextElement = stickyChildren[i].nextElementSibling! as HTMLElement;
 				stickyList.scrollTop = nextElement.offsetTop - stickyList.offsetTop - stickyAcc[i];
 			}
 			stickySizes[i] = stickyChildren[i].offsetHeight;

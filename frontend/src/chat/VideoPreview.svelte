@@ -24,7 +24,7 @@
 	let video_key: string;
 
 	additionalData = "";
-	let ytMatch = youtubeUrlRegex.exec(videoSrc);
+	const ytMatch = youtubeUrlRegex.exec(videoSrc);
 	if (ytMatch !== null) {
 		detectedType = "youtube";
 		video_key = ytMatch[5];

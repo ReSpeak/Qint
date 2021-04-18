@@ -106,18 +106,18 @@
 			);
 			if (query.data.serverByAddress !== null) {
 				server = urlBase64Encode(query.data.serverByAddress.publicKey);
-				let channels: Map<ChannelId, Channel> = new Map(
+				const channels: Map<ChannelId, Channel> = new Map(
 					query.data.serverByAddress.channels.map((c: any) => {
-						let channel = Channel.fromGraphql(c);
+						const channel = Channel.fromGraphql(c);
 						return [channel.id, channel];
 					})
 				);
-				let topChannels: Channel[] = [];
+				const topChannels: Channel[] = [];
 				// Get into tree form
-				for (let c of channels.values()) {
+				for (const c of channels.values()) {
 					// Add to parent
 					if (c.parent !== null) {
-						let children = channels.get(c.parent)!.channels;
+						const children = channels.get(c.parent)!.channels;
 						children.update((cs) => {
 							Book.addChannelSorted(cs, c);
 							return cs;

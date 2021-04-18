@@ -49,7 +49,7 @@
 		const cachePath = getCachePath();
 		channel.lastFilePath = path;
 		displayChannel = $fileTreeCache.get(cachePath, true);
-		let childrenIter = displayChannel?.children?.values();
+		const childrenIter = displayChannel?.children?.values();
 		displayChildren = childrenIter !== undefined ? Array.from(childrenIter) : [];
 	}
 	$: on(channelId, path, refreshCurrentFolder(true));
@@ -73,7 +73,7 @@
 		}
 		invalidateCache = false;
 		$fileTreeCache.clear(cachePath);
-		let getPath = "/" + path.join("/");
+		const getPath = "/" + path.join("/");
 		connection.sendMessage({
 			Change: {
 				change: {
@@ -98,7 +98,7 @@
 	}
 
 	function onClickRow(evt: ClickRowEvent<FileTreeNode>) {
-		let { row, dblclick } = evt.detail;
+		const { row, dblclick } = evt.detail;
 		if (dblclick) {
 			if (row.isFile) {
 				const cachePathStr = getCachePath().join("/");
@@ -141,7 +141,7 @@
 
 	function deleteFiles() {
 		// TODO as one packet
-		for (let toDelete of fileSelection) {
+		for (const toDelete of fileSelection) {
 			const deletePath = pathJoin(...path, toDelete.name);
 			connection.sendMessage({
 				Change: {
@@ -217,7 +217,7 @@
 			Array.from(document.querySelectorAll("[data-type='folder']:not(.selected)")),
 	};
 
-	let currentUploadTask: any = undefined; // TODO
+	const currentUploadTask: any = undefined; // TODO
 	function uploadFiles(...files: File[]) {
 		connection.filetransferManager.uploadFiles(
 			...files.map((file) => {
@@ -248,13 +248,13 @@
 		currentState = WorkState.None;
 		e.preventDefault();
 
-		let files = e.dataTransfer?.files;
+		const files = e.dataTransfer?.files;
 		if (!files) return;
 		uploadFiles(...files);
 	}
 
 	function uploadSelected() {
-		let files = dummyUploader.files;
+		const files = dummyUploader.files;
 		if (files && files.length > 0) {
 			uploadFiles(...files);
 			dummyUploader.value = null!;

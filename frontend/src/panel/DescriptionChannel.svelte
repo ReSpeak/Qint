@@ -94,7 +94,7 @@
 	}
 
 	function getPropsDiff() {
-		let diff: Record<string, any> = {};
+		const diff: Record<string, any> = {};
 
 		if (chanEditMaxClientsMode === MaxClientsMode.Inherited)
 			chanEdit.maxClients = "Inherited";
@@ -172,7 +172,7 @@
 	function clickSaveChanges() {
 		editing = false;
 
-		let diff = getPropsDiff();
+		const diff = getPropsDiff();
 		if (Object.keys(diff).length === 0) return;
 		changeRequest = connection.sendChange({
 			ChannelEdit: {

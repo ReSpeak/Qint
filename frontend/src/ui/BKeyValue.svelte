@@ -13,7 +13,7 @@
 
 	onMount(() => {
 		if (slot) {
-			let inputField = slot.querySelector("input");
+			const inputField = slot.querySelector("input");
 			if (inputField) {
 				inputField.id = labelId;
 			}

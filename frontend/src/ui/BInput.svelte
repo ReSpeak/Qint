@@ -43,10 +43,10 @@
 
 	export function moveCursorToEnd(): void {
 		// https://stackoverflow.com/questions/1125292/how-to-move-cursor-to-end-of-contenteditable-entity
-		let range = document.createRange();
+		const range = document.createRange();
 		range.selectNodeContents(self);
 		range.collapse(false);
-		let selection = window.getSelection();
+		const selection = window.getSelection();
 		selection?.removeAllRanges();
 		selection?.addRange(range);
 	}
@@ -68,7 +68,7 @@
 	}
 
 	export function getStructuredView(): StructuredData {
-		let parts = [];
+		const parts = [];
 		for (const node of self.childNodes) {
 			switch (node.nodeType) {
 				case Node.TEXT_NODE:
@@ -80,7 +80,7 @@
 							parts.push("\n");
 							break;
 						case "IMG": {
-							let src =
+							const src =
 								(node as HTMLImageElement).dataset.qintimg ??
 								(node as HTMLImageElement).src;
 							if (src.startsWith("data:")) {
@@ -150,7 +150,7 @@
 			if (child.nodeType === Node.ELEMENT_NODE) {
 				cleanNode(child);
 				if ((child as Element).tagName === "DIV") {
-					for (let unwrap of (child as Element).childNodes) {
+					for (const unwrap of (child as Element).childNodes) {
 						node.insertBefore(document.createElement("BR"), child);
 						node.insertBefore(unwrap, child);
 					}
@@ -192,7 +192,7 @@
 				const domImg = dom.querySelector("img");
 				log("pasting as html %o", domImg);
 				if (domImg !== null && domImg.src && !domImg.src.startsWith("file://")) {
-					let qintImg = domImg.dataset.qintimg
+					const qintImg = domImg.dataset.qintimg
 						? ` data-qintimg="${escapeHtml(domImg.dataset.qintimg)}"`
 						: "";
 					const imgHtml = `<img src="${escapeHtml(domImg.src)}"${qintImg}/>`;

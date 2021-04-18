@@ -51,7 +51,7 @@
 	let spacerType: SpacerType;
 	let displayName: string;
 	$: {
-		let chanData = getDisplayName($channel);
+		const chanData = getDisplayName($channel);
 		spacerType = chanData.type;
 		displayName = chanData.name;
 	}
@@ -60,7 +60,7 @@
 
 	function updateOwnClient(_children: ITreeNode[]) {
 		if (connection === undefined) return false;
-		let client = get(connection.book.ownClient);
+		const client = get(connection.book.ownClient);
 		if (client === undefined) return false;
 		return client.channel === channel.id;
 	}
@@ -165,9 +165,9 @@
 		const dropTarget = hoverOpt.find((x) => x.dataset.type === "channel");
 		if (dropTarget !== undefined && connection !== undefined) {
 			const rect = dropTarget.getBoundingClientRect();
-			let clickY = ev.detail.mouseDrop.clientY - rect.top;
-			let clickPerc = clickY / (rect.bottom - rect.top);
-			let target = connection.book.getChannel(dropTarget.dataset.key!)!;
+			const clickY = ev.detail.mouseDrop.clientY - rect.top;
+			const clickPerc = clickY / (rect.bottom - rect.top);
+			const target = connection.book.getChannel(dropTarget.dataset.key!)!;
 			// < 0.25      : Dropped in the upper quarter
 			// 0.25 - 0.75 : Dropped in the middle half
 			// > 0.75      : Dropped in the lower quarter
@@ -199,7 +199,7 @@
 
 	function getDisplayName(c: Channel) {
 		// TODO consider special names [*spacer] --- ... -.- ___ -..
-		let data = { type: SpacerType.None, name: c.name };
+		const data = { type: SpacerType.None, name: c.name };
 		if (c.parent !== "0" || c.channelType !== ChannelType.Permanent) return data;
 		const match = /^\[(c|l|r|\*|)spacer[^\]]*\](.*)$/.exec(c.name);
 		if (match == null) return data;

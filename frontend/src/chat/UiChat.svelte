@@ -28,9 +28,9 @@
 	export let chat: Chat;
 
 	const selected = app.selectedNode;
-	let chatStore = app.transientSettings.chat;
+	const chatStore = app.transientSettings.chat;
 
-	let developMode = app.transientSettings.ui._developMode;
+	const developMode = app.transientSettings.ui._developMode;
 	let chatList: UiLazyList | undefined;
 	let messagesError: unknown | undefined;
 	let messageInput: BInput;
@@ -111,7 +111,7 @@
 		}
 		const ownChannel = $ownClient?.channel;
 
-		let type = sel.node.qlType;
+		const type = sel.node.qlType;
 		if (type === "SERVER" || type === "CLIENT") {
 			canChatHere = true;
 		} else if (type === "CHANNEL" && sel.node instanceof Channel) {
@@ -133,10 +133,10 @@
 			isSending = true;
 			const sel = $selected;
 			if (sel === undefined) return;
-			let textData = messageInput.getStructuredView();
+			const textData = messageInput.getStructuredView();
 			if (textData.length === 0) return;
-			let channelId: ChannelId = get(sel.connection.book.ownClient)?.channel ?? "";
-			let mdData = structuredViewToMd(textData, channelId);
+			const channelId: ChannelId = get(sel.connection.book.ownClient)?.channel ?? "";
+			const mdData = structuredViewToMd(textData, channelId);
 			if (!mdData.text) return;
 			sendError = await tryUploadChatImage(sel.connection, mdData, channelId);
 			if (sendError === undefined) {
@@ -154,11 +154,11 @@
 	}
 
 	async function chatboxHistoryMove(e: CustomEvent<number>) {
-		let historyId = e.detail;
+		const historyId = e.detail;
 		assert(historyId > 0, "History id should be at least 1");
 		if (connection === undefined)
 			return;
-		let ownUid = get(connection.book.ownClient)?.uid;
+		const ownUid = get(connection.book.ownClient)?.uid;
 		if (ownUid === undefined || ownUid === null)
 			return;
 		const data = await chat.getSendHistory(ownUid, historyId - 1);
@@ -200,7 +200,7 @@
 		}
 
 		if (mdData.files.length >= 1) {
-			let file = mdData.files[0];
+			const file = mdData.files[0];
 			let uplRes = await tryUpload(file);
 
 			if (uplRes !== undefined && uplRes.tsResult !== TsError.Ok) {
@@ -212,7 +212,7 @@
 					uplRes.tsResult === TsError.FileNotFound
 				) {
 					log("Creating folder for chat images");
-					let cresult = await createFolder(file);
+					const cresult = await createFolder(file);
 					if (cresult !== undefined) {
 						log("Could not create folder %o", cresult);
 						return "No permission to create folders in this channel";
@@ -226,7 +226,7 @@
 			}
 
 			if (mdData.files.length > 1) {
-				let tasks = mdData.files.slice(1).map((file) => tryUpload(file));
+				const tasks = mdData.files.slice(1).map((file) => tryUpload(file));
 				await Promise.allSettled(tasks);
 			}
 		}

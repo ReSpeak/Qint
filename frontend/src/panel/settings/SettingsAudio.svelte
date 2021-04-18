@@ -20,10 +20,10 @@
 	let selected: boolean;
 	const audioSett = app.transientSettings.audio;
 
-	let minGlobalVolume = MIN_VOLUME_DB;
-	let maxGlobalVolume = -MIN_VOLUME_DB;
-	let minLoudnessThreshold = -100;
-	let maxLoudnessThreshold = 100;
+	const minGlobalVolume = MIN_VOLUME_DB;
+	const maxGlobalVolume = -MIN_VOLUME_DB;
+	const minLoudnessThreshold = -100;
+	const maxLoudnessThreshold = 100;
 
 	let globalVolume = factorToDb(audioSett.globalVolume);
 	let loudnessThreshold = audioSett.loudnessThreshold ?? minLoudnessThreshold;
@@ -61,7 +61,7 @@
 
 	function renderLoudnessGraphs(timestamp: number) {
 		renderRequested = false;
-		let hasRequest = loudnessDiagram?.redraw(timestamp) ?? false;
+		const hasRequest = loudnessDiagram?.redraw(timestamp) ?? false;
 		if (hasRequest) {
 			requestRenderLoudnessGraphs();
 		}

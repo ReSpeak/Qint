@@ -28,10 +28,10 @@
 	const selected = app.selectedNode;
 	$: sel = $selected;
 	const ui = app.transientSettings.ui;
-	let showSidebar = app.showSidebar;
-	let displayPanel = app.displayPanel;
+	const showSidebar = app.showSidebar;
+	const displayPanel = app.displayPanel;
 
-	let descriptionMode = ui._descriptionMode;
+	const descriptionMode = ui._descriptionMode;
 	let columnStyle = "";
 	let connectData = new ConnectData("", "");
 

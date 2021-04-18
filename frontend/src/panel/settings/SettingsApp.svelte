@@ -3,8 +3,8 @@
 	import BTabSlot from "../../ui/BTabSlot.svelte";
 	import BKeyValue from "../../ui/BKeyValue.svelte";
 
-	let browserNotificationDenied = Notification.permission === "denied";
-	let developMode = app.transientSettings.ui._developMode;
+	const browserNotificationDenied = Notification.permission === "denied";
+	const developMode = app.transientSettings.ui._developMode;
 
 	function syncSettings() {
 		app.transientSettings.save();

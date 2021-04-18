@@ -39,12 +39,12 @@
 	// the data elements held by this list
 	let elems: T[] = [];
 
-	let pxBeforeLoad = 500; // TODO? could be adjusted dynamically
+	const pxBeforeLoad = 500; // TODO? could be adjusted dynamically
 	/** The minimum amout of items that must be at least `minPxDistanceToRemove`
 	 * will be removed when out of view */
-	let minItemsToRemove = 20;
+	const minItemsToRemove = 20;
 	/** How far the item at index `minItemsToRemove` has to be out of view to be removed */
-	let minPxDistanceToRemove = 1500;
+	const minPxDistanceToRemove = 1500;
 	// The holding list element which has the scrollbar
 	let pan: HTMLElement;
 	let scrollPane: HTMLElement;
@@ -453,7 +453,7 @@
 			return;
 		}
 
-		let lockElem = tryGetLockElem();
+		const lockElem = tryGetLockElem();
 		if (lockElem === undefined) {
 			return;
 		}
@@ -462,12 +462,12 @@
 	}
 
 	function onIntersectionChanged(elem: IntersectionObserverEntry[]): void {
-		let oldIdStart = lastViewStart;
-		let oldIdEnd = lastViewEnd;
+		const oldIdStart = lastViewStart;
+		const oldIdEnd = lastViewEnd;
 		let newLockElem: HTMLElement | undefined;
 		for (const e of elem) {
-			let htmlElem = e.target as HTMLElement;
-			let elemId = Number(htmlElem.dataset.index);
+			const htmlElem = e.target as HTMLElement;
+			const elemId = Number(htmlElem.dataset.index);
 			if (e.isIntersecting) {
 				if (lastViewStart === undefined || elemId < lastViewStart) {
 					newLockElem = htmlElem;
@@ -496,7 +496,7 @@
 		const startChanged = oldIdStart !== lastViewStart;
 		const endChanged = oldIdEnd !== lastViewEnd;
 		if (startChanged && newLockElem !== undefined) {
-			let newLockIndex = Number(newLockElem.dataset.index);
+			const newLockIndex = Number(newLockElem.dataset.index);
 			//console.log("Insersec Loc", newLockIndex, allowRelock);
 			if (allowRelock) {
 				setLockPos(newLockIndex);

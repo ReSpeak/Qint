@@ -27,7 +27,7 @@
 	let hoverComp: HTMLElement;
 	const state = connection.state;
 	const server = connection.book.server;
-	let channels = server.channels;
+	const channels = server.channels;
 	$: chat = server.chat;
 	$: filterStartFromRoot = filter.includes("/");
 	$: selectedServerChat = $server.isSelected;

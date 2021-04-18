@@ -8,9 +8,9 @@
 
 	export let connection: Connection;
 	export let client: Client;
-	let minVolume = MIN_VOLUME_DB;
-	let maxVolume = -MIN_VOLUME_DB;
-	let clientVolume = client.volume;
+	const minVolume = MIN_VOLUME_DB;
+	const maxVolume = -MIN_VOLUME_DB;
+	const clientVolume = client.volume;
 
 	async function loadVolume() {
 		await client.loadVolume();
@@ -25,7 +25,7 @@
 		updateVolume();
 	}
 
-	let updateVolume = debounced(() => {
+	const updateVolume = debounced(() => {
 		client.updateVolume(connection, dbToFactor($clientVolume));
 	}, 100);
 

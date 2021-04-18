@@ -29,7 +29,7 @@
 	}
 
 	async function clickImportIdentity() {
-		let files = dummyUploader.files;
+		const files = dummyUploader.files;
 		if (files && files.length > 0) {
 			const content = await files[0].text();
 			await importIdentityFromString(content);

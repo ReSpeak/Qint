@@ -33,7 +33,7 @@
 	$: chat = client.chat;
 	$: filterShow = applyFilter(filter, $client);
 	$: clientProperties = getClientProperties($client, channel !== undefined ? $channel : undefined);
-	let ownClient = client.id === connection.book.ownClientId;
+	const ownClient = client.id === connection.book.ownClientId;
 	let div: HTMLElement;
 	let loudnessDiagram: SimpleDiagram;
 

@@ -36,7 +36,7 @@
 	let pokeModalVisible = false;
 	let pokeInput: HTMLElement | undefined;
 	let pokeMessage: string = "";
-	let developMode = app.transientSettings.ui._developMode;
+	const developMode = app.transientSettings.ui._developMode;
 	let chart: BChart | null = null;
 	let editing = false;
 	let dummyUploader: HTMLInputElement;
@@ -66,7 +66,7 @@
 	let [clientEdit, clientSpecialEdit] = createPropsCopy();
 	let changeRequest: ChangePromise | undefined;
 
-	let chartConfig: Chart.ChartConfiguration = {
+	const chartConfig: Chart.ChartConfiguration = {
 		type: "line",
 		data: {
 			datasets: [{
@@ -193,7 +193,7 @@
 		chartConfig.data?.datasets?.filter(dataset => dataset.data).forEach(dataset => {
 			dataset.data = [];
 			for (let i = CHART_ENTRY_COUNT; i > 0; i--) {
-				let entry = {
+				const entry = {
 					x: moment().subtract(i, "second"),
 					y: undefined
 				};
@@ -329,7 +329,7 @@
 	}
 
 	async function uploadSelectedAvatar() {
-		let files = dummyUploader.files;
+		const files = dummyUploader.files;
 		if (files && files.length > 0) {
 			const file = files[0];
 			dummyUploader.value = null!;
@@ -370,7 +370,7 @@
 	}
 
 	function getPropsDiff() {
-		let diff: Record<string, any> = {};
+		const diff: Record<string, any> = {};
 		for (const [key, value] of Object.entries(clientEdit)) {
 			if (key.startsWith("_")) continue;
 			if ((client as any)[key] !== value) {
@@ -381,7 +381,7 @@
 	}
 
 	function getSpecialPropsDiff() {
-		let diff: Record<string, any> = {};
+		const diff: Record<string, any> = {};
 		for (const [key, value] of Object.entries(clientSpecialEdit)) {
 			if (key.startsWith("_")) continue;
 			if ((client as any)[key] !== value) {
@@ -393,7 +393,7 @@
 
 	function clickEditMode() {
 		editing = true;
-		let [e, specialE] = createPropsCopy();
+		const [e, specialE] = createPropsCopy();
 		clientEdit = e;
 		clientSpecialEdit = specialE;
 	}

@@ -25,7 +25,7 @@
 	export let connection: Connection;
 	export let server: Server;
 
-	let developMode = app.transientSettings.ui._developMode;
+	const developMode = app.transientSettings.ui._developMode;
 	let editing = false;
 	let logOpen = false;
 	$: create_date = $server.created !== undefined ? $server.created : moment.unix(0);
@@ -42,8 +42,8 @@
 	let changeRequest: ChangePromise | undefined;
 
 	function createPropsCopy(): [EditProps, EditPropsOpt] {
-		let serv: EditProps = {} as any;
-		let servOpt: EditPropsOpt = {} as any;
+		const serv: EditProps = {} as any;
+		const servOpt: EditPropsOpt = {} as any;
 		// *** General
 		serv.name = server.name;
 		serv.phoneticName = server.phoneticName;
@@ -92,7 +92,7 @@
 	}
 
 	function getPropsDiff() {
-		let diff: Record<string, any> = {};
+		const diff: Record<string, any> = {};
 		if (servEdit.nickname === "" && server.nickname !== "")
 			servEdit.nickname = null!;
 		for (const [key, value] of Object.entries(servEdit)) {
@@ -104,7 +104,7 @@
 		if (diff.nickname === null)
 			diff.nickname = "";
 		if (server.optionalData !== null) {
-			let optionalData = server.optionalData as any;
+			const optionalData = server.optionalData as any;
 			for (const [key, value] of Object.entries(servEditOpt)) {
 				if (key.startsWith("_")) continue;
 				if (optionalData[key] !== value) {
@@ -138,7 +138,7 @@
 	function clickSaveChanges() {
 		editing = false;
 
-		let diff = getPropsDiff();
+		const diff = getPropsDiff();
 		if (Object.keys(diff).length === 0) return;
 		changeRequest = connection.sendChange({
 			ServerEdit: {

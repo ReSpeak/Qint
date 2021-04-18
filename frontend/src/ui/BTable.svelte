@@ -93,7 +93,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	function reSort() {
 		clearSelectionInternal(true);
 		if (sortBy === "") return;
-		let sortFn = columnByKey[sortBy].sort;
+		const sortFn = columnByKey[sortBy].sort;
 		if (sortFn === undefined) return;
 		c_rows = c_rows.sort((a, b) => sortFn!(a.t, b.t, sortOrder));
 		c_rows.forEach((r, i) => {
@@ -109,7 +109,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		}
 	}
 
-	let selected = new Set<number>();
+	const selected = new Set<number>();
 	let lastSelected: number = 0;
 
 	function handleClickCol(event: MouseEvent, col: TCol) {
@@ -168,14 +168,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	}
 
 	function handleClickRow(event: MouseEvent, row: InternalRow, dblclick: boolean) {
-		let isRealDblClick = dblclick && !event.ctrlKey && !event.shiftKey;
+		const isRealDblClick = dblclick && !event.ctrlKey && !event.shiftKey;
 		if (!dblclick) {
 			if (event.ctrlKey) {
 				lastSelected = row.id;
 				toggleElem(true, row);
 				event.preventDefault();
 			} else if (event.shiftKey) {
-				let [start, end] =
+				const [start, end] =
 					row.id > lastSelected ? [lastSelected, row.id] : [row.id, lastSelected];
 				selectElem(false, ...c_rows.slice(start, end + 1));
 			} else {
@@ -226,8 +226,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		dragVisualizer.style.display = null!;
 		ev.detail.dragNode = dragVisualizer;
 		const rect = dragVisualizer.getBoundingClientRect();
-		let dx = ev.detail.mouseStart.clientX - rect.x;
-		let dy = ev.detail.mouseStart.clientY - rect.y;
+		const dx = ev.detail.mouseStart.clientX - rect.x;
+		const dy = ev.detail.mouseStart.clientY - rect.y;
 		ev.detail.x -= dx;
 		ev.detail.y -= dy;
 		dragVisualizer.style.transform = `translate(${dx}px,${dy}px)`;

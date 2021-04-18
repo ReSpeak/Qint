@@ -22,12 +22,12 @@
 		obj.innerHTML = html;
 
 		// Apply highlight.js
-		for (let elem of obj.getElementsByTagName("code")) {
+		for (const elem of obj.getElementsByTagName("code")) {
 			hljsHighlight(elem);
 		}
 
 		// Apply KaTeX
-		for (let elem of (obj.getElementsByClassName("latex") as any) as HTMLElement[]) {
+		for (const elem of (obj.getElementsByClassName("latex") as any) as HTMLElement[]) {
 			const code = elem.getAttribute("data-latex");
 			const mode = elem.getAttribute("data-displaymode");
 			try {

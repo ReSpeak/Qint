@@ -103,7 +103,7 @@
 
 			let startA, endA, endB;
 			startA = start;
-			let end = start + lengthWithData;
+			const end = start + lengthWithData;
 			if (end > history.length) {
 				endA = history.length;
 				endB = end - history.length;
@@ -115,7 +115,7 @@
 			for (let i = startA; i < endA; i++) {
 				ctx.lineTo(getX(i - startA), getY(history[i]));
 			}
-			let off = endA - startA;
+			const off = endA - startA;
 			for (let i = 0; i < endB; i++) {
 				ctx.lineTo(getX(i + off), getY(history[i]));
 			}

@@ -11,8 +11,8 @@
 	export let div: HTMLElement;
 	export let selected: NodeSelection;
 
-	let curSelected = app.selectedNode;
-	let descriptionMode = app.transientSettings.ui._descriptionMode;
+	const curSelected = app.selectedNode;
+	const descriptionMode = app.transientSettings.ui._descriptionMode;
 
 	let infoActive: boolean;
 	let filesActive: boolean;

@@ -14,7 +14,7 @@
 	function selectedToIndex(selected: any) {
 		if (dd == null || items.length === 0) return;
 		if (hasProperty(items[0], "value")) {
-			let index = (items as DDObjElement[]).findIndex(it => it.value === selected);
+			const index = (items as DDObjElement[]).findIndex(it => it.value === selected);
 			if (index === -1) return;
 			dd.selectedIndex = index;
 		} else {

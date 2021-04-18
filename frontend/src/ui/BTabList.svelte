@@ -12,7 +12,7 @@
 	$: indexStore.set(activeId);
 	let idCounter = 0;
 	let items: [number, string][] = [];
-	let context: TabListContext = {
+	const context: TabListContext = {
 		activeId: indexStore,
 		registerPanel,
 		unregisterPanel,
@@ -32,7 +32,7 @@
 	function unregisterPanel(id: number) {
 		const remIndex = items.findIndex((item) => item[0] === id);
 		if (remIndex >= 0) {
-			let removedItem = items.splice(remIndex, 1)[0];
+			const removedItem = items.splice(remIndex, 1)[0];
 			items = items;
 			if (activeId === id && items.length > 0) {
 				activeId = items[Math.min(remIndex, items.length - 1)][0];
