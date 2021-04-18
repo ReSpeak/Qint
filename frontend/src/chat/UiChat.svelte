@@ -81,31 +81,26 @@
 	}
 
 	function chatChanged() {
-		if (!chatList || !chatList.clear) return;
-
 		const sel = $selected;
-		if (sel === undefined) {
-			oldSelection = undefined;
-			chatList.clear();
-			canChatHere = false;
-			return;
-		}
-
 		if (!NodeSelection.equals(sel, oldSelection)) {
-			if (oldSelection !== undefined) chatStore.save(text, oldSelection);
-			text = chatStore.load(sel) ?? "";
-			oldSelection = sel;
+			if (oldSelection !== undefined)
+				chatStore.save(text, oldSelection);
 
-			chatList.sourceChanged(ListFetchDir.New, ListFetchDir.After);
-			chatBoxRecheck();
+			oldSelection = sel;
+			if (sel === undefined) {
+				canChatHere = false;
+				chatList?.clear();
+			} else {
+				text = chatStore.load(sel) ?? "";
+
+				chatList?.sourceChanged(ListFetchDir.New, ListFetchDir.After);
+				chatBoxRecheck();
+			}
 		}
 	}
 
 	function unreadCountChanged() {
-		// TODO Also check for sourceChanged, so hot reload with snowpack works
-		if (!chatList || !chatList.sourceChanged) return;
-
-		chatList.sourceChanged(ListFetchDir.After, ListFetchDir.After);
+		chatList?.sourceChanged(ListFetchDir.After, ListFetchDir.After);
 	}
 
 	function chatBoxRecheck() {
@@ -282,8 +277,9 @@
 	});
 
 	onDestroy(() => {
-		// TODO Was there a reason for this?
-		//chatChanged();
+		// Save current message in chatStore
+		if (oldSelection !== undefined)
+			chatStore.save(text, oldSelection);
 		window.removeEventListener("focus", markRead);
 	});
 </script>

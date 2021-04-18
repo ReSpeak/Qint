@@ -37,10 +37,11 @@
 	const LOUDNESS_COUNT = 500;
 
 	// Reload settings
-	app.transientSettings.loadAsync().then(() => {
+	// TODO Why? This removes all unsaved changes we made
+	/*app.transientSettings.loadAsync().then(() => {
 		globalVolume = factorToDb(audioSett.globalVolume);
 		loudnessThreshold = audioSett.loudnessThreshold ?? loudnessThreshold;
-	});
+	});*/
 
 	function syncSettings() {
 		app.transientSettings.save();
@@ -77,7 +78,6 @@
 
 	function changeSelected() {
 		if (selected && loudnessSocket === undefined) {
-			console.log("mount audio");
 			loudnessSocket = new WebSocket(`${backend.wsBaseAddress}/loudness`);
 			loudnessSocket.binaryType = "arraybuffer";
 			loudnessSocket.onmessage = (ev) => {
@@ -97,7 +97,6 @@
 	}
 
 	function closeSocket() {
-		console.log("unmount audio");
 		loudnessSocket?.close();
 		loudnessSocket = undefined;
 	}
