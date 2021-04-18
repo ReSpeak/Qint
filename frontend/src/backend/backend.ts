@@ -11,7 +11,7 @@ export interface IBackend {
 	readonly wsBaseAddress: string;
 	createNewConnection(): IBackendConnection;
 	fetch(cmd: string, data?: RequestInit): Promise<IFetchLike>;
-	graphql<T = any>(query: string, variables?: object): Promise<{ data: T }>;
+	graphql<T = any>(query: string, variables?: Record<string, unknown>): Promise<{ data: T }>;
 	setTitle(name: string): void;
 	setIcon(url: string | undefined): void;
 }

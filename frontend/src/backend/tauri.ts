@@ -22,13 +22,13 @@ interface InWsMsg {
 type OutHttpRequest = OutListPluginsRequest;
 
 interface OutListPluginsRequest {
-	ListPlugins: {};
+	ListPlugins: unknown;
 }
 
 const connections: Map<string, TauriBackendConnection> = new Map();
 
 listen<string>('websocket', payload => {
-	let msg = JSON.parse(payload.payload) as InWsMsg;
+	const msg = JSON.parse(payload.payload) as InWsMsg;
 	const con = connections.get(msg.connection);
 	if (msg.msg === "Close")
 		con?.onClose?.();
@@ -71,7 +71,7 @@ export class TauriBackend implements IBackend {
 		return fetch(`${BASE_ADDRESS}${cmd}`, data);
 	}
 
-	public async graphql<T = any>(query: string, variables?: object): Promise<{ data: T }> {
+	public async graphql<T = any>(query: string, variables?: Record<string, unknown>): Promise<{ data: T }> {
 		return (await promisified<{ Graphql: any }>({ Graphql: { query, variables } })).Graphql;
 	}
 

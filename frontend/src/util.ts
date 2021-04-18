@@ -50,7 +50,7 @@ export async function sleep(timeout: number): Promise<void> {
 	return new Promise(resolve => setTimeout(resolve, timeout));
 }
 
-export function flash(element: HTMLElement) {
+export function flash(element: HTMLElement): void {
 	if (!element) return;
 	requestAnimationFrame(() => {
 		element.classList.remove("update-flash-fade");
@@ -67,7 +67,7 @@ export function flash(element: HTMLElement) {
 	});
 }
 
-export function autoError(element: HTMLImageElement) {
+export function autoError(element: HTMLImageElement): void {
 	if (!element) return;
 	function errFn(this: HTMLImageElement) {
 		this.src = "/128x128.png"
@@ -76,12 +76,12 @@ export function autoError(element: HTMLImageElement) {
 	element.addEventListener("onerror", errFn);
 }
 
-export function clickToSelectAll(element: HTMLElement) {
+export function clickToSelectAll(element: HTMLElement): void {
 	if (!element) return;
-	let clickFn = function () {
-		let range = document.createRange();
+	const clickFn = function () {
+		const range = document.createRange();
 		range.selectNodeContents(element);
-		let sel = document.getSelection();
+		const sel = document.getSelection();
 		if (sel) {
 			sel.removeAllRanges();
 			sel.addRange(range);
@@ -112,7 +112,7 @@ export function assert(condition: any, message: string, ...data: any[]): asserts
 	if (!condition) debugger;
 }
 
-export function getDataColor(data: number[] | string, lightBackground: boolean = false) {
+export function getDataColor(data: number[] | string, lightBackground: boolean = false): string {
 	if (data.length < 3) {
 		return lightBackground ? "black" : "white";
 	}
@@ -161,7 +161,7 @@ export function hasProperty(obj: unknown, propName: string): boolean {
 	return propName in obj;
 }
 
-export function escapeHtml(s: string) {
+export function escapeHtml(s: string): string {
 	return s.replace('&', "&amp;")
 		.replace('<', "&lt;")
 		.replace('>', "&gt;")
@@ -170,7 +170,7 @@ export function escapeHtml(s: string) {
 		.replace('/', "&#x2F;");
 }
 
-export function ignoreCaseRegex(search: string) {
+export function ignoreCaseRegex(search: string): RegExp {
 	return RegExp(search.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"), "gi");
 }
 
@@ -277,13 +277,13 @@ export function findParent(elem: HTMLElement, selector: string): HTMLElement | u
 	return undefined;
 }
 
-export function focus(node: Element, args: any): {} {
+export function focus(node: Element): Record<string, never> {
 	(node as HTMLElement).focus();
 	return {};
 }
 
 export function getDefaultVersion(): Version {
-	let platform = ((window.navigator as any).oscpu ?? window.navigator.userAgent).toLowerCase();
+	const platform = ((window.navigator as any).oscpu ?? window.navigator.userAgent).toLowerCase();
 	if (platform.includes("windows")) {
 		return Version.Windows_3_X_X__1;
 	} else if (platform.includes("linux")) {
@@ -300,7 +300,7 @@ export function getDefaultVersion(): Version {
 }
 
 export function base64Decode(s: string): number[] {
-	let res = [];
+	const res = [];
 	const b = atob(s);
 	for (let i = 0; i < b.length; i++)
 		res.push(b.charCodeAt(i));
@@ -323,7 +323,7 @@ export function urlBase64Encode(data: number[]): string {
 }
 
 export function hexDecode(s: string): number[] {
-	let res = [];
+	const res = [];
 	for (let i = 0; i < s.length; i += 2)
 		res.push(parseInt(s.substr(i, i + 2), 16));
 	return res;
@@ -342,7 +342,7 @@ export function hexEncode(data: number[]): string {
 export function emojiEncode(data: number[]): EmojiData[] {
 	const BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 	const b64 = base64Encode(data);
-	let res = [];
+	const res = [];
 	for (let i = 0; i < b64.length; i++) {
 		const bi = BASE64_CHARS.indexOf(b64[i]);
 		if (bi !== 64)
@@ -416,7 +416,7 @@ export function deep_diff(from: any, to: any): any | undefined {
 		return to;
 	}
 	let hasChanges = false;
-	let res: Record<string, any> = {};
+	const res: Record<string, any> = {};
 	// Check existing and new entries
 	for (const [key, value] of Object.entries(to)) {
 		const diff = deep_diff(from[key], value);
@@ -454,13 +454,14 @@ export function deep_equals(a: any, b: any): boolean {
 	return true;
 }
 
-export function on(..._: any[]) { }
+// eslint-disable-next-line @typescript-eslint/no-empty-function
+export function on(..._: any[]): void { }
 
 export function oneshot<T>(
 	store: Readable<T>,
 	when: (t: T) => boolean,
-	action: (t: T) => void) {
-	let unsub = store.subscribe(x => {
+	action: (t: T) => void): void {
+	const unsub = store.subscribe(x => {
 		if (when(x)) {
 			unsub();
 			action(x);
@@ -486,8 +487,8 @@ interface DebounceOpt {
 export function debounced<T extends unknown[] = []>(fn: FuncTyp<T>, timeout: number, options?: DebounceOpt) {
 	let timer: number | undefined;
 	let lastArgs: T;
-	let resetOnCall = options?.resetOnCall ?? false;
-	let callInitial = options?.callInitial ?? false;
+	const resetOnCall = options?.resetOnCall ?? false;
+	const callInitial = options?.callInitial ?? false;
 
 	function cancel() {
 		if (timer !== undefined) {
@@ -549,7 +550,7 @@ export function fnBroadcast<T extends unknown[] = []>() {
 	return call;
 }
 
-export function enumValues(e: object): (string | number)[] {
+export function enumValues(e: Record<string, unknown>): (string | number)[] {
 	return Object.keys(e) as any;
 }
 
@@ -559,7 +560,7 @@ export function formatSi(num: number, decimals: number = 0): string {
 	const sign = Math.sign(num);
 	let unit = Math.floor(Math.log(Math.abs(num)) / Math.log(1000));
 	unit = Math.max(Math.min(unit, SiName.length - 1), 0);
-	let divided = num / Math.pow(1000, unit);
+	const divided = num / Math.pow(1000, unit);
 	return (sign * divided).toFixed(unit === 0 ? 0 : decimals) + (unit === 0 ? "" : NARROW_NO_BREAK_SPACE + SiName[unit]);
 }
 

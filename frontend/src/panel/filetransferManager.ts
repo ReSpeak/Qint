@@ -14,7 +14,7 @@ export class FiletransferManager {
 
 	}
 
-	public uploadFiles(...files: UploadFile[]) {
+	public uploadFiles(...files: UploadFile[]): void {
 		if (files.length === 0) return;
 		this.uploadQueue.push(...files);
 		this.uploadState.set(this.uploadQueue.length);
@@ -23,10 +23,9 @@ export class FiletransferManager {
 		}
 	}
 
-	private async uploadTaskFn() {
-		while (true) {
-			if (this.uploadQueue.length === 0) break;
-			let file = this.uploadQueue.shift()!;
+	private async uploadTaskFn(): Promise<void> {
+		while (this.uploadQueue.length !== 0) {
+			const file = this.uploadQueue.shift()!;
 			await this.connection.backend.fetch(`/file${pathJoin(file.channelId, file.path)}`, {
 				method: "PUT",
 				body: file.data,

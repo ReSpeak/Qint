@@ -25,7 +25,7 @@
 		applyValue(value);
 	}
 
-	export async function focus() {
+	export async function focus(): Promise<void> {
 		const range = document.createRange();
 		range.selectNodeContents(self);
 		const sel = window.getSelection()!;
@@ -35,13 +35,13 @@
 		self.focus();
 	}
 
-	export function clear() {
+	export function clear(): void {
 		self.innerText = "";
 		historyIndex = undefined;
 		textChanged();
 	}
 
-	export function moveCursorToEnd() {
+	export function moveCursorToEnd(): void {
 		// https://stackoverflow.com/questions/1125292/how-to-move-cursor-to-end-of-contenteditable-entity
 		let range = document.createRange();
 		range.selectNodeContents(self);
@@ -79,7 +79,7 @@
 						case "BR":
 							parts.push("\n");
 							break;
-						case "IMG":
+						case "IMG": {
 							let src =
 								(node as HTMLImageElement).dataset.qintimg ??
 								(node as HTMLImageElement).src;
@@ -99,6 +99,7 @@
 								parts.push({ src });
 							}
 							break;
+						}
 						default:
 							log("Unknown node", node);
 							break;

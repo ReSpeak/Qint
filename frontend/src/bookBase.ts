@@ -1,4 +1,4 @@
-import { Writable, writable, get, Readable } from "svelte/store";
+import { Writable, writable } from "svelte/store";
 import { arraysEqual, base64Encode, Cached, datetimeDeserialize, getDataColor } from "./util";
 import { Moment } from "moment";
 import moment from "moment";
@@ -14,7 +14,7 @@ export class ChatData {
 		this.unreadCount = unreadCount;
 	}
 
-	public static fromGraphql(obj: any): ChatData {
+	public static fromGraphql(obj: { lastRead: number, timezone: number, unreadCount: number }): ChatData {
 		return new ChatData(datetimeDeserialize([obj.lastRead, obj.timezone]), obj.unreadCount);
 	}
 
@@ -40,7 +40,7 @@ export class BookNode {
 		return this;
 	}
 
-	public updateChat(obj: Partial<ChatData>) {
+	public updateChat(obj: Partial<ChatData>): void {
 		this.chat.update(c => Object.assign(c, obj));
 	}
 
@@ -68,9 +68,9 @@ export class ClientBase extends BookNode {
 	//public readonly uid: Uid | null;
 	public readonly avatar_hash!: string;
 	private readonly _color: Cached<Uid | null, string>;
-	public get color() { return this._color.get(); }
+	public get color(): string { return this._color.get(); }
 	private readonly _uidStr: Cached<Uid | null, string>;
-	public get uidStr() { return this._uidStr.get(); }
+	public get uidStr(): string { return this._uidStr.get(); }
 
 	protected constructor(uid?: number[], avatar_hash?: string) {
 		super();
@@ -120,9 +120,9 @@ export class ConnectionClientDataBase {
 export class ServerBase extends BookNode {
 	public readonly uid!: number[];
 	private readonly _color: Cached<number[], string>;
-	public get color() { return this._color.get(); }
+	public get color(): string { return this._color.get(); }
 	private readonly _uidStr: Cached<number[], string>;
-	public get uidStr() { return this._uidStr.get(); }
+	public get uidStr(): string { return this._uidStr.get(); }
 
 	protected constructor(uid?: number[]) {
 		super();

@@ -1,8 +1,6 @@
 <script lang="ts">
 	import { Channel } from "../book";
-	import { Connection } from "../connection";
 
-	export let connection: Connection;
 	export let channel: Channel;
 </script>
 

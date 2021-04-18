@@ -16,7 +16,7 @@ export class App {
 	// 	$connections.map((c) => c.state) as [Readable<ConnectionState>],
 	// 	(states) => states.some((s) => s.connected)
 	// );
-	public get hasConnected() { return get(this.connections).some(s => get(s.state).connected); }
+	public get hasConnected(): boolean { return get(this.connections).some(s => get(s.state).connected); }
 	public readonly selectedNode: Writable<NodeSelection | undefined> = writable(undefined);
 	public readonly showSidebar = writable(false);
 	public readonly displayPanel = writable(DisplayPanel.Connect);
@@ -30,7 +30,7 @@ export class App {
 
 	constructor() {
 		loadPlugins().then(x => this.plugins = x);
-		this.transientSettings.loadAsync().then(_ => {
+		this.transientSettings.loadAsync().then(() => {
 			this.transientSettingsLoaded();
 		});
 		// TODO unsubscribe somewhere
@@ -47,15 +47,15 @@ export class App {
 		});
 	}
 
-	public select(con: Connection, node: ITreeNode) {
+	public select(con: Connection, node: ITreeNode): void {
 		this.selectNode(new NodeSelection(con, node));
 	}
 
-	public deselect() {
+	public deselect(): void {
 		this.selectNode(undefined);
 	}
 
-	public selectNode(nodeSel?: NodeSelection) {
+	public selectNode(nodeSel?: NodeSelection): void {
 		const checkOldNode = get(this.selectedNode);
 		if (NodeSelection.equals(checkOldNode, nodeSel))
 			return;
@@ -71,7 +71,7 @@ export class App {
 		});
 	}
 
-	public setDescriptionMode(selected: NodeSelection, mode: DescriptionMode) {
+	public setDescriptionMode(selected: NodeSelection, mode: DescriptionMode): void {
 		app.selectNode(selected);
 		this.transientSettings.ui._descriptionMode.set(mode);
 		app.transientSettings.save();
@@ -99,7 +99,7 @@ export class App {
 		return con;
 	}
 
-	public close() {
+	public close(): void {
 		for (const con of get(this.connections)) {
 			con.close();
 		}

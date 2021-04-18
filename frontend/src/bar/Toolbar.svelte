@@ -10,8 +10,6 @@
 	export let showSidebar: boolean;
 	export let connectData: ConnectData;
 
-	const cons = app.connections;
-
 	function toggleSidebar(show: boolean) {
 		showSidebar = show;
 	}

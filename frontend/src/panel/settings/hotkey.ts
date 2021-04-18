@@ -14,7 +14,7 @@ export function isHotkeyComplete(hotkey: Hotkey): boolean {
 
 export function buildAction(subject: HotkeySubject): HotkeyAction | null {
 	if (!subject) return null;
-	let obj: HotkeyAction = {};
+	const obj: HotkeyAction = {};
 	obj[subject] = null;
 	return obj;
 }
@@ -24,8 +24,8 @@ export function getActionSubject(action: HotkeyAction | null): HotkeySubject | n
 	return Object.keys(action)[0] as HotkeySubject | undefined ?? null;
 }
 
-export function hotkeyToString(hotkey: Hotkey) {
-	let content = [];
+export function hotkeyToString(hotkey: Hotkey): string {
+	const content = [];
 	if (hotkey._ctrl) content.push("Ctrl");
 	if (hotkey._shift) content.push("Shift");
 	if (hotkey._alt) content.push("Alt");

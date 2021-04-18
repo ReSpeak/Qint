@@ -44,7 +44,7 @@
 		needRender = true;
 	}
 
-	export function addValue(value: number, timestamp: number) {
+	export function addValue(value: number, timestamp: number): void {
 		move(timestamp);
 		if (bufferCount < bufferSize) {
 			history[(start + historySize + bufferCount) % history.length] = value;
@@ -145,7 +145,7 @@
 		return lengthWithData > 0;
 	}
 
-	export function redrawNow() {
+	export function redrawNow(): void {
 		redraw(performance.now());
 	}
 

@@ -233,7 +233,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		dragVisualizer.style.transform = `translate(${dx}px,${dy}px)`;
 	}
 
-	function dragDrop(ev: CustomEvent<DragData>) {
+	function dragDrop(_ev: CustomEvent<DragData>) {
 		for (const dropTarget of dropTargets) {
 			dropTarget.removeEventListener("mouseenter", dragEnter);
 			dropTarget.removeEventListener("mouseleave", dragLeave);

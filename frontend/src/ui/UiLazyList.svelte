@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { CustomIntersectionObserver, ListFetchDir } from "./lazyList";
 	import type { FetchResult } from "./lazyList";
-	import { assert, binarySearchByKey, debounced } from "../util";
+	import { assert, binarySearchByKey } from "../util";
 	import { createEventDispatcher, tick, onMount } from "svelte";
 	import ResizeObserver from "resize-observer-polyfill";
 	import debug from "debug";
@@ -54,7 +54,7 @@
 
 	// *** Export functions ***
 
-	export function clear() {
+	export function clear(): void {
 		elems = [];
 		visObs.clear();
 		canLoadAfterEnd = false;
@@ -65,7 +65,7 @@
 		lastViewEnd = undefined;
 	}
 
-	export function sourceChanged(dir: ListFetchDir, anchor?: ListFetchDir) {
+	export function sourceChanged(dir: ListFetchDir, anchor?: ListFetchDir): void {
 		loadAnchored = anchor;
 		switch (dir) {
 			case ListFetchDir.New:
@@ -83,7 +83,7 @@
 		start_fill();
 	}
 
-	export function jumpTo(dir: ListFetchDir, target?: T) {
+	export function jumpTo(dir: ListFetchDir, target?: T): void {
 		switch (dir) {
 			case ListFetchDir.Before:
 				if (!canLoadBeforeStart) {
@@ -401,7 +401,7 @@
 		if (docked) {
 			setPanScrollTop(pan.scrollHeight);
 		} else {
-			let lockElem = tryGetLockElem();
+			const lockElem = tryGetLockElem();
 			if (lockElem !== undefined && lockPos !== undefined) {
 				assert(lockElem.parentElement, "lockElem must be in DOM to jump to");
 				setPanScrollTop(lockElem.offsetTop - lockPos);
@@ -515,7 +515,7 @@
 		start_fill();
 
 		const resizeObserver = new ResizeObserver(
-			(entries: ResizeObserverEntry[], observer: ResizeObserver) => {
+			(_entries: ResizeObserverEntry[], _observer: ResizeObserver) => {
 				//console.log(entries, "locked", lockIndex);
 				triggerResizing();
 			}

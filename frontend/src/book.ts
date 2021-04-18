@@ -12,7 +12,7 @@ import { backend } from "./backend/backend";
 import debug from "debug";
 const error = debug("error:BOOK");
 
-export function codecToName(codec: Codec) {
+export function codecToName(codec: Codec): string {
 	switch (codec) {
 		case Codec.SpeexNarrowband: return "Speex Narrowband";
 		case Codec.SpeexWideband: return "Speex Wideband";
@@ -34,7 +34,7 @@ export class Book {
 	public ownClientId?: ClientId;
 	public ownClient: Writable<Client | undefined> = writable(undefined);
 
-	public reset() {
+	public reset(): void {
 		this.server.reset();
 		this.clients.clear();
 		this.channels.clear();
@@ -65,7 +65,7 @@ export class Book {
 			}
 		} else {
 			let inserted;
-			let elems = [elem];
+			const elems = [elem];
 			let lastElem = elem;
 			for (let i = start; i < list.length; i++) {
 				let c = list[i] as Channel;
@@ -103,7 +103,7 @@ export class Book {
 		return list;
 	}
 
-	public addChannel(channel: Channel) {
+	public addChannel(channel: Channel): void {
 		if (this.channels.has(channel.id)) throw Error(`Channel ${channel.id} already exists`);
 		this.channels.set(channel.id, channel);
 		let parent: ITreeParent | undefined;
@@ -114,7 +114,7 @@ export class Book {
 		}
 	}
 
-	public updateChannel(id: ChannelId, obj: Partial<Channel> | Partial<book_events.ChannelGen>) {
+	public updateChannel(id: ChannelId, obj: Partial<Channel> | Partial<book_events.ChannelGen>): void {
 		const channel = this.channels.get(id);
 		if (channel === undefined) {
 			error(`Cannot update non-existant channel ${id}`);
@@ -146,8 +146,8 @@ export class Book {
 	}
 
 	private static addClientSorted(list: Client[], elem: Client): Client[] {
-		let i = binarySearchBy(list, t => {
-			let c = t as Client;
+		const i = binarySearchBy(list, t => {
+			const c = t as Client;
 			if (elem.talkPower < c.talkPower)
 				return -1;
 			if (elem.talkPower > c.talkPower)
@@ -162,16 +162,16 @@ export class Book {
 		return list;
 	}
 
-	public addClient(obj: Partial<Client> | Partial<book_events.ClientGen>) {
+	public addClient(obj: Partial<Client> | Partial<book_events.ClientGen>): void {
 		const client = Client.fromJson(obj, (obj.id === this.ownClientId) ? this.ownClient : undefined);
 		if (this.clients.has(client.id)) throw Error(`Client ${client.id} already exists`);
 		this.clients.set(client.id, client);
-		let parent = this.channels.get(client.channel);
+		const parent = this.channels.get(client.channel);
 		if (parent !== undefined)
 			parent.clients.update(pch => Book.addClientSorted(pch, client));
 	}
 
-	public updateClient(id: ClientId, obj: Partial<Client> | Partial<book_events.ClientGen>) {
+	public updateClient(id: ClientId, obj: Partial<Client> | Partial<book_events.ClientGen>): void {
 		const client = this.getClient(id);
 		if (client === undefined) {
 			error(`Cannot update non-existant client ${id}`);
@@ -202,7 +202,7 @@ export class Book {
 		this.clients.delete(id);
 	}
 
-	public addClientServerGroup(id: ClientId, group: ServerGroupId) {
+	public addClientServerGroup(id: ClientId, group: ServerGroupId): void {
 		const client = this.getClient(id);
 		if (client === undefined) {
 			error(`Cannot update non-existant client ${id}`);
@@ -214,7 +214,7 @@ export class Book {
 		}
 	}
 
-	public removeClientServerGroup(id: ClientId, group: ServerGroupId) {
+	public removeClientServerGroup(id: ClientId, group: ServerGroupId): void {
 		const client = this.getClient(id);
 		if (client === undefined) {
 			error(`Cannot update non-existant client ${id}`);
@@ -224,49 +224,49 @@ export class Book {
 		client.update({}); // TODO nicer?
 	}
 
-	public updateServer(obj: Partial<Server> | Partial<book_events.ServerGen>) {
+	public updateServer(obj: Partial<Server> | Partial<book_events.ServerGen>): void {
 		this.server.update(obj as any);
 	}
 
-	public addServerIp(ip: IpAddr) {
+	public addServerIp(ip: IpAddr): void {
 		this.server.ips.push(ip);
 		this.server.update({}); // TODO nicer
 	}
 
-	public removeServerIp(ip: IpAddr) {
+	public removeServerIp(ip: IpAddr): void {
 		this.server.ips.remove_item(ip);
 		this.server.update({}); // TODO nicer
 	}
 
-	public addChannelGroup(channelGroup: ChannelGroup) {
+	public addChannelGroup(channelGroup: ChannelGroup): void {
 		this.channelGroups.update(channelGroups => {
 			channelGroups.set(channelGroup.id, writable(channelGroup));
 			return channelGroups;
 		});
 	}
 
-	public updateChannelGroup(id: ChannelGroupId, obj: Partial<ChannelGroup>) {
+	public updateChannelGroup(id: ChannelGroupId, obj: Partial<ChannelGroup>): void {
 		const channelGroup = get(this.channelGroups).get(id);
 		if (channelGroup === undefined)
 			return;
 		channelGroup.update((sg: ChannelGroup) => sg.update(obj));
 	}
 
-	public removeChannelGroup(id: ChannelGroupId) {
+	public removeChannelGroup(id: ChannelGroupId): void {
 		this.channelGroups.update(channelGroups => {
 			channelGroups.delete(id);
 			return channelGroups;
 		});
 	}
 
-	public addServerGroup(serverGroup: ServerGroup) {
+	public addServerGroup(serverGroup: ServerGroup): void {
 		this.serverGroups.update(serverGroups => {
 			serverGroups.set(serverGroup.id, writable(serverGroup));
 			return serverGroups;
 		});
 	}
 
-	public updateServerGroup(id: ServerGroupId, obj: Partial<ServerGroup> | Partial<book_events.ServerGroupGen>) {
+	public updateServerGroup(id: ServerGroupId, obj: Partial<ServerGroup> | Partial<book_events.ServerGroupGen>): void {
 		const serverGroup = get(this.serverGroups).get(id);
 		if (serverGroup === undefined)
 			return;
@@ -275,7 +275,7 @@ export class Book {
 			this.serverGroups.update(gs => gs);
 	}
 
-	public removeServerGroup(id: ServerGroupId) {
+	public removeServerGroup(id: ServerGroupId): void {
 		this.serverGroups.update(serverGroups => {
 			serverGroups.delete(id);
 			return serverGroups;
@@ -321,7 +321,7 @@ export class Book {
 		return grs;
 	}
 
-	public messageHandler(msg: InBookChangeMsg) {
+	public messageHandler(msg: InBookChangeMsg): void {
 		if ("PropertyAdded" in msg) {
 			const id = msg.PropertyAdded.id;
 			const prop = msg.PropertyAdded.prop!;
@@ -402,8 +402,8 @@ export class Book {
 		}
 	}
 
-	public talkersHandler(talkers: [ClientId, boolean][]) {
-		let oldTalkers = this.currentTalkers;
+	public talkersHandler(talkers: [ClientId, boolean][]): void {
+		const oldTalkers = this.currentTalkers;
 		for (const [id, isWhispering] of talkers) {
 			const i = oldTalkers.findIndex(t => t[0] === id);
 
@@ -443,7 +443,7 @@ export class ChatData {
 		this.unreadCount = unreadCount;
 	}
 
-	public static fromGraphql(obj: any): ChatData {
+	public static fromGraphql(obj: { lastRead: number, timezone: number, unreadCount: number }): ChatData {
 		return new ChatData(datetimeDeserialize([obj.lastRead, obj.timezone]), obj.unreadCount);
 	}
 
@@ -469,7 +469,7 @@ export class BookNode {
 		return this;
 	}
 
-	public updateChat(obj: Partial<ChatData>) {
+	public updateChat(obj: Partial<ChatData>): void {
 		this.chat.update(c => Object.assign(c, obj));
 	}
 
@@ -489,11 +489,11 @@ export class GraphQlClient extends ClientBase {
 		if (icon !== undefined) this.icon = icon;
 	}
 
-	public static fromGraphql(obj: any): GraphQlClient {
+	public static fromGraphql(obj: { uid: number[], customName?: string, name?: string }): GraphQlClient {
 		return new GraphQlClient(obj.uid, obj.customName ?? obj.name, "0", "");
 	}
 
-	public static fromGraphqlInvoker(obj: any): GraphQlClient {
+	public static fromGraphqlInvoker(obj: { client: { uid: number[], customName?: string, name?: string }, icon?: IconId, avatar?: string }): GraphQlClient {
 		return new GraphQlClient(obj.client.uid, obj.client.customName ?? obj.client.name, obj.icon ?? "0", obj.avatar ?? "");
 	}
 }
@@ -507,7 +507,7 @@ export class Client extends book_events.ClientGen implements ITreeNode, Readable
 	}
 
 	public static fromJson(obj: Partial<Client> | Partial<book_events.ClientGen>, store?: Writable<Client | undefined>): Client {
-		let c = new Client();
+		const c = new Client();
 		if (store !== undefined) {
 			(c._store as any) = store;
 		}
@@ -525,10 +525,10 @@ export class Client extends book_events.ClientGen implements ITreeNode, Readable
 	}
 
 	public readonly qlType = "CLIENT";
-	public get qlId() { return this.uidStr; }
-	public get wsTarget() { return { Client: this.id }; }
+	public get qlId(): string { return this.uidStr; }
+	public get wsTarget(): { Client: string } { return { Client: this.id }; }
 
-	public updateVolume(connection: Connection, volume: number) {
+	public updateVolume(connection: Connection, volume: number): void {
 		assert(this.uid !== null, "Cannot update volume if the client has no uid");
 		connection.sendMessage({
 			SetClientVolume: {
@@ -538,7 +538,7 @@ export class Client extends book_events.ClientGen implements ITreeNode, Readable
 		});
 	}
 
-	public async loadVolume() {
+	public async loadVolume(): Promise<void> {
 		const res = await backend.graphql(`query GetClientVolume($client: [Int!]!) {
 			client(uid: $client) { volume }
 		}`, {
@@ -572,7 +572,7 @@ export class Channel extends book_events.ChannelGen implements ITreeNode, Readab
 		return new Channel().update(obj);
 	}
 
-	public static fromGraphql(obj: any): Channel {
+	public static fromGraphql(obj: Partial<Channel>): Channel {
 		return new Channel().update(obj);
 	}
 
@@ -581,7 +581,7 @@ export class Channel extends book_events.ChannelGen implements ITreeNode, Readab
 	}
 
 	public readonly qlType = "CHANNEL";
-	public get qlId() { return this.id };
+	public get qlId(): string { return this.id };
 	public readonly wsTarget = "Channel";
 }
 
@@ -591,7 +591,7 @@ export class GraphQlServer extends ServerBase {
 	public readonly address!: string;
 	public readonly icon!: IconId;
 	private readonly _publicKeyStr: Cached<number[], string>;
-	public get publicKeyStr() { return this._publicKeyStr.get(); }
+	public get publicKeyStr(): string { return this._publicKeyStr.get(); }
 
 	protected constructor(publicKey?: number[] | undefined, uid?: number[], name?: string, address?: string, icon?: IconId) {
 		super(uid);
@@ -602,7 +602,7 @@ export class GraphQlServer extends ServerBase {
 		if (icon !== undefined) this.icon = icon;
 	}
 
-	public static fromGraphql(obj: any): GraphQlServer {
+	public static fromGraphql(obj: { publicKey?: number[], uid?: number[], name?: string, address?: string, icon?: IconId }): GraphQlServer {
 		return new GraphQlServer(obj.publicKey, obj.uid, obj.name, obj.address, obj.icon);
 	}
 
@@ -625,7 +625,7 @@ export class Server extends book_events.ServerGen implements ITreeNode, Readable
 		return this;
 	}
 
-	public reset() {
+	public reset(): void {
 		this.channels.set([]);
 		Object.assign(this, { unreadCount: undefined });
 		this.filterShow = true;

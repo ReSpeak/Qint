@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { CLIENT_ICON, LONG_DATETIME, SERVER_ICON } from "../util";
+	import { CLIENT_ICON, SERVER_ICON } from "../util";
 	import Icon from "../ui/Icon.svelte";
 	import TsIcon from "../ui/TsIcon.svelte";
 	import ClientName from "../ui/ClientName.svelte";

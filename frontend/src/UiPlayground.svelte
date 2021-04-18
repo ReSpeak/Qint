@@ -53,9 +53,4 @@
 		height: 75vh;
 		width: 20em;
 	}
-
-	.text {
-		color: wheat;
-		white-space: pre;
-	}
 </style>

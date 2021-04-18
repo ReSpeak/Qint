@@ -46,7 +46,7 @@
 		if (isHotkeyComplete(hotkey)) dispatch("change");
 	}
 
-	function onRemovePress(_: MouseEvent) {
+	function onRemovePress() {
 		dispatch("remove");
 	}
 

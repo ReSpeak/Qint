@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy, onMount } from "svelte";
+	import { onMount } from "svelte";
 	import UiLazyList from "../ui/UiLazyList.svelte";
 	import UiChangeResult from "../ui/UiChangeResult.svelte";
 	import Icon from "../ui/Icon.svelte";

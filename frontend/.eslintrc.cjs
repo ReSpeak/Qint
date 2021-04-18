@@ -3,10 +3,20 @@ module.exports = {
 	parser: '@typescript-eslint/parser',
 	extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended', 'prettier'],
 	plugins: ['svelte3', '@typescript-eslint'],
-	ignorePatterns: ['*.cjs'],
+	ignorePatterns: ['*.cjs', 'vite.config.js'],
+	rules: {
+		"@typescript-eslint/no-explicit-any": "off",
+		"@typescript-eslint/no-non-null-assertion": "off",
+		"@typescript-eslint/no-inferrable-types": "off",
+		"@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+		"no-debugger": "off",
+		"no-empty": "off",
+		"prefer-const": ["error", {"destructuring": "all"}],
+	},
 	overrides: [{ files: ['*.svelte'], processor: 'svelte3/svelte3' }],
 	settings: {
-		'svelte3/typescript': require('typescript')
+		'svelte3/typescript': require('typescript'),
+		'svelte3/ignore-styles': (attrs) => attrs.lang === "scss"
 	},
 	parserOptions: {
 		sourceType: 'module',

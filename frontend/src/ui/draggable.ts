@@ -22,7 +22,7 @@ export class DragData {
 }
 
 export function draggable(node: HTMLElement, enabled: boolean = true) {
-	let dd = new DragData(node, enabled);
+	const dd = new DragData(node, enabled);
 
 	function handleMousedown(event: MouseEvent) {
 		if (!dd.enabled) return;

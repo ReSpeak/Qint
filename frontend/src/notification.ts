@@ -72,7 +72,7 @@ function notif(strings: TemplateStringsArray, ...keys: NotificationArg[]): TsNot
 export type NotificationHandler = (con: Connection, e: InMsg | InBookMsg | InMessage, no: TsNotification) => void;
 
 function getHandler(plugins: IPlugin[]): NotificationHandler {
-	for (let p of plugins) {
+	for (const p of plugins) {
 		if (p.handleNotification !== undefined) {
 			return p.handleNotification;
 		}
@@ -80,7 +80,7 @@ function getHandler(plugins: IPlugin[]): NotificationHandler {
 	return textToSpeechNotification;
 }
 
-export function handleMessage(con: Connection, msg: InMsg, plugins: IPlugin[]) {
+export function handleMessage(con: Connection, msg: InMsg, plugins: IPlugin[]): void {
 	try {
 		const handler = getHandler(plugins);
 		if ("Connected" in msg) {
@@ -123,8 +123,8 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHand
 					handler(con, msg, notif`${msg.Message.invoker} poked ${msg.Message.message}`);
 
 				if (app.transientSettings.app.allowBrowserNotifications) {
-					let client = msg.Message.invoker.uid ? con.book.getClient(msg.Message.invoker.id.toString()) : undefined;
-					let iconUrl = client ? getClientIconPath(client, con) : undefined;
+					const client = msg.Message.invoker.uid ? con.book.getClient(msg.Message.invoker.id.toString()) : undefined;
+					const iconUrl = client ? getClientIconPath(client, con) : undefined;
 					new Notification(notif`👉 ${msg.Message.invoker}`.toString(con), {
 						body: notif`${msg.Message.message}`.toString(con),
 						icon: iconUrl,
@@ -192,7 +192,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHand
 				if ("Channel" in prop && "Channel" in msg.PropertyChanged.id) {
 					if (!isQuiet && msg.PropertyChanged.extra.reason === Reason.Channeledit) {
 						let isInteresting = false;
-						for (let k in prop.Channel) {
+						for (const k in prop.Channel) {
 							if (k !== "subscribed") {
 								isInteresting = true;
 								break;
@@ -449,6 +449,6 @@ function textToSpeechNotification(con: Connection, _e: InMsg | InBookMsg | InMes
 	app.transientSettings.synth.trySpeak(no.toString(con));
 }
 
-function textNotification(_c: Connection, _e: InMsg | InBookMsg | InMessage, no: TsNotification) {
+function _textNotification(_c: Connection, _e: InMsg | InBookMsg | InMessage, _no: TsNotification) {
 	// TODO
 }

@@ -18,7 +18,7 @@ export function extensionToIcon(file: string): string {
 	const DEFAULT = "file-outline"
 	const dotIndex = file.lastIndexOf('.');
 	if (dotIndex === -1) return DEFAULT;
-	let ext = file.substring(dotIndex + 1).toLowerCase();
+	const ext = file.substring(dotIndex + 1).toLowerCase();
 	switch (ext) {
 		// Archives
 		case "7z":
@@ -127,8 +127,8 @@ export function extensionToIcon(file: string): string {
 export function pathJoin(...parts: string[]): string {
 	let path = "";
 	for (const segment of parts) {
-		let pathEndsSlash = path.endsWith("/");
-		let segmentStartsSlash = segment.startsWith("/");
+		const pathEndsSlash = path.endsWith("/");
+		const segmentStartsSlash = segment.startsWith("/");
 		if (pathEndsSlash !== segmentStartsSlash) {
 			path += segment;
 		} else if (pathEndsSlash && segmentStartsSlash) {
@@ -141,11 +141,11 @@ export function pathJoin(...parts: string[]): string {
 }
 
 export function pathSplit(...parts: string[]): string[] {
-	let path = [];
+	const path = [];
 	for (const segment of parts) {
 		if (segment === "/")
 			continue;
-		let subSegment = segment.substring(
+		const subSegment = segment.substring(
 			segment.startsWith("/") ? 1 : 0,
 			segment.endsWith("/") ? segment.length - 1 : segment.length);
 		if (subSegment.length === 0)

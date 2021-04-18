@@ -22,8 +22,8 @@ export class CustomIntersectionObserver extends IntersectionObserver {
 		this._observedNodes = new Set();
 	}
 
-	public observeWithDiff(nodes: ArrayLike<Element>) {
-		let oldNodes = new Set(this._observedNodes);
+	public observeWithDiff(nodes: ArrayLike<Element>): void {
+		const oldNodes = new Set(this._observedNodes);
 		for (let i = 0; i < nodes.length; i++) {
 			const element = nodes[i];
 			if (this._observedNodes.has(element)) {
@@ -37,35 +37,35 @@ export class CustomIntersectionObserver extends IntersectionObserver {
 			super.unobserve(oldNode);
 		}
 	}
-	public observeReplace(nodes: ArrayLike<Element>) {
+	public observeReplace(nodes: ArrayLike<Element>): void {
 		this.clear();
 		this.observeNodes(nodes);
 	}
-	public observe(node: Element) {
+	public observe(node: Element): void {
 		this._observedNodes.add(node);
 		super.observe(node);
 	}
-	public observeNodes(nodes: ArrayLike<Element>) {
+	public observeNodes(nodes: ArrayLike<Element>): void {
 		for (let i = 0; i < nodes.length; i++) {
 			this.observe(nodes[i]);
 		}
 	}
-	public unobserve(node: Element) {
+	public unobserve(node: Element): void {
 		this._observedNodes.delete(node);
 		super.unobserve(node);
 	}
-	public disconnect() {
+	public disconnect(): void {
 		this._observedNodes.clear();
 		super.disconnect();
 	}
-	public clear() {
-		for (let node of this._observedNodes) {
+	public clear(): void {
+		for (const node of this._observedNodes) {
 			super.unobserve(node);
 		}
 		this._observedNodes.clear();
 	}
-	public refresh() {
-		for (let node of this._observedNodes) {
+	public refresh(): void {
+		for (const node of this._observedNodes) {
 			super.unobserve(node);
 			super.observe(node);
 		}

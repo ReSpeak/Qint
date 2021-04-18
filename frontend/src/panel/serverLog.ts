@@ -1,4 +1,4 @@
-import { ListFetchDir } from "../ui/lazyList";
+import { FetchResult, ListFetchDir } from "../ui/lazyList";
 import { Connection } from "../connection";
 import { assert } from "../util";
 import { IMsgServerLogPart } from "../book_events";
@@ -21,11 +21,11 @@ export class ServerLogState {
 		this.unsub = con.serverLogCmd.subscribe(l => this.receivedLog = l);
 	}
 
-	public unsubscribe() {
+	public unsubscribe(): void {
 		this.unsub?.()
 	}
 
-	public async fetchElements(idFrom: LogEntry | undefined, dir: ListFetchDir) {
+	public async fetchElements(idFrom: LogEntry | undefined, dir: ListFetchDir): Promise<FetchResult<LogEntry>> {
 		this.receivedLog = [];
 		if (dir === ListFetchDir.After) {
 			assert(idFrom !== undefined, "Need a start for fetching after");

@@ -38,7 +38,7 @@ export class DelayedHover {
 		this.listener.push([c, s, f]);
 	}
 
-	unregister() {
+	unregister(): void {
 		for (const l of this.listener) {
 			l[0].removeEventListener(l[1], l[2]);
 		}
@@ -46,7 +46,7 @@ export class DelayedHover {
 		this.unsub2();
 	}
 
-	mouseover() {
+	mouseover(): void {
 		hover_id.set(this.id);
 		this.hovered.set(true);
 		this.closeDebouced.cancel();
@@ -60,7 +60,7 @@ export class DelayedHover {
 		resetOnCall: true
 	});
 
-	mouseout() {
+	mouseout(): void {
 		this.closeDebouced();
 	}
 }

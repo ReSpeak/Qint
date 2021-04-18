@@ -199,7 +199,7 @@
 				<button
 					class="button collapseButton noBut"
 					type="button"
-					on:click={(e) => (showDetails = !showDetails)}>
+					on:click={() => (showDetails = !showDetails)}>
 					<Icon name="chevron-right{!showDetails ? '' : ' mdi-rotate-90'}" />
 					Details
 				</button>

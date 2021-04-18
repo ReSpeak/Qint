@@ -6,8 +6,7 @@
 	let chartCanvas: HTMLCanvasElement;
 	let chart: Chart;
 
-	export function updateChart()
-	{
+	export function updateChart(): void {
 		chart.update();
 	}
 

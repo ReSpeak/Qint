@@ -49,7 +49,7 @@
 	{#if selected.node instanceof Client}
 		<HoverMenuClient connection={selected.connection} client={selected.node} />
 	{:else if selected.node instanceof Channel}
-		<HoverMenuChannel connection={selected.connection} channel={selected.node} />
+		<HoverMenuChannel channel={selected.node} />
 	{:else if selected.node instanceof Server}
 		<HoverMenuServer connection={selected.connection} />
 	{/if}

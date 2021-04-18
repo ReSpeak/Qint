@@ -9,7 +9,7 @@ export class FileTreeCache {
 	public isLoading: boolean = false;
 	public root: FileTreeFolder = new FileTreeFolder("", unknownDate);
 
-	public applyFileList(fileList: IMsgFileList) {
+	public applyFileList(fileList: IMsgFileList): this {
 		fileList.FileList.forEach(m => this.updateCache(m));
 		log("File list %o", this)
 		return this;
@@ -24,7 +24,7 @@ export class FileTreeCache {
 		return pathSplit(entry.channelId, entry.path, entry.name);
 	}
 
-	public updateCache(entry: IMsgFileListPart) {
+	public updateCache(entry: IMsgFileListPart): void {
 		this.root.updateCachePath(FileTreeCache.getPath(entry), entry);
 	}
 
@@ -34,7 +34,7 @@ export class FileTreeCache {
 		return this.root.get(path, folderOnly);
 	}
 
-	public clear(path: string[] = []) {
+	public clear(path: string[] = []): void {
 		log("clearing %o", path);
 		this.root.clear(path);
 	}
@@ -74,22 +74,22 @@ class FileTreeFolder {
 	) {
 	}
 
-	private static createCacheDummy(name: string) {
+	private static createCacheDummy(name: string): FileTreeFolder {
 		return new FileTreeFolder(
 			name,
 			unknownDate
 		);
 	}
 
-	private static createFromEntry(entry: IMsgFileListPart) {
+	private static createFromEntry(entry: IMsgFileListPart): FileTreeFolder {
 		return new FileTreeFolder(
 			entry.name,
 			datetimeDeserialize(entry.dateTime)
 		);
 	}
 
-	public updateCachePath(path: string[], entry: IMsgFileListPart) {
-		let [part, ...rest] = path;
+	public updateCachePath(path: string[], entry: IMsgFileListPart): void {
+		const [part, ...rest] = path;
 		if (this.children === undefined)
 			this.children = new Map();
 		if (rest.length === 0) {
@@ -111,8 +111,8 @@ class FileTreeFolder {
 
 	public get(path: string[], folderOnly: boolean): FileTreeNode | null {
 		if (this.children === undefined) return null;
-		let [part, ...rest] = path;
-		let child = this.children.get(part);
+		const [part, ...rest] = path;
+		const child = this.children.get(part);
 		if (child === undefined) return null;
 		if (rest.length === 0) {
 			if (!child.isFile || !folderOnly)
@@ -131,8 +131,8 @@ class FileTreeFolder {
 			this.children?.clear();
 			this.contentLoaded = FolderState.Dummy;
 		} else {
-			let [part, ...rest] = path;
-			let child = this.children.get(part);
+			const [part, ...rest] = path;
+			const child = this.children.get(part);
 			if (child === undefined || child.isFile) return;
 			child.clear(rest);
 		}

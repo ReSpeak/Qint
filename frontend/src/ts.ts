@@ -21,7 +21,7 @@ interface ClientTypeQuery {
 
 export interface TalkPowerRequest {
 	time: Moment;
-	message: String;
+	message: string;
 }
 
 export enum TalkState {

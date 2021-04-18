@@ -22,7 +22,7 @@ export class TransientSettings {
 	public audio = new TransientSettingsAudio();
 	public hotkeys = new TransientSettingsHotkeys();
 
-	public async loadAsync() {
+	public async loadAsync(): Promise<void> {
 		try {
 			const resp = await backend.fetch(`/transient`);
 			const data = await resp.json();
@@ -33,19 +33,18 @@ export class TransientSettings {
 		}
 	}
 
-	public save() {
-
+	public save(): void {
 		this._syncDebounced();
 	}
 
-	public flush() {
+	public flush(): void {
 		this._syncDebounced.flush();
 	}
 
-	private async saveAsync() {
-		let newSave = JSON.parse(JSON.stringify(this, (k, v) => k.startsWith('_') ? undefined : v));
+	private async saveAsync(): Promise<void> {
+		const newSave = JSON.parse(JSON.stringify(this, (k, v) => k.startsWith('_') ? undefined : v));
 		// Diff to last save
-		let diff = deep_diff(this._lastSave, newSave);
+		const diff = deep_diff(this._lastSave, newSave);
 		log("Syncing:\nOld: %j\nNew: %j\nDiff: %j", this._lastSave, newSave, diff);
 		if (diff === undefined)
 			return;
@@ -76,7 +75,7 @@ export class TransientSettingsSynth {
 			const synth = window.speechSynthesis;
 			if (synth) {
 				const voices = synth.getVoices();
-				this._voiceCache = voices.find(v => v.voiceURI === this.voiceId) ?? voices.find(_ => true);
+				this._voiceCache = voices.find(v => v.voiceURI === this.voiceId) ?? voices.find(() => true);
 				this._voiceIdCache = this.voiceId;
 			} else {
 				this.voice = undefined;
@@ -96,7 +95,7 @@ export class TransientSettingsSynth {
 		}
 	}
 
-	public canSpeak() { return window.speechSynthesis !== undefined; }
+	public canSpeak(): boolean { return window.speechSynthesis !== undefined; }
 
 	private getNewUtter(): SpeechSynthesisUtterance {
 		const utter = new SpeechSynthesisUtterance();
@@ -106,7 +105,7 @@ export class TransientSettingsSynth {
 		return utter;
 	}
 
-	public trySpeak(text: string) {
+	public trySpeak(text: string): void {
 		const synth = window.speechSynthesis;
 		if (synth) {
 			const utter = this.getNewUtter();
@@ -150,8 +149,8 @@ export class TransientSettingsUi {
 	public defaultOutputMuted: boolean = false;
 	public defaultAway: boolean = false;
 
-	toJSON() {
-		const res: any = {};
+	toJSON(): Record<string, unknown> {
+		const res: Record<string, unknown> = {};
 		for (const k in this) {
 			res[k] = this[k];
 		}
@@ -168,7 +167,7 @@ export class TransientSettingsChat {
 		this._parent = parent;
 	}
 
-	public save(text: string | undefined, selection: NodeSelection) {
+	public save(text: string | undefined, selection: NodeSelection): void {
 		const key = selection.uniqueStr;
 		if (key === undefined) return;
 		const oldVal = (this as any)[key];

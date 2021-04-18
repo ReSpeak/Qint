@@ -53,8 +53,7 @@ export class SyncState {
 		return null;
 	}
 
-	public sendJoinOrHost() {
-
+	public sendJoinOrHost(): void {
 	}
 
 	private processLocalAction(ev: VSyncEvent) {
@@ -74,14 +73,14 @@ export class SyncState {
 		this.debouncedEvent = undefined;
 	}, 200, { resetOnCall: false });
 
-	public broadcastNewState(ev: VSyncEvent) {
+	public broadcastNewState(ev: VSyncEvent): void {
 		if (!this.enabled) return;
 		const broadcastTarget = this.target();
 		if (broadcastTarget === null) return;
 		const [target, targetClientId] = broadcastTarget;
 
 		// Prevent feedback loops
-		let diffEv = SyncState.diffSafe(ev, this.lastReceivedSync);
+		const diffEv = SyncState.diffSafe(ev, this.lastReceivedSync);
 		if (Object.keys(diffEv).length === 0) return;
 		log("Syncing %o", diffEv);
 
@@ -98,22 +97,22 @@ export class SyncState {
 		});
 	}
 
-	private processRawPluginCmd(cmd: IMsgPluginCommandPart) {
+	private processRawPluginCmd(cmd: IMsgPluginCommandPart): void {
 		if (cmd.name !== vSyncCmdKey) return;
 		if (cmd.invokerId === this.nodeSel.connection.book.ownClientId) return;
 		// NOTE: JSON parsing user data, make sure this is safe and can't poison anything.
-		let vSyncCmd = JSON.parse(cmd.data) as VSyncCmd;
+		const vSyncCmd = JSON.parse(cmd.data) as VSyncCmd;
 		this.receiveNewState(vSyncCmd);
 	}
 
-	private static copySafe(src: VSyncEvent, dst: VSyncEvent) {
+	private static copySafe(src: VSyncEvent, dst: VSyncEvent): void {
 		dst.action = src.action;
 		dst.position = src.position;
 		dst.speed = src.speed;
 	}
 
 	private static diffSafe(value: VSyncEvent, base: VSyncEvent): VSyncEvent {
-		let diffEv: VSyncEvent = {};
+		const diffEv: VSyncEvent = {};
 		if (value.action !== undefined && value.action !== base.action)
 			diffEv.action = value.action;
 		if (value.position !== undefined && value.position !== base.position)
@@ -123,7 +122,7 @@ export class SyncState {
 		return diffEv;
 	}
 
-	public receiveNewState(cmd: VSyncCmd) {
+	public receiveNewState(cmd: VSyncCmd): void {
 		if (cmd.video_key !== this.video_key)
 			return;
 		log("Got sync %o", cmd);
@@ -144,7 +143,7 @@ export class SyncState {
 		}
 	}
 
-	public subscribe() {
+	public subscribe(): void {
 		assert(this.pluginCmdUnsub === undefined, "previous sub not removed");
 		this.pluginCmdUnsub = this.nodeSel.connection.pluginCmd.subscribe(cmd => this.processRawPluginCmd(cmd));
 		this.videoControl.event = (ev) => this.processLocalAction(ev);
@@ -152,7 +151,7 @@ export class SyncState {
 		this.enabled = true;
 	}
 
-	public unsubscribe() {
+	public unsubscribe(): void {
 		this.pluginCmdUnsub?.();
 		this.pluginCmdUnsub = undefined;
 		this.videoControl.event = undefined;
@@ -200,7 +199,7 @@ export class HTML5VideoControl implements IVideoControl {
 const windowYoutubeMsg = fnBroadcast<[YoutubeEvent]>();
 window.addEventListener("message", (event) => {
 	if (event.origin !== "https://www.youtube.com") return;
-	let evd = JSON.parse(event.data) as YoutubeEvent;
+	const evd = JSON.parse(event.data) as YoutubeEvent;
 	windowYoutubeMsg(evd);
 }, false);
 
@@ -317,7 +316,7 @@ export class YoutubeVideoControl implements IVideoControl {
 	}
 
 	private checkIframe() {
-		let cw = this.elem.contentWindow;
+		const cw = this.elem.contentWindow;
 		if (cw === null) return;
 		if (!this.originReady) {
 			try { if (cw.origin) return; } catch {
@@ -337,7 +336,7 @@ export class YoutubeVideoControl implements IVideoControl {
 			cw.postMessage(JSON.stringify({ ...this.getCmdObj("listening") }), host);
 		}
 	}
-	private getCmdObj(cmd: string = "command"): object {
+	private getCmdObj(cmd: string = "command"): { channel: "widget", event: string, args: [], id: number } {
 		return {
 			channel: "widget",
 			event: cmd,
@@ -346,13 +345,13 @@ export class YoutubeVideoControl implements IVideoControl {
 		}
 	}
 
-	public register() {
+	public register(): void {
 		assert(this.evTimer === undefined, "Old evTimer not cleared");
 		if (!this.iFrameLoaded)
-			this.evTimer = setInterval(() => this.checkIframe(), 250);
+			this.evTimer = window.setInterval(() => this.checkIframe(), 250);
 		this.windowYoutubeMsgUnsub = windowYoutubeMsg.subscribe((msg) => this.iFrameMessage(msg));
 	}
-	public unregister() {
+	public unregister(): void {
 		if (this.evTimer !== undefined) {
 			clearInterval(this.evTimer);
 			this.evTimer = undefined;

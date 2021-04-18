@@ -7,7 +7,7 @@ export type LinksMap = Map<string, {
 	title: string,
 }>;
 
-const ts3Scheme = /^(ts3file|ts3image):\/\/([^\?]*)(\?(.*))?$/i;
+const ts3Scheme = /^(ts3file|ts3image):\/\/([^?]*)(\?(.*))?$/i;
 
 type Ts3Scheme = {
 	scheme: "ts3file",
@@ -42,7 +42,7 @@ export function parseTsScheme(url: string): Ts3Scheme | null {
 	if (!queryPart || !hostPart) return null;
 	const params: Record<string, string> = {};
 	for (const param of queryPart.split('&')) {
-		let eqIndex = param.indexOf('=');
+		const eqIndex = param.indexOf('=');
 		if (eqIndex === -1) continue;
 		const key = param.substring(0, eqIndex);
 		const value = decodeURIComponent(param.substring(eqIndex + 1));

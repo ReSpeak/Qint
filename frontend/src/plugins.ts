@@ -21,7 +21,7 @@ function genImportFunc() {
 }
 
 export async function loadPlugins(): Promise<IPlugin[]> {
-	let plugins: IPlugin[] = [];
+	const plugins: IPlugin[] = [];
 	let list: string[];
 	try {
 		list = await (await backend.fetch(`/plugins`)).json();

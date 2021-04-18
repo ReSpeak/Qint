@@ -18,13 +18,13 @@ type GraphQlSearchResult = {
 	}[];
 };
 
-export let EmptyMessageFetch: FetchResult<MessageSearchResult> = {
+export const EmptyMessageFetch: FetchResult<MessageSearchResult> = {
 	items: [],
 	canLoadBeforeStart: false,
 	canLoadAfterEnd: false
 };
 
-export let EmptyOtherFetch: FetchResult<OtherSearchResult> = {
+export const EmptyOtherFetch: FetchResult<OtherSearchResult> = {
 	items: [],
 	canLoadBeforeStart: false,
 	canLoadAfterEnd: false

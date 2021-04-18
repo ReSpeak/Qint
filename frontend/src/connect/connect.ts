@@ -73,11 +73,11 @@ export class ConnectData {
 				data.outputMuted, data.away, data.password, data.channelPassword);
 		} else {
 			let start = data.indexOf("@");
-			let name = start === -1 ? DEFAULT_NAME : data.substr(0, start);
+			const name = start === -1 ? DEFAULT_NAME : data.substr(0, start);
 			start += 1;
-			let end = data.indexOf("/");
-			let channel = end === -1 ? "" : data.substr(end + 1);
-			let address = data.substr(start, end === -1 ? undefined : end);
+			const end = data.indexOf("/");
+			const channel = end === -1 ? "" : data.substr(end + 1);
+			const address = data.substr(start, end === -1 ? undefined : end);
 			return new ConnectData(name, address, undefined, undefined, channel);
 		}
 	}

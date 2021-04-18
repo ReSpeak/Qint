@@ -50,8 +50,8 @@ export class Chat {
 	public async getMessages(idFrom: Message | undefined, dir: ListFetchDir): Promise<FetchResult<Message>> {
 		const selected = get(this.selectedChat);
 		if (selected === undefined) return Chat.EmptyFetch;
-		let public_key = selected.connection.book.server.publicKey;
-		if (public_key === undefined) {
+		const publicKey = selected.connection.book.server.publicKey;
+		if (publicKey === undefined) {
 			error("Cannot get messages for a non-existant connection");
 			return Chat.EmptyFetch;
 		}
@@ -96,7 +96,7 @@ export class Chat {
 				}
 			}`, {
 			chatType: selected.node.qlType,
-			server: public_key,
+			server: publicKey,
 			chatId: selected.node.qlId,
 			startTime,
 			startId,
@@ -133,7 +133,7 @@ export class Chat {
 		}
 	}
 
-	public sendMessage(message: string) {
+	public sendMessage(message: string): void {
 		const selected = get(this.selectedChat);
 		if (selected === undefined) return;
 		selected.connection.sendMessage({
@@ -144,11 +144,11 @@ export class Chat {
 		});
 	}
 
-	public async setLastRead(messageId: string, lastRead: Moment) {
+	public async setLastRead(messageId: string, lastRead: Moment): Promise<void> {
 		const selected = get(this.selectedChat);
 		if (selected === undefined) return;
-		let public_key = selected.connection.book.server.publicKey;
-		if (public_key === undefined) {
+		const publicKey = selected.connection.book.server.publicKey;
+		if (publicKey === undefined) {
 			error("Cannot get messages for a non-existant connection");
 			return;
 		}
@@ -157,7 +157,7 @@ export class Chat {
 				setLastRead(typ: $chatType, server: $server, id: $chatId, message: $message)
 			}`, {
 			chatType: selected.node.qlType,
-			server: public_key,
+			server: publicKey,
 			chatId: selected.node.qlId,
 			message: messageId,
 		});
@@ -167,8 +167,8 @@ export class Chat {
 	public async getSendHistory(from: Uid, id: number): Promise<string | undefined> {
 		const selected = get(this.selectedChat);
 		if (selected === undefined) return undefined;
-		let public_key = selected.connection.book.server.publicKey;
-		if (public_key === undefined) {
+		const publicKey = selected.connection.book.server.publicKey;
+		if (publicKey === undefined) {
 			error("Cannot get send history for a non-existant connection");
 			return undefined;
 		}
@@ -183,7 +183,7 @@ export class Chat {
 				}
 			}`, {
 			chatType: selected.node.qlType,
-			server: public_key,
+			server: publicKey,
 			chatId: selected.node.qlId,
 			from,
 			id,
@@ -215,7 +215,7 @@ export class Message {
 	public displayGroupHeader: boolean = false;
 
 	public get displayName(): string { return this.invoker?.name ?? this.invokerName ?? ""; }
-	public get clientColor() { return this._clientColor.get(); }
+	public get clientColor(): string { return this._clientColor.get(); }
 
 	constructor(
 		public id: string,
@@ -266,7 +266,7 @@ export function structuredViewToMd(data: StructuredData, channel: ChannelId): Md
 	let text = "";
 	let chainid = 0;
 	let date: { iso: string, unix: string } | undefined;
-	let files = [];
+	const files = [];
 	for (const part of data) {
 		if (typeof part === "string") {
 			text += part;

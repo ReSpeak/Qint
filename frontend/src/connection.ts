@@ -60,7 +60,7 @@ export class Connection {
 			},
 			() => this.onClose(),
 		).then(() => {
-			let connectMsg = connectOptions.toConnectMsg();
+			const connectMsg = connectOptions.toConnectMsg();
 			const [returnCode, promise] = this.generateReturnCode();
 			connectMsg.Connect.returnCode = returnCode;
 			this.backend.send(connectMsg);
@@ -85,12 +85,12 @@ export class Connection {
 		return get(this.state);
 	}
 
-	public close() {
+	public close(): void {
 		this.backend.close();
 		this._state.update(s => s.setDisconnected());
 	}
 
-	private onClose() {
+	private onClose(): void {
 		// Plugins
 		for (const plugin of app.plugins) {
 			try {
@@ -104,14 +104,14 @@ export class Connection {
 		this.rejectReturnCodes();
 	}
 
-	private rejectReturnCodes() {
+	private rejectReturnCodes(): void {
 		for (const value of this.returnCodes.values()) {
 			value.resolve(ConnectionClosedResult);
 		}
 		this.returnCodes.clear();
 	}
 
-	public sendMessage(data: OutMsg) {
+	public sendMessage(data: OutMsg): void {
 		log_raw_out("%o", data);
 		this.backend.send(data);
 	}
@@ -135,7 +135,7 @@ export class Connection {
 		})];
 	}
 
-	public disconnect(reason?: Reason, message?: string) {
+	public disconnect(reason?: Reason, message?: string): void {
 		this.sendMessage({ Disconnect: { reason, message } });
 	}
 
@@ -163,7 +163,7 @@ export class Connection {
 		});
 	}
 
-	public pokeClient(clientId: ClientId, message: string) {
+	public pokeClient(clientId: ClientId, message: string): void {
 		// TODO Use return code
 		this.sendMessage({
 			SendMessage: {
@@ -180,7 +180,7 @@ export class Connection {
 		}
 	}
 
-	private async updateAllUnreadCounts() {
+	private async updateAllUnreadCounts(): Promise<void> {
 		// Server
 		const serverData = await backend.graphql(`query GetUnreadCounts($server: [Int!]!) {
 			chat(typ: SERVER, server: $server) {
@@ -232,7 +232,7 @@ export class Connection {
 		}
 	}
 
-	private async updateClientUnreadCount(clientId: ClientId) {
+	private async updateClientUnreadCount(clientId: ClientId): Promise<void> {
 		const client = this.book.getClient(clientId)!;
 		const clientData = await backend.graphql(`query GetUnreadCount($server: [Int!]!, $client: ID!) {
 			chat(typ: CLIENT, server: $server, id: $client) {
@@ -250,9 +250,10 @@ export class Connection {
 
 	private renderRequested = false;
 
-	private applyLoudnesses(loudnesses: Record<ClientId, number>) {
+	private applyLoudnesses(loudnesses: Record<ClientId, number>): void {
 		const now = performance.now();
 
+		// eslint-disable-next-line prefer-const
 		for (let [client, loudness] of Object.entries(loudnesses)) {
 			const l = this.loudnesses.get(client);
 			if (l !== undefined) {
@@ -264,13 +265,13 @@ export class Connection {
 		this.requestRenderLoudnessGraphs();
 	}
 
-	private requestRenderLoudnessGraphs() {
+	private requestRenderLoudnessGraphs(): void {
 		if (this.renderRequested) return;
 		this.renderRequested = true;
 		requestAnimationFrame((ts) => this.renderLoudnessGraphs(ts));
 	}
 
-	private renderLoudnessGraphs(timestamp: number) {
+	private renderLoudnessGraphs(timestamp: number): void {
 		this.renderRequested = false;
 		let hasRequest = false;
 		for (const hist of this.loudnesses.values()) {
@@ -282,7 +283,7 @@ export class Connection {
 		}
 	}
 
-	private messageHandler(msg: InMsg) {
+	private messageHandler(msg: InMsg): void {
 		log_raw_in("%o", msg);
 
 		// Plugins
@@ -455,14 +456,14 @@ export enum ConnectionStateEnum {
 export class ConnectionState {
 	public rawState: ConnectionStateEnum = ConnectionStateEnum.Uninitialized;
 	public error: string | ResultDetails | undefined;
-	public get channelListFinished() { return this.rawState === ConnectionStateEnum.ChannelListFinished; }
-	public get connecting() { return this.rawState === ConnectionStateEnum.Connecting; }
-	public get connected() {
+	public get channelListFinished(): boolean { return this.rawState === ConnectionStateEnum.ChannelListFinished; }
+	public get connecting(): boolean { return this.rawState === ConnectionStateEnum.Connecting; }
+	public get connected(): boolean {
 		return this.rawState === ConnectionStateEnum.Connected ||
 			this.rawState === ConnectionStateEnum.ChannelListFinished;
 	}
-	public get errored() { return this.rawState === ConnectionStateEnum.Errored; }
-	public get closed() { return this.rawState === ConnectionStateEnum.Disconnected; }
+	public get errored(): boolean { return this.rawState === ConnectionStateEnum.Errored; }
+	public get closed(): boolean { return this.rawState === ConnectionStateEnum.Disconnected; }
 
 	public setConnecting(): this {
 		if (this.rawState !== ConnectionStateEnum.Uninitialized

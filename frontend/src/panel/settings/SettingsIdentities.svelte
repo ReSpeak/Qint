@@ -152,7 +152,7 @@
 
 				<BKeyValue label="">
 					<p class="buttons is-right">
-						<button class="button is-danger" on:click={() => {}} disabled>
+						<button class="button is-danger" disabled>
 							<Icon name="delete" />
 							<span>Delete (Not implemented, do it yourself)</span>
 						</button>

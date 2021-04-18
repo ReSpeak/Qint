@@ -19,7 +19,7 @@ export class BrowserBackend implements IBackend {
 		return fetch(`${BASE_ADDRESS}${cmd}`, data);
 	}
 
-	public async graphql<T = any>(query: string, variables?: object): Promise<{ data: T }> {
+	public async graphql<T = any>(query: string, variables?: Record<string, unknown>): Promise<{ data: T }> {
 		const val = await this.fetch(`/db`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -66,7 +66,7 @@ export class BrowserBackendConnection implements IBackendConnection {
 		this.socket.onerror = (error) => onError(String(error));
 		this.socket.onclose = onClose;
 		this.socket.onmessage = (evt) => { onMsg(JSON.parse(evt.data) as InMsg); };
-		return new Promise((resolve, reject) => {
+		return new Promise(resolve => {
 			this.socket!.onopen = () => { resolve() };
 		});
 	}
