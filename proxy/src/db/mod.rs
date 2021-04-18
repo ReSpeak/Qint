@@ -383,9 +383,7 @@ impl Handler<GetIdentityAndServerMsg> for DbHandler {
 			.first::<Option<Vec<u8>>>(&self.con)
 			.optional()?
 			.flatten()
-			.map(|key| {
-				EccKeyPubP256::from_short(&key).map(|key| UidBuf(key.get_uid_no_base64()))
-			})
+			.map(|key| EccKeyPubP256::from_short(&key).map(|key| UidBuf(key.get_uid_no_base64())))
 			.transpose()?;
 
 		// Search identity
@@ -472,8 +470,10 @@ impl Handler<AddIdentityMsg> for DbHandler {
 
 		//Check if a client with that uid already exists and create it if not
 		self.con.transaction::<_, diesel::result::Error, _>(|| {
-			match diesel::select(diesel::dsl::exists(schema::clients::table.filter(schema::clients::uid.eq(&client_uid))))
-				.get_result(&self.con)
+			match diesel::select(diesel::dsl::exists(
+				schema::clients::table.filter(schema::clients::uid.eq(&client_uid)),
+			))
+			.get_result(&self.con)
 			{
 				Ok(false) => {
 					let cli = models::ClientInsert {

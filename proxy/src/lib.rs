@@ -409,16 +409,29 @@ impl Settings {
 	}
 
 	fn get_default_mute_states(&self) -> MuteStates {
-		self.0.as_object().and_then(|p| p.get("audio")).and_then(|p| p.as_object())
+		self.0
+			.as_object()
+			.and_then(|p| p.get("audio"))
+			.and_then(|p| p.as_object())
 			.map(|ui| MuteStates {
-				input: if ui.get("defaultInputMuted").and_then(|p| p.as_bool()).unwrap_or_default() { MuteState::Muted } else { MuteState::None },
-				output: if ui.get("defaultOutputMuted").and_then(|p| p.as_bool()).unwrap_or_default() { MuteState::Muted } else { MuteState::None },
+				input: if ui.get("defaultInputMuted").and_then(|p| p.as_bool()).unwrap_or_default()
+				{
+					MuteState::Muted
+				} else {
+					MuteState::None
+				},
+				output: if ui
+					.get("defaultOutputMuted")
+					.and_then(|p| p.as_bool())
+					.unwrap_or_default()
+				{
+					MuteState::Muted
+				} else {
+					MuteState::None
+				},
 				away: ui.get("defaultAway").and_then(|p| p.as_bool()).unwrap_or_default(),
-			}).unwrap_or(MuteStates {
-				input: MuteState::None,
-				output: MuteState::None,
-				away: false,
 			})
+			.unwrap_or(MuteStates { input: MuteState::None, output: MuteState::None, away: false })
 	}
 }
 
@@ -911,50 +924,71 @@ async fn get_mute_state(state: web::Data<Arc<State>>) -> impl Responder {
 		away: bool,
 	}
 
-	let res = state.aggregate(|con, _| {
-		con.get_own_client().map(|c| MuteStates {
-			input: if !c.input_hardware_enabled {
-				MuteState::Disabled
-			} else if c.input_muted {
-				MuteState::Muted
-			} else {
-				MuteState::None
-			},
-			output: if !c.output_hardware_enabled {
-				MuteState::Disabled
-			} else if c.output_muted {
-				MuteState::Muted
-			} else {
-				MuteState::None
-			},
-			away: c.away_message.is_some(),
-		})
-	}).fold(None, |res: Option<OptionMuteStates>, state| {
-		future::ready(if let (Some(res), Some(state)) = (&res, &state) {
-			let can_talk = !state.away && state.output == MuteState::None;
-			Some(OptionMuteStates {
-				input_can_talk: if can_talk { if let Some(i) = res.input_can_talk { Some(i.merge(state.input)) } else { Some(state.input) } } else { res.input_can_talk },
-				input_cannot_talk: if !can_talk { if let Some(i) = res.input_can_talk { Some(i.merge(state.input)) } else { Some(state.input) } } else { res.input_can_talk },
-				output: res.output.merge(state.output),
-				away: res.away && state.away,
+	let res = state
+		.aggregate(|con, _| {
+			con.get_own_client().map(|c| MuteStates {
+				input: if !c.input_hardware_enabled {
+					MuteState::Disabled
+				} else if c.input_muted {
+					MuteState::Muted
+				} else {
+					MuteState::None
+				},
+				output: if !c.output_hardware_enabled {
+					MuteState::Disabled
+				} else if c.output_muted {
+					MuteState::Muted
+				} else {
+					MuteState::None
+				},
+				away: c.away_message.is_some(),
 			})
-		} else if let Some(state) = state {
-			let can_talk = !state.away && state.output == MuteState::None;
-			Some(OptionMuteStates {
-				input_can_talk: if can_talk { Some(state.input) } else { None },
-				input_cannot_talk: if !can_talk { Some(state.input) } else { None },
-				output: state.output,
-				away: state.away,
-			})
-		} else {
-			res
 		})
-	}).await;
-	let res = res.map(|res| MuteStates {
-		input: res.input_can_talk.or(res.input_cannot_talk).unwrap_or(MuteState::None),
-		output: res.output,
-		away: res.away,
-	}).unwrap_or_else(|| state.settings.read().unwrap().get_default_mute_states());
+		.fold(None, |res: Option<OptionMuteStates>, state| {
+			future::ready(if let (Some(res), Some(state)) = (&res, &state) {
+				let can_talk = !state.away && state.output == MuteState::None;
+				Some(OptionMuteStates {
+					input_can_talk: if can_talk {
+						if let Some(i) = res.input_can_talk {
+							Some(i.merge(state.input))
+						} else {
+							Some(state.input)
+						}
+					} else {
+						res.input_can_talk
+					},
+					input_cannot_talk: if !can_talk {
+						if let Some(i) = res.input_can_talk {
+							Some(i.merge(state.input))
+						} else {
+							Some(state.input)
+						}
+					} else {
+						res.input_can_talk
+					},
+					output: res.output.merge(state.output),
+					away: res.away && state.away,
+				})
+			} else if let Some(state) = state {
+				let can_talk = !state.away && state.output == MuteState::None;
+				Some(OptionMuteStates {
+					input_can_talk: if can_talk { Some(state.input) } else { None },
+					input_cannot_talk: if !can_talk { Some(state.input) } else { None },
+					output: state.output,
+					away: state.away,
+				})
+			} else {
+				res
+			})
+		})
+		.await;
+	let res = res
+		.map(|res| MuteStates {
+			input: res.input_can_talk.or(res.input_cannot_talk).unwrap_or(MuteState::None),
+			output: res.output,
+			away: res.away,
+		})
+		.unwrap_or_else(|| state.settings.read().unwrap().get_default_mute_states());
 	HttpResponse::Ok().json(res)
 }
 

@@ -7,7 +7,7 @@ use juniper::GraphQLEnum;
 use serde::{Deserialize, Serialize};
 use tsproto_types::crypto::EccKeyPrivP256;
 
-use super::{FindIdentity, schema::*};
+use super::{schema::*, FindIdentity};
 use crate::secret::Secret;
 
 #[derive(Queryable)]
@@ -164,10 +164,10 @@ pub struct NewIdentity<'a> {
 }
 
 #[derive(AsChangeset, Default)]
-#[table_name="identities"]
+#[table_name = "identities"]
 pub struct UpdateIdentity {
-    pub name: Option<String>,
-    pub counter: Option<i64>,
+	pub name: Option<String>,
+	pub counter: Option<i64>,
 	pub max_counter: Option<i64>,
 }
 
@@ -261,7 +261,9 @@ impl<'a> NewIdentity<'a> {
 		Self::new_with_name(identity, "Default", secret)
 	}
 
-	pub fn new_with_name(identity: &tsclientlib::Identity, name: &'a str, secret: &Secret) -> Result<Self> {
+	pub fn new_with_name(
+		identity: &tsclientlib::Identity, name: &'a str, secret: &Secret,
+	) -> Result<Self> {
 		let private_key = secret.seal(identity.key().to_short().to_vec())?;
 		let client = identity.key().to_pub().get_uid_no_base64();
 		Ok(Self {

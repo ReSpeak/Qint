@@ -1,6 +1,6 @@
 use crate::{db::AddIdentityMsg, State};
 use anyhow::Result;
-use proxy_codegen::book_events::{serialize_u64, deserialize_u64};
+use proxy_codegen::book_events::{deserialize_u64, serialize_u64};
 use serde::{Deserialize, Serialize};
 use serde_ini::de::from_str;
 

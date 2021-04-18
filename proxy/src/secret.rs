@@ -1,6 +1,6 @@
 use anyhow::{format_err, Result};
-use chacha20poly1305::{ChaCha20Poly1305, Key};
 use chacha20poly1305::aead::{AeadInPlace, NewAead};
+use chacha20poly1305::{ChaCha20Poly1305, Key};
 use rand::Rng;
 
 #[derive(Clone)]
@@ -24,7 +24,8 @@ impl Secret {
 		let cipher = ChaCha20Poly1305::new(&self.0);
 		let nonce = rand::thread_rng().gen::<[u8; 12]>();
 		let nonce = nonce.into();
-		cipher.encrypt_in_place(&nonce, &[], &mut data)
+		cipher
+			.encrypt_in_place(&nonce, &[], &mut data)
 			.map_err(|_| format_err!("Failed to encrypt secret"))?;
 		data.extend_from_slice(nonce.as_slice());
 		Ok(data)
@@ -41,7 +42,8 @@ impl Secret {
 		nonce.copy_from_slice(&data[data.len() - nonce_len..]);
 		data.truncate(data.len() - nonce_len);
 
-		cipher.decrypt_in_place(&nonce.into(), &[], &mut data)
+		cipher
+			.decrypt_in_place(&nonce.into(), &[], &mut data)
 			.map_err(|_| format_err!("Failed to decrypt secret"))?;
 		Ok(data)
 	}

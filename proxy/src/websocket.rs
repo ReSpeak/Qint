@@ -717,7 +717,8 @@ impl Ws {
 				if let Some(state) = self.get_book() {
 					if let JsM2B::ConnectionClientUpdate(change) = &mut change {
 						if let Some(client) = state.clients.get(&state.own_client) {
-							let has_multiple_cons = self.state.connections.lock().unwrap().len() > 1;
+							let has_multiple_cons =
+								self.state.connections.lock().unwrap().len() > 1;
 							if let Some(c) = change.input_muted {
 								if c {
 									// Mute, change to disable if there is more than one
@@ -736,24 +737,36 @@ impl Ws {
 									}
 
 									// Change all other muted servers to disabled
-									let cons = self.state.connections.lock().unwrap().iter()
-										.filter_map(|(id, addr)| if *id != self.id {
-											Some(addr.clone())
-										} else {
-											None
-										}).collect::<Vec<_>>();
+									let cons = self
+										.state
+										.connections
+										.lock()
+										.unwrap()
+										.iter()
+										.filter_map(|(id, addr)| {
+											if *id != self.id { Some(addr.clone()) } else { None }
+										})
+										.collect::<Vec<_>>();
 									let state = self.state.clone();
 									tokio::spawn(async move {
-										state.send_each_con(cons.into_iter(), |con| {
-											if let Some(client) = con.clients.get(&con.own_client) {
-												if client.input_muted && client.input_hardware_enabled {
-													return Some(con.client_update()
-														.set_input_muted(false)
-														.set_input_hardware_enabled(false));
+										state
+											.send_each_con(cons.into_iter(), |con| {
+												if let Some(client) =
+													con.clients.get(&con.own_client)
+												{
+													if client.input_muted
+														&& client.input_hardware_enabled
+													{
+														return Some(
+															con.client_update()
+																.set_input_muted(false)
+																.set_input_hardware_enabled(false),
+														);
+													}
 												}
-											}
-											None
-										}).await
+												None
+											})
+											.await
 									});
 								}
 							}
@@ -776,24 +789,36 @@ impl Ws {
 									}
 
 									// Change all other muted servers to disabled
-									let cons = self.state.connections.lock().unwrap().iter()
-										.filter_map(|(id, addr)| if *id != self.id {
-											Some(addr.clone())
-										} else {
-											None
-										}).collect::<Vec<_>>();
+									let cons = self
+										.state
+										.connections
+										.lock()
+										.unwrap()
+										.iter()
+										.filter_map(|(id, addr)| {
+											if *id != self.id { Some(addr.clone()) } else { None }
+										})
+										.collect::<Vec<_>>();
 									let state = self.state.clone();
 									tokio::spawn(async move {
-										state.send_each_con(cons.into_iter(), |con| {
-											if let Some(client) = con.clients.get(&con.own_client) {
-												if client.output_muted && client.output_hardware_enabled {
-													return Some(con.client_update()
-														.set_output_muted(false)
-														.set_output_hardware_enabled(false));
+										state
+											.send_each_con(cons.into_iter(), |con| {
+												if let Some(client) =
+													con.clients.get(&con.own_client)
+												{
+													if client.output_muted
+														&& client.output_hardware_enabled
+													{
+														return Some(
+															con.client_update()
+																.set_output_muted(false)
+																.set_output_hardware_enabled(false),
+														);
+													}
 												}
-											}
-											None
-										}).await
+												None
+											})
+											.await
 									});
 								}
 							}
@@ -879,11 +904,7 @@ impl Ws {
 					if let Some(uid) = own_client.uid.as_ref() {
 						uid.clone()
 					} else {
-						self.send_error(
-							return_code,
-							"Failed to get own client uid".into(),
-							ctx,
-						);
+						self.send_error(return_code, "Failed to get own client uid".into(), ctx);
 						return;
 					}
 				} else {
@@ -1110,8 +1131,7 @@ impl Handler<GetClientVolumeMsg> for Ws {
 				)));
 			} else {
 				// TODO Get uid from server
-				uid_fut =
-					Box::new(wrap_future(future::err(format_err!("Not yet implemented"))));
+				uid_fut = Box::new(wrap_future(future::err(format_err!("Not yet implemented"))));
 			}
 			// Get volume from db
 			ActorResponse::r#async(
@@ -1246,10 +1266,7 @@ impl<R: 'static, F: FnOnce(&mut Ws) -> R> Handler<RunOnConMsg<R, F>> for Ws {
 }
 
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
-	fn handle(
-		&mut self, msg: Result<ws::Message, ws::ProtocolError>,
-		ctx: &mut Self::Context,
-	) {
+	fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
 		match msg {
 			Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
 			Ok(ws::Message::Text(msg)) => {
