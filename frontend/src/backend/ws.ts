@@ -22,7 +22,9 @@ export interface OMsgConnect {
 		channel: string | undefined;
 		version: Version;
 		inputMuted?: boolean;
+		inputHardwareEnabled?: boolean;
 		outputMuted?: boolean;
+		outputHardwareEnabled?: boolean;
 		away?: string;
 		password?: string;
 		channelPassword?: string;

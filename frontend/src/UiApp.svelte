@@ -12,7 +12,8 @@
 	import Connect from "./connect/UiConnect.svelte";
 	import GlobalCss from "./GlobalCss.svelte";
 	import GlobalScss from "./GlobalScss.svelte";
-	import { ConnectData } from "./connect/connect";
+	import { ConnectData, MuteState } from "./connect/connect";
+	import type { MuteStates } from "./connect/connect";
 	import { DescriptionMode } from "./transientSettings";
 	import { Channel } from "./book";
 	import { backend } from "./backend/backend";
@@ -69,23 +70,29 @@
 	}
 
 	async function updateGlobalMuteState() {
-		const enum MuteState {
-			None = "None",
-			Muted = "Muted",
-			Disabled = "Disabled",
-		}
-
-		interface MuteStates {
-			input: MuteState,
-			output: MuteState,
-			away: boolean,
-		}
-
 		try {
 			const state: MuteStates = await (await backend.fetch("/mutestate")).json();
-			connectData.inputMuted = state.input !== MuteState.None;
-			connectData.outputMuted = state.output !== MuteState.None;
+			connectData.inputMuted = state.input;
+			connectData.outputMuted = state.output;
 			connectData.away = state.away ? "" : undefined;
+
+			// Save in transientsettings
+			const ui = app.transientSettings.ui;
+			let changed = false
+			if (ui.defaultInputMuted !== (connectData.inputMuted !== MuteState.None)) {
+				ui.defaultInputMuted = connectData.inputMuted !== MuteState.None;
+				changed = true;
+			}
+			if (ui.defaultOutputMuted !== (connectData.outputMuted !== MuteState.None)) {
+				ui.defaultOutputMuted = connectData.outputMuted !== MuteState.None;
+				changed = true;
+			}
+			if (ui.defaultAway !== state.away) {
+				ui.defaultAway = state.away;
+				changed = true;
+			}
+			if (changed)
+				app.transientSettings.save();
 		} catch (e) {
 			console.log("Failed to get mute state", e);
 		}

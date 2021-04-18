@@ -144,7 +144,11 @@ pub struct ConnectOptions {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub input_muted: Option<bool>,
 	#[serde(skip_serializing_if = "Option::is_none")]
+	pub input_hardware_enabled: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub output_muted: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub output_hardware_enabled: Option<bool>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub away: Option<String>,
 	#[serde(skip_serializing_if = "Option::is_none")]

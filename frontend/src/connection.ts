@@ -5,7 +5,7 @@ import { oneshot, fnBroadcast, LOUDNESS_MIN } from "./util";
 import { handleMessage } from "./notification";
 import { backend, IBackendConnection } from "./backend/backend";
 import { app } from "./app";
-import { ConnectData } from "./connect/connect";
+import { ConnectData, MuteState } from "./connect/connect";
 import { OChange, Reason, IMsgPluginCommandPart, TsError, IMsgServerLogPart } from "./book_events";
 import moment from "moment";
 import { ChannelId, ClientId } from "./ts";
@@ -369,14 +369,20 @@ export class Connection {
 										app.select(this, this.book.getChannel(prop.Client.channel!)!);
 								}
 
-								if ("inputMuted" in prop.Client || "outputMuted" in prop.Client
+								if ("inputMuted" in prop.Client || "inputHardwareEnabled" in prop.Client
+									|| "outputMuted" in prop.Client || "outputHardwareEnabled" in prop.Client
 									|| "name" in prop.Client || "awayMessage" in prop.Client
 									|| "channel" in prop.Client) {
 									this.connectOptions.update(opts => {
 										if ("inputMuted" in prop.Client)
-											opts.inputMuted = prop.Client.inputMuted ? true : undefined;
+											opts.inputMuted = prop.Client.inputMuted ? MuteState.Muted : undefined;
+										if ("inputHardwareEnabled" in prop.Client)
+											opts.inputMuted = !prop.Client.inputHardwareEnabled ? MuteState.Disabled : undefined;
 										if ("outputMuted" in prop.Client)
-											opts.outputMuted = prop.Client.outputMuted ? true : undefined;
+											opts.outputMuted = prop.Client.outputMuted ? MuteState.Muted : undefined;
+										if ("outputHardwareEnabled" in prop.Client)
+											opts.outputMuted = !prop.Client.outputHardwareEnabled ? MuteState.Disabled : undefined;
+
 										if (prop.Client.name !== undefined)
 											opts.name = prop.Client.name;
 										if (prop.Client.awayMessage !== undefined) {

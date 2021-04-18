@@ -78,12 +78,6 @@ export class App {
 	}
 
 	public connect(options: ConnectData): Connection {
-		if (options.inputMuted !== undefined)
-			this.transientSettings.ui.defaultInputMuted = options.inputMuted;
-		if (options.outputMuted !== undefined)
-			this.transientSettings.ui.defaultOutputMuted = options.outputMuted;
-		this.transientSettings.save();
-
 		const con = new Connection(options);
 		oneshot(con.state, s => s.closed, () => {
 			this.connections.update(cs => {

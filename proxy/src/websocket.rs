@@ -615,25 +615,30 @@ impl Ws {
 								.logger(actor.logger.clone())
 								.log_commands(o.log_commands || launch_config.verbosity > 0)
 								.log_packets(o.log_packets || launch_config.verbosity > 1)
-								.log_udp_packets(o.log_udp_packets || launch_config.verbosity > 2)
-								.input_muted(o.input_muted.unwrap_or_default())
-								.output_muted(o.output_muted.unwrap_or_default());
+								.log_udp_packets(o.log_udp_packets || launch_config.verbosity > 2);
 
-							if let Some(version) = &o.version {
-								options = options.version(version.clone());
+							macro_rules! opt {
+								($name:ident) => {
+									if let Some($name) = o.$name {
+										options = options.$name($name);
+									}
+								};
+								($name:ident, clone) => {
+									if let Some($name) = &o.$name {
+										options = options.$name($name.clone());
+									}
+								};
 							}
-							if let Some(c) = &o.channel {
-								options = options.channel(c.clone());
-							}
-							if let Some(msg) = &o.away {
-								options = options.away(msg.clone());
-							}
-							if let Some(pw) = &o.channel_password {
-								options = options.channel_password(pw.clone());
-							}
-							if let Some(pw) = &o.password {
-								options = options.password(pw.clone());
-							}
+
+							opt!(input_muted);
+							opt!(input_hardware_enabled);
+							opt!(output_muted);
+							opt!(output_hardware_enabled);
+
+							opt!(version, clone);
+							opt!(channel, clone);
+							opt!(channel_password, clone);
+							opt!(password, clone);
 							if !o.ignore_identity_mismatch {
 								if let Some(server) = server {
 									options = options.server(server);

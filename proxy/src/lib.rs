@@ -958,7 +958,7 @@ async fn get_mute_state(state: web::Data<Arc<State>>) -> impl Responder {
 						res.input_can_talk
 					},
 					input_cannot_talk: if !can_talk {
-						if let Some(i) = res.input_can_talk {
+						if let Some(i) = res.input_cannot_talk {
 							Some(i.merge(state.input))
 						} else {
 							Some(state.input)

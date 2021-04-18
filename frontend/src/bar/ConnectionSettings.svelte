@@ -4,7 +4,7 @@
 	import { Client } from "../book";
 	import type { OChangeConnectionClientUpdate } from "../book_events";
 	import { Connection } from "../connection";
-	import { ConnectData } from "../connect/connect";
+	import { ConnectData, MuteState } from "../connect/connect";
 	import { backend } from "../backend/backend";
 	import { app } from "../app";
 
@@ -24,8 +24,8 @@
 			const awayMessage = $ownClient?.awayMessage;
 			isAway = awayMessage !== undefined && awayMessage !== null;
 		} else if (connectData !== undefined) {
-			inputMuted = connectData.inputMuted ?? false;
-			outputMuted = connectData.outputMuted ?? false;
+			inputMuted = connectData.inputMuted !== MuteState.None;
+			outputMuted = connectData.outputMuted !== MuteState.None;
 			isAway = connectData.away !== undefined;
 		}
 	}
@@ -34,12 +34,12 @@
 		if (change.inputMuted !== undefined) {
 			inputMuted = change.inputMuted;
 			if (connectData !== undefined)
-				connectData.inputMuted = inputMuted;
+				connectData.inputMuted = inputMuted ? MuteState.Muted : MuteState.None;
 		}
 		if (change.outputMuted !== undefined) {
 			outputMuted = change.outputMuted;
 			if (connectData !== undefined)
-				connectData.outputMuted = outputMuted;
+				connectData.outputMuted = outputMuted ? MuteState.Muted : MuteState.None;
 		}
 		if (change.away !== undefined) {
 			isAway = change.away !== null;

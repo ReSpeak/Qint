@@ -4,6 +4,18 @@ import { ChannelId } from "../ts";
 
 const DEFAULT_NAME: string = "QintUser";
 
+export const enum MuteState {
+	None = "None",
+	Muted = "Muted",
+	Disabled = "Disabled",
+}
+
+export interface MuteStates {
+	input: MuteState,
+	output: MuteState,
+	away: boolean,
+}
+
 export class ConnectData {
 
 	constructor(
@@ -13,8 +25,8 @@ export class ConnectData {
 		public identityId?: string,
 		public channel?: string,
 		public channelId?: ChannelId,
-		public inputMuted?: boolean,
-		public outputMuted?: boolean,
+		public inputMuted?: MuteState,
+		public outputMuted?: MuteState,
 		public away?: string,
 		public password?: string,
 		public channelPassword?: string) { }
@@ -35,8 +47,10 @@ export class ConnectData {
 				name: this.name,
 				channel,
 				version: getDefaultVersion(),
-				inputMuted: this.inputMuted,
-				outputMuted: this.outputMuted,
+				inputMuted: this.inputMuted === MuteState.Muted ? true : undefined,
+				inputHardwareEnabled: this.inputMuted === MuteState.Disabled ? false : undefined,
+				outputMuted: this.outputMuted === MuteState.Muted ? true : undefined,
+				outputHardwareEnabled: this.outputMuted === MuteState.Disabled ? false : undefined,
 				away: this.away,
 				password: this.password,
 				channelPassword: this.channelPassword,
