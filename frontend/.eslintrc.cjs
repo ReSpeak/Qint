@@ -11,6 +11,7 @@ module.exports = {
 		"@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
 		"no-debugger": "off",
 		"no-empty": "off",
+		"@typescript-eslint/no-empty-function": "off",
 		"prefer-const": ["error", {"destructuring": "all"}],
 	},
 	overrides: [{ files: ['*.svelte'], processor: 'svelte3/svelte3' }],

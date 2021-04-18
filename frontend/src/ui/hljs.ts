@@ -56,7 +56,7 @@ hljs.registerLanguage("typescript", lang_typescript);
 
 // Needed for typescript
 import type hljs_type from "highlight.js";
-const _unused: typeof hljs_type = undefined!;
+const _: typeof hljs_type = undefined!;
 
 export function hljsHighlight(elem: HTMLElement): void {
 	const lang = elem.getAttribute('data-lang');

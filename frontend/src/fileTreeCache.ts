@@ -15,7 +15,7 @@ export class FileTreeCache {
 		return this;
 	}
 
-	public applyFileInfo(fileInfo: IMsgFileInfo) {
+	public applyFileInfo(_fileInfo: IMsgFileInfo) {
 		throw Error("not impl");
 		//return this;
 	}

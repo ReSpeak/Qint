@@ -1,4 +1,4 @@
-// tslint:disable-next-line: interface-name
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface Array<T> {
 	remove_item(o: T): void;
 }

@@ -104,7 +104,7 @@ export function handleMessage(con: Connection, msg: InMsg, plugins: IPlugin[]): 
 }
 
 function isPoke(target: WsMessageTarget): target is { Poke: ClientId } {
-	return target.hasOwnProperty("Poke");
+	return Object.prototype.hasOwnProperty.call(target, "Poke");
 }
 
 function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHandler) {
@@ -133,7 +133,7 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHand
 				}
 			} else if (msg.Message.invoker.id.toString() !== ownClientId) {
 				// If in quiet mode, ignore all but private messages
-				if (!isQuiet || msg.Message.target.hasOwnProperty("Client")) {
+				if (!isQuiet || Object.prototype.hasOwnProperty.call(msg.Message.target, "Client")) {
 					if (longMessage)
 						handler(con, msg, notif`${msg.Message.invoker} wrote a message`);
 					else
@@ -449,6 +449,6 @@ function textToSpeechNotification(con: Connection, _e: InMsg | InBookMsg | InMes
 	app.transientSettings.synth.trySpeak(no.toString(con));
 }
 
-function _textNotification(_c: Connection, _e: InMsg | InBookMsg | InMessage, _no: TsNotification) {
+function textNotification(_c: Connection, _e: InMsg | InBookMsg | InMessage, _no: TsNotification) {
 	// TODO
 }

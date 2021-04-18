@@ -84,7 +84,7 @@
 			{#if $state.errored}
 				{#if typeof $state.error === "string"}
 					{$state.error}
-				{:else}
+				{:else if $state.error !== undefined}
 					<UiChangeResult result={$state.error} />
 				{/if}
 			{:else}

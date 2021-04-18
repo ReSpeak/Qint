@@ -205,7 +205,9 @@
 	 * This will fetch one block only.
 	 */
 	async function load(dir: ListFetchDir.After | ListFetchDir.Before, from: T): Promise<void>;
+	// eslint-disable-next-line no-redeclare
 	async function load(dir: ListFetchDir.New, from?: T): Promise<void>;
+	// eslint-disable-next-line no-redeclare
 	async function load(dir: ListFetchDir, from?: T): Promise<void> {
 		assert(
 			dir === ListFetchDir.New || from !== undefined,

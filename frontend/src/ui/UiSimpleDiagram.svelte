@@ -101,8 +101,8 @@
 			ctx.beginPath();
 			ctx.moveTo(getX(0), realHeight);
 
-			let startA, endA, endB;
-			startA = start;
+			let endA, endB;
+			const startA = start;
 			const end = start + lengthWithData;
 			if (end > history.length) {
 				endA = history.length;

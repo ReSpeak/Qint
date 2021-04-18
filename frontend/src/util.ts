@@ -25,7 +25,7 @@ export const MIN_VOLUME_DB = -30;
 export const PASSWORD_PLACEHOLDER = "**********";
 
 export const NARROW_NO_BREAK_SPACE = String.fromCharCode(0x202f);
-export const youtubeUrlRegex = /^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube\.com|youtu.be))(\/(?:[\w\-]+\?v=|embed\/|v\/)?)([\w\-]+)(\S+)?$/;
+export const youtubeUrlRegex = /^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube\.com|youtu.be))(\/(?:[\w-]+\?v=|embed\/|v\/)?)([\w-]+)(\S+)?$/;
 
 export const LOUDNESS_MIN = -45;
 export const LOUDNESS_MAX = 0;
@@ -106,6 +106,7 @@ export function createUuidV4(): string {
 		'-' + d2h[vals[10]] + d2h[vals[11]] + d2h[vals[12]] + d2h[vals[13]] + d2h[vals[14]] + d2h[vals[15]];
 }
 
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function assert(condition: any, message: string, ...data: any[]): asserts condition {
 	if (debug === false) return;
 	console.assert(condition, message, ...data);
@@ -171,7 +172,7 @@ export function escapeHtml(s: string): string {
 }
 
 export function ignoreCaseRegex(search: string): RegExp {
-	return RegExp(search.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"), "gi");
+	return RegExp(search.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&"), "gi");
 }
 
 export class BinarySearchResult {
@@ -277,7 +278,8 @@ export function findParent(elem: HTMLElement, selector: string): HTMLElement | u
 	return undefined;
 }
 
-export function focus(node: Element): Record<string, never> {
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+export function focus(node: Element, _args: any): Record<string, never> {
 	(node as HTMLElement).focus();
 	return {};
 }
@@ -389,6 +391,7 @@ export function dbToFactor(volume: number): number {
  * Works similar to Object.assign except that it doesn't overwrite existing
  * object structures. But instead merges them recursively
  */
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function deep_merge(obj: any, merge: any): void {
 	for (const [key, value] of Object.entries(merge)) {
 		if (typeof value === "object" && typeof obj[key] === "object") {
@@ -406,6 +409,7 @@ export function deep_merge(obj: any, merge: any): void {
  * Returns `null` if the value was deleted.
  * Returns the diff object otherwise.
  */
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function deep_diff(from: any, to: any): any | undefined {
 	if (from == null) return to;
 	if (to == null) return null;
@@ -438,6 +442,7 @@ export function deep_diff(from: any, to: any): any | undefined {
 }
 (window as any).deep_diff = deep_diff;
 
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function deep_equals(a: any, b: any): boolean {
 	if (a === b) return true;
 	if (typeof a !== typeof b)
