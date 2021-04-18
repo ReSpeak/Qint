@@ -17,7 +17,7 @@
 	import { getClientAvatarPath } from "../ui/clientIcon";
 	import { Reason } from "../book_events";
 	import { onMount } from "svelte";
-	import { formatSi, hexEncode, NARROW_NO_BREAK_SPACE, on } from "../util";
+	import { formatDuration, formatSi, hexEncode, NARROW_NO_BREAK_SPACE, on } from "../util";
 	import { Client, ServerGroup } from "../book";
 	import BModal from "../ui/BModal.svelte";
 	import { tick } from "svelte";
@@ -325,21 +325,6 @@
 		if (!duration) return "";
 		if (ago) return moment.duration(-duration.asSeconds(), "seconds").humanize(true);
 		else return moment.duration(duration.asSeconds(), "seconds").humanize();
-	}
-
-	function formatDuration(duration: Duration | null | undefined): string {
-		if (!duration) return "";
-		const asSec = Math.floor(duration.asSeconds());
-		if (asSec <= 60) return `${asSec}s`;
-		const asMin = Math.floor(duration.asMinutes());
-		const floorSec = Math.floor(duration.seconds());
-		if (asMin <= 60) return `${asMin}m ${floorSec}s`;
-		const asHour = Math.floor(duration.asHours());
-		const floorMin = Math.floor(duration.minutes());
-		if (asHour <= 24) return `${asHour}h ${floorMin}m ${floorSec}s`;
-		const asDay = Math.floor(duration.asDays());
-		const floorHour = Math.floor(duration.hours());
-		return `${asDay}d ${floorHour}h ${floorMin}m ${floorSec}s`;
 	}
 
 	async function uploadSelectedAvatar() {

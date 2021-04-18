@@ -173,7 +173,7 @@ export class TransientSettingsChat {
 		if (key === undefined) return;
 		const oldVal = (this as any)[key];
 		const storeText = !text ? null : text;
-		if (storeText !== oldVal) {
+		if (storeText !== oldVal && !(storeText === null && oldVal === undefined)) {
 			(this as any)[key] = storeText;
 			this._parent.save();
 		}
@@ -193,19 +193,13 @@ export class TransientSettingsApp {
 
 export class TransientSettingsAudio {
 	public globalVolume: number = 1.0;
-	public loudnessThreshold: number | null = null;
-}
-
-export const enum Tristate {
-	True = "True",
-	False = "False",
-	Toggle = "Toggle",
+	public loudnessThreshold: number | undefined = undefined;
 }
 
 export type HotkeySubject = "Away" | "InputMute" | "OutputMute";
 
 export type HotkeyAction = {
-	[P in HotkeySubject]?: Tristate
+	[P in HotkeySubject]?: null
 };
 
 export interface Hotkey {

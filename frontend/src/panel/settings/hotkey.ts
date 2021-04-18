@@ -1,7 +1,6 @@
-import { Hotkey, HotkeyAction, HotkeySubject, Tristate } from "../../transientSettings";
+import { Hotkey, HotkeyAction, HotkeySubject } from "../../transientSettings";
 
 type Option<T> = Readonly<{ value: T | "", text: string }>;
-type StateOptions = Tristate;
 export const hotkeySubjects: readonly Option<HotkeySubject>[] = [
 	{ value: "", text: "" },
 	{ value: "Away", text: "Away" },
@@ -9,32 +8,20 @@ export const hotkeySubjects: readonly Option<HotkeySubject>[] = [
 	{ value: "OutputMute", text: "Mute Output" },
 ];
 
-export const hotkeyValueFns: readonly Option<StateOptions>[] = [
-	{ value: "", text: "" },
-	{ value: Tristate.True, text: "On" },
-	{ value: Tristate.False, text: "Off" },
-	{ value: Tristate.Toggle, text: "Toggle" },
-]
-
 export function isHotkeyComplete(hotkey: Hotkey): boolean {
 	return hotkey.keycode != null && hotkey.action != null;
 }
 
-export function buildAction(subject: HotkeySubject, valueFn: Tristate): HotkeyAction | null {
-	if (!subject || !valueFn) return null;
+export function buildAction(subject: HotkeySubject): HotkeyAction | null {
+	if (!subject) return null;
 	let obj: HotkeyAction = {};
-	obj[subject] = valueFn;
+	obj[subject] = null;
 	return obj;
 }
 
 export function getActionSubject(action: HotkeyAction | null): HotkeySubject | null {
 	if (!action) return null;
 	return Object.keys(action)[0] as HotkeySubject | undefined ?? null;
-}
-
-export function getActionValueFn(action: HotkeyAction | null): Tristate | null {
-	if (!action) return null;
-	return Object.values(action)[0] ?? null;
 }
 
 export function hotkeyToString(hotkey: Hotkey) {

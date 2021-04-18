@@ -3,7 +3,7 @@
 	import type { ChangePromise } from "../connection";
 	import type { Server } from "../book";
 	import moment from "moment";
-	import { CLEAR_ICON, enumValues, LONG_DATETIME, PASSWORD_PLACEHOLDER } from "../util";
+	import { CLEAR_ICON, enumValues, formatDuration, LONG_DATETIME, on, PASSWORD_PLACEHOLDER } from "../util";
 	import type { RequiredNN, Writeable } from "../util";
 	import BDropDown from "../ui/BDropDown.svelte";
 	import Icon from "../ui/Icon.svelte";
@@ -20,6 +20,7 @@
 	import UiEmojiString from "../ui/UiEmojiString.svelte";
 	import { app } from "../app";
 	import UiServerLog from "./UiServerLog.svelte";
+	import { onMount } from "svelte";
 
 	export let connection: Connection;
 	export let server: Server;
@@ -29,9 +30,7 @@
 	let logOpen = false;
 	$: create_date = $server.created !== undefined ? $server.created : moment.unix(0);
 
-	$: {
-		if ($server.optionalData == null) getOptionalData();
-	}
+	$: on(server, getOptionalData());
 
 	// THIS IS NOT A FULL SERVER OBJECT
 	type EditProps = Omit<Writeable<RequiredNN<Server>>,
@@ -154,13 +153,18 @@
 				ServerVariablesRequest: {},
 			})
 			.catch((reason) => {
-				console.error("ServerVariablesRequest failed: ", reason);
+				console.error("ServerVariablesRequest failed", reason);
 			});
 	}
 
 	function disconnect() {
 		connection.disconnect();
 	}
+
+	onMount(() => {
+		const timer = setInterval(getOptionalData, 10000);
+		return () => clearInterval(timer);
+	})
 </script>
 
 <StickyList>
@@ -211,6 +215,8 @@
 			{:else}
 				<ServerName {connection} />
 			{/if}
+			<div style="flex: 1;" />
+			<PlatformIcon platform={$server.platform} version={$server.version} />
 		</div>
 		{#if editing}
 			<div class="dataLine">
@@ -239,17 +245,23 @@
 		{/if}
 		<div class="dataLine">
 			<div>License:</div>
-			<div title={licenseTypeGetDoc($server.license)}>{$server.license}</div>
-		</div>
-		<div class="dataLine">
-			<div>Version:</div>
-			<PlatformIcon platform={$server.platform} version={$server.version} />
+			<div title={$server.license}>{licenseTypeGetDoc($server.license)}</div>
 		</div>
 		{#if !editing}
 			<div class="dataLine">
 				<div>Host message:</div>
 				<RenderedText {connection} text={$server.hostmessageRendered ?? ''} />
 			</div>
+			{#if $server.hostbannerGfxUrl}
+				<a href={$server.hostbannerUrl}>
+					<img src={$server.hostbannerGfxUrl} alt="hostbanner" />
+				</a>
+			{/if}
+			{#if $server.hostbuttonGfxUrl}
+				<a href={$server.hostbuttonUrl} title={$server.hostbuttonTooltip}>
+					<img src={$server.hostbuttonGfxUrl} alt={$server.hostbuttonTooltip} />
+				</a>
+			{/if}
 		{/if}
 		<div class="dataLine large" class:editing>
 			<div>Welcome message:</div>
@@ -263,6 +275,12 @@
 			<div>Created:</div>
 			<div>{create_date.format(LONG_DATETIME)}</div>
 		</div>
+		{#if $server.optionalData !== null}
+			<div class="dataLine">
+				<div>Uptime:</div>
+				<div>{formatDuration($server.optionalData.uptime)}</div>
+			</div>
+		{/if}
 		{#if editing}
 			<div class="dataLine">
 				<div>Max clients:</div>
@@ -275,7 +293,7 @@
 		{:else}
 			<div class="dataLine">
 				<div>Current clients:</div>
-				<div>{'?'} / {$server.maxClients}</div>
+				<div>{$server.optionalData?.clientCount ?? "?"} / {$server.maxClients}</div>
 				{#if $server.optionalData !== null && $server.optionalData.reservedSlots > 0}
 					<div style="margin-left:0.5em;">
 						({$server.optionalData.reservedSlots}
@@ -311,7 +329,7 @@
 					bind:selected={servEdit.hostmessageMode}
 					items={enumValues(HostMessageMode)} />
 			</div>
-			(TODO) More ...
+			(TODO) More ... Hostbanner, Hostbutton
 		</div>
 
 		<StickySlot>Security</StickySlot>
@@ -359,7 +377,6 @@
 	<div class="descGroup">
 		<p class="buttons">
 			<button class="button is-small is-warning" on:click={disconnect}>
-				<Icon name="" />
 				<span>Disconnect</span>
 			</button>
 		</p>

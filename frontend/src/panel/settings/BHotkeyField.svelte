@@ -3,10 +3,8 @@
 	import {
 		buildAction,
 		getActionSubject,
-		getActionValueFn,
 		hotkeyToString,
 		hotkeySubjects,
-		hotkeyValueFns,
 		translateJsKeyToWindows,
 		isHotkeyComplete,
 	} from "./hotkey";
@@ -27,7 +25,6 @@
 	let input: HTMLInputElement;
 
 	let selectedSubject = getActionSubject(hotkey.action);
-	let selectedValueFn = getActionValueFn(hotkey.action);
 
 	function onKeyHook(e: KeyboardEvent) {
 		e.preventDefault();
@@ -43,8 +40,8 @@
 	}
 
 	function onDropdownChange() {
-		if (!selectedSubject || !selectedValueFn) return;
-		hotkey.action = buildAction(selectedSubject, selectedValueFn);
+		if (!selectedSubject) return;
+		hotkey.action = buildAction(selectedSubject);
 		log("%j", hotkey);
 		if (isHotkeyComplete(hotkey)) dispatch("change");
 	}
@@ -74,12 +71,6 @@
 				on:change={onDropdownChange}
 				items={hotkeySubjects}
 				bind:selected={selectedSubject} />
-		</div>
-		<div class="control">
-			<BDropDown
-				on:change={onDropdownChange}
-				items={hotkeyValueFns}
-				bind:selected={selectedValueFn} />
 		</div>
 		<div class="control">
 			<input bind:this={input} class="input" value={hotkeyToString(hotkey)} />

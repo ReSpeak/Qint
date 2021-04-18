@@ -129,6 +129,21 @@ export function getDataColor(data: number[] | string, lightBackground: boolean =
 	return color.css();
 }
 
+export function formatDuration(duration: Duration | null | undefined): string {
+	if (!duration) return "";
+	const asSec = Math.floor(duration.asSeconds());
+	if (asSec <= 60) return `${asSec}${NARROW_NO_BREAK_SPACE}s`;
+	const asMin = Math.floor(duration.asMinutes());
+	const floorSec = Math.floor(duration.seconds());
+	if (asMin <= 60) return `${asMin}${NARROW_NO_BREAK_SPACE}m ${floorSec}${NARROW_NO_BREAK_SPACE}s`;
+	const asHour = Math.floor(duration.asHours());
+	const floorMin = Math.floor(duration.minutes());
+	if (asHour <= 24) return `${asHour}${NARROW_NO_BREAK_SPACE}h ${floorMin}${NARROW_NO_BREAK_SPACE}m ${floorSec}${NARROW_NO_BREAK_SPACE}s`;
+	const asDay = Math.floor(duration.asDays());
+	const floorHour = Math.floor(duration.hours());
+	return `${asDay}${NARROW_NO_BREAK_SPACE}d ${floorHour}${NARROW_NO_BREAK_SPACE}h ${floorMin}${NARROW_NO_BREAK_SPACE}m ${floorSec}${NARROW_NO_BREAK_SPACE}s`;
+}
+
 export function arraysEqual<T>(a: ArrayLike<T>, b: ArrayLike<T>): boolean {
 	if (a === b) return true;
 	if (a == null || b == null || a.length !== b.length)

@@ -36,20 +36,13 @@
 	const LOUDNESS_HEIGHT = 300;
 	const LOUDNESS_COUNT = 500;
 
-	// Reload settings
-	// TODO Why? This removes all unsaved changes we made
-	/*app.transientSettings.loadAsync().then(() => {
-		globalVolume = factorToDb(audioSett.globalVolume);
-		loudnessThreshold = audioSett.loudnessThreshold ?? loudnessThreshold;
-	});*/
-
 	function syncSettings() {
 		app.transientSettings.save();
 	}
 
 	function updateLoudness() {
 		audioSett.loudnessThreshold =
-			loudnessThreshold === minLoudnessThreshold ? null : loudnessThreshold;
+			loudnessThreshold === minLoudnessThreshold ? undefined : loudnessThreshold;
 		syncSettings();
 	}
 

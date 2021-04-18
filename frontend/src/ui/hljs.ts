@@ -65,7 +65,7 @@ export function hljsHighlight(elem: HTMLElement) {
 	let res: HighlightResult;
 	try {
 		if (hl_lang !== undefined) {
-			res = hljs.highlight(lang!, code);
+			res = hljs.highlight(code, { language: lang! });
 		} else {
 			res = hljs.highlightAuto(code);
 		}
