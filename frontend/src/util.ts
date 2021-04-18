@@ -503,7 +503,7 @@ export function debounced<T extends unknown[] = []>(fn: FuncTyp<T>, timeout: num
 		}
 
 		if (timer === undefined) {
-			timer = setTimeout(() => {
+			timer = window.setTimeout(() => {
 				timer = undefined;
 				fn(...lastArgs);
 			}, timeout);

@@ -30,6 +30,12 @@ export enum TalkState {
 	Whisper
 }
 
+export enum MaxClientsMode {
+	Inherited = "Inherited",
+	Unlimited = "Unlimited",
+	Limited = "Limited",
+}
+
 export type MaxClients = "Inherited" | "Unlimited" | { Limited: number };
 export type OffsetDateTime = [number, number];
 export type RustDuration = [number, number];

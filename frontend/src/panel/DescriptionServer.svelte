@@ -15,7 +15,7 @@
 	import StickyHeader from "./StickyHeader.svelte";
 	import RenderedText from "../ui/RenderedText.svelte";
 	import RenderedTextEditor from "../ui/RenderedTextEditor.svelte";
-	import { CodecEncryptionMode, HostMessageMode, licenseTypeGetDoc, OptionalServerDataGen } from "../book_events";
+	import { CodecEncryptionMode, HostBannerMode, HostMessageMode, licenseTypeGetDoc, OptionalServerDataGen } from "../book_events";
 	import UiChangeResult from "../ui/UiChangeResult.svelte";
 	import UiEmojiString from "../ui/UiEmojiString.svelte";
 	import { app } from "../app";
@@ -30,7 +30,7 @@
 	let logOpen = false;
 	$: create_date = $server.created !== undefined ? $server.created : moment.unix(0);
 
-	$: on(server, getOptionalData());
+	$: on($server, $server.optionalData === null ? getOptionalData() : undefined);
 
 	// THIS IS NOT A FULL SERVER OBJECT
 	type EditProps = Omit<Writeable<RequiredNN<Server>>,
@@ -214,8 +214,13 @@
 				<input class="input" type="text" bind:value={servEdit.name} />
 			{:else}
 				<ServerName {connection} />
+				{#if $server.nickname}
+					<span style="margin-left:1em;">(Nickname: </span>
+					<code class="nick">{$server.nickname}</code>
+					<span>)</span>
+				{/if}
 			{/if}
-			<div style="flex: 1;" />
+			<div style="flex: 1;" class="platformIconSpacer" />
 			<PlatformIcon platform={$server.platform} version={$server.version} />
 		</div>
 		{#if editing}
@@ -228,15 +233,6 @@
 					placeholder="Same as name by default" />
 			</div>
 		{/if}
-		<div class="dataLine">
-			<div>IPs:</div>
-			<div>{$server.ips?.join(', ') ?? ''}</div>
-			{#if $server.nickname && !editing}
-				<span style="margin-left:1em;">(Nickname: </span>
-				<code class="nick">{$server.nickname}</code>
-				<span>)</span>
-			{/if}
-		</div>
 		{#if editing}
 			<div class="dataLine">
 				<label for="edit_nickname">Nickname:</label>
@@ -252,16 +248,6 @@
 				<div>Host message:</div>
 				<RenderedText {connection} text={$server.hostmessageRendered ?? ''} />
 			</div>
-			{#if $server.hostbannerGfxUrl}
-				<a href={$server.hostbannerUrl}>
-					<img src={$server.hostbannerGfxUrl} alt="hostbanner" />
-				</a>
-			{/if}
-			{#if $server.hostbuttonGfxUrl}
-				<a href={$server.hostbuttonUrl} title={$server.hostbuttonTooltip}>
-					<img src={$server.hostbuttonGfxUrl} alt={$server.hostbuttonTooltip} />
-				</a>
-			{/if}
 		{/if}
 		<div class="dataLine large" class:editing>
 			<div>Welcome message:</div>
@@ -283,12 +269,12 @@
 		{/if}
 		{#if editing}
 			<div class="dataLine">
-				<div>Max clients:</div>
-				<input class="input" type="number" bind:value={servEdit.maxClients} />
+				<label for="edit_maxClients">Max clients:</label>
+				<input id="edit_maxClients" class="input" type="number" bind:value={servEdit.maxClients} />
 			</div>
 			<div class="dataLine">
-				<div>Reserved slots:</div>
-				<input class="input" type="number" bind:value={servEditOpt.reservedSlots} />
+				<label for="edit_reservedSlots">Reserved slots:</label>
+				<input id="edit_reservedSlots" class="input" type="number" bind:value={servEditOpt.reservedSlots} />
 			</div>
 		{:else}
 			<div class="dataLine">
@@ -304,6 +290,18 @@
 		{/if}
 		{#if $developMode}
 			<div class="dataLine">
+				<div>IPs:</div>
+				<div>{$server.ips?.join(', ') ?? ''}</div>
+			</div>
+			<div class="dataLine">
+				<div>Port:</div>
+				<div>{$server.optionalData?.port}</div>
+			</div>
+			<div class="dataLine">
+				<div>Id:</div>
+				<div>{$server.id}</div>
+			</div>
+			<div class="dataLine">
 				<div>Uid:</div>
 				<div>{$server.uidStr}</div>
 			</div>
@@ -314,35 +312,87 @@
 				</div>
 			</div>
 		{/if}
+		{#if !editing}
+			{#if $server.hostbuttonGfxUrl}
+				<div class="dataLine">
+					<a href={$server.hostbuttonUrl} title={$server.hostbuttonTooltip}>
+						<img src={$server.hostbuttonGfxUrl} alt={$server.hostbuttonTooltip} class="hostbutton" />
+					</a>
+				</div>
+			{/if}
+			{#if $server.hostbannerGfxUrl}
+				<div class="dataLine">
+					<a href={$server.hostbannerUrl}>
+						<img src={$server.hostbannerGfxUrl} alt="hostbanner" class="hostbanner" />
+					</a>
+				</div>
+			{/if}
+		{/if}
 	</div>
 	{#if editing}
 		<StickySlot>Host</StickySlot>
 		<div class="descGroup" class:editing>
-			<div class="dataLine large" class:editing>
-				<div>Host message:</div>
-				<RenderedTextEditor {connection} bind:raw={servEdit.hostmessage} />
+			<div class="dataLine">
+				<h3 class="title">Host message:</h3>
 			</div>
+			<RenderedTextEditor {connection} bind:raw={servEdit.hostmessage} />
 
 			<div class="dataLine">
-				<div>Host message mode:</div>
+				<label for="edit_hostmessageMode">Mode:</label>
 				<BDropDown
+					id="edit_hostmessageMode"
 					bind:selected={servEdit.hostmessageMode}
 					items={enumValues(HostMessageMode)} />
 			</div>
-			(TODO) More ... Hostbanner, Hostbutton
+
+			<div class="dataLine">
+				<h3 class="title">Host banner</h3>
+			</div>
+			<div class="dataLine">
+				<label for="edit_hostbannerUrl">URL:</label>
+				<input id="edit_hostbannerUrl" class="input" bind:value={servEdit.hostbannerUrl} />
+			</div>
+			<div class="dataLine">
+				<label for="edit_hostbannerGfxUrl">Image:</label>
+				<input id="edit_hostbannerGfxUrl" class="input" bind:value={servEdit.hostbannerGfxUrl} />
+			</div>
+			<div class="dataLine">
+				<label for="edit_hostbannerMode">Mode:</label>
+				<BDropDown
+					id="edit_hostbannerMode"
+					bind:selected={servEdit.hostbannerMode}
+					items={enumValues(HostBannerMode)} />
+			</div>
+
+			<div class="dataLine">
+				<h3 class="title">Host button</h3>
+			</div>
+			<div class="dataLine">
+				<label for="edit_hostbuttonUrl">URL:</label>
+				<input id="edit_hostbuttonUrl" class="input" bind:value={servEdit.hostbuttonUrl} />
+			</div>
+			<div class="dataLine">
+				<label for="edit_hostbuttonGfxUrl">Image:</label>
+				<input id="edit_hostbuttonGfxUrl" class="input" bind:value={servEdit.hostbuttonGfxUrl} />
+			</div>
+			<div class="dataLine">
+				<label for="edit_hostbuttonTooltip">Tooltip:</label>
+				<input id="edit_hostbuttonTooltip" class="input" bind:value={servEdit.hostbuttonTooltip} />
+			</div>
 		</div>
 
 		<StickySlot>Security</StickySlot>
 		<div class="descGroup" class:editing>
 			<div class="dataLine">
-				<div>Audio encryption mode:</div>
+				<label for="edit_codecEncryptionMode">Audio encryption mode:</label>
 				<BDropDown
+					id="edit_codecEncryptionMode"
 					bind:selected={servEdit.codecEncryptionMode}
 					items={enumValues(CodecEncryptionMode)} />
 			</div>
 
 			<div class="dataLine">
-				<div>Password:</div>
+				<label for="edit_password">Password:</label>
 				<div class="field has-addons">
 					<div class="control">
 						<input
@@ -400,5 +450,14 @@
 
 	.serverLog > :global(.serverLog) {
 		max-height: calc(100vh - 15em);
+	}
+
+	.platformIconSpacer {
+		margin-right: 0.5em;
+	}
+
+	.hostbutton {
+		max-width: 5em;
+		max-height: 5em;
 	}
 </style>

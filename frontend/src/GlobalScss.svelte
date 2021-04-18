@@ -22,6 +22,7 @@
 	@import "bulma/sass/elements/notification";
 	@import "bulma/sass/elements/table";
 	@import "bulma/sass/elements/tag";
+	@import "bulma/sass/elements/title";
 	@import "bulma/sass/form/shared";
 	@import "bulma/sass/form/input-textarea";
 	@import "bulma/sass/form/select";

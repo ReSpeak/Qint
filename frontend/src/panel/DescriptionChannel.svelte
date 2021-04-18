@@ -8,13 +8,14 @@
 	import StickyHeader from "./StickyHeader.svelte";
 	import { codecToName } from "../book";
 	import type { Channel } from "../book";
+	import { MaxClientsMode } from "../ts";
 	import RenderedText from "../ui/RenderedText.svelte";
 	import RenderedTextEditor from "../ui/RenderedTextEditor.svelte";
 	import BDropDown from "../ui/BDropDown.svelte";
 	import BSlider from "../ui/BSlider.svelte";
 	import BDurationPicker from "../ui/BDurationPicker.svelte";
 	import { ChannelType, Codec, CodecEncryptionMode } from "../book_events";
-	import { CLEAR_ICON, durationSerialize, on, PASSWORD_PLACEHOLDER } from "../util";
+	import { CLEAR_ICON, durationSerialize, enumValues, on, PASSWORD_PLACEHOLDER } from "../util";
 	import type { RequiredNN, Writeable } from "../util";
 	import type { Duration } from "moment";
 	import UiChangeResult from "../ui/UiChangeResult.svelte";
@@ -53,6 +54,10 @@
 		_password: string;
 	};
 	let chanEdit: EditProps = createPropsCopy();
+	let chanEditMaxClientsMode: MaxClientsMode;
+	let chanEditMaxClientsLimit: number;
+	let chanEditMaxFamilyClientsMode: MaxClientsMode;
+	let chanEditMaxFamilyClientsLimit: number;
 	let changeRequest: ChangePromise | undefined;
 
 	$: descRequest = requestDescription($channel);
@@ -90,6 +95,21 @@
 
 	function getPropsDiff() {
 		let diff: Record<string, any> = {};
+
+		if (chanEditMaxClientsMode === MaxClientsMode.Inherited)
+			chanEdit.maxClients = "Inherited";
+		else if (chanEditMaxClientsMode === MaxClientsMode.Unlimited)
+			chanEdit.maxClients = "Unlimited";
+		else if (chanEditMaxClientsMode === MaxClientsMode.Limited)
+			chanEdit.maxClients = { Limited: chanEditMaxClientsLimit };
+
+		if (chanEditMaxFamilyClientsMode === MaxClientsMode.Inherited)
+			chanEdit.maxFamilyClients = "Inherited";
+		else if (chanEditMaxFamilyClientsMode === MaxClientsMode.Unlimited)
+			chanEdit.maxFamilyClients = "Unlimited";
+		else if (chanEditMaxFamilyClientsMode === MaxClientsMode.Limited)
+			chanEdit.maxFamilyClients = { Limited: chanEditMaxFamilyClientsLimit };
+
 		for (const [key, value] of Object.entries(chanEdit)) {
 			if (key.startsWith("_")) continue;
 			if (((channel as any)[key] as any) !== value) {
@@ -129,6 +149,24 @@
 	function clickEditMode() {
 		editing = true;
 		chanEdit = createPropsCopy();
+
+		if (chanEdit.maxClients === "Inherited")
+			chanEditMaxClientsMode = MaxClientsMode.Inherited;
+		else if (chanEdit.maxClients === "Unlimited")
+			chanEditMaxClientsMode = MaxClientsMode.Unlimited;
+		else {
+			chanEditMaxClientsMode = MaxClientsMode.Limited;
+			chanEditMaxClientsLimit = chanEdit.maxClients.Limited;
+		}
+
+		if (chanEdit.maxFamilyClients === "Inherited")
+			chanEditMaxFamilyClientsMode = MaxClientsMode.Inherited;
+		else if (chanEdit.maxFamilyClients === "Unlimited")
+			chanEditMaxFamilyClientsMode = MaxClientsMode.Unlimited;
+		else {
+			chanEditMaxFamilyClientsMode = MaxClientsMode.Limited;
+			chanEditMaxFamilyClientsLimit = chanEdit.maxFamilyClients.Limited;
+		}
 	}
 
 	function clickSaveChanges() {
@@ -229,20 +267,21 @@
 			{/if}
 		{/if}
 		<div class="dataLine">
-			<span>Topic:</span>
+			<label for="edit_topic">Topic:</label>
 			{#if editing}
-				<input class="input" type="text" bind:value={chanEdit.topic} />
+				<input id="edit_topic" class="input" type="text" bind:value={chanEdit.topic} />
 			{:else}{$channel.topic ?? ''}{/if}
 		</div>
 		{#if editing}
 			<div class="dataLine">
-				<div>Codec:</div>
-				<BDropDown bind:selected={chanEdit.codec} items={codecOpt} display={codecToName} />
+				<label for="edit_codec">Codec:</label>
+				<BDropDown id="edit_codec" bind:selected={chanEdit.codec} items={codecOpt} display={codecToName} />
 			</div>
 			<div class="dataLine">
-				<div>Codec quality:</div>
+				<label for="edit_codecQuality">Codec quality:</label>
 				<div class="flex1">
 					<BSlider
+						id="edit_codecQuality"
 						min={1}
 						max={10}
 						step={1}
@@ -282,9 +321,10 @@
 		{/if}
 		{#if $channel.neededTalkPower !== 0 || editing}
 			<div class="dataLine">
-				<span>Required talk power:</span>
+				<label for="edit_neededTalkPower">Required talk power:</label>
+				<span></span>
 				{#if editing}
-					<input class="input" type="number" bind:value={chanEdit.neededTalkPower} />
+					<input id="edit_neededTalkPower" class="input" type="number" bind:value={chanEdit.neededTalkPower} />
 				{:else}
 					<div>{$channel.neededTalkPower}</div>
 				{/if}
@@ -298,22 +338,43 @@
 		{/if}
 		{#if editing}
 			<div class="dataLine">
-				<div>Max clients:</div>
-				<div>{chanEdit.maxClients} (TODO)</div>
+				<label for="edit_maxClients" title="Maximum amount of clients in this channel">Max clients:</label>
+				<BDropDown
+					id="edit_maxClients"
+					bind:selected={chanEditMaxClientsMode}
+					items={enumValues(MaxClientsMode)} />
+				{#if chanEditMaxClientsMode === MaxClientsMode.Limited}
+					<input class="input maxClientsLimit" type="number" bind:value={chanEditMaxClientsLimit} />
+				{/if}
 			</div>
 			<div class="dataLine">
-				<div>Max family clients:</div>
-				<div>{chanEdit.maxFamilyClients} (TODO)</div>
+				<label for="edit_maxFamilyClients" title="Maximum amount of clients in this channel and all subchannels combined">Max family clients:</label>
+				<BDropDown
+					id="edit_maxFamilyClients"
+					bind:selected={chanEditMaxFamilyClientsMode}
+					items={enumValues(MaxClientsMode)} />
+				{#if chanEditMaxFamilyClientsMode === MaxClientsMode.Limited}
+					<input class="input maxClientsLimit" type="number" bind:value={chanEditMaxFamilyClientsLimit} />
+				{/if}
 			</div>
 		{:else}
 			<div class="dataLine">
 				<div>Current clients:</div>
-				<div>{clientCount} / {formatMaxClients}</div>
+				<div>
+					{clientCount} / {formatMaxClients}
+					{#if $channel.maxFamilyClients !== null && $channel.maxFamilyClients !== "Unlimited"}
+						{#if $channel.maxFamilyClients === "Inherited"}
+							(max clients in family are inherited)
+						{:else}
+							(max clients in family: {$channel.maxFamilyClients.Limited})
+						{/if}
+					{/if}
+				</div>
 			</div>
 		{/if}
 		{#if editing}
 			<div class="dataLine">
-				<div>Password:</div>
+				<label for="edit_password">Password:</label>
 				<div class="field has-addons">
 					<div class="control">
 						<input
@@ -363,5 +424,9 @@
 
 	.disabled {
 		color: darken($text, 25);
+	}
+
+	.maxClientsLimit {
+		margin-left: 1.5em;
 	}
 </style>

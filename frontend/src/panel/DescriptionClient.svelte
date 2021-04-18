@@ -17,7 +17,7 @@
 	import { getClientAvatarPath } from "../ui/clientIcon";
 	import { Reason } from "../book_events";
 	import { onMount } from "svelte";
-	import { formatDuration, formatSi, hexEncode, NARROW_NO_BREAK_SPACE, on } from "../util";
+	import { formatDuration, formatSi, hexEncode, LONG_DATETIME, NARROW_NO_BREAK_SPACE, on } from "../util";
 	import { Client, ServerGroup } from "../book";
 	import BModal from "../ui/BModal.svelte";
 	import { tick } from "svelte";
@@ -427,7 +427,7 @@
 	function updateTimer() {
 		if (timer !== undefined) clearInterval(timer);
 		// Throttle when stats are not open, we still need to update last active and online time
-		timer = setInterval(updateClientInfo, statsOpen ? 1000 : 10000);
+		timer = window.setInterval(updateClientInfo, statsOpen ? 1000 : 10000);
 	}
 
 	onMount(() => {
@@ -497,17 +497,17 @@
 
 		<div class="descTable">
 			{#if editing}
-				<div>
+				<label for="edit_phoneticName">
 					Phonetic name{#if !ownClient}<Icon name="information-outline" title="Change is not visible for others" />{/if}:
-				</div>
+				</label>
 				<div>
-					<input class="input" type="text" bind:value={clientSpecialEdit.phoneticName} />
+					<input id="edit_phoneticName" class="input" type="text" bind:value={clientSpecialEdit.phoneticName} />
 				</div>
 			{/if}
-			<div>Description:</div>
+			<label for="edit_description">Description:</label>
 			<div>
 				{#if editing}
-					<input class="input" type="text" bind:value={clientEdit.description} />
+					<input id="edit_description" class="input" type="text" bind:value={clientEdit.description} />
 				{:else}{$client.description}{/if}
 			</div>
 			<div>Online:</div>
@@ -515,6 +515,13 @@
 			<div>Last active:</div>
 			<div>{formatAgo($client.connectionData?.idleTime, true)}</div>
 			{#if $developMode}
+				{#if $client.optionalData !== null}
+					<div>First connected:</div>
+					<div>{$client.optionalData.created.format(LONG_DATETIME)}</div>
+					<div>Last connected:</div>
+					<div>{$client.optionalData.lastConnected.format(LONG_DATETIME)}</div>
+				{/if}
+
 				{#if $client.uid !== null}
 					<div>Uid:</div>
 					<div>{$client.uidStr}</div>
@@ -525,6 +532,8 @@
 				{/if}
 				<div>Id:</div>
 				<div>{$client.id}</div>
+				<div>Database id:</div>
+				<div>{$client.databaseId}</div>
 			{/if}
 			{#if editing}
 				<div>

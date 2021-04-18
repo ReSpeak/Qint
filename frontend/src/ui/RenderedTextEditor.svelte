@@ -81,10 +81,6 @@
 </div>
 
 <style lang="scss">
-	.renderedTextEditor {
-		width: 100%;
-	}
-
 	.editbox {
 		display: flex;
 
