@@ -20,4 +20,4 @@ Foreach ($file in "qint-proxy.exe", "WebView2Loader.dll") {
 }
 Copy-Item -Path "./proxy-codegen/SDL2.dll" -Destination "./target/publish/" -Force
 # Copy frontend
-Copy-Item -Path "./frontend/build/*" -Destination (Join-Path "./target/publish/" $Env:FRONTEND_PATH -Resolve) -Recurse -Force
+Copy-Item -Path "./frontend/dist/*" -Destination (Join-Path "./target/publish/" $Env:FRONTEND_PATH -Resolve) -Recurse -Force
