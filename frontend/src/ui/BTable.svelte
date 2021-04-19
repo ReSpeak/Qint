@@ -276,7 +276,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 			{#each c_rows as row}
 				<tr
 					use:draggable={true}
-					on:svddrag={(e) => dragStart(e, row)}
+					on:svddrag={e => dragStart(e, row)}
 					on:svddrop={dragDrop}
 					on:click={(e) => handleClickRow(e, row, false)}
 					on:dblclick={(e) => handleClickRow(e, row, true)}

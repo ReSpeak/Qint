@@ -13,7 +13,8 @@
 	let searchList: UiLazyList | undefined;
 	let otherSearchList: UiLazyList | undefined;
 	let searchError: unknown | undefined;
-	let resultCount = 0;
+	let messageResultCount = 0;
+	let otherResultCount = 0;
 
 	$: {
 		if (searchList) {
@@ -45,12 +46,12 @@
 				canLoadBeforeStart = start !== 0;
 				res = await search(filter, start);
 				res.others = res.others.slice(0, idFrom.id - start);
-				resultCount = res.count;
+				otherResultCount = res.count;
 			} else {
 				if (idFrom !== undefined)
 					canLoadBeforeStart = idFrom.id !== 0;
 				res = await search(filter, idFrom !== undefined ? idFrom.id + 1 : undefined);
-				resultCount = res.count;
+				otherResultCount = res.count;
 				if (res.others.length < 50)
 					canLoadAfterEnd = false;
 			}
@@ -82,12 +83,12 @@
 				canLoadBeforeStart = start !== 0;
 				res = await search(filter, start);
 				res.messages = res.messages.slice(0, idFrom.id - start);
-				resultCount = res.count;
+				messageResultCount = res.count;
 			} else {
 				if (idFrom !== undefined)
 					canLoadBeforeStart = idFrom.id !== 0;
 				res = await search(filter, idFrom !== undefined ? idFrom.id + 1 : undefined);
-				resultCount = res.count;
+				messageResultCount = res.count;
 				if (res.messages.length < 50)
 					canLoadAfterEnd = false;
 			}
@@ -120,6 +121,7 @@
 			</article>
 		</div>
 	{:else if filter.length >= 2}
+		<div>{otherResultCount} results</div>
 		<UiLazyList
 			bind:this={otherSearchList}
 			fetchElements={fetchOtherElements}
@@ -133,6 +135,7 @@
 			<UiOtherSearchResult content={item} />
 		</UiLazyList>
 
+		<div>Found {messageResultCount} messages</div>
 		<UiLazyList
 			bind:this={searchList}
 			fetchElements={fetchMessageElements}
