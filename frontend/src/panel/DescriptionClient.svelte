@@ -4,7 +4,7 @@
 	import type { ChangePromise } from "../connection";
 	import type { ServerGroupId } from "../ts";
 	import moment from "moment";
-	import type { Duration } from "moment";
+	import type { Duration, Moment } from "moment";
 	import Icon from "../ui/Icon.svelte";
 	import PlatformIcon from "../ui/PlatformIcon.svelte";
 	import ServerGroupIcon from "../ui/ServerGroupIcon.svelte";
@@ -25,7 +25,8 @@
 	import UiChangeResult from "../ui/UiChangeResult.svelte";
 	import UiEmojiString from "../ui/UiEmojiString.svelte";
 	import { app } from "../app";
-	import Chart from "chart.js";
+	import type { ChartConfiguration } from 'chart.js';
+	import 'chartjs-adapter-moment';
 
 	export let connection: Connection;
 	export let client: Client;
@@ -66,26 +67,27 @@
 	let [clientEdit, clientSpecialEdit] = createPropsCopy();
 	let changeRequest: ChangePromise | undefined;
 
-	const chartConfig: Chart.ChartConfiguration = {
+	type TimeDataPoint = { x: Moment, y: number | undefined };
+	const chartConfig: ChartConfiguration<"line", TimeDataPoint[]> = {
 		type: "line",
 		data: {
 			datasets: [{
 				label: "Ping",
-				yAxisID: "Ping",
+				yAxisID: "ping",
 				data: [],
 				backgroundColor: "#87A23600",
 				borderColor: "#87A236FF",
 				pointRadius: 1
 			}, {
 				label: "Packet loss to Server",
-				yAxisID: "Packetloss",
+				yAxisID: "packetloss",
 				data: [],
 				backgroundColor: "#9F354800",
 				borderColor: "#9F3548FF",
 				pointRadius: 1
 			}, {
 				label: "Packet loss from Server",
-				yAxisID: "Packetloss",
+				yAxisID: "packetloss",
 				data: [],
 				backgroundColor: "#512C7300",
 				borderColor: "#512C73FF",
@@ -94,44 +96,43 @@
 		},
 		options: {
 			scales: {
-				xAxes: [{
+				x: {
 					type: "time",
-					time: {
-						unit: "second",
-						displayFormats: {
-							second: "X"
-						},
-						stepSize: 5
-					},
 					ticks: {
 						callback: function(value) {
 							let seconds = moment().diff(moment(value, "X"), "seconds");
 							if (seconds < 1) seconds = 0;
 							return `${seconds}${NARROW_NO_BREAK_SPACE}s`;
 						}
+					},
+					time: {
+						unit: "second",
+						displayFormats: {
+							second: "X"
+						},
+						stepSize: 5
 					}
-				}],
-				yAxes: [{
-					id: "Ping",
+				},
+				ping: {
+					beginAtZero: true,
+					suggestedMax: 100,
 					ticks: {
-						beginAtZero: true,
-						suggestedMax: 100,
 						maxTicksLimit: 5,
 						callback: function(value) {
 							return `${value}${NARROW_NO_BREAK_SPACE}ms`;
 						}
 					}
-				}, {
-					id: "Packetloss",
+				},
+				packetloss: {
+					beginAtZero: true,
+					suggestedMax: 5,
 					ticks: {
-						beginAtZero: true,
-						suggestedMax: 5,
 						maxTicksLimit: 5,
 						callback: function(value) {
 							return `${Number(value)}${NARROW_NO_BREAK_SPACE}%`;
 						}
 					}
-				}]
+				}
 			}
 		}
 	};
@@ -159,7 +160,7 @@
 		});
 	}
 
-	function createDataPoint(value: number | undefined): Chart.ChartPoint {
+	function createDataPoint(value: number | undefined): TimeDataPoint {
 		return {
 			x: moment(),
 			y: value,
@@ -171,9 +172,7 @@
 		return loss01 * 100;
 	}
 
-	function addChartValue(data: (number | number[] | null | undefined)[] | Chart.ChartPoint[] | undefined, newValue: number | undefined) {
-		if (!data) return;
-
+	function addChartValue(data: TimeDataPoint[], newValue: number | undefined) {
 		data.push(createDataPoint(newValue));
 
 		while (data.length > CHART_ENTRY_COUNT) {
@@ -182,10 +181,10 @@
 	}
 
 	function chartRefresh() {
-		addChartValue(chartConfig.data?.datasets![0].data, client.connectionData ? client.connectionData.ping?.asMilliseconds() : undefined);
-		addChartValue(chartConfig.data?.datasets![1].data, packetLossToPercent(client.connectionData?.clientToServerPacketlossTotal));
-		addChartValue(chartConfig.data?.datasets![2].data, packetLossToPercent(client.connectionData?.serverToClientPacketlossTotal));
-		chart?.updateChart?.();
+		addChartValue(chartConfig.data.datasets[0].data, client.connectionData ? client.connectionData.ping?.asMilliseconds() : undefined);
+		addChartValue(chartConfig.data.datasets[1].data, packetLossToPercent(client.connectionData?.clientToServerPacketlossTotal));
+		addChartValue(chartConfig.data.datasets[2].data, packetLossToPercent(client.connectionData?.serverToClientPacketlossTotal));
+		chart?.updateChart();
 	}
 
 	function onClientChanged() {
@@ -200,7 +199,7 @@
 				dataset.data.push(entry);
 			}
 		});
-		chart?.updateChart?.();
+		chart?.updateChart();
 	}
 
 	async function changeServerGroup(e: Event, group: ServerGroupId, isMember: boolean) {

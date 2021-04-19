@@ -60,6 +60,11 @@ yarn
 yarn dev
 # For builds
 yarn build
+
+# For checks
+yarn typecheck
+yarn lint
+yarn format
 ```
 
 Now, you can use the client at [http://localhost:4422](http://localhost:4422).

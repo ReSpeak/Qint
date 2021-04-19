@@ -1,8 +1,44 @@
 <script lang="ts">
-	import Chart from "chart.js";
 	import { onMount } from "svelte";
+	import {
+		Chart,
+		ArcElement,
+		LineElement,
+		BarElement,
+		PointElement,
+		BarController,
+		LineController,
+		ScatterController,
+		CategoryScale,
+		LinearScale,
+		TimeScale,
+		TimeSeriesScale,
+		Filler,
+		Legend,
+		Title,
+		Tooltip
+	} from "chart.js";
+	import "chartjs-adapter-moment";
 
-	export let config: Chart.ChartConfiguration;
+	Chart.register(
+		ArcElement,
+		LineElement,
+		BarElement,
+		PointElement,
+		BarController,
+		LineController,
+		ScatterController,
+		CategoryScale,
+		LinearScale,
+		TimeScale,
+		TimeSeriesScale,
+		Filler,
+		Legend,
+		Title,
+		Tooltip
+	);
+
+	export let config: any;
 	let chartCanvas: HTMLCanvasElement;
 	let chart: Chart;
 
