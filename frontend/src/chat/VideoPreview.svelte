@@ -101,13 +101,13 @@
 
 <div class="chatVideoWrap padTop">
 	<div class="chatVideo limitChatSize">
-		{#if detectedType === 'media'}
+		{#if detectedType === "media"}
 			<!-- svelte-ignore a11y-media-has-caption -->
 			<video bind:this={html5videoElem} controls playsinline allowfullscreen>
 				<source src={videoSrc} />
 				Your browser does not support the video tag.
 			</video>
-		{:else if detectedType === 'youtube'}
+		{:else if detectedType === "youtube"}
 			{#if preview_only}
 				<div class="playableOverlay" on:click={() => (preview_only = false)}>
 					<img

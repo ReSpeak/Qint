@@ -35,24 +35,26 @@ export class Bookmark {
 		if (this.lastUsed)
 			this.lastUsed = datetimeDeserialize([content.lastUsed, content.timezone]);
 		if (this.server !== null) {
-			if (content.server?.icon !== undefined)
-				this.server.icon = content.server.icon;
+			if (content.server?.icon !== undefined) this.server.icon = content.server.icon;
 			this.server.urlBase64PublicKey = urlBase64Encode(this.server.publicKey);
 		}
 	}
 
 	public async update(): Promise<void> {
-		await backend.graphql(`mutation UpdateBookmark($update: UpdateBookmark!) {
+		await backend.graphql(
+			`mutation UpdateBookmark($update: UpdateBookmark!) {
 			updateBookmark(update: $update) { void }
-		}`, {
-			update: {
-				id: this.id,
-				name: this.name,
-				username: this.username,
-				bookmark: this.bookmark,
-				identity: this.identity?.id,
+		}`,
+			{
+				update: {
+					id: this.id,
+					name: this.name,
+					username: this.username,
+					bookmark: this.bookmark,
+					identity: this.identity?.id,
+				},
 			}
-		});
+		);
 	}
 
 	public static async get(): Promise<Bookmark[]> {
@@ -80,12 +82,14 @@ export class Bookmark {
 				}
 			}
 		}`);
-		return bookmarks.data.bookmarks.map((b: any) => new Bookmark(b))
+		return bookmarks.data.bookmarks.map((b: any) => new Bookmark(b));
 	}
 
 	public static async getRecent(): Promise<Bookmark | undefined> {
 		try {
-			return new Bookmark((await backend.graphql(`query GetRecentBookmark {
+			return new Bookmark(
+				(
+					await backend.graphql(`query GetRecentBookmark {
 			mostRecentBookmark {
 				id
 				name
@@ -108,7 +112,9 @@ export class Bookmark {
 					icon
 				}
 			}
-		}`)).data.mostRecentBookmark);
+		}`)
+				).data.mostRecentBookmark
+			);
 		} catch (err) {
 			console.log("Failed to get last bookmark", err);
 			return undefined;

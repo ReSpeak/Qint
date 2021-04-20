@@ -55,7 +55,9 @@
 			server={bookmark.server?.urlBase64PublicKey} />
 	</div>
 	<div class="bookmarkName">{bookmark.name || bookmark.server?.name}</div>
-	<div class="bookmarkInfo" title={bookmark.lastUsed?.format(LONG_DATETIME)}>{bookmark.username}@{fullAddress}</div>
+	<div class="bookmarkInfo" title={bookmark.lastUsed?.format(LONG_DATETIME)}>
+		{bookmark.username}@{fullAddress}
+	</div>
 
 	<button class="button bookmarkEdit" on:click|stopPropagation={toggleEdit}>
 		<i class="mdi mdi-{EDIT_ICON} mdi-24px" />

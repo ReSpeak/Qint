@@ -1,17 +1,26 @@
 // tslint:disable: interface-name
 
 import { ClientId } from "../ts";
-import { InMessage, OChange, PropertyId, PropertyValue, Reason, Version, TsError } from "../book_events";
+import {
+	InMessage,
+	OChange,
+	PropertyId,
+	PropertyValue,
+	Reason,
+	Version,
+	TsError,
+} from "../book_events";
 
-export type WsMessageTarget =
-	"Server"
-	| "Channel"
-	| { Client: ClientId }
-	| { Poke: ClientId };
+export type WsMessageTarget = "Server" | "Channel" | { Client: ClientId } | { Poke: ClientId };
 
 // Out Messages
-export type OutMsg = OMsgConnect | OMsgDisconnect | OMsgSendMessage | OMsgSendCommand
-	| OMsgSetClientVolume | OMsgChange;
+export type OutMsg =
+	| OMsgConnect
+	| OMsgDisconnect
+	| OMsgSendMessage
+	| OMsgSendCommand
+	| OMsgSetClientVolume
+	| OMsgChange;
 
 export interface OMsgConnect {
 	Connect: {
@@ -45,7 +54,7 @@ interface OMsgDisconnect {
 
 interface OMsgSendMessage {
 	SendMessage: {
-		target: WsMessageTarget,
+		target: WsMessageTarget;
 		message: string;
 		returnCode?: string;
 	};
@@ -60,8 +69,8 @@ interface OMsgSendCommand {
 
 interface OMsgSetClientVolume {
 	SetClientVolume: {
-		client: number[],
-		volume: number,
+		client: number[];
+		volume: number;
 	};
 }
 
@@ -72,15 +81,22 @@ interface OMsgChange {
 	};
 }
 
-
 // In Messages
-export type InMsg = InMsgConnected | InDisconnectedTemporarily | InDisconnected | InMsgError
-	| InTalkersChanged | InMsgEvents | InMsgMessage | InLoudnesses | InResult;
+export type InMsg =
+	| InMsgConnected
+	| InDisconnectedTemporarily
+	| InDisconnected
+	| InMsgError
+	| InTalkersChanged
+	| InMsgEvents
+	| InMsgMessage
+	| InLoudnesses
+	| InResult;
 
 interface InMsgConnected {
 	Connected: {
 		server: number[];
-		ownClient: ClientId,
+		ownClient: ClientId;
 	};
 }
 

@@ -8,7 +8,15 @@
 	import { Connection } from "../connection";
 	import { Channel, Client } from "../book";
 	import { draggable, DragData } from "../ui/draggable";
-	import { findParent, flash, LOUDNESS_HISTORY, LOUDNESS_MAX, LOUDNESS_MIN, on, render_updates } from "../util";
+	import {
+		findParent,
+		flash,
+		LOUDNESS_HISTORY,
+		LOUDNESS_MAX,
+		LOUDNESS_MIN,
+		on,
+		render_updates,
+	} from "../util";
 	import { afterUpdate, onMount } from "svelte";
 	import { app, NodeSelection } from "../app";
 	import type { ServerGroupId } from "../ts";
@@ -32,7 +40,10 @@
 	$: isSelected = $client.isSelected;
 	$: chat = client.chat;
 	$: filterShow = applyFilter(filter, $client);
-	$: clientProperties = getClientProperties($client, channel !== undefined ? $channel : undefined);
+	$: clientProperties = getClientProperties(
+		$client,
+		channel !== undefined ? $channel : undefined
+	);
 	const ownClient = client.id === connection.book.ownClientId;
 	let div: HTMLElement;
 	let loudnessDiagram: SimpleDiagram;
@@ -44,13 +55,27 @@
 		sortedServerGroups = connection.book.sortServerGroupIds($client.serverGroups);
 	}
 
-	function getClientProperties(client: Client, channel: Channel | undefined): [string, string, string] | undefined {
+	function getClientProperties(
+		client: Client,
+		channel: Channel | undefined
+	): [string, string, string] | undefined {
 		const properties: [boolean, string, string, string][] = [
-			[client.awayMessage !== null, "sleep", "color: rgb(70,180,255)", client.awayMessage === "" ? "Away" : ("Away: " + client.awayMessage ?? "")],
+			[
+				client.awayMessage !== null,
+				"sleep",
+				"color: rgb(70,180,255)",
+				client.awayMessage === "" ? "Away" : "Away: " + client.awayMessage ?? "",
+			],
 			[!client.outputHardwareEnabled, "volume-off", "color: red;", "Speaker disabled"],
 			[client.outputMuted, "volume-off", "color: red;", "Deaf"],
-			[channel !== undefined && channel.neededTalkPower !== null && client.talkPower < channel.neededTalkPower,
-				"microphone-off", "color: gray;", "Not enough talk power"],
+			[
+				channel !== undefined &&
+					channel.neededTalkPower !== null &&
+					client.talkPower < channel.neededTalkPower,
+				"microphone-off",
+				"color: gray;",
+				"Not enough talk power",
+			],
 			[!client.inputHardwareEnabled, "microphone-off", "color: red;", "Microphone disabled"],
 			[client.inputMuted, "microphone-off", "color: red;", "Muted"],
 		];
@@ -68,8 +93,7 @@
 			}
 		}
 
-		if (resEntry === undefined)
-			return undefined;
+		if (resEntry === undefined) return undefined;
 		return [resEntry[0], resEntry[1], resDescription];
 	}
 
@@ -143,23 +167,26 @@
 			data-key={$client.id}>
 			<!--<div class:talking={$client.talking !== TalkState.Off} class="talkWave" />-->
 			<div class="talkWave talking">
-				<SimpleDiagram bind:this={loudnessDiagram}
+				<SimpleDiagram
+					bind:this={loudnessDiagram}
 					style="width: 100%; height: 100%"
 					min={LOUDNESS_MIN}
 					max={LOUDNESS_MAX}
-					count={LOUDNESS_HISTORY}
-				/>
+					count={LOUDNESS_HISTORY} />
 			</div>
 			<TsIcon type="client" source={$client} {connection} />
 			<span class="nameBox" style="color:{$client.color};">
 				{#if showId}
 					[<FilterString filter={thisFilter} content={$client.id.toString()} />]
 				{/if}
-				<FilterString filter={showId ? '' : thisFilter} content={$client.name} />
+				<FilterString filter={showId ? "" : thisFilter} content={$client.name} />
 			</span>
 			<span class="icons">
 				{#if clientProperties !== undefined}
-					<Icon name={clientProperties[0]} style={clientProperties[1]} title={clientProperties[2]} />
+					<Icon
+						name={clientProperties[0]}
+						style={clientProperties[1]}
+						title={clientProperties[2]} />
 				{/if}
 				{#each sortedServerGroups as grp (grp)}
 					<ServerGroupIcon id={grp} {connection} />

@@ -37,7 +37,7 @@
 	let childrenFilter = "";
 	let hover: DelayedHover;
 	let hovered: Writable<boolean>;
-	let askPassword: string | undefined
+	let askPassword: string | undefined;
 	let error: ResultDetails | undefined;
 
 	$: isSelected = $channel.isSelected;
@@ -113,8 +113,7 @@
 			console.log("Failed to switch channel", res);
 			error = res;
 			if (res.tsResult === TsError.ChannelInvalidPassword) {
-				if (askPassword === undefined)
-					askPassword = "";
+				if (askPassword === undefined) askPassword = "";
 			}
 		}
 	}
@@ -245,7 +244,8 @@
 				<TsIcon type="channel" source={$channel} {connection} {server} />
 			</button>
 			<span
-				class:spacerC={spacerType === SpacerType.CSpacer || spacerType === SpacerType.StarSpacer}
+				class:spacerC={spacerType === SpacerType.CSpacer ||
+					spacerType === SpacerType.StarSpacer}
 				class:spacerL={spacerType === SpacerType.LSpacer}
 				class:spacerR={spacerType === SpacerType.RSpacer}
 				class="nameBox"
@@ -256,7 +256,7 @@
 				{#if showId}
 					[<FilterString filter={thisFilter} content={$channel.id.toString()} />]
 				{/if}
-				<FilterString filter={showId ? '' : thisFilter} content={displayName} />
+				<FilterString filter={showId ? "" : thisFilter} content={displayName} />
 			</span>
 			<span class="icons">
 				{#if $chat.unreadCount > 0}
@@ -267,10 +267,10 @@
 			</span>
 		</div>
 		{#if askPassword !== undefined}
-			<div class="askPasswordHoverContainer"
+			<div
+				class="askPasswordHoverContainer"
 				on:keydown={(e) => {
-					if (e.key === 'Escape')
-						closeAskPassword();
+					if (e.key === "Escape") closeAskPassword();
 				}}
 				tabindex="0">
 				<HoverContainer {div} closeButton={true} on:close={closeAskPassword}>
@@ -298,7 +298,13 @@
 			</div>
 		{:else if error !== undefined}
 			<div class="errorHoverContainer">
-				<HoverContainer {div} closeButton={true} on:close={() => { error = undefined; hovered.set(false); }}>
+				<HoverContainer
+					{div}
+					closeButton={true}
+					on:close={() => {
+						error = undefined;
+						hovered.set(false);
+					}}>
 					<UiChangeResult result={error} />
 				</HoverContainer>
 			</div>
@@ -400,7 +406,8 @@
 		text-align: end;
 	}
 
-	.errorHoverContainer :global(.hover), .errorHoverContainer :global(.hover .corner) {
+	.errorHoverContainer :global(.hover),
+	.errorHoverContainer :global(.hover .corner) {
 		background-color: mix($background, $danger, 50) !important;
 	}
 
@@ -413,7 +420,8 @@
 		top: 1em !important;
 	}
 
-	.errorHoverContainer :global(.hover), .askPasswordHoverContainer :global(.hover) {
+	.errorHoverContainer :global(.hover),
+	.askPasswordHoverContainer :global(.hover) {
 		display: grid !important;
 		grid-template-columns: 1fr auto;
 	}

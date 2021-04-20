@@ -4,7 +4,6 @@ import { Moment } from "moment";
 import moment from "moment";
 import { Uid } from "./ts";
 
-
 export class ChatData {
 	public readonly lastRead: Moment;
 	public readonly unreadCount: number;
@@ -14,7 +13,11 @@ export class ChatData {
 		this.unreadCount = unreadCount;
 	}
 
-	public static fromGraphql(obj: { lastRead: number, timezone: number, unreadCount: number }): ChatData {
+	public static fromGraphql(obj: {
+		lastRead: number;
+		timezone: number;
+		unreadCount: number;
+	}): ChatData {
 		return new ChatData(datetimeDeserialize([obj.lastRead, obj.timezone]), obj.unreadCount);
 	}
 
@@ -29,7 +32,6 @@ export class BookNode {
 	public filterShow: boolean = true;
 	public isSelected: boolean = false;
 
-
 	constructor() {
 		this._store = writable(this);
 	}
@@ -41,7 +43,7 @@ export class BookNode {
 	}
 
 	public updateChat(obj: Partial<ChatData>): void {
-		this.chat.update(c => Object.assign(c, obj));
+		this.chat.update((c) => Object.assign(c, obj));
 	}
 
 	public subscribe(run: (c: this) => any): () => void {
@@ -55,28 +57,35 @@ export class Group {
 	}
 }
 
-export class ChannelBase extends BookNode {
-}
+export class ChannelBase extends BookNode {}
 
-export class ChannelGroupBase extends Group {
-}
+export class ChannelGroupBase extends Group {}
 
-export class OptionalChannelDataBase {
-}
+export class OptionalChannelDataBase {}
 
 export class ClientBase extends BookNode {
 	//public readonly uid: Uid | null;
 	public readonly avatar_hash!: string;
 	private readonly _color: Cached<Uid | null, string>;
-	public get color(): string { return this._color.get(); }
+	public get color(): string {
+		return this._color.get();
+	}
 	private readonly _uidStr: Cached<Uid | null, string>;
-	public get uidStr(): string { return this._uidStr.get(); }
+	public get uidStr(): string {
+		return this._uidStr.get();
+	}
 
 	protected constructor(uid?: number[], avatar_hash?: string) {
 		super();
 		// TODO Handle null uid
-		this._color = new Cached(() => (this as any).uid, u => u !== null ? getDataColor(u) : "");
-		this._uidStr = new Cached(() => (this as any).uid, u => u !== null ? base64Encode(u) : "");
+		this._color = new Cached(
+			() => (this as any).uid,
+			(u) => (u !== null ? getDataColor(u) : "")
+		);
+		this._uidStr = new Cached(
+			() => (this as any).uid,
+			(u) => (u !== null ? base64Encode(u) : "")
+		);
 		if (uid !== undefined) (this as any).uid = uid;
 		if (avatar_hash !== undefined) this.avatar_hash = avatar_hash;
 	}
@@ -88,9 +97,8 @@ export class ClientBase extends BookNode {
 	 * [0-9a-f] with [a-p].
 	 */
 	public getAvatarUid(): string | undefined {
-		if (this.avatar_hash === "" || (this as any).uid === null)
-			return;
-		const a0 = 'a'.charCodeAt(0);
+		if (this.avatar_hash === "" || (this as any).uid === null) return;
+		const a0 = "a".charCodeAt(0);
 		let res = "";
 		for (let i = 0; i < (this as any).uid.length; i++) {
 			const c = (this as any).uid[i];
@@ -106,28 +114,42 @@ export class ClientBase extends BookNode {
 
 	public static equals(first: ClientBase | undefined, second: ClientBase | undefined): boolean {
 		if (first === second) return true;
-		if (first === undefined || second === undefined || (first as any).uid === null || (second as any).uid === null) return false;
+		if (
+			first === undefined ||
+			second === undefined ||
+			(first as any).uid === null ||
+			(second as any).uid === null
+		)
+			return false;
 		return arraysEqual((first as any).uid, (second as any).uid);
 	}
 }
 
-export class OptionalClientDataBase {
-}
+export class OptionalClientDataBase {}
 
-export class ConnectionClientDataBase {
-}
+export class ConnectionClientDataBase {}
 
 export class ServerBase extends BookNode {
 	public readonly uid!: number[];
 	private readonly _color: Cached<number[], string>;
-	public get color(): string { return this._color.get(); }
+	public get color(): string {
+		return this._color.get();
+	}
 	private readonly _uidStr: Cached<number[], string>;
-	public get uidStr(): string { return this._uidStr.get(); }
+	public get uidStr(): string {
+		return this._uidStr.get();
+	}
 
 	protected constructor(uid?: number[]) {
 		super();
-		this._color = new Cached(() => this.uid, u => getDataColor(u));
-		this._uidStr = new Cached(() => this.uid, u => base64Encode(u));
+		this._color = new Cached(
+			() => this.uid,
+			(u) => getDataColor(u)
+		);
+		this._uidStr = new Cached(
+			() => this.uid,
+			(u) => base64Encode(u)
+		);
 		if (uid !== undefined) this.uid = uid;
 	}
 
@@ -136,11 +158,8 @@ export class ServerBase extends BookNode {
 	}
 }
 
-export class ServerGroupBase extends Group {
-}
+export class ServerGroupBase extends Group {}
 
-export class OptionalServerDataBase {
-}
+export class OptionalServerDataBase {}
 
-export class ConnectionServerDataBase {
-}
+export class ConnectionServerDataBase {}

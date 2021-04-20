@@ -31,7 +31,7 @@
 
 {#if iconPath}
 	<span class="icon">
-		<img src={iconPath} alt="{type} icon" on:error={() => iconPath = undefined} />
+		<img src={iconPath} alt="{type} icon" on:error={() => (iconPath = undefined)} />
 	</span>
 {:else if fallback}
 	<Icon name={fallback} />

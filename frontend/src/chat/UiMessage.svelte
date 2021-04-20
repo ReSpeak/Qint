@@ -1,3 +1,5 @@
+<svelte:options immutable />
+
 <script lang="ts">
 	import { Message, MessageStatus } from "./chat";
 	import { LONG_DATETIME } from "../util";
@@ -18,11 +20,10 @@
 	$: linksArr = links !== undefined ? Array.from(links.values()) : [];
 </script>
 
-<svelte:options immutable />
 <div class="messageRow" class:unread>
 	<div class="hover-container" style="border-color:{message.clientColor};">
 		<div class="messageTime chat-left-col">
-			<span title={message.date.format(LONG_DATETIME)}> {message.date.format('HH:mm')} </span>
+			<span title={message.date.format(LONG_DATETIME)}> {message.date.format("HH:mm")} </span>
 		</div>
 		<!-- msg.status === MessageStatus::Sending -->
 		<!-- msg.status === MessageStatus::Error -->
@@ -33,7 +34,11 @@
 			class:isPoke={message.isPoke}
 			class:viewRaw>
 			<div class="messageRendered">
-				<RenderedText connection={nodeSel?.connection} {server} text={messageHighlightedContent || message.rendered} bind:links />
+				<RenderedText
+					connection={nodeSel?.connection}
+					{server}
+					text={messageHighlightedContent || message.rendered}
+					bind:links />
 				{#each linksArr as { link, title } (link)}
 					<LinkPreview {link} textContent={title} {nodeSel} />
 				{/each}

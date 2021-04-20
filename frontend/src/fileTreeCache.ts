@@ -10,8 +10,8 @@ export class FileTreeCache {
 	public root: FileTreeFolder = new FileTreeFolder("", unknownDate);
 
 	public applyFileList(fileList: IMsgFileList): this {
-		fileList.FileList.forEach(m => this.updateCache(m));
-		log("File list %o", this)
+		fileList.FileList.forEach((m) => this.updateCache(m));
+		log("File list %o", this);
 		return this;
 	}
 
@@ -53,14 +53,13 @@ class FileTreeFile {
 		this.size = Number(entry.size);
 		this.lastModified = datetimeDeserialize(entry.dateTime).local();
 	}
-
 }
 
 const unknownDate = moment(0);
 export const enum FolderState {
 	Dummy,
 	Loading,
-	Loaded
+	Loaded,
 }
 
 class FileTreeFolder {
@@ -68,30 +67,19 @@ class FileTreeFolder {
 	public children?: Map<string, FileTreeNode>;
 	public contentLoaded: FolderState = FolderState.Dummy;
 
-	constructor(
-		public name: string,
-		public lastModified: Moment,
-	) {
-	}
+	constructor(public name: string, public lastModified: Moment) {}
 
 	private static createCacheDummy(name: string): FileTreeFolder {
-		return new FileTreeFolder(
-			name,
-			unknownDate
-		);
+		return new FileTreeFolder(name, unknownDate);
 	}
 
 	private static createFromEntry(entry: IMsgFileListPart): FileTreeFolder {
-		return new FileTreeFolder(
-			entry.name,
-			datetimeDeserialize(entry.dateTime)
-		);
+		return new FileTreeFolder(entry.name, datetimeDeserialize(entry.dateTime));
 	}
 
 	public updateCachePath(path: string[], entry: IMsgFileListPart): void {
 		const [part, ...rest] = path;
-		if (this.children === undefined)
-			this.children = new Map();
+		if (this.children === undefined) this.children = new Map();
 		if (rest.length === 0) {
 			this.contentLoaded = FolderState.Loading;
 			if (entry.isFile) {
@@ -115,12 +103,10 @@ class FileTreeFolder {
 		const child = this.children.get(part);
 		if (child === undefined) return null;
 		if (rest.length === 0) {
-			if (!child.isFile || !folderOnly)
-				return child;
+			if (!child.isFile || !folderOnly) return child;
 			return null;
 		} else {
-			if (!child.isFile)
-				return child.get(rest, folderOnly);
+			if (!child.isFile) return child.get(rest, folderOnly);
 			return null;
 		}
 	}

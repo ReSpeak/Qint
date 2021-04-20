@@ -53,7 +53,7 @@ $bg-color: #777;
 	@each $name, $pair in $colors {
 		$color: nth($pair, 1);
 		$color-invert: nth($pair, 2);
-		
+
 		&.is-#{$name} {
 			background-color: $color;
 		}

@@ -83,8 +83,7 @@
 	function chatChanged() {
 		const sel = $selected;
 		if (!NodeSelection.equals(sel, oldSelection)) {
-			if (oldSelection !== undefined)
-				chatStore.save(text, oldSelection);
+			if (oldSelection !== undefined) chatStore.save(text, oldSelection);
 
 			oldSelection = sel;
 			if (sel === undefined) {
@@ -156,11 +155,9 @@
 	async function chatboxHistoryMove(e: CustomEvent<number>) {
 		const historyId = e.detail;
 		assert(historyId > 0, "History id should be at least 1");
-		if (connection === undefined)
-			return;
+		if (connection === undefined) return;
 		const ownUid = get(connection.book.ownClient)?.uid;
-		if (ownUid === undefined || ownUid === null)
-			return;
+		if (ownUid === undefined || ownUid === null) return;
 		const data = await chat.getSendHistory(ownUid, historyId - 1);
 		if (data !== undefined) {
 			text = data;
@@ -257,10 +254,12 @@
 
 	async function markRead() {
 		if (chatData === undefined || lastDisplayed === undefined) return;
-		if (document.hasFocus() &&
+		if (
+			document.hasFocus() &&
 			lastDisplayed.date.unix() >= $chatData.lastRead.unix() &&
 			$chatData.unreadCount > 0 &&
-			isSettingLastRead !== lastDisplayed.id) {
+			isSettingLastRead !== lastDisplayed.id
+		) {
 			isSettingLastRead = lastDisplayed.id;
 			await chat.setLastRead(lastDisplayed.id, lastDisplayed.date);
 		}
@@ -278,8 +277,7 @@
 
 	onDestroy(() => {
 		// Save current message in chatStore
-		if (oldSelection !== undefined)
-			chatStore.save(text, oldSelection);
+		if (oldSelection !== undefined) chatStore.save(text, oldSelection);
 		window.removeEventListener("focus", markRead);
 	});
 </script>
@@ -308,9 +306,9 @@
 			</div>
 			<div slot="empty" class="chatFiller">Chat history empty ¯\_(ツ)_/¯</div>
 			{#if item.displayDateSeparator}
-				<div title={item.date.format('L')} class="chat-date">
+				<div title={item.date.format("L")} class="chat-date">
 					<div class="chat-date-line" />
-					<span>{item.date.format('LL')}</span>
+					<span>{item.date.format("LL")}</span>
 					<div class="chat-date-line" />
 				</div>
 			{/if}
@@ -370,8 +368,8 @@
 			<form class="chat-form" on:submit|preventDefault={sendCommand}>
 				<div class="sendCombo">
 					<BInput bind:value={command} />
-					<button class="button" name="send" type="submit" style="height: auto;">Send
-						Command</button>
+					<button class="button" name="send" type="submit" style="height: auto;"
+						>Send Command</button>
 				</div>
 			</form>
 		{/if}

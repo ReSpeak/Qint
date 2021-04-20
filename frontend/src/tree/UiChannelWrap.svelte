@@ -1,4 +1,4 @@
-<svelte:options immutable={true}/>
+<svelte:options immutable={true} />
 
 <script lang="ts">
 	import { Channel } from "../book";
@@ -13,4 +13,4 @@
 	export let channel: Channel;
 </script>
 
-<UiChannel {connection} {server} {filter} bind:filterShow={filterShow} {filterStartFromRoot} {channel} />
+<UiChannel {connection} {server} {filter} bind:filterShow {filterStartFromRoot} {channel} />

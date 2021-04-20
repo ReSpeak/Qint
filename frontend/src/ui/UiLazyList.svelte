@@ -170,7 +170,8 @@
 	 * @returns true when the list is satisfied with loading data
 	 */
 	async function fill_body(): Promise<boolean> {
-		if ((!canLoadAfterEnd && !canLoadBeforeStart) || !enableFetching || pan === null) return true;
+		if ((!canLoadAfterEnd && !canLoadBeforeStart) || !enableFetching || pan === null)
+			return true;
 
 		const holdIdStart = getFirstElem();
 		const holdIdEnd = getLastElem();
@@ -414,8 +415,7 @@
 
 	function handle_scroll() {
 		//console.log("scroll", "locked", lockIndex);
-		if (allowRelock)
-		{
+		if (allowRelock) {
 			setLockPos();
 			if (pan.scrollTop === pan.scrollHeight - pan.clientHeight) {
 				//if (docked === false) log("docked");

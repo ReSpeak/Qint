@@ -6,13 +6,15 @@ import { app } from "./app";
 import { ConnectData } from "./connect/connect";
 import debug from "debug";
 
-if (localStorage.getItem("debug") === null)
-	debug.enable("error:*");
+if (localStorage.getItem("debug") === null) debug.enable("error:*");
 
 (window as any).qint = app; // DEBUG
 (window as any).get = get; // DEBUG
 (window as any).debug = debug; // DEBUG
-(window as any).debugset = (s: string) => { debug.enable(s); localStorage.setItem("debug", s); }
+(window as any).debugset = (s: string) => {
+	debug.enable(s);
+	localStorage.setItem("debug", s);
+};
 console.log("BUILD", BUILD_ENV, BUILD_DAT);
 
 window.onbeforeunload = function (e: any) {

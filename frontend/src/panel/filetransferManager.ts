@@ -8,11 +8,7 @@ export class FiletransferManager {
 	private currentUploadTask: Promise<void> | undefined;
 	public uploadState: Writable<number> = writable(0);
 
-	constructor(
-		private connection: Connection
-	) {
-
-	}
+	constructor(private connection: Connection) {}
 
 	public uploadFiles(...files: UploadFile[]): void {
 		if (files.length === 0) return;
@@ -40,5 +36,5 @@ export interface UploadFile {
 	data: BodyInit;
 	channelId: ChannelId;
 	path: string;
-	task?: Promise<void>
+	task?: Promise<void>;
 }

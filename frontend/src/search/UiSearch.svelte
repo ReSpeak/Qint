@@ -28,14 +28,17 @@
 		if (otherSearchList) {
 			if (filter.length >= 2) {
 				if (otherSearchList.sourceChanged)
-				otherSearchList.sourceChanged(ListFetchDir.New, ListFetchDir.Before);
+					otherSearchList.sourceChanged(ListFetchDir.New, ListFetchDir.Before);
 			} else if (otherSearchList.clear) {
 				otherSearchList.clear();
 			}
 		}
 	}
 
-	async function fetchOtherElements(idFrom: OtherSearchResult | undefined, dir: ListFetchDir): Promise<FetchResult<OtherSearchResult>> {
+	async function fetchOtherElements(
+		idFrom: OtherSearchResult | undefined,
+		dir: ListFetchDir
+	): Promise<FetchResult<OtherSearchResult>> {
 		searchError = undefined;
 		try {
 			let res;
@@ -48,12 +51,10 @@
 				res.others = res.others.slice(0, idFrom.id - start);
 				otherResultCount = res.count;
 			} else {
-				if (idFrom !== undefined)
-					canLoadBeforeStart = idFrom.id !== 0;
+				if (idFrom !== undefined) canLoadBeforeStart = idFrom.id !== 0;
 				res = await search(filter, idFrom !== undefined ? idFrom.id + 1 : undefined);
 				otherResultCount = res.count;
-				if (res.others.length < 50)
-					canLoadAfterEnd = false;
+				if (res.others.length < 50) canLoadAfterEnd = false;
 			}
 			if (res.others.length === 0) {
 				canLoadBeforeStart = false;
@@ -72,7 +73,10 @@
 		}
 	}
 
-	async function fetchMessageElements(idFrom: MessageSearchResult | undefined, dir: ListFetchDir): Promise<FetchResult<MessageSearchResult>> {
+	async function fetchMessageElements(
+		idFrom: MessageSearchResult | undefined,
+		dir: ListFetchDir
+	): Promise<FetchResult<MessageSearchResult>> {
 		searchError = undefined;
 		try {
 			let res;
@@ -85,12 +89,10 @@
 				res.messages = res.messages.slice(0, idFrom.id - start);
 				messageResultCount = res.count;
 			} else {
-				if (idFrom !== undefined)
-					canLoadBeforeStart = idFrom.id !== 0;
+				if (idFrom !== undefined) canLoadBeforeStart = idFrom.id !== 0;
 				res = await search(filter, idFrom !== undefined ? idFrom.id + 1 : undefined);
 				messageResultCount = res.count;
-				if (res.messages.length < 50)
-					canLoadAfterEnd = false;
+				if (res.messages.length < 50) canLoadAfterEnd = false;
 			}
 			if (res.messages.length === 0) {
 				canLoadBeforeStart = false;
@@ -149,7 +151,7 @@
 			<UiMessageSearchResult content={item} />
 		</UiLazyList>
 	{:else}
-		<div class="searchFiller"></div>
+		<div class="searchFiller" />
 	{/if}
 </div>
 

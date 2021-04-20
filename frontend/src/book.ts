@@ -1,8 +1,24 @@
 import { Writable, writable, get, Readable } from "svelte/store";
 import { InBookChangeMsg, WsMessageTarget } from "./backend/ws";
 import { Connection } from "./connection";
-import { binarySearchBy,datetimeDeserialize, assert, factorToDb, Cached, urlBase64Encode } from "./util";
-import { ChannelGroupId, ChannelId, ClientId, IconId, IpAddr, ServerGroupId, TalkState, Uid } from "./ts";
+import {
+	binarySearchBy,
+	datetimeDeserialize,
+	assert,
+	factorToDb,
+	Cached,
+	urlBase64Encode,
+} from "./util";
+import {
+	ChannelGroupId,
+	ChannelId,
+	ClientId,
+	IconId,
+	IpAddr,
+	ServerGroupId,
+	TalkState,
+	Uid,
+} from "./ts";
 import { Codec } from "./book_events";
 import * as book_events from "./book_events";
 import { Moment } from "moment";
@@ -14,13 +30,20 @@ const error = debug("error:BOOK");
 
 export function codecToName(codec: Codec): string {
 	switch (codec) {
-		case Codec.SpeexNarrowband: return "Speex Narrowband";
-		case Codec.SpeexWideband: return "Speex Wideband";
-		case Codec.SpeexUltrawideband: return "Speex Ultrawideband";
-		case Codec.CeltMono: return "Celt Mono";
-		case Codec.OpusVoice: return "Opus Voice";
-		case Codec.OpusMusic: return "Opus Music";
-		default: return "Unknown";
+		case Codec.SpeexNarrowband:
+			return "Speex Narrowband";
+		case Codec.SpeexWideband:
+			return "Speex Wideband";
+		case Codec.SpeexUltrawideband:
+			return "Speex Ultrawideband";
+		case Codec.CeltMono:
+			return "Celt Mono";
+		case Codec.OpusVoice:
+			return "Opus Voice";
+		case Codec.OpusMusic:
+			return "Opus Music";
+		default:
+			return "Unknown";
 	}
 }
 
@@ -28,7 +51,9 @@ export class Book {
 	public server: Server = new Server();
 	public clients: Map<ClientId, Client> = new Map();
 	public channels: Map<ChannelId, Channel> = new Map();
-	public channelGroups: Writable<Map<ChannelGroupId, Writable<ChannelGroup>>> = writable(new Map());
+	public channelGroups: Writable<Map<ChannelGroupId, Writable<ChannelGroup>>> = writable(
+		new Map()
+	);
 	public serverGroups: Writable<Map<ServerGroupId, Writable<ServerGroup>>> = writable(new Map());
 	public currentTalkers: [ClientId, boolean][] = [];
 	public ownClientId?: ClientId;
@@ -58,8 +83,7 @@ export class Book {
 					start++;
 					lastElem = c;
 					i++;
-					if (i >= list.length)
-						break;
+					if (i >= list.length) break;
 					c = list[i] as Channel;
 				}
 			}
@@ -79,8 +103,7 @@ export class Book {
 							list.splice(i, 1);
 							elems.push(c);
 							lastElem = c;
-							if (i >= list.length)
-								break;
+							if (i >= list.length) break;
 							c = list[i] as Channel;
 						}
 					}
@@ -91,14 +114,12 @@ export class Book {
 						inserted++;
 						lastElem = c;
 						i++;
-						if (i >= list.length)
-							break;
+						if (i >= list.length) break;
 						c = list[i] as Channel;
 					}
 				}
 			}
-			if (inserted === undefined)
-				list.splice(list.length, 0, ...elems);
+			if (inserted === undefined) list.splice(list.length, 0, ...elems);
 		}
 		return list;
 	}
@@ -110,11 +131,14 @@ export class Book {
 		if (channel.parent === "0") parent = this.server;
 		else parent = this.channels.get(channel.parent);
 		if (parent !== undefined) {
-			parent.channels.update(pch => Book.addChannelSorted(pch, channel));
+			parent.channels.update((pch) => Book.addChannelSorted(pch, channel));
 		}
 	}
 
-	public updateChannel(id: ChannelId, obj: Partial<Channel> | Partial<book_events.ChannelGen>): void {
+	public updateChannel(
+		id: ChannelId,
+		obj: Partial<Channel> | Partial<book_events.ChannelGen>
+	): void {
 		const channel = this.channels.get(id);
 		if (channel === undefined) {
 			error(`Cannot update non-existant channel ${id}`);
@@ -126,11 +150,14 @@ export class Book {
 		if (channel.parent !== oldParent || "order" in obj) {
 			let parent = this.getChannel(oldParent);
 			if (parent !== undefined) {
-				parent.channels.update(pch => { pch.remove_item(channel); return pch; });
+				parent.channels.update((pch) => {
+					pch.remove_item(channel);
+					return pch;
+				});
 			}
 			parent = this.getChannel(channel.parent);
 			if (parent !== undefined) {
-				parent.channels.update(pch => Book.addChannelSorted(pch, channel));
+				parent.channels.update((pch) => Book.addChannelSorted(pch, channel));
 			}
 		}
 	}
@@ -140,22 +167,21 @@ export class Book {
 		if (channel === undefined) return;
 		const parent = this.getNode(channel.parent);
 		if (parent !== undefined) {
-			parent.channels.update(c => { c.remove_item(channel); return c; });
+			parent.channels.update((c) => {
+				c.remove_item(channel);
+				return c;
+			});
 		}
 		this.channels.delete(id);
 	}
 
 	private static addClientSorted(list: Client[], elem: Client): Client[] {
-		const i = binarySearchBy(list, t => {
+		const i = binarySearchBy(list, (t) => {
 			const c = t as Client;
-			if (elem.talkPower < c.talkPower)
-				return -1;
-			if (elem.talkPower > c.talkPower)
-				return 1;
-			if (elem.name < c.name)
-				return 1;
-			if (elem.name > c.name)
-				return -1;
+			if (elem.talkPower < c.talkPower) return -1;
+			if (elem.talkPower > c.talkPower) return 1;
+			if (elem.name < c.name) return 1;
+			if (elem.name > c.name) return -1;
 			return Number(elem.id) - Number(c.id);
 		}).index;
 		list.splice(i, 0, elem);
@@ -163,12 +189,14 @@ export class Book {
 	}
 
 	public addClient(obj: Partial<Client> | Partial<book_events.ClientGen>): void {
-		const client = Client.fromJson(obj, (obj.id === this.ownClientId) ? this.ownClient : undefined);
+		const client = Client.fromJson(
+			obj,
+			obj.id === this.ownClientId ? this.ownClient : undefined
+		);
 		if (this.clients.has(client.id)) throw Error(`Client ${client.id} already exists`);
 		this.clients.set(client.id, client);
 		const parent = this.channels.get(client.channel);
-		if (parent !== undefined)
-			parent.clients.update(pch => Book.addClientSorted(pch, client));
+		if (parent !== undefined) parent.clients.update((pch) => Book.addClientSorted(pch, client));
 	}
 
 	public updateClient(id: ClientId, obj: Partial<Client> | Partial<book_events.ClientGen>): void {
@@ -183,11 +211,14 @@ export class Book {
 		if (client.channel !== oldChannel || "talkPower" in obj || "name" in obj) {
 			let parent = this.getChannel(oldChannel);
 			if (parent !== undefined) {
-				parent.clients.update(pch => { pch.remove_item(client); return pch; });
+				parent.clients.update((pch) => {
+					pch.remove_item(client);
+					return pch;
+				});
 			}
 			parent = this.getChannel(client.channel);
 			if (parent !== undefined) {
-				parent.clients.update(pch => Book.addClientSorted(pch, client));
+				parent.clients.update((pch) => Book.addClientSorted(pch, client));
 			}
 		}
 	}
@@ -197,7 +228,10 @@ export class Book {
 		if (client === undefined) return;
 		const parent = this.getChannel(client.channel);
 		if (parent !== undefined) {
-			parent.clients.update(pch => { pch.remove_item(client); return pch; });
+			parent.clients.update((pch) => {
+				pch.remove_item(client);
+				return pch;
+			});
 		}
 		this.clients.delete(id);
 	}
@@ -239,7 +273,7 @@ export class Book {
 	}
 
 	public addChannelGroup(channelGroup: ChannelGroup): void {
-		this.channelGroups.update(channelGroups => {
+		this.channelGroups.update((channelGroups) => {
 			channelGroups.set(channelGroup.id, writable(channelGroup));
 			return channelGroups;
 		});
@@ -247,53 +281,49 @@ export class Book {
 
 	public updateChannelGroup(id: ChannelGroupId, obj: Partial<ChannelGroup>): void {
 		const channelGroup = get(this.channelGroups).get(id);
-		if (channelGroup === undefined)
-			return;
+		if (channelGroup === undefined) return;
 		channelGroup.update((sg: ChannelGroup) => sg.update(obj));
 	}
 
 	public removeChannelGroup(id: ChannelGroupId): void {
-		this.channelGroups.update(channelGroups => {
+		this.channelGroups.update((channelGroups) => {
 			channelGroups.delete(id);
 			return channelGroups;
 		});
 	}
 
 	public addServerGroup(serverGroup: ServerGroup): void {
-		this.serverGroups.update(serverGroups => {
+		this.serverGroups.update((serverGroups) => {
 			serverGroups.set(serverGroup.id, writable(serverGroup));
 			return serverGroups;
 		});
 	}
 
-	public updateServerGroup(id: ServerGroupId, obj: Partial<ServerGroup> | Partial<book_events.ServerGroupGen>): void {
+	public updateServerGroup(
+		id: ServerGroupId,
+		obj: Partial<ServerGroup> | Partial<book_events.ServerGroupGen>
+	): void {
 		const serverGroup = get(this.serverGroups).get(id);
-		if (serverGroup === undefined)
-			return;
+		if (serverGroup === undefined) return;
 		serverGroup.update((sg: ServerGroup) => sg.update(obj));
-		if ("sortId" in obj)
-			this.serverGroups.update(gs => gs);
+		if ("sortId" in obj) this.serverGroups.update((gs) => gs);
 	}
 
 	public removeServerGroup(id: ServerGroupId): void {
-		this.serverGroups.update(serverGroups => {
+		this.serverGroups.update((serverGroups) => {
 			serverGroups.delete(id);
 			return serverGroups;
 		});
 	}
 
 	public getNode(id: string): Server | Channel | undefined {
-		if (id === "0")
-			return this.server;
-		else
-			return this.channels.get(id);
+		if (id === "0") return this.server;
+		else return this.channels.get(id);
 	}
 
 	public getChannel(id: ChannelId): Channel | undefined {
-		if (id === "0")
-			return undefined;
-		else
-			return this.channels.get(id);
+		if (id === "0") return undefined;
+		else return this.channels.get(id);
 	}
 
 	public getClient(id: ClientId): Client | undefined {
@@ -328,15 +358,21 @@ export class Book {
 			if ("Channel" in prop) {
 				this.addChannel(Channel.fromJson(prop.Channel as any));
 			} else if ("OptionalChannelData" in prop && "OptionalChannelData" in id) {
-				this.updateChannel(id.OptionalChannelData, { optionalData: prop.OptionalChannelData } as any);
+				this.updateChannel(id.OptionalChannelData, {
+					optionalData: prop.OptionalChannelData,
+				} as any);
 			} else if ("ChannelGroup" in prop) {
 				this.addChannelGroup(ChannelGroup.fromJson(prop.ChannelGroup));
 			} else if ("Client" in prop) {
 				this.addClient(prop.Client);
 			} else if ("OptionalClientData" in prop && "OptionalClientData" in id) {
-				this.updateClient(id.OptionalClientData, { optionalData: prop.OptionalClientData } as any);
+				this.updateClient(id.OptionalClientData, {
+					optionalData: prop.OptionalClientData,
+				} as any);
 			} else if ("ConnectionClientData" in prop && "ConnectionClientData" in id) {
-				this.updateClient(id.ConnectionClientData, { connectionData: prop.ConnectionClientData } as any);
+				this.updateClient(id.ConnectionClientData, {
+					connectionData: prop.ConnectionClientData,
+				} as any);
 			} else if ("ServerGroupId" in prop && "ClientServerGroup" in id) {
 				this.addClientServerGroup(id.ClientServerGroup[0], id.ClientServerGroup[1]);
 			} else if ("Server" in prop) {
@@ -356,15 +392,21 @@ export class Book {
 			if ("Channel" in prop && "Channel" in id) {
 				this.updateChannel(id.Channel, prop.Channel);
 			} else if ("OptionalChannelData" in prop && "OptionalChannelData" in id) {
-				this.updateChannel(id.OptionalChannelData, { optionalData: prop.OptionalChannelData } as any);
+				this.updateChannel(id.OptionalChannelData, {
+					optionalData: prop.OptionalChannelData,
+				} as any);
 			} else if ("ChannelGroup" in prop && "ChannelGroup" in id) {
 				this.updateChannelGroup(id.ChannelGroup, prop.ChannelGroup);
 			} else if ("Client" in prop && "Client" in id) {
 				this.updateClient(id.Client, prop.Client);
 			} else if ("OptionalClientData" in prop && "OptionalClientData" in id) {
-				this.updateClient(id.OptionalClientData, { optionalData: prop.OptionalClientData } as any);
+				this.updateClient(id.OptionalClientData, {
+					optionalData: prop.OptionalClientData,
+				} as any);
 			} else if ("ConnectionClientData" in prop && "ConnectionClientData" in id) {
-				this.updateClient(id.ConnectionClientData, { connectionData: prop.ConnectionClientData } as any);
+				this.updateClient(id.ConnectionClientData, {
+					connectionData: prop.ConnectionClientData,
+				} as any);
 			} else if ("Server" in prop) {
 				this.updateServer(prop.Server);
 			} else if ("OptionalServerData" in prop) {
@@ -405,7 +447,7 @@ export class Book {
 	public talkersHandler(talkers: [ClientId, boolean][]): void {
 		const oldTalkers = this.currentTalkers;
 		for (const [id, isWhispering] of talkers) {
-			const i = oldTalkers.findIndex(t => t[0] === id);
+			const i = oldTalkers.findIndex((t) => t[0] === id);
 
 			if (i === -1 || oldTalkers[i][1] !== isWhispering) {
 				const client = this.getClient(id);
@@ -416,12 +458,11 @@ export class Book {
 				client.update({ talking: isWhispering ? TalkState.Whisper : TalkState.Voice });
 			}
 
-			if (i !== -1)
-				oldTalkers.splice(i, 1);
+			if (i !== -1) oldTalkers.splice(i, 1);
 		}
 
 		// Remove old talkers
-		for (const [id,] of oldTalkers) {
+		for (const [id] of oldTalkers) {
 			const client = this.getClient(id);
 			if (client === undefined) {
 				error(`Cannot update non-existant client ${id}`);
@@ -433,7 +474,6 @@ export class Book {
 	}
 }
 
-
 export class ChatData {
 	public readonly lastRead: Moment;
 	public readonly unreadCount: number;
@@ -443,7 +483,11 @@ export class ChatData {
 		this.unreadCount = unreadCount;
 	}
 
-	public static fromGraphql(obj: { lastRead: number, timezone: number, unreadCount: number }): ChatData {
+	public static fromGraphql(obj: {
+		lastRead: number;
+		timezone: number;
+		unreadCount: number;
+	}): ChatData {
 		return new ChatData(datetimeDeserialize([obj.lastRead, obj.timezone]), obj.unreadCount);
 	}
 
@@ -458,7 +502,6 @@ export class BookNode {
 	public filterShow: boolean = true;
 	public isSelected: boolean = false;
 
-
 	constructor() {
 		this._store = writable(this);
 	}
@@ -470,7 +513,7 @@ export class BookNode {
 	}
 
 	public updateChat(obj: Partial<ChatData>): void {
-		this.chat.update(c => Object.assign(c, obj));
+		this.chat.update((c) => Object.assign(c, obj));
 	}
 
 	public subscribe(run: (c: this) => any): () => void {
@@ -489,12 +532,25 @@ export class GraphQlClient extends ClientBase {
 		if (icon !== undefined) this.icon = icon;
 	}
 
-	public static fromGraphql(obj: { uid: number[], customName?: string, name?: string }): GraphQlClient {
+	public static fromGraphql(obj: {
+		uid: number[];
+		customName?: string;
+		name?: string;
+	}): GraphQlClient {
 		return new GraphQlClient(obj.uid, obj.customName ?? obj.name, "0", "");
 	}
 
-	public static fromGraphqlInvoker(obj: { client: { uid: number[], customName?: string, name?: string }, icon?: IconId, avatar?: string }): GraphQlClient {
-		return new GraphQlClient(obj.client.uid, obj.client.customName ?? obj.client.name, obj.icon ?? "0", obj.avatar ?? "");
+	public static fromGraphqlInvoker(obj: {
+		client: { uid: number[]; customName?: string; name?: string };
+		icon?: IconId;
+		avatar?: string;
+	}): GraphQlClient {
+		return new GraphQlClient(
+			obj.client.uid,
+			obj.client.customName ?? obj.client.name,
+			obj.icon ?? "0",
+			obj.avatar ?? ""
+		);
 	}
 }
 
@@ -506,7 +562,10 @@ export class Client extends book_events.ClientGen implements ITreeNode, Readable
 		super();
 	}
 
-	public static fromJson(obj: Partial<Client> | Partial<book_events.ClientGen>, store?: Writable<Client | undefined>): Client {
+	public static fromJson(
+		obj: Partial<Client> | Partial<book_events.ClientGen>,
+		store?: Writable<Client | undefined>
+	): Client {
 		const c = new Client();
 		if (store !== undefined) {
 			(c._store as any) = store;
@@ -525,8 +584,12 @@ export class Client extends book_events.ClientGen implements ITreeNode, Readable
 	}
 
 	public readonly qlType = "CLIENT";
-	public get qlId(): string { return this.uidStr; }
-	public get wsTarget(): { Client: string } { return { Client: this.id }; }
+	public get qlId(): string {
+		return this.uidStr;
+	}
+	public get wsTarget(): { Client: string } {
+		return { Client: this.id };
+	}
 
 	public updateVolume(connection: Connection, volume: number): void {
 		assert(this.uid !== null, "Cannot update volume if the client has no uid");
@@ -539,11 +602,14 @@ export class Client extends book_events.ClientGen implements ITreeNode, Readable
 	}
 
 	public async loadVolume(): Promise<void> {
-		const res = await backend.graphql(`query GetClientVolume($client: [Int!]!) {
+		const res = await backend.graphql(
+			`query GetClientVolume($client: [Int!]!) {
 			client(uid: $client) { volume }
-		}`, {
-			client: this.uid,
-		});
+		}`,
+			{
+				client: this.uid,
+			}
+		);
 		if (res.data) {
 			const volume = res.data.client.volume;
 			this.volume.set(factorToDb(volume));
@@ -581,7 +647,9 @@ export class Channel extends book_events.ChannelGen implements ITreeNode, Readab
 	}
 
 	public readonly qlType = "CHANNEL";
-	public get qlId(): string { return this.id };
+	public get qlId(): string {
+		return this.id;
+	}
 	public readonly wsTarget = "Channel";
 }
 
@@ -591,18 +659,35 @@ export class GraphQlServer extends ServerBase {
 	public readonly address!: string;
 	public readonly icon!: IconId;
 	private readonly _publicKeyStr: Cached<number[], string>;
-	public get publicKeyStr(): string { return this._publicKeyStr.get(); }
+	public get publicKeyStr(): string {
+		return this._publicKeyStr.get();
+	}
 
-	protected constructor(publicKey?: number[] | undefined, uid?: number[], name?: string, address?: string, icon?: IconId) {
+	protected constructor(
+		publicKey?: number[] | undefined,
+		uid?: number[],
+		name?: string,
+		address?: string,
+		icon?: IconId
+	) {
 		super(uid);
-		this._publicKeyStr = new Cached(() => this.publicKey, u => urlBase64Encode(u));
+		this._publicKeyStr = new Cached(
+			() => this.publicKey,
+			(u) => urlBase64Encode(u)
+		);
 		if (publicKey !== undefined) this.publicKey = publicKey;
 		if (address !== undefined) this.address = address;
 		if (name !== undefined) this.name = name;
 		if (icon !== undefined) this.icon = icon;
 	}
 
-	public static fromGraphql(obj: { publicKey?: number[], uid?: number[], name?: string, address?: string, icon?: IconId }): GraphQlServer {
+	public static fromGraphql(obj: {
+		publicKey?: number[];
+		uid?: number[];
+		name?: string;
+		address?: string;
+		icon?: IconId;
+	}): GraphQlServer {
 		return new GraphQlServer(obj.publicKey, obj.uid, obj.name, obj.address, obj.icon);
 	}
 
@@ -638,24 +723,27 @@ export class Server extends book_events.ServerGen implements ITreeNode, Readable
 }
 
 export class ServerGroup extends book_events.ServerGroupGen {
-	public static fromJson(obj: Partial<ServerGroup> | Partial<book_events.ServerGroupGen>): ServerGroup {
+	public static fromJson(
+		obj: Partial<ServerGroup> | Partial<book_events.ServerGroupGen>
+	): ServerGroup {
 		return new ServerGroup().update(obj);
 	}
 
 	public cmp(other: ServerGroup): number {
 		// If the sortId is 0, the group id is taken
-		if (this.id === other.id)
-			return 0;
+		if (this.id === other.id) return 0;
 		const aid = BigInt(this.id);
 		const bid = BigInt(other.id);
 		const ai = this.sortId === 0 ? aid : BigInt(this.sortId);
 		const bi = other.sortId === 0 ? bid : BigInt(other.sortId);
-		return ai === bi ? (aid < bid ? -1 : 1) : (ai < bi ? -1 : 1);
+		return ai === bi ? (aid < bid ? -1 : 1) : ai < bi ? -1 : 1;
 	}
 }
 
 export class ChannelGroup extends book_events.ChannelGroupGen {
-	public static fromJson(obj: Partial<ChannelGroup> | Partial<book_events.ChannelGroupGen>): ChannelGroup {
+	public static fromJson(
+		obj: Partial<ChannelGroup> | Partial<book_events.ChannelGroupGen>
+	): ChannelGroup {
 		return new ChannelGroup().update(obj);
 	}
 }

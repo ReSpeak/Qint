@@ -13,7 +13,8 @@
 		<slot />
 		<button
 			class="toolbutton is-small compact active"
-			on:click|stopPropagation={() => app.transientSettings.ui._descriptionMode.set(DescriptionMode.None)}>
+			on:click|stopPropagation={() =>
+				app.transientSettings.ui._descriptionMode.set(DescriptionMode.None)}>
 			<Icon name="close" />
 		</button>
 	</div>

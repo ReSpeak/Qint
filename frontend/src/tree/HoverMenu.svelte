@@ -31,7 +31,10 @@
 	}
 
 	function setDescriptionMode(mode: DescriptionMode) {
-		if ((mode === DescriptionMode.Info && infoActive) || (mode === DescriptionMode.Files && filesActive)) {
+		if (
+			(mode === DescriptionMode.Info && infoActive) ||
+			(mode === DescriptionMode.Files && filesActive)
+		) {
 			$descriptionMode = DescriptionMode.None;
 		} else {
 			$descriptionMode = mode;
@@ -71,10 +74,7 @@
 			</button>
 		{/if}
 		{#if selected.node instanceof Server}
-			<button
-				class="toolbutton"
-				on:click={disconnect}
-				title="Disconnect">
+			<button class="toolbutton" on:click={disconnect} title="Disconnect">
 				<Icon name="exit-to-app" />
 			</button>
 		{/if}

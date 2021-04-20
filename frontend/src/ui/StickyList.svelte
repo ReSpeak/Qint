@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onDestroy } from "svelte";
-	import ResizeObserver from 'resize-observer-polyfill';
-	import { setContext } from 'svelte';
+	import ResizeObserver from "resize-observer-polyfill";
+	import { setContext } from "svelte";
 
 	let stickyList: HTMLElement;
 	let stickyChildren: ArrayLike<HTMLElement> = [];
@@ -26,7 +26,9 @@
 
 	function stickyChanged() {
 		if (!stickyList) return;
-		stickyChildren = Array(...stickyList.children).filter(c => c.matches(".stickySlot")) as HTMLElement[];
+		stickyChildren = Array(...stickyList.children).filter((c) =>
+			c.matches(".stickySlot")
+		) as HTMLElement[];
 		stickySizes = Array(stickyChildren.length);
 		stickyAcc = Array(stickyChildren.length);
 		obs?.disconnect();
@@ -35,7 +37,7 @@
 			stickyChildren[i].onclick = () => {
 				const nextElement = stickyChildren[i].nextElementSibling! as HTMLElement;
 				stickyList.scrollTop = nextElement.offsetTop - stickyList.offsetTop - stickyAcc[i];
-			}
+			};
 			stickySizes[i] = stickyChildren[i].offsetHeight;
 			obs.observe(stickyChildren[i]);
 		}
@@ -43,15 +45,17 @@
 		updateChildSize();
 	}
 
-	setContext('stickyChanged', stickyChanged);
+	setContext("stickyChanged", stickyChanged);
 
-	onDestroy(() => { obs?.disconnect(); });
+	onDestroy(() => {
+		obs?.disconnect();
+	});
 	//onMount();
 </script>
 
 <div bind:this={stickyList} class="stickyList">
 	<slot />
-	<div class="stickEndDummy"></div>
+	<div class="stickEndDummy" />
 </div>
 
 <style lang="scss">

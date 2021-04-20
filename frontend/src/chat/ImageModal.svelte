@@ -13,9 +13,12 @@
 </script>
 
 <!-- Tabindex to make the div focusable and trigger onkeydown -->
-<div bind:this={div} class="modal is-active" on:click={() => (visible = false)}
+<div
+	bind:this={div}
+	class="modal is-active"
+	on:click={() => (visible = false)}
 	on:keydown={(e) => {
-		if (e.key === 'Escape') {
+		if (e.key === "Escape") {
 			e.stopPropagation();
 			visible = false;
 		}

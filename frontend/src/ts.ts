@@ -27,7 +27,7 @@ export interface TalkPowerRequest {
 export enum TalkState {
 	Off,
 	Voice,
-	Whisper
+	Whisper,
 }
 
 export enum MaxClientsMode {

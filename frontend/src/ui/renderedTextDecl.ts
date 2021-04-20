@@ -2,36 +2,41 @@ import { backend } from "../backend/backend";
 import { Connection } from "../connection";
 import { pathJoin } from "../panel/fileUtil";
 
-export type LinksMap = Map<string, {
-	link: string,
-	title: string,
-}>;
+export type LinksMap = Map<
+	string,
+	{
+		link: string;
+		title: string;
+	}
+>;
 
 const ts3Scheme = /^(ts3file|ts3image):\/\/([^?]*)(\?(.*))?$/i;
 
-type Ts3Scheme = {
-	scheme: "ts3file",
-	server: string,
-	attrs: Partial<Ts3FileAtt>
-} | {
-	scheme: "ts3image",
-	file: string
-	attrs: Partial<Ts3ImageAtt>
-}
+type Ts3Scheme =
+	| {
+			scheme: "ts3file";
+			server: string;
+			attrs: Partial<Ts3FileAtt>;
+	  }
+	| {
+			scheme: "ts3image";
+			file: string;
+			attrs: Partial<Ts3ImageAtt>;
+	  };
 type Ts3FileAtt = {
-	port: string,
-	serverUID: string,
-	channel: string,
-	path: string,
-	filename: string,
-	isDir: string,
-	fileDateTime: string
+	port: string;
+	serverUID: string;
+	channel: string;
+	path: string;
+	filename: string;
+	isDir: string;
+	fileDateTime: string;
 };
 
 type Ts3ImageAtt = {
-	channel: string,
-	path: string
-}
+	channel: string;
+	path: string;
+};
 
 export function parseTsScheme(url: string): Ts3Scheme | null {
 	const m = ts3Scheme.exec(url);
@@ -41,8 +46,8 @@ export function parseTsScheme(url: string): Ts3Scheme | null {
 	const hostPart = m[2];
 	if (!queryPart || !hostPart) return null;
 	const params: Record<string, string> = {};
-	for (const param of queryPart.split('&')) {
-		const eqIndex = param.indexOf('=');
+	for (const param of queryPart.split("&")) {
+		const eqIndex = param.indexOf("=");
 		if (eqIndex === -1) continue;
 		const key = param.substring(0, eqIndex);
 		const value = decodeURIComponent(param.substring(eqIndex + 1));
@@ -52,19 +57,23 @@ export function parseTsScheme(url: string): Ts3Scheme | null {
 		return {
 			scheme: schemeStr,
 			server: hostPart,
-			attrs: params
+			attrs: params,
 		};
 	} else if (schemeStr === "ts3image") {
 		return {
 			scheme: schemeStr,
 			file: hostPart,
-			attrs: params
+			attrs: params,
 		};
 	}
 	return null;
 }
 
-export function schemeToLink(con: Connection | undefined, server: string | undefined, scheme: Ts3Scheme): string | null {
+export function schemeToLink(
+	con: Connection | undefined,
+	server: string | undefined,
+	scheme: Ts3Scheme
+): string | null {
 	if (!con && !server) {
 		console.error("schemeToLink needs either connection or server");
 		return null;
@@ -72,7 +81,10 @@ export function schemeToLink(con: Connection | undefined, server: string | undef
 	if (scheme.attrs.path) {
 		let path;
 		if (scheme.scheme === "ts3file") {
-			path = `${scheme.attrs.channel}${pathJoin(scheme.attrs.path, scheme.attrs.filename ?? "")}`;
+			path = `${scheme.attrs.channel}${pathJoin(
+				scheme.attrs.path,
+				scheme.attrs.filename ?? ""
+			)}`;
 		} else if (scheme.scheme === "ts3image") {
 			path = `${scheme.attrs.channel}${pathJoin(scheme.attrs.path, scheme.file)}`;
 		}

@@ -20,10 +20,7 @@ export interface IBackendConnection {
 	readonly id: string;
 	readonly serverFileSrc: string;
 	send(data: OutMsg): void;
-	connect(
-		onMsg: msgFn,
-		onError: errorFn,
-		onClose: closedFn): Promise<void>;
+	connect(onMsg: msgFn, onError: errorFn, onClose: closedFn): Promise<void>;
 	close(): void;
 	fetch(cmd: string, data?: RequestInit): Promise<IFetchLike>;
 }

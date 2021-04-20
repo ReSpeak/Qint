@@ -96,8 +96,7 @@
 	function getPropsDiff() {
 		const diff: Record<string, any> = {};
 
-		if (chanEditMaxClientsMode === MaxClientsMode.Inherited)
-			chanEdit.maxClients = "Inherited";
+		if (chanEditMaxClientsMode === MaxClientsMode.Inherited) chanEdit.maxClients = "Inherited";
 		else if (chanEditMaxClientsMode === MaxClientsMode.Unlimited)
 			chanEdit.maxClients = "Unlimited";
 		else if (chanEditMaxClientsMode === MaxClientsMode.Limited)
@@ -133,10 +132,8 @@
 			delete diff.hasPassword;
 		} else if (diff.hasPassword !== undefined) {
 			// Ignore when password is empty
-			if (diff.hasPassword)
-				delete diff.hasPassword;
-			else
-				diff.password = null;
+			if (diff.hasPassword) delete diff.hasPassword;
+			else diff.password = null;
 		}
 		return diff;
 	}
@@ -150,8 +147,7 @@
 		editing = true;
 		chanEdit = createPropsCopy();
 
-		if (chanEdit.maxClients === "Inherited")
-			chanEditMaxClientsMode = MaxClientsMode.Inherited;
+		if (chanEdit.maxClients === "Inherited") chanEditMaxClientsMode = MaxClientsMode.Inherited;
 		else if (chanEdit.maxClients === "Unlimited")
 			chanEditMaxClientsMode = MaxClientsMode.Unlimited;
 		else {
@@ -270,12 +266,16 @@
 			<label for="edit_topic">Topic:</label>
 			{#if editing}
 				<input id="edit_topic" class="input" type="text" bind:value={chanEdit.topic} />
-			{:else}{$channel.topic ?? ''}{/if}
+			{:else}{$channel.topic ?? ""}{/if}
 		</div>
 		{#if editing}
 			<div class="dataLine">
 				<label for="edit_codec">Codec:</label>
-				<BDropDown id="edit_codec" bind:selected={chanEdit.codec} items={codecOpt} display={codecToName} />
+				<BDropDown
+					id="edit_codec"
+					bind:selected={chanEdit.codec}
+					items={codecOpt}
+					display={codecToName} />
 			</div>
 			<div class="dataLine">
 				<label for="edit_codecQuality">Codec quality:</label>
@@ -308,10 +308,10 @@
 		{:else}
 			<div class="dataLine">
 				<div>Codec:</div>
-				<div>{$channel.codec !== null ? codecToName($channel.codec) : 'unknown'}</div>
-				<div> @ </div>
+				<div>{$channel.codec !== null ? codecToName($channel.codec) : "unknown"}</div>
+				<div>@</div>
 				<div>{$channel.codecQuality}</div>
-				<div> </div>
+				<div />
 				{#if server.codecEncryptionMode === CodecEncryptionMode.ForcedOn}
 					<Icon name="lock-outline" title="Voice is encrypted (forced by server)" />
 				{:else if !channel.isUnencrypted}
@@ -322,9 +322,13 @@
 		{#if $channel.neededTalkPower !== 0 || editing}
 			<div class="dataLine">
 				<label for="edit_neededTalkPower">Required talk power:</label>
-				<span></span>
+				<span />
 				{#if editing}
-					<input id="edit_neededTalkPower" class="input" type="number" bind:value={chanEdit.neededTalkPower} />
+					<input
+						id="edit_neededTalkPower"
+						class="input"
+						type="number"
+						bind:value={chanEdit.neededTalkPower} />
 				{:else}
 					<div>{$channel.neededTalkPower}</div>
 				{/if}
@@ -338,23 +342,33 @@
 		{/if}
 		{#if editing}
 			<div class="dataLine">
-				<label for="edit_maxClients" title="Maximum amount of clients in this channel">Max clients:</label>
+				<label for="edit_maxClients" title="Maximum amount of clients in this channel"
+					>Max clients:</label>
 				<BDropDown
 					id="edit_maxClients"
 					bind:selected={chanEditMaxClientsMode}
 					items={enumValues(MaxClientsMode)} />
 				{#if chanEditMaxClientsMode === MaxClientsMode.Limited}
-					<input class="input maxClientsLimit" type="number" bind:value={chanEditMaxClientsLimit} />
+					<input
+						class="input maxClientsLimit"
+						type="number"
+						bind:value={chanEditMaxClientsLimit} />
 				{/if}
 			</div>
 			<div class="dataLine">
-				<label for="edit_maxFamilyClients" title="Maximum amount of clients in this channel and all subchannels combined">Max family clients:</label>
+				<label
+					for="edit_maxFamilyClients"
+					title="Maximum amount of clients in this channel and all subchannels combined"
+					>Max family clients:</label>
 				<BDropDown
 					id="edit_maxFamilyClients"
 					bind:selected={chanEditMaxFamilyClientsMode}
 					items={enumValues(MaxClientsMode)} />
 				{#if chanEditMaxFamilyClientsMode === MaxClientsMode.Limited}
-					<input class="input maxClientsLimit" type="number" bind:value={chanEditMaxFamilyClientsLimit} />
+					<input
+						class="input maxClientsLimit"
+						type="number"
+						bind:value={chanEditMaxFamilyClientsLimit} />
 				{/if}
 			</div>
 		{:else}
@@ -382,12 +396,14 @@
 							class="input"
 							type="password"
 							bind:value={chanEdit._password}
-							placeholder={channel.hasPassword && chanEdit.hasPassword !== false ? PASSWORD_PLACEHOLDER : ""}
-						/>
+							placeholder={channel.hasPassword && chanEdit.hasPassword !== false
+								? PASSWORD_PLACEHOLDER
+								: ""} />
 					</div>
 					{#if channel.hasPassword && chanEdit.hasPassword !== false}
 						<div class="control">
-							<button class="button" on:click={editClearPasword}><Icon name={CLEAR_ICON} /></button>
+							<button class="button" on:click={editClearPasword}
+								><Icon name={CLEAR_ICON} /></button>
 						</div>
 					{/if}
 				</div>
@@ -406,7 +422,7 @@
 				{:else}
 					<RenderedText
 						{connection}
-						text={$channel.optionalData?.descriptionRendered ?? ''} />
+						text={$channel.optionalData?.descriptionRendered ?? ""} />
 				{/if}
 			{/await}
 		{/if}

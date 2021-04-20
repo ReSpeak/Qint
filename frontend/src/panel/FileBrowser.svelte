@@ -371,7 +371,7 @@
 			on:click={() => dummyUploader.click()}
 			class:is-info={currentUploadTask !== undefined}
 			class="button">
-			<Icon name={currentUploadTask === undefined ? 'upload' : 'orbit mdi-spin'} />
+			<Icon name={currentUploadTask === undefined ? "upload" : "orbit mdi-spin"} />
 		</button>
 		<button
 			class="button"
@@ -468,7 +468,7 @@
 					<form
 						on:submit|preventDefault={createNewFolder}
 						on:keydown={(e) => {
-							if (e.key === 'Escape') createNewFolderClick();
+							if (e.key === "Escape") createNewFolderClick();
 						}}
 						class="flex">
 						<input
@@ -484,14 +484,14 @@
 			</tr>
 		{/if}
 		<tr slot="headerCell" let:col>
-			{#if col.key === 'type'}
+			{#if col.key === "type"}
 				<div on:click={() => goUp()} class="upIcon" class:invisible={path.length === 0}>
 					<Icon name="arrow-up-circle-outline" />
 				</div>
 			{/if}
 		</tr>
 		<tr slot="colCell" let:col let:row>
-			{#if col.key === 'type'}
+			{#if col.key === "type"}
 				{#if row.isFile}
 					<Icon name={extensionToIcon(row.name)} />
 				{:else}

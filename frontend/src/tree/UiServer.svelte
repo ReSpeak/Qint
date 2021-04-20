@@ -58,9 +58,8 @@
 		<ServerName {connection} />
 		<div class="buttons">
 			{#if !$state.connected}
-				<button
-					class="button is-danger is-small"
-					on:click|stopPropagation={cancel}>Cancel</button>
+				<button class="button is-danger is-small" on:click|stopPropagation={cancel}
+					>Cancel</button>
 			{/if}
 		</div>
 		<span class="icons">
@@ -88,7 +87,7 @@
 					<UiChangeResult result={$state.error} />
 				{/if}
 			{:else}
-				<Loader text={'Connecting ...'} />
+				<Loader text={"Connecting ..."} />
 			{/if}
 		</div>
 	</div>
@@ -119,7 +118,7 @@
 			background-color: mix($background, $text, 95%);
 		}
 
-		> :global(.serverName){
+		> :global(.serverName) {
 			flex: 1;
 			text-align: start;
 			overflow: hidden;

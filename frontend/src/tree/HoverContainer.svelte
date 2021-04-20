@@ -15,9 +15,7 @@
 <div class="hover menu" style="top: calc({div.getBoundingClientRect().top}px - 1.5em);">
 	<div class="corner" />
 	{#if closeButton}
-		<button
-			class="toolbutton closeButton"
-			on:click={close}>
+		<button class="toolbutton closeButton" on:click={close}>
 			<Icon name="close" />
 		</button>
 	{/if}

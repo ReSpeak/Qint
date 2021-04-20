@@ -25,15 +25,15 @@
 </script>
 
 {#if iconPath}
-<span title={name} class="serverGroupIcon">
-	{#if iconPath.startsWith('alpha')}
-		<Icon name={iconPath} />
-	{:else}
-		<span class="icon">
-			<img src={iconPath} alt="" />
-		</span>
-	{/if}
-</span>
+	<span title={name} class="serverGroupIcon">
+		{#if iconPath.startsWith("alpha")}
+			<Icon name={iconPath} />
+		{:else}
+			<span class="icon">
+				<img src={iconPath} alt="" />
+			</span>
+		{/if}
+	</span>
 {/if}
 
 <style>

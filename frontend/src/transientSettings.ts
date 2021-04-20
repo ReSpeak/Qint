@@ -42,19 +42,20 @@ export class TransientSettings {
 	}
 
 	private async saveAsync(): Promise<void> {
-		const newSave = JSON.parse(JSON.stringify(this, (k, v) => k.startsWith('_') ? undefined : v));
+		const newSave = JSON.parse(
+			JSON.stringify(this, (k, v) => (k.startsWith("_") ? undefined : v))
+		);
 		// Diff to last save
 		const diff = deep_diff(this._lastSave, newSave);
 		log("Syncing:\nOld: %j\nNew: %j\nDiff: %j", this._lastSave, newSave, diff);
-		if (diff === undefined)
-			return;
+		if (diff === undefined) return;
 
 		this._lastSave = newSave;
 
 		try {
 			await backend.fetch(`/transient`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(diff),
 			});
 		} catch (e) {
@@ -67,15 +68,16 @@ export class TransientSettingsSynth {
 	public voiceId?: string;
 	public volume: number = 1;
 	public speed: number = 1;
-	private _voiceIdCache?: string
-	private _voiceCache?: SpeechSynthesisVoice
+	private _voiceIdCache?: string;
+	private _voiceCache?: SpeechSynthesisVoice;
 	private _previousUtter: SpeechSynthesisUtterance | undefined;
 	public get voice(): SpeechSynthesisVoice | undefined {
 		if (this._voiceIdCache !== this.voiceId) {
 			const synth = window.speechSynthesis;
 			if (synth) {
 				const voices = synth.getVoices();
-				this._voiceCache = voices.find(v => v.voiceURI === this.voiceId) ?? voices.find(() => true);
+				this._voiceCache =
+					voices.find((v) => v.voiceURI === this.voiceId) ?? voices.find(() => true);
 				this._voiceIdCache = this.voiceId;
 			} else {
 				this.voice = undefined;
@@ -95,7 +97,9 @@ export class TransientSettingsSynth {
 		}
 	}
 
-	public canSpeak(): boolean { return window.speechSynthesis !== undefined; }
+	public canSpeak(): boolean {
+		return window.speechSynthesis !== undefined;
+	}
 
 	private getNewUtter(): SpeechSynthesisUtterance {
 		const utter = new SpeechSynthesisUtterance();
@@ -117,7 +121,7 @@ export class TransientSettingsSynth {
 			if (synth.speaking && this._previousUtter) {
 				this._previousUtter.onend = () => {
 					synth.speak(utter);
-				}
+				};
 				synth.cancel();
 			} else {
 				synth.speak(utter);
@@ -138,10 +142,18 @@ export class TransientSettingsSynth {
 
 // TODO move into own app.ui management
 export class TransientSettingsUi {
-	private get descriptionMode() { return get(this._descriptionMode); }
-	private set descriptionMode(val: DescriptionMode) { this._descriptionMode.set(val); }
-	private get developMode() { return get(this._developMode); }
-	private set developMode(val: boolean) { this._developMode.set(val); }
+	private get descriptionMode() {
+		return get(this._descriptionMode);
+	}
+	private set descriptionMode(val: DescriptionMode) {
+		this._descriptionMode.set(val);
+	}
+	private get developMode() {
+		return get(this._developMode);
+	}
+	private set developMode(val: boolean) {
+		this._developMode.set(val);
+	}
 	public readonly _descriptionMode = writable(DescriptionMode.None);
 	public readonly _developMode = writable(false);
 	/// If the default state is muted for new connections
@@ -157,8 +169,8 @@ export class TransientSettingsUi {
 		return res;
 	}
 }
-Object.defineProperty(TransientSettingsUi.prototype, 'descriptionMode', { enumerable: true });
-Object.defineProperty(TransientSettingsUi.prototype, 'developMode', { enumerable: true });
+Object.defineProperty(TransientSettingsUi.prototype, "descriptionMode", { enumerable: true });
+Object.defineProperty(TransientSettingsUi.prototype, "developMode", { enumerable: true });
 
 export class TransientSettingsChat {
 	private _parent: TransientSettings;
@@ -198,7 +210,7 @@ export class TransientSettingsAudio {
 export type HotkeySubject = "Away" | "InputMute" | "OutputMute";
 
 export type HotkeyAction = {
-	[P in HotkeySubject]?: null
+	[P in HotkeySubject]?: null;
 };
 
 export interface Hotkey {

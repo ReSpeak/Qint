@@ -10,5 +10,5 @@ Object.defineProperty(Array.prototype, "remove_item", {
 				this.splice(i, 1);
 			}
 		}
-	}
+	},
 });

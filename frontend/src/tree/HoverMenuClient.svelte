@@ -27,9 +27,9 @@
 	{/if}
 </div>
 {#if $client.description.length > 0}
-<div class="description">
-	{$client.description}
-</div>
+	<div class="description">
+		{$client.description}
+	</div>
 {/if}
 {#if !ownClient}
 	<ClientVolume client={$client} {connection} />

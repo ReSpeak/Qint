@@ -1,3 +1,5 @@
+<svelte:options immutable={true} />
+
 <script lang="ts">
 	//import Loader from "../ui/Loader.svelte";
 	import VideoPreview from "./VideoPreview.svelte";
@@ -15,11 +17,10 @@
 	$: analyzeResult = analyzeLink(link);
 </script>
 
-<svelte:options immutable={true} />
 {#await analyzeResult}
 	<!-- <Loader text="Loading preview..." /> -->
 {:then result}
-	{#if result.kind === 'image'}
+	{#if result.kind === "image"}
 		<!-- TODO add 'open original' button -->
 		<img
 			class="limitChatSize previewImg padTop"
@@ -30,9 +31,9 @@
 		{#if showBig}
 			<ImageModal src={result.imageSrc} bind:visible={showBig} />
 		{/if}
-	{:else if result.kind === 'video'}
+	{:else if result.kind === "video"}
 		<VideoPreview videoSrc={result.videoSrc} embed={result.embed} {nodeSel} />
-	{:else if result.kind === 'site'}
+	{:else if result.kind === "site"}
 		<a href={link} target="_blank" class="box padTop">
 			<div>
 				<div class="media-left">
@@ -42,7 +43,7 @@
 				</div>
 				<div class="media-content">
 					<p class="title">{result.title}</p>
-					<span>{result.description ?? ''}</span>
+					<span>{result.description ?? ""}</span>
 				</div>
 			</div>
 		</a>

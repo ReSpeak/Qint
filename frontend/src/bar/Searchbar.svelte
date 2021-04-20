@@ -8,7 +8,7 @@
 		<p class="control has-icons-right">
 			<input class="input" type="text" placeholder="Search" bind:value={filter} />
 			<span class="icon is-small is-right">
-				<i class="mdi mdi-magnify"></i>
+				<i class="mdi mdi-magnify" />
 			</span>
 		</p>
 	</div>
@@ -20,7 +20,11 @@
 		box-shadow: 3px 0 3px #0005;
 	}
 
-	.searchbar, .media-content, p, input.input, p.control.has-icons-right > span.icon {
+	.searchbar,
+	.media-content,
+	p,
+	input.input,
+	p.control.has-icons-right > span.icon {
 		height: 100%;
 	}
 

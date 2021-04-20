@@ -24,8 +24,13 @@
 			Server
 		{/if}
 	</div>
-	<UiMessage unread={false} message={content.message} server={content.server}
-		messageHighlightedContent={content.highlightedContent === null ? undefined : content.highlightedContent} />
+	<UiMessage
+		unread={false}
+		message={content.message}
+		server={content.server}
+		messageHighlightedContent={content.highlightedContent === null
+			? undefined
+			: content.highlightedContent} />
 </div>
 
 <style lang="scss">

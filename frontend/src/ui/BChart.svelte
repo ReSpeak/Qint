@@ -16,7 +16,7 @@
 		Filler,
 		Legend,
 		Title,
-		Tooltip
+		Tooltip,
 	} from "chart.js";
 	import "chartjs-adapter-moment";
 

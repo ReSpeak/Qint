@@ -13,18 +13,18 @@ export const vSyncCmdKey = "qint.vsync";
 
 export type VSyncCmd = {
 	/** The youtube_id or video link */
-	video_key: string,
-	event: VSyncEvent,
+	video_key: string;
+	event: VSyncEvent;
 	/** Optionally announce a new host which will answer join requests */
-	host?: ClientId,
-}
+	host?: ClientId;
+};
 
 export type VSyncEvent = {
-	action?: "start" | "pause",
+	action?: "start" | "pause";
 	/** Position in seconds */
-	position?: number,
-	speed?: number,
-}
+	position?: number;
+	speed?: number;
+};
 
 export class SyncState {
 	public host?: ClientId;
@@ -36,16 +36,17 @@ export class SyncState {
 	constructor(
 		public nodeSel: NodeSelection,
 		public video_key: string,
-		public videoControl: IVideoControl,
-	) {
-	}
+		public videoControl: IVideoControl
+	) {}
 
 	private target(): [PluginTargetMode, ClientId] | null {
 		const node = this.nodeSel.node;
 		if (node instanceof Client) {
 			return [PluginTargetMode.Client, node.id];
-		} else if (node instanceof Channel
-			&& NodeSelection.equals(get(app.selectedNode), this.nodeSel)) {
+		} else if (
+			node instanceof Channel &&
+			NodeSelection.equals(get(app.selectedNode), this.nodeSel)
+		) {
 			return [PluginTargetMode.CurrentChannel, "0"];
 		} else if (node instanceof Server) {
 			return [PluginTargetMode.Server, "0"];
@@ -53,25 +54,25 @@ export class SyncState {
 		return null;
 	}
 
-	public sendJoinOrHost(): void {
-	}
+	public sendJoinOrHost(): void {}
 
 	private processLocalAction(ev: VSyncEvent) {
 		log("Local action %o", ev);
 		if (!this.enabled) return;
-		if (this.debouncedEvent === undefined)
-			this.debouncedEvent = ev;
-		else
-			this.debouncedEvent = Object.assign(this.debouncedEvent, ev);
+		if (this.debouncedEvent === undefined) this.debouncedEvent = ev;
+		else this.debouncedEvent = Object.assign(this.debouncedEvent, ev);
 		this.broadcastDebounced();
 	}
 
-	private broadcastDebounced = debounced(() => {
-		if (this.debouncedEvent === undefined)
-			return;
-		this.broadcastNewState(this.debouncedEvent);
-		this.debouncedEvent = undefined;
-	}, 200, { resetOnCall: false });
+	private broadcastDebounced = debounced(
+		() => {
+			if (this.debouncedEvent === undefined) return;
+			this.broadcastNewState(this.debouncedEvent);
+			this.debouncedEvent = undefined;
+		},
+		200,
+		{ resetOnCall: false }
+	);
 
 	public broadcastNewState(ev: VSyncEvent): void {
 		if (!this.enabled) return;
@@ -89,11 +90,11 @@ export class SyncState {
 				name: vSyncCmdKey,
 				data: JSON.stringify({
 					video_key: this.video_key,
-					event: diffEv
+					event: diffEv,
 				}),
 				target,
-				targetClientId
-			}
+				targetClientId,
+			},
 		});
 	}
 
@@ -117,14 +118,12 @@ export class SyncState {
 			diffEv.action = value.action;
 		if (value.position !== undefined && value.position !== base.position)
 			diffEv.position = value.position;
-		if (value.speed !== undefined && value.speed !== base.speed)
-			diffEv.speed = value.speed;
+		if (value.speed !== undefined && value.speed !== base.speed) diffEv.speed = value.speed;
 		return diffEv;
 	}
 
 	public receiveNewState(cmd: VSyncCmd): void {
-		if (cmd.video_key !== this.video_key)
-			return;
+		if (cmd.video_key !== this.video_key) return;
 		log("Got sync %o", cmd);
 		SyncState.copySafe(cmd.event, this.lastReceivedSync);
 		if (cmd.host) {
@@ -145,7 +144,9 @@ export class SyncState {
 
 	public subscribe(): void {
 		assert(this.pluginCmdUnsub === undefined, "previous sub not removed");
-		this.pluginCmdUnsub = this.nodeSel.connection.pluginCmd.subscribe(cmd => this.processRawPluginCmd(cmd));
+		this.pluginCmdUnsub = this.nodeSel.connection.pluginCmd.subscribe((cmd) =>
+			this.processRawPluginCmd(cmd)
+		);
 		this.videoControl.event = (ev) => this.processLocalAction(ev);
 		this.videoControl.register?.();
 		this.enabled = true;
@@ -172,9 +173,7 @@ export interface IVideoControl {
 }
 
 export class HTML5VideoControl implements IVideoControl {
-	constructor(
-		public elem: HTMLVideoElement
-	) {
+	constructor(public elem: HTMLVideoElement) {
 		elem.onplay = () => this.event?.({ action: "start", position: elem.currentTime });
 		elem.onpause = () => this.event?.({ action: "pause" });
 		elem.onratechange = () => this.event?.({ speed: elem.playbackRate });
@@ -197,11 +196,15 @@ export class HTML5VideoControl implements IVideoControl {
 
 // Global msg handler to listen for postMessage events from youtube iframes
 const windowYoutubeMsg = fnBroadcast<[YoutubeEvent]>();
-window.addEventListener("message", (event) => {
-	if (event.origin !== "https://www.youtube.com") return;
-	const evd = JSON.parse(event.data) as YoutubeEvent;
-	windowYoutubeMsg(evd);
-}, false);
+window.addEventListener(
+	"message",
+	(event) => {
+		if (event.origin !== "https://www.youtube.com") return;
+		const evd = JSON.parse(event.data) as YoutubeEvent;
+		windowYoutubeMsg(evd);
+	},
+	false
+);
 
 const enum YoutubePlayerState {
 	UNSTARTED = -1,
@@ -211,10 +214,11 @@ const enum YoutubePlayerState {
 	BUFFERING = 3,
 	CUED = 5,
 }
-type YoutubeEventBase = { channel: string, id: number };
-type YoutubeEvent = { event: "onReady", info: null } & YoutubeEventBase
-	| { event: "infoDelivery", info: Partial<YTInfoDelivery> } & YoutubeEventBase
-	| { event: "onStateChange", info: YoutubePlayerState } & YoutubeEventBase
+type YoutubeEventBase = { channel: string; id: number };
+type YoutubeEvent =
+	| ({ event: "onReady"; info: null } & YoutubeEventBase)
+	| ({ event: "infoDelivery"; info: Partial<YTInfoDelivery> } & YoutubeEventBase)
+	| ({ event: "onStateChange"; info: YoutubePlayerState } & YoutubeEventBase);
 
 interface YTInfoDelivery {
 	currentTime: number;
@@ -238,30 +242,40 @@ export class YoutubeVideoControl implements IVideoControl {
 	private dedupState: Partial<YTInfoDelivery> & { status?: YoutubePlayerState } = {};
 	private vSyncSeekTime: Moment | undefined;
 
-	constructor(
-		public elem: HTMLIFrameElement
-	) {
+	constructor(public elem: HTMLIFrameElement) {
 		this.pipe_id = YoutubeVideoControl.gid++;
 	}
 	public play(): void {
 		this.dedupState.playerState = YoutubePlayerState.PLAYING;
-		this.elem.contentWindow?.postMessage(JSON.stringify({ ...this.getCmdObj(), func: "playVideo" }), host);
+		this.elem.contentWindow?.postMessage(
+			JSON.stringify({ ...this.getCmdObj(), func: "playVideo" }),
+			host
+		);
 	}
 	public pause(): void {
 		this.dedupState.playerState = YoutubePlayerState.PAUSED;
-		this.elem.contentWindow?.postMessage(JSON.stringify({ ...this.getCmdObj(), func: "pauseVideo" }), host);
+		this.elem.contentWindow?.postMessage(
+			JSON.stringify({ ...this.getCmdObj(), func: "pauseVideo" }),
+			host
+		);
 	}
 	public seek(pos: number /* In seconds*/): void {
 		const now = moment();
 		if (this.isSeekJump(now, pos)) {
-			this.elem.contentWindow?.postMessage(JSON.stringify({ ...this.getCmdObj(), func: "seekTo", args: [pos, true] }), host);
+			this.elem.contentWindow?.postMessage(
+				JSON.stringify({ ...this.getCmdObj(), func: "seekTo", args: [pos, true] }),
+				host
+			);
 		}
 		this.dedupState.currentTime = pos;
 		this.vSyncSeekTime = now;
 	}
 	public speed(rate: number): void {
 		this.dedupState.playbackRate = rate;
-		this.elem.contentWindow?.postMessage(JSON.stringify({ ...this.getCmdObj(), func: "setPlaybackRate", args: [rate] }), host);
+		this.elem.contentWindow?.postMessage(
+			JSON.stringify({ ...this.getCmdObj(), func: "setPlaybackRate", args: [rate] }),
+			host
+		);
 	}
 	public event?: (ev: VSyncEvent) => void;
 
@@ -275,18 +289,19 @@ export class YoutubeVideoControl implements IVideoControl {
 				this.evTimer = undefined;
 				break;
 			case "onStateChange":
-				if (this.dedupState.playerState === msg.info)
-					break;
+				if (this.dedupState.playerState === msg.info) break;
 				this.dedupState.playerState = msg.info;
 				if (msg.info === YoutubePlayerState.PLAYING) {
 					this.event?.({ action: "start", position: this.dedupState.currentTime });
-				}
-				else if (msg.info === YoutubePlayerState.PAUSED) {
+				} else if (msg.info === YoutubePlayerState.PAUSED) {
 					this.event?.({ action: "pause" });
 				}
 				break;
 			case "infoDelivery":
-				if (msg.info.playbackRate !== undefined && msg.info.playbackRate !== this.dedupState.playbackRate) {
+				if (
+					msg.info.playbackRate !== undefined &&
+					msg.info.playbackRate !== this.dedupState.playbackRate
+				) {
 					log("Rate change to %d", msg.info.playbackRate);
 					this.dedupState.playbackRate = msg.info.playbackRate;
 					this.event?.({ speed: msg.info.playbackRate });
@@ -319,15 +334,31 @@ export class YoutubeVideoControl implements IVideoControl {
 		const cw = this.elem.contentWindow;
 		if (cw === null) return;
 		if (!this.originReady) {
-			try { if (cw.origin) return; } catch {
+			try {
+				if (cw.origin) return;
+			} catch {
 				log("orig");
 				this.originReady = true;
 			}
 		}
 		if (!this.iFrameRegistered) {
 			log("ireg");
-			cw.postMessage(JSON.stringify({ ...this.getCmdObj(), func: "addEventListener", args: ["onReady"] }), host);
-			cw.postMessage(JSON.stringify({ ...this.getCmdObj(), func: "addEventListener", args: ["onStateChange"] }), host);
+			cw.postMessage(
+				JSON.stringify({
+					...this.getCmdObj(),
+					func: "addEventListener",
+					args: ["onReady"],
+				}),
+				host
+			);
+			cw.postMessage(
+				JSON.stringify({
+					...this.getCmdObj(),
+					func: "addEventListener",
+					args: ["onStateChange"],
+				}),
+				host
+			);
 			this.iFrameRegistered = true;
 		}
 
@@ -336,19 +367,20 @@ export class YoutubeVideoControl implements IVideoControl {
 			cw.postMessage(JSON.stringify({ ...this.getCmdObj("listening") }), host);
 		}
 	}
-	private getCmdObj(cmd: string = "command"): { channel: "widget", event: string, args: [], id: number } {
+	private getCmdObj(
+		cmd: string = "command"
+	): { channel: "widget"; event: string; args: []; id: number } {
 		return {
 			channel: "widget",
 			event: cmd,
 			args: [],
-			id: this.pipe_id
-		}
+			id: this.pipe_id,
+		};
 	}
 
 	public register(): void {
 		assert(this.evTimer === undefined, "Old evTimer not cleared");
-		if (!this.iFrameLoaded)
-			this.evTimer = window.setInterval(() => this.checkIframe(), 250);
+		if (!this.iFrameLoaded) this.evTimer = window.setInterval(() => this.checkIframe(), 250);
 		this.windowYoutubeMsgUnsub = windowYoutubeMsg.subscribe((msg) => this.iFrameMessage(msg));
 	}
 	public unregister(): void {

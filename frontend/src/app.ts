@@ -16,7 +16,9 @@ export class App {
 	// 	$connections.map((c) => c.state) as [Readable<ConnectionState>],
 	// 	(states) => states.some((s) => s.connected)
 	// );
-	public get hasConnected(): boolean { return get(this.connections).some(s => get(s.state).connected); }
+	public get hasConnected(): boolean {
+		return get(this.connections).some((s) => get(s.state).connected);
+	}
 	public readonly selectedNode: Writable<NodeSelection | undefined> = writable(undefined);
 	public readonly showSidebar = writable(false);
 	public readonly displayPanel = writable(DisplayPanel.Connect);
@@ -29,14 +31,15 @@ export class App {
 	public updateMuteState = fnBroadcast();
 
 	constructor() {
-		loadPlugins().then(x => this.plugins = x);
+		loadPlugins().then((x) => (this.plugins = x));
 		this.transientSettings.loadAsync().then(() => {
 			this.transientSettingsLoaded();
 		});
 		// TODO unsubscribe somewhere
-		this.selectedNode.subscribe(s => {
+		this.selectedNode.subscribe((s) => {
 			if (s !== undefined) {
-				const name = s.connection.book.server.name ?? get(s.connection.connectOptions).address;
+				const name =
+					s.connection.book.server.name ?? get(s.connection.connectOptions).address;
 				backend.setTitle(name + " – Qint");
 				const iconPath = getIconPath(s.connection.book.server, s.connection);
 				backend.setIcon(iconPath);
@@ -57,10 +60,9 @@ export class App {
 
 	public selectNode(nodeSel?: NodeSelection): void {
 		const checkOldNode = get(this.selectedNode);
-		if (NodeSelection.equals(checkOldNode, nodeSel))
-			return;
+		if (NodeSelection.equals(checkOldNode, nodeSel)) return;
 		console.log("Switching to", nodeSel?.uniqueStr);
-		this.selectedNode.update(oldNode => {
+		this.selectedNode.update((oldNode) => {
 			if (oldNode !== undefined) {
 				oldNode.node.update({ isSelected: false });
 			}
@@ -79,18 +81,22 @@ export class App {
 
 	public connect(options: ConnectData): Connection {
 		const con = new Connection(options);
-		oneshot(con.state, s => s.closed, () => {
-			this.connections.update(cs => {
-				cs.remove_item(con);
-				if (cs.length === 0) {
-					// Hide sidebare and show connect screen
-					this.showSidebar.set(false);
-					this.displayPanel.set(DisplayPanel.Connect);
-				}
-				return cs;
-			});
-		});
-		this.connections.update(cs => {
+		oneshot(
+			con.state,
+			(s) => s.closed,
+			() => {
+				this.connections.update((cs) => {
+					cs.remove_item(con);
+					if (cs.length === 0) {
+						// Hide sidebare and show connect screen
+						this.showSidebar.set(false);
+						this.displayPanel.set(DisplayPanel.Connect);
+					}
+					return cs;
+				});
+			}
+		);
+		this.connections.update((cs) => {
 			cs.push(con);
 			return cs;
 		});
@@ -107,15 +113,16 @@ export class App {
 }
 
 export class NodeSelection {
-	constructor(
-		public readonly connection: Connection,
-		public readonly node: ITreeNode) { }
+	constructor(public readonly connection: Connection, public readonly node: ITreeNode) {}
 
 	public get uniqueStr(): string {
 		return `${this.node.qlType},${this.connection.book.server.uidStr},${this.node.qlId}`;
 	}
 
-	public static equals(first: NodeSelection | undefined, second: NodeSelection | undefined): boolean {
+	public static equals(
+		first: NodeSelection | undefined,
+		second: NodeSelection | undefined
+	): boolean {
 		if (first === second) return true;
 		if (first === undefined || second === undefined) return false;
 		if (first.connection !== second.connection) return false;

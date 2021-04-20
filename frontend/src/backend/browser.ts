@@ -19,10 +19,13 @@ export class BrowserBackend implements IBackend {
 		return fetch(`${BASE_ADDRESS}${cmd}`, data);
 	}
 
-	public async graphql<T = any>(query: string, variables?: Record<string, unknown>): Promise<{ data: T }> {
+	public async graphql<T = any>(
+		query: string,
+		variables?: Record<string, unknown>
+	): Promise<{ data: T }> {
 		const val = await this.fetch(`/db`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ query, variables }),
 		});
 		return await val.json();
@@ -34,10 +37,8 @@ export class BrowserBackend implements IBackend {
 
 	public setIcon(url: string | undefined): void {
 		const icon = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
-		if (icon !== null)
-			icon.href = url ?? "icon.png";
-		else
-			console.log("Tried to set icon but did not find icon element");
+		if (icon !== null) icon.href = url ?? "icon.png";
+		else console.log("Tried to set icon but did not find icon element");
 	}
 }
 
@@ -46,16 +47,13 @@ export class BrowserBackendConnection implements IBackendConnection {
 	public id: string;
 	private socket?: WebSocket;
 
-	constructor(
-		private parent: BrowserBackend
-	) {
+	constructor(private parent: BrowserBackend) {
 		this.serverFileSrc = "";
 		this.id = createUuidV4();
 	}
 
 	public send(data: OutMsg): void {
-		if (this.socket)
-			this.socket.send(JSON.stringify(data));
+		if (this.socket) this.socket.send(JSON.stringify(data));
 	}
 
 	public connect(onMsg: msgFn, onError: errorFn, onClose: closedFn): Promise<void> {
@@ -65,15 +63,18 @@ export class BrowserBackendConnection implements IBackendConnection {
 		this.socket = new WebSocket(`${this.parent.wsBaseAddress}/con/${this.id}/ws?format=Json`);
 		this.socket.onerror = (error) => onError(String(error));
 		this.socket.onclose = onClose;
-		this.socket.onmessage = (evt) => { onMsg(JSON.parse(evt.data) as InMsg); };
-		return new Promise(resolve => {
-			this.socket!.onopen = () => { resolve() };
+		this.socket.onmessage = (evt) => {
+			onMsg(JSON.parse(evt.data) as InMsg);
+		};
+		return new Promise((resolve) => {
+			this.socket!.onopen = () => {
+				resolve();
+			};
 		});
 	}
 
 	public close(): void {
-		if (this.socket)
-			this.socket.close();
+		if (this.socket) this.socket.close();
 		this.socket = undefined;
 	}
 

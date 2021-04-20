@@ -1,3 +1,5 @@
+<svelte:options immutable={true} />
+
 <script lang="ts">
 	import { setContext } from "svelte";
 	import { writable } from "svelte/store";
@@ -17,7 +19,7 @@
 		registerPanel,
 		unregisterPanel,
 	};
-	
+
 	setContext(contextKey, context);
 
 	function registerPanel(title: string) {
@@ -42,7 +44,6 @@
 	}
 </script>
 
-<svelte:options immutable={true} />
 <div class="tabList {_class}" style={_style}>
 	<div class="tabs">
 		<ul>

@@ -1,6 +1,6 @@
 import { Hotkey, HotkeyAction, HotkeySubject } from "../../transientSettings";
 
-type Option<T> = Readonly<{ value: T | "", text: string }>;
+type Option<T> = Readonly<{ value: T | ""; text: string }>;
 export const hotkeySubjects: readonly Option<HotkeySubject>[] = [
 	{ value: "", text: "" },
 	{ value: "Away", text: "Away" },
@@ -21,7 +21,7 @@ export function buildAction(subject: HotkeySubject): HotkeyAction | null {
 
 export function getActionSubject(action: HotkeyAction | null): HotkeySubject | null {
 	if (!action) return null;
-	return Object.keys(action)[0] as HotkeySubject | undefined ?? null;
+	return (Object.keys(action)[0] as HotkeySubject | undefined) ?? null;
 }
 
 export function hotkeyToString(hotkey: Hotkey): string {
@@ -38,10 +38,22 @@ export function translateJsKeyToWindows(jsKeyCode: string): string {
 	// Too lazy to map the rest, have fun with this:
 	// https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/code/code_values
 	// https://github.com/LiveSplit/livesplit-core/blob/master/crates/livesplit-hotkey/src/windows/key_code.rs
-	if (["ControlLeft", "ControlRight", "ShiftLeft", "ShiftRight", "AltLeft", "AltRight", "MetaLeft", "MetaRight"].includes(jsKeyCode))
+	if (
+		[
+			"ControlLeft",
+			"ControlRight",
+			"ShiftLeft",
+			"ShiftRight",
+			"AltLeft",
+			"AltRight",
+			"MetaLeft",
+			"MetaRight",
+		].includes(jsKeyCode)
+	)
 		return jsKeyCode;
 	switch (jsKeyCode) {
-		case "ScrollLock": return "Scroll";
+		case "ScrollLock":
+			return "Scroll";
 	}
 	if (jsKeyCode.startsWith("Digit")) return jsKeyCode.replace("Digit", "D");
 	if (jsKeyCode.startsWith("Key")) return jsKeyCode.replace("Key", "");

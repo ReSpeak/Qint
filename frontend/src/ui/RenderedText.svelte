@@ -64,8 +64,7 @@
 			if (scheme !== null) {
 				// Cache images in text fields
 				let proxyFileSrc = schemeToLink(connection, server, scheme);
-				if (connection !== undefined)
-					proxyFileSrc += "?cache=true";
+				if (connection !== undefined) proxyFileSrc += "?cache=true";
 				if (proxyFileSrc === null) {
 					img.parentElement?.removeChild(img);
 					continue;

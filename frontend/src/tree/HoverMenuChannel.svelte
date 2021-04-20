@@ -8,9 +8,9 @@
 	{$channel.name}
 </div>
 {#if $channel.topic !== null && $channel.topic.length > 0}
-<div class="description">
-	{$channel.topic}
-</div>
+	<div class="description">
+		{$channel.topic}
+	</div>
 {/if}
 
 <style lang="scss">

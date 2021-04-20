@@ -10,8 +10,8 @@ export async function analyzeLink(link: string): Promise<AnalyzeResult> {
 			result = {
 				kind: "video",
 				videoSrc: link,
-				embed: "youtube"
-			}
+				embed: "youtube",
+			};
 		} else {
 			const task = analyzeLinkInBackend(link);
 			cache[link] = task;
@@ -21,10 +21,8 @@ export async function analyzeLink(link: string): Promise<AnalyzeResult> {
 				if (result.kind === "site") {
 					const resultUrl = result.imageSrc;
 					const origin = new URL(link).origin;
-					if (resultUrl.startsWith("//"))
-						result.imageSrc = `https:${resultUrl}`;
-					else if (resultUrl.startsWith("/"))
-						result.imageSrc = `${origin}${resultUrl}`;
+					if (resultUrl.startsWith("//")) result.imageSrc = `https:${resultUrl}`;
+					else if (resultUrl.startsWith("/")) result.imageSrc = `${origin}${resultUrl}`;
 					else if (!resultUrl.startsWith("http://") && !resultUrl.startsWith("https://"))
 						result.imageSrc = `${origin}/${resultUrl}`;
 				}
@@ -50,7 +48,7 @@ function rustResultToAnalyzeResult(data: any): AnalyzeResult {
 			kind: "site",
 			title: data.Site.title,
 			imageSrc: data.Site.image_src,
-			description: data.Site.description
+			description: data.Site.description,
 		};
 	} else if (data.Image) {
 		return {
@@ -91,12 +89,12 @@ interface SiteResult {
 }
 
 interface ImageResult {
-	kind: "image",
+	kind: "image";
 	imageSrc: string;
 }
 
 interface VideoResult {
-	kind: "video",
+	kind: "video";
 	videoSrc: string;
 	embed?: EmbedTypes;
 }

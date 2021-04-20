@@ -18,14 +18,17 @@ export class ServerLogState {
 	private wholeLog: LogEntry[] = [];
 
 	public constructor(private con: Connection) {
-		this.unsub = con.serverLogCmd.subscribe(l => this.receivedLog = l);
+		this.unsub = con.serverLogCmd.subscribe((l) => (this.receivedLog = l));
 	}
 
 	public unsubscribe(): void {
-		this.unsub?.()
+		this.unsub?.();
 	}
 
-	public async fetchElements(idFrom: LogEntry | undefined, dir: ListFetchDir): Promise<FetchResult<LogEntry>> {
+	public async fetchElements(
+		idFrom: LogEntry | undefined,
+		dir: ListFetchDir
+	): Promise<FetchResult<LogEntry>> {
 		this.receivedLog = [];
 		if (dir === ListFetchDir.After) {
 			assert(idFrom !== undefined, "Need a start for fetching after");
@@ -33,7 +36,7 @@ export class ServerLogState {
 				return {
 					items: [],
 					canLoadBeforeStart: false,
-					canLoadAfterEnd: false
+					canLoadAfterEnd: false,
 				};
 			}
 			const min = Math.max(0, idFrom.id - LINE_COUNT);
@@ -42,7 +45,7 @@ export class ServerLogState {
 			return {
 				items,
 				canLoadBeforeStart: true,
-				canLoadAfterEnd: true
+				canLoadAfterEnd: true,
 			};
 		}
 
@@ -53,19 +56,21 @@ export class ServerLogState {
 			// Before
 			assert(idFrom !== undefined, "Need a start for fetching before");
 			if (idFrom.id !== this.wholeLog.length - 1) {
-				const items = this.wholeLog.slice(idFrom.id + 1, idFrom.id + 1 + LINE_COUNT).reverse();
+				const items = this.wholeLog
+					.slice(idFrom.id + 1, idFrom.id + 1 + LINE_COUNT)
+					.reverse();
 				log("Returning before elements %o", idFrom, items);
 				return {
 					items,
 					canLoadBeforeStart: true,
-					canLoadAfterEnd: true
+					canLoadAfterEnd: true,
 				};
 			}
 			if (idFrom.lastOffset === "0") {
 				return {
 					items: [],
 					canLoadBeforeStart: false,
-					canLoadAfterEnd: false
+					canLoadAfterEnd: false,
 				};
 			}
 			offset = idFrom.lastOffset;
@@ -78,13 +83,12 @@ export class ServerLogState {
 				offset,
 			},
 		});
-		if (fetchError !== undefined)
-			throw fetchError;
+		if (fetchError !== undefined) throw fetchError;
 		if (this.receivedLog.length === 0) {
 			return {
 				items: [],
 				canLoadBeforeStart: false,
-				canLoadAfterEnd: false
+				canLoadAfterEnd: false,
 			};
 		}
 
@@ -98,7 +102,7 @@ export class ServerLogState {
 		return {
 			items: newLog.reverse(),
 			canLoadBeforeStart: true,
-			canLoadAfterEnd: dir !== ListFetchDir.New // Heuristic: when fetching new we start at the end
+			canLoadAfterEnd: dir !== ListFetchDir.New, // Heuristic: when fetching new we start at the end
 		};
 	}
 }

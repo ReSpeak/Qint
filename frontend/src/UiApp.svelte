@@ -49,9 +49,12 @@
 		if ($connections.length === 0) {
 			connectStringDerived = writable("");
 		} else {
-			connectStringDerived = derived($connections.map(c => c.connectOptions) as [Writable<ConnectData>], cs => {
-				return JSON.stringify(cs);
-			});
+			connectStringDerived = derived(
+				$connections.map((c) => c.connectOptions) as [Writable<ConnectData>],
+				(cs) => {
+					return JSON.stringify(cs);
+				}
+			);
 		}
 	}
 
@@ -78,7 +81,7 @@
 
 			// Save in transientsettings
 			const ui = app.transientSettings.ui;
-			let changed = false
+			let changed = false;
 			if (ui.defaultInputMuted !== (connectData.inputMuted !== MuteState.None)) {
 				ui.defaultInputMuted = connectData.inputMuted !== MuteState.None;
 				changed = true;
@@ -91,8 +94,7 @@
 				ui.defaultAway = state.away;
 				changed = true;
 			}
-			if (changed)
-				app.transientSettings.save();
+			if (changed) app.transientSettings.save();
 		} catch (e) {
 			console.log("Failed to get mute state", e);
 		}
@@ -106,7 +108,7 @@
 </script>
 
 <div class="appContainer" style="grid-template-columns: {columnStyle}">
-	<Toolbar bind:showSidebar={$showSidebar} bind:displayPanel={$displayPanel} bind:connectData={connectData} />
+	<Toolbar bind:showSidebar={$showSidebar} bind:displayPanel={$displayPanel} bind:connectData />
 	<Searchbar bind:filter visible={$showSidebar} />
 	<Sidebar {connections} {filter} visible={$showSidebar} {showConnect} />
 	<div class="panel">

@@ -21,17 +21,18 @@ type GraphQlSearchResult = {
 export const EmptyMessageFetch: FetchResult<MessageSearchResult> = {
 	items: [],
 	canLoadBeforeStart: false,
-	canLoadAfterEnd: false
+	canLoadAfterEnd: false,
 };
 
 export const EmptyOtherFetch: FetchResult<OtherSearchResult> = {
 	items: [],
 	canLoadBeforeStart: false,
-	canLoadAfterEnd: false
+	canLoadAfterEnd: false,
 };
 
 export async function search(s: string, start: number = 0): Promise<SearchResults> {
-	const res = await backend.graphql<{ search: GraphQlSearchResult }>(`query Search($query: String!, $start: Int!) {
+	const res = await backend.graphql<{ search: GraphQlSearchResult }>(
+		`query Search($query: String!, $start: Int!) {
 			search(query: $query, start: $start) {
 				count
 				results {
@@ -90,24 +91,34 @@ export async function search(s: string, start: number = 0): Promise<SearchResult
 					}
 				}
 			}
-		}`, {
-		query: s,
-		start,
-	});
+		}`,
+		{
+			query: s,
+			start,
+		}
+	);
 	if ("data" in res) {
 		const messages: MessageSearchResult[] = [];
 		const others: OtherSearchResult[] = [];
 
 		let id = start;
-		res.data.search.results.forEach(res => {
+		res.data.search.results.forEach((res) => {
 			let client;
 			if (res.message !== null) {
 				const msg = res.message;
 				if (msg.invoker) {
 					client = GraphQlClient.fromGraphqlInvoker(msg.invoker);
 				}
-				const message = new Message(msg.id, client, msg.invokerName,
-					msg.content, msg.rendered, datetimeDeserialize([msg.time, msg.timezone]), msg.status, msg.isPoke);
+				const message = new Message(
+					msg.id,
+					client,
+					msg.invokerName,
+					msg.content,
+					msg.rendered,
+					datetimeDeserialize([msg.time, msg.timezone]),
+					msg.status,
+					msg.isPoke
+				);
 				const server = urlBase64Encode(msg.invoker.server.publicKey);
 				messages.push({
 					id,
@@ -117,24 +128,33 @@ export async function search(s: string, start: number = 0): Promise<SearchResult
 				});
 			} else if (res.channel !== null) {
 				const channel = res.channel;
-				others.push({ id, Channel: {
-					channel: Channel.fromGraphql(channel),
-					server: GraphQlServer.fromGraphql(channel.server),
-					highlightedName: res.highlightedName,
-				}})
+				others.push({
+					id,
+					Channel: {
+						channel: Channel.fromGraphql(channel),
+						server: GraphQlServer.fromGraphql(channel.server),
+						highlightedName: res.highlightedName,
+					},
+				});
 			} else if (res.client !== null) {
 				const client = res.client;
-				others.push({ id, Client: {
-					client: GraphQlClient.fromGraphql(client),
-					highlightedName: res.highlightedName,
-				}})
+				others.push({
+					id,
+					Client: {
+						client: GraphQlClient.fromGraphql(client),
+						highlightedName: res.highlightedName,
+					},
+				});
 			} else if (res.server !== null) {
 				const server = res.server;
-				others.push({ id, Server: {
-					server: GraphQlServer.fromGraphql(server),
-					highlightedAddress: res.highlightedAddress,
-					highlightedName: res.highlightedName,
-				}})
+				others.push({
+					id,
+					Server: {
+						server: GraphQlServer.fromGraphql(server),
+						highlightedAddress: res.highlightedAddress,
+						highlightedName: res.highlightedName,
+					},
+				});
 			}
 			id++;
 		});
@@ -157,14 +177,14 @@ export interface SearchResults {
 }
 
 export interface MessageSearchResult {
-	id: number,
+	id: number;
 	message: Message;
-	server: string,
+	server: string;
 	highlightedContent: string | null;
 }
 
 export interface ChannelSearchResult {
-	server: GraphQlServer,
+	server: GraphQlServer;
 	channel: Channel;
 	highlightedName: string | null;
 }
@@ -181,7 +201,12 @@ export interface ServerSearchResult {
 }
 
 export interface OtherSearchResultCommon {
-	id: number,
+	id: number;
 }
 
-export type OtherSearchResult = OtherSearchResultCommon & ({ Channel: ChannelSearchResult } | { Client: ClientSearchResult } | { Server: ServerSearchResult });
+export type OtherSearchResult = OtherSearchResultCommon &
+	(
+		| { Channel: ChannelSearchResult }
+		| { Client: ClientSearchResult }
+		| { Server: ServerSearchResult }
+	);

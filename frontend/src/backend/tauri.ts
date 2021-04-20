@@ -1,8 +1,8 @@
 import { InMsg, OutMsg } from "./ws";
 import { BASE_ADDRESS, createUuidV4 } from "../util";
 import { closedFn, errorFn, IBackend, IBackendConnection, IFetchLike, msgFn } from "./backend";
-import { emit, listen } from 'tauri/api/event';
-import { promisified } from 'tauri/api/tauri'
+import { emit, listen } from "tauri/api/event";
+import { promisified } from "tauri/api/tauri";
 import { urlToWebSocket } from "./backendUtil";
 
 type OutWsEvent = { Msg: OutMsg } | "Close";
@@ -27,19 +27,21 @@ interface OutListPluginsRequest {
 
 const connections: Map<string, TauriBackendConnection> = new Map();
 
-listen<string>('websocket', payload => {
+listen<string>("websocket", (payload) => {
 	const msg = JSON.parse(payload.payload) as InWsMsg;
 	const con = connections.get(msg.connection);
-	if (msg.msg === "Close")
-		con?.onClose?.();
-	else
-		con?.onMsg?.(msg.msg.Msg);
+	if (msg.msg === "Close") con?.onClose?.();
+	else con?.onMsg?.(msg.msg.Msg);
 });
 
 class FetchLike implements IFetchLike {
 	constructor(private obj: any) {}
-	public async json(): Promise<any> { return this.obj; }
-	public async text(): Promise<string> { return JSON.stringify(this.obj); }
+	public async json(): Promise<any> {
+		return this.obj;
+	}
+	public async text(): Promise<string> {
+		return JSON.stringify(this.obj);
+	}
 }
 
 export class TauriBackend implements IBackend {
@@ -71,7 +73,10 @@ export class TauriBackend implements IBackend {
 		return fetch(`${BASE_ADDRESS}${cmd}`, data);
 	}
 
-	public async graphql<T = any>(query: string, variables?: Record<string, unknown>): Promise<{ data: T }> {
+	public async graphql<T = any>(
+		query: string,
+		variables?: Record<string, unknown>
+	): Promise<{ data: T }> {
 		return (await promisified<{ Graphql: any }>({ Graphql: { query, variables } })).Graphql;
 	}
 
@@ -81,10 +86,8 @@ export class TauriBackend implements IBackend {
 
 	public setIcon(url: string | undefined): void {
 		const icon = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
-		if (icon !== null)
-			icon.href = url ?? "icon.png";
-		else
-			console.log("Tried to set icon but did not find icon element");
+		if (icon !== null) icon.href = url ?? "icon.png";
+		else console.log("Tried to set icon but did not find icon element");
 	}
 }
 

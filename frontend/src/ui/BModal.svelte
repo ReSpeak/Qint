@@ -18,7 +18,7 @@
 <!-- Tabindex to make the div focusable and trigger onkeydown -->
 <div
 	on:keydown={(e) => {
-		if (e.key === 'Escape') close(e);
+		if (e.key === "Escape") close(e);
 	}}
 	tabindex="0"
 	class="modal"

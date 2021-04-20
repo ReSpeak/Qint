@@ -46,7 +46,7 @@
 		"dev": "vite",
 		"typecheck": "svelte-check --output human",
 		"lint": "eslint --ignore-path .gitignore .",
-		"format": "prettier --write .",
+		"format": "prettier --ignore-path ./.gitignore --write .",
 		"tauri": "tauri"
 	}
 }

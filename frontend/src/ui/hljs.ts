@@ -1,31 +1,31 @@
-import hljs from 'highlight.js/lib/core.js';
+import hljs from "highlight.js/lib/core.js";
 
-import lang_c_like from 'highlight.js/lib/languages/c-like';
-import lang_cpp from 'highlight.js/lib/languages/cpp';
-import lang_xml from 'highlight.js/lib/languages/xml';
-import lang_bash from 'highlight.js/lib/languages/bash';
-import lang_c from 'highlight.js/lib/languages/c';
-import lang_csharp from 'highlight.js/lib/languages/csharp';
-import lang_css from 'highlight.js/lib/languages/css';
-import lang_markdown from 'highlight.js/lib/languages/markdown';
-import lang_diff from 'highlight.js/lib/languages/diff';
-import lang_haxe from 'highlight.js/lib/languages/haxe';
-import lang_ini from 'highlight.js/lib/languages/ini';
-import lang_java from 'highlight.js/lib/languages/java';
-import lang_javascript from 'highlight.js/lib/languages/javascript';
-import lang_json from 'highlight.js/lib/languages/json';
-import lang_latex from 'highlight.js/lib/languages/latex';
-import lang_less from 'highlight.js/lib/languages/less';
-import lang_lua from 'highlight.js/lib/languages/lua';
-import lang_nix from 'highlight.js/lib/languages/nix';
-import lang_php from 'highlight.js/lib/languages/php';
-import lang_powershell from 'highlight.js/lib/languages/powershell';
-import lang_python from 'highlight.js/lib/languages/python';
-import lang_rust from 'highlight.js/lib/languages/rust';
-import lang_scss from 'highlight.js/lib/languages/scss';
-import lang_sql from 'highlight.js/lib/languages/sql';
-import lang_yaml from 'highlight.js/lib/languages/yaml';
-import lang_typescript from 'highlight.js/lib/languages/typescript';
+import lang_c_like from "highlight.js/lib/languages/c-like";
+import lang_cpp from "highlight.js/lib/languages/cpp";
+import lang_xml from "highlight.js/lib/languages/xml";
+import lang_bash from "highlight.js/lib/languages/bash";
+import lang_c from "highlight.js/lib/languages/c";
+import lang_csharp from "highlight.js/lib/languages/csharp";
+import lang_css from "highlight.js/lib/languages/css";
+import lang_markdown from "highlight.js/lib/languages/markdown";
+import lang_diff from "highlight.js/lib/languages/diff";
+import lang_haxe from "highlight.js/lib/languages/haxe";
+import lang_ini from "highlight.js/lib/languages/ini";
+import lang_java from "highlight.js/lib/languages/java";
+import lang_javascript from "highlight.js/lib/languages/javascript";
+import lang_json from "highlight.js/lib/languages/json";
+import lang_latex from "highlight.js/lib/languages/latex";
+import lang_less from "highlight.js/lib/languages/less";
+import lang_lua from "highlight.js/lib/languages/lua";
+import lang_nix from "highlight.js/lib/languages/nix";
+import lang_php from "highlight.js/lib/languages/php";
+import lang_powershell from "highlight.js/lib/languages/powershell";
+import lang_python from "highlight.js/lib/languages/python";
+import lang_rust from "highlight.js/lib/languages/rust";
+import lang_scss from "highlight.js/lib/languages/scss";
+import lang_sql from "highlight.js/lib/languages/sql";
+import lang_yaml from "highlight.js/lib/languages/yaml";
+import lang_typescript from "highlight.js/lib/languages/typescript";
 
 hljs.registerLanguage("c-like", lang_c_like);
 hljs.registerLanguage("cpp", lang_cpp);
@@ -59,7 +59,7 @@ import type hljs_type from "highlight.js";
 const _: typeof hljs_type = undefined!;
 
 export function hljsHighlight(elem: HTMLElement): void {
-	const lang = elem.getAttribute('data-lang');
+	const lang = elem.getAttribute("data-lang");
 	const hl_lang = lang ? hljs.getLanguage(lang) : undefined;
 
 	const code = elem.textContent ?? "";

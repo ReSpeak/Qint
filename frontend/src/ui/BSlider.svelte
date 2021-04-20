@@ -4,7 +4,7 @@
 	export let step: number = 1;
 	export let value: number;
 	export let tooltip: boolean = false;
-	export let display: (n: number) => string = n => String(n);
+	export let display: (n: number) => string = (n) => String(n);
 	export let id: string | undefined = undefined;
 
 	let slider!: HTMLElement;
@@ -18,7 +18,7 @@
 <div class="bslider">
 	<input
 		bind:this={slider}
-		id={id}
+		{id}
 		type="range"
 		class="slider is-fullwidth"
 		class:has-output-tooltip={tooltip}

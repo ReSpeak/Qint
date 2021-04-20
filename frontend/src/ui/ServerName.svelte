@@ -7,7 +7,8 @@
 	export let server: GraphQlServer | undefined = undefined;
 	const state = connection?.state;
 	const conServer = connection?.book.server;
-	const address = connection !== undefined ? get(connection.connectOptions).address : server!.address;
+	const address =
+		connection !== undefined ? get(connection.connectOptions).address : server!.address;
 	$: realServer = conServer !== undefined ? $conServer : server!;
 </script>
 

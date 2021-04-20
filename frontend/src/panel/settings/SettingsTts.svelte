@@ -48,10 +48,7 @@
 	<BKeyValue label="Preview" narrow={false} labelStyle="is-normal">
 		<div class="is-horizontal field">
 			<div class="control" style="flex: 1;">
-				<input
-					bind:this={previewText}
-					class="input"
-					value="Mit Qwint wird alles besser" />
+				<input bind:this={previewText} class="input" value="Mit Qwint wird alles besser" />
 			</div>
 			<div class="control">
 				<button class="button" on:click={() => previewVoice()}>Listen</button>

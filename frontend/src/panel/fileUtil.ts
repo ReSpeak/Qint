@@ -15,8 +15,8 @@ export function formatBytes(size: number): string {
 }
 
 export function extensionToIcon(file: string): string {
-	const DEFAULT = "file-outline"
-	const dotIndex = file.lastIndexOf('.');
+	const DEFAULT = "file-outline";
+	const dotIndex = file.lastIndexOf(".");
 	if (dotIndex === -1) return DEFAULT;
 	const ext = file.substring(dotIndex + 1).toLowerCase();
 	switch (ext) {
@@ -143,17 +143,14 @@ export function pathJoin(...parts: string[]): string {
 export function pathSplit(...parts: string[]): string[] {
 	const path = [];
 	for (const segment of parts) {
-		if (segment === "/")
-			continue;
+		if (segment === "/") continue;
 		const subSegment = segment.substring(
 			segment.startsWith("/") ? 1 : 0,
-			segment.endsWith("/") ? segment.length - 1 : segment.length);
-		if (subSegment.length === 0)
-			continue;
-		if (!subSegment.includes('/'))
-			path.push(subSegment);
-		else
-			path.push(...subSegment.split(/\//g));
+			segment.endsWith("/") ? segment.length - 1 : segment.length
+		);
+		if (subSegment.length === 0) continue;
+		if (!subSegment.includes("/")) path.push(subSegment);
+		else path.push(...subSegment.split(/\//g));
 	}
 	return path;
 }

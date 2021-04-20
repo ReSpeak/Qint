@@ -12,7 +12,10 @@
 <div class="searchResult">
 	<div class="result-icon chat-left-col">
 		{#if "Channel" in content}
-			<TsIcon type="channel" source={content.Channel.channel} server={content.Channel.server.publicKeyStr} />
+			<TsIcon
+				type="channel"
+				source={content.Channel.channel}
+				server={content.Channel.server.publicKeyStr} />
 		{:else if "Client" in content}
 			<Icon name={CLIENT_ICON} />
 		{:else}
@@ -28,11 +31,13 @@
 			<ServerName server={content.Server.server} />
 		{/if}
 	</div>
-	<div class="chat-left-col">
-	</div>
+	<div class="chat-left-col" />
 	<div class="resultBody">
 		{#if "Channel" in content}
-			<TsIcon type="server" source={content.Channel.server} server={content.Channel.server.publicKeyStr} />
+			<TsIcon
+				type="server"
+				source={content.Channel.server}
+				server={content.Channel.server.publicKeyStr} />
 			<ServerName server={content.Channel.server} />
 			<span class="serverAddress">({content.Channel.server.address})</span>
 		{:else if "Server" in content}

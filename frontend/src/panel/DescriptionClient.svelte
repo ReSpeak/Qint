@@ -17,7 +17,14 @@
 	import { getClientAvatarPath } from "../ui/clientIcon";
 	import { Reason } from "../book_events";
 	import { onMount } from "svelte";
-	import { formatDuration, formatSi, hexEncode, LONG_DATETIME, NARROW_NO_BREAK_SPACE, on } from "../util";
+	import {
+		formatDuration,
+		formatSi,
+		hexEncode,
+		LONG_DATETIME,
+		NARROW_NO_BREAK_SPACE,
+		on,
+	} from "../util";
 	import { Client, ServerGroup } from "../book";
 	import BModal from "../ui/BModal.svelte";
 	import { tick } from "svelte";
@@ -25,8 +32,8 @@
 	import UiChangeResult from "../ui/UiChangeResult.svelte";
 	import UiEmojiString from "../ui/UiEmojiString.svelte";
 	import { app } from "../app";
-	import type { ChartConfiguration } from 'chart.js';
-	import 'chartjs-adapter-moment';
+	import type { ChartConfiguration } from "chart.js";
+	import "chartjs-adapter-moment";
 
 	export let connection: Connection;
 	export let client: Client;
@@ -67,74 +74,78 @@
 	let [clientEdit, clientSpecialEdit] = createPropsCopy();
 	let changeRequest: ChangePromise | undefined;
 
-	type TimeDataPoint = { x: Moment, y: number | undefined };
+	type TimeDataPoint = { x: Moment; y: number | undefined };
 	const chartConfig: ChartConfiguration<"line", TimeDataPoint[]> = {
 		type: "line",
 		data: {
-			datasets: [{
-				label: "Ping",
-				yAxisID: "ping",
-				data: [],
-				backgroundColor: "#87A23600",
-				borderColor: "#87A236FF",
-				pointRadius: 1
-			}, {
-				label: "Packet loss to Server",
-				yAxisID: "packetloss",
-				data: [],
-				backgroundColor: "#9F354800",
-				borderColor: "#9F3548FF",
-				pointRadius: 1
-			}, {
-				label: "Packet loss from Server",
-				yAxisID: "packetloss",
-				data: [],
-				backgroundColor: "#512C7300",
-				borderColor: "#512C73FF",
-				pointRadius: 1
-			}]
+			datasets: [
+				{
+					label: "Ping",
+					yAxisID: "ping",
+					data: [],
+					backgroundColor: "#87A23600",
+					borderColor: "#87A236FF",
+					pointRadius: 1,
+				},
+				{
+					label: "Packet loss to Server",
+					yAxisID: "packetloss",
+					data: [],
+					backgroundColor: "#9F354800",
+					borderColor: "#9F3548FF",
+					pointRadius: 1,
+				},
+				{
+					label: "Packet loss from Server",
+					yAxisID: "packetloss",
+					data: [],
+					backgroundColor: "#512C7300",
+					borderColor: "#512C73FF",
+					pointRadius: 1,
+				},
+			],
 		},
 		options: {
 			scales: {
 				x: {
 					type: "time",
 					ticks: {
-						callback: function(value) {
+						callback: function (value) {
 							let seconds = moment().diff(moment(value, "X"), "seconds");
 							if (seconds < 1) seconds = 0;
 							return `${seconds}${NARROW_NO_BREAK_SPACE}s`;
-						}
+						},
 					},
 					time: {
 						unit: "second",
 						displayFormats: {
-							second: "X"
+							second: "X",
 						},
-						stepSize: 5
-					}
+						stepSize: 5,
+					},
 				},
 				ping: {
 					beginAtZero: true,
 					suggestedMax: 100,
 					ticks: {
 						maxTicksLimit: 5,
-						callback: function(value) {
+						callback: function (value) {
 							return `${value}${NARROW_NO_BREAK_SPACE}ms`;
-						}
-					}
+						},
+					},
 				},
 				packetloss: {
 					beginAtZero: true,
 					suggestedMax: 5,
 					ticks: {
 						maxTicksLimit: 5,
-						callback: function(value) {
+						callback: function (value) {
 							return `${Number(value)}${NARROW_NO_BREAK_SPACE}%`;
-						}
-					}
-				}
-			}
-		}
+						},
+					},
+				},
+			},
+		},
 	};
 
 	interface ExtendedGroup {
@@ -181,24 +192,35 @@
 	}
 
 	function chartRefresh() {
-		addChartValue(chartConfig.data.datasets[0].data, client.connectionData ? client.connectionData.ping?.asMilliseconds() : undefined);
-		addChartValue(chartConfig.data.datasets[1].data, packetLossToPercent(client.connectionData?.clientToServerPacketlossTotal));
-		addChartValue(chartConfig.data.datasets[2].data, packetLossToPercent(client.connectionData?.serverToClientPacketlossTotal));
+		addChartValue(
+			chartConfig.data.datasets[0].data,
+			client.connectionData ? client.connectionData.ping?.asMilliseconds() : undefined
+		);
+		addChartValue(
+			chartConfig.data.datasets[1].data,
+			packetLossToPercent(client.connectionData?.clientToServerPacketlossTotal)
+		);
+		addChartValue(
+			chartConfig.data.datasets[2].data,
+			packetLossToPercent(client.connectionData?.serverToClientPacketlossTotal)
+		);
 		chart?.updateChart();
 	}
 
 	function onClientChanged() {
 		editing = false;
-		chartConfig.data?.datasets?.filter(dataset => dataset.data).forEach(dataset => {
-			dataset.data = [];
-			for (let i = CHART_ENTRY_COUNT; i > 0; i--) {
-				const entry = {
-					x: moment().subtract(i, "second"),
-					y: undefined
-				};
-				dataset.data.push(entry);
-			}
-		});
+		chartConfig.data?.datasets
+			?.filter((dataset) => dataset.data)
+			.forEach((dataset) => {
+				dataset.data = [];
+				for (let i = CHART_ENTRY_COUNT; i > 0; i--) {
+					const entry = {
+						x: moment().subtract(i, "second"),
+						y: undefined,
+					};
+					dataset.data.push(entry);
+				}
+			});
 		chart?.updateChart();
 	}
 
@@ -300,7 +322,12 @@
 	}
 
 	function formatClientPing(client: Client): string {
-		if (client.connectionData === null || client.connectionData.ping === null || client.connectionData.pingDeviation === null) return "";
+		if (
+			client.connectionData === null ||
+			client.connectionData.ping === null ||
+			client.connectionData.pingDeviation === null
+		)
+			return "";
 
 		return `(${Math.round(client.connectionData.ping.asMilliseconds() * 10) / 10} ± ${
 			Math.round(client.connectionData.pingDeviation.asMilliseconds() * 10) / 10
@@ -308,7 +335,7 @@
 	}
 
 	function formatPacketLoss(...losses: (number | null | undefined)[]) {
-		const filteredLosses = losses.flatMap(a => a !== null && a !== undefined ? [a] : []);
+		const filteredLosses = losses.flatMap((a) => (a !== null && a !== undefined ? [a] : []));
 		if (filteredLosses.length === 0) {
 			return "unknown";
 		} else {
@@ -318,7 +345,10 @@
 	}
 
 	function formatPacketCount(...packetCounts: (string | null | undefined)[]) {
-		return formatSi(packetCounts.map((x) => (x ? parseInt(x) : 0)).reduce((a, b) => a + b), 1);
+		return formatSi(
+			packetCounts.map((x) => (x ? parseInt(x) : 0)).reduce((a, b) => a + b),
+			1
+		);
 	}
 
 	function formatAgo(duration: Duration | null | undefined, ago: boolean): string {
@@ -359,13 +389,16 @@
 	}
 
 	function createPropsCopy(): [EditProps, SpecialEditProps] {
-		return [{
-			description: client.description,
-		}, {
-			name: client.name,
-			phoneticName: client.phoneticName,
-			isChannelCommander: client.isChannelCommander,
-		}];
+		return [
+			{
+				description: client.description,
+			},
+			{
+				name: client.name,
+				phoneticName: client.phoneticName,
+				isChannelCommander: client.isChannelCommander,
+			},
+		];
 	}
 
 	function getPropsDiff() {
@@ -483,31 +516,47 @@
 		<div class="dataLine headLine">
 			<TsIcon type="client" source={{ icon: $client.icon }} {connection} />
 			{#if editing}
-				{#if !ownClient}<Icon name="information-outline" title="Change is not visible for others" style="margin-right: 0.5em;" />{/if}
+				{#if !ownClient}<Icon
+						name="information-outline"
+						title="Change is not visible for others"
+						style="margin-right: 0.5em;" />{/if}
 				<input class="input" type="text" bind:value={clientSpecialEdit.name} />
 			{:else}
 				<ClientName client={$client} />
 			{/if}
-			<span class="countryFlag" title={$client.countryCode}>{countryCodeToEmojis($client.countryCode)}</span>
+			<span class="countryFlag" title={$client.countryCode}
+				>{countryCodeToEmojis($client.countryCode)}</span>
 			<div style="flex: 1;" />
 			{#if $client.optionalData !== null}
-				<PlatformIcon platform={$client.optionalData.platform} version={$client.optionalData.version} />
+				<PlatformIcon
+					platform={$client.optionalData.platform}
+					version={$client.optionalData.version} />
 			{/if}
 		</div>
 
 		<div class="descTable">
 			{#if editing}
 				<label for="edit_phoneticName">
-					Phonetic name{#if !ownClient}<Icon name="information-outline" title="Change is not visible for others" />{/if}:
+					Phonetic name{#if !ownClient}<Icon
+							name="information-outline"
+							title="Change is not visible for others" />{/if}:
 				</label>
 				<div>
-					<input id="edit_phoneticName" class="input" type="text" bind:value={clientSpecialEdit.phoneticName} />
+					<input
+						id="edit_phoneticName"
+						class="input"
+						type="text"
+						bind:value={clientSpecialEdit.phoneticName} />
 				</div>
 			{/if}
 			<label for="edit_description">Description:</label>
 			<div>
 				{#if editing}
-					<input id="edit_description" class="input" type="text" bind:value={clientEdit.description} />
+					<input
+						id="edit_description"
+						class="input"
+						type="text"
+						bind:value={clientEdit.description} />
 				{:else}{$client.description}{/if}
 			</div>
 			<div>Online:</div>
@@ -537,7 +586,8 @@
 			{/if}
 			{#if editing}
 				<div>
-					<label for="client_channel_commander">Channel commander:</label></div>
+					<label for="client_channel_commander">Channel commander:</label>
+				</div>
 				<div>
 					<input
 						id="client_channel_commander"
@@ -554,9 +604,14 @@
 							bind:this={dummyUploader}
 							on:change={uploadSelectedAvatar}
 							type="file" />
-						<button class="button is-small is-info" on:click={() => dummyUploader.click()}>Upload</button>
+						<button
+							class="button is-small is-info"
+							on:click={() => dummyUploader.click()}>Upload</button>
 					{/if}
-					{#if avatarPath}<button class="button is-small is-danger" on:click={deleteAvatar}>Delete</button>{/if}
+					{#if avatarPath}<button
+							class="button is-small is-danger"
+							on:click={deleteAvatar}>Delete</button
+						>{/if}
 				</div>
 			{/if}
 		</div>
@@ -565,12 +620,12 @@
 			<div>Server Groups:</div>
 			<div class="serverGroupList">
 				{#each groups as grp (grp)}
-					<label class="checkbox serverGroupContainer" for={'group' + grp.inner.id}>
+					<label class="checkbox serverGroupContainer" for={"group" + grp.inner.id}>
 						<div class="serverGroupCheckbox">
 							<input
 								type="checkbox"
 								class="checkbox-switch is-info"
-								id={'group' + grp.inner.id}
+								id={"group" + grp.inner.id}
 								on:input={(e) => changeServerGroup(e, grp.inner.id, !grp.isMember)}
 								checked={grp.isMember} />
 						</div>
@@ -578,7 +633,9 @@
 						<div class="serverGroupIcon">
 							<ServerGroupIcon id={grp.inner.id} {connection} />
 						</div>
-						<div class="serverGroupDescription" title={'Id ' + grp.inner.id}>{grp.inner.name}</div>
+						<div class="serverGroupDescription" title={"Id " + grp.inner.id}>
+							{grp.inner.name}
+						</div>
 					</label>
 				{/each}
 			</div>
@@ -637,7 +694,7 @@
 				<div>Ping:</div>
 				<div>{formatClientPing($client)}</div>
 				<div>IP Address:</div>
-				<div>{$client.connectionData?.clientAddress ?? ''}</div>
+				<div>{$client.connectionData?.clientAddress ?? ""}</div>
 			</div>
 		</div>
 		<div class="descGroup">
@@ -652,7 +709,10 @@
 
 				<div>Packet loss:</div>
 				<div>
-					{formatPacketLoss($client.connectionData?.serverToClientPacketlossTotal, $client.connectionData?.clientToServerPacketlossTotal)}
+					{formatPacketLoss(
+						$client.connectionData?.serverToClientPacketlossTotal,
+						$client.connectionData?.clientToServerPacketlossTotal
+					)}
 				</div>
 				<div>{formatPacketLoss($client.connectionData?.serverToClientPacketlossTotal)}</div>
 				<div>{formatPacketLoss($client.connectionData?.clientToServerPacketlossTotal)}</div>
@@ -660,10 +720,18 @@
 				<div>Packets transferred:</div>
 				<div />
 				<div>
-					{formatPacketCount($client.connectionData?.packetsReceivedSpeech, $client.connectionData?.packetsReceivedKeepalive, $client.connectionData?.packetsReceivedControl)}
+					{formatPacketCount(
+						$client.connectionData?.packetsReceivedSpeech,
+						$client.connectionData?.packetsReceivedKeepalive,
+						$client.connectionData?.packetsReceivedControl
+					)}
 				</div>
 				<div>
-					{formatPacketCount($client.connectionData?.packetsSentSpeech, $client.connectionData?.packetsSentKeepalive, $client.connectionData?.packetsSentControl)}
+					{formatPacketCount(
+						$client.connectionData?.packetsSentSpeech,
+						$client.connectionData?.packetsSentKeepalive,
+						$client.connectionData?.packetsSentControl
+					)}
 				</div>
 			</div>
 		</div>

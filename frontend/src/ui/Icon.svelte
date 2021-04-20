@@ -1,4 +1,5 @@
 <svelte:options immutable />
+
 <script lang="ts">
 	export let raw: string | undefined = undefined;
 	export let size: number | string = "1.2em";
@@ -13,7 +14,9 @@
 	{#if raw}
 		{raw}
 	{:else}
-		<i class="mdi mdi-{name ?? 'dummy'}" style="font-size:{(typeof size === "number" ? size + "px" : size)};{style}" />
+		<i
+			class="mdi mdi-{name ?? 'dummy'}"
+			style="font-size:{typeof size === 'number' ? size + 'px' : size};{style}" />
 	{/if}
 </span>
 

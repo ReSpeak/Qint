@@ -1,4 +1,4 @@
-<svelte:options immutable={true}/>
+<svelte:options immutable={true} />
 
 <script lang="ts">
 	import { Channel, Client } from "../book";
@@ -12,4 +12,4 @@
 	export let filterShow: boolean = true;
 </script>
 
-<UiClient {connection} {client} {channel} {filter} bind:filterShow={filterShow} />
+<UiClient {connection} {client} {channel} {filter} bind:filterShow />

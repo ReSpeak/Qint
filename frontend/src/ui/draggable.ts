@@ -13,12 +13,9 @@ export class DragData {
 	public mouseMove!: MouseEvent;
 	public mouseDrop!: MouseEvent;
 	public customData: any | undefined;
-	public customDragNode?: HTMLElement
+	public customDragNode?: HTMLElement;
 
-	constructor(
-		public dragNode: HTMLElement,
-		public enabled: boolean
-	) { }
+	constructor(public dragNode: HTMLElement, public enabled: boolean) {}
 }
 
 export function draggable(node: HTMLElement, enabled: boolean = true) {
@@ -31,8 +28,8 @@ export function draggable(node: HTMLElement, enabled: boolean = true) {
 		dd.x = event.clientX;
 		dd.y = event.clientY;
 		dd.hasTriggered = false;
-		window.addEventListener('mousemove', handleMousemove);
-		window.addEventListener('mouseup', handleMouseup);
+		window.addEventListener("mousemove", handleMousemove);
+		window.addEventListener("mouseup", handleMouseup);
 	}
 
 	function handleMousemove(event: MouseEvent) {
@@ -52,13 +49,12 @@ export function draggable(node: HTMLElement, enabled: boolean = true) {
 
 		dd.mouseMove = event;
 		if (!dd.hasTriggered) {
-			if (Math.abs(dx) + Math.abs(dy) < dd.minDistBeforeTrigger)
-				return;
+			if (Math.abs(dx) + Math.abs(dy) < dd.minDistBeforeTrigger) return;
 			dd.hasTriggered = true;
 			node.style.pointerEvents = "none";
-			node.dispatchEvent(new CustomEvent('svddrag', { detail: dd }));
+			node.dispatchEvent(new CustomEvent("svddrag", { detail: dd }));
 		} else {
-			node.dispatchEvent(new CustomEvent('svdmove', { detail: dd }));
+			node.dispatchEvent(new CustomEvent("svdmove", { detail: dd }));
 			dd.dragNode.style.transform = `translate(${dx}px,${dy}px)`;
 		}
 	}
@@ -69,27 +65,26 @@ export function draggable(node: HTMLElement, enabled: boolean = true) {
 	}
 
 	function stopDrag() {
-		window.removeEventListener('mousemove', handleMousemove);
-		window.removeEventListener('mouseup', handleMouseup);
+		window.removeEventListener("mousemove", handleMousemove);
+		window.removeEventListener("mouseup", handleMouseup);
 		if (dd.hasTriggered) {
 			dd.dragNode.style.transform = null!;
 			node.style.pointerEvents = null!;
-			node.dispatchEvent(new CustomEvent('svddrop', { detail: dd }));
+			node.dispatchEvent(new CustomEvent("svddrop", { detail: dd }));
 		}
 	}
 
-	node.addEventListener('mousedown', handleMousedown);
+	node.addEventListener("mousedown", handleMousedown);
 
 	return {
 		destroy() {
-			node.removeEventListener('mousedown', handleMousedown);
+			node.removeEventListener("mousedown", handleMousedown);
 			stopDrag();
 		},
 		update(enabled: boolean) {
 			dd.enabled = enabled;
-			if (!enabled)
-				stopDrag();
-		}
+			if (!enabled) stopDrag();
+		},
 	};
 }
 

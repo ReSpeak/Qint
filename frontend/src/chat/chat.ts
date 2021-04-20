@@ -9,19 +9,23 @@ import { StructuredData } from "../ui/BInputDecl";
 import { ChannelId, Uid } from "../ts";
 import moment from "moment";
 import debug from "debug";
-const log = debug("CHAT"), error = debug("error:CHAT");
+const log = debug("CHAT"),
+	error = debug("error:CHAT");
 
 export class Chat {
 	public static readonly EmptyFetch: FetchResult<Message> = {
 		items: [],
 		canLoadBeforeStart: false,
-		canLoadAfterEnd: false
+		canLoadAfterEnd: false,
 	};
 
-	public constructor(
-		private readonly selectedChat: Readable<NodeSelection | undefined>) { }
+	public constructor(private readonly selectedChat: Readable<NodeSelection | undefined>) {}
 
-	private static groupMessages(messages: Message[], lastEntry: Message | undefined, dir: ListFetchDir): void {
+	private static groupMessages(
+		messages: Message[],
+		lastEntry: Message | undefined,
+		dir: ListFetchDir
+	): void {
 		let previousMessage: Message | undefined;
 
 		if (lastEntry) {
@@ -29,16 +33,19 @@ export class Chat {
 				lastEntry.displayGroupHeader = false;
 				lastEntry.displayDateSeparator = false;
 				messages.push(lastEntry);
-			}
-			else if (dir === ListFetchDir.After) {
+			} else if (dir === ListFetchDir.After) {
 				previousMessage = lastEntry;
 			}
 		}
 
 		for (const message of messages) {
 			const previousDate = previousMessage?.date;
-			message.displayDateSeparator = !previousDate || !previousDate.isSame(message.date, "day");
-			message.displayGroupHeader = message.displayDateSeparator || !previousMessage || !GraphQlClient.equals(previousMessage.invoker, message.invoker);
+			message.displayDateSeparator =
+				!previousDate || !previousDate.isSame(message.date, "day");
+			message.displayGroupHeader =
+				message.displayDateSeparator ||
+				!previousMessage ||
+				!GraphQlClient.equals(previousMessage.invoker, message.invoker);
 			previousMessage = message;
 		}
 
@@ -47,7 +54,10 @@ export class Chat {
 		}
 	}
 
-	public async getMessages(idFrom: Message | undefined, dir: ListFetchDir): Promise<FetchResult<Message>> {
+	public async getMessages(
+		idFrom: Message | undefined,
+		dir: ListFetchDir
+	): Promise<FetchResult<Message>> {
 		const selected = get(this.selectedChat);
 		if (selected === undefined) return Chat.EmptyFetch;
 		const publicKey = selected.connection.book.server.publicKey;
@@ -60,10 +70,17 @@ export class Chat {
 		let startId;
 		let loadAtBeginning: boolean | undefined;
 		switch (dir) {
-			case ListFetchDir.Before: loadAtBeginning = true; break;
-			case ListFetchDir.New: loadAtBeginning = undefined; break;
-			case ListFetchDir.After: loadAtBeginning = false; break;
-			default: assert(false, "Unknown direction");
+			case ListFetchDir.Before:
+				loadAtBeginning = true;
+				break;
+			case ListFetchDir.New:
+				loadAtBeginning = undefined;
+				break;
+			case ListFetchDir.After:
+				loadAtBeginning = false;
+				break;
+			default:
+				assert(false, "Unknown direction");
 		}
 
 		if (idFrom) {
@@ -71,7 +88,8 @@ export class Chat {
 			startId = idFrom.id;
 		}
 
-		const res = await backend.graphql(`query GetMessages($chatType: GMessageTarget!, $server: [Int!]!, $chatId: ID,
+		const res = await backend.graphql(
+			`query GetMessages($chatType: GMessageTarget!, $server: [Int!]!, $chatId: ID,
 					$startTime: NaiveDateTime, $startId: ID, $loadAtBeginning: Boolean) {
 				chat(typ: $chatType, server: $server, id: $chatId) {
 					messages(startTime: $startTime, startId: $startId, beforeStart: $loadAtBeginning) {
@@ -94,14 +112,16 @@ export class Chat {
 						timezone
 					}
 				}
-			}`, {
-			chatType: selected.node.qlType,
-			server: publicKey,
-			chatId: selected.node.qlId,
-			startTime,
-			startId,
-			loadAtBeginning,
-		});
+			}`,
+			{
+				chatType: selected.node.qlType,
+				server: publicKey,
+				chatId: selected.node.qlId,
+				startTime,
+				startId,
+				loadAtBeginning,
+			}
+		);
 		if ("data" in res) {
 			// We never chatted here
 			if (!res.data.chat || res.data.chat.messages.length === 0) {
@@ -115,17 +135,32 @@ export class Chat {
 				if (msg.invoker) {
 					client = GraphQlClient.fromGraphqlInvoker(msg.invoker);
 				}
-				msgs.push(new Message(msg.id, client, msg.invokerName,
-					msg.content, msg.rendered, datetimeDeserialize([msg.time, msg.timezone]), msg.status, msg.isPoke));
+				msgs.push(
+					new Message(
+						msg.id,
+						client,
+						msg.invokerName,
+						msg.content,
+						msg.rendered,
+						datetimeDeserialize([msg.time, msg.timezone]),
+						msg.status,
+						msg.isPoke
+					)
+				);
 			});
-			log("Fetching messages " + (loadAtBeginning ? "before" : "after"), [startTime, startId], "; got", msgs);
+			log(
+				"Fetching messages " + (loadAtBeginning ? "before" : "after"),
+				[startTime, startId],
+				"; got",
+				msgs
+			);
 
 			Chat.groupMessages(msgs, idFrom, dir);
 
 			return {
 				items: msgs,
 				canLoadBeforeStart: true,
-				canLoadAfterEnd: dir !== ListFetchDir.New // Heuristic: when fetching new we start at the end
+				canLoadAfterEnd: dir !== ListFetchDir.New, // Heuristic: when fetching new we start at the end
 			};
 		} else {
 			error("GetMessages result does not contain data", res);
@@ -140,7 +175,7 @@ export class Chat {
 			SendMessage: {
 				target: selected.node.wsTarget,
 				message,
-			}
+			},
 		});
 	}
 
@@ -152,15 +187,18 @@ export class Chat {
 			error("Cannot get messages for a non-existant connection");
 			return;
 		}
-		const res = await backend.graphql(`mutation SetLastRead($chatType: GMessageTarget!, $server: [Int!]!, $chatId: ID,
+		const res = await backend.graphql(
+			`mutation SetLastRead($chatType: GMessageTarget!, $server: [Int!]!, $chatId: ID,
 					$message: ID!) {
 				setLastRead(typ: $chatType, server: $server, id: $chatId, message: $message)
-			}`, {
-			chatType: selected.node.qlType,
-			server: publicKey,
-			chatId: selected.node.qlId,
-			message: messageId,
-		});
+			}`,
+			{
+				chatType: selected.node.qlType,
+				server: publicKey,
+				chatId: selected.node.qlId,
+				message: messageId,
+			}
+		);
 		selected.node.updateChat(new ChatData(lastRead, res.data.setLastRead));
 	}
 
@@ -173,7 +211,7 @@ export class Chat {
 			return undefined;
 		}
 
-		const res = await backend.graphql<{chat:{sendHistory:{content: string}}}>(
+		const res = await backend.graphql<{ chat: { sendHistory: { content: string } } }>(
 			`query GetSendHistory($chatType: GMessageTarget!, $server: [Int!]!, $chatId: ID,
 					$from: [Int!]!, $id: Int!) {
 				chat(typ: $chatType, server: $server, id: $chatId) {
@@ -181,13 +219,15 @@ export class Chat {
 						content
 					}
 				}
-			}`, {
-			chatType: selected.node.qlType,
-			server: publicKey,
-			chatId: selected.node.qlId,
-			from,
-			id,
-		});
+			}`,
+			{
+				chatType: selected.node.qlType,
+				server: publicKey,
+				chatId: selected.node.qlId,
+				from,
+				id,
+			}
+		);
 		if ("data" in res) {
 			// We never chatted here
 			if (!res.data.chat || !res.data.chat.sendHistory) {
@@ -214,8 +254,12 @@ export class Message {
 	public displayDateSeparator: boolean = false;
 	public displayGroupHeader: boolean = false;
 
-	public get displayName(): string { return this.invoker?.name ?? this.invokerName ?? ""; }
-	public get clientColor(): string { return this._clientColor.get(); }
+	public get displayName(): string {
+		return this.invoker?.name ?? this.invokerName ?? "";
+	}
+	public get clientColor(): string {
+		return this._clientColor.get();
+	}
 
 	constructor(
 		public id: string,
@@ -225,20 +269,22 @@ export class Message {
 		public rendered: string,
 		public date: Moment,
 		public status: MessageStatus,
-		public isPoke: boolean,
+		public isPoke: boolean
 	) {
 		this._clientColor = new Lazy(() => this.generateClientColor());
 	}
 
 	private generateClientColor(): string {
 		if (this.invoker?.uid) {
-			return getDataColor(this.invoker.uid)
+			return getDataColor(this.invoker.uid);
 		} else {
 			return getDataColor(this.displayName);
 		}
 	}
 
-	public hasSameInvoker(other: Message): boolean { return Message.hasSameInvoker(this, other); }
+	public hasSameInvoker(other: Message): boolean {
+		return Message.hasSameInvoker(this, other);
+	}
 
 	// TODO recheck
 	public static hasSameInvoker(first: Message, second: Message): boolean {
@@ -265,7 +311,7 @@ const QINT_CHAT_FOLDER = "/.qint_chat";
 export function structuredViewToMd(data: StructuredData, channel: ChannelId): MdWithFiles {
 	let text = "";
 	let chainid = 0;
-	let date: { iso: string, unix: string } | undefined;
+	let date: { iso: string; unix: string } | undefined;
 	const files = [];
 	for (const part of data) {
 		if (typeof part === "string") {
@@ -274,19 +320,23 @@ export function structuredViewToMd(data: StructuredData, channel: ChannelId): Md
 			text += `![](${part.src})`;
 		} else if ("blob" in part) {
 			const blob = part.blob;
-			if (date === undefined){
+			if (date === undefined) {
 				const m = moment();
 				date = { iso: m.format("YYYY-MM-DD_HH-mm-ss-SSS"), unix: m.unix().toString() };
 			}
 			const file = part.blob.type === "image/jpeg" ? "jpg" : "png";
 			const name = `${date.iso}-${chainid++}.${file}`;
 			files.push({ blob, path: QINT_CHAT_FOLDER, name });
-			const tslink = `ts3file://server?port=${0}&serverUID=${''}&channel=${channel}&path=${encodeURIComponent(QINT_CHAT_FOLDER)}&filename=${encodeURIComponent(name)}&isDir=0&size=${blob.size}&fileDateTime=${date.unix}`;
+			const tslink = `ts3file://server?port=${0}&serverUID=${""}&channel=${channel}&path=${encodeURIComponent(
+				QINT_CHAT_FOLDER
+			)}&filename=${encodeURIComponent(name)}&isDir=0&size=${blob.size}&fileDateTime=${
+				date.unix
+			}`;
 			text += `![](${tslink})`;
 		}
 	}
 	return {
 		text,
-		files
+		files,
 	};
 }

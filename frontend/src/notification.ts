@@ -11,15 +11,24 @@ import { getClientIconPath } from "./ui/clientIcon";
 import debug from "debug";
 const error = debug("error:NTFY");
 
-type NotificationArg = Book | Channel | Client | Invoker | Server | ServerGroup | string | null | undefined;
+type NotificationArg =
+	| Book
+	| Channel
+	| Client
+	| Invoker
+	| Server
+	| ServerGroup
+	| string
+	| null
+	| undefined;
 
 export class TsNotification {
 	constructor(
 		/** The string pieces */
 		public pieces: TemplateStringsArray,
 		/** The dynamically formatted pieces. Every arg is preceded by a string piece. */
-		public args: NotificationArg[],
-	) { }
+		public args: NotificationArg[]
+	) {}
 
 	public toString(con: Connection): string {
 		let res = "";
@@ -29,32 +38,24 @@ export class TsNotification {
 				const a = this.args[i];
 				if (a === null || a === undefined) continue;
 				if (a instanceof Channel) {
-					if (a.phoneticName !== null && a.phoneticName.length > 0)
-						res += a.phoneticName;
-					else
-						res += a.name.split(' ', 2)[0];
+					if (a.phoneticName !== null && a.phoneticName.length > 0) res += a.phoneticName;
+					else res += a.name.split(" ", 2)[0];
 				} else if (a instanceof Client) {
-					if (a.phoneticName && a.phoneticName.length > 0)
-						res += a.phoneticName;
-					else
-						res += a.name.split(' ', 2)[0];
+					if (a.phoneticName && a.phoneticName.length > 0) res += a.phoneticName;
+					else res += a.name.split(" ", 2)[0];
 				} else if (a instanceof Server) {
-					if (a.phoneticName && a.phoneticName.length > 0)
-						res += a.phoneticName;
-					else
-						res += a.name.split(' ', 2)[0];
+					if (a.phoneticName && a.phoneticName.length > 0) res += a.phoneticName;
+					else res += a.name.split(" ", 2)[0];
 				} else if (a instanceof ServerGroup) {
 					res += a.name;
-				} else if (typeof a === 'string' || a instanceof String) {
+				} else if (typeof a === "string" || a instanceof String) {
 					res += a;
 				} else if ("name" in a) {
 					// Is an invoker
 					const client = con.book.getClient(a.id.toString());
 					if (client !== undefined) {
-						if (client.phoneticName.length > 0)
-							res += client.phoneticName;
-						else
-							res += client.name.split(' ', 2)[0];
+						if (client.phoneticName.length > 0) res += client.phoneticName;
+						else res += client.name.split(" ", 2)[0];
 					} else {
 						res += a.name;
 					}
@@ -69,7 +70,11 @@ function notif(strings: TemplateStringsArray, ...keys: NotificationArg[]): TsNot
 	return new TsNotification(strings, keys);
 }
 
-export type NotificationHandler = (con: Connection, e: InMsg | InBookMsg | InMessage, no: TsNotification) => void;
+export type NotificationHandler = (
+	con: Connection,
+	e: InMsg | InBookMsg | InMessage,
+	no: TsNotification
+) => void;
 
 function getHandler(plugins: IPlugin[]): NotificationHandler {
 	for (const p of plugins) {
@@ -115,29 +120,39 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHand
 		const isQuiet = ownClient?.outputMuted ?? false;
 
 		if ("Message" in msg) {
-			const longMessage = msg.Message.message.length > 20 || msg.Message.message.length === 0 || msg.Message.message.includes("//");
+			const longMessage =
+				msg.Message.message.length > 20 ||
+				msg.Message.message.length === 0 ||
+				msg.Message.message.includes("//");
 			if (isPoke(msg.Message.target)) {
-				if (longMessage)
-					handler(con, msg, notif`${msg.Message.invoker} poked you`);
-				else
-					handler(con, msg, notif`${msg.Message.invoker} poked ${msg.Message.message}`);
+				if (longMessage) handler(con, msg, notif`${msg.Message.invoker} poked you`);
+				else handler(con, msg, notif`${msg.Message.invoker} poked ${msg.Message.message}`);
 
 				if (app.transientSettings.app.allowBrowserNotifications) {
-					const client = msg.Message.invoker.uid ? con.book.getClient(msg.Message.invoker.id.toString()) : undefined;
+					const client = msg.Message.invoker.uid
+						? con.book.getClient(msg.Message.invoker.id.toString())
+						: undefined;
 					const iconUrl = client ? getClientIconPath(client, con) : undefined;
 					new Notification(notif`👉 ${msg.Message.invoker}`.toString(con), {
 						body: notif`${msg.Message.message}`.toString(con),
 						icon: iconUrl,
-						badge: "/icon.png"
+						badge: "/icon.png",
 					});
 				}
 			} else if (msg.Message.invoker.id.toString() !== ownClientId) {
 				// If in quiet mode, ignore all but private messages
-				if (!isQuiet || Object.prototype.hasOwnProperty.call(msg.Message.target, "Client")) {
+				if (
+					!isQuiet ||
+					Object.prototype.hasOwnProperty.call(msg.Message.target, "Client")
+				) {
 					if (longMessage)
 						handler(con, msg, notif`${msg.Message.invoker} wrote a message`);
 					else
-						handler(con, msg, notif`${msg.Message.invoker} wrote ${msg.Message.message}`);
+						handler(
+							con,
+							msg,
+							notif`${msg.Message.invoker} wrote ${msg.Message.message}`
+						);
 				}
 			}
 		} else {
@@ -151,39 +166,66 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHand
 				} else if ("Client" in prop) {
 					const reason = msg.PropertyAdded.extra.reason;
 					const client = Client.fromJson(prop.Client);
-					if (reason === Reason.None || (reason === Reason.Subscription && client.id === ownClientId)) {
+					if (
+						reason === Reason.None ||
+						(reason === Reason.Subscription && client.id === ownClientId)
+					) {
 						if (client.id === ownClientId) {
 							handler(con, msg, notif`Connected to ${con.book.server}`);
 						} else if (!isQuiet) {
 							if (client.channel === ownChannelId) {
 								handler(con, msg, notif`${client} connected`);
 							} else {
-								handler(con, msg, notif`${client} connected to ${con.book.getChannel(client.channel)}`);
+								handler(
+									con,
+									msg,
+									notif`${client} connected to ${con.book.getChannel(
+										client.channel
+									)}`
+								);
 							}
 						}
 					} else if (reason === Reason.Moved) {
 						if (!isQuiet || client.id === ownClientId) {
 							if (client.channel === ownChannelId) {
 								if (invoker !== null)
-									handler(con, msg, notif`${client} was moved in by ${invoker} and appeared`);
-								else
-									handler(con, msg, notif`${client} was moved in and appeared`);
+									handler(
+										con,
+										msg,
+										notif`${client} was moved in by ${invoker} and appeared`
+									);
+								else handler(con, msg, notif`${client} was moved in and appeared`);
 							} else {
 								if (invoker !== null)
-									handler(con, msg, notif`${client} was moved to ${con.book.getChannel(client.channel)} by ${invoker} and appeared`);
+									handler(
+										con,
+										msg,
+										notif`${client} was moved to ${con.book.getChannel(
+											client.channel
+										)} by ${invoker} and appeared`
+									);
 								else
-									handler(con, msg, notif`${client} was moved to ${con.book.getChannel(client.channel)} and appeared`);
+									handler(
+										con,
+										msg,
+										notif`${client} was moved to ${con.book.getChannel(
+											client.channel
+										)} and appeared`
+									);
 							}
 						}
 					}
 				} else if ("ServerGroupId" in prop && "ClientServerGroup" in msg.PropertyAdded.id) {
 					if (!isQuiet) {
-						const client = con.book.getClient(msg.PropertyAdded.id.ClientServerGroup[0]);
-						const group = con.book.getServerGroup(msg.PropertyAdded.id.ClientServerGroup[1]);
+						const client = con.book.getClient(
+							msg.PropertyAdded.id.ClientServerGroup[0]
+						);
+						const group = con.book.getServerGroup(
+							msg.PropertyAdded.id.ClientServerGroup[1]
+						);
 						if (invoker !== null)
 							handler(con, msg, notif`${invoker} added ${client} to group ${group}`);
-						else
-							handler(con, msg, notif`${client} was added to group ${group}`);
+						else handler(con, msg, notif`${client} was added to group ${group}`);
 					}
 				}
 			} else if ("PropertyChanged" in msg) {
@@ -223,55 +265,90 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHand
 									handler(con, msg, notif`${client} joined`);
 								else if (client.channel === ownChannelId)
 									handler(con, msg, notif`${client} left to ${newChannel}`);
-								else
-									handler(con, msg, notif`${client} switched to ${newChannel}`);
+								else handler(con, msg, notif`${client} switched to ${newChannel}`);
 							}
 						} else if (reason === Reason.Moved) {
 							if (client.id === ownClientId) {
 								if (invoker !== null)
 									handler(con, msg, notif`Moved to ${newChannel} by ${invoker}`);
-								else
-									handler(con, msg, notif`Moved to ${newChannel}`);
+								else handler(con, msg, notif`Moved to ${newChannel}`);
 							} else if (!isQuiet) {
 								if (newChannel.id === ownChannelId) {
 									if (invoker !== null)
-										handler(con, msg, notif`${client} was moved in by ${invoker}`);
-									else
-										handler(con, msg, notif`${client} was moved in`);
+										handler(
+											con,
+											msg,
+											notif`${client} was moved in by ${invoker}`
+										);
+									else handler(con, msg, notif`${client} was moved in`);
 								} else if (client.channel === ownChannelId) {
 									if (invoker !== null)
-										handler(con, msg, notif`${client} was moved out to ${newChannel} by ${invoker}`);
+										handler(
+											con,
+											msg,
+											notif`${client} was moved out to ${newChannel} by ${invoker}`
+										);
 									else
-										handler(con, msg, notif`${client} was moved out to ${newChannel}`);
+										handler(
+											con,
+											msg,
+											notif`${client} was moved out to ${newChannel}`
+										);
 								} else {
 									if (invoker !== null)
-										handler(con, msg, notif`${client} was moved to ${newChannel} by ${invoker}`);
+										handler(
+											con,
+											msg,
+											notif`${client} was moved to ${newChannel} by ${invoker}`
+										);
 									else
-										handler(con, msg, notif`${client} was moved to ${newChannel}`);
+										handler(
+											con,
+											msg,
+											notif`${client} was moved to ${newChannel}`
+										);
 								}
 							}
 						} else if (reason === Reason.KickChannel) {
 							if (client.id === ownClientId) {
 								if (invoker !== null)
 									handler(con, msg, notif`Kicked to ${newChannel} by ${invoker}`);
-								else
-									handler(con, msg, notif`Kicked to ${newChannel}`);
+								else handler(con, msg, notif`Kicked to ${newChannel}`);
 							} else if (!isQuiet) {
 								if (newChannel.id === ownChannelId) {
 									if (invoker !== null)
-										handler(con, msg, notif`${client} was kicked in by ${invoker}`);
-									else
-										handler(con, msg, notif`${client} was kicked in`);
+										handler(
+											con,
+											msg,
+											notif`${client} was kicked in by ${invoker}`
+										);
+									else handler(con, msg, notif`${client} was kicked in`);
 								} else if (client.channel === ownChannelId) {
 									if (invoker !== null)
-										handler(con, msg, notif`${client} was kicked out to ${newChannel} by ${invoker}`);
+										handler(
+											con,
+											msg,
+											notif`${client} was kicked out to ${newChannel} by ${invoker}`
+										);
 									else
-										handler(con, msg, notif`${client} was kicked out to ${newChannel}`);
+										handler(
+											con,
+											msg,
+											notif`${client} was kicked out to ${newChannel}`
+										);
 								} else {
 									if (invoker !== null)
-										handler(con, msg, notif`${client} was kicked to ${newChannel} by ${invoker}`);
+										handler(
+											con,
+											msg,
+											notif`${client} was kicked to ${newChannel} by ${invoker}`
+										);
 									else
-										handler(con, msg, notif`${client} was kicked to ${newChannel}`);
+										handler(
+											con,
+											msg,
+											notif`${client} was kicked to ${newChannel}`
+										);
 								}
 							}
 						}
@@ -287,35 +364,38 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHand
 						else if (newClient.awayMessage!.length === 0)
 							handler(con, msg, notif`${client} has gone`);
 						else
-							handler(con, msg, notif`${client} has gone to ${newClient.awayMessage}`);
+							handler(
+								con,
+								msg,
+								notif`${client} has gone to ${newClient.awayMessage}`
+							);
 					}
 
 					if (newClient.inputMuted !== undefined) {
 						if (client.id === ownClientId) {
-							if (newClient.inputMuted)
-								handler(con, msg, notif`muted`);
-							else
-								handler(con, msg, notif`unmuted`);
+							if (newClient.inputMuted) handler(con, msg, notif`muted`);
+							else handler(con, msg, notif`unmuted`);
 						} else if (!isQuiet && inOwnChannel) {
-							if (newClient.inputMuted)
-								handler(con, msg, notif`${client} is muted`);
-							else
-								handler(con, msg, notif`${client} is unmuted`);
+							if (newClient.inputMuted) handler(con, msg, notif`${client} is muted`);
+							else handler(con, msg, notif`${client} is unmuted`);
 						}
 					}
 
-					if (newClient.outputMuted !== undefined && (client.id === ownClientId || (!isQuiet && inOwnChannel))) {
-						if (newClient.outputMuted)
-							handler(con, msg, notif`${client} is deaf`);
-						else
-							handler(con, msg, notif`${client} is listening`);
+					if (
+						newClient.outputMuted !== undefined &&
+						(client.id === ownClientId || (!isQuiet && inOwnChannel))
+					) {
+						if (newClient.outputMuted) handler(con, msg, notif`${client} is deaf`);
+						else handler(con, msg, notif`${client} is listening`);
 					}
 
-					if (newClient.inputHardwareEnabled !== undefined && (client.id === ownClientId || (!isQuiet && inOwnChannel))) {
+					if (
+						newClient.inputHardwareEnabled !== undefined &&
+						(client.id === ownClientId || (!isQuiet && inOwnChannel))
+					) {
 						if (newClient.inputHardwareEnabled)
 							handler(con, msg, notif`${client} can talk`);
-						else
-							handler(con, msg, notif`${client} is silent`);
+						else handler(con, msg, notif`${client} is silent`);
 					}
 				} else if ("Server" in prop) {
 					if (!isQuiet && invoker !== null) {
@@ -331,16 +411,18 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHand
 				} else if ("Client" in msg.PropertyRemoved.id) {
 					const reason = msg.PropertyRemoved.extra.reason;
 					const client = con.book.getClient(msg.PropertyRemoved.id.Client)!;
-					if (reason === null || reason === Reason.None || reason === Reason.Clientdisconnect) {
+					if (
+						reason === null ||
+						reason === Reason.None ||
+						reason === Reason.Clientdisconnect
+					) {
 						if (client.id === ownClientId)
 							handler(con, msg, notif`Disconnected from ${con.book.server}`);
-						else if (!isQuiet)
-							handler(con, msg, notif`${client} disconnected`);
+						else if (!isQuiet) handler(con, msg, notif`${client} disconnected`);
 					} else if (reason === Reason.LostConnection) {
 						if (client.id === ownClientId)
 							handler(con, msg, notif`Timed out from ${con.book.server}`);
-						else if (!isQuiet)
-							handler(con, msg, notif`${client} timed out`);
+						else if (!isQuiet) handler(con, msg, notif`${client} timed out`);
 					} else if (reason === Reason.Moved) {
 						if (client.channel === ownChannelId) {
 							if (invoker !== null) {
@@ -349,71 +431,104 @@ function handleEvents(con: Connection, msg: InBookMsg, handler: NotificationHand
 									// TODO Wait <ping> and check if we got the client again before talking
 									handler(con, msg, notif`${client} was moved out by ${invoker}`);
 								} else {
-									handler(con, msg, notif`${client} was moved out by ${invoker} and disappeared`);
+									handler(
+										con,
+										msg,
+										notif`${client} was moved out by ${invoker} and disappeared`
+									);
 								}
 							} else
 								handler(con, msg, notif`${client} was moved out and disappeared`);
-						} else  if (!isQuiet) {
+						} else if (!isQuiet) {
 							if (invoker !== null) {
 								if (invoker.id === 0) {
 									// This could be a new channel we are not subscribed to yet
 									// TODO Wait <ping> and check if we got the client again before talking
 									handler(con, msg, notif`${client} was moved by ${invoker}`);
 								} else {
-									handler(con, msg, notif`${client} was moved by ${invoker} and disappeared`);
+									handler(
+										con,
+										msg,
+										notif`${client} was moved by ${invoker} and disappeared`
+									);
 								}
-							} else
-								handler(con, msg, notif`${client} was moved and disappeared`);
+							} else handler(con, msg, notif`${client} was moved and disappeared`);
 						}
 					} else if (reason === Reason.KickChannel) {
 						if (!isQuiet) {
 							if (client.channel === ownChannelId) {
 								if (invoker !== null)
-									handler(con, msg, notif`${client} was kicked out by ${invoker} and disappeared`);
+									handler(
+										con,
+										msg,
+										notif`${client} was kicked out by ${invoker} and disappeared`
+									);
 								else
-									handler(con, msg, notif`${client} was kicked out and disappeared`);
+									handler(
+										con,
+										msg,
+										notif`${client} was kicked out and disappeared`
+									);
 							} else {
 								if (invoker !== null)
-									handler(con, msg, notif`${client} was kicked by ${invoker} and disappeared`);
-								else
-									handler(con, msg, notif`${client} was kicked and disappeared`);
+									handler(
+										con,
+										msg,
+										notif`${client} was kicked by ${invoker} and disappeared`
+									);
+								else handler(con, msg, notif`${client} was kicked and disappeared`);
 							}
 						}
 					} else if (reason === Reason.KickServer) {
 						if (client.id === ownClientId) {
 							if (invoker !== null)
 								handler(con, msg, notif`Kicked from the server by ${invoker}`);
-							else
-								handler(con, msg, notif`Kicked from the server`);
+							else handler(con, msg, notif`Kicked from the server`);
 						} else if (!isQuiet) {
 							if (invoker !== null)
-								handler(con, msg, notif`${client} was kicked from the server by ${invoker}`);
-							else
-								handler(con, msg, notif`${client} was kicked from the server`);
+								handler(
+									con,
+									msg,
+									notif`${client} was kicked from the server by ${invoker}`
+								);
+							else handler(con, msg, notif`${client} was kicked from the server`);
 						}
 					} else if (reason === Reason.KickServerBan) {
 						if (client.id === ownClientId) {
 							if (invoker !== null)
 								handler(con, msg, notif`Banned from the server by ${invoker}`);
-							else
-								handler(con, msg, notif`Banned from the server`);
+							else handler(con, msg, notif`Banned from the server`);
 						} else if (!isQuiet) {
 							if (invoker !== null)
-								handler(con, msg, notif`${client} was banned from the server by ${invoker}`);
-							else
-								handler(con, msg, notif`${client} was banned from the server`);
+								handler(
+									con,
+									msg,
+									notif`${client} was banned from the server by ${invoker}`
+								);
+							else handler(con, msg, notif`${client} was banned from the server`);
 						}
-					} else if ((reason === Reason.ClientdisconnectServerShutdown || reason === Reason.Serverstop) && client.id === ownClientId) {
+					} else if (
+						(reason === Reason.ClientdisconnectServerShutdown ||
+							reason === Reason.Serverstop) &&
+						client.id === ownClientId
+					) {
 						handler(con, msg, notif`Disconnected, server ${con.book.server} shut down`);
 					}
 				} else if ("ClientServerGroup" in msg.PropertyRemoved.id) {
 					if (!isQuiet) {
-						const client = con.book.getClient(msg.PropertyRemoved.id.ClientServerGroup[0]);
-						const group = con.book.getServerGroup(msg.PropertyRemoved.id.ClientServerGroup[1]);
+						const client = con.book.getClient(
+							msg.PropertyRemoved.id.ClientServerGroup[0]
+						);
+						const group = con.book.getServerGroup(
+							msg.PropertyRemoved.id.ClientServerGroup[1]
+						);
 						if (invoker !== null)
-							handler(con, msg, notif`${invoker} removed ${client} from group ${group}`);
-						else
-							handler(con, msg, notif`${client} was removed from group ${group}`);
+							handler(
+								con,
+								msg,
+								notif`${invoker} removed ${client} from group ${group}`
+							);
+						else handler(con, msg, notif`${client} was removed from group ${group}`);
 					}
 				}
 			}
@@ -435,7 +550,7 @@ function handleInMessage(con: Connection, msg: InMessage, handler: NotificationH
 					/*if (invoker !== null) {
 						handler(con, msg, notif`${invoker} edited ${channel}’s description`);
 					} else {*/
-						handler(con, msg, notif`${channel}’s description was edited`);
+					handler(con, msg, notif`${channel}’s description was edited`);
 					//}
 				}
 			}
@@ -445,7 +560,11 @@ function handleInMessage(con: Connection, msg: InMessage, handler: NotificationH
 	}
 }
 
-function textToSpeechNotification(con: Connection, _e: InMsg | InBookMsg | InMessage, no: TsNotification) {
+function textToSpeechNotification(
+	con: Connection,
+	_e: InMsg | InBookMsg | InMessage,
+	no: TsNotification
+) {
 	app.transientSettings.synth.trySpeak(no.toString(con));
 }
 

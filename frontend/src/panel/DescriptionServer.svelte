@@ -3,7 +3,14 @@
 	import type { ChangePromise } from "../connection";
 	import type { Server } from "../book";
 	import moment from "moment";
-	import { CLEAR_ICON, enumValues, formatDuration, LONG_DATETIME, on, PASSWORD_PLACEHOLDER } from "../util";
+	import {
+		CLEAR_ICON,
+		enumValues,
+		formatDuration,
+		LONG_DATETIME,
+		on,
+		PASSWORD_PLACEHOLDER,
+	} from "../util";
 	import type { RequiredNN, Writeable } from "../util";
 	import BDropDown from "../ui/BDropDown.svelte";
 	import Icon from "../ui/Icon.svelte";
@@ -15,7 +22,13 @@
 	import StickyHeader from "./StickyHeader.svelte";
 	import RenderedText from "../ui/RenderedText.svelte";
 	import RenderedTextEditor from "../ui/RenderedTextEditor.svelte";
-	import { CodecEncryptionMode, HostBannerMode, HostMessageMode, licenseTypeGetDoc, OptionalServerDataGen } from "../book_events";
+	import {
+		CodecEncryptionMode,
+		HostBannerMode,
+		HostMessageMode,
+		licenseTypeGetDoc,
+		OptionalServerDataGen,
+	} from "../book_events";
 	import UiChangeResult from "../ui/UiChangeResult.svelte";
 	import UiEmojiString from "../ui/UiEmojiString.svelte";
 	import { app } from "../app";
@@ -33,8 +46,7 @@
 	$: on($server, $server.optionalData === null ? getOptionalData() : undefined);
 
 	// THIS IS NOT A FULL SERVER OBJECT
-	type EditProps = Omit<Writeable<RequiredNN<Server>>,
-		""> & {
+	type EditProps = Omit<Writeable<RequiredNN<Server>>, ""> & {
 		_password: string;
 	};
 	type EditPropsOpt = Writeable<RequiredNN<OptionalServerDataGen>>;
@@ -93,16 +105,14 @@
 
 	function getPropsDiff() {
 		const diff: Record<string, any> = {};
-		if (servEdit.nickname === "" && server.nickname !== "")
-			servEdit.nickname = null!;
+		if (servEdit.nickname === "" && server.nickname !== "") servEdit.nickname = null!;
 		for (const [key, value] of Object.entries(servEdit)) {
 			if (key.startsWith("_")) continue;
 			if ((server as any)[key] !== value) {
 				diff[key] = value;
 			}
 		}
-		if (diff.nickname === null)
-			diff.nickname = "";
+		if (diff.nickname === null) diff.nickname = "";
 		if (server.optionalData !== null) {
 			const optionalData = server.optionalData as any;
 			for (const [key, value] of Object.entries(servEditOpt)) {
@@ -117,10 +127,8 @@
 			delete diff.hasPassword;
 		} else if (diff.hasPassword !== undefined) {
 			// Ignore when password is empty
-			if (diff.hasPassword)
-				delete diff.hasPassword;
-			else
-				diff.password = null;
+			if (diff.hasPassword) delete diff.hasPassword;
+			else diff.password = null;
 		}
 		return diff;
 	}
@@ -164,7 +172,7 @@
 	onMount(() => {
 		const timer = setInterval(getOptionalData, 10000);
 		return () => clearInterval(timer);
-	})
+	});
 </script>
 
 <StickyList>
@@ -200,7 +208,7 @@
 					<button
 						class="toolbutton is-small"
 						style="float: right;"
-						on:click={() => changeRequest = undefined}>
+						on:click={() => (changeRequest = undefined)}>
 						<Icon name="close" />
 					</button>
 					<UiChangeResult result={changeResult} />
@@ -246,7 +254,7 @@
 		{#if !editing}
 			<div class="dataLine">
 				<div>Host message:</div>
-				<RenderedText {connection} text={$server.hostmessageRendered ?? ''} />
+				<RenderedText {connection} text={$server.hostmessageRendered ?? ""} />
 			</div>
 		{/if}
 		<div class="dataLine large" class:editing>
@@ -254,7 +262,7 @@
 			{#if editing}
 				<RenderedTextEditor {connection} bind:raw={servEdit.welcomeMessage} />
 			{:else}
-				<RenderedText {connection} text={$server.welcomeMessageRendered ?? ''} />
+				<RenderedText {connection} text={$server.welcomeMessageRendered ?? ""} />
 			{/if}
 		</div>
 		<div class="dataLine">
@@ -270,11 +278,19 @@
 		{#if editing}
 			<div class="dataLine">
 				<label for="edit_maxClients">Max clients:</label>
-				<input id="edit_maxClients" class="input" type="number" bind:value={servEdit.maxClients} />
+				<input
+					id="edit_maxClients"
+					class="input"
+					type="number"
+					bind:value={servEdit.maxClients} />
 			</div>
 			<div class="dataLine">
 				<label for="edit_reservedSlots">Reserved slots:</label>
-				<input id="edit_reservedSlots" class="input" type="number" bind:value={servEditOpt.reservedSlots} />
+				<input
+					id="edit_reservedSlots"
+					class="input"
+					type="number"
+					bind:value={servEditOpt.reservedSlots} />
 			</div>
 		{:else}
 			<div class="dataLine">
@@ -291,7 +307,7 @@
 		{#if $developMode}
 			<div class="dataLine">
 				<div>IPs:</div>
-				<div>{$server.ips?.join(', ') ?? ''}</div>
+				<div>{$server.ips?.join(", ") ?? ""}</div>
 			</div>
 			<div class="dataLine">
 				<div>Port:</div>
@@ -316,7 +332,10 @@
 			{#if $server.hostbuttonGfxUrl}
 				<div class="dataLine">
 					<a href={$server.hostbuttonUrl} title={$server.hostbuttonTooltip}>
-						<img src={$server.hostbuttonGfxUrl} alt={$server.hostbuttonTooltip} class="hostbutton" />
+						<img
+							src={$server.hostbuttonGfxUrl}
+							alt={$server.hostbuttonTooltip}
+							class="hostbutton" />
 					</a>
 				</div>
 			{/if}
@@ -354,7 +373,10 @@
 			</div>
 			<div class="dataLine">
 				<label for="edit_hostbannerGfxUrl">Image:</label>
-				<input id="edit_hostbannerGfxUrl" class="input" bind:value={servEdit.hostbannerGfxUrl} />
+				<input
+					id="edit_hostbannerGfxUrl"
+					class="input"
+					bind:value={servEdit.hostbannerGfxUrl} />
 			</div>
 			<div class="dataLine">
 				<label for="edit_hostbannerMode">Mode:</label>
@@ -373,11 +395,17 @@
 			</div>
 			<div class="dataLine">
 				<label for="edit_hostbuttonGfxUrl">Image:</label>
-				<input id="edit_hostbuttonGfxUrl" class="input" bind:value={servEdit.hostbuttonGfxUrl} />
+				<input
+					id="edit_hostbuttonGfxUrl"
+					class="input"
+					bind:value={servEdit.hostbuttonGfxUrl} />
 			</div>
 			<div class="dataLine">
 				<label for="edit_hostbuttonTooltip">Tooltip:</label>
-				<input id="edit_hostbuttonTooltip" class="input" bind:value={servEdit.hostbuttonTooltip} />
+				<input
+					id="edit_hostbuttonTooltip"
+					class="input"
+					bind:value={servEdit.hostbuttonTooltip} />
 			</div>
 		</div>
 
@@ -400,12 +428,15 @@
 							class="input"
 							type="password"
 							bind:value={servEdit._password}
-							placeholder={server.optionalData?.hasPassword && servEditOpt.hasPassword !== false ? PASSWORD_PLACEHOLDER : ""}
-						/>
+							placeholder={server.optionalData?.hasPassword &&
+							servEditOpt.hasPassword !== false
+								? PASSWORD_PLACEHOLDER
+								: ""} />
 					</div>
 					{#if server.optionalData?.hasPassword && servEditOpt.hasPassword !== false}
 						<div class="control">
-							<button class="button" on:click={editClearPasword}><Icon name={CLEAR_ICON} /></button>
+							<button class="button" on:click={editClearPasword}
+								><Icon name={CLEAR_ICON} /></button>
 						</div>
 					{/if}
 				</div>
@@ -413,7 +444,7 @@
 		</div>
 	{/if}
 	<StickySlot on:click={() => (logOpen = true)}>
-		<button class="button iconButton" on:click|stopPropagation={() => logOpen = !logOpen}>
+		<button class="button iconButton" on:click|stopPropagation={() => (logOpen = !logOpen)}>
 			<Icon name="chevron-right{logOpen ? ' mdi-rotate-90' : ''}" />
 		</button>
 		<span>Log</span>

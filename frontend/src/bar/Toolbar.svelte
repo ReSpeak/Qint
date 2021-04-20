@@ -59,7 +59,7 @@
 	</div>
 	<div class="spacer" />
 	<div class="rightButtons">
-		<ConnectionSettings bind:connectData={connectData} />
+		<ConnectionSettings bind:connectData />
 	</div>
 </div>
 

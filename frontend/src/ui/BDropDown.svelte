@@ -1,3 +1,5 @@
+<svelte:options immutable={true} />
+
 <script lang="ts">
 	import { hasProperty } from "../util";
 	import { createEventDispatcher, onMount } from "svelte";
@@ -14,11 +16,11 @@
 	function selectedToIndex(selected: any) {
 		if (dd == null || items.length === 0) return;
 		if (hasProperty(items[0], "value")) {
-			const index = (items as DDObjElement[]).findIndex(it => it.value === selected);
+			const index = (items as DDObjElement[]).findIndex((it) => it.value === selected);
 			if (index === -1) return;
 			dd.selectedIndex = index;
 		} else {
-			const newIndex = (items as string[]).findIndex(i => i === selected);
+			const newIndex = (items as string[]).findIndex((i) => i === selected);
 			if (newIndex !== -1) {
 				dd.selectedIndex = newIndex;
 			}
@@ -51,10 +53,9 @@
 	});
 </script>
 
-<svelte:options immutable={true} />
 <div class="select is-fullwidth">
 	<!-- svelte-ignore a11y-no-onchange -->
-	<select bind:this={dd} on:change={indexToSelected} id={id}>
+	<select bind:this={dd} on:change={indexToSelected} {id}>
 		{#each items as item, index}
 			<option value={index}>{display(item)}</option>
 		{/each}

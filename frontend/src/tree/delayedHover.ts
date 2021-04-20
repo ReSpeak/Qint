@@ -13,9 +13,7 @@ export class DelayedHover {
 	private unsub1: () => any;
 	private unsub2: () => any;
 
-	public constructor(
-		private id: any,
-		components: HTMLElement[]) {
+	public constructor(private id: any, components: HTMLElement[]) {
 		for (const c of components) {
 			this.addListener(c, "mouseenter", () => this.mouseover());
 			this.addListener(c, "mouseleave", () => this.mouseout());
@@ -23,17 +21,21 @@ export class DelayedHover {
 			//this.addListener(c, "focus", () => this.mouseover());
 			//this.addListener(c, "blur", () => this.mouseout());
 		}
-		this.unsub1 = app.modalVisible.subscribe(open => {
+		this.unsub1 = app.modalVisible.subscribe((open) => {
 			this.modalState = open;
 		});
-		this.unsub2 = hover_id.subscribe(new_id => {
+		this.unsub2 = hover_id.subscribe((new_id) => {
 			if (new_id !== this.id) {
 				this.hovered.set(false);
 			}
 		});
 	}
 
-	private addListener<K extends keyof HTMLElementEventMap>(c: HTMLElement, s: K, f: (this: HTMLElement, ev: HTMLElementEventMap[K]) => any) {
+	private addListener<K extends keyof HTMLElementEventMap>(
+		c: HTMLElement,
+		s: K,
+		f: (this: HTMLElement, ev: HTMLElementEventMap[K]) => any
+	) {
 		c.addEventListener(s, f);
 		this.listener.push([c, s, f]);
 	}
@@ -52,13 +54,17 @@ export class DelayedHover {
 		this.closeDebouced.cancel();
 	}
 
-	private closeDebouced = debounced(() => {
-		if (!this.modalState) {
-			this.hovered.set(false);
+	private closeDebouced = debounced(
+		() => {
+			if (!this.modalState) {
+				this.hovered.set(false);
+			}
+		},
+		50,
+		{
+			resetOnCall: true,
 		}
-	}, 50, {
-		resetOnCall: true
-	});
+	);
 
 	mouseout(): void {
 		this.closeDebouced();

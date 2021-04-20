@@ -21,8 +21,7 @@
 		fetchError = undefined;
 		state.unsubscribe();
 		state = new ServerLogState(connection);
-		if (logList)
-			logList.sourceChanged(ListFetchDir.New, ListFetchDir.After);
+		if (logList) logList.sourceChanged(ListFetchDir.New, ListFetchDir.After);
 	}
 
 	async function fetchElements(idFrom: LogEntry | undefined, dir: ListFetchDir) {
@@ -34,7 +33,7 @@
 			return {
 				items: [],
 				canLoadBeforeStart: false,
-				canLoadAfterEnd: false
+				canLoadAfterEnd: false,
 			};
 		}
 	}
@@ -51,22 +50,18 @@
 			<button
 				class="toolbutton is-small"
 				style="float: right;"
-				on:click={() => fetchError = undefined}>
+				on:click={() => (fetchError = undefined)}>
 				<Icon name="close" />
 			</button>
 			<UiChangeResult result={fetchError} />
 		</div>
 	{/if}
-	<UiLazyList
-		bind:this={logList}
-		{fetchElements}
-		suggestJumpEnd={true}
-		let:item>
+	<UiLazyList bind:this={logList} {fetchElements} suggestJumpEnd={true} let:item>
 		<div slot="loading" class="logFiller">
 			<span>Loading ...</span>
 			<Icon name="orbit mdi-spin" />
 		</div>
-		<div slot="empty" class="logFiller"></div>
+		<div slot="empty" class="logFiller" />
 		<div class="logLine">{item.log}</div>
 	</UiLazyList>
 </div>

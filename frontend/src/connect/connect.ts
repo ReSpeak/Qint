@@ -11,13 +11,12 @@ export const enum MuteState {
 }
 
 export interface MuteStates {
-	input: MuteState,
-	output: MuteState,
-	away: boolean,
+	input: MuteState;
+	output: MuteState;
+	away: boolean;
 }
 
 export class ConnectData {
-
 	constructor(
 		public name: string,
 		public address: string,
@@ -29,12 +28,23 @@ export class ConnectData {
 		public outputMuted?: MuteState,
 		public away?: string,
 		public password?: string,
-		public channelPassword?: string) { }
+		public channelPassword?: string
+	) {}
 
 	public clone(): ConnectData {
-		return new ConnectData(this.name, this.address, this.bookmark,
-			this.identityId, this.channel, this.channelId, this.inputMuted,
-			this.outputMuted, this.away, this.password, this.channelPassword);
+		return new ConnectData(
+			this.name,
+			this.address,
+			this.bookmark,
+			this.identityId,
+			this.channel,
+			this.channelId,
+			this.inputMuted,
+			this.outputMuted,
+			this.away,
+			this.password,
+			this.channelPassword
+		);
 	}
 
 	public toConnectMsg(): OMsgConnect {
@@ -58,7 +68,7 @@ export class ConnectData {
 				logCommands: false,
 				logPackets: false,
 				logUdpPackets: false,
-			}
+			},
 		};
 	}
 
@@ -66,11 +76,20 @@ export class ConnectData {
 		if (typeof data !== "string") {
 			assert("address" in data, "Connection needs an address");
 			assert("address" in data, "connection data needs an address");
-			if (!("name" in data))
-				data.name = DEFAULT_NAME;
-			return new ConnectData(data.name, data.address, data.bookmark,
-				data.identityId, data.channel, data.channelId, data.inputMuted,
-				data.outputMuted, data.away, data.password, data.channelPassword);
+			if (!("name" in data)) data.name = DEFAULT_NAME;
+			return new ConnectData(
+				data.name,
+				data.address,
+				data.bookmark,
+				data.identityId,
+				data.channel,
+				data.channelId,
+				data.inputMuted,
+				data.outputMuted,
+				data.away,
+				data.password,
+				data.channelPassword
+			);
 		} else {
 			let start = data.indexOf("@");
 			const name = start === -1 ? DEFAULT_NAME : data.substr(0, start);

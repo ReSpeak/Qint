@@ -34,20 +34,19 @@ export const LOUDNESS_HISTORY = 100;
 export const LOUDNESS_UPDATE_MS = 20;
 export const BROWSER = detectBrowser();
 
-
 export type RequiredNN<T> = { [P in keyof T]: NonNullable<T[P]> };
 export type Writeable<T> = { -readonly [P in keyof T]: Writeable<T[P]> };
 
 export interface EmojiData {
-	number: number,
-	emoji: string,
-	description: string,
-	unicode: string,
-	translated_descriptions: Record<string, string>,
-};
+	number: number;
+	emoji: string;
+	description: string;
+	unicode: string;
+	translated_descriptions: Record<string, string>;
+}
 
 export async function sleep(timeout: number): Promise<void> {
-	return new Promise(resolve => setTimeout(resolve, timeout));
+	return new Promise((resolve) => setTimeout(resolve, timeout));
 }
 
 export function flash(element: HTMLElement): void {
@@ -70,7 +69,7 @@ export function flash(element: HTMLElement): void {
 export function autoError(element: HTMLImageElement): void {
 	if (!element) return;
 	function errFn(this: HTMLImageElement) {
-		this.src = "/128x128.png"
+		this.src = "/128x128.png";
 		this.removeEventListener("onerror", errFn);
 	}
 	element.addEventListener("onerror", errFn);
@@ -86,24 +85,42 @@ export function clickToSelectAll(element: HTMLElement): void {
 			sel.removeAllRanges();
 			sel.addRange(range);
 		}
-	}
+	};
 	element.onfocus = clickFn;
 	element.onclick = clickFn;
 }
 
 // See https://jsperf.com/node-uuid-performance/64 about how to generate a uuid fast
 export function createUuidV4(): string {
-	const d2h: string[] = [], vals = new Array(16);
+	const d2h: string[] = [],
+		vals = new Array(16);
 	for (let i = 0; i < 256; ++i) d2h.push((0x100 + i).toString(16).substr(1));
 
-	for (let i = 0; i < 16; ++i) vals[i] = Math.random() * 256 | 0;
-	vals[6] = vals[6] & 0x0f | 0x40;
-	vals[8] = vals[8] & 0x3f | 0x80;
-	return d2h[vals[0]] + d2h[vals[1]] + d2h[vals[2]] + d2h[vals[3]] +
-		'-' + d2h[vals[4]] + d2h[vals[5]] +
-		'-' + d2h[vals[6]] + d2h[vals[7]] +
-		'-' + d2h[vals[8]] + d2h[vals[9]] +
-		'-' + d2h[vals[10]] + d2h[vals[11]] + d2h[vals[12]] + d2h[vals[13]] + d2h[vals[14]] + d2h[vals[15]];
+	for (let i = 0; i < 16; ++i) vals[i] = (Math.random() * 256) | 0;
+	vals[6] = (vals[6] & 0x0f) | 0x40;
+	vals[8] = (vals[8] & 0x3f) | 0x80;
+	return (
+		d2h[vals[0]] +
+		d2h[vals[1]] +
+		d2h[vals[2]] +
+		d2h[vals[3]] +
+		"-" +
+		d2h[vals[4]] +
+		d2h[vals[5]] +
+		"-" +
+		d2h[vals[6]] +
+		d2h[vals[7]] +
+		"-" +
+		d2h[vals[8]] +
+		d2h[vals[9]] +
+		"-" +
+		d2h[vals[10]] +
+		d2h[vals[11]] +
+		d2h[vals[12]] +
+		d2h[vals[13]] +
+		d2h[vals[14]] +
+		d2h[vals[15]]
+	);
 }
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
@@ -124,7 +141,7 @@ export function getDataColor(data: number[] | string, lightBackground: boolean =
 		data = dataTmp;
 	}
 
-	let color = chroma(data[0], data[1], data[2], 'rgb');
+	let color = chroma(data[0], data[1], data[2], "rgb");
 	const setLum = lightBackground ? 35 : 65;
 	color = color.set("lab.l", setLum);
 	return color.css();
@@ -136,10 +153,12 @@ export function formatDuration(duration: Duration | null | undefined): string {
 	if (asSec <= 60) return `${asSec}${NARROW_NO_BREAK_SPACE}s`;
 	const asMin = Math.floor(duration.asMinutes());
 	const floorSec = Math.floor(duration.seconds());
-	if (asMin <= 60) return `${asMin}${NARROW_NO_BREAK_SPACE}m ${floorSec}${NARROW_NO_BREAK_SPACE}s`;
+	if (asMin <= 60)
+		return `${asMin}${NARROW_NO_BREAK_SPACE}m ${floorSec}${NARROW_NO_BREAK_SPACE}s`;
 	const asHour = Math.floor(duration.asHours());
 	const floorMin = Math.floor(duration.minutes());
-	if (asHour <= 24) return `${asHour}${NARROW_NO_BREAK_SPACE}h ${floorMin}${NARROW_NO_BREAK_SPACE}m ${floorSec}${NARROW_NO_BREAK_SPACE}s`;
+	if (asHour <= 24)
+		return `${asHour}${NARROW_NO_BREAK_SPACE}h ${floorMin}${NARROW_NO_BREAK_SPACE}m ${floorSec}${NARROW_NO_BREAK_SPACE}s`;
 	const asDay = Math.floor(duration.asDays());
 	const floorHour = Math.floor(duration.hours());
 	return `${asDay}${NARROW_NO_BREAK_SPACE}d ${floorHour}${NARROW_NO_BREAK_SPACE}h ${floorMin}${NARROW_NO_BREAK_SPACE}m ${floorSec}${NARROW_NO_BREAK_SPACE}s`;
@@ -147,12 +166,10 @@ export function formatDuration(duration: Duration | null | undefined): string {
 
 export function arraysEqual<T>(a: ArrayLike<T>, b: ArrayLike<T>): boolean {
 	if (a === b) return true;
-	if (a == null || b == null || a.length !== b.length)
-		return false;
+	if (a == null || b == null || a.length !== b.length) return false;
 
 	for (let i = 0; i < a.length; ++i) {
-		if (a[i] !== b[i])
-			return false;
+		if (a[i] !== b[i]) return false;
 	}
 	return true;
 }
@@ -163,12 +180,13 @@ export function hasProperty(obj: unknown, propName: string): boolean {
 }
 
 export function escapeHtml(s: string): string {
-	return s.replace('&', "&amp;")
-		.replace('<', "&lt;")
-		.replace('>', "&gt;")
+	return s
+		.replace("&", "&amp;")
+		.replace("<", "&lt;")
+		.replace(">", "&gt;")
 		.replace('"', "&quot;")
-		.replace('\'', "&#x27;")
-		.replace('/', "&#x2F;");
+		.replace("'", "&#x27;")
+		.replace("/", "&#x2F;");
 }
 
 export function ignoreCaseRegex(search: string): RegExp {
@@ -179,8 +197,8 @@ export class BinarySearchResult {
 	public constructor(
 		public found: boolean,
 		// Index of found element or index where element can be inserted to maintain order
-		public index: number,
-	) { }
+		public index: number
+	) {}
 }
 
 /** The comparator function should implement an order consistent with the sort order of the underlying slice,
@@ -191,7 +209,12 @@ export class BinarySearchResult {
  * @param [start] The starting index for the search. 0 by default.
  * @param [end] The end index for the search. End of the list by default.
  */
-export function binarySearchBy<T>(list: ArrayLike<T>, f: (t: T) => number, start?: number, end?: number): BinarySearchResult {
+export function binarySearchBy<T>(
+	list: ArrayLike<T>,
+	f: (t: T) => number,
+	start?: number,
+	end?: number
+): BinarySearchResult {
 	start = start ?? 0;
 	end = end ?? list.length;
 	assert(start >= 0 && start <= list.length, "Start must be within list range");
@@ -200,8 +223,7 @@ export function binarySearchBy<T>(list: ArrayLike<T>, f: (t: T) => number, start
 	// Code is copied from Rust
 	let base = start;
 	let size = end - base;
-	if (size === 0)
-		return new BinarySearchResult(false, 0);
+	if (size === 0) return new BinarySearchResult(false, 0);
 
 	while (size > 1) {
 		const half = Math.floor(size / 2);
@@ -210,35 +232,39 @@ export function binarySearchBy<T>(list: ArrayLike<T>, f: (t: T) => number, start
 		// mid >= 0: by definition
 		// mid < size: mid = size / 2 + size / 4 + size / 8 ...
 		const cmp = f(list[mid]);
-		if (cmp <= 0)
-			base = mid;
+		if (cmp <= 0) base = mid;
 		size -= half;
 	}
 	// base is always in [0, size) because base <= mid.
 	const cmp = f(list[base]);
-	if (cmp === 0)
-		return new BinarySearchResult(true, base);
-	else
-		return new BinarySearchResult(false, base + (cmp < 0 ? 1 : 0));
+	if (cmp === 0) return new BinarySearchResult(true, base);
+	else return new BinarySearchResult(false, base + (cmp < 0 ? 1 : 0));
 }
 
-export function binarySearchByKey<T, E>(list: ArrayLike<T>, elem: E, f: (t: T) => E, start?: number, end?: number): BinarySearchResult {
-	return binarySearchBy(list, t => {
-		const x = f(t);
-		if (elem < x)
-			return 1;
-		if (elem > x)
-			return -1;
-		return 0;
-	}, start, end);
+export function binarySearchByKey<T, E>(
+	list: ArrayLike<T>,
+	elem: E,
+	f: (t: T) => E,
+	start?: number,
+	end?: number
+): BinarySearchResult {
+	return binarySearchBy(
+		list,
+		(t) => {
+			const x = f(t);
+			if (elem < x) return 1;
+			if (elem > x) return -1;
+			return 0;
+		},
+		start,
+		end
+	);
 }
 
 export class Lazy<T> {
 	private value: T | undefined;
 
-	constructor(
-		private generator: () => T
-	) { }
+	constructor(private generator: () => T) {}
 
 	public get(): T {
 		if (this.generator !== undefined) {
@@ -250,13 +276,10 @@ export class Lazy<T> {
 }
 
 export class Cached<TSrc, TDst> {
-	private oldSource: TSrc = (Number.NaN as any);
+	private oldSource: TSrc = Number.NaN as any;
 	private value: TDst | undefined;
 
-	constructor(
-		private source: () => TSrc,
-		private transform: (src: TSrc) => TDst
-	) {
+	constructor(private source: () => TSrc, private transform: (src: TSrc) => TDst) {
 		this.oldSource = source();
 	}
 
@@ -304,37 +327,33 @@ export function getDefaultVersion(): Version {
 export function base64Decode(s: string): number[] {
 	const res = [];
 	const b = atob(s);
-	for (let i = 0; i < b.length; i++)
-		res.push(b.charCodeAt(i));
+	for (let i = 0; i < b.length; i++) res.push(b.charCodeAt(i));
 	return res;
 }
 
 export function base64Encode(data: number[]): string {
 	let res = "";
-	for (let i = 0; i < data.length; i++)
-		res += String.fromCharCode(data[i]);
+	for (let i = 0; i < data.length; i++) res += String.fromCharCode(data[i]);
 	return btoa(res);
 }
 
 export function urlBase64Decode(s: string): number[] {
-	return base64Decode(s.replace('-', '+').replace('_', '/'));
+	return base64Decode(s.replace("-", "+").replace("_", "/"));
 }
 
 export function urlBase64Encode(data: number[]): string {
-	return base64Encode(data).replace('+', '-').replace('/', '_').replace(/=+$/, '');
+	return base64Encode(data).replace("+", "-").replace("/", "_").replace(/=+$/, "");
 }
 
 export function hexDecode(s: string): number[] {
 	const res = [];
-	for (let i = 0; i < s.length; i += 2)
-		res.push(parseInt(s.substr(i, i + 2), 16));
+	for (let i = 0; i < s.length; i += 2) res.push(parseInt(s.substr(i, i + 2), 16));
 	return res;
 }
 
 export function hexEncode(data: number[]): string {
 	let res = "";
-	for (let i = 0; i < data.length; i++)
-		res += data[i].toString(16).padStart(2, "0");
+	for (let i = 0; i < data.length; i++) res += data[i].toString(16).padStart(2, "0");
 	return res;
 }
 
@@ -347,8 +366,7 @@ export function emojiEncode(data: number[]): EmojiData[] {
 	const res = [];
 	for (let i = 0; i < b64.length; i++) {
 		const bi = BASE64_CHARS.indexOf(b64[i]);
-		if (bi !== 64)
-			res.push(EMOJI_ENCODING[bi] as EmojiData);
+		if (bi !== 64) res.push(EMOJI_ENCODING[bi] as EmojiData);
 	}
 	return res;
 }
@@ -382,8 +400,7 @@ export function factorToDb(factor: number): number {
  */
 export function dbToFactor(volume: number): number {
 	let factor = 0;
-	if (volume !== MIN_VOLUME_DB)
-		factor = Math.pow(10, volume / 20);
+	if (volume !== MIN_VOLUME_DB) factor = Math.pow(10, volume / 20);
 	return factor;
 }
 
@@ -415,8 +432,7 @@ export function deep_diff(from: any, to: any): any | undefined {
 	if (to == null) return null;
 	if (typeof from !== typeof to) return to;
 	if (typeof to !== "object" || to === null || Array.isArray(to)) {
-		if (deep_equals(from, to))
-			return undefined;
+		if (deep_equals(from, to)) return undefined;
 		return to;
 	}
 	let hasChanges = false;
@@ -436,8 +452,7 @@ export function deep_diff(from: any, to: any): any | undefined {
 			res[key] = null;
 		}
 	}
-	if (!hasChanges)
-		return undefined;
+	if (!hasChanges) return undefined;
 	return res;
 }
 (window as any).deep_diff = deep_diff;
@@ -445,28 +460,27 @@ export function deep_diff(from: any, to: any): any | undefined {
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function deep_equals(a: any, b: any): boolean {
 	if (a === b) return true;
-	if (typeof a !== typeof b)
-		return false;
+	if (typeof a !== typeof b) return false;
 	if (typeof a !== "object") return false;
 	if (Array.isArray(a) && a.length !== b.length) return false;
 	const a_entries = Object.entries(a);
 	const b_keys = Object.keys(b);
 	if (a_entries.length !== b_keys.length) return false;
 	for (const [key, value] of a_entries) {
-		if (!deep_equals(value, b[key]))
-			return false;
+		if (!deep_equals(value, b[key])) return false;
 	}
 	return true;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
-export function on(..._: any[]): void { }
+export function on(..._: any[]): void {}
 
 export function oneshot<T>(
 	store: Readable<T>,
 	when: (t: T) => boolean,
-	action: (t: T) => void): void {
-	const unsub = store.subscribe(x => {
+	action: (t: T) => void
+): void {
+	const unsub = store.subscribe((x) => {
 		if (when(x)) {
 			unsub();
 			action(x);
@@ -480,16 +494,20 @@ interface DebounceOpt {
 	 * When true, resets timer on each new call. Does not fire until the timer ran out.<br>
 	 * **Default**: false
 	 */
-	resetOnCall?: boolean,
+	resetOnCall?: boolean;
 
 	/**
 	 * When true, calls the function once when starting the timer.<br>
 	 * **Default**: false
 	 */
-	callInitial?: boolean,
+	callInitial?: boolean;
 }
 
-export function debounced<T extends unknown[] = []>(fn: FuncTyp<T>, timeout: number, options?: DebounceOpt) {
+export function debounced<T extends unknown[] = []>(
+	fn: FuncTyp<T>,
+	timeout: number,
+	options?: DebounceOpt
+) {
 	let timer: number | undefined;
 	let lastArgs: T;
 	const resetOnCall = options?.resetOnCall ?? false;
@@ -513,8 +531,7 @@ export function debounced<T extends unknown[] = []>(fn: FuncTyp<T>, timeout: num
 				timer = undefined;
 				fn(...lastArgs);
 			}, timeout);
-			if (callInitial)
-				fn(...args);
+			if (callInitial) fn(...args);
 		}
 	}
 
@@ -532,7 +549,7 @@ export function debounced<T extends unknown[] = []>(fn: FuncTyp<T>, timeout: num
 }
 
 export function fnBroadcast<T extends unknown[] = []>() {
-	let callList: (FuncTyp<T>)[] = [];
+	let callList: FuncTyp<T>[] = [];
 
 	function call(...args: T): void {
 		for (const func of callList) {
@@ -566,7 +583,10 @@ export function formatSi(num: number, decimals: number = 0): string {
 	let unit = Math.floor(Math.log(Math.abs(num)) / Math.log(1000));
 	unit = Math.max(Math.min(unit, SiName.length - 1), 0);
 	const divided = num / Math.pow(1000, unit);
-	return (sign * divided).toFixed(unit === 0 ? 0 : decimals) + (unit === 0 ? "" : NARROW_NO_BREAK_SPACE + SiName[unit]);
+	return (
+		(sign * divided).toFixed(unit === 0 ? 0 : decimals) +
+		(unit === 0 ? "" : NARROW_NO_BREAK_SPACE + SiName[unit])
+	);
 }
 
 export enum Browser {
@@ -575,11 +595,11 @@ export enum Browser {
 	Chrome,
 	Safari,
 	Firefox,
-	IE
+	IE,
 }
 
 function detectBrowser(): Browser {
-	if ((navigator.userAgent.indexOf("Opera") || navigator.userAgent.indexOf('OPR')) != -1) {
+	if ((navigator.userAgent.indexOf("Opera") || navigator.userAgent.indexOf("OPR")) != -1) {
 		return Browser.Opera;
 	} else if (navigator.userAgent.indexOf("Chrome") != -1) {
 		return Browser.Chrome;
@@ -587,7 +607,10 @@ function detectBrowser(): Browser {
 		return Browser.Safari;
 	} else if (navigator.userAgent.indexOf("Firefox") != -1) {
 		return Browser.Firefox;
-	} else if ((navigator.userAgent.indexOf("MSIE") != -1) || (!!(document as any).documentMode == true)) {
+	} else if (
+		navigator.userAgent.indexOf("MSIE") != -1 ||
+		!!(document as any).documentMode == true
+	) {
 		return Browser.IE;
 	} else {
 		return Browser.Unknwon;

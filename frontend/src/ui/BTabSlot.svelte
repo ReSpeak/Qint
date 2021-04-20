@@ -1,3 +1,5 @@
+<svelte:options immutable={true} />
+
 <script lang="ts">
 	import { getContext, onDestroy } from "svelte";
 	import { contextKey } from "./tabList";
@@ -16,7 +18,6 @@
 	onDestroy(() => context.unregisterPanel(ownId));
 </script>
 
-<svelte:options immutable="{true}" />
 {#if selected}
 	<slot />
 {/if}
