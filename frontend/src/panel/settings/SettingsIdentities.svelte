@@ -36,7 +36,7 @@
 			let newIdentity = await req.json();
 			await loadIdentities();
 
-			let newIndex = identities.findIndex(ident => ident.id === newIdentity.id);
+			let newIndex = identities.findIndex((ident) => ident.id === newIdentity.id);
 			selectIndex(newIndex);
 		} catch (ex) {
 			// TODO: change to debug and show on ui
@@ -118,6 +118,7 @@
 			<div class="identItems">
 				{#each identities as identity, index}
 					<a
+						style="color:{identity.color};"
 						class="panel-block"
 						class:is-active={selectedIndex === index}
 						on:click={() => {
@@ -182,7 +183,10 @@
 
 				<BKeyValue label="">
 					<p class="buttons is-right">
-						<button class="button is-danger" on:click={() => deleteIdentity()}>
+						<button
+							type="button"
+							class="button is-danger"
+							on:click={() => deleteIdentity()}>
 							<Icon name="delete" />
 							<span>Delete</span>
 						</button>
