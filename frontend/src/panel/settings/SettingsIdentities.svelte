@@ -28,6 +28,22 @@
 		editIdentity = selectedIdentity !== undefined ? { ...selectedIdentity } : undefined;
 	}
 
+	async function clickNewIdentity() {
+		try {
+			const req = await backend.fetch("/ident/new", {
+				method: "POST",
+			});
+			let newIdentity = await req.json();
+			await loadIdentities();
+
+			let newIndex = identities.findIndex(ident => ident.id === newIdentity.id);
+			selectIndex(newIndex);
+		} catch (ex) {
+			// TODO: change to debug and show on ui
+			console.log("Failed to upload: ", ex);
+		}
+	}
+
 	async function clickImportIdentity() {
 		const files = dummyUploader.files;
 		if (files && files.length > 0) {
@@ -52,7 +68,6 @@
 	}
 
 	async function updateIdentity() {
-		console.log("subba");
 		if (editIdentity === undefined) return;
 		try {
 			const req = await backend.fetch(`/ident/${editIdentity.id}?name=${editIdentity.name}`, {
@@ -60,6 +75,21 @@
 			});
 			await req.text();
 			await loadIdentities();
+		} catch (ex) {
+			// TODO: change to debug and show on ui
+			console.log("Failed to update: ", ex);
+		}
+	}
+
+	async function deleteIdentity() {
+		if (editIdentity === undefined) return;
+		try {
+			const req = await backend.fetch(`/ident/${editIdentity.id}`, {
+				method: "DELETE",
+			});
+			await req.text();
+			await loadIdentities();
+			editIdentity = undefined;
 		} catch (ex) {
 			// TODO: change to debug and show on ui
 			console.log("Failed to update: ", ex);
@@ -73,7 +103,7 @@
 		<div class="identList panel is-primary">
 			<p class="panel-heading">Your Identities</p>
 
-			<a class="panel-block is-active">
+			<a class="panel-block is-active" on:click={() => clickNewIdentity()}>
 				<Icon name="plus" />
 				New
 			</a>
@@ -152,9 +182,9 @@
 
 				<BKeyValue label="">
 					<p class="buttons is-right">
-						<button class="button is-danger" disabled>
+						<button class="button is-danger" on:click={() => deleteIdentity()}>
 							<Icon name="delete" />
-							<span>Delete (Not implemented, do it yourself)</span>
+							<span>Delete</span>
 						</button>
 
 						<span style="flex:1;" />

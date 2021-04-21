@@ -28,6 +28,11 @@ pub(crate) struct SetPacketlossMsg(pub f32);
 pub(crate) struct PlayPacketMsg(Option<(OutPacket, bool)>, Option<f64>);
 pub(crate) struct SetLoudnessThresholdMsg(pub f64);
 pub(crate) struct ResetMsg;
+// (Input, Output)
+pub(crate) struct GetAudioDevices(pub (Vec<String>, Vec<String>));
+// (Input, Output)
+pub(crate) struct SetAudioDevices(pub (Option<String>, Option<String>));
+
 
 /// Threshold for voice activation detection.
 const VAD_THRESHOLD: f32 = 0.3;
@@ -272,10 +277,10 @@ impl AudioToTs {
 
 	fn open_device(&mut self) {
 		let desired_spec = AudioSpecDesired {
-			freq: Some(48000),
+			freq: Some(SAMPLE_RATE as i32),
 			channels: Some(1),
 			// Default sample size, 20 ms per packet
-			samples: Some(48000 / 50),
+			samples: Some(USUAL_SAMPLE_COUNT as u16),
 		};
 
 		let spawn_send = self.spawn_send.clone();

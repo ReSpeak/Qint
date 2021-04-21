@@ -22,7 +22,10 @@ use actix_web::{
 };
 use actix_web_actors::ws;
 use anyhow::{bail, format_err, Result};
-use db::{models::UpdateIdentity, FindIdentity, GetIdentitiesMsg, UpdateIdentityMsg};
+use db::{
+	models::UpdateIdentity, DeleteIdentityMsg, FindIdentity, GenrateNewIdentityMsg,
+	GetIdentitiesMsg, UpdateIdentityMsg,
+};
 use futures::prelude::*;
 use futures::stream::{FuturesUnordered, Peekable};
 use http::{header::CACHE_CONTROL, header::ETAG, HeaderValue};
@@ -896,9 +899,12 @@ async fn put_ident(
 }
 
 #[delete("/ident/{id}")]
-async fn delete_ident(_state: web::Data<Arc<State>>) -> impl Responder {
-	// TODO Implement deleting identities
-	HttpResponse::ServiceUnavailable().finish()
+async fn delete_ident(state: web::Data<Arc<State>>, path: web::Path<u64>) -> impl Responder {
+	match state.database.send(DeleteIdentityMsg(FindIdentity::ById(path.into_inner()))).await {
+		Ok(Ok(_)) => HttpResponse::Ok().finish(),
+		Ok(Err(err)) => HttpResponse::BadRequest().body(err.to_string()),
+		Err(_) => HttpResponse::Gone().finish(),
+	}
 }
 
 #[post("/ident/import")]
@@ -910,6 +916,15 @@ async fn post_ident_import(state: web::Data<Arc<State>>, body: web::Bytes) -> im
 		}
 	} else {
 		HttpResponse::BadRequest().body("Invalid text data")
+	}
+}
+
+#[post("/ident/new")]
+async fn post_ident_new(state: web::Data<Arc<State>>) -> impl Responder {
+	match state.database.send(GenrateNewIdentityMsg()).await {
+		Ok(Ok(ident)) => HttpResponse::Ok().json(ident),
+		Ok(Err(err)) => HttpResponse::BadRequest().body(err.to_string()),
+		Err(_) => HttpResponse::Gone().finish(),
 	}
 }
 
@@ -1235,6 +1250,7 @@ impl App {
 				.service(put_ident)
 				.service(delete_ident)
 				.service(post_ident_import)
+				.service(post_ident_new)
 				.service(get_mute_state)
 				.service(db::graphql::db_graphql)
 				.service(db::graphql::graphiql)

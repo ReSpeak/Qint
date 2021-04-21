@@ -59,8 +59,8 @@ pub struct GetIdentityAndServerMsg {
 pub struct AddIdentityMsg {
 	pub identity: tsclientlib::Identity,
 	pub name: String,
-	pub nickname: String,
-	pub phonetic_nickname: String,
+	pub nickname: Option<String>,
+	pub phonetic_nickname: Option<String>,
 }
 pub struct GetIdentitiesMsg(pub FindIdentity);
 pub enum FindIdentity {
@@ -74,6 +74,8 @@ pub struct GetClientVolumeMsg(pub UidBuf);
 #[derive(Clone, Debug)]
 pub struct SetClientVolumeMsg(pub UidBuf, pub f32);
 pub struct UpdateIdentityMsg(pub FindIdentity, pub models::UpdateIdentity);
+pub struct DeleteIdentityMsg(pub FindIdentity);
+pub struct GenrateNewIdentityMsg();
 pub struct RunOnDbMsg<I: 'static, E: 'static, F: FnOnce(&mut DbHandler) -> result::Result<I, E>>(
 	pub F,
 );
@@ -151,6 +153,12 @@ impl Message for AddIdentityMsg {
 }
 impl Message for UpdateIdentityMsg {
 	type Result = Result<()>;
+}
+impl Message for DeleteIdentityMsg {
+	type Result = Result<()>;
+}
+impl Message for GenrateNewIdentityMsg {
+	type Result = Result<crate::identities::ApiIdentity>;
 }
 impl Message for GetClientVolumeMsg {
 	type Result = Result<Option<f32>>;
@@ -398,72 +406,23 @@ impl Handler<GetIdentityAndServerMsg> for DbHandler {
 					bail!("No identity found");
 				}
 
-				// TODO check if identity already exists
-
-				// Create new identity
 				let identity = tsclientlib::Identity::create();
-				let pub_key = identity.key().to_pub();
-				let uid = pub_key.get_uid_no_base64();
-				let client_key = pub_key.to_short();
-
-				let cli = models::ClientInsert {
-					uid: &uid,
-					name: "QintUser",
-					public_key: Some(client_key.as_slice()),
-					custom_name: None,
-					custom_phonetic_name: None,
-				};
-				diesel::insert_into(schema::clients::table).values(&cli).execute(&self.con)?;
-
-				let new_identity = models::NewIdentity::new_default(&identity, &self.secret)?;
-				diesel::insert_into(identities).values(&new_identity).execute(&self.con)?;
-
+				self.save_identity(AddIdentityMsg {
+					identity: identity.clone(),
+					name: "Default".into(),
+					nickname: None,
+					phonetic_nickname: None,
+				})?;
 				Ok((identity, server))
 			}
 		}
 	}
 }
 
-impl Handler<GetIdentitiesMsg> for DbHandler {
-	type Result = Result<Vec<crate::identities::ApiIdentity>>;
-	fn handle(&mut self, msg: GetIdentitiesMsg, _: &mut Self::Context) -> Self::Result {
-		use schema::identities::dsl::*;
-
-		let query = match msg.0 {
-			FindIdentity::All => identities.load::<models::Identity>(&self.con),
-			FindIdentity::ById(by_id) => {
-				identities.find(by_id as i64).load::<models::Identity>(&self.con)
-			}
-			FindIdentity::ByUid(by_uid) => {
-				identities.filter(client.eq(by_uid)).load::<models::Identity>(&self.con)
-			}
-			FindIdentity::ByName(by_name) => {
-				identities.filter(name.eq(by_name)).load::<models::Identity>(&self.con)
-			}
-		}?;
-
-		Ok(query
-			.into_iter()
-			.filter_map(|db_ident| {
-				let i_id = db_ident.id as u64;
-				let i_name = db_ident.name.clone();
-				let tscl_ident = db_ident.into_identity(&self.secret).ok()?;
-				Some(crate::identities::ApiIdentity {
-					id: i_id,
-					name: i_name,
-					uid: tscl_ident.key().to_pub().get_uid_no_base64(),
-					level: tscl_ident.level(),
-				})
-			})
-			.collect())
-	}
-}
-
-impl Handler<AddIdentityMsg> for DbHandler {
-	type Result = Result<()>;
-	fn handle(&mut self, msg: AddIdentityMsg, _: &mut Self::Context) -> Self::Result {
+impl DbHandler {
+	fn save_identity(&mut self, msg: AddIdentityMsg) -> Result<Vec<u8>> {
 		let identity = msg.identity;
-		let nickname = msg.nickname.as_str();
+		let nickname = msg.nickname.as_deref().unwrap_or("QintUser");
 		let pub_key = identity.key().to_pub();
 		let client_uid = pub_key.get_uid_no_base64();
 		let client_key = pub_key.to_short();
@@ -493,7 +452,44 @@ impl Handler<AddIdentityMsg> for DbHandler {
 		let new_identity = models::NewIdentity::new_with_name(&identity, &msg.name, &self.secret)?;
 		diesel::insert_into(schema::identities::table).values(&new_identity).execute(&self.con)?;
 
-		Ok(())
+		Ok(client_uid)
+	}
+}
+
+impl Handler<GetIdentitiesMsg> for DbHandler {
+	type Result = Result<Vec<crate::identities::ApiIdentity>>;
+	fn handle(&mut self, msg: GetIdentitiesMsg, _: &mut Self::Context) -> Self::Result {
+		use schema::identities::dsl::*;
+
+		let query = match msg.0 {
+			FindIdentity::All => identities.load::<models::Identity>(&self.con),
+			FindIdentity::ById(by_id) => {
+				identities.find(by_id as i64).load::<models::Identity>(&self.con)
+			}
+			FindIdentity::ByUid(by_uid) => {
+				identities.filter(client.eq(by_uid)).load::<models::Identity>(&self.con)
+			}
+			FindIdentity::ByName(by_name) => {
+				identities.filter(name.eq(by_name)).load::<models::Identity>(&self.con)
+			}
+		}?;
+
+		Ok(query
+			.into_iter()
+			.filter_map(|db_ident| {
+				let i_id = db_ident.id as u64;
+				let i_name = db_ident.name.clone();
+				let tscl_ident = db_ident.into_identity(&self.secret).ok()?;
+				Some(crate::identities::ApiIdentity::from_identity(i_id, i_name, tscl_ident))
+			})
+			.collect())
+	}
+}
+
+impl Handler<AddIdentityMsg> for DbHandler {
+	type Result = Result<()>;
+	fn handle(&mut self, msg: AddIdentityMsg, _: &mut Self::Context) -> Self::Result {
+		self.save_identity(msg).map(|_|())
 	}
 }
 
@@ -520,6 +516,46 @@ impl Handler<UpdateIdentityMsg> for DbHandler {
 			bail!("Identity not found");
 		}
 		Ok(())
+	}
+}
+
+impl Handler<DeleteIdentityMsg> for DbHandler {
+	type Result = Result<()>;
+	fn handle(
+		&mut self, DeleteIdentityMsg(find): DeleteIdentityMsg, _: &mut Self::Context,
+	) -> Self::Result {
+		use schema::identities::dsl::*;
+
+		match find {
+			FindIdentity::ById(ident_id) => {
+				diesel::delete(identities.filter(id.eq(ident_id as i64))).execute(&self.con)?
+			}
+			FindIdentity::ByUid(uid) => {
+				diesel::delete(identities.filter(client.eq(&uid))).execute(&self.con)?
+			}
+			_ => bail!("Not allowed identity update key"),
+		};
+		Ok(())
+	}
+}
+
+impl Handler<GenrateNewIdentityMsg> for DbHandler {
+	type Result = Result<crate::identities::ApiIdentity>;
+	fn handle(&mut self, _: GenrateNewIdentityMsg, _: &mut Self::Context) -> Self::Result {
+		use schema::identities::dsl::*;
+
+		let identity = tsclientlib::Identity::create();
+
+		let uid = self.save_identity(AddIdentityMsg {
+			identity: identity.clone(),
+			name: "New Identity".into(),
+			nickname: None,
+			phonetic_nickname: None,
+		})?;
+
+		let ident_db = identities.filter(client.eq(uid)).first::<models::Identity>(&self.con)?;
+
+		Ok(crate::identities::ApiIdentity::from_identity(ident_db.id as u64, ident_db.name, identity))
 	}
 }
 

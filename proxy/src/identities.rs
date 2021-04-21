@@ -35,18 +35,29 @@ pub struct ApiIdentity {
 	pub level: u8,
 }
 
+impl ApiIdentity {
+	pub fn from_identity(id: u64, name: String, identity: tsclientlib::Identity) -> ApiIdentity {
+		ApiIdentity {
+			id,
+			name,
+			uid: identity.key().to_pub().get_uid_no_base64(),
+			level: identity.level(),
+		}
+	}
+}
+
 // TODO thiserror
 
 pub async fn import_ts_identities_from_string(state: &State, any: &str) -> Result<()> {
 	let import_result = if let Ok(exp) = from_str::<TsExportIdentityFile>(any) {
 		let exp = exp.identity;
 		match tsclientlib::Identity::new_from_str(&exp.identity.trim_matches('"')) {
-			Ok(identity) => Ok((identity, exp.id, exp.nickname, exp.phonetic_nickname)),
+			Ok(identity) => Ok((identity, exp.id, Some(exp.nickname), Some(exp.phonetic_nickname))),
 			Err(err) => Err(err),
 		}
 	} else {
 		match tsclientlib::Identity::new_from_str(any) {
-			Ok(identity) => Ok((identity, "Import".into(), "QintUser".into(), "".into())), // TODO allow none
+			Ok(identity) => Ok((identity, "Import".into(), None, None)), // TODO allow none
 			Err(err) => Err(err),
 		}
 	};
