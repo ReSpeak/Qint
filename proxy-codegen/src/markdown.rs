@@ -323,6 +323,7 @@ impl RenderMd {
 		match self.text_state {
 			TextKind::None => return,
 			TextKind::Normal(code) => {
+				// Ignore bb code and (auto-detected) links if we are in a tag
 				if code {
 					self.push_node(VNode::highlighted_str(
 						&self.text_builder,
@@ -373,12 +374,12 @@ impl RenderMd {
 					self.push_vtag(vtag);
 				}
 				Event::Text(text) => {
-					let is_code = if let Some(parent_node) = self.spine.last() {
-						matches!(parent_node.0, RenderMdMeta::Code(_))
-					} else {
-						false
-					};
-					self.text_state = self.text_state.when_none(TextKind::Normal(is_code));
+					// Do not render bb if inside code or link. We do not want to autodetect links
+					// inside a link.
+					let ignore_bb = self.spine.iter().any(|parent| {
+						matches!(parent.0, RenderMdMeta::Code(_)) || parent.1.tag == "a"
+					});
+					self.text_state = self.text_state.when_none(TextKind::Normal(ignore_bb));
 					let cur_len = self.text_builder.len();
 					self.text_builder_highlights.extend(matching_highlights.iter().map(|h| {
 						Range {
@@ -872,6 +873,18 @@ mod tests {
 			markdown("*this* __will__ **be** [color=red]interesting[/color] 🙂"),
 			p(
 				r#"<em>this</em> <strong>will</strong> <strong>be</strong> <span style="color:red">interesting</span> 🙂"#
+			)
+		);
+	}
+
+	#[test]
+	fn find_url_in_link() {
+		assert_eq!(
+			markdown(
+				"[https://incomplete.de/link,with,comma.](https://incomplete.de/link,with,comma.)"
+			),
+			p(
+				r#"<a data-ismdlink="true" href="https://incomplete.de/link,with,comma." target="_blank">https:&#x2F;&#x2F;incomplete.de&#x2F;link,with,comma.</a>"#
 			)
 		);
 	}
