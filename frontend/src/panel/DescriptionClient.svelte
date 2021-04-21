@@ -106,6 +106,12 @@
 			],
 		},
 		options: {
+			animations: {
+				numbers: {
+					properties: ['x', 'borderWidth', 'radius', 'tension'],
+					type: "number",
+				},
+			},
 			scales: {
 				x: {
 					type: "time",
@@ -125,6 +131,7 @@
 					},
 				},
 				ping: {
+					axis: "y",
 					beginAtZero: true,
 					suggestedMax: 100,
 					ticks: {
@@ -135,6 +142,7 @@
 					},
 				},
 				packetloss: {
+					axis: "y",
 					beginAtZero: true,
 					suggestedMax: 5,
 					ticks: {
@@ -209,18 +217,16 @@
 
 	function onClientChanged() {
 		editing = false;
-		chartConfig.data?.datasets
-			?.filter((dataset) => dataset.data)
-			.forEach((dataset) => {
-				dataset.data = [];
-				for (let i = CHART_ENTRY_COUNT; i > 0; i--) {
-					const entry = {
-						x: moment().subtract(i, "second"),
-						y: undefined,
-					};
-					dataset.data.push(entry);
-				}
-			});
+		chartConfig.data.datasets.forEach((dataset) => {
+			dataset.data = [];
+			for (let i = CHART_ENTRY_COUNT; i > 0; i--) {
+				const entry = {
+					x: moment().subtract(i, "second"),
+					y: undefined,
+				};
+				dataset.data.push(entry);
+			}
+		});
 		chart?.updateChart();
 	}
 
