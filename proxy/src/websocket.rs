@@ -635,6 +635,7 @@ impl Ws {
 							opt!(output_muted);
 							opt!(output_hardware_enabled);
 
+							opt!(away, clone);
 							opt!(version, clone);
 							opt!(channel, clone);
 							opt!(channel_password, clone);

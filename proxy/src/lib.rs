@@ -436,6 +436,19 @@ impl Settings {
 			})
 			.unwrap_or(MuteStates { input: MuteState::None, output: MuteState::None, away: false })
 	}
+
+	fn set_default_mute_states(&mut self, state: MuteStates) {
+		let input = if state.input == MuteState::None { None } else { Some(true) };
+		let output = if state.output == MuteState::None { None } else { Some(true) };
+		let away = if state.away { Some(true) } else { None };
+		self.merge(&serde_json::json!({
+			"audio": {
+				"defaultInputMuted": input,
+				"defaultOutputMuted": output,
+				"defaultAway": away,
+			}
+		}));
+	}
 }
 
 impl MuteState {

@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 use actix::Addr;
 use futures::{future, StreamExt};
 use serde::{Deserialize, Serialize};
+use slog::error;
 use tsclientlib::prelude::*;
 
 use crate::{websocket, MuteState};
@@ -88,10 +91,27 @@ async fn get_away_states(state: &crate::State) -> Vec<(bool, Addr<Ws>)> {
 }
 
 impl Action {
-	pub async fn run(&self, state: &crate::State) {
+	pub async fn run(&self, state: &Arc<crate::State>) {
 		match self {
 			Self::InputMute => {
 				let states = get_input_mute_states(state).await;
+				if states.is_empty() {
+					// No connections, toggle default
+					if let (Err(e), _) = crate::State::modify_settings(state, |settings| {
+						let mut state = settings.get_default_mute_states();
+						if state.input != MuteState::None {
+							state.input = MuteState::None;
+						} else {
+							state.input = MuteState::Muted;
+						}
+						settings.set_default_mute_states(state);
+						Ok(Default::default())
+					}) {
+						error!(state.logger, "Failed to change default mute state"; "error" => %e);
+					}
+					return;
+				}
+
 				// Filter out servers, where we cannot talk anyway (away or output muted), except
 				// if this is the case for all servers.
 				let states: Vec<_> = if states.iter().any(|(_, can_talk, _)| *can_talk) {
@@ -127,6 +147,23 @@ impl Action {
 			}
 			Self::OutputMute => {
 				let states = get_output_mute_states(state).await;
+				if states.is_empty() {
+					// No connections, toggle default
+					if let (Err(e), _) = crate::State::modify_settings(state, |settings| {
+						let mut state = settings.get_default_mute_states();
+						if state.output != MuteState::None {
+							state.output = MuteState::None;
+						} else {
+							state.output = MuteState::Muted;
+						}
+						settings.set_default_mute_states(state);
+						Ok(Default::default())
+					}) {
+						error!(state.logger, "Failed to change default mute state"; "error" => %e);
+					}
+					return;
+				}
+
 				if states.iter().all(|(s, _)| *s == MuteState::Disabled) {
 					// If all servers have disabled output, enable output
 					state
@@ -152,6 +189,19 @@ impl Action {
 			}
 			Self::Away => {
 				let states = get_away_states(state).await;
+				if states.is_empty() {
+					// No connections, toggle default
+					if let (Err(e), _) = crate::State::modify_settings(state, |settings| {
+						let mut state = settings.get_default_mute_states();
+						state.away = !state.away;
+						settings.set_default_mute_states(state);
+						Ok(Default::default())
+					}) {
+						error!(state.logger, "Failed to change default mute state"; "error" => %e);
+					}
+					return;
+				}
+
 				if states.iter().all(|(s, _)| *s) {
 					// If all servers are away, remove away
 					state
