@@ -26,7 +26,7 @@
 			class="limitChatSize previewImg padTop"
 			src={result.imageSrc}
 			alt={textContent}
-			title="Click to enlage"
+			title="Click to enlarge"
 			on:click={() => (showBig = true)} />
 		{#if showBig}
 			<ImageModal src={result.imageSrc} bind:visible={showBig} />

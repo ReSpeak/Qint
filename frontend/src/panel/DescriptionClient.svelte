@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ImageModal from "../chat/ImageModal.svelte";
 	import { get } from "svelte/store";
 	import { Connection } from "../connection";
 	import type { ChangePromise } from "../connection";
@@ -49,6 +50,7 @@
 	let editing = false;
 	let dummyUploader: HTMLInputElement;
 	let timer: number | undefined;
+	let showBigAvatar = false;
 
 	const serverGroups = connection.book.serverGroups;
 	$: avatarPath = getClientAvatarPath($client, connection);
@@ -108,7 +110,7 @@
 		options: {
 			animations: {
 				numbers: {
-					properties: ['x', 'borderWidth', 'radius', 'tension'],
+					properties: ["x", "borderWidth", "radius", "tension"],
 					type: "number",
 				},
 			},
@@ -478,6 +480,9 @@
 	});
 </script>
 
+{#if showBigAvatar && avatarPath}
+	<ImageModal src={avatarPath} bind:visible={showBigAvatar} />
+{/if}
 <StickyList>
 	<StickySlot styled={false}>
 		<StickyHeader title="Info">
@@ -522,16 +527,19 @@
 		<div class="dataLine headLine">
 			<TsIcon type="client" source={{ icon: $client.icon }} {connection} />
 			{#if editing}
-				{#if !ownClient}<Icon
+				{#if !ownClient}
+					<Icon
 						name="information-outline"
 						title="Change is not visible for others"
-						style="margin-right: 0.5em;" />{/if}
+						style="margin-right: 0.5em;" />
+				{/if}
 				<input class="input" type="text" bind:value={clientSpecialEdit.name} />
 			{:else}
 				<ClientName client={$client} />
 			{/if}
-			<span class="countryFlag" title={$client.countryCode}
-				>{countryCodeToEmojis($client.countryCode)}</span>
+			<span class="countryFlag" title={$client.countryCode}>
+				{countryCodeToEmojis($client.countryCode)}
+			</span>
 			<div style="flex: 1;" />
 			{#if $client.optionalData !== null}
 				<PlatformIcon
@@ -614,14 +622,22 @@
 							class="button is-small is-info"
 							on:click={() => dummyUploader.click()}>Upload</button>
 					{/if}
-					{#if avatarPath}<button
-							class="button is-small is-danger"
-							on:click={deleteAvatar}>Delete</button
-						>{/if}
+					{#if avatarPath}
+						<button class="button is-small is-danger" on:click={deleteAvatar}>
+							Delete
+						</button>
+					{/if}
 				</div>
 			{/if}
 		</div>
-		{#if avatarPath}<img class="clientAvatar" src={avatarPath} alt="Client avatar" />{/if}
+		{#if avatarPath}
+			<img
+				class="clientAvatar"
+				src={avatarPath}
+				alt="Client avatar"
+				title="Click to enlarge"
+				on:click={() => (showBigAvatar = true)} />
+		{/if}
 		<div class="serverGroups">
 			<div>Server Groups:</div>
 			<div class="serverGroupList">
