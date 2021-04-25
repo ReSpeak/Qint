@@ -12,3 +12,9 @@ Object.defineProperty(Array.prototype, "remove_item", {
 		}
 	},
 });
+
+interface Math {
+	clamp(val: number, min: number, max: number): number;
+}
+
+Math.clamp = function (a, b, c) { return Math.max(b, Math.min(c, a)); }

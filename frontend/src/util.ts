@@ -94,7 +94,7 @@ export function clickToSelectAll(element: HTMLElement): void {
 export function createUuidV4(): string {
 	const d2h: string[] = [],
 		vals = new Array(16);
-	for (let i = 0; i < 256; ++i) d2h.push((0x100 + i).toString(16).substr(1));
+	for (let i = 0; i < 256; ++i) d2h.push((0x100 + i).toString(16).substring(1));
 
 	for (let i = 0; i < 16; ++i) vals[i] = (Math.random() * 256) | 0;
 	vals[6] = (vals[6] & 0x0f) | 0x40;
@@ -198,7 +198,7 @@ export class BinarySearchResult {
 		public found: boolean,
 		// Index of found element or index where element can be inserted to maintain order
 		public index: number
-	) {}
+	) { }
 }
 
 /** The comparator function should implement an order consistent with the sort order of the underlying slice,
@@ -264,7 +264,7 @@ export function binarySearchByKey<T, E>(
 export class Lazy<T> {
 	private value: T | undefined;
 
-	constructor(private generator: () => T) {}
+	constructor(private generator: () => T) { }
 
 	public get(): T {
 		if (this.generator !== undefined) {
@@ -347,7 +347,7 @@ export function urlBase64Encode(data: number[]): string {
 
 export function hexDecode(s: string): number[] {
 	const res = [];
-	for (let i = 0; i < s.length; i += 2) res.push(parseInt(s.substr(i, i + 2), 16));
+	for (let i = 0; i < s.length; i += 2) res.push(parseInt(s.substring(i, i + 2), 16));
 	return res;
 }
 
@@ -473,7 +473,7 @@ export function deep_equals(a: any, b: any): boolean {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
-export function on(..._: any[]): void {}
+export function on(..._: any[]): void { }
 
 export function oneshot<T>(
 	store: Readable<T>,
@@ -615,4 +615,11 @@ function detectBrowser(): Browser {
 	} else {
 		return Browser.Unknwon;
 	}
+}
+
+export function nodeIsText(node: Node): node is Text {
+	return node.nodeType === Node.TEXT_NODE;
+}
+export function nodeIsElement(node: Node): node is Element {
+	return node.nodeType === Node.ELEMENT_NODE;
 }

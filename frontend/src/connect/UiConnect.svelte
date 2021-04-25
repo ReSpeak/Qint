@@ -70,12 +70,12 @@
 			addressInput.selectionStart > sep
 		) {
 			// Show channel popup
-			const addr = address.substr(0, sep);
+			const addr = address.substring(0, sep);
 			if (addr !== channelsAddress) {
-				channels = await loadChannels(address.substr(0, sep));
+				channels = await loadChannels(address.substring(0, sep));
 				channelsAddress = addr;
 			}
-			if (channelPart !== address.substr(sep + 1)) channelPart = address.substr(sep + 1);
+			if (channelPart !== address.substring(sep + 1)) channelPart = address.substring(sep + 1);
 		} else {
 			if (channelPart !== "") channelPart = "";
 		}

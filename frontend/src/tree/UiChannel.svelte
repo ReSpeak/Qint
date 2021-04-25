@@ -83,20 +83,20 @@
 		const filterById = filter[0] === "/";
 		if (filterById) {
 			// Ignore filterStartFromRoot when matching by id
-			const matches = channel.id.toString().includes(filter.substr(1));
+			const matches = channel.id.toString().includes(filter.substring(1));
 			if (!showId) showId = true;
 			if (childrenFilter !== filter) childrenFilter = filter;
-			if (thisFilter !== filter.substr(1)) thisFilter = filter.substr(1);
+			if (thisFilter !== filter.substring(1)) thisFilter = filter.substring(1);
 			return matches || children.some((c) => c.filterShow);
 		} else {
 			if (showId) showId = false;
 			const index = filter.indexOf("/");
-			const newThisFilter = index === -1 ? filter : filter.substr(0, index);
+			const newThisFilter = index === -1 ? filter : filter.substring(0, index);
 			if (thisFilter !== newThisFilter) thisFilter = newThisFilter;
 			const matches = channel.name.toLowerCase().includes(thisFilter.toLowerCase());
 			if (filterStartFromRoot) {
 				let newChildrenFilter = "";
-				if (index !== -1) newChildrenFilter = filter.substr(index + 1);
+				if (index !== -1) newChildrenFilter = filter.substring(index + 1);
 				if (childrenFilter !== newChildrenFilter) childrenFilter = newChildrenFilter;
 				return matches && (childrenFilter === "" || children.some((c) => c.filterShow));
 			}

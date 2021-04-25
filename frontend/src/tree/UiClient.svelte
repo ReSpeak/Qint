@@ -110,8 +110,8 @@
 		const filterById = filter[0] === "/";
 		if (filterById) {
 			if (!showId) showId = true;
-			if (thisFilter !== filter.substr(1)) thisFilter = filter.substr(1);
-			return client.id.toString().includes(filter.substr(1));
+			if (thisFilter !== filter.substring(1)) thisFilter = filter.substring(1);
+			return client.id.toString().includes(filter.substring(1));
 		} else {
 			if (showId) showId = false;
 			if (thisFilter !== filter) thisFilter = filter;

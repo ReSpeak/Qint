@@ -92,11 +92,11 @@ export class ConnectData {
 			);
 		} else {
 			let start = data.indexOf("@");
-			const name = start === -1 ? DEFAULT_NAME : data.substr(0, start);
+			const name = start === -1 ? DEFAULT_NAME : data.substring(0, start);
 			start += 1;
 			const end = data.indexOf("/");
-			const channel = end === -1 ? "" : data.substr(end + 1);
-			const address = data.substr(start, end === -1 ? undefined : end);
+			const channel = end === -1 ? "" : data.substring(end + 1);
+			const address = data.substring(start, end === -1 ? undefined : end);
 			return new ConnectData(name, address, undefined, undefined, channel);
 		}
 	}

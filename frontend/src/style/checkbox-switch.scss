@@ -7,6 +7,7 @@ $paddle-offset-active: $switch-width - $paddle-size - ($paddle-offset * 1.5);
 $bg-color: #777;
 
 .checkbox-switch {
+	-webkit-appearance: none;
 	appearance: none;
 	box-sizing: content-box;
 	position: relative;

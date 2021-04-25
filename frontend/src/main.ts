@@ -35,7 +35,7 @@ const loc = location.hash;
 if (loc && loc !== "" && loc !== "#") {
 	// Starts with #
 	try {
-		const conDatas = JSON.parse(decodeURIComponent(loc.substr(1)));
+		const conDatas = JSON.parse(decodeURIComponent(loc.substring(1)));
 		for (const conData of conDatas) {
 			app.connect(ConnectData.fromJSON(conData));
 		}
