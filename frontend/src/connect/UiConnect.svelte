@@ -174,6 +174,7 @@
 						id="username"
 						class="input"
 						type="text"
+						autocomplete="nickname"
 						title="Username"
 						placeholder="Username" />
 					<Icon name={CLIENT_ICON} isLeft />
@@ -190,6 +191,7 @@
 						id="server"
 						class="input"
 						type="text"
+						autocomplete="off"
 						title="Server address"
 						placeholder="Server" />
 					<Icon name={SERVER_ICON} isLeft />
@@ -213,6 +215,7 @@
 							id="serverPassword"
 							class="input"
 							type="password"
+							autocomplete="current-password"
 							title="Server password"
 							placeholder="Server password" />
 						<Icon name={SERVER_ICON} isLeft />
@@ -226,6 +229,7 @@
 							id="channelPassword"
 							class="input"
 							type="password"
+							autocomplete="off"
 							title="Channel password"
 							placeholder="Channel password" />
 						<Icon name={CHANNEL_ICON} isLeft />

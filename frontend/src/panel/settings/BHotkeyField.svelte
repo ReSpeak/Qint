@@ -28,6 +28,7 @@
 
 	function onKeyHook(e: KeyboardEvent) {
 		e.preventDefault();
+		log("RAW: code:%j char:%j charCode:%j", e.code, e.char, e.charCode);
 		hotkey.keycode = translateJsKeyToWindows(e.code);
 		hotkey._ctrl = e.ctrlKey;
 		hotkey._shift = e.shiftKey;
@@ -35,7 +36,7 @@
 		hotkey._meta = e.metaKey;
 
 		input.value = hotkeyToString(hotkey);
-		log("%j", hotkey);
+		log("KeyData %j", hotkey);
 		if (isHotkeyComplete(hotkey)) dispatch("change");
 	}
 
