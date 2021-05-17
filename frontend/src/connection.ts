@@ -101,6 +101,30 @@ export class Connection {
 	public close(): void {
 		this.backend.close();
 		this._state.update((s) => s.setDisconnected());
+
+		app.clientsByUid.update(clients => {
+			for (const c of this.book.clients.values()) {
+				if (c.uid !== null) {
+					const cs = clients.get(c.uidStr);
+					if (cs !== undefined) {
+						for (let i = 0; i < cs.length; i++) {
+							if (cs[i][0] === this) {
+								cs.splice(i, 1);
+							}
+						}
+						if (cs.length === 0)
+							clients.delete(c.uidStr);
+					}
+				}
+			}
+			return clients;
+		});
+		if (this.book.server !== undefined) {
+			app.serversByUid.update(servers => {
+				servers.delete(this.book.server.uidStr);
+				return servers;
+			});
+		}
 	}
 
 	private onClose(): void {
@@ -388,6 +412,23 @@ export class Connection {
 										? undefined
 										: n
 								);
+								const client = this.book.getClient(id);
+								if (client !== undefined && client.uid !== null) {
+									app.clientsByUid.update(clients => {
+										const cs = clients.get(client.uidStr);
+										if (cs !== undefined) {
+											for (let i = 0; i < cs.length; i++) {
+												if (cs[i][1] === client) {
+													cs.splice(i, 1);
+													break;
+												}
+											}
+											if (cs.length === 0)
+												clients.delete(client.uidStr);
+										}
+										return clients;
+									});
+								}
 							}
 						}
 
@@ -399,11 +440,26 @@ export class Connection {
 								"Server" in tsevt.PropertyAdded.prop
 							) {
 								this._state.update((s) => s.setConnected());
+								app.serversByUid.update(servers => {
+									servers.set(this.book.server.uidStr, this);
+									return servers;
+								});
 							} else if (
 								tsevt.PropertyAdded.prop !== undefined &&
 								"Client" in tsevt.PropertyAdded.id
 							) {
 								this.updateClientUnreadCount(tsevt.PropertyAdded.id.Client);
+								const client = this.book.getClient(tsevt.PropertyAdded.id.Client);
+								if (client !== undefined && client.uid !== null) {
+									app.clientsByUid.update(clients => {
+										const cs = clients.get(client.uidStr);
+										if (cs !== undefined)
+											cs.push([this, client]);
+										else
+											clients.set(client.uidStr, [[this, client]]);
+										return clients;
+									});
+								}
 							}
 						} else if ("PropertyChanged" in tsevt) {
 							const prop = tsevt.PropertyChanged.prop!;

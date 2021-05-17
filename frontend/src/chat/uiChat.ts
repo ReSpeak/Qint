@@ -60,7 +60,7 @@ export class Chat {
 	): Promise<FetchResult<Message>> {
 		const selected = get(this.selectedChat);
 		if (selected === undefined) return Chat.EmptyFetch;
-		const publicKey = selected.connection.book.server.publicKey;
+		const publicKey = selected.connection?.book.server.publicKey;
 		if (publicKey === undefined) {
 			error("Cannot get messages for a non-existant connection");
 			return Chat.EmptyFetch;
@@ -171,7 +171,7 @@ export class Chat {
 	public sendMessage(message: string): void {
 		const selected = get(this.selectedChat);
 		if (selected === undefined) return;
-		selected.connection.sendMessage({
+		selected.connection?.sendMessage({
 			SendMessage: {
 				target: selected.node.wsTarget,
 				message,
@@ -182,7 +182,7 @@ export class Chat {
 	public async setLastRead(messageId: string, lastRead: Moment): Promise<void> {
 		const selected = get(this.selectedChat);
 		if (selected === undefined) return;
-		const publicKey = selected.connection.book.server.publicKey;
+		const publicKey = selected.connection?.book.server.publicKey;
 		if (publicKey === undefined) {
 			error("Cannot get messages for a non-existant connection");
 			return;
@@ -205,7 +205,7 @@ export class Chat {
 	public async getSendHistory(from: Uid, id: number): Promise<string | undefined> {
 		const selected = get(this.selectedChat);
 		if (selected === undefined) return undefined;
-		const publicKey = selected.connection.book.server.publicKey;
+		const publicKey = selected.connection?.book.server.publicKey;
 		if (publicKey === undefined) {
 			error("Cannot get send history for a non-existant connection");
 			return undefined;

@@ -1,6 +1,6 @@
 import { Writable, writable, get } from "svelte/store";
 import { Chat } from "./chat/uiChat";
-import { ITreeNode } from "./book";
+import { Client, ITreeNode } from "./book";
 import { Connection } from "./connection";
 import { TransientSettings, DescriptionMode } from "./transientSettings";
 import { loadPlugins, IPlugin } from "./plugins";
@@ -10,9 +10,13 @@ import { ConnectData } from "./connect/uiConnect";
 import { DisplayPanel } from "./panel/panel";
 import { getIconPath } from "./ui/icon/tsIcons";
 import { TsNotification } from "./notifications";
+import { EccKeyPubP256, Uid } from "./ts";
 
 export class App {
 	public readonly connections: Writable<Connection[]> = writable([]);
+	// JavaScript maps cannot take arrays as keys, so we use the string form of the uid
+	public readonly serversByUid: Writable<Map<string, Connection>> = writable(new Map());
+	public readonly clientsByUid: Writable<Map<string, [Connection, Client][]>> = writable(new Map());
 	// $: hasConnected = derived(
 	// 	$connections.map((c) => c.state) as [Readable<ConnectionState>],
 	// 	(states) => states.some((s) => s.connected)
@@ -41,7 +45,7 @@ export class App {
 		});
 		// TODO unsubscribe somewhere
 		this.selectedNode.subscribe((s) => {
-			if (s !== undefined) {
+			if (s !== undefined && s.connection !== undefined) {
 				const name =
 					s.connection.book.server.name ?? get(s.connection.connectOptions).address;
 				backend.setTitle(name + " – Qint");
@@ -54,7 +58,7 @@ export class App {
 		});
 	}
 
-	public select(con: Connection, node: ITreeNode): void {
+	public select(con: Connection | undefined, node: ITreeNode): void {
 		this.selectNode(new NodeSelection(con, node));
 	}
 
@@ -124,10 +128,10 @@ export class App {
 }
 
 export class NodeSelection {
-	constructor(public readonly connection: Connection, public readonly node: ITreeNode) {}
+	constructor(public readonly connection: Connection | undefined, public readonly node: ITreeNode) {}
 
 	public get uniqueStr(): string {
-		return `${this.node.qlType},${this.connection.book.server.uidStr},${this.node.qlId}`;
+		return `${this.node.qlType},${this.connection?.book.server.uidStr},${this.node.qlId}`;
 	}
 
 	public static equals(

@@ -1,20 +1,26 @@
 <script lang="ts">
 	import DescriptionClient from "./DescriptionClient.svelte";
+	import DescriptionOfflineClient from "./DescriptionOfflineClient.svelte";
 	import DescriptionChannel from "./DescriptionChannel.svelte";
 	import DescriptionServer from "./DescriptionServer.svelte";
+	import DescriptionOfflineServer from "./DescriptionOfflineServer.svelte";
 	import { NodeSelection } from "../app";
-	import { Channel, Client, Server } from "../book";
+	import { Channel, Client, GraphQlClient, GraphQlServer, Server } from "../book";
 
 	export let selected: NodeSelection | undefined;
 </script>
 
 {#if selected !== undefined}
-	{#if selected.node instanceof Client}
+	{#if selected.node instanceof Client && selected.connection !== undefined}
 		<DescriptionClient connection={selected.connection} client={selected.node} />
-	{:else if selected.node instanceof Channel}
+	{:else if selected.node instanceof GraphQlClient}
+		<DescriptionOfflineClient client={selected.node} />
+	{:else if selected.node instanceof Channel && selected.connection !== undefined}
 		<DescriptionChannel connection={selected.connection} channel={selected.node} />
-	{:else if selected.node instanceof Server}
+	{:else if selected.node instanceof Server && selected.connection !== undefined}
 		<DescriptionServer connection={selected.connection} server={selected.node} />
+	{:else if selected.node instanceof GraphQlServer}
+		<DescriptionOfflineServer server={selected.node} />
 	{/if}
 {/if}
 

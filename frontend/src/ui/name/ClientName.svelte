@@ -3,7 +3,10 @@
 	import { Client, GraphQlClient } from "../../book";
 	import { Message } from "../../chat/uiChat";
 	import { getDataColor } from "../../util";
+	import { app } from "../app";
+	import { Connection } from "../connection";
 
+	export let connection: Connection | undefined = undefined;
 	export let client: GraphQlClient | Client | Message;
 
 	let color: string = "";
@@ -21,7 +24,16 @@
 		return [getDataColor(data), name];
 	}
 
+	function click() {
+		if (client instanceof Message) {
+			if (client.invoker !== undefined)
+				app.select(undefined, client.invoker);
+		} else {
+			app.select(connection, client);
+		}
+	}
+
 	$: [color, name] = refreshClient(client);
 </script>
 
-<span style="color:{color};">{name}</span>
+<span tabindex="0" class="button noBut" style="color: {color};" on:click={click}>{name}</span>

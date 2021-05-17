@@ -521,7 +521,7 @@ export class BookNode {
 	}
 }
 
-export class GraphQlClient extends ClientBase {
+export class GraphQlClient extends ClientBase implements ITreeNode {
 	public readonly uid!: Uid | null;
 	public readonly name!: string;
 	public readonly icon!: IconId;
@@ -551,6 +551,14 @@ export class GraphQlClient extends ClientBase {
 			obj.icon ?? "0",
 			obj.avatar ?? ""
 		);
+	}
+
+	public readonly qlType = "CLIENT";
+	public get qlId(): string {
+		return this.uidStr;
+	}
+	public get wsTarget(): { Client: string } {
+		throw "Cannot write to a graphql client";
 	}
 }
 
@@ -653,7 +661,7 @@ export class Channel extends book_events.ChannelGen implements ITreeNode, Readab
 	public readonly wsTarget = "Channel";
 }
 
-export class GraphQlServer extends ServerBase {
+export class GraphQlServer extends ServerBase implements ITreeNode {
 	public readonly publicKey!: number[];
 	public readonly name!: string;
 	public readonly address!: string;
@@ -694,6 +702,12 @@ export class GraphQlServer extends ServerBase {
 	public equals(other: this): boolean {
 		return other instanceof GraphQlServer && this.uidStr === other.uidStr;
 	}
+
+	public readonly qlType = "SERVER";
+	public get qlId(): string {
+		return this.publicKeyStr;
+	}
+	public readonly wsTarget = "Server";
 }
 
 export class Server extends book_events.ServerGen implements ITreeNode, Readable<Server> {
