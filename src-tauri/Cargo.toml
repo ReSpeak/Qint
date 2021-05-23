@@ -3,14 +3,15 @@ name = "qint"
 version = "0.1.0"
 authors = [ "Flakebi <flakebi@t-online.de>" ]
 edition = "2018"
+build = "src/build.rs"
 
 [features]
-default = [ "no-server" ]
-embedded-server = [ "tauri/embedded-server" ]
-no-server = [ "tauri/no-server" ]
+#default = [ "no-server" ]
+#embedded-server = [ "tauri/embedded-server" ]
+#no-server = [ "tauri/no-server" ]
 
 [dependencies]
-actix-rt = "1"
+actix-rt = "2"
 anyhow = "1"
 qint-proxy = { path = "../proxy" }
 slog-async = "2"
@@ -19,13 +20,16 @@ slog-scope = "4"
 slog-stdlog = "4"
 slog-term = "2"
 structopt = { version = "0.3", default-features = false }
-tauri = { version = "0.10", features = [ "all-api" ] }
-tokio = "0.2"
+tauri = { version = "1.0.0-beta.1", features = ["api-all", "cli", "menu", "system-tray"] }
+tokio = "1"
 
-  [dependencies.log]
-  version = "0.4"
-  features = [ "max_level_info", "release_max_level_info" ]
+[dependencies.log]
+version = "0.4"
+features = [ "max_level_info", "release_max_level_info" ]
 
-  [dependencies.slog]
-  version = "2"
-  features = [ "max_level_trace", "release_max_level_debug" ]
+[dependencies.slog]
+version = "2"
+features = [ "max_level_trace", "release_max_level_debug" ]
+
+[target."cfg(windows)".build-dependencies]
+winres = "0.1"

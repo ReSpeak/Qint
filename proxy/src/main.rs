@@ -120,7 +120,5 @@ async fn real_main() -> Result<()> {
 		});
 	}
 
-	//tauri::AppBuilder::new().build().run();
-
 	app.serve().await
 }
