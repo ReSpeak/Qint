@@ -425,13 +425,15 @@ export class Connection {
 										);
 								}
 
-								if (
-									"inputMuted" in prop.Client ||
+								const muteOrAwayChanged = "inputMuted" in prop.Client ||
 									"inputHardwareEnabled" in prop.Client ||
 									"outputMuted" in prop.Client ||
 									"outputHardwareEnabled" in prop.Client ||
+									"awayMessage" in prop.Client;
+
+								if (
+									muteOrAwayChanged ||
 									"name" in prop.Client ||
-									"awayMessage" in prop.Client ||
 									"channel" in prop.Client
 								) {
 									this.connectOptions.update((opts) => {
@@ -466,6 +468,9 @@ export class Connection {
 										return opts;
 									});
 								}
+
+								if (muteOrAwayChanged)
+									app.updateMuteState();
 							}
 						}
 					}
