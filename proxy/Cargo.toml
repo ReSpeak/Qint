@@ -7,7 +7,7 @@ description = "Qint is a TeamSpeak client"
 
 [dependencies]
 actix = "0.11"
-actix-cors = { git = "https://github.com/actix/actix-extras", rev = "727353213ffde5604c4f64c783ea453eb3150381" }
+actix-cors = "=0.6.0-beta.1"
 actix-files = "=0.6.0-beta.4"
 actix-web = "=4.0.0-beta.5"
 actix-web-actors = "=4.0.0-beta.4"
@@ -16,17 +16,17 @@ actix-service = "=2.0.0-beta.5"
 anyhow = "1"
 audiopus = "0.2"
 base64 = "0.13"
-chacha20poly1305 = "0.7"
+chacha20poly1305 = "0.8"
 chrono = { version = "0.4", features = [ "serde" ] }
 diesel = { version = "1.4", features = [ "chrono", "sqlite" ] }
 diesel-derive-enum = { version = "1", features = [ "sqlite" ] }
 diesel_migrations = "1.4"
 directories-next = "2"
 ebur128 = "0.1"
-fancy-regex = "0.5"
+fancy-regex = "0.6"
 futures = "0.3"
 generic-array = "0.14"
-git-testament = "0.1"
+git-testament = "0.2"
 juniper = "0.15"
 libsqlite3-sys = { version = "0.18", features = [ "bundled" ] }
 livesplit-hotkey = { git = "https://github.com/LiveSplit/livesplit-core", rev = "624783aebf83fc23e040da174accffae44e5ed12", version = "0.5" }
@@ -73,6 +73,11 @@ features = [ "max_level_info", "release_max_level_info" ]
 [dependencies.slog]
 version = "2"
 features = [ "max_level_trace", "release_max_level_debug" ]
+
+# Fix resolver=2 with diesel
+[build-dependencies]
+diesel = { version = "1.4", features = [ "chrono", "sqlite" ] }
+libsqlite3-sys = { version = "0.18", features = [ "bundled" ] }
 
 [dev-dependencies]
 actix-codec = "0.4.0-beta.1"

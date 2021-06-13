@@ -1,5 +1,6 @@
 [workspace]
 members = ["proxy-codegen", "proxy", "src-tauri"]
+resolver = "2"
 
 [patch.crates-io]
 # Use master branch to fix reserving 200 G disk space on windows
