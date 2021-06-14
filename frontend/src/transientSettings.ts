@@ -22,6 +22,17 @@ export class TransientSettings {
 	public audio = new TransientSettingsAudio();
 	public hotkeys = new TransientSettingsHotkeys();
 
+	constructor() {
+		// Initialize with default values
+		this._lastSave = this.getSaveObject();
+	}
+
+	private getSaveObject(): any {
+		return JSON.parse(
+			JSON.stringify(this, (k, v) => (k.startsWith("_") ? undefined : v))
+		);
+	}
+
 	public async loadAsync(): Promise<void> {
 		try {
 			const resp = await backend.fetch(`/transient`);
@@ -42,9 +53,7 @@ export class TransientSettings {
 	}
 
 	private async saveAsync(): Promise<void> {
-		const newSave = JSON.parse(
-			JSON.stringify(this, (k, v) => (k.startsWith("_") ? undefined : v))
-		);
+		const newSave = this.getSaveObject();
 		// Diff to last save
 		const diff = deep_diff(this._lastSave, newSave);
 		log("Syncing:\nOld: %j\nNew: %j\nDiff: %j", this._lastSave, newSave, diff);
