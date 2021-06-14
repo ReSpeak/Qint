@@ -7,11 +7,19 @@
 	import SettingsIdentities from "./settings/SettingsIdentities.svelte";
 	import SettingsDeveloper from "./settings/SettingsDeveloper.svelte";
 	import BTabList from "../ui/BTabList.svelte";
+	import Icon from "../ui/Icon.svelte";
+	import { DisplayPanel } from "../panel/panel";
 
 	const developMode = app.transientSettings.ui._developMode;
+	const displayPanel = app.displayPanel;
 </script>
 
 <div class="settings">
+	<button
+		class="toolbutton is-small compact active"
+		on:click={() => ($displayPanel = DisplayPanel.Main)}>
+		<Icon name="close" />
+	</button>
 	<BTabList _style="height:100%;">
 		<SettingsApp />
 		<SettingsAudio />
@@ -27,5 +35,9 @@
 <style lang="scss">
 	.settings {
 		padding: 1em;
+	}
+
+	.toolbutton {
+		float: right;
 	}
 </style>
