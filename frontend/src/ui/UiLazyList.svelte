@@ -514,8 +514,6 @@
 	}
 
 	onMount(() => {
-		start_fill();
-
 		const resizeObserver = new ResizeObserver(
 			(_entries: ResizeObserverEntry[], _observer: ResizeObserver) => {
 				//console.log(entries, "locked", lockIndex);
