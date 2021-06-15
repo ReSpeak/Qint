@@ -15,7 +15,7 @@
 	import { ConnectData, MuteState } from "./connect/connect";
 	import type { MuteStates } from "./connect/connect";
 	import { DescriptionMode } from "./transientSettings";
-	import { Channel } from "./book";
+	import { Channel, Server } from "./book";
 	import { backend } from "./backend/backend";
 	import { onMount } from "svelte";
 	import { derived, writable } from "svelte/store";
@@ -116,8 +116,8 @@
 			<UiChat {chat} />
 			{#if $descriptionMode !== DescriptionMode.None}
 				<div class="description">
-					{#if $descriptionMode === DescriptionMode.Files && sel?.node instanceof Channel}
-						<FileBrowser connection={sel.connection} channelId={sel.node.id} />
+					{#if $descriptionMode === DescriptionMode.Files && (sel?.node instanceof Channel || sel?.node instanceof Server)}
+						<FileBrowser connection={sel.connection} channelId={sel?.node instanceof Channel ? sel.node.id : "0"} />
 					{:else}
 						<Description selected={$selected} />
 					{/if}

@@ -14,6 +14,8 @@
 	import HoverMenu from "./HoverMenu.svelte";
 	import { DelayedHover } from "./delayedHover";
 	import UiChangeResult from "../ui/UiChangeResult.svelte";
+	import { DescriptionMode } from "../transientSettings";
+	import { MouseButton } from "../ui/draggable";
 
 	let div: HTMLElement;
 	if (render_updates) afterUpdate(() => flash(div));
@@ -32,11 +34,21 @@
 	$: filterStartFromRoot = filter.includes("/");
 	$: selectedServerChat = $server.isSelected;
 
-	function click() {
+	function preventScrollClick(ev: MouseEvent): any {
+		if (ev.button === MouseButton.Auxiliary) {
+			ev.preventDefault();
+			return false;
+		}
+	}
+
+	function click(ev: MouseEvent) {
 		if (!$state.connected) {
 			showConnect(get(connection.connectOptions).clone());
-		} else {
-			app.select(connection, server);
+		} else if (ev.button === MouseButton.Main) {
+			app.setDescriptionMode(new NodeSelection(connection, server), DescriptionMode.Info);
+		} else if (ev.button === MouseButton.Auxiliary) {
+			ev.preventDefault();
+			app.setDescriptionMode(new NodeSelection(connection, server), DescriptionMode.Files);
 		}
 	}
 
@@ -52,7 +64,7 @@
 	});
 </script>
 
-<StickySlot styled={false} on:click={click}>
+<StickySlot styled={false} on:click={click} on:auxclick={click}>
 	<div bind:this={div} class="button stickyLine" class:selectedServerChat tabindex="0">
 		<TsIcon type="server" source={$server} {connection} />
 		<ServerName {connection} />

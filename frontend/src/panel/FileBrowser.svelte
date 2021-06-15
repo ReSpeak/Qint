@@ -42,12 +42,13 @@
 	let createNewFolderName = "";
 
 	$: channelRaw = connection.book.channels.get(channelId)!;
-	$: channel = $channelRaw;
+	$: channel = channelRaw !== undefined ? $channelRaw : undefined;
 	$: on(channelId, channelChanged());
 	$: {
 		on(path);
 		const cachePath = getCachePath();
-		channel.lastFilePath = path;
+		if (channel !== undefined)
+			channel.lastFilePath = path;
 		displayChannel = $fileTreeCache.get(cachePath, true);
 		const childrenIter = displayChannel?.children?.values();
 		displayChildren = childrenIter !== undefined ? Array.from(childrenIter) : [];
@@ -55,7 +56,7 @@
 	$: on(channelId, path, refreshCurrentFolder(true));
 
 	function channelChanged() {
-		path = channel.lastFilePath;
+		path = channel?.lastFilePath ?? [];
 		invalidateCache = true;
 	}
 
@@ -63,7 +64,7 @@
 		return [channelId, ...path];
 	}
 
-	function refreshCurrentFolder(useCache: boolean) {
+	async function refreshCurrentFolder(useCache: boolean) {
 		const cachePath = getCachePath();
 		if (useCache && !invalidateCache) {
 			const cachedFolder = $fileTreeCache.get(cachePath, true);
@@ -74,17 +75,21 @@
 		invalidateCache = false;
 		$fileTreeCache.clear(cachePath);
 		const getPath = "/" + path.join("/");
-		connection.sendMessage({
-			Change: {
-				change: {
-					ChannelFileListRequest: {
-						id: channelId,
-						password: "", // TODO
-						path: getPath,
-					},
+		if (channel !== undefined) {
+			await connection.sendChange({
+				ChannelFileListRequest: {
+					id: channelId,
+					password: "", // TODO
+					path: getPath,
 				},
-			},
-		});
+			});
+		} else {
+			await connection.sendChange({
+				ServerFileListRequest: {
+					path: getPath,
+				},
+			});
+		}
 	}
 
 	function goUp(toLevel?: number) {
@@ -423,7 +428,7 @@
 					class:crubclickable={path.length > 0}
 					class:selected={path.length === 0}>
 					<Icon name="folder-home" />
-					<span>{channel.name}</span>
+					<span>{channel?.name ?? "Server"}</span>
 				</div>
 			</li>
 			{#each path.slice(0, -1) as folder, dep (folder)}

@@ -10,7 +10,7 @@
 	}
 </script>
 
-<div on:click class:button={styled} class="stickySlot">
+<div on:click on:auxclick class:button={styled} class="stickySlot">
 	<slot />
 </div>
 <div class="stickyDummy" />

@@ -838,7 +838,7 @@ impl Ws {
 						Err(e) => {
 							self.send_error(
 								return_code.as_deref(),
-								format!("Failed to create packet for change: {}", e),
+								format!("Failed to create packet for change {:?}: {}", change, e),
 								ctx,
 							);
 						}
