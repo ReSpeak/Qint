@@ -15,15 +15,17 @@
 	import BSlider from "../ui/BSlider.svelte";
 	import BDurationPicker from "../ui/BDurationPicker.svelte";
 	import { ChannelType, Codec, CodecEncryptionMode } from "../book_events";
-	import { CLEAR_ICON, durationSerialize, enumValues, on, PASSWORD_PLACEHOLDER } from "../util";
+	import { CLEAR_ICON, durationSerialize, enumValues, iconPathToId, on, PASSWORD_PLACEHOLDER } from "../util";
 	import type { RequiredNN, Writeable } from "../util";
 	import type { Duration } from "moment";
 	import UiChangeResult from "../ui/UiChangeResult.svelte";
+	import ImageFileBrowser from "./ImageFileBrowser.svelte";
 
 	export let connection: Connection;
 	export let channel: Channel;
 
 	let editing = false;
+	let editIcon = false;
 
 	$: clients = channel.clients;
 	$: clientCount = $clients.length;
@@ -59,6 +61,7 @@
 	let chanEditMaxFamilyClientsMode: MaxClientsMode;
 	let chanEditMaxFamilyClientsLimit: number;
 	let changeRequest: ChangePromise | undefined;
+	let iconSelection: string | undefined = undefined;
 
 	$: descRequest = requestDescription($channel);
 
@@ -146,6 +149,7 @@
 	function clickEditMode() {
 		editing = true;
 		chanEdit = createPropsCopy();
+		iconSelection = "icon_" + chanEdit.icon;
 
 		if (chanEdit.maxClients === "Inherited") chanEditMaxClientsMode = MaxClientsMode.Inherited;
 		else if (chanEdit.maxClients === "Unlimited")
@@ -169,13 +173,25 @@
 		editing = false;
 
 		const diff = getPropsDiff();
-		if (Object.keys(diff).length === 0) return;
-		changeRequest = connection.sendChange({
-			ChannelEdit: {
-				id: channel.id,
-				...diff,
-			},
-		});
+		if (Object.keys(diff).length !== 0) {
+			changeRequest = connection.sendChange({
+				ChannelEdit: {
+					id: channel.id,
+					...diff,
+				},
+			});
+		}
+
+		const newIcon = iconPathToId(iconSelection);
+		if (newIcon !== channel.icon) {
+			changeRequest = connection.sendChange({
+				ChannelAddPerm: {
+					id: channel.id,
+					permissionName: "i_icon_id",
+					value: parseInt(newIcon) >> 0, // Cast to signed i32, icon ids are u32s but permission values are i32s
+				},
+			});
+		}
 	}
 
 	const channelTypeOpt = [
@@ -229,7 +245,13 @@
 		{/await}
 
 		<div class="dataLine">
-			<TsIcon type="channel" source={$channel} {connection} />
+			{#if editing}
+				<button class="button" on:click={() => (editIcon = !editIcon)}>
+					<TsIcon type="channel" source={{ icon: iconPathToId(iconSelection) }} {connection} />
+				</button>
+			{:else}
+				<TsIcon type="channel" source={$channel} {connection} />
+			{/if}
 			{#if editing}
 				<input class="input" type="text" bind:value={chanEdit.name} />
 			{:else}
@@ -243,6 +265,12 @@
 				</span>
 			{/if}
 		</div>
+		{#if editing && editIcon}
+			<div class="dataLine">
+				<ImageFileBrowser {connection} path={["0", "icons"]} canShowBig={false} forSelection={true} bind:selection={iconSelection} />
+			</div>
+		{/if}
+
 		{#if editing}
 			<div class="dataLine">
 				<div>Type:</div>

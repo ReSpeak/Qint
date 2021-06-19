@@ -22,6 +22,7 @@
 		formatDuration,
 		formatSi,
 		hexEncode,
+		iconPathToId,
 		LONG_DATETIME,
 		NARROW_NO_BREAK_SPACE,
 		on,
@@ -32,6 +33,7 @@
 	import BChart from "../ui/BChart.svelte";
 	import UiChangeResult from "../ui/UiChangeResult.svelte";
 	import UiEmojiString from "../ui/UiEmojiString.svelte";
+	import ImageFileBrowser from "./ImageFileBrowser.svelte";
 	import { app } from "../app";
 	import type { ChartConfiguration } from "chart.js";
 	import "chartjs-adapter-moment";
@@ -48,6 +50,7 @@
 	const developMode = app.transientSettings.ui._developMode;
 	let chart: BChart | null = null;
 	let editing = false;
+	let editIcon = false;
 	let dummyUploader: HTMLInputElement;
 	let timer: number | undefined;
 	let showBigAvatar = false;
@@ -75,6 +78,7 @@
 	};
 	let [clientEdit, clientSpecialEdit] = createPropsCopy();
 	let changeRequest: ChangePromise | undefined;
+	let iconSelection: string | undefined = undefined;
 
 	type TimeDataPoint = { x: Moment; y: number | undefined };
 	const chartConfig: ChartConfiguration<"line", TimeDataPoint[]> = {
@@ -436,6 +440,7 @@
 		const [e, specialE] = createPropsCopy();
 		clientEdit = e;
 		clientSpecialEdit = specialE;
+		iconSelection = "icon_" + client.icon;
 	}
 
 	function clickSaveChanges() {
@@ -462,6 +467,18 @@
 			} else {
 				// TODO Save custom name and phonetic name for other clients
 			}
+		}
+
+		const newIcon = iconPathToId(iconSelection);
+		if (newIcon !== client.icon) {
+			changeRequest = connection.sendChange({
+				ClientAddPerm: {
+					id: client.id,
+					permissionName: "i_icon_id",
+					value: parseInt(newIcon) >> 0, // Cast to signed i32, icon ids are u32s but permission values are i32s
+					skip: false,
+				},
+			});
 		}
 	}
 
@@ -525,7 +542,13 @@
 		{/await}
 
 		<div class="dataLine headLine">
-			<TsIcon type="client" source={{ icon: $client.icon }} {connection} />
+			{#if editing}
+				<button class="button" on:click={() => (editIcon = !editIcon)}>
+					<TsIcon type="client" source={{ icon: iconPathToId(iconSelection) }} {connection} />
+				</button>
+			{:else}
+				<TsIcon type="client" source={{ icon: $client.icon }} {connection} />
+			{/if}
 			{#if editing}
 				{#if !ownClient}
 					<Icon
@@ -547,6 +570,12 @@
 					version={$client.optionalData.version} />
 			{/if}
 		</div>
+
+		{#if editing && editIcon}
+			<div class="dataLine">
+				<ImageFileBrowser {connection} path={["0", "icons"]} canShowBig={false} forSelection={true} bind:selection={iconSelection} />
+			</div>
+		{/if}
 
 		<div class="descTable">
 			{#if editing}

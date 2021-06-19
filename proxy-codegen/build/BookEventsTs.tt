@@ -1,6 +1,7 @@
 <#@ template cleanws="true" #>
 import { ChannelGroupId, ChannelId, ClientDbId, ClientId, ClientType, EccKeyPubP256, IconId, IpAddr,
-	MaxClients, OffsetDateTime, RustDuration, ServerGroupId, SocketAddr, TalkPowerRequest, Uid,
+	MaxClients, OffsetDateTime, Permission, RustDuration, ServerGroupId, SocketAddr,
+	TalkPowerRequest, Uid,
 } from "./ts";
 import { datetimeDeserialize, durationDeserialize } from "./util";
 import { Duration, Moment } from "moment";

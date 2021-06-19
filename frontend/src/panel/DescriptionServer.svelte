@@ -7,6 +7,7 @@
 		CLEAR_ICON,
 		enumValues,
 		formatDuration,
+		iconPathToId,
 		LONG_DATETIME,
 		on,
 		PASSWORD_PLACEHOLDER,
@@ -33,6 +34,7 @@
 	import UiEmojiString from "../ui/UiEmojiString.svelte";
 	import { app } from "../app";
 	import UiServerLog from "./UiServerLog.svelte";
+	import ImageFileBrowser from "./ImageFileBrowser.svelte";
 	import { onMount } from "svelte";
 
 	export let connection: Connection;
@@ -40,6 +42,7 @@
 
 	const developMode = app.transientSettings.ui._developMode;
 	let editing = false;
+	let editIcon = false;
 	let logOpen = false;
 	$: create_date = $server.created !== undefined ? $server.created : moment.unix(0);
 
@@ -52,6 +55,9 @@
 	type EditPropsOpt = Writeable<RequiredNN<OptionalServerDataGen>>;
 	let [servEdit, servEditOpt] = createPropsCopy();
 	let changeRequest: ChangePromise | undefined;
+	let iconSelection: string | undefined = undefined;
+
+	$: servEdit.icon = iconPathToId(iconSelection);
 
 	function createPropsCopy(): [EditProps, EditPropsOpt] {
 		const serv: EditProps = {} as any;
@@ -141,6 +147,7 @@
 	function clickEditMode() {
 		editing = true;
 		[servEdit, servEditOpt] = createPropsCopy();
+		iconSelection = "icon_" + servEdit.icon;
 	}
 
 	function clickSaveChanges() {
@@ -217,7 +224,13 @@
 		{/await}
 
 		<div class="dataLine headLine">
-			<TsIcon type="server" source={$server} {connection} />
+			{#if editing}
+				<button class="button" on:click={() => (editIcon = !editIcon)}>
+					<TsIcon type="server" source={servEdit} {connection} />
+				</button>
+			{:else}
+				<TsIcon type="server" source={$server} {connection} />
+			{/if}
 			{#if editing}
 				<input class="input" type="text" bind:value={servEdit.name} />
 			{:else}
@@ -231,6 +244,11 @@
 			<div style="flex: 1;" class="platformIconSpacer" />
 			<PlatformIcon platform={$server.platform} version={$server.version} />
 		</div>
+		{#if editing && editIcon}
+			<div class="dataLine">
+				<ImageFileBrowser {connection} path={["0", "icons"]} canShowBig={false} forSelection={true} bind:selection={iconSelection} />
+			</div>
+		{/if}
 		{#if editing}
 			<div class="dataLine">
 				<label for="edit_phoneticName">Phonetic name:</label>

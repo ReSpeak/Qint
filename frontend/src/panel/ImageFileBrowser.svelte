@@ -4,7 +4,7 @@
 	import { FolderState } from "../fileTreeCache";
 	import type { FileTreeNode } from "../fileTreeCache";
 	import { pathJoin } from "./fileUtil";
-	import { on } from "../util";
+	import { javaHash, on } from "../util";
 	import ImageModal from "../chat/ImageModal.svelte";
 
 	export let connection: Connection;
@@ -13,6 +13,9 @@
 	export let canDelete = true;
 	export let canShowBig = true;
 	export let maxSize = "1.5em";
+	// Allow only one or zero files to be selected
+	export let forSelection = false;
+	export let selection: string | undefined = undefined;
 	$: fileTreeCache = connection.fileTreeCache;
 
 	const enum WorkState {
@@ -26,10 +29,10 @@
 	let currentState = WorkState.None;
 	let fileBrowserHasFocus = false;
 	let displayFiles: SelectableFileTreeNode[] = [];
+	let fileSelection: SelectableFileTreeNode[] = [];
 	let dummyDownloader: HTMLIFrameElement;
 	let dummyUploader: HTMLInputElement;
 	let invalidateCache = true;
-	let fileSelection: SelectableFileTreeNode[] = [];
 	let showBig: FileTreeNode | undefined = undefined;
 	let showBigVisible = false;
 
@@ -38,15 +41,50 @@
 		const childrenIter = folder?.children?.values();
 		// Only update if available, we do not want to update icons after fetching avatars
 		// (which invalidates the icons/ subfolder).
-		if (childrenIter !== undefined)
+		if (childrenIter !== undefined) {
 			displayFiles = Array.from(childrenIter);
+			fileSelection = [];
+		}
 	}
 	$: on(connection, path, refreshFiles(true));
 	$: on(showBigVisible, hideShowBig());
+	$: on(selection, displayFiles, updateSelection());
 
 	function hideShowBig() {
 		if (!showBigVisible)
 			showBig = undefined;
+	}
+
+	// Make sure that the filename in `selection` is selected in the `displayFiles`.
+	// This gets called when either `selection` changed or when the file list changed.
+	// Set `selection` to undefined if no file with this name can be found.
+	function updateSelection() {
+		if (!forSelection) return;
+		if (selection === undefined) {
+			if (fileSelection.length !== 0) {
+				for (let f of fileSelection)
+					f.selected = false;
+				displayFiles = displayFiles;
+				fileSelection = [];
+			}
+		} else {
+			for (let f of fileSelection) {
+				if (f.name !== selection) {
+					f.selected = false;
+					displayFiles = displayFiles;
+				}
+			}
+			if (fileSelection.length !== 1) {
+				let file = displayFiles.find((f) => f.name === selection);
+				if (file === undefined) {
+					selection = undefined;
+			 	} else {
+					fileSelection = [file];
+					file.selected = true;
+					displayFiles = displayFiles;
+				}
+			}
+		}
 	}
 
 	function getPath(filename: string): string {
@@ -72,11 +110,14 @@
 		});
 	}
 
-	function deleteFiles() {
+	async function deleteFiles() {
+		const deleteFiles = fileSelection;
+		fileSelection = [];
+		selection = undefined;
 		// TODO as one packet
-		for (const toDelete of fileSelection) {
+		for (const toDelete of deleteFiles) {
 			const deletePath = pathJoin(toDelete.name);
-			connection.sendChange({
+			await connection.sendChange({
 				ServerDeleteFile: {
 					path: deletePath,
 				},
@@ -90,16 +131,27 @@
 	function uploadFiles(...files: File[]) {
 		connection.filetransferManager.uploadFiles(
 			...files.map((file) => {
+				// Add number to name if filename already exist
+				// TODO Has to be an u32
+				let number = javaHash(file.name);
+				let name = "icon_" + number;
+				while (displayFiles.find((node) => node.name === name) !== undefined) {
+					number++;
+					number &= number; // Truncate to u32
+					name = "icon_" + number;
+				}
 				return {
 					data: file,
 					channelId: "0",
-					path: "icon_" + file.name,
+					path: name,
 				};
 			})
 		);
+		refreshFiles(false); // TODO apply in chage instead
 	}
 
 	function dragEnter(e: DragEvent) {
+		if (!canUpload) return;
 		currentState = WorkState.DraggingFilesForUpload;
 		e.preventDefault();
 	}
@@ -141,12 +193,19 @@
 	}
 
 	function onFileClick(file: SelectableFileTreeNode, i: number) {
-		if (canDelete) {
+		if (canDelete || forSelection) {
 			if (fileSelection.includes(file)) {
 				fileSelection.remove_item(file);
 				displayFiles[i].selected = false;
+				selection = undefined;
 			} else {
+				if (forSelection) {
+					for (let f of fileSelection)
+						f.selected = false;
+					fileSelection = [];
+				}
 				fileSelection.push(file);
+				selection = file.name;
 				displayFiles[i].selected = true;
 			}
 			fileSelection = fileSelection;
@@ -245,16 +304,15 @@
 	{#if displayFiles.length === 0}
 		<div class="noFiles">Empty</div>
 	{:else}
-		<div class="imageList"
-			on:svddrop={dragDrop}>
+		<div class="imageList">
 			{#each displayFiles as file, i (file.name)}
 				{#if file.isFile}
 					<span class="image" class:selected={file.selected ?? false}
 						on:click={() => onFileClick(file, i)}
-						on:dblclick={() => onFileDblClick(file)} >
+						on:dblclick={() => onFileDblClick(file)}>
 						<img src={getPath(file.name)}
 							alt={file.name}
-							title="Click to enlarge"
+							title={file.name}
 							style="max-width: {maxSize}; max-height: {maxSize};"/>
 					</span>
 				{/if}

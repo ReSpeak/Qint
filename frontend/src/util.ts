@@ -324,6 +324,10 @@ export function getDefaultVersion(): Version {
 	}
 }
 
+export function iconPathToId(path: string | undefined): string {
+	return path === undefined ? "0" : path.replace("icon_", "");
+}
+
 export function base64Decode(s: string): number[] {
 	const res = [];
 	const b = atob(s);
@@ -369,6 +373,15 @@ export function emojiEncode(data: number[]): EmojiData[] {
 		if (bi !== 64) res.push(EMOJI_ENCODING[bi] as EmojiData);
 	}
 	return res;
+}
+
+// Java hashCode implementation for string.
+// We don't need the Java version, we just need any hash and this one is short to implement.
+export function javaHash(s: string): number {
+	return s.split("").reduce((a, b) => {
+		a = a * 31 + b.charCodeAt(0);
+		return a & a; // Truncate to 32 bit
+	}, 0);
 }
 
 export function datetimeDeserialize(rustDate: OffsetDateTime): Moment {

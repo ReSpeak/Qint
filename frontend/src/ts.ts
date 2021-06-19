@@ -6,6 +6,7 @@ export type ClientDbId = string;
 export type ClientId = string;
 export type IconId = string;
 export type IpAddr = string;
+export type Permission = number;
 export type ServerGroupId = string;
 export type SocketAddr = string;
 export type Uid = number[];
