@@ -22,6 +22,8 @@
 	import type { ServerGroupId } from "../ts";
 	import HoverMenu from "./HoverMenu.svelte";
 	import { DelayedHover } from "./delayedHover";
+	import debug from "debug";
+	const log = debug("UICLIENT");
 
 	if (render_updates) afterUpdate(() => flash(div));
 
@@ -132,9 +134,9 @@
 		ev.detail.dragNode.classList.remove("dragStyle");
 		const hoverOpt: HTMLElement[] = [...ev.detail.customData.querySelectorAll(":hover")];
 		const dropTarget = hoverOpt.reverse().find((x) => x.dataset.type === "channel");
-		console.log(hoverOpt, dropTarget);
+		log(hoverOpt, dropTarget);
 		if (dropTarget !== undefined) {
-			console.log("Would drop to", dropTarget.dataset.key);
+			log("Would drop to", dropTarget.dataset.key);
 			connection.moveClient(client.id, dropTarget.dataset.key!);
 		}
 	}

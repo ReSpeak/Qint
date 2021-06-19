@@ -6,6 +6,7 @@
 	import Toolbar from "./bar/Toolbar.svelte";
 	import Description from "./panel/Description.svelte";
 	import FileBrowser from "./panel/FileBrowser.svelte";
+	import ServerFileBrowser from "./panel/ServerFileBrowser.svelte";
 	import UiSearch from "./search/UiSearch.svelte";
 	import { DisplayPanel } from "./panel/panel";
 	import { app } from "./app";
@@ -116,8 +117,12 @@
 			<UiChat {chat} />
 			{#if $descriptionMode !== DescriptionMode.None}
 				<div class="description">
-					{#if $descriptionMode === DescriptionMode.Files && (sel?.node instanceof Channel || sel?.node instanceof Server)}
-						<FileBrowser connection={sel.connection} channelId={sel?.node instanceof Channel ? sel.node.id : "0"} />
+					{#if $descriptionMode === DescriptionMode.Files && sel !== undefined && (sel?.node instanceof Channel || sel?.node instanceof Server)}
+						{#if sel?.node instanceof Channel}
+							<FileBrowser connection={sel.connection} channelId={sel.node.id} />
+						{:else}
+							<ServerFileBrowser connection={sel.connection} />
+						{/if}
 					{:else}
 						<Description selected={$selected} />
 					{/if}

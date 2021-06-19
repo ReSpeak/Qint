@@ -7,6 +7,8 @@
 	import UiOtherSearchResult from "./UiOtherSearchResult.svelte";
 	import { EmptyMessageFetch, EmptyOtherFetch, search } from "./search";
 	import type { MessageSearchResult, OtherSearchResult } from "./search";
+	import debug from "debug";
+	const log = debug("SEARCH");
 
 	export let filter: string;
 
@@ -60,7 +62,7 @@
 				canLoadBeforeStart = false;
 				canLoadAfterEnd = false;
 			}
-			console.log("loading other search", idFrom, dir, "gives", res.others);
+			log("loading other search", idFrom, dir, "gives", res.others);
 			return {
 				items: res.others,
 				canLoadAfterEnd,

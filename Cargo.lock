@@ -4158,7 +4158,7 @@ dependencies = [
 [[package]]
 name = "self_cell"
 version = "0.8.0"
-source = "git+https://github.com/Voultapher/self_cell?rev=fa9f39c771a8566ec68ecc58c5f499cb7af52de0#fa9f39c771a8566ec68ecc58c5f499cb7af52de0"
+source = "git+https://github.com/Voultapher/self_cell?rev=33d2a7d8ae0bc950a0193bb60506f9e08ba1163f#33d2a7d8ae0bc950a0193bb60506f9e08ba1163f"
 
 [[package]]
 name = "semver"

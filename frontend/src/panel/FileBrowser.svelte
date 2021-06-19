@@ -148,15 +148,11 @@
 		// TODO as one packet
 		for (const toDelete of fileSelection) {
 			const deletePath = pathJoin(...path, toDelete.name);
-			connection.sendMessage({
-				Change: {
-					change: {
-						ChannelDeleteFile: {
-							id: channelId,
-							password: "", // TODO
-							path: deletePath,
-						},
-					},
+			connection.sendChange({
+				ChannelDeleteFile: {
+					id: channelId,
+					password: "", // TODO
+					path: deletePath,
 				},
 			});
 		}
@@ -276,8 +272,6 @@
 		if (!fileBrowserHasFocus) return;
 		if ((e.target as HTMLElement).tagName === "INPUT") return;
 
-		console.log(e.key);
-
 		if (e.key === "F2" && fileSelection.length === 1) {
 			e.preventDefault();
 			currentState = WorkState.EditingFile;
@@ -345,7 +339,7 @@
 </script>
 
 <StickySlot styled={false}>
-	<StickyHeader title="FileBrowser" />
+	<StickyHeader title="Files" />
 </StickySlot>
 <div
 	on:dragenter={dragEnter}
