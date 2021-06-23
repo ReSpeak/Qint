@@ -23,7 +23,12 @@
 	// The channels directly under the server, sub-channels are stored as children.
 	let channels: Channel[] = [];
 	let address: string = "";
+	let identity: Identity | undefined;
 	let showDetails = data.password !== undefined || data.channelPassword !== undefined;
+	let identities = loadIdentities().then(identities => {
+		identity = identities.find(i => i.id === data.identityId?.toString());
+		return identities;
+	});
 
 	$: on(data, dataChanged());
 
@@ -35,6 +40,9 @@
 				: data.channelId !== undefined
 				? "//" + data.channelId
 				: "");
+		identities.then(identities => {
+			identity = identities.find(i => i.id === data.identityId?.toString());
+		});
 		if (addressInput !== undefined) {
 			await changeChannels();
 		}
@@ -44,14 +52,19 @@
 		app.connect(data.clone());
 	}
 
-	function onNameChange() {
+	function unsetBookmark() {
 		data.bookmark = undefined;
 	}
 
 	async function onAddressChange() {
-		data.bookmark = undefined;
+		unsetBookmark();
 		data.channelId = undefined;
 		await changeChannels();
+	}
+
+	function onIdentityChange() {
+		unsetBookmark();
+		data.identityId = identity.id;
 	}
 
 	async function changeChannels() {
@@ -157,6 +170,7 @@
 				}
 				data.bookmark = recent.id;
 			}
+			data.identityId = recent.identity.id;
 		}
 	});
 </script>
@@ -169,7 +183,7 @@
 				<p class="control has-icons-left">
 					<input
 						bind:value={data.name}
-						on:input={onNameChange}
+						on:input={unsetBookmark}
 						name="username"
 						id="username"
 						class="input"
@@ -236,14 +250,13 @@
 					</p>
 				</div>
 				<div>
-					{#await loadIdentities() then identities}
+					{#await identities then identities}
 						{#if identities !== undefined && identities.length > 1}
 							<BDropDown
 								items={identities}
 								display={(i) => i.name}
-								on:change={(i) => {
-									data.identityId = i.detail.id;
-								}} />
+								bind:selected={identity}
+								on:change={onIdentityChange} />
 						{/if}
 					{/await}
 				</div>

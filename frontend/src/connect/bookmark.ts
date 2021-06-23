@@ -51,7 +51,6 @@ export class Bookmark {
 					name: this.name,
 					username: this.username,
 					bookmark: this.bookmark,
-					identity: this.identity?.id,
 				},
 			}
 		);

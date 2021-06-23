@@ -266,7 +266,7 @@
 			{/if}
 		</div>
 		{#if editing && editIcon}
-			<div class="dataLine">
+			<div class="dataLine iconChooser">
 				<ImageFileBrowser {connection} path={["0", "icons"]} canShowBig={false} forSelection={true} bind:selection={iconSelection} />
 			</div>
 		{/if}
@@ -472,5 +472,9 @@
 
 	.maxClientsLimit {
 		margin-left: 1.5em;
+	}
+
+	.iconChooser {
+		background-color: mix($box-background-color, $text, 95%);
 	}
 </style>

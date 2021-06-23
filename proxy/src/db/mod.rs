@@ -671,6 +671,8 @@ impl Handler<ConnectedMsg> for DbHandler {
 			{
 				Ok(r) => r,
 				Err(_) => {
+					trace!(self.logger, "Connected: Identity not found, picking default";
+						"identity" => msg.identity);
 					// Pick an existing identity
 					identities::table
 						.order(identities::id)
