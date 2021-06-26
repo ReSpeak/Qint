@@ -19,7 +19,7 @@
 	}
 </script>
 
-<BTabSlot title="TTS">
+<BTabSlot title="Text to Speech">
 	<BKeyValue label="Voice" labelStyle="is-normal">
 		<BDropDown
 			items={voices}

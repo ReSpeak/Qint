@@ -21,6 +21,7 @@ export class TransientSettings {
 	public app = new TransientSettingsApp();
 	public audio = new TransientSettingsAudio();
 	public hotkeys = new TransientSettingsHotkeys();
+	public notifications = new TransientSettingsNotifications();
 
 	constructor() {
 		// Initialize with default values
@@ -234,4 +235,43 @@ export interface Hotkey {
 
 export class TransientSettingsHotkeys {
 	public actions: Hotkey[] = [];
+}
+
+export const enum NotificationCategory {
+	Poke = "poke",
+	Message = "message",
+	ChannelChanged = "channelChanged",
+	ClientChanged = "clientChanged",
+	ClientSwitched = "clientSwitched",
+	ClientStateChanged = "clientStateChanged",
+}
+
+export interface NotificationSetting {
+	tts: boolean;
+	notification: boolean;
+}
+
+export type RelevantNotificationSetting = NotificationSetting & {
+	onlyRelevant: boolean;
+}
+
+export class TransientSettingsNotifications {
+	public poke: NotificationSetting = { tts: true, notification: true };
+	public message: NotificationSetting = { tts: true, notification: true };
+	/// Channel or server edited
+	public channelChanged: RelevantNotificationSetting = { tts: true, notification: false, onlyRelevant: false };
+	public clientChanged: RelevantNotificationSetting = { tts: true, notification: false, onlyRelevant: false };
+	public clientSwitched: RelevantNotificationSetting = { tts: true, notification: false, onlyRelevant: false };
+	public clientStateChanged: RelevantNotificationSetting = { tts: true, notification: false, onlyRelevant: false };
+
+	public getSetting(category: NotificationCategory): NotificationSetting | RelevantNotificationSetting {
+		switch (category) {
+			case NotificationCategory.Poke: return this.poke;
+			case NotificationCategory.Message: return this.message;
+			case NotificationCategory.ChannelChanged: return this.channelChanged;
+			case NotificationCategory.ClientChanged: return this.clientChanged;
+			case NotificationCategory.ClientSwitched: return this.clientSwitched;
+			case NotificationCategory.ClientStateChanged: return this.clientStateChanged;
+		}
+	}
 }

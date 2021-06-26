@@ -111,7 +111,7 @@
 <div class="appContainer" style="grid-template-columns: {columnStyle}">
 	<Toolbar bind:showSidebar={$showSidebar} bind:displayPanel={$displayPanel} bind:connectData />
 	<Searchbar bind:filter visible={$showSidebar} />
-	<Sidebar {connections} {filter} visible={$showSidebar} {showConnect} />
+	<Sidebar {connections} notifications={app.nofifications} {filter} visible={$showSidebar} {showConnect} />
 	<div class="panel">
 		{#if $displayPanel === DisplayPanel.Main}
 			<UiChat {chat} />

@@ -9,6 +9,7 @@ import { fnBroadcast, oneshot } from "./util";
 import { ConnectData } from "./connect/connect";
 import { DisplayPanel } from "./panel/panel";
 import { getIconPath } from "./ui/clientIcon";
+import { TsNotification } from "./notification";
 
 export class App {
 	public readonly connections: Writable<Connection[]> = writable([]);
@@ -26,6 +27,8 @@ export class App {
 
 	public readonly chat: Chat = new Chat(this.selectedNode);
 	public readonly transientSettings: TransientSettings = new TransientSettings();
+	// List of displayed notifications. Sorted by descending time, the latest comes first.
+	public readonly nofifications: Writable<[Connection, TsNotification][]> = writable([]);
 	public plugins: IPlugin[] = [];
 	public transientSettingsLoaded = fnBroadcast();
 	public updateMuteState = fnBroadcast();
@@ -77,6 +80,14 @@ export class App {
 		app.selectNode(selected);
 		this.transientSettings.ui._descriptionMode.set(mode);
 		app.transientSettings.save();
+	}
+
+	public addNotification(n: [Connection, TsNotification]) {
+		this.nofifications.update(ns => {
+			if (ns.length > 50)
+				ns.pop();
+			return [n, ...ns];
+		});
 	}
 
 	public connect(options: ConnectData): Connection {

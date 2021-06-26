@@ -3,10 +3,13 @@
 	import UiServer from "../tree/UiServerWrap.svelte";
 	import StickyList from "../ui/StickyList.svelte";
 	import StickySlot from "../ui/StickySlot.svelte";
+	import NotificationList from "./NotificationList.svelte";
 	import { Connection } from "../connection";
 	import { ConnectData } from "../connect/connect";
+	import { TsNotification } from "../notification";
 
 	export let connections: Writable<Connection[]>;
+	export let notifications: Writable<[Connection, TsNotification][]>;
 	export let filter: string;
 	export let visible: boolean;
 	export let showConnect: (data: ConnectData) => void;
@@ -19,6 +22,7 @@
 		{/each}
 
 		<StickySlot>Notifications</StickySlot>
+		<NotificationList {notifications} />
 	</StickyList>
 </aside>
 

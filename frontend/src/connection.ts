@@ -326,7 +326,7 @@ export class Connection {
 			}
 		}
 
-		handleMessage(this, msg, app.plugins);
+		handleMessage(this, msg);
 		if ("Connected" in msg) {
 			this.book.server.update({ uid: msg.Connected.server });
 			this.book.ownClientId = msg.Connected.ownClient;

@@ -3,13 +3,14 @@ import { importModule } from "@uupaa/dynamic-import-polyfill";
 import { backend } from "./backend/backend";
 import { Connection } from "./connection";
 import { InMsg } from "./backend/ws";
-import { NotificationHandler } from "./notification";
+import { NotificationHandler, TsNotification } from "./notification";
 
 const importFunc = genImportFunc();
 
 export interface IPlugin {
 	handleEvent?: (con: Connection, evt: InMsg) => any;
 	handleNotification?: NotificationHandler;
+	handleTts?: (con: Connection, notification: TsNotification) => void;
 }
 
 function genImportFunc() {

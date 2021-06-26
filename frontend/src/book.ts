@@ -634,8 +634,8 @@ export class Channel extends book_events.ChannelGen implements ITreeNode, Readab
 		return this;
 	}
 
-	public static fromJson(obj: Partial<Channel>): Channel {
-		return new Channel().update(obj);
+	public static fromJson(obj: Partial<Channel> | Partial<book_events.ChannelGen>): Channel {
+		return new Channel().update(obj as any);
 	}
 
 	public static fromGraphql(obj: Partial<Channel>): Channel {
