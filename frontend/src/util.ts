@@ -351,13 +351,32 @@ export function urlBase64Encode(data: number[]): string {
 
 export function hexDecode(s: string): number[] {
 	const res = [];
-	for (let i = 0; i < s.length; i += 2) res.push(parseInt(s.substring(i, i + 2), 16));
+	for (let i = 0; i < s.length - 1; i += 2) res.push(parseInt(s.substring(i, i + 2), 16));
 	return res;
 }
 
 export function hexEncode(data: number[]): string {
 	let res = "";
 	for (let i = 0; i < data.length; i++) res += data[i].toString(16).padStart(2, "0");
+	return res;
+}
+
+export function tsHexDecode(s: string): number[] {
+	const a0 = "a".charCodeAt(0);
+	const res = [];
+	for (let i = 0; i < s.length - 1; i += 2)
+		res.push(((s.charCodeAt(i) - a0) << 4) | (s.charCodeAt(i + 1) - a0));
+	return res;
+}
+
+export function tsHexEncode(data: number[]): string {
+	const a0 = "a".charCodeAt(0);
+	let res = "";
+	for (let i = 0; i < data.length; i++) {
+		const c = data[i];
+		res += String.fromCharCode(a0 + (c >> 4));
+		res += String.fromCharCode(a0 + (c & 0xf));
+	}
 	return res;
 }
 

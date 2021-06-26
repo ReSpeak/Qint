@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { Connection } from "../connection";
 	import Icon from "../ui/Icon.svelte";
-	import { FolderState } from "../fileTreeCache";
+	import { FileTreeFolder, FolderState } from "../fileTreeCache";
 	import type { FileTreeNode } from "../fileTreeCache";
 	import { pathJoin } from "./fileUtil";
-	import { javaHash, on } from "../util";
+	import { base64Encode, javaHash, on, tsHexDecode } from "../util";
 	import ImageModal from "../chat/ImageModal.svelte";
 
 	export let connection: Connection;
@@ -36,16 +36,7 @@
 	let showBig: FileTreeNode | undefined = undefined;
 	let showBigVisible = false;
 
-	$: {
-		let folder = $fileTreeCache.get(path, true);
-		const childrenIter = folder?.children?.values();
-		// Only update if available, we do not want to update icons after fetching avatars
-		// (which invalidates the icons/ subfolder).
-		if (childrenIter !== undefined) {
-			displayFiles = Array.from(childrenIter);
-			fileSelection = [];
-		}
-	}
+	$: updateDisplayFiles($fileTreeCache.get(path, true));
 	$: on(connection, path, refreshFiles(true));
 	$: on(showBigVisible, hideShowBig());
 	$: on(selection, displayFiles, updateSelection());
@@ -53,6 +44,16 @@
 	function hideShowBig() {
 		if (!showBigVisible)
 			showBig = undefined;
+	}
+
+	function updateDisplayFiles(folder: FileTreeFolder | null) {
+		const childrenIter = folder?.children?.values();
+		// Only update if available, we do not want to update icons after fetching avatars
+		// (which invalidates the icons/ subfolder).
+		if (childrenIter !== undefined) {
+			displayFiles = Array.from(childrenIter);
+			fileSelection = [];
+		}
 	}
 
 	// Make sure that the filename in `selection` is selected in the `displayFiles`.
@@ -116,7 +117,13 @@
 		selection = undefined;
 		// TODO as one packet
 		for (const toDelete of deleteFiles) {
-			const deletePath = pathJoin(toDelete.name);
+			let name = toDelete.name;
+			if (name.startsWith("avatar_"))
+			{
+				// To delete avatars, use the base64 encoding of the avatar
+				name = "avatar_" + base64Encode(tsHexDecode(name.substring(7)));
+			}
+			const deletePath = pathJoin(name);
 			await connection.sendChange({
 				ServerDeleteFile: {
 					path: deletePath,

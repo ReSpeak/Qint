@@ -25,7 +25,7 @@
 	</StickySlot>
 	{#if avatarsOpen}
 		<!-- We can only delete avatars with their respective clientuid, so we cannot do that here -->
-		<ImageFileBrowser {connection} path={["0"]} canUpload={false} canDelete={false} maxSize="10em" />
+		<ImageFileBrowser {connection} path={["0"]} canUpload={false} maxSize="10em" />
 	{/if}
 </StickyList>
 

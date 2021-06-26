@@ -57,7 +57,7 @@ export function getClientAvatarPath(
 		if (client.avatarHash !== "" && client.uid)
 			return `${
 				connection.backend.serverFileSrc
-			}/file/0/avatar_${client.getAvatarUid!()}?hash=${client.avatarHash}?cache=true`;
+			}/file/0/avatar_${client.getAvatarUid!()}?hash=${client.avatarHash}&cache=true`;
 	} else if (server) {
 		if (client.avatarHash !== "" && client.uid)
 			return `${backend.cacheFileSrc}/${server}/0/avatar_${client.getAvatarUid!()}`;

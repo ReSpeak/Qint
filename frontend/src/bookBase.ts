@@ -1,5 +1,5 @@
 import { Writable, writable } from "svelte/store";
-import { arraysEqual, base64Encode, Cached, datetimeDeserialize, getDataColor } from "./util";
+import { arraysEqual, base64Encode, Cached, datetimeDeserialize, getDataColor, tsHexEncode } from "./util";
 import { Moment } from "moment";
 import moment from "moment";
 import { Uid } from "./ts";
@@ -98,14 +98,7 @@ export class ClientBase extends BookNode {
 	 */
 	public getAvatarUid(): string | undefined {
 		if (this.avatar_hash === "" || (this as any).uid === null) return;
-		const a0 = "a".charCodeAt(0);
-		let res = "";
-		for (let i = 0; i < (this as any).uid.length; i++) {
-			const c = (this as any).uid[i];
-			res += String.fromCharCode(a0 + (c >> 4));
-			res += String.fromCharCode(a0 + (c & 0xf));
-		}
-		return res;
+		return tsHexEncode((this as any).uid);
 	}
 
 	public equals(other: this | undefined): boolean {

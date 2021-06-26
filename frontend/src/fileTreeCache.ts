@@ -62,7 +62,7 @@ export const enum FolderState {
 	Loaded,
 }
 
-class FileTreeFolder {
+export class FileTreeFolder {
 	public isFile: false = false;
 	public children?: Map<string, FileTreeNode>;
 	public contentLoaded: FolderState = FolderState.Dummy;
