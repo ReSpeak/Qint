@@ -82,10 +82,9 @@ export class App {
 		app.transientSettings.save();
 	}
 
-	public addNotification(n: [Connection, TsNotification]) {
-		this.nofifications.update(ns => {
-			if (ns.length > 50)
-				ns.pop();
+	public addNotification(n: [Connection, TsNotification]): void {
+		this.nofifications.update((ns) => {
+			if (ns.length > 50) ns.pop();
 			return [n, ...ns];
 		});
 	}

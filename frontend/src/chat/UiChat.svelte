@@ -272,8 +272,7 @@
 
 	onMount(() => {
 		chatChanged();
-		if ($selected !== undefined)
-			chatList?.sourceChanged(ListFetchDir.New, ListFetchDir.After);
+		if ($selected !== undefined) chatList?.sourceChanged(ListFetchDir.New, ListFetchDir.After);
 		window.addEventListener("focus", markRead);
 	});
 

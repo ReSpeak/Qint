@@ -46,37 +46,67 @@ export function translateJsKeyToWindows(jsKeyCode: string): string {
 	// https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/code/code_values
 	// https://github.com/LiveSplit/livesplit-core/blob/master/crates/livesplit-hotkey/src/windows/key_code.rs
 	switch (jsKeyCode) {
-		case "Backquote": return "Oem3";
-		case "Backslash": return "Oem5";
-		case "BracketLeft": return "Oem4";
-		case "BracketRight": return "Oem6";
-		case "CapsLock": return "Capital";
-		case "Comma": return "OemComma";
-		case "Equal": return "OemPlus";
-		case "IntlBackslash": return "Oem102";
-		case "Minus": return "OemMinus";
-		case "NumpadAdd": return "Add";
-		case "NumpadDecimal": return "Decimal";
-		case "NumpadDivide": return "Divide";
+		case "Backquote":
+			return "Oem3";
+		case "Backslash":
+			return "Oem5";
+		case "BracketLeft":
+			return "Oem4";
+		case "BracketRight":
+			return "Oem6";
+		case "CapsLock":
+			return "Capital";
+		case "Comma":
+			return "OemComma";
+		case "Equal":
+			return "OemPlus";
+		case "IntlBackslash":
+			return "Oem102";
+		case "Minus":
+			return "OemMinus";
+		case "NumpadAdd":
+			return "Add";
+		case "NumpadDecimal":
+			return "Decimal";
+		case "NumpadDivide":
+			return "Divide";
 		case "Enter":
-		case "NumpadEnter": return "Return"; // Apparently same as the big enter in VK code
-		case "NumpadMultiply": return "Multiply";
-		case "NumpadSubtract": return "Subtract";
-		case "PageDown": return "Next";
-		case "PageUp": return "Prior";
-		case "Period": return "OemPeriod";
-		case "Quote": return "Oem7";
-		case "ScrollLock": return "Scroll";
-		case "Slash": return "Oem2";
-		case "ContextMenu": return "Apps";
-		case "ControlLeft": return "LeftControl";
-		case "ControlRight": return "RightControl";
-		case "ShiftLeft": return "LeftShift";
-		case "ShiftRight": return "RightShift";
-		case "AltLeft": return "LeftMenu";
-		case "AltRight": return "RightMenu";
-		case "MetaLeft": return "LeftWin";
-		case "MetaRight": return "RightWin";
+		case "NumpadEnter":
+			return "Return"; // Apparently same as the big enter in VK code
+		case "NumpadMultiply":
+			return "Multiply";
+		case "NumpadSubtract":
+			return "Subtract";
+		case "PageDown":
+			return "Next";
+		case "PageUp":
+			return "Prior";
+		case "Period":
+			return "OemPeriod";
+		case "Quote":
+			return "Oem7";
+		case "ScrollLock":
+			return "Scroll";
+		case "Slash":
+			return "Oem2";
+		case "ContextMenu":
+			return "Apps";
+		case "ControlLeft":
+			return "LeftControl";
+		case "ControlRight":
+			return "RightControl";
+		case "ShiftLeft":
+			return "LeftShift";
+		case "ShiftRight":
+			return "RightShift";
+		case "AltLeft":
+			return "LeftMenu";
+		case "AltRight":
+			return "RightMenu";
+		case "MetaLeft":
+			return "LeftWin";
+		case "MetaRight":
+			return "RightWin";
 	}
 	if (jsKeyCode.startsWith("Digit")) return "D" + jsKeyCode.substring(5);
 	if (jsKeyCode.startsWith("Key")) return jsKeyCode.substring(3);

@@ -489,7 +489,7 @@ impl Handler<GetIdentitiesMsg> for DbHandler {
 impl Handler<AddIdentityMsg> for DbHandler {
 	type Result = Result<()>;
 	fn handle(&mut self, msg: AddIdentityMsg, _: &mut Self::Context) -> Self::Result {
-		self.save_identity(msg).map(|_|())
+		self.save_identity(msg).map(|_| ())
 	}
 }
 
@@ -555,7 +555,11 @@ impl Handler<GenrateNewIdentityMsg> for DbHandler {
 
 		let ident_db = identities.filter(client.eq(uid)).first::<models::Identity>(&self.con)?;
 
-		Ok(crate::identities::ApiIdentity::from_identity(ident_db.id as u64, ident_db.name, identity))
+		Ok(crate::identities::ApiIdentity::from_identity(
+			ident_db.id as u64,
+			ident_db.name,
+			identity,
+		))
 	}
 }
 

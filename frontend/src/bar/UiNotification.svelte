@@ -11,13 +11,21 @@
 	export let connection: Connection;
 	export let notification: TsNotification;
 
-	let args = notification.args;
+	const args = notification.args;
 
 	// Make the svelte typechecker happy
-	function toClient(a: any): Client { return a as Client; }
-	function getName(a: any): string { return a.name; }
-	function hasName(a: any): a is Invoker { return a !== null && a !== undefined && "name" in a; }
-	function getClientFromInvoker(i: any): Client | undefined { return connection.book.getClient(i.id.toString()); }
+	function toClient(a: any): Client {
+		return a as Client;
+	}
+	function getName(a: any): string {
+		return a.name;
+	}
+	function hasName(a: any): a is Invoker {
+		return a !== null && a !== undefined && "name" in a;
+	}
+	function getClientFromInvoker(i: any): Client | undefined {
+		return connection.book.getClient(i.id.toString());
+	}
 </script>
 
 {#each notification.pieces as piece, i}

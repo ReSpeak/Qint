@@ -42,8 +42,7 @@
 	$: on(selection, displayFiles, updateSelection());
 
 	function hideShowBig() {
-		if (!showBigVisible)
-			showBig = undefined;
+		if (!showBigVisible) showBig = undefined;
 	}
 
 	function updateDisplayFiles(folder: FileTreeFolder | null) {
@@ -63,23 +62,22 @@
 		if (!forSelection) return;
 		if (selection === undefined) {
 			if (fileSelection.length !== 0) {
-				for (let f of fileSelection)
-					f.selected = false;
+				for (const f of fileSelection) f.selected = false;
 				displayFiles = displayFiles;
 				fileSelection = [];
 			}
 		} else {
-			for (let f of fileSelection) {
+			for (const f of fileSelection) {
 				if (f.name !== selection) {
 					f.selected = false;
 					displayFiles = displayFiles;
 				}
 			}
 			if (fileSelection.length !== 1) {
-				let file = displayFiles.find((f) => f.name === selection);
+				const file = displayFiles.find((f) => f.name === selection);
 				if (file === undefined) {
 					selection = undefined;
-			 	} else {
+				} else {
 					fileSelection = [file];
 					file.selected = true;
 					displayFiles = displayFiles;
@@ -118,8 +116,7 @@
 		// TODO as one packet
 		for (const toDelete of deleteFiles) {
 			let name = toDelete.name;
-			if (name.startsWith("avatar_"))
-			{
+			if (name.startsWith("avatar_")) {
 				// To delete avatars, use the base64 encoding of the avatar
 				name = "avatar_" + base64Encode(tsHexDecode(name.substring(7)));
 			}
@@ -192,8 +189,7 @@
 
 	function clickBackground(this: HTMLElement, e: MouseEvent) {
 		if (this !== e.target) return;
-		for (let f of fileSelection)
-			f.selected = false;
+		for (const f of fileSelection) f.selected = false;
 		displayFiles = displayFiles;
 		fileSelection = [];
 		currentState = WorkState.None;
@@ -207,8 +203,7 @@
 				selection = undefined;
 			} else {
 				if (forSelection) {
-					for (let f of fileSelection)
-						f.selected = false;
+					for (const f of fileSelection) f.selected = false;
 					fileSelection = [];
 				}
 				fileSelection.push(file);
@@ -314,13 +309,16 @@
 		<div class="imageList">
 			{#each displayFiles as file, i (file.name)}
 				{#if file.isFile}
-					<span class="image" class:selected={file.selected ?? false}
+					<span
+						class="image"
+						class:selected={file.selected ?? false}
 						on:click={() => onFileClick(file, i)}
 						on:dblclick={() => onFileDblClick(file)}>
-						<img src={getPath(file.name)}
+						<img
+							src={getPath(file.name)}
 							alt={file.name}
 							title={file.name}
-							style="max-width: {maxSize}; max-height: {maxSize};"/>
+							style="max-width: {maxSize}; max-height: {maxSize};" />
 					</span>
 				{/if}
 			{/each}

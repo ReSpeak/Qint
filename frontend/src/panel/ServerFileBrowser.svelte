@@ -18,7 +18,9 @@
 	<ImageFileBrowser {connection} path={["0", "icons"]} canShowBig={false} />
 
 	<StickySlot on:click={() => (avatarsOpen = true)}>
-		<button class="button iconButton" on:click|stopPropagation={() => (avatarsOpen = !avatarsOpen)}>
+		<button
+			class="button iconButton"
+			on:click|stopPropagation={() => (avatarsOpen = !avatarsOpen)}>
 			<Icon name="chevron-right{avatarsOpen ? ' mdi-rotate-90' : ''}" />
 		</button>
 		<span>Avatars</span>

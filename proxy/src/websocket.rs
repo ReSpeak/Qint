@@ -274,8 +274,9 @@ impl Ws {
 
 								// Save in database
 								let opts = self.connect_options.as_ref().unwrap();
-								let id = opts.identity_id.unwrap_or_else(||
-									self.state.launch_config.read().unwrap().default_identity);
+								let id = opts.identity_id.unwrap_or_else(|| {
+									self.state.launch_config.read().unwrap().default_identity
+								});
 								connected_msg = Some(db::ConnectedMsg {
 									bookmark: opts.bookmark.map(|i| i as i64),
 									username: opts.name.clone(),

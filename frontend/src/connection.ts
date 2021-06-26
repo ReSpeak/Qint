@@ -425,7 +425,8 @@ export class Connection {
 										);
 								}
 
-								const muteOrAwayChanged = "inputMuted" in prop.Client ||
+								const muteOrAwayChanged =
+									"inputMuted" in prop.Client ||
 									"inputHardwareEnabled" in prop.Client ||
 									"outputMuted" in prop.Client ||
 									"outputHardwareEnabled" in prop.Client ||
@@ -469,8 +470,7 @@ export class Connection {
 									});
 								}
 
-								if (muteOrAwayChanged)
-									app.updateMuteState();
+								if (muteOrAwayChanged) app.updateMuteState();
 							}
 						}
 					}

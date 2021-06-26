@@ -33,7 +33,6 @@ pub(crate) struct GetAudioDevices(pub (Vec<String>, Vec<String>));
 // (Input, Output)
 pub(crate) struct SetAudioDevices(pub (Option<String>, Option<String>));
 
-
 /// Threshold for voice activation detection.
 const VAD_THRESHOLD: f32 = 0.3;
 /// The default minimum loudness for voice activation detection.

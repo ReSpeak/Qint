@@ -11,6 +11,7 @@
 	import { app } from "../app";
 	import { backend } from "../backend/backend";
 	import { loadIdentities } from "../panel/settings/identity";
+	import type { ApiIdentity } from "../panel/settings/identity";
 	import BDropDown from "../ui/BDropDown.svelte";
 
 	export let data: ConnectData;
@@ -23,10 +24,10 @@
 	// The channels directly under the server, sub-channels are stored as children.
 	let channels: Channel[] = [];
 	let address: string = "";
-	let identity: Identity | undefined;
+	let identity: ApiIdentity | undefined;
 	let showDetails = data.password !== undefined || data.channelPassword !== undefined;
-	let identities = loadIdentities().then(identities => {
-		identity = identities.find(i => i.id === data.identityId?.toString());
+	const identities = loadIdentities().then((identities) => {
+		identity = identities.find((i) => i.id === data.identityId?.toString());
 		return identities;
 	});
 
@@ -40,8 +41,8 @@
 				: data.channelId !== undefined
 				? "//" + data.channelId
 				: "");
-		identities.then(identities => {
-			identity = identities.find(i => i.id === data.identityId?.toString());
+		identities.then((identities) => {
+			identity = identities.find((i) => i.id === data.identityId?.toString());
 		});
 		if (addressInput !== undefined) {
 			await changeChannels();
@@ -64,7 +65,7 @@
 
 	function onIdentityChange() {
 		unsetBookmark();
-		data.identityId = identity.id;
+		data.identityId = identity?.id;
 	}
 
 	async function changeChannels() {
@@ -88,7 +89,8 @@
 				channels = await loadChannels(address.substring(0, sep));
 				channelsAddress = addr;
 			}
-			if (channelPart !== address.substring(sep + 1)) channelPart = address.substring(sep + 1);
+			if (channelPart !== address.substring(sep + 1))
+				channelPart = address.substring(sep + 1);
 		} else {
 			if (channelPart !== "") channelPart = "";
 		}
@@ -170,7 +172,7 @@
 				}
 				data.bookmark = recent.id;
 			}
-			data.identityId = recent.identity.id;
+			data.identityId = recent.identity?.id;
 		}
 	});
 </script>

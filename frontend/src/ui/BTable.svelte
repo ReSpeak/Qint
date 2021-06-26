@@ -66,7 +66,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	let c_rows: InternalRow[];
 	let columnByKey: Record<ColumnKey, TCol> = {};
 
-	export function clearSelection() {
+	export function clearSelection(): void {
 		clearSelectionInternal(true);
 	}
 

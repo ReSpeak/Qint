@@ -544,7 +544,10 @@
 		<div class="dataLine headLine">
 			{#if editing}
 				<button class="button" on:click={() => (editIcon = !editIcon)}>
-					<TsIcon type="client" source={{ icon: iconPathToId(iconSelection) }} {connection} />
+					<TsIcon
+						type="client"
+						source={{ icon: iconPathToId(iconSelection) }}
+						{connection} />
 				</button>
 			{:else}
 				<TsIcon type="client" source={{ icon: $client.icon }} {connection} />
@@ -573,7 +576,12 @@
 
 		{#if editing && editIcon}
 			<div class="dataLine">
-				<ImageFileBrowser {connection} path={["0", "icons"]} canShowBig={false} forSelection={true} bind:selection={iconSelection} />
+				<ImageFileBrowser
+					{connection}
+					path={["0", "icons"]}
+					canShowBig={false}
+					forSelection={true}
+					bind:selection={iconSelection} />
 			</div>
 		{/if}
 

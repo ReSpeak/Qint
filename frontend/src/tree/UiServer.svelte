@@ -34,13 +34,6 @@
 	$: filterStartFromRoot = filter.includes("/");
 	$: selectedServerChat = $server.isSelected;
 
-	function preventScrollClick(ev: MouseEvent): any {
-		if (ev.button === MouseButton.Auxiliary) {
-			ev.preventDefault();
-			return false;
-		}
-	}
-
 	function click(ev: MouseEvent) {
 		if (!$state.connected) {
 			showConnect(get(connection.connectOptions).clone());

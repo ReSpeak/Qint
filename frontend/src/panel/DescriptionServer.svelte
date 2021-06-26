@@ -246,7 +246,12 @@
 		</div>
 		{#if editing && editIcon}
 			<div class="dataLine">
-				<ImageFileBrowser {connection} path={["0", "icons"]} canShowBig={false} forSelection={true} bind:selection={iconSelection} />
+				<ImageFileBrowser
+					{connection}
+					path={["0", "icons"]}
+					canShowBig={false}
+					forSelection={true}
+					bind:selection={iconSelection} />
 			</div>
 		{/if}
 		{#if editing}

@@ -12,13 +12,12 @@
 	import { DisplayPanel } from "../panel/panel";
 
 	const developMode = app.transientSettings.ui._developMode;
-	const displayPanel = app.displayPanel;
 </script>
 
 <div class="settings">
 	<button
 		class="toolbutton is-small compact active"
-		on:click={() => ($displayPanel = DisplayPanel.Main)}>
+		on:click={() => app.displayPanel.set(DisplayPanel.Main)}>
 		<Icon name="close" />
 	</button>
 	<BTabList _style="height:100%;">

@@ -29,9 +29,7 @@ export class TransientSettings {
 	}
 
 	private getSaveObject(): any {
-		return JSON.parse(
-			JSON.stringify(this, (k, v) => (k.startsWith("_") ? undefined : v))
-		);
+		return JSON.parse(JSON.stringify(this, (k, v) => (k.startsWith("_") ? undefined : v)));
 	}
 
 	public async loadAsync(): Promise<void> {
@@ -253,25 +251,49 @@ export interface NotificationSetting {
 
 export type RelevantNotificationSetting = NotificationSetting & {
 	onlyRelevant: boolean;
-}
+};
 
 export class TransientSettingsNotifications {
 	public poke: NotificationSetting = { tts: true, notification: true };
 	public message: NotificationSetting = { tts: true, notification: true };
 	/// Channel or server edited
-	public channelChanged: RelevantNotificationSetting = { tts: true, notification: false, onlyRelevant: false };
-	public clientChanged: RelevantNotificationSetting = { tts: true, notification: false, onlyRelevant: false };
-	public clientSwitched: RelevantNotificationSetting = { tts: true, notification: false, onlyRelevant: false };
-	public clientStateChanged: RelevantNotificationSetting = { tts: true, notification: false, onlyRelevant: false };
+	public channelChanged: RelevantNotificationSetting = {
+		tts: true,
+		notification: false,
+		onlyRelevant: false,
+	};
+	public clientChanged: RelevantNotificationSetting = {
+		tts: true,
+		notification: false,
+		onlyRelevant: false,
+	};
+	public clientSwitched: RelevantNotificationSetting = {
+		tts: true,
+		notification: false,
+		onlyRelevant: false,
+	};
+	public clientStateChanged: RelevantNotificationSetting = {
+		tts: true,
+		notification: false,
+		onlyRelevant: false,
+	};
 
-	public getSetting(category: NotificationCategory): NotificationSetting | RelevantNotificationSetting {
+	public getSetting(
+		category: NotificationCategory
+	): NotificationSetting | RelevantNotificationSetting {
 		switch (category) {
-			case NotificationCategory.Poke: return this.poke;
-			case NotificationCategory.Message: return this.message;
-			case NotificationCategory.ChannelChanged: return this.channelChanged;
-			case NotificationCategory.ClientChanged: return this.clientChanged;
-			case NotificationCategory.ClientSwitched: return this.clientSwitched;
-			case NotificationCategory.ClientStateChanged: return this.clientStateChanged;
+			case NotificationCategory.Poke:
+				return this.poke;
+			case NotificationCategory.Message:
+				return this.message;
+			case NotificationCategory.ChannelChanged:
+				return this.channelChanged;
+			case NotificationCategory.ClientChanged:
+				return this.clientChanged;
+			case NotificationCategory.ClientSwitched:
+				return this.clientSwitched;
+			case NotificationCategory.ClientStateChanged:
+				return this.clientStateChanged;
 		}
 	}
 }

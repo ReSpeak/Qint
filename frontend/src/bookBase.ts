@@ -1,5 +1,12 @@
 import { Writable, writable } from "svelte/store";
-import { arraysEqual, base64Encode, Cached, datetimeDeserialize, getDataColor, tsHexEncode } from "./util";
+import {
+	arraysEqual,
+	base64Encode,
+	Cached,
+	datetimeDeserialize,
+	getDataColor,
+	tsHexEncode,
+} from "./util";
 import { Moment } from "moment";
 import moment from "moment";
 import { Uid } from "./ts";

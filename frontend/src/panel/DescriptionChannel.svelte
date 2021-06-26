@@ -15,7 +15,14 @@
 	import BSlider from "../ui/BSlider.svelte";
 	import BDurationPicker from "../ui/BDurationPicker.svelte";
 	import { ChannelType, Codec, CodecEncryptionMode } from "../book_events";
-	import { CLEAR_ICON, durationSerialize, enumValues, iconPathToId, on, PASSWORD_PLACEHOLDER } from "../util";
+	import {
+		CLEAR_ICON,
+		durationSerialize,
+		enumValues,
+		iconPathToId,
+		on,
+		PASSWORD_PLACEHOLDER,
+	} from "../util";
 	import type { RequiredNN, Writeable } from "../util";
 	import type { Duration } from "moment";
 	import UiChangeResult from "../ui/UiChangeResult.svelte";
@@ -247,7 +254,10 @@
 		<div class="dataLine">
 			{#if editing}
 				<button class="button" on:click={() => (editIcon = !editIcon)}>
-					<TsIcon type="channel" source={{ icon: iconPathToId(iconSelection) }} {connection} />
+					<TsIcon
+						type="channel"
+						source={{ icon: iconPathToId(iconSelection) }}
+						{connection} />
 				</button>
 			{:else}
 				<TsIcon type="channel" source={$channel} {connection} />
@@ -267,7 +277,12 @@
 		</div>
 		{#if editing && editIcon}
 			<div class="dataLine iconChooser">
-				<ImageFileBrowser {connection} path={["0", "icons"]} canShowBig={false} forSelection={true} bind:selection={iconSelection} />
+				<ImageFileBrowser
+					{connection}
+					path={["0", "icons"]}
+					canShowBig={false}
+					forSelection={true}
+					bind:selection={iconSelection} />
 			</div>
 		{/if}
 

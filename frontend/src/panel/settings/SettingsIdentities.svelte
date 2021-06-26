@@ -33,10 +33,10 @@
 			const req = await backend.fetch("/ident/new", {
 				method: "POST",
 			});
-			let newIdentity = await req.json();
+			const newIdentity = await req.json();
 			await loadIdentities();
 
-			let newIndex = identities.findIndex((ident) => ident.id === newIdentity.id);
+			const newIndex = identities.findIndex((ident) => ident.id === newIdentity.id);
 			selectIndex(newIndex);
 		} catch (ex) {
 			// TODO: change to debug and show on ui
