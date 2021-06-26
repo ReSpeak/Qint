@@ -7,7 +7,7 @@ build = "build/build.rs"
 
 [dependencies]
 anyhow = "1"
-fancy-regex = "0.4"
+fancy-regex = "0.6"
 lazy_static = "1"
 nom = "6"
 pulldown-cmark = "0.8"

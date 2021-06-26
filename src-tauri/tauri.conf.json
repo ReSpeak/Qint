@@ -1,57 +1,66 @@
 {
-  "build": {
-    "distDir": "../frontend/dist",
-    "devPath": "http://localhost:4422",
-    "beforeDevCommand": "",
-    "beforeBuildCommand": ""
-  },
-  "ctx": {},
-  "tauri": {
-    "embeddedServer": {
-      "active": false
-    },
-    "bundle": {
-      "active": true,
-      "targets": "all",
-      "identifier": "org.respeak.qint",
-      "icon": [
-        "../frontend/public/128x128.png"
-      ],
-      "resources": [],
-      "externalBin": [],
-      "copyright": "",
-      "category": "DeveloperTool",
-      "shortDescription": "",
-      "longDescription": "",
-      "deb": {
-        "depends": [],
-        "useBootstrapper": false
-      },
-      "osx": {
-        "frameworks": [],
-        "minimumSystemVersion": "",
-        "useBootstrapper": false
-      },
-      "exceptionDomain": ""
-    },
-    "allowlist": {
-      "all": true
-    },
-    "window": {
-      "title": "Qint",
-      "width": 800,
-      "height": 600,
-      "resizable": true,
-      "fullscreen": false
-    },
-    "security": {
-      "csp": "default-src blob: data: filesystem: ws: http: https: 'unsafe-eval' 'unsafe-inline'"
-    },
-    "inliner": {
-      "active": true
-    },
-    "systemTray": {
-      "iconPath": "../assets/icon.ico"
-    }
-  }
+	"build": {
+		"distDir": "../frontend/dist",
+		"devPath": "http://localhost:3000",
+		"beforeDevCommand": "",
+		"beforeBuildCommand": ""
+	},
+	"tauri": {
+		"bundle": {
+			"active": true,
+			"targets": "all",
+			"identifier": "org.respeak.qint",
+			"icon": [
+				"../assets/16.png",
+				"../assets/32.png",
+				"../assets/48.png",
+				"../assets/icon.png",
+				"../assets/icon.ico"
+			],
+			"resources": [],
+			"externalBin": [],
+			"copyright": "",
+			"category": "DeveloperTool",
+			"shortDescription": "",
+			"longDescription": "",
+			"deb": {
+				"depends": [],
+				"useBootstrapper": false
+			},
+			"macOS": {
+				"frameworks": [],
+				"minimumSystemVersion": "",
+				"useBootstrapper": false,
+				"exceptionDomain": "",
+				"signingIdentity": null,
+				"entitlements": null
+			},
+			"windows": {
+				"certificateThumbprint": null,
+				"digestAlgorithm": "sha256",
+				"timestampUrl": ""
+			}
+		},
+		"updater": {
+			"active": false
+		},
+		"allowlist": {
+			"all": true
+		},
+		"windows": [
+			{
+				"title": "Qint",
+				"width": 800,
+				"height": 600,
+				"resizable": true,
+				"fullscreen": false
+			}
+		],
+		"security": {
+			"csp": "default-src blob: data: filesystem: ws: http: https: 'unsafe-eval' 'unsafe-inline'"
+		},
+		"systemTray": {
+			"iconPath": "../assets/icon.ico"
+		}
+	}
 }

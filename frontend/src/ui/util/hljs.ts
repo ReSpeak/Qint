@@ -1,6 +1,7 @@
-import hljs from "highlight.js/lib/core.js";
+import type { HighlightResult } from "highlight.js";
 
-import lang_c_like from "highlight.js/lib/languages/c-like";
+import hljs from "highlight.js/lib/core";
+
 import lang_cpp from "highlight.js/lib/languages/cpp";
 import lang_xml from "highlight.js/lib/languages/xml";
 import lang_bash from "highlight.js/lib/languages/bash";
@@ -27,7 +28,6 @@ import lang_sql from "highlight.js/lib/languages/sql";
 import lang_yaml from "highlight.js/lib/languages/yaml";
 import lang_typescript from "highlight.js/lib/languages/typescript";
 
-hljs.registerLanguage("c-like", lang_c_like);
 hljs.registerLanguage("cpp", lang_cpp);
 hljs.registerLanguage("xml", lang_xml);
 hljs.registerLanguage("bash", lang_bash);
@@ -53,10 +53,6 @@ hljs.registerLanguage("scss", lang_scss);
 hljs.registerLanguage("sql", lang_sql);
 hljs.registerLanguage("yaml", lang_yaml);
 hljs.registerLanguage("typescript", lang_typescript);
-
-// Needed for typescript
-import type hljs_type from "highlight.js";
-const _: typeof hljs_type = undefined!;
 
 export function hljsHighlight(elem: HTMLElement): void {
 	const lang = elem.getAttribute("data-lang");

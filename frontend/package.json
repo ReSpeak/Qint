@@ -19,13 +19,14 @@
 		"svelte": "3.38.3",
 		"svelte-check": "2.2.0",
 		"svelte-preprocess": "4.7.3",
-		"tauri": "0.14.1",
+
 		"tslib": "2.3.0",
 		"typescript": "4.3.5",
 		"vite": "2.3.7"
 	},
 	"dependencies": {
 		"@mdi/font": "5.9.55",
+		"@tauri-apps/api": "1.0.0-beta.4",
 		"@uupaa/dynamic-import-polyfill": "1.0.2",
 		"bulma": "0.9.3",
 		"bulma-slider": "2.0.4",
@@ -35,7 +36,7 @@
 		"chartjs-adapter-moment": "1.0.0",
 		"chroma-js": "2.1.2",
 		"debug": "4.3.1",
-		"highlight.js": "10.7.1",
+		"highlight.js": "11.0.1",
 		"katex": "0.13.11",
 		"moment": "2.29.1",
 		"resize-observer-polyfill": "1.5.1"

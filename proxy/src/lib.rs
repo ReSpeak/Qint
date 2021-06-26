@@ -9,7 +9,9 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::{Arc, Mutex, RwLock};
+use std::thread;
 
+use actix::prelude::*;
 use actix::{Actor, Addr};
 use actix_cors::Cors;
 use actix_files::Files;
@@ -18,6 +20,7 @@ use actix_web::middleware::Condition;
 use actix_web::web::Bytes;
 use actix_web::web::{Data, Query};
 use actix_web::*;
+
 use actix_web_actors::ws;
 use anyhow::{bail, format_err, Result};
 use db::{
@@ -30,10 +33,15 @@ use http::{header::CACHE_CONTROL, header::ETAG, HeaderValue};
 use identities::import_ts_identities_from_string;
 use messages::ResultDetails;
 use rand::Rng;
+use messages::{MessageF2P, MessageP2F};
 use serde::de::IntoDeserializer;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use slog::{debug, error, info, warn, Logger};
+use tokio::runtime::Runtime;
+use tokio::sync::mpsc::channel;
+use tokio::sync::mpsc::Receiver;
+use tokio::sync::mpsc::Sender;
 use tokio::time::{self, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
 use tsclientlib::ChannelId;
@@ -49,7 +57,7 @@ mod identities;
 mod link_previewer;
 mod loudness_ws;
 mod markdown_ws;
-mod messages;
+pub mod messages;
 mod search;
 mod secret;
 mod websocket;
@@ -59,6 +67,7 @@ use link_previewer::LinkPreviewer;
 use loudness_ws::LoudnessService;
 use markdown_ws::MarkdownService;
 use secret::Secret;
+use websocket::CustomWsMsg;
 use websocket::Ws;
 
 const DIR_ORGANIZATION: &str = "ReSpeak";
@@ -162,7 +171,7 @@ struct LaunchConfig {
 pub struct State {
 	logger: Logger,
 	/// The list of all currently existing connections
-	connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
+	pub connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
 	audio_data: Option<audio::AudioData>,
 	hotkeys: hotkey::Hotkeys,
 	launch_config: RwLock<LaunchConfig>,
@@ -173,6 +182,7 @@ pub struct State {
 	link_previewer: link_previewer::LinkPreviewer,
 	secret: Secret,
 	search: Option<Arc<search::Search>>,
+	pub ws_listener: (Sender<Ws>, Receiver<Ws>),
 	/// Authentication token, this needs to be set in the qint-auth cookie.
 	token: String,
 }
@@ -207,9 +217,11 @@ struct MuteStates {
 	away: bool,
 }
 
-pub struct App(Arc<State>);
+pub struct App(pub Arc<State>);
 
-fn default_listen_address() -> SocketAddr { "127.0.0.1:4422".parse().unwrap() }
+fn default_listen_address() -> SocketAddr {
+	"127.0.0.1:4422".parse().unwrap()
+}
 
 fn default_cache_path() -> PathBuf {
 	let proj_dirs = match directories_next::ProjectDirs::from("", DIR_ORGANIZATION, DIR_PROJECT) {
@@ -222,6 +234,10 @@ fn default_cache_path() -> PathBuf {
 }
 
 impl juniper::Context for State {}
+
+pub trait AppToFrontendBridge {
+	fn send(&self, msg: &MessageP2F);
+}
 
 impl State {
 	fn modify_settings<T: FnOnce(&mut Settings) -> Result<SettingsUpdate>>(
@@ -365,6 +381,51 @@ impl State {
 			.collect();
 		fut.filter_map(|f| future::ready(f))
 	}
+
+	pub async fn create_ws(uuid: Uuid, state: Arc<State>, sender: Box<dyn AppToFrontendBridge>) {
+		let ws = Ws::new(
+			state.logger.clone(),
+			state.clone(),
+			WsOptions { format: WsFormat::Json },
+			ConnectionId(uuid),
+			sender,
+		);
+		state.ws_listener.0.send(ws).await;
+	}
+
+	pub async fn send_ws(&self, con_id: ConnectionId, msg: MessageF2P) {
+		println!("Sending {:?} {:?}", con_id, msg);
+		let con = {
+			match self.connections.lock().unwrap().get(&con_id) {
+				Some(con) => con.clone(),
+				None => {
+					println!("No con for msg found {:?}", con_id);
+					warn!(self.logger, "No con for msg found"; "error" => ?con_id);
+					return;
+				}
+			}
+		};
+
+		con.send(CustomWsMsg(msg)).await.unwrap();
+		println!("Sent !!");
+	}
+
+	pub async fn accept_ws(&self) {
+		loop {
+			if let Some(ws) = self.ws_listener.1.recv().await {
+				let addr = ws.start();
+				let mut cons = self.connections.lock().unwrap();
+				let id = &ws.id;
+				// Check that the id does not exist
+				if cons.contains_key(&id) || id.0.is_nil() {
+					// TODO
+					println!("uuid fuk up");
+					return;
+				}
+				cons.insert(id, addr);
+			}
+		}
+	}
 }
 
 impl Default for LaunchConfig {
@@ -407,7 +468,9 @@ impl Settings {
 		Ok(())
 	}
 
-	fn merge(&mut self, v: &Value) { merge_json(&mut self.0, v); }
+	fn merge(&mut self, v: &Value) {
+		merge_json(&mut self.0, v);
+	}
 
 	fn get_global_volume(&self) -> Option<f32> {
 		Some(self.0.as_object()?.get("audio")?.as_object()?.get("globalVolume")?.as_f64()? as f32)
@@ -530,34 +593,34 @@ async fn guess_content_type<
 	(stream, response)
 }
 
-#[get("/con/{id}/ws")]
-async fn create_ws(
-	state: web::Data<Arc<State>>, uuid: web::Path<Uuid>, options: web::Query<WsOptions>,
-	req: HttpRequest, stream: web::Payload,
-) -> impl Responder {
-	let id = ConnectionId(*uuid);
+// #[get("/con/{id}/ws")]
+// async fn create_ws(
+// 	state: web::Data<Arc<State>>, uuid: web::Path<Uuid>, options: web::Query<WsOptions>,
+// 	req: HttpRequest, stream: web::Payload,
+// ) -> impl Responder {
+// 	let id = ConnectionId(*uuid);
 
-	// Check that the id does not exist
-	let mut cons = state.connections.lock().unwrap();
-	if cons.contains_key(&id) || uuid.is_nil() {
-		return Either::Left(
-			HttpResponse::PreconditionFailed()
-				.body("Connection id is already occupied".to_string()),
-		);
-	}
+// 	// Check that the id does not exist
+// 	let mut cons = state.connections.lock().unwrap();
+// 	if cons.contains_key(&id) || uuid.is_nil() {
+// 		return Either::Left(
+// 			HttpResponse::PreconditionFailed()
+// 				.body("Connection id is already occupied".to_string()),
+// 		);
+// 	}
 
-	let ws_con = Ws::new(state.logger.clone(), (**state).clone(), options.0, id);
-	match ws::start_with_addr(ws_con, &req, stream) {
-		Err(e) => {
-			error!(state.logger, "Failed to create websocket actor"; "error" => %e);
-			Either::Left(HttpResponse::InternalServerError().body("Failed to start connection"))
-		}
-		Ok((addr, ws)) => {
-			cons.insert(id, addr);
-			Either::Right(ws)
-		}
-	}
-}
+// 	let ws_con = Ws::new(state.logger.clone(), (**state).clone(), options.0, id);
+// 	match ws::start_with_addr(ws_con, &req, stream) {
+// 		Err(e) => {
+// 			error!(state.logger, "Failed to create websocket actor"; "error" => %e);
+// 			Either::Left(HttpResponse::InternalServerError().body("Failed to start connection"))
+// 		}
+// 		Ok((addr, ws)) => {
+// 			cons.insert(id, addr);
+// 			Either::Right(ws)
+// 		}
+// 	}
+// }
 
 #[post("/hotkey")]
 async fn run_hotkey(
@@ -663,7 +726,9 @@ struct GetFileOptions {
 }
 
 impl ResultDetails {
-	fn gone() -> Self { Self::from_desc("gone".into()) }
+	fn gone() -> Self {
+		Self::from_desc("gone".into())
+	}
 }
 
 #[get("/con/{id}/file/{channel}/{path:.*}")]
@@ -977,10 +1042,10 @@ async fn put_ident(
 	let query = query_opt.into_inner();
 	match state
 		.database
-		.send(UpdateIdentityMsg(FindIdentity::ById(path.into_inner()), UpdateIdentity {
-			name: query.name,
-			..Default::default()
-		}))
+		.send(UpdateIdentityMsg(
+			FindIdentity::ById(path.into_inner()),
+			UpdateIdentity { name: query.name, ..Default::default() },
+		))
 		.await
 	{
 		Ok(Ok(())) => HttpResponse::Ok().finish(),
@@ -1117,7 +1182,7 @@ fn merge_json(a: &mut Value, b: &Value) {
 ///
 /// Returns an http response if this request is handled by an error or redirect.
 /// If the result is `None`, the token is ok.
-fn check_authentication(token: &str, req: &dev::ServiceRequest) -> Option<HttpResponse> {
+fn check_authentication(token: &str, req: &actix_web::dev::ServiceRequest) -> Option<HttpResponse> {
 	#[derive(Deserialize)]
 	pub struct TokenQuery {
 		token: String,
@@ -1154,7 +1219,7 @@ fn check_authentication(token: &str, req: &dev::ServiceRequest) -> Option<HttpRe
 }
 
 impl App {
-	pub async fn new(logger: Logger, args: Args) -> Result<Self> {
+	pub fn new(logger: Logger, args: Args) -> Result<Self> {
 		#[cfg(debug_assertions)]
 		let profile = "Debug";
 		#[cfg(not(debug_assertions))]
@@ -1331,6 +1396,7 @@ impl App {
 			secret,
 			search,
 			token,
+			ws_listener: channel(1),
 		});
 
 		state.hotkeys.apply_config(&state, hotkey_config)?;
@@ -1372,7 +1438,7 @@ impl App {
 					future::Either::Right(srv.call(req))
 				})
 				.app_data(Data::new(state))
-				.service(create_ws)
+
 				.service(run_hotkey)
 				.service(audio_reset)
 				.service(audio_device_list)
@@ -1506,7 +1572,9 @@ mod tests {
 		}
 
 		async fn graphql<T>(&self, request: &GraphQLRequest) -> Result<T>
-		where for<'a> T: Deserialize<'a> {
+		where
+			for<'a> T: Deserialize<'a>,
+		{
 			let client = awc::Client::default();
 			let url = format!("http://127.0.0.1:{}/db", self.port);
 			debug!(self.logger, "GraphQL request"; "body" => serde_json::to_string(&request).unwrap());
@@ -1670,7 +1738,7 @@ mod tests {
 					no_link_cache: false,
 					verbosity: 1,
 				};
-				let app = App::new(logger, args).await?;
+				let app = App::new(logger, args);
 				app.serve().await?;
 				dir.close()?;
 				Ok(())

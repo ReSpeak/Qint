@@ -27,14 +27,15 @@ use tsproto_types::crypto::EccKeyPubP256;
 
 use crate::db::{ChannelListMsg, ChatId, ChatType, SetClientVolumeMsg};
 use crate::messages::{self, MessageF2P, MessageP2F, ResultDetails, ResultStruct};
-use crate::{audio, db, ConnectionId, State, WsFormat, WsOptions};
+use crate::{AppToFrontendBridge, ConnectionId, State, WsFormat, WsOptions, audio, db};
 
 /// A websocket connection
 pub(crate) struct Ws {
+	pub id: ConnectionId,
 	logger: Logger,
 	state: Arc<State>,
 	options: WsOptions,
-	id: ConnectionId,
+	sender: Box<dyn AppToFrontendBridge>,
 	connection: Option<Connection>,
 	connect_options: Option<messages::ConnectOptions>,
 	channel_list_finished_msg: Option<ChannelListMsg>,
@@ -50,6 +51,7 @@ pub(crate) struct Ws {
 /// Polls the connection for events.
 struct ConnectionPoller;
 
+pub(crate) struct CustomWsMsg(pub MessageF2P);
 pub(crate) struct GetPublicKeyMsg;
 pub(crate) struct GetClientVolumeMsg(pub ClientId);
 /// Audio detection tells us if we are talking.
@@ -91,7 +93,7 @@ pub(crate) enum Error {
 }
 
 impl Actor for Ws {
-	type Context = ws::WebsocketContext<Self>;
+	type Context = actix::Context<Self>;
 
 	fn stopping(&mut self, ctx: &mut Self::Context) -> Running {
 		// Wait until disconnected if still connected
@@ -110,6 +112,9 @@ impl Actor for Ws {
 	}
 }
 
+impl Message for CustomWsMsg {
+	type Result = ();
+}
 impl Message for GetPublicKeyMsg {
 	type Result = Result<EccKeyPubP256>;
 }
@@ -149,13 +154,14 @@ impl<R: 'static, F: FnOnce(&mut Ws) -> R> Message for RunOnConMsg<R, F> {
 }
 
 impl Ws {
-	pub fn new(logger: Logger, state: Arc<State>, options: WsOptions, id: ConnectionId) -> Self {
+	pub fn new(logger: Logger, state: Arc<State>, options: WsOptions, id: ConnectionId, sender: Box<dyn AppToFrontendBridge>) -> Self {
 		let logger = logger.new(o!("id" => id.0.to_string()));
 		Self {
 			logger,
 			state,
 			options,
 			id,
+			sender,
 			connection: None,
 			connect_options: None,
 			channel_list_finished_msg: None,
@@ -195,7 +201,9 @@ impl Ws {
 	}
 
 	fn send_to_ts2a<T: Message<Result = Result<()>> + Send + 'static>(&self, msg: T)
-	where audio::ts_to_audio::TsToAudio: Handler<T> {
+	where
+		audio::ts_to_audio::TsToAudio: Handler<T>,
+	{
 		if let Some(ad) = &self.state.audio_data {
 			let logger = self.logger.clone();
 			actix::spawn(ad.ts2a.send(msg).map(move |r| match r {
@@ -211,7 +219,9 @@ impl Ws {
 	}
 
 	fn send_to_a2ts<T: Message<Result = ()> + Send + 'static>(&self, msg: T)
-	where audio::audio_to_ts::AudioToTs: Handler<T> {
+	where
+		audio::audio_to_ts::AudioToTs: Handler<T>,
+	{
 		if let Some(ad) = &self.state.audio_data {
 			let logger = self.logger.clone();
 			actix::spawn(ad.a2ts.send(msg).map(move |r| {
@@ -223,7 +233,9 @@ impl Ws {
 	}
 
 	fn send_to_a2ts_r<R: Send + 'static, T: Message<Result = R> + Send + 'static>(&self, msg: T)
-	where audio::audio_to_ts::AudioToTs: Handler<T> {
+	where
+		audio::audio_to_ts::AudioToTs: Handler<T>,
+	{
 		if let Some(ad) = &self.state.audio_data {
 			let logger = self.logger.clone();
 			actix::spawn(ad.a2ts.send(msg).map(move |r| {
@@ -584,7 +596,7 @@ impl Ws {
 		}
 		if !self.websocket_closed {
 			debug!(self.logger, "Closing websocket");
-			ctx.close(None);
+			ctx.stop(); // ?TAURI
 		} else {
 			debug!(self.logger, "Stopping websocket");
 			ctx.stop();
@@ -752,7 +764,11 @@ impl Ws {
 										.unwrap()
 										.iter()
 										.filter_map(|(id, addr)| {
-											if *id != self.id { Some(addr.clone()) } else { None }
+											if *id != self.id {
+												Some(addr.clone())
+											} else {
+												None
+											}
 										})
 										.collect::<Vec<_>>();
 									let state = self.state.clone();
@@ -804,7 +820,11 @@ impl Ws {
 										.unwrap()
 										.iter()
 										.filter_map(|(id, addr)| {
-											if *id != self.id { Some(addr.clone()) } else { None }
+											if *id != self.id {
+												Some(addr.clone())
+											} else {
+												None
+											}
 										})
 										.collect::<Vec<_>>();
 									let state = self.state.clone();
@@ -854,8 +874,8 @@ impl Ws {
 
 	fn send_message(&mut self, msg: &MessageP2F, ctx: &mut <Self as Actor>::Context) {
 		match self.options.format {
-			WsFormat::Msgpack => ctx.binary(rmp_serde::to_vec(msg).unwrap()),
-			WsFormat::Json => ctx.text(serde_json::to_string(msg).unwrap()),
+			WsFormat::Msgpack => panic!("Not implemented"),
+			WsFormat::Json => self.sender.send(msg),
 		}
 	}
 
@@ -1273,47 +1293,55 @@ impl<R: 'static, F: FnOnce(&mut Ws) -> R> Handler<RunOnConMsg<R, F>> for Ws {
 	}
 }
 
-impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
-	fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
-		match msg {
-			Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
-			Ok(ws::Message::Text(msg)) => {
-				let msg: MessageF2P = match serde_json::from_str(&msg) {
-					Ok(r) => r,
-					Err(e) => {
-						let msg_str: &str = msg.as_ref();
-						error!(self.logger, "json deserializing error"; "error" => %e,
-							"message" => msg_str);
-						self.send_message(
-							&MessageP2F::Error(format!("json deserializing error: {}", e)),
-							ctx,
-						);
-						return;
-					}
-				};
-				self.handle_ws_message(msg, ctx);
-			}
-			Ok(ws::Message::Binary(msg)) => {
-				let msg: MessageF2P = match rmp_serde::from_read_ref(msg.as_ref()) {
-					Ok(r) => r,
-					Err(e) => {
-						error!(self.logger, "msgpack deserializing error"; "error" => %e);
-						self.send_message(
-							&MessageP2F::Error(format!("msgpack deserializing error: {}", e)),
-							ctx,
-						);
-						return;
-					}
-				};
-				self.handle_ws_message(msg, ctx);
-			}
-			Ok(ws::Message::Close(_)) => {
-				debug!(self.logger, "Websocket closed");
-				self.websocket_closed = true;
-				self.disconnect(ctx);
-			}
-			_ => {}
-		}
+// impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
+// 	fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
+// 		match msg {
+// 			Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
+// 			Ok(ws::Message::Text(msg)) => {
+// 				let msg: MessageF2P = match serde_json::from_str(&msg) {
+// 					Ok(r) => r,
+// 					Err(e) => {
+// 						let msg_str: &str = msg.as_ref();
+// 						error!(self.logger, "json deserializing error"; "error" => %e,
+// 							"message" => msg_str);
+// 						self.send_message(
+// 							&MessageP2F::Error(format!("json deserializing error: {}", e)),
+// 							ctx,
+// 						);
+// 						return;
+// 					}
+// 				};
+// 				self.handle_ws_message(msg, ctx);
+// 			}
+// 			Ok(ws::Message::Binary(msg)) => {
+// 				let msg: MessageF2P = match rmp_serde::from_read_ref(msg.as_ref()) {
+// 					Ok(r) => r,
+// 					Err(e) => {
+// 						error!(self.logger, "msgpack deserializing error"; "error" => %e);
+// 						self.send_message(
+// 							&MessageP2F::Error(format!("msgpack deserializing error: {}", e)),
+// 							ctx,
+// 						);
+// 						return;
+// 					}
+// 				};
+// 				self.handle_ws_message(msg, ctx);
+// 			}
+// 			Ok(ws::Message::Close(_)) => {
+// 				debug!(self.logger, "Websocket closed");
+// 				self.websocket_closed = true;
+// 				self.disconnect(ctx);
+// 			}
+// 			_ => {}
+// 		}
+// 	}
+// }
+
+impl Handler<CustomWsMsg> for Ws {
+	type Result = ();
+	fn handle(&mut self, msg: CustomWsMsg, ctx: &mut Self::Context) -> Self::Result {
+		println!("CutomWsMsg {:?}", msg.0);
+		self.handle_ws_message(msg.0, ctx);
 	}
 }
 

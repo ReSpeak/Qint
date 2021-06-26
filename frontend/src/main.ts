@@ -6,7 +6,8 @@ import { app } from "./app";
 import { ConnectData } from "./connect/uiConnect";
 import debug from "debug";
 
-if (localStorage.getItem("debug") === null) debug.enable("error:*");
+//if (localStorage.getItem("debug") === null) debug.enable("error:*");
+debug.enable("*");
 
 (window as any).qint = app; // DEBUG
 (window as any).get = get; // DEBUG

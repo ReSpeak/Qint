@@ -94,7 +94,7 @@ async fn real_main() -> Result<()> {
 	let args = Args::from_args();
 	let no_open = args.no_open;
 
-	let app = App::new(logger.clone(), args.into()).await?;
+	let app = App::new(logger.clone(), args.into())?;
 
 	if !no_open {
 		// Open browser

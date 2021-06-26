@@ -1,15 +1,26 @@
 // Don't show terminal in release mode
 #![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
 
+mod cmd;
+
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::thread;
+use std::time::Duration;
 
 use anyhow::{format_err, Result};
+use cmd::TauriMsg;
+use qint_proxy::messages::MessageF2P;
 use qint_proxy::App;
+use qint_proxy::ConnectionId;
 use slog::{o, Drain};
 use structopt::StructOpt;
-use tauri::{CustomMenuItem, Icon, Manager, SystemTrayMenuItem, WindowBuilder, WindowUrl};
-use tauri::api::notification::Notification;
+use tauri::async_runtime::channel;
+use tauri::command;
+use tauri::State;
+use tauri::{CustomMenuItem, Manager, SystemTrayMenuItem};
+use tokio::runtime::Runtime;
+use uuid::Uuid;
 
 #[derive(Clone, Debug, StructOpt)]
 #[structopt(author, about)]
@@ -74,10 +85,7 @@ impl Into<qint_proxy::Args> for Args {
 	}
 }
 
-#[actix_rt::main]
-async fn main() -> Result<()> { real_main().await }
-
-async fn real_main() -> Result<()> {
+fn main() {
 	let logger = {
 		let decorator = slog_term::TermDecorator::new().build();
 		let drain = slog_term::CompactFormat::new(decorator).build();
@@ -94,11 +102,30 @@ async fn real_main() -> Result<()> {
 	// Parse command line options
 	let args = Args::from_args();
 
-	//let app = App::new(logger.clone(), args.into()).await?;
-	//std::thread::spawn(|| tauri::AppBuilder::new().build().run());
-	//app.serve().await
+	let app = {
+		let (sender, receiver) = std::sync::mpsc::channel();
+
+		let mut runtime = Runtime::new().unwrap();
+		thread::spawn(move || {
+			let local = tokio::task::LocalSet::new();
+			local.block_on(&mut runtime, async move {
+				let app = App::new(logger.clone(), args.into()).unwrap();
+
+				sender.send(app).unwrap();
+
+				app.0.accept_ws().await;
+			});
+		});
+
+		receiver.recv().unwrap()
+	};
+
+	//let window_thread_handle = std::thread::spawn(|| );
+	//app.serve().await;
+	//window_thread_handle.join().unwrap();
 
 	tauri::Builder::default()
+		.manage(app)
 		.on_page_load(|window, _| {
 			if let Err(e) = window.set_title("Qint") {
 				println!("Failed to set title: {}", e);
@@ -106,10 +133,10 @@ async fn real_main() -> Result<()> {
 			/*if let Err(e) = window.set_icon(Icon::File("../frontend/public/128x128.png".into())) {
 				println!("Failed to set icon: {}", e);
 			}*/
-			let window_ = window.clone();
+			//let window_ = window.clone();
 			window.on_window_event(move |e| {
 				//println!("Scale factor: {:?}", window_.scale_factor());
-				println!("Window event: {:?}", e);
+				//println!("Window event: {:?}", e);
 			});
 			window.listen("js-event", move |event| {
 				println!("got js-event with message '{:?}'", event.payload());
@@ -128,13 +155,13 @@ async fn real_main() -> Result<()> {
 					let window = app.get_window("main").unwrap();
 					// TODO: window.is_visible API
 					window.hide().unwrap();
-					if let Err(e) = Notification::new("qint")
-						.title("Window hidden")
-						.body("The window has gone 😯")
-						.show()
-					{
-						println!("Failed to show notification");
-					}
+					// if let Err(e) = Notification::new("qint")
+					// 	.title("Window hidden")
+					// 	.body("The window has gone 😯")
+					// 	.show()
+					// {
+					// 	println!("Failed to show notification");
+					// }
 				}
 				"show" => {
 					let window = app.get_window("main").unwrap();
@@ -156,7 +183,8 @@ async fn real_main() -> Result<()> {
 				_ => {}
 			}
 		})
+		.invoke_handler(tauri::generate_handler![cmd::create_ws, cmd::pass_ws_msg,])
 		.run(tauri::generate_context!())
-		.map_err(|e| format_err!("tauri error: {}", e))?;
-	Ok(())
+		.map_err(|e| format_err!("tauri error: {}", e))
+		.unwrap();
 }
