@@ -3,3 +3,4 @@ target/
 /proxy-codegen/SDL2.dll
 /proxy-codegen/msvc/
 /proxy-codegen/gnu-mingw/
+node_modules
