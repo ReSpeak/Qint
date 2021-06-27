@@ -7,7 +7,7 @@ Qint allows you to speak with other people over the internet.
 ## Dependencies
 - [Rust](https://rust-lang.org), preferred installation method is [rustup](https://rustup.rs)
 - [yarn](https://yarnpkg.com)
-- [SDL2](https://www.libsdl.org), Windows installation guide is [below](#download-sdl2-on-windows)
+- [SDL2](https://www.libsdl.org), Windows installation guide is [below](#windows)
 - [OpenSSL](https://www.openssl.org) 1.1, on linux only
 - [libopus](https://opus-codec.org), on linux only
 
@@ -15,8 +15,8 @@ Qint allows you to speak with other people over the internet.
 Run `./install_sdl.ps1`  
  \--- OR ---  
 Download the `SDL2-devel-2.x.x-VC.zip` from [libsdl.org](https://www.libsdl.org).  
-From this file, copy `SDL2-2.x.x/lib/x64/*.lib` to `Qint/proxy/msvc/lib/64/`.  
-And copy `SDL2-2.x.x/lib/x64/*.dll` to `Qint/proxy/msvc/dll/64/` and `Qint/proxy/`.
+From this file, copy `SDL2-2.x.x/lib/x64/*.lib` to `proxy-codegen/msvc/lib/64/`.  
+And copy `SDL2-2.x.x/lib/x64/*.dll` to `proxy-codegen/msvc/dll/64/` and `proxy-codegen/`.
 
 ### macOS
 ```bash
