@@ -4,11 +4,11 @@
 	import { TsNotification } from "../notification";
 	import UiNotification from "./UiNotification.svelte";
 
-	export let notifications: Writable<[Connection, TsNotification][]>;
+	export let notifications: Writable<[number, Connection, TsNotification][]>;
 </script>
 
 <ul class="notificationList">
-	{#each $notifications as [connection, notification] (notification)}
+	{#each $notifications as [i, connection, notification] (i)}
 		<li>
 			<UiNotification {connection} {notification} />
 		</li>

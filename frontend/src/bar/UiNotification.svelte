@@ -17,6 +17,9 @@
 	function toClient(a: any): Client {
 		return a as Client;
 	}
+	function toServer(a: any): Server {
+		return a as Server;
+	}
 	function getName(a: any): string {
 		return a.name;
 	}
@@ -28,33 +31,43 @@
 	}
 </script>
 
-{#each notification.pieces as piece, i}
-	{piece}
-	{#if i < args.length}
-		{#if args[i] instanceof Client}
-			<ClientName client={toClient(args[i])} />
-		{:else if args[i] instanceof Server}
-			<ServerName {connection} />
-		{:else if args[i] instanceof Channel}
-			<span class="channel">{getName(args[i])}</span>
-		{:else if args[i] instanceof ServerGroup}
-			<span class="serverGroup">{getName(args[i])}</span>
-		{:else if typeof args[i] === "string" || args[i] instanceof String}
-			{args[i]}
-		{:else if hasName(args[i])}
-			<!-- Invoker -->
-			{#if getClientFromInvoker(args[i]) !== undefined}
-				<ClientName client={toClient(getClientFromInvoker(args[i]))} />
+<h6 class="title is-6">
+	<ServerName server={connection.book.server} />
+</h6>
+<div class="content">
+	{#each notification.pieces as piece, i}
+		{piece}
+		{#if i < args.length}
+			{#if args[i] instanceof Client}
+				<ClientName client={toClient(args[i])} />
+			{:else if args[i] instanceof Server}
+				<ServerName server={toServer(args[i])} />
+			{:else if args[i] instanceof Channel}
+				<span class="channel">{getName(args[i])}</span>
+			{:else if args[i] instanceof ServerGroup}
+				<span class="serverGroup">{getName(args[i])}</span>
+			{:else if typeof args[i] === "string" || args[i] instanceof String}
+				{args[i]}
+			{:else if hasName(args[i])}
+				<!-- Invoker -->
+				{#if getClientFromInvoker(args[i]) !== undefined}
+					<ClientName client={toClient(getClientFromInvoker(args[i]))} />
+				{:else}
+					{getName(args[i])}
+				{/if}
 			{:else}
-				{getName(args[i])}
+				<span class="unknown">{args[i]}</span>
 			{/if}
-		{:else}
-			<span class="unknown">{args[i]}</span>
 		{/if}
-	{/if}
-{/each}
+	{/each}
+</div>
 
 <style lang="scss">
+	.title.is-6 {
+		font-size: 0.8em;
+		margin-bottom: 0.1em;
+	}
+
 	.unknown {
 		background-color: red;
 	}

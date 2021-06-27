@@ -9,7 +9,7 @@
 	import { TsNotification } from "../notification";
 
 	export let connections: Writable<Connection[]>;
-	export let notifications: Writable<[Connection, TsNotification][]>;
+	export let notifications: Writable<[number, Connection, TsNotification][]>;
 	export let filter: string;
 	export let visible: boolean;
 	export let showConnect: (data: ConnectData) => void;
