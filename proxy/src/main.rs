@@ -72,6 +72,7 @@ impl Into<qint_proxy::Args> for Args {
 	}
 }
 
+#[allow(unused_braces)]
 #[actix_rt::main]
 async fn main() -> Result<()> { real_main().await }
 
@@ -99,6 +100,7 @@ async fn real_main() -> Result<()> {
 		// Open browser
 		let addr = app.get_listen_address();
 		let port = addr.port();
+		let token = app.get_token().to_string();
 		actix::spawn(async move {
 			// Connect to localhost if == 0.0.0.0 or ::
 			let url = if addr.ip() == "0.0.0.0".parse::<IpAddr>().unwrap()
@@ -108,6 +110,7 @@ async fn real_main() -> Result<()> {
 			} else {
 				format!("http://{}", addr)
 			};
+			let url = format!("{}/?token={}", url, token);
 			debug!(logger, "Opening url"; "url" => &url);
 			if let Err(e) = open::that(url) {
 				error!(logger, "Failed to open frontend in browser"; "error" => %e);

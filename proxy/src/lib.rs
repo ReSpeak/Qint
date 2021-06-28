@@ -13,13 +13,11 @@ use std::sync::{Arc, Mutex, RwLock};
 use actix::{Actor, Addr};
 use actix_cors::Cors;
 use actix_files::Files;
+use actix_web::dev::{Service, ServiceResponse};
 use actix_web::middleware::Condition;
 use actix_web::web::Bytes;
+use actix_web::web::{Data, Query};
 use actix_web::*;
-use actix_web::{
-	dev::{HttpResponseBuilder, Service},
-	web::Query,
-};
 use actix_web_actors::ws;
 use anyhow::{bail, format_err, Result};
 use db::{
@@ -31,6 +29,7 @@ use futures::stream::{FuturesUnordered, Peekable};
 use http::{header::CACHE_CONTROL, header::ETAG, HeaderValue};
 use identities::import_ts_identities_from_string;
 use messages::ResultDetails;
+use rand::Rng;
 use serde::de::IntoDeserializer;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -174,6 +173,8 @@ pub struct State {
 	link_previewer: link_previewer::LinkPreviewer,
 	secret: Secret,
 	search: Option<Arc<search::Search>>,
+	/// Authentication token, this needs to be set in the qint-auth cookie.
+	token: String,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]
@@ -1035,6 +1036,44 @@ fn merge_json(a: &mut Value, b: &Value) {
 	}
 }
 
+/// Check the authentication token.
+///
+/// Returns an http response if this request is handled by an error or redirect.
+/// If the result is `None`, the token is ok.
+fn check_authentication(token: &str, req: &dev::ServiceRequest) -> Option<HttpResponse> {
+	#[derive(Deserialize)]
+	pub struct TokenQuery {
+		token: String,
+	}
+
+	if req.path() == "/" {
+		if let Ok(Query(TokenQuery { token })) = Query::from_query(req.query_string()) {
+			// Redirect to / and set cookie with token
+			return Some(HttpResponse::SeeOther()
+				.append_header((http::header::LOCATION, "/"))
+				.cookie(
+					cookie::Cookie::build("qint-auth", token)
+					.http_only(true)
+					.same_site(cookie::SameSite::Strict)
+					.finish())
+				.finish());
+		}
+	}
+
+	// Check auth cookie
+	if let Some(cookie) = req.cookie("qint-auth") {
+		if cookie.value() == token {
+			None
+		} else {
+			Some(HttpResponse::Forbidden()
+				.body("Authentication token is wrong, please get a valid authentication token from the qint proxy"))
+		}
+	} else {
+		Some(HttpResponse::Forbidden()
+			.body("Authentication token is missing, please get a valid authentication token from the qint proxy"))
+	}
+}
+
 impl App {
 	pub async fn new(logger: Logger, args: Args) -> Result<Self> {
 		#[cfg(debug_assertions)]
@@ -1200,6 +1239,8 @@ impl App {
 			logger.clone(),
 			if launch_config.no_link_cache { Some(launch_config.cache_path.clone()) } else { None },
 		);
+		let mut rng = rand::thread_rng();
+		let token = format!("{:0x}{:0x}", rng.gen::<u64>(), rng.gen::<u64>());
 
 		let state = Arc::new(State {
 			logger,
@@ -1214,6 +1255,7 @@ impl App {
 			link_previewer,
 			secret,
 			search,
+			token,
 		});
 
 		state.hotkeys.apply_config(&state, hotkey_config)?;
@@ -1231,9 +1273,11 @@ impl App {
 		info!(self.0.logger, "Serving frontend"; "path" => frontend_path);
 		let state2 = self.0.clone();
 		let addr = self.get_listen_address();
+		let token = self.get_token().to_string();
 
 		HttpServer::new(move || {
 			let state = state2.clone();
+			let token = token.clone();
 			actix_web::App::new()
 				//.wrap(middleware::Logger::default())
 				// Return error messages
@@ -1243,7 +1287,15 @@ impl App {
 						err, HttpResponse::BadRequest().body(err_string)).into()
 				}))
 				.wrap(Condition::new(!is_production, Cors::permissive().max_age(3600)))
-				.data(state)
+				.wrap_fn(move |req, srv| {
+					if let Some(resp) = check_authentication(&token, &req) {
+						future::Either::Left(future::ok(ServiceResponse::new(req.into_parts().0, resp)))
+					} else {
+						// Token is ok
+						future::Either::Right(srv.call(req))
+					}
+				})
+				.app_data(Data::new(state))
 				.service(create_ws)
 				.service(run_hotkey)
 				.service(audio_reset)
@@ -1313,6 +1365,10 @@ impl App {
 	pub fn get_listen_address(&self) -> SocketAddr {
 		let settings = self.0.launch_config.read().unwrap();
 		settings.listen_address
+	}
+
+	pub fn get_token(&self) -> &str {
+		&self.0.token
 	}
 }
 
