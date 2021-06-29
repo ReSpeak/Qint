@@ -55,7 +55,8 @@
 
 	async function importIdentityFromString(data: string) {
 		try {
-			const req = await backend.fetch("/ident/import", {
+			// import is special...
+			const req = await backend.fetch("/ident/im" + "port", {
 				method: "POST",
 				body: data,
 			});
