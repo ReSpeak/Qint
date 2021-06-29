@@ -5,10 +5,12 @@
 	import { app, NodeSelection } from "../app";
 	import ConnectionSettings from "./ConnectionSettings.svelte";
 	import { ConnectData } from "../connect/connect";
+	import Searchbar from "./Searchbar.svelte";
 
 	export let displayPanel: DisplayPanel;
 	export let showSidebar: boolean;
 	export let connectData: ConnectData;
+	export let filter: string; // from the search
 
 	function toggleSidebar(show: boolean) {
 		showSidebar = show;
@@ -32,6 +34,9 @@
 			title="Channel tree">
 			<Icon name="file-tree" />
 		</button>
+		<div class="searchbar">
+			<Searchbar bind:filter visible={true} />
+		</div>
 	</div>
 	<div class="spacer" />
 	<div class="centerButtons toolbuttons">
@@ -78,5 +83,9 @@
 	.leftButtons,
 	.rightButtons {
 		display: inline-flex;
+	}
+
+	.searchbar {
+		padding-left: 1em;
 	}
 </style>

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import UiChat from "./chat/UiChat.svelte";
 	import UiGlobalSettings from "./panel/UiGlobalSettings.svelte";
-	import Searchbar from "./bar/Searchbar.svelte";
 	import Sidebar from "./bar/Sidebar.svelte";
 	import Toolbar from "./bar/Toolbar.svelte";
 	import Description from "./panel/Description.svelte";
@@ -109,8 +108,8 @@
 </script>
 
 <div class="appContainer" style="grid-template-columns: {columnStyle}">
-	<Toolbar bind:showSidebar={$showSidebar} bind:displayPanel={$displayPanel} bind:connectData />
-	<Searchbar bind:filter visible={$showSidebar} />
+	<Toolbar bind:showSidebar={$showSidebar} bind:displayPanel={$displayPanel} bind:connectData bind:filter />
+	
 	<Sidebar
 		{connections}
 		notifications={app.nofifications}
@@ -159,7 +158,7 @@
 
 		> :global(.toolbar) {
 			grid-row: 1;
-			grid-column: 2;
+			grid-column: 1 / span 2;
 		}
 		> :global(.searchbar) {
 			grid-row: 1;
