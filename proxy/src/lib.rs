@@ -1049,14 +1049,12 @@ fn check_authentication(token: &str, req: &dev::ServiceRequest) -> Option<HttpRe
 	if req.path() == "/" {
 		if let Ok(Query(TokenQuery { token })) = Query::from_query(req.query_string()) {
 			// Redirect to / and set cookie with token
-			return Some(HttpResponse::SeeOther()
-				.append_header((http::header::LOCATION, "/"))
-				.cookie(
-					cookie::Cookie::build("qint-auth", token)
-					.http_only(true)
-					.same_site(cookie::SameSite::Strict)
-					.finish())
-				.finish());
+			return Some(
+				HttpResponse::SeeOther()
+					.append_header((http::header::LOCATION, "/"))
+					.cookie(cookie::Cookie::build("qint-auth", token).http_only(true).finish())
+					.finish(),
+			);
 		}
 	}
 
@@ -1065,12 +1063,16 @@ fn check_authentication(token: &str, req: &dev::ServiceRequest) -> Option<HttpRe
 		if cookie.value() == token {
 			None
 		} else {
-			Some(HttpResponse::Forbidden()
-				.body("Authentication token is wrong, please get a valid authentication token from the qint proxy"))
+			Some(HttpResponse::Forbidden().body(
+				"Authentication token is wrong, please get a valid authentication token from the \
+				 qint proxy",
+			))
 		}
 	} else {
-		Some(HttpResponse::Forbidden()
-			.body("Authentication token is missing, please get a valid authentication token from the qint proxy"))
+		Some(HttpResponse::Forbidden().body(
+			"Authentication token is missing, please get a valid authentication token from the \
+			 qint proxy",
+		))
 	}
 }
 
@@ -1288,12 +1290,13 @@ impl App {
 				}))
 				.wrap(Condition::new(!is_production, Cors::permissive().max_age(3600)))
 				.wrap_fn(move |req, srv| {
-					if let Some(resp) = check_authentication(&token, &req) {
-						future::Either::Left(future::ok(ServiceResponse::new(req.into_parts().0, resp)))
-					} else {
-						// Token is ok
-						future::Either::Right(srv.call(req))
+					if is_production {
+						if let Some(resp) = check_authentication(&token, &req) {
+							return future::Either::Left(future::ok(ServiceResponse::new(req.into_parts().0, resp)));
+						}
 					}
+					// Token is ok
+					future::Either::Right(srv.call(req))
 				})
 				.app_data(Data::new(state))
 				.service(create_ws)
@@ -1367,9 +1370,7 @@ impl App {
 		settings.listen_address
 	}
 
-	pub fn get_token(&self) -> &str {
-		&self.0.token
-	}
+	pub fn get_token(&self) -> &str { &self.0.token }
 }
 
 /// Tests need a running TeamSpeak server on localhost. The default channel has to be channel 1,

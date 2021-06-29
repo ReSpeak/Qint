@@ -105,6 +105,8 @@ async fn real_main() -> Result<()> {
 			// Connect to localhost if == 0.0.0.0 or ::
 			let url = if addr.ip() == "0.0.0.0".parse::<IpAddr>().unwrap()
 				|| addr.ip() == "::".parse::<IpAddr>().unwrap()
+				|| addr.ip() == "127.0.0.1".parse::<IpAddr>().unwrap()
+				|| addr.ip() == "::1".parse::<IpAddr>().unwrap()
 			{
 				format!("http://localhost:{}", port)
 			} else {
