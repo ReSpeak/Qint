@@ -88,7 +88,7 @@
 	}
 
 	async function updatePlugin(name: string, content: string) {
-		const req = await backend.fetch(`/plugins/${name}`, {
+		await backend.fetch(`/plugins/${name}`, {
 			method: "PUT",
 			body: content,
 		});
@@ -123,7 +123,7 @@
 			delete editingPlugins[selectedPlugin];
 			editingPlugins = editingPlugins;
 			if (plugins.includes(selectedPlugin)) {
-				const req = await backend.fetch(`/plugins/${selectedPlugin}`, {
+				await backend.fetch(`/plugins/${selectedPlugin}`, {
 					method: "DELETE",
 				});
 				await loadPlugins();
@@ -158,7 +158,7 @@
 			<div class="panel-block" style="padding: 0" />
 
 			<div class="items">
-				{#each plugins as plugin, index}
+				{#each plugins as plugin}
 					<a
 						class="panel-block"
 						class:is-active={selectedPlugin === plugin}
@@ -167,7 +167,7 @@
 						<span class:isSelected={selectedPlugin === plugin}>{plugin}</span>
 					</a>
 				{/each}
-				{#each newPlugins as plugin, index}
+				{#each newPlugins as plugin}
 					<a
 						class="panel-block"
 						class:is-active={selectedPlugin === plugin}

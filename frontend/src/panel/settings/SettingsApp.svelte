@@ -3,7 +3,7 @@
 	import TabSlot from "../../ui/container/TabSlot.svelte";
 	import KeyValue from "../../ui/util/KeyValue.svelte";
 
-	let browserNotificationPermission: NotificationPermission = Notification.permission;
+	let browserNotificationPermission = Notification.permission;
 	const developMode = app.transientSettings.ui._developMode;
 
 	function syncSettings() {
