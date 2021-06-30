@@ -937,7 +937,7 @@ function defaultNotificationHandler(
 
 		if (!handled) app.transientSettings.synth.trySpeak(tts.toString(con, true));
 	}
-	if (settings.notification && app.transientSettings.app.allowBrowserNotifications) {
+	if (settings.notification && Notification.permission === "granted") {
 		//  By default, set server name as title, tts as content and server as icon
 		const iconPath = notification?.icon
 			? getClientIconPath(notification.icon, con)
