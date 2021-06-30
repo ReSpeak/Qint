@@ -582,6 +582,30 @@ async fn get_plugin(state: web::Data<Arc<State>>, name: web::Path<String>) -> im
 		.with_header((http::header::CONTENT_TYPE, "application/javascript; charset=utf-8"))
 }
 
+#[put("/plugins/{name}")]
+async fn put_plugin(state: web::Data<Arc<State>>, name: web::Path<String>, body: web::Bytes) -> impl Responder {
+	if let Ok(s) = std::str::from_utf8(body.as_ref()) {
+		let path = state.launch_config.read().unwrap().plugin_path.join(&*name);
+		if let Err(e) = fs::write(path, s) {
+			HttpResponse::InternalServerError().body(e.to_string())
+		} else {
+			HttpResponse::Ok().finish()
+		}
+	} else {
+		HttpResponse::BadRequest().body("Invalid text data")
+	}
+}
+
+#[delete("/plugins/{name}")]
+async fn delete_plugin(state: web::Data<Arc<State>>, name: web::Path<String>) -> impl Responder {
+	let path = state.launch_config.read().unwrap().plugin_path.join(&*name);
+	if let Err(e) = fs::remove_file(path) {
+		HttpResponse::InternalServerError().body(e.to_string())
+	} else {
+		HttpResponse::Ok().finish()
+	}
+}
+
 #[derive(Deserialize)]
 struct GetFileOptions {
 	dl: Option<String>,
@@ -1304,6 +1328,8 @@ impl App {
 				.service(audio_reset)
 				.service(list_plugins)
 				.service(get_plugin)
+				.service(put_plugin)
+				.service(delete_plugin)
 				.service(download_file)
 				.service(upload_file)
 				.service(download_cache_file)

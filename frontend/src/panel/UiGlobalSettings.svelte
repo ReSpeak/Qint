@@ -6,6 +6,7 @@
 	import SettingsHotkeys from "./settings/SettingsHotkeys.svelte";
 	import SettingsIdentities from "./settings/SettingsIdentities.svelte";
 	import SettingsNotifications from "./settings/SettingsNotifications.svelte";
+	import SettingsPlugins from "./settings/SettingsPlugins.svelte";
 	import SettingsDeveloper from "./settings/SettingsDeveloper.svelte";
 	import BTabList from "../ui/BTabList.svelte";
 	import Icon from "../ui/Icon.svelte";
@@ -27,6 +28,7 @@
 		<SettingsHotkeys />
 		<SettingsIdentities />
 		<SettingsNotifications />
+		<SettingsPlugins />
 		{#if $developMode}
 			<SettingsDeveloper />
 		{/if}
