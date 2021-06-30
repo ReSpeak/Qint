@@ -1,15 +1,15 @@
 import { Writable, writable, get } from "svelte/store";
-import { Chat } from "./chat/chat";
+import { Chat } from "./chat/uiChat";
 import { ITreeNode } from "./book";
 import { Connection } from "./connection";
 import { TransientSettings, DescriptionMode } from "./transientSettings";
 import { loadPlugins, IPlugin } from "./plugins";
 import { backend } from "./backend/backend";
 import { fnBroadcast, oneshot } from "./util";
-import { ConnectData } from "./connect/connect";
+import { ConnectData } from "./connect/uiConnect";
 import { DisplayPanel } from "./panel/panel";
-import { getIconPath } from "./ui/clientIcon";
-import { TsNotification } from "./notification";
+import { getIconPath } from "./ui/icon/tsIcons";
+import { TsNotification } from "./notifications";
 
 export class App {
 	public readonly connections: Writable<Connection[]> = writable([]);

@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { app } from "../../app";
-	import BTabSlot from "../../ui/BTabSlot.svelte";
-	import BKeyValue from "../../ui/BKeyValue.svelte";
-	import BHotkeyField from "./BHotkeyField.svelte";
-	import Icon from "../../ui/Icon.svelte";
+	import TabSlot from "../../ui/container/TabSlot.svelte";
+	import KeyValue from "../../ui/util/KeyValue.svelte";
+	import HotkeyField from "./HotkeyField.svelte";
+	import Icon from "../../ui/icon/Icon.svelte";
 	import { isHotkeyComplete } from "./hotkey";
 
 	let localHotkeys = [...app.transientSettings.hotkeys.actions];
@@ -32,17 +32,17 @@
 	}
 </script>
 
-<BTabSlot title="Hotkeys">
+<TabSlot title="Hotkeys">
 	{#each localHotkeys as hotkey, index}
-		<BHotkeyField
+		<HotkeyField
 			{hotkey}
 			on:change={() => syncHotkeys()}
 			on:remove={() => deleteHotkey(index)} />
 	{/each}
 
-	<BKeyValue label="Add hotkey" labelStyle="is-normal">
+	<KeyValue label="Add hotkey" labelStyle="is-normal">
 		<button class="button" on:click={createHotkey}>
 			<Icon name="plus" />
 		</button>
-	</BKeyValue>
-</BTabSlot>
+	</KeyValue>
+</TabSlot>

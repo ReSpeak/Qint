@@ -3,7 +3,7 @@ import { importModule } from "@uupaa/dynamic-import-polyfill";
 import { backend } from "./backend/backend";
 import { Connection } from "./connection";
 import { InMsg } from "./backend/ws";
-import { NotificationHandler, TsNotification } from "./notification";
+import { NotificationHandler, TsNotification } from "./notificationss";
 
 const importFunc = genImportFunc();
 

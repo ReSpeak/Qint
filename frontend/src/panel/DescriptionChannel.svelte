@@ -1,19 +1,19 @@
 <script lang="ts">
 	import { Connection } from "../connection";
 	import type { ChangePromise } from "../connection";
-	import TsIcon from "../ui/TsIcon.svelte";
-	import Icon from "../ui/Icon.svelte";
-	import StickyList from "../ui/StickyList.svelte";
-	import StickySlot from "../ui/StickySlot.svelte";
+	import TsIcon from "../ui/icon/TsIcon.svelte";
+	import Icon from "../ui/icon/Icon.svelte";
+	import StickyList from "../ui/container/StickyList.svelte";
+	import StickySlot from "../ui/container/StickySlot.svelte";
 	import StickyHeader from "./StickyHeader.svelte";
 	import { codecToName } from "../book";
 	import type { Channel } from "../book";
 	import { MaxClientsMode } from "../ts";
-	import RenderedText from "../ui/RenderedText.svelte";
-	import RenderedTextEditor from "../ui/RenderedTextEditor.svelte";
-	import BDropDown from "../ui/BDropDown.svelte";
-	import BSlider from "../ui/BSlider.svelte";
-	import BDurationPicker from "../ui/BDurationPicker.svelte";
+	import RenderedText from "../ui/specialized/RenderedText.svelte";
+	import RenderedTextEditor from "../ui/specialized/RenderedTextEditor.svelte";
+	import DropDown from "../ui/html/DropDown.svelte";
+	import Slider from "../ui/html/Slider.svelte";
+	import DurationPicker from "../ui/html/DurationPicker.svelte";
 	import { ChannelType, Codec, CodecEncryptionMode } from "../book_events";
 	import {
 		CLEAR_ICON,
@@ -25,7 +25,7 @@
 	} from "../util";
 	import type { RequiredNN, Writeable } from "../util";
 	import type { Duration } from "moment";
-	import UiChangeResult from "../ui/UiChangeResult.svelte";
+	import ChangeResult from "../ui/specialized/ChangeResult.svelte";
 	import ImageFileBrowser from "./ImageFileBrowser.svelte";
 
 	export let connection: Connection;
@@ -246,7 +246,7 @@
 						on:click={() => (changeRequest = undefined)}>
 						<Icon name="close" />
 					</button>
-					<UiChangeResult result={changeResult} />
+					<ChangeResult result={changeResult} />
 				</div>
 			{/if}
 		{/await}
@@ -295,13 +295,13 @@
 						<i>(Permanent)</i>
 					</div>
 				{:else}
-					<BDropDown bind:selected={chanEdit._channelType} items={channelTypeOpt} />
+					<DropDown bind:selected={chanEdit._channelType} items={channelTypeOpt} />
 				{/if}
 			</div>
 			{#if chanEdit._channelType === ChannelType.Temporary}
 				<div class="dataLine">
 					<div>Delete delay:</div>
-					<BDurationPicker bind:duration={chanEdit._deleteDelay} />
+					<DurationPicker bind:duration={chanEdit._deleteDelay} />
 				</div>
 			{/if}
 		{/if}
@@ -314,7 +314,7 @@
 		{#if editing}
 			<div class="dataLine">
 				<label for="edit_codec">Codec:</label>
-				<BDropDown
+				<DropDown
 					id="edit_codec"
 					bind:selected={chanEdit.codec}
 					items={codecOpt}
@@ -323,7 +323,7 @@
 			<div class="dataLine">
 				<label for="edit_codecQuality">Codec quality:</label>
 				<div class="flex1">
-					<BSlider
+					<Slider
 						id="edit_codecQuality"
 						min={1}
 						max={10}
@@ -387,7 +387,7 @@
 			<div class="dataLine">
 				<label for="edit_maxClients" title="Maximum amount of clients in this channel"
 					>Max clients:</label>
-				<BDropDown
+				<DropDown
 					id="edit_maxClients"
 					bind:selected={chanEditMaxClientsMode}
 					items={enumValues(MaxClientsMode)} />
@@ -403,7 +403,7 @@
 					for="edit_maxFamilyClients"
 					title="Maximum amount of clients in this channel and all subchannels combined"
 					>Max family clients:</label>
-				<BDropDown
+				<DropDown
 					id="edit_maxFamilyClients"
 					bind:selected={chanEditMaxFamilyClientsMode}
 					items={enumValues(MaxClientsMode)} />

@@ -2,17 +2,17 @@ import { ResultDetails, OutMsg, InMsg } from "./backend/ws";
 import { get, writable, Writable, Readable } from "svelte/store";
 import { Book, Channel, ChatData, Client } from "./book";
 import { oneshot, fnBroadcast, LOUDNESS_MIN } from "./util";
-import { handleMessage } from "./notification";
+import { handleMessage } from "./notifications";
 import { backend, IBackendConnection } from "./backend/backend";
 import { app } from "./app";
-import { ConnectData, MuteState } from "./connect/connect";
+import { ConnectData, MuteState } from "./connect/uiConnect";
 import { OChange, Reason, IMsgPluginCommandPart, TsError, IMsgServerLogPart } from "./book_events";
 import moment from "moment";
 import { ChannelId, ClientId } from "./ts";
 import { FileTreeCache } from "./fileTreeCache";
 import { FiletransferManager } from "./panel/filetransferManager";
 import debug from "debug";
-import SimpleDiagram from "./ui/UiSimpleDiagram.svelte";
+import VoiceGraph from "./ui/specialized/VoiceGraph.svelte";
 const log_raw_in = debug("RAW:IN");
 const log_raw_out = debug("RAW:OUT");
 const log = debug("CON"),
@@ -50,7 +50,7 @@ export class Connection {
 	public serverLogCmd = fnBroadcast<[IMsgServerLogPart[]]>();
 
 	/** Listeners for loudness from the ui. */
-	public readonly loudnesses: Map<ClientId, SimpleDiagram> = new Map();
+	public readonly loudnesses: Map<ClientId, VoiceGraph> = new Map();
 
 	constructor(connectOptions: ConnectData) {
 		this.connectOptions = writable(connectOptions);

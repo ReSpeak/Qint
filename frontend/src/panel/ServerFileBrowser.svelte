@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { Connection } from "../connection";
-	import Icon from "../ui/Icon.svelte";
-	import StickyList from "../ui/StickyList.svelte";
-	import StickySlot from "../ui/StickySlot.svelte";
+	import Icon from "../ui/icon/Icon.svelte";
+	import StickyList from "../ui/container/StickyList.svelte";
+	import StickySlot from "../ui/container/StickySlot.svelte";
 	import StickyHeader from "./StickyHeader.svelte";
 	import ImageFileBrowser from "./ImageFileBrowser.svelte";
 

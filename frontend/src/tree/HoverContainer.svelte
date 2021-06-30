@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { createEventDispatcher } from "svelte";
-	import Icon from "../ui/Icon.svelte";
+	import Icon from "../ui/icon/Icon.svelte";
 
 	export let div: HTMLElement;
 	export let closeButton: boolean = false;

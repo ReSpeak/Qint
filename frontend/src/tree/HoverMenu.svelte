@@ -2,7 +2,7 @@
 	import HoverMenuClient from "./HoverMenuClient.svelte";
 	import HoverMenuChannel from "./HoverMenuChannel.svelte";
 	import HoverMenuServer from "./HoverMenuServer.svelte";
-	import Icon from "../ui/Icon.svelte";
+	import Icon from "../ui/icon/Icon.svelte";
 	import { app, NodeSelection } from "../app";
 	import { Channel, Client, Server } from "../book";
 	import { DescriptionMode } from "../transientSettings";

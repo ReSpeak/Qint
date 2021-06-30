@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Icon from "../ui/Icon.svelte";
+	import Icon from "../ui/icon/Icon.svelte";
 	import { HTML5VideoControl, SyncState, YoutubeVideoControl } from "./videoSync";
 	import type { IVideoControl } from "./videoSync";
 	import { onDestroy, tick } from "svelte";

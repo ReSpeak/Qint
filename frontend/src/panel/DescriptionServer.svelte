@@ -13,16 +13,16 @@
 		PASSWORD_PLACEHOLDER,
 	} from "../util";
 	import type { RequiredNN, Writeable } from "../util";
-	import BDropDown from "../ui/BDropDown.svelte";
-	import Icon from "../ui/Icon.svelte";
-	import PlatformIcon from "../ui/PlatformIcon.svelte";
-	import ServerName from "../ui/ServerName.svelte";
-	import TsIcon from "../ui/TsIcon.svelte";
-	import StickyList from "../ui/StickyList.svelte";
-	import StickySlot from "../ui/StickySlot.svelte";
+	import DropDown from "../ui/html/DropDown.svelte";
+	import Icon from "../ui/icon/Icon.svelte";
+	import PlatformIcon from "../ui/icon/PlatformIcon.svelte";
+	import ServerName from "../ui/name/ServerName.svelte";
+	import TsIcon from "../ui/icon/TsIcon.svelte";
+	import StickyList from "../ui/container/StickyList.svelte";
+	import StickySlot from "../ui/container/StickySlot.svelte";
 	import StickyHeader from "./StickyHeader.svelte";
-	import RenderedText from "../ui/RenderedText.svelte";
-	import RenderedTextEditor from "../ui/RenderedTextEditor.svelte";
+	import RenderedText from "../ui/specialized/RenderedText.svelte";
+	import RenderedTextEditor from "../ui/specialized/RenderedTextEditor.svelte";
 	import {
 		CodecEncryptionMode,
 		HostBannerMode,
@@ -30,10 +30,10 @@
 		licenseTypeGetDoc,
 		OptionalServerDataGen,
 	} from "../book_events";
-	import UiChangeResult from "../ui/UiChangeResult.svelte";
-	import UiEmojiString from "../ui/UiEmojiString.svelte";
+	import ChangeResult from "../ui/specialized/ChangeResult.svelte";
+	import EmojiString from "../ui/specialized/EmojiString.svelte";
 	import { app } from "../app";
-	import UiServerLog from "./UiServerLog.svelte";
+	import ServerLog from "./ServerLog.svelte";
 	import ImageFileBrowser from "./ImageFileBrowser.svelte";
 	import { onMount } from "svelte";
 
@@ -218,7 +218,7 @@
 						on:click={() => (changeRequest = undefined)}>
 						<Icon name="close" />
 					</button>
-					<UiChangeResult result={changeResult} />
+					<ChangeResult result={changeResult} />
 				</div>
 			{/if}
 		{/await}
@@ -347,7 +347,7 @@
 			<div class="dataLine">
 				<div>Uid (emoji):</div>
 				<div>
-					<UiEmojiString data={$server.uid} />
+					<EmojiString data={$server.uid} />
 				</div>
 			</div>
 		{/if}
@@ -381,7 +381,7 @@
 
 			<div class="dataLine">
 				<label for="edit_hostmessageMode">Mode:</label>
-				<BDropDown
+				<DropDown
 					id="edit_hostmessageMode"
 					bind:selected={servEdit.hostmessageMode}
 					items={enumValues(HostMessageMode)} />
@@ -403,7 +403,7 @@
 			</div>
 			<div class="dataLine">
 				<label for="edit_hostbannerMode">Mode:</label>
-				<BDropDown
+				<DropDown
 					id="edit_hostbannerMode"
 					bind:selected={servEdit.hostbannerMode}
 					items={enumValues(HostBannerMode)} />
@@ -436,7 +436,7 @@
 		<div class="descGroup" class:editing>
 			<div class="dataLine">
 				<label for="edit_codecEncryptionMode">Audio encryption mode:</label>
-				<BDropDown
+				<DropDown
 					id="edit_codecEncryptionMode"
 					bind:selected={servEdit.codecEncryptionMode}
 					items={enumValues(CodecEncryptionMode)} />
@@ -474,7 +474,7 @@
 	</StickySlot>
 	{#if logOpen}
 		<div class="descGroup serverLog">
-			<UiServerLog {connection} />
+			<ServerLog {connection} />
 		</div>
 	{/if}
 	<StickySlot>Actions</StickySlot>

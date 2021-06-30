@@ -1,8 +1,8 @@
 <script lang="ts">
-	import Icon from "../ui/Icon.svelte";
+	import Icon from "../ui/icon/Icon.svelte";
 	import { Connection } from "../connection";
-	import ClientName from "../ui/ClientName.svelte";
-	import ClientVolume from "../ui/ClientVolume.svelte";
+	import ClientName from "../ui/name/ClientName.svelte";
+	import ClientVolume from "../ui/specialized/ClientVolume.svelte";
 	import { app } from "../app";
 	import { Client } from "../book";
 

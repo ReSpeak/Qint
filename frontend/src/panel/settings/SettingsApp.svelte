@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { app } from "../../app";
-	import BTabSlot from "../../ui/BTabSlot.svelte";
-	import BKeyValue from "../../ui/BKeyValue.svelte";
+	import TabSlot from "../../ui/container/TabSlot.svelte";
+	import KeyValue from "../../ui/util/KeyValue.svelte";
 
 	let browserNotificationPermission: NotificationPermission = Notification.permission;
 	const developMode = app.transientSettings.ui._developMode;
@@ -20,25 +20,25 @@
 	}
 </script>
 
-<BTabSlot title="App">
-	<BKeyValue label="Ask before closing">
+<TabSlot title="App">
+	<KeyValue label="Ask before closing">
 		<input
 			type="checkbox"
 			class="checkbox-switch is-info"
 			bind:checked={app.transientSettings.app.askBeforeClosing}
 			on:change={syncSettings} />
-	</BKeyValue>
-	<BKeyValue label="Developer Mode">
+	</KeyValue>
+	<KeyValue label="Developer Mode">
 		<input
 			type="checkbox"
 			class="checkbox-switch is-info"
 			bind:checked={$developMode}
 			on:change={syncSettings} />
-	</BKeyValue>
+	</KeyValue>
 	{#if browserNotificationPermission === "default"}
-		<BKeyValue label="">
+		<KeyValue label="">
 			<button class="button is-warning" on:click={enableBrowserNotifications}>Enable browser notifications</button>
-		</BKeyValue>
+		</KeyValue>
 	{:else if browserNotificationPermission === "denied"}
 		<article class="message is-warning">
 			<div class="message-header">
@@ -50,4 +50,4 @@
 			</div>
 		</article>
 	{/if}
-</BTabSlot>
+</TabSlot>

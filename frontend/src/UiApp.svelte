@@ -1,19 +1,19 @@
 <script lang="ts">
-	import UiChat from "./chat/UiChat.svelte";
-	import UiGlobalSettings from "./panel/UiGlobalSettings.svelte";
+	import Chat from "./chat/Chat.svelte";
+	import Settings from "./panel/Settings.svelte";
 	import Sidebar from "./bar/Sidebar.svelte";
 	import Toolbar from "./bar/Toolbar.svelte";
 	import Description from "./panel/Description.svelte";
 	import FileBrowser from "./panel/FileBrowser.svelte";
 	import ServerFileBrowser from "./panel/ServerFileBrowser.svelte";
-	import UiSearch from "./search/UiSearch.svelte";
+	import Search from "./search/Search.svelte";
 	import { DisplayPanel } from "./panel/panel";
 	import { app } from "./app";
-	import Connect from "./connect/UiConnect.svelte";
+	import Connect from "./connect/Connect.svelte";
 	import GlobalCss from "./GlobalCss.svelte";
 	import GlobalScss from "./GlobalScss.svelte";
-	import { ConnectData, MuteState } from "./connect/connect";
-	import type { MuteStates } from "./connect/connect";
+	import { ConnectData, MuteState } from "./connect/uiConnect";
+	import type { MuteStates } from "./connect/uiConnect";
 	import { DescriptionMode } from "./transientSettings";
 	import { Channel, Server } from "./book";
 	import { backend } from "./backend/backend";
@@ -109,7 +109,7 @@
 
 <div class="appContainer" style="grid-template-columns: {columnStyle}">
 	<Toolbar bind:showSidebar={$showSidebar} bind:displayPanel={$displayPanel} bind:connectData bind:filter />
-	
+
 	<Sidebar
 		{connections}
 		notifications={app.nofifications}
@@ -118,7 +118,7 @@
 		{showConnect} />
 	<div class="panel">
 		{#if $displayPanel === DisplayPanel.Main}
-			<UiChat {chat} />
+			<Chat {chat} />
 			{#if $descriptionMode !== DescriptionMode.None}
 				<div class="description">
 					{#if $descriptionMode === DescriptionMode.Files && sel !== undefined && (sel?.node instanceof Channel || sel?.node instanceof Server)}
@@ -133,11 +133,11 @@
 				</div>
 			{/if}
 		{:else if $displayPanel === DisplayPanel.Settings}
-			<UiGlobalSettings />
+			<Settings />
 		{:else if $displayPanel === DisplayPanel.Connect}
 			<Connect bind:data={connectData} />
 		{:else if $displayPanel === DisplayPanel.Search}
-			<UiSearch {filter} />
+			<Search {filter} />
 		{/if}
 	</div>
 </div>

@@ -1,9 +1,9 @@
 <script lang="ts">
 	import type { ChannelId } from "../ts";
 	import { Connection } from "../connection";
-	import Icon from "../ui/Icon.svelte";
-	import BTable from "../ui/BTable.svelte";
-	import StickySlot from "../ui/StickySlot.svelte";
+	import Icon from "../ui/icon/Icon.svelte";
+	import Table from "../ui/html/Table.svelte";
+	import StickySlot from "../ui/container/StickySlot.svelte";
 	import StickyHeader from "./StickyHeader.svelte";
 	import type {
 		IColumns,
@@ -11,7 +11,7 @@
 		ClickRowEvent,
 		IDragOptions,
 		TableSortFn,
-	} from "../ui/table";
+	} from "../ui/html/uiTable";
 	import { FolderState } from "../fileTreeCache";
 	import type { FileTreeNode } from "../fileTreeCache";
 	import { extensionToIcon, formatBytes, pathJoin, pathSplit } from "./fileUtil";
@@ -32,7 +32,7 @@
 	let currentState = WorkState.None;
 	let path: string[] = [];
 	let fileBrowserHasFocus = false;
-	let fileTable: BTable;
+	let fileTable: Table;
 	let displayChannel: FileTreeNode | null;
 	let displayChildren: FileTreeNode[];
 	let dummyDownloader: HTMLIFrameElement;
@@ -445,7 +445,7 @@
 		</ul>
 	</nav>
 
-	<BTable
+	<Table
 		bind:this={fileTable}
 		{columns}
 		{rowOptions}
@@ -500,7 +500,7 @@
 		<tr slot="empty">
 			<th class="noFiles" colspan="4">No files</th>
 		</tr>
-	</BTable>
+	</Table>
 
 	<input
 		title="Dummy Uploader"

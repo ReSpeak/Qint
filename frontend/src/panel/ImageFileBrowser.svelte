@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Connection } from "../connection";
-	import Icon from "../ui/Icon.svelte";
+	import Icon from "../ui/icon/Icon.svelte";
 	import { FileTreeFolder, FolderState } from "../fileTreeCache";
 	import type { FileTreeNode } from "../fileTreeCache";
 	import { pathJoin } from "./fileUtil";

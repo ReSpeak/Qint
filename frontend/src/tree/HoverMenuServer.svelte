@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Connection } from "../connection";
-	import ServerName from "../ui/ServerName.svelte";
-	import RenderedText from "../ui/RenderedText.svelte";
+	import ServerName from "../ui/name/ServerName.svelte";
+	import RenderedText from "../ui/specialized/RenderedText.svelte";
 	import ConnectionSettings from "../bar/ConnectionSettings.svelte";
 
 	export let connection: Connection;

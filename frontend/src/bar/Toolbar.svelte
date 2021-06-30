@@ -1,10 +1,10 @@
 <script lang="ts">
-	import Icon from "../ui/Icon.svelte";
+	import Icon from "../ui/icon/Icon.svelte";
 	import { DisplayPanel } from "../panel/panel";
 	import { SERVER_ICON } from "../util";
 	import { app, NodeSelection } from "../app";
 	import ConnectionSettings from "./ConnectionSettings.svelte";
-	import { ConnectData } from "../connect/connect";
+	import { ConnectData } from "../connect/uiConnect";
 	import Searchbar from "./Searchbar.svelte";
 
 	export let displayPanel: DisplayPanel;

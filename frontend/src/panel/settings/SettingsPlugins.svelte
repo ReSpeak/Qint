@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { BASE_ADDRESS, on } from "../../util";
+	import { BASE_ADDRESS } from "../../util";
 	import { backend } from "../../backend/backend";
-	import BTabSlot from "../../ui/BTabSlot.svelte";
-	import Icon from "../../ui/Icon.svelte";
+	import TabSlot from "../../ui/container/TabSlot.svelte";
+	import Icon from "../../ui/icon/Icon.svelte";
 
 	let dummyUploader: HTMLInputElement;
 	let dummyDownloader: HTMLIFrameElement;
@@ -140,7 +140,7 @@
 </script>
 
 <!-- svelte-ignore a11y-missing-attribute -->
-<BTabSlot title="Plugins">
+<TabSlot title="Plugins">
 	<div class="layout">
 		<div class="pluginList panel is-primary">
 			<p class="panel-heading">Your Plugins</p>
@@ -229,7 +229,7 @@
 		style="display: none;"
 		bind:this={dummyDownloader}
 		sandbox="allow-downloads" />
-</BTabSlot>
+</TabSlot>
 
 <style lang="scss">
 	.layout {

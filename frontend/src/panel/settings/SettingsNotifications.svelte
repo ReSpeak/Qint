@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { app } from "../../app";
-	import BTabSlot from "../../ui/BTabSlot.svelte";
+	import TabSlot from "../../ui/container/TabSlot.svelte";
 
 	const settings = app.transientSettings.notifications;
 
@@ -22,7 +22,7 @@
 	}
 </script>
 
-<BTabSlot title="Notifications">
+<TabSlot title="Notifications">
 	<table class="table">
 		<thead>
 			<tr
@@ -75,7 +75,7 @@
 			{/each}
 		</tbody>
 	</table>
-</BTabSlot>
+</TabSlot>
 
 <style lang="scss">
 	.checkboxCell {

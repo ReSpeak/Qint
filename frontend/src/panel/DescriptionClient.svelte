@@ -6,16 +6,16 @@
 	import type { ServerGroupId } from "../ts";
 	import moment from "moment";
 	import type { Duration, Moment } from "moment";
-	import Icon from "../ui/Icon.svelte";
-	import PlatformIcon from "../ui/PlatformIcon.svelte";
-	import ServerGroupIcon from "../ui/ServerGroupIcon.svelte";
-	import TsIcon from "../ui/TsIcon.svelte";
-	import ClientName from "../ui/ClientName.svelte";
-	import StickyList from "../ui/StickyList.svelte";
-	import StickySlot from "../ui/StickySlot.svelte";
+	import Icon from "../ui/icon/Icon.svelte";
+	import PlatformIcon from "../ui/icon/PlatformIcon.svelte";
+	import ServerGroupIcon from "../ui/icon/ServerGroupIcon.svelte";
+	import TsIcon from "../ui/icon/TsIcon.svelte";
+	import ClientName from "../ui/name/ClientName.svelte";
+	import StickyList from "../ui/container/StickyList.svelte";
+	import StickySlot from "../ui/container/StickySlot.svelte";
 	import StickyHeader from "./StickyHeader.svelte";
-	import ClientVolume from "../ui/ClientVolume.svelte";
-	import { getClientAvatarPath } from "../ui/clientIcon";
+	import ClientVolume from "../ui/specialized/ClientVolume.svelte";
+	import { getClientAvatarPath } from "../ui/icon/tsIcons";
 	import { Reason } from "../book_events";
 	import { onMount } from "svelte";
 	import {
@@ -28,11 +28,11 @@
 		on,
 	} from "../util";
 	import { Client, ServerGroup } from "../book";
-	import BModal from "../ui/BModal.svelte";
+	import Modal from "../ui/container/Modal.svelte";
 	import { tick } from "svelte";
-	import BChart from "../ui/BChart.svelte";
-	import UiChangeResult from "../ui/UiChangeResult.svelte";
-	import UiEmojiString from "../ui/UiEmojiString.svelte";
+	import Chart from "../ui/html/Chart.svelte";
+	import ChangeResult from "../ui/specialized/ChangeResult.svelte";
+	import EmojiString from "../ui/specialized/EmojiString.svelte";
 	import ImageFileBrowser from "./ImageFileBrowser.svelte";
 	import { app } from "../app";
 	import type { ChartConfiguration } from "chart.js";
@@ -48,7 +48,7 @@
 	let pokeInput: HTMLElement | undefined;
 	let pokeMessage: string = "";
 	const developMode = app.transientSettings.ui._developMode;
-	let chart: BChart | null = null;
+	let chart: Chart | null = null;
 	let editing = false;
 	let editIcon = false;
 	let dummyUploader: HTMLInputElement;
@@ -536,7 +536,7 @@
 						on:click={() => (changeRequest = undefined)}>
 						<Icon name="close" />
 					</button>
-					<UiChangeResult result={changeResult} />
+					<ChangeResult result={changeResult} />
 				</div>
 			{/if}
 		{/await}
@@ -627,7 +627,7 @@
 					<div>{$client.uidStr}</div>
 					<div>Uid (emoji):</div>
 					<div>
-						<UiEmojiString data={$client.uid} />
+						<EmojiString data={$client.uid} />
 					</div>
 				{/if}
 				<div>Id:</div>
@@ -726,7 +726,7 @@
 				<ClientVolume {client} {connection} />
 			</div>
 			<form on:submit|preventDefault={onPokeSend}>
-				<BModal bind:visible={pokeModalVisible}>
+				<Modal bind:visible={pokeModalVisible}>
 					<div slot="header">
 						<span>Poke</span>
 						<ClientName client={$client} />
@@ -737,7 +737,7 @@
 						bind:this={pokeInput}
 						bind:value={pokeMessage} />
 					<button type="submit" slot="footer" class="button is-success">Poke</button>
-				</BModal>
+				</Modal>
 			</form>
 		</div>
 	{/if}
@@ -757,7 +757,7 @@
 			</div>
 		</div>
 		<div class="descGroup">
-			<BChart bind:this={chart} config={chartConfig} />
+			<Chart bind:this={chart} config={chartConfig} />
 		</div>
 		<div class="descGroup">
 			<div class="statsTable">

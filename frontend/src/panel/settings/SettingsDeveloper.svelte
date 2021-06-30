@@ -1,11 +1,11 @@
 <script lang="typescript">
-	import BTabSlot from "../../ui/BTabSlot.svelte";
-	import BInput from "../../ui/BInput.svelte";
+	import TabSlot from "../../ui/container/TabSlot.svelte";
+	import ChatInput from "../../ui/specialized/ChatInput.svelte";
 
 
 </script>
 
-<BTabSlot title="I'm a DeVeLoPeR">
+<TabSlot title="I'm a DeVeLoPeR">
 	<br />
-	<BInput value="" enterToSubmit={false} />
-</BTabSlot>
+	<ChatInput value="" enterToSubmit={false} />
+</TabSlot>

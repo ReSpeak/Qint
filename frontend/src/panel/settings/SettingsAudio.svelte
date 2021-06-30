@@ -12,10 +12,10 @@
 		NARROW_NO_BREAK_SPACE,
 		on,
 	} from "../../util";
-	import BTabSlot from "../../ui/BTabSlot.svelte";
-	import BKeyValue from "../../ui/BKeyValue.svelte";
-	import BSlider from "../../ui/BSlider.svelte";
-	import SimpleDiagram from "../../ui/UiSimpleDiagram.svelte";
+	import TabSlot from "../../ui/container/TabSlot.svelte";
+	import KeyValue from "../../ui/util/KeyValue.svelte";
+	import Slider from "../../ui/html/Slider.svelte";
+	import VoiceGraph from "../../ui/specialized/VoiceGraph.svelte";
 
 	let selected: boolean;
 	const audioSett = app.transientSettings.audio;
@@ -27,7 +27,7 @@
 
 	let globalVolume = factorToDb(audioSett.globalVolume);
 	let loudnessThreshold = audioSett.loudnessThreshold ?? minLoudnessThreshold;
-	let loudnessDiagram: SimpleDiagram;
+	let loudnessDiagram: VoiceGraph;
 	let renderRequested: boolean = false;
 
 	let loudnessSocket: WebSocket | undefined;
@@ -99,10 +99,10 @@
 	});
 </script>
 
-<BTabSlot title="Audio" bind:selected>
-	<BKeyValue label="Global Volume">
+<TabSlot title="Audio" bind:selected>
+	<KeyValue label="Global Volume">
 		<div class="volumeControl">
-			<BSlider
+			<Slider
 				min={minGlobalVolume}
 				max={maxGlobalVolume}
 				step={1}
@@ -111,9 +111,9 @@
 				tooltip={true}
 				on:input={updateGlobalVolume} />
 		</div>
-	</BKeyValue>
-	<BKeyValue label="Loudness">
-		<SimpleDiagram
+	</KeyValue>
+	<KeyValue label="Loudness">
+		<VoiceGraph
 			bind:this={loudnessDiagram}
 			width={LOUDNESS_WIDTH}
 			height={LOUDNESS_HEIGHT}
@@ -124,10 +124,10 @@
 				[-14, `Standard normalized volume (-14${NARROW_NO_BREAK_SPACE}dB)`, "#555555"],
 				[loudnessThreshold, "Your talking threshold", "#aa3333"],
 			]} />
-	</BKeyValue>
-	<BKeyValue label="Volume Capture Trigger">
+	</KeyValue>
+	<KeyValue label="Volume Capture Trigger">
 		<div class="volumeControl">
-			<BSlider
+			<Slider
 				min={minLoudnessThreshold}
 				max={maxLoudnessThreshold}
 				step={1}
@@ -136,8 +136,8 @@
 				tooltip={true}
 				on:input={updateLoudness} />
 		</div>
-	</BKeyValue>
-</BTabSlot>
+	</KeyValue>
+</TabSlot>
 
 <style lang="scss">
 	.volumeControl {

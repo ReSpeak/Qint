@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { base64Encode, clickToSelectAll } from "../../util";
 	import { backend } from "../../backend/backend";
-	import BTabSlot from "../../ui/BTabSlot.svelte";
-	import BKeyValue from "../../ui/BKeyValue.svelte";
-	import Icon from "../../ui/Icon.svelte";
-	import UiEmojiString from "../../ui/UiEmojiString.svelte";
+	import TabSlot from "../../ui/container/TabSlot.svelte";
+	import KeyValue from "../../ui/util/KeyValue.svelte";
+	import Icon from "../../ui/icon/Icon.svelte";
+	import EmojiString from "../../ui/specialized/EmojiString.svelte";
 	import { loadIdentities as liArr } from "./identity";
 	import type { ApiIdentity } from "./identity";
 
@@ -99,7 +99,7 @@
 </script>
 
 <!-- svelte-ignore a11y-missing-attribute -->
-<BTabSlot title="Identities">
+<TabSlot title="Identities">
 	<div class="layout">
 		<div class="identList panel is-primary">
 			<p class="panel-heading">Your Identities</p>
@@ -134,13 +134,13 @@
 
 		<form class="identOption" on:submit|preventDefault={updateIdentity}>
 			{#if editIdentity !== undefined}
-				<BKeyValue label="Name" labelStyle="is-normal">
+				<KeyValue label="Name" labelStyle="is-normal">
 					<div class="is-horizontal field">
 						<input type="text" bind:value={editIdentity.name} class="input" />
 					</div>
-				</BKeyValue>
+				</KeyValue>
 
-				<BKeyValue label="Uid" labelStyle="is-normal">
+				<KeyValue label="Uid" labelStyle="is-normal">
 					<div class="field has-addons">
 						<p class="control has-icons-right" style="flex: 1;">
 							<span class="input" use:clickToSelectAll>
@@ -149,20 +149,20 @@
 							<Icon name="lock-outline" isRight />
 						</p>
 					</div>
-				</BKeyValue>
+				</KeyValue>
 
-				<BKeyValue label="Uid (Emoji)" labelStyle="is-normal">
+				<KeyValue label="Uid (Emoji)" labelStyle="is-normal">
 					<div class="field has-addons">
 						<p class="control has-icons-right" style="flex: 1;">
 							<span class="input" use:clickToSelectAll>
-								<UiEmojiString data={editIdentity.uid} />
+								<EmojiString data={editIdentity.uid} />
 							</span>
 							<Icon name="lock-outline" isRight />
 						</p>
 					</div>
-				</BKeyValue>
+				</KeyValue>
 
-				<BKeyValue label="Security Level" labelStyle="is-normal">
+				<KeyValue label="Security Level" labelStyle="is-normal">
 					<div class="field has-addons">
 						<p class="control has-icons-right" style="flex: 1;">
 							<span class="input" use:clickToSelectAll>
@@ -171,7 +171,7 @@
 							<Icon name="lock-outline" isRight />
 						</p>
 					</div>
-				</BKeyValue>
+				</KeyValue>
 
 				<!-- <button title="Import a identity" on:click={() => dummyUploader.click()} class="button">
 				<Icon name="file-import-outline" />
@@ -182,7 +182,7 @@
 				- Any string
 				/button> -->
 
-				<BKeyValue label="">
+				<KeyValue label="">
 					<p class="buttons is-right">
 						<button
 							type="button"
@@ -213,7 +213,7 @@
 							<span>Save</span>
 						</button>
 					</p>
-				</BKeyValue>
+				</KeyValue>
 			{/if}
 		</form>
 	</div>
@@ -229,7 +229,7 @@
 		style="display: none;"
 		bind:this={dummyDownloader}
 		sandbox="allow-downloads" />
-</BTabSlot>
+</TabSlot>
 
 <style lang="scss">
 	.layout {

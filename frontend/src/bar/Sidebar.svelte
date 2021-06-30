@@ -1,12 +1,12 @@
 <script lang="ts">
 	import type { Writable } from "svelte/store";
-	import UiServer from "../tree/UiServerWrap.svelte";
-	import StickyList from "../ui/StickyList.svelte";
-	import StickySlot from "../ui/StickySlot.svelte";
+	import Server from "../tree/ServerWrap.svelte";
+	import StickyList from "../ui/container/StickyList.svelte";
+	import StickySlot from "../ui/container/StickySlot.svelte";
 	import NotificationList from "./NotificationList.svelte";
 	import { Connection } from "../connection";
-	import { ConnectData } from "../connect/connect";
-	import { TsNotification } from "../notification";
+	import { ConnectData } from "../connect/uiConnect";
+	import { TsNotification } from "../notifications";
 
 	export let connections: Writable<Connection[]>;
 	export let notifications: Writable<[number, Connection, TsNotification][]>;
@@ -18,7 +18,7 @@
 <aside class="sidebar" class:hidden={!visible}>
 	<StickyList>
 		{#each $connections as connection (connection.backend.id)}
-			<UiServer {connection} {filter} {showConnect} />
+			<Server {connection} {filter} {showConnect} />
 		{/each}
 
 		<StickySlot>Notifications</StickySlot>

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Icon from "../ui/Icon.svelte";
+	import Icon from "../ui/icon/Icon.svelte";
 	import { app } from "../app";
 	import { DescriptionMode } from "../transientSettings";
 

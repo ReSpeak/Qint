@@ -1,9 +1,9 @@
 import "./extensions";
 import UiApp from "./UiApp.svelte";
-//import App from "./UiPlayground.svelte";
+//import App from "./Playground.svelte";
 import { get } from "svelte/store";
 import { app } from "./app";
-import { ConnectData } from "./connect/connect";
+import { ConnectData } from "./connect/uiConnect";
 import debug from "debug";
 
 if (localStorage.getItem("debug") === null) debug.enable("error:*");

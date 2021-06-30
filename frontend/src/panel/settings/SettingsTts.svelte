@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { app } from "../../app";
-	import BTabSlot from "../../ui/BTabSlot.svelte";
-	import BKeyValue from "../../ui/BKeyValue.svelte";
-	import BDropDown from "../../ui/BDropDown.svelte";
-	import BSlider from "../../ui/BSlider.svelte";
+	import TabSlot from "../../ui/container/TabSlot.svelte";
+	import KeyValue from "../../ui/util/KeyValue.svelte";
+	import DropDown from "../../ui/html/DropDown.svelte";
+	import Slider from "../../ui/html/Slider.svelte";
 
 	const synthSett = app.transientSettings.synth;
 	const voices = synthSett.getVoices();
@@ -19,33 +19,33 @@
 	}
 </script>
 
-<BTabSlot title="Text to Speech">
-	<BKeyValue label="Voice" labelStyle="is-normal">
-		<BDropDown
+<TabSlot title="Text to Speech">
+	<KeyValue label="Voice" labelStyle="is-normal">
+		<DropDown
 			items={voices}
 			display={(v) => v.name}
 			bind:selected={synthSett.voice}
 			on:change={() => syncSettings()} />
-	</BKeyValue>
-	<BKeyValue label="Speed" labelStyle="is-normal">
-		<BSlider
+	</KeyValue>
+	<KeyValue label="Speed" labelStyle="is-normal">
+		<Slider
 			min={0.1}
 			max={3}
 			step={0.1}
 			bind:value={synthSett.speed}
 			tooltip={true}
 			on:change={() => syncSettings()} />
-	</BKeyValue>
-	<BKeyValue label="Volume" labelStyle="is-normal">
-		<BSlider
+	</KeyValue>
+	<KeyValue label="Volume" labelStyle="is-normal">
+		<Slider
 			min={0}
 			max={1}
 			step={0.05}
 			bind:value={synthSett.volume}
 			tooltip={true}
 			on:change={() => syncSettings()} />
-	</BKeyValue>
-	<BKeyValue label="Preview" narrow={false} labelStyle="is-normal">
+	</KeyValue>
+	<KeyValue label="Preview" narrow={false} labelStyle="is-normal">
 		<div class="is-horizontal field">
 			<div class="control" style="flex: 1;">
 				<input bind:this={previewText} class="input" value="Mit Qwint wird alles besser" />
@@ -54,5 +54,5 @@
 				<button class="button" on:click={() => previewVoice()}>Listen</button>
 			</div>
 		</div>
-	</BKeyValue>
-</BTabSlot>
+	</KeyValue>
+</TabSlot>

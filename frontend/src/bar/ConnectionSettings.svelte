@@ -1,10 +1,10 @@
 <script lang="ts">
-	import Icon from "../ui/Icon.svelte";
+	import Icon from "../ui/icon/Icon.svelte";
 	import type { Writable } from "svelte/store";
 	import { Client } from "../book";
 	import type { OChangeConnectionClientUpdate } from "../book_events";
 	import { Connection } from "../connection";
-	import { ConnectData, MuteState } from "../connect/connect";
+	import { ConnectData, MuteState } from "../connect/uiConnect";
 	import { backend } from "../backend/backend";
 	import { app } from "../app";
 
