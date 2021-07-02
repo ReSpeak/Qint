@@ -1,13 +1,13 @@
 <script lang="ts">
 	import type { ChangePromise } from "../connection";
 	import type { GraphQlServer } from "../book";
-	import Icon from "../ui/Icon.svelte";
-	import ServerName from "../ui/ServerName.svelte";
-	import StickyList from "../ui/StickyList.svelte";
-	import StickySlot from "../ui/StickySlot.svelte";
+	import Icon from "../ui/icon/Icon.svelte";
+	import ServerName from "../ui/name/ServerName.svelte";
+	import StickyList from "../ui/container/StickyList.svelte";
+	import StickySlot from "../ui/container/StickySlot.svelte";
 	import StickyHeader from "./StickyHeader.svelte";
-	import UiChangeResult from "../ui/UiChangeResult.svelte";
-	import UiEmojiString from "../ui/UiEmojiString.svelte";
+	import ChangeResult from "../ui/specialized/ChangeResult.svelte";
+	import EmojiString from "../ui/specialized/EmojiString.svelte";
 	import { app } from "../app";
 
 	export let server: GraphQlServer;
@@ -61,7 +61,7 @@
 						on:click={() => (changeRequest = undefined)}>
 						<Icon name="close" />
 					</button>
-					<UiChangeResult result={changeResult} />
+					<ChangeResult result={changeResult} />
 				</div>
 			{/if}
 		{/await}
@@ -78,7 +78,7 @@
 			<div class="dataLine">
 				<div>Uid (emoji):</div>
 				<div>
-					<UiEmojiString data={$server.uid} />
+					<EmojiString data={$server.uid} />
 				</div>
 			</div>
 		{/if}

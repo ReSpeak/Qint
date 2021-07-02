@@ -1,16 +1,16 @@
 <script lang="ts">
-	import Icon from "../ui/Icon.svelte";
-	import ClientName from "../ui/ClientName.svelte";
-	import StickyList from "../ui/StickyList.svelte";
-	import StickySlot from "../ui/StickySlot.svelte";
+	import Icon from "../ui/icon/Icon.svelte";
+	import ClientName from "../ui/name/ClientName.svelte";
+	import ServerName from "../ui/name/ServerName.svelte";
+	import StickyList from "../ui/container/StickyList.svelte";
+	import StickySlot from "../ui/container/StickySlot.svelte";
 	import StickyHeader from "./StickyHeader.svelte";
 	import { on } from "../util";
 	import { GraphQlClient } from "../book";
-	import UiChangeResult from "../ui/UiChangeResult.svelte";
-	import UiEmojiString from "../ui/UiEmojiString.svelte";
+	import ChangeResult from "../ui/specialized/ChangeResult.svelte";
+	import EmojiString from "../ui/specialized/EmojiString.svelte";
 	import { app } from "../app";
 	import type { ChangePromise } from "../connection";
-	import ServerName from "../ui/ServerName.svelte";
 
 	export let client: GraphQlClient;
 
@@ -76,7 +76,7 @@
 						on:click={() => (changeRequest = undefined)}>
 						<Icon name="close" />
 					</button>
-					<UiChangeResult result={changeResult} />
+					<ChangeResult result={changeResult} />
 				</div>
 			{/if}
 		{/await}
@@ -92,7 +92,7 @@
 					<div>{$client.uidStr}</div>
 					<div>Uid (emoji):</div>
 					<div>
-						<UiEmojiString data={$client.uid} />
+						<EmojiString data={$client.uid} />
 					</div>
 				{/if}
 			{/if}

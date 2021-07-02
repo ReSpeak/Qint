@@ -1,7 +1,6 @@
 <svelte:options immutable={true} />
 
 <script lang="ts">
-	//import Loader from "../ui/Loader.svelte";
 	import VideoPreview from "./VideoPreview.svelte";
 	import ImageModal from "./ImageModal.svelte";
 	import { analyzeLink } from "./previewAnalyzer";
