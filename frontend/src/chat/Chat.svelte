@@ -29,9 +29,10 @@
 
 	const selected = app.selectedNode;
 	const chatStore = app.transientSettings.chat;
+	const _itemType: Message = undefined!;
 
 	const developMode = app.transientSettings.ui._developMode;
-	let chatList: LazyList | undefined;
+	let chatList: LazyList<Message> | undefined;
 	let messagesError: unknown | undefined;
 	let messageInput: ChatInput;
 	let text = "";
@@ -295,6 +296,7 @@
 		</div>
 	{:else if $selected !== undefined && sel !== undefined}
 		<LazyList
+			{_itemType}
 			on:viewchanged={viewchanged}
 			bind:this={chatList}
 			{fetchElements}

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { CustomIntersectionObserver, ListFetchDir } from "./uiLazyList";
 	import type { FetchResult } from "./uiLazyList";
-	import { assert, binarySearchByKey } from "../../util";
+	import { assert, binarySearchByKey, on } from "../../util";
 	import { createEventDispatcher, tick, onMount } from "svelte";
 	import ResizeObserver from "resize-observer-polyfill";
 	import debug from "debug";
@@ -10,7 +10,10 @@
 
 	// Dummy class to have nice typing for our 'generic' parameter T which
 	// represents the element type.
-	type T = any;
+	type T = $$Generic;
+	interface $$Slots {
+		default: { item: T };
+	}
 
 	// The golden handbook for js/css:
 	// - pan.scrollHeight, // complete content
@@ -27,6 +30,8 @@
 	export let suggestJumpStart: boolean = false;
 	export let suggestJumpEnd: boolean = false;
 	export let notifyViewChanged: boolean = false;
+	export let _itemType: T = undefined!;
+	on(_itemType); // dummy usage to remove unused field waning
 	let canLoadBeforeStart: boolean = true;
 	let canLoadAfterEnd: boolean = true;
 	let showJumpStart: boolean;
@@ -108,8 +113,8 @@
 		}
 	}
 
-	type fetchFun<TL = any> = (id: TL | undefined, dir: ListFetchDir) => Promise<FetchResult<TL>>;
-	export let fetchElements: fetchFun;
+	type fetchFun<TL> = (id: TL | undefined, dir: ListFetchDir) => Promise<FetchResult<TL>>;
+	export let fetchElements: fetchFun<T>;
 
 	// Require the minimum distance before deleting an item to be higher
 	// than the minimum size the list wants to buffer.
@@ -143,7 +148,7 @@
 	}
 
 	function getHtmlElements(): ArrayLike<HTMLElement> {
-		const childList = (scrollPane.children as any) as ArrayLike<HTMLElement>;
+		const childList = scrollPane.children as any as ArrayLike<HTMLElement>;
 		assert(childList.length === elems.length, "HTML node count does not match elements count");
 		return childList;
 	}

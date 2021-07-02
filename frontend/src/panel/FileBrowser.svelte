@@ -32,7 +32,7 @@
 	let currentState = WorkState.None;
 	let path: string[] = [];
 	let fileBrowserHasFocus = false;
-	let fileTable: Table;
+	let fileTable: Table<FileTreeNode>;
 	let displayChannel: FileTreeNode | null;
 	let displayChildren: FileTreeNode[];
 	let dummyDownloader: HTMLIFrameElement;

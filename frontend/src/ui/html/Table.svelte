@@ -47,7 +47,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		dragDrop: { target: HTMLElement };
 	}>();
 
-	type TRow = any;
+	type TRow = $$Generic;
 	type TCol = IColumn<TRow>;
 	type InternalRow = {
 		t: TRow;
@@ -55,6 +55,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		selected: boolean;
 		sortVal?: any;
 	};
+	interface $$Slots {
+		headerCell: { col: TCol };
+		orderIcon: { sortOrder: SortOrder };
+		colCell: { col: TCol; row: TRow };
+	}
 
 	export let columns: IColumns<TRow>;
 	export let rows: IRows<TRow>;
@@ -192,7 +197,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	}
 
 	function handleClickCell(event: MouseEvent, row: InternalRow, key: ColumnKey) {
-		dispatch("clickCell", { event, row, key });
+		dispatch("clickCell", { event, row: row.t, key });
 	}
 
 	let draggingElements = false;
@@ -265,7 +270,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 							<slot name="headerCell" {col} />
 						{:else}{col.title}{/if}
 						{#if sortBy === col.key}
-							<slot name="orderIcon" {sortOrder}>{sortOrder === 1 ? "▲" : "▼"}</slot>
+							<slot name="orderIcon" {sortOrder}>{sortOrder === SortOrder.Asc ? "▲" : "▼"}</slot>
 						{/if}
 					</th>
 				{/each}
