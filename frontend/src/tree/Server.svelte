@@ -60,7 +60,7 @@
 <StickySlot styled={false} on:click={click} on:auxclick={click}>
 	<div bind:this={div} class="button stickyLine" class:selectedServerChat tabindex="0">
 		<TsIcon type="server" source={$server} {connection} />
-		<ServerName {connection} />
+		<ServerName {server} />
 		<div class="buttons">
 			{#if !$state.connected}
 				<button class="button is-danger is-small" on:click|stopPropagation={cancel}

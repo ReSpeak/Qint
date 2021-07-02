@@ -1,27 +1,14 @@
 <script lang="ts">
 	import type { ChangePromise } from "../connection";
 	import type { GraphQlServer } from "../book";
-	import {
-		CLEAR_ICON,
-		enumValues,
-		PASSWORD_PLACEHOLDER,
-	} from "../util";
-	import BDropDown from "../ui/BDropDown.svelte";
 	import Icon from "../ui/Icon.svelte";
 	import ServerName from "../ui/ServerName.svelte";
 	import StickyList from "../ui/StickyList.svelte";
 	import StickySlot from "../ui/StickySlot.svelte";
 	import StickyHeader from "./StickyHeader.svelte";
-	import RenderedTextEditor from "../ui/RenderedTextEditor.svelte";
-	import {
-		CodecEncryptionMode,
-		HostBannerMode,
-		HostMessageMode,
-	} from "../book_events";
 	import UiChangeResult from "../ui/UiChangeResult.svelte";
 	import UiEmojiString from "../ui/UiEmojiString.svelte";
 	import { app } from "../app";
-	import UiServerLog from "./UiServerLog.svelte";
 
 	export let server: GraphQlServer;
 

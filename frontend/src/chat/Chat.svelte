@@ -353,7 +353,7 @@
 						{:else if sel.node instanceof Channel}
 							<span>your channel</span>
 						{:else if sel.node instanceof Server}
-							<ServerName connection={sel.connection} />
+							<ServerName server={sel.node} />
 						{/if}
 					</svelte:fragment>
 				</ChatInput>

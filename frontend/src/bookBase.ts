@@ -6,10 +6,11 @@ import {
 	datetimeDeserialize,
 	getDataColor,
 	tsHexEncode,
+	urlBase64Encode,
 } from "./util";
 import { Moment } from "moment";
 import moment from "moment";
-import { Uid } from "./ts";
+import { IconId, Uid } from "./ts";
 
 export class ChatData {
 	public readonly lastRead: Moment;
@@ -33,7 +34,7 @@ export class ChatData {
 	}
 }
 
-export class BookNode {
+export abstract class BookNode {
 	protected readonly _store: Writable<this>;
 	public readonly chat: Writable<ChatData> = writable(new ChatData(moment(), 0));
 	public filterShow: boolean = true;
@@ -58,21 +59,25 @@ export class BookNode {
 	}
 }
 
-export class Group {
+export abstract class Group {
 	public update(obj: Partial<this>): this {
 		return Object.assign(this, obj);
 	}
 }
 
-export class ChannelBase extends BookNode {}
+export abstract class ChannelBase extends BookNode { }
 
-export class ChannelGroupBase extends Group {}
+export abstract class ChannelGroupBase extends Group { }
 
-export class OptionalChannelDataBase {}
+export abstract class OptionalChannelDataBase {
+	public abstract update(obj: Partial<this>): this;
+}
 
-export class ClientBase extends BookNode {
-	//public readonly uid: Uid | null;
-	public readonly avatar_hash!: string;
+export abstract class ClientBase extends BookNode {
+	public abstract readonly uid: Uid | null;
+	public abstract readonly name: string;
+	public abstract readonly icon: IconId;
+	public abstract readonly avatarHash: string;
 	private readonly _color: Cached<Uid | null, string>;
 	public get color(): string {
 		return this._color.get();
@@ -82,19 +87,17 @@ export class ClientBase extends BookNode {
 		return this._uidStr.get();
 	}
 
-	protected constructor(uid?: number[], avatar_hash?: string) {
+	protected constructor() {
 		super();
 		// TODO Handle null uid
 		this._color = new Cached(
-			() => (this as any).uid,
+			() => this.uid,
 			(u) => (u !== null ? getDataColor(u) : "")
 		);
 		this._uidStr = new Cached(
-			() => (this as any).uid,
+			() => this.uid,
 			(u) => (u !== null ? base64Encode(u) : "")
 		);
-		if (uid !== undefined) (this as any).uid = uid;
-		if (avatar_hash !== undefined) this.avatar_hash = avatar_hash;
 	}
 
 	/**
@@ -104,7 +107,7 @@ export class ClientBase extends BookNode {
 	 * [0-9a-f] with [a-p].
 	 */
 	public getAvatarUid(): string | undefined {
-		if (this.avatar_hash === "" || (this as any).uid === null) return;
+		if (this.avatarHash === "" || (this as any).uid === null) return;
 		return tsHexEncode((this as any).uid);
 	}
 
@@ -125,12 +128,20 @@ export class ClientBase extends BookNode {
 	}
 }
 
-export class OptionalClientDataBase {}
+export abstract class OptionalClientDataBase {
+	public abstract update(obj: Partial<this>): this;
+}
 
-export class ConnectionClientDataBase {}
+export abstract class ConnectionClientDataBase {
+	public abstract update(obj: Partial<this>): this;
+}
 
-export class ServerBase extends BookNode {
-	public readonly uid!: number[];
+export abstract class ServerBase extends BookNode {
+	public abstract readonly publicKey: number[];
+	public abstract readonly name: string;
+	public abstract readonly icon: IconId;
+
+	public readonly uid!: number[]; // TODO Where does this come from, and why is it not on the full book class ???
 	private readonly _color: Cached<number[], string>;
 	public get color(): string {
 		return this._color.get();
@@ -138,6 +149,10 @@ export class ServerBase extends BookNode {
 	private readonly _uidStr: Cached<number[], string>;
 	public get uidStr(): string {
 		return this._uidStr.get();
+	}
+	private readonly _publicKeyStr: Cached<number[], string>;
+	public get publicKeyStr(): string {
+		return this._publicKeyStr.get();
 	}
 
 	protected constructor(uid?: number[]) {
@@ -150,6 +165,10 @@ export class ServerBase extends BookNode {
 			() => this.uid,
 			(u) => base64Encode(u)
 		);
+		this._publicKeyStr = new Cached(
+			() => this.publicKey,
+			(u) => urlBase64Encode(u)
+		);
 		if (uid !== undefined) this.uid = uid;
 	}
 
@@ -158,8 +177,12 @@ export class ServerBase extends BookNode {
 	}
 }
 
-export class ServerGroupBase extends Group {}
+export class ServerGroupBase extends Group { }
 
-export class OptionalServerDataBase {}
+export abstract class OptionalServerDataBase {
+	public abstract update(obj: Partial<this>): this;
+}
 
-export class ConnectionServerDataBase {}
+export abstract class ConnectionServerDataBase {
+	public abstract update(obj: Partial<this>): this;
+}

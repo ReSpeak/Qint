@@ -91,7 +91,7 @@ export class <#= struc.name #>Gen extends <#= struc.name #>Base {
 	<# }
 	} #>
 
-	public update(obj: Partial<this> | Partial<<#= struc.name #>Gen>): this {
+	public override update(obj: Partial<this> | Partial<<#= struc.name #>Gen>): this {
 	<#
 	// Preprocess properties
 	for p in &struc.properties {
@@ -218,7 +218,7 @@ export interface IMsg<#= msg.name #>Part {
 
 <# } else { #>
 export interface IMsg<#= msg.name #> {
-	<#= msg.name #>: {};
+	<#= msg.name #>: Record<string, never>; // empty object
 };
 
 <# } #>

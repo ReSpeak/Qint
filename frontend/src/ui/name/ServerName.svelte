@@ -2,10 +2,11 @@
 	import { Connection } from "../../connection";
 	import { get } from "svelte/store";
 	import { GraphQlServer, Server } from "../../book";
-	import { app } from "../app";
+	import { app } from "../../app";
+	import { ServerBase } from "../../bookBase";
 
 	export let connection: Connection | undefined = undefined;
-	export let server: GraphQlServer | Server | undefined = undefined;
+	export let server: ServerBase | undefined = undefined;
 
 	const state = connection?.state;
 	const conServer = connection?.book.server;
@@ -14,7 +15,9 @@
 	$: realServer = conServer !== undefined ? $conServer : server!;
 
 	function click() {
-		app.select(connection, conServer ?? server!);
+		if (realServer instanceof Server && connection !== undefined) {
+			app.select(connection, realServer);
+		}
 	}
 </script>
 

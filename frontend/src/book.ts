@@ -522,14 +522,21 @@ export class BookNode {
 }
 
 export class GraphQlClient extends ClientBase implements ITreeNode {
-	public readonly uid!: Uid | null;
-	public readonly name!: string;
-	public readonly icon!: IconId;
+	public override readonly uid!: Uid | null;
+	public override readonly name!: string;
+	public override readonly icon!: IconId;
+	public override readonly avatarHash!: string;
 
-	protected constructor(uid?: number[], name?: string, icon?: IconId, avatar_hash?: string) {
-		super(uid, avatar_hash);
+	protected constructor(uid?: number[], name?: string, icon?: IconId, avatarHash?: string) {
+		super();
+		// TODO Fix this stupid checks:
+		// Either declare the fiels at top null/undefied-able
+		// or make sure this is definitely initalized.
+		// Otherwise this will be a nasty surprise
 		if (name !== undefined) this.name = name;
 		if (icon !== undefined) this.icon = icon;
+		this.uid = uid ?? null;
+		if (avatarHash !== undefined) this.avatarHash = avatarHash;
 	}
 
 	public static fromGraphql(obj: {
@@ -581,13 +588,13 @@ export class Client extends book_events.ClientGen implements ITreeNode, Readable
 		return c.update(obj as any);
 	}
 
-	public update(obj: Partial<this>): this {
+	public override update(obj: Partial<this>): this {
 		super.update(obj);
 		this._store.set(this);
 		return this;
 	}
 
-	public equals(other: this): boolean {
+	public override equals(other: this): boolean {
 		return other instanceof Client && this.id === other.id && super.equals(other);
 	}
 
@@ -636,7 +643,7 @@ export class Channel extends book_events.ChannelGen implements ITreeNode, Readab
 		super();
 	}
 
-	public update(obj: Partial<this>): this {
+	public override update(obj: Partial<this>): this {
 		super.update(obj);
 		this._store.set(this);
 		return this;
@@ -662,14 +669,10 @@ export class Channel extends book_events.ChannelGen implements ITreeNode, Readab
 }
 
 export class GraphQlServer extends ServerBase implements ITreeNode {
-	public readonly publicKey!: number[];
-	public readonly name!: string;
+	public override readonly publicKey!: number[];
+	public override readonly name!: string;
+	public override readonly icon!: IconId;
 	public readonly address!: string;
-	public readonly icon!: IconId;
-	private readonly _publicKeyStr: Cached<number[], string>;
-	public get publicKeyStr(): string {
-		return this._publicKeyStr.get();
-	}
 
 	protected constructor(
 		publicKey?: number[] | undefined,
@@ -679,10 +682,6 @@ export class GraphQlServer extends ServerBase implements ITreeNode {
 		icon?: IconId
 	) {
 		super(uid);
-		this._publicKeyStr = new Cached(
-			() => this.publicKey,
-			(u) => urlBase64Encode(u)
-		);
 		if (publicKey !== undefined) this.publicKey = publicKey;
 		if (address !== undefined) this.address = address;
 		if (name !== undefined) this.name = name;
@@ -699,7 +698,7 @@ export class GraphQlServer extends ServerBase implements ITreeNode {
 		return new GraphQlServer(obj.publicKey, obj.uid, obj.name, obj.address, obj.icon);
 	}
 
-	public equals(other: this): boolean {
+	public override equals(other: this): boolean {
 		return other instanceof GraphQlServer && this.uidStr === other.uidStr;
 	}
 
@@ -718,7 +717,7 @@ export class Server extends book_events.ServerGen implements ITreeNode, Readable
 		super();
 	}
 
-	public update(obj: Partial<this>): this {
+	public override update(obj: Partial<this>): this {
 		super.update(obj);
 		this._store.set(this);
 		return this;

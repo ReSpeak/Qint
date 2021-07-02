@@ -121,10 +121,10 @@
 			<Chat {chat} />
 			{#if $descriptionMode !== DescriptionMode.None}
 				<div class="description">
-					{#if $descriptionMode === DescriptionMode.Files && sel !== undefined && (sel?.node instanceof Channel || sel?.node instanceof Server)}
-						{#if sel?.node instanceof Channel}
+					{#if $descriptionMode === DescriptionMode.Files && sel !== undefined && (sel.node instanceof Channel || sel.node instanceof Server)}
+						{#if sel.node instanceof Channel}
 							<FileBrowser connection={sel.connection} channelId={sel.node.id} />
-						{:else}
+						{:else if sel.node instanceof Server}
 							<ServerFileBrowser connection={sel.connection} />
 						{/if}
 					{:else}

@@ -27,16 +27,6 @@
 		console.log("Client", client);
 	}
 
-	async function kickFromServer() {
-		// TODO Handle result
-		/*await connection.sendChange({
-			ClientKick: {
-				id: client.id,
-				reason: Reason.KickServer,
-			},
-		});*/
-	}
-
 	function clickEditMode() {
 		editing = true;
 	}

@@ -10,7 +10,6 @@ import { ConnectData } from "./connect/uiConnect";
 import { DisplayPanel } from "./panel/panel";
 import { getIconPath } from "./ui/icon/tsIcons";
 import { TsNotification } from "./notifications";
-import { EccKeyPubP256, Uid } from "./ts";
 
 export class App {
 	public readonly connections: Writable<Connection[]> = writable([]);
@@ -58,7 +57,7 @@ export class App {
 		});
 	}
 
-	public select(con: Connection | undefined, node: ITreeNode): void {
+	public select(con: Connection, node: ITreeNode): void {
 		this.selectNode(new NodeSelection(con, node));
 	}
 
@@ -128,7 +127,7 @@ export class App {
 }
 
 export class NodeSelection {
-	constructor(public readonly connection: Connection | undefined, public readonly node: ITreeNode) {}
+	constructor(public readonly connection: Connection, public readonly node: ITreeNode) { }
 
 	public get uniqueStr(): string {
 		return `${this.node.qlType},${this.connection?.book.server.uidStr},${this.node.qlId}`;
