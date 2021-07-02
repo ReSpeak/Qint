@@ -11,7 +11,7 @@
 
 	export let connection: Connection;
 
-	let logList: LazyList;
+	let logList: LazyList<LogEntry>;
 	let fetchError: ResultDetails | undefined;
 	let state = new ServerLogState(connection);
 

@@ -522,33 +522,29 @@ export class BookNode {
 }
 
 export class GraphQlClient extends ClientBase implements ITreeNode {
-	public override readonly uid!: Uid | null;
-	public override readonly name!: string;
-	public override readonly icon!: IconId;
-	public override readonly avatarHash!: string;
+	public override readonly uid: Uid;
+	public override readonly name: string;
+	public override readonly icon: IconId;
+	public override readonly avatarHash: string;
 
-	protected constructor(uid?: number[], name?: string, icon?: IconId, avatarHash?: string) {
+	protected constructor(uid: Uid, name: string, icon: IconId, avatarHash: string) {
 		super();
-		// TODO Fix this stupid checks:
-		// Either declare the fiels at top null/undefied-able
-		// or make sure this is definitely initalized.
-		// Otherwise this will be a nasty surprise
-		if (name !== undefined) this.name = name;
-		if (icon !== undefined) this.icon = icon;
-		this.uid = uid ?? null;
-		if (avatarHash !== undefined) this.avatarHash = avatarHash;
+		this.name = name;
+		this.icon = icon;
+		this.uid = uid;
+		this.avatarHash = avatarHash;
 	}
 
 	public static fromGraphql(obj: {
 		uid: number[];
 		customName?: string;
-		name?: string;
+		name: string;
 	}): GraphQlClient {
 		return new GraphQlClient(obj.uid, obj.customName ?? obj.name, "0", "");
 	}
 
 	public static fromGraphqlInvoker(obj: {
-		client: { uid: number[]; customName?: string; name?: string };
+		client: { uid: number[]; customName?: string; name: string };
 		icon?: IconId;
 		avatar?: string;
 	}): GraphQlClient {
@@ -632,9 +628,8 @@ export class Client extends book_events.ClientGen implements ITreeNode, Readable
 	}
 }
 
-export class Channel extends book_events.ChannelGen implements ITreeNode, Readable<Channel> {
+export class Channel extends book_events.ChannelGen implements ITreeNode, ITreeParent, Readable<Channel> {
 	public readonly clients: Writable<Client[]> = writable([]);
-	// ITreeParent
 	public readonly channels: Writable<Channel[]> = writable([]);
 	// Cache last path in file browser
 	public lastFilePath: string[] = [];
@@ -669,30 +664,32 @@ export class Channel extends book_events.ChannelGen implements ITreeNode, Readab
 }
 
 export class GraphQlServer extends ServerBase implements ITreeNode {
-	public override readonly publicKey!: number[];
-	public override readonly name!: string;
-	public override readonly icon!: IconId;
+	public override readonly publicKey: number[];
+	public override readonly uid: Uid;
+	public override readonly name: string;
 	public readonly address!: string;
+	public override readonly icon: IconId;
 
 	protected constructor(
-		publicKey?: number[] | undefined,
-		uid?: number[],
-		name?: string,
-		address?: string,
+		publicKey: number[],
+		uid: Uid,
+		name: string,
+		address: string,
 		icon?: IconId
 	) {
-		super(uid);
-		if (publicKey !== undefined) this.publicKey = publicKey;
-		if (address !== undefined) this.address = address;
-		if (name !== undefined) this.name = name;
-		if (icon !== undefined) this.icon = icon;
+		super();
+		this.publicKey = publicKey;
+		this.uid = uid;
+		this.name = name;
+		this.address = address;
+		this.icon = icon ?? "0";
 	}
 
 	public static fromGraphql(obj: {
-		publicKey?: number[];
-		uid?: number[];
-		name?: string;
-		address?: string;
+		publicKey: number[];
+		uid: Uid;
+		name: string;
+		address: string;
 		icon?: IconId;
 	}): GraphQlServer {
 		return new GraphQlServer(obj.publicKey, obj.uid, obj.name, obj.address, obj.icon);
@@ -709,8 +706,7 @@ export class GraphQlServer extends ServerBase implements ITreeNode {
 	public readonly wsTarget = "Server";
 }
 
-export class Server extends book_events.ServerGen implements ITreeNode, Readable<Server> {
-	// ITreeParent
+export class Server extends book_events.ServerGen implements ITreeNode, ITreeParent, Readable<Server> {
 	public readonly channels: Writable<Channel[]> = writable([]);
 
 	constructor() {

@@ -11,3 +11,6 @@ declare namespace svelte.JSX {
 		onsvddrop?: (e: CustomEvent<DragData>) => void;
 	}
 }
+
+declare const BUILD_ENV: string;
+declare const BUILD_DAT: string;

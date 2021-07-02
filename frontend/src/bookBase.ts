@@ -140,8 +140,10 @@ export abstract class ServerBase extends BookNode {
 	public abstract readonly publicKey: number[];
 	public abstract readonly name: string;
 	public abstract readonly icon: IconId;
+	// for `Server`: gets injected from msg.Connected
+	// for `GraphQlServer`: get directly
+	public readonly uid!: Uid;
 
-	public readonly uid!: number[]; // TODO Where does this come from, and why is it not on the full book class ???
 	private readonly _color: Cached<number[], string>;
 	public get color(): string {
 		return this._color.get();
@@ -155,7 +157,7 @@ export abstract class ServerBase extends BookNode {
 		return this._publicKeyStr.get();
 	}
 
-	protected constructor(uid?: number[]) {
+	protected constructor() {
 		super();
 		this._color = new Cached(
 			() => this.uid,
@@ -169,7 +171,6 @@ export abstract class ServerBase extends BookNode {
 			() => this.publicKey,
 			(u) => urlBase64Encode(u)
 		);
-		if (uid !== undefined) this.uid = uid;
 	}
 
 	public equals(other: this): boolean {

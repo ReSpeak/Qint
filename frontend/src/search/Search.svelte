@@ -12,8 +12,8 @@
 
 	export let filter: string;
 
-	let searchList: LazyList | undefined;
-	let otherSearchList: LazyList | undefined;
+	let searchList: LazyList<MessageSearchResult> | undefined;
+	let otherSearchList: LazyList<OtherSearchResult> | undefined;
 	let searchError: unknown | undefined;
 	let messageResultCount = 0;
 	let otherResultCount = 0;

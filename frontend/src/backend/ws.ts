@@ -1,6 +1,6 @@
 // tslint:disable: interface-name
 
-import { ClientId } from "../ts";
+import { ClientId, Uid } from "../ts";
 import {
 	InMessage,
 	OChange,
@@ -95,7 +95,7 @@ export type InMsg =
 
 interface InMsgConnected {
 	Connected: {
-		server: number[];
+		server: Uid;
 		ownClient: ClientId;
 	};
 }

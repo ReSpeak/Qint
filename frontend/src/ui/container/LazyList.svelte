@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { CustomIntersectionObserver, ListFetchDir } from "./uiLazyList";
 	import type { FetchResult } from "./uiLazyList";
-	import { assert, binarySearchByKey, on } from "../../util";
+	import { assert, binarySearchByKey } from "../../util";
 	import { createEventDispatcher, tick, onMount } from "svelte";
 	import ResizeObserver from "resize-observer-polyfill";
 	import debug from "debug";
@@ -30,8 +30,6 @@
 	export let suggestJumpStart: boolean = false;
 	export let suggestJumpEnd: boolean = false;
 	export let notifyViewChanged: boolean = false;
-	export let _itemType: T = undefined!;
-	on(_itemType); // dummy usage to remove unused field waning
 	let canLoadBeforeStart: boolean = true;
 	let canLoadAfterEnd: boolean = true;
 	let showJumpStart: boolean;
