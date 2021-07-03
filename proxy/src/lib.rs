@@ -209,7 +209,9 @@ struct MuteStates {
 
 pub struct App(Arc<State>);
 
-fn default_listen_address() -> SocketAddr { "127.0.0.1:4422".parse().unwrap() }
+fn default_listen_address() -> SocketAddr {
+	"127.0.0.1:4422".parse().unwrap()
+}
 
 fn default_cache_path() -> PathBuf {
 	let proj_dirs = match directories_next::ProjectDirs::from("", DIR_ORGANIZATION, DIR_PROJECT) {
@@ -230,6 +232,7 @@ impl State {
 		let mut settings = state.settings.write().unwrap();
 		let old_loudness_threshold = settings.get_loudness_threshold();
 		let old_global_volume = settings.get_global_volume();
+		let (old_capture, old_playback) = settings.get_preferred_audio_device();
 
 		// Reload before changing to prevent overwriting changes from other processes
 		if let Err(e) = settings.load(&state.launch_config.read().unwrap().config_path) {
@@ -243,10 +246,10 @@ impl State {
 		}
 
 		// Apply audio changes
-		if let Some(v) = settings.get_loudness_threshold() {
-			if Some(v) != old_loudness_threshold {
-				let logger = state.logger.clone();
-				if let Some(ad) = &state.audio_data {
+		if let Some(ad) = &state.audio_data {
+			if let Some(v) = settings.get_loudness_threshold() {
+				if Some(v) != old_loudness_threshold {
+					let logger = state.logger.clone();
 					actix::spawn(ad.a2ts.send(audio::audio_to_ts::SetLoudnessThresholdMsg(v)).map(
 						move |r| {
 							if let Err(e) = r {
@@ -257,12 +260,10 @@ impl State {
 					));
 				}
 			}
-		}
 
-		if let Some(v) = settings.get_global_volume() {
-			if Some(v) != old_global_volume {
-				let logger = state.logger.clone();
-				if let Some(ad) = &state.audio_data {
+			if let Some(v) = settings.get_global_volume() {
+				if Some(v) != old_global_volume {
+					let logger = state.logger.clone();
 					actix::spawn(ad.ts2a.send(audio::ts_to_audio::SetGlobalVolumeMsg(v)).map(
 						move |r| {
 							if let Err(e) = r {
@@ -271,6 +272,32 @@ impl State {
 						},
 					));
 				}
+			}
+
+			let (new_capture, new_playback) = settings.get_preferred_audio_device();
+			if old_capture != new_capture {
+				let logger = state.logger.clone();
+				actix::spawn(
+					ad.a2ts.send(audio::SetAudioDevice(new_capture)).map(
+						move |r| {
+							if let Err(e) = r {
+								error!(logger, "Failed to apply global volume"; "error" => %e);
+							}
+						},
+					),
+				);
+			}
+			if old_playback != new_playback {
+				let logger = state.logger.clone();
+				actix::spawn(
+					ad.ts2a.send(audio::SetAudioDevice(new_playback)).map(
+						move |r| {
+							if let Err(e) = r {
+								error!(logger, "Failed to apply global volume"; "error" => %e);
+							}
+						},
+					),
+				);
 			}
 		}
 
@@ -390,7 +417,9 @@ impl Settings {
 		Ok(())
 	}
 
-	fn merge(&mut self, v: &Value) { merge_json(&mut self.0, v); }
+	fn merge(&mut self, v: &Value) {
+		merge_json(&mut self.0, v);
+	}
 
 	fn get_global_volume(&self) -> Option<f32> {
 		Some(self.0.as_object()?.get("audio")?.as_object()?.get("globalVolume")?.as_f64()? as f32)
@@ -449,6 +478,21 @@ impl Settings {
 				"defaultAway": away,
 			}
 		}));
+	}
+
+	/* (Capture, Playback) */
+	fn get_preferred_audio_device(&self) -> (Option<String>, Option<String>) {
+		self.0
+			.as_object()
+			.and_then(|p| p.get("audio"))
+			.and_then(|p| p.as_object())
+			.map(|audio| {
+				(
+					audio.get("capture").and_then(|p| p.as_str().map(|p| p.to_string())),
+					audio.get("playback").and_then(|p| p.as_str().map(|p| p.to_string())),
+				)
+			})
+			.unwrap_or((None, None))
 	}
 }
 
@@ -538,10 +582,10 @@ async fn run_hotkey(
 #[post("/audio/reset")]
 async fn audio_reset(state: web::Data<Arc<State>>) -> impl Responder {
 	if let Some(ad) = &state.audio_data {
-		if ad.a2ts.send(audio::audio_to_ts::ResetMsg).await.is_err() {
+		if ad.a2ts.send(audio::ResetMsg).await.is_err() {
 			error!(state.logger, "Failed to reset audio pipeline");
 			HttpResponse::InternalServerError()
-		} else if ad.ts2a.send(audio::ts_to_audio::ResetMsg).await.is_err() {
+		} else if ad.ts2a.send(audio::ResetMsg).await.is_err() {
 			error!(state.logger, "Failed to reset audio pipeline");
 			HttpResponse::InternalServerError()
 		} else {
@@ -549,6 +593,20 @@ async fn audio_reset(state: web::Data<Arc<State>>) -> impl Responder {
 		}
 	} else {
 		HttpResponse::Ok()
+	}
+}
+
+#[get("/audio/device_list")]
+async fn audio_device_list(state: web::Data<Arc<State>>) -> impl Responder {
+	if let Some(ad) = &state.audio_data {
+		let captures = ad.a2ts.send(audio::GetAudioDevices()).await.unwrap_or(Vec::new());
+		let playbacks = ad.ts2a.send(audio::GetAudioDevices()).await.unwrap_or(Vec::new());
+		HttpResponse::Ok().json(&serde_json::json!({
+			"capture": captures,
+			"playback": playbacks,
+		}))
+	} else {
+		HttpResponse::Ok().json(&serde_json::json!({ "capture": [], "playback": [] }))
 	}
 }
 
@@ -583,7 +641,9 @@ async fn get_plugin(state: web::Data<Arc<State>>, name: web::Path<String>) -> im
 }
 
 #[put("/plugins/{name}")]
-async fn put_plugin(state: web::Data<Arc<State>>, name: web::Path<String>, body: web::Bytes) -> impl Responder {
+async fn put_plugin(
+	state: web::Data<Arc<State>>, name: web::Path<String>, body: web::Bytes,
+) -> impl Responder {
 	if let Ok(s) = std::str::from_utf8(body.as_ref()) {
 		let path = state.launch_config.read().unwrap().plugin_path.join(&*name);
 		if let Err(e) = fs::write(path, s) {
@@ -615,7 +675,9 @@ struct GetFileOptions {
 }
 
 impl ResultDetails {
-	fn gone() -> Self { Self::from_desc("gone".into()) }
+	fn gone() -> Self {
+		Self::from_desc("gone".into())
+	}
 }
 
 #[get("/con/{id}/file/{channel}/{path:.*}")]
@@ -924,10 +986,10 @@ async fn put_ident(
 	let query = query_opt.into_inner();
 	match state
 		.database
-		.send(UpdateIdentityMsg(FindIdentity::ById(path.into_inner()), UpdateIdentity {
-			name: query.name,
-			..Default::default()
-		}))
+		.send(UpdateIdentityMsg(
+			FindIdentity::ById(path.into_inner()),
+			UpdateIdentity { name: query.name, ..Default::default() },
+		))
 		.await
 	{
 		Ok(Ok(())) => HttpResponse::Ok().finish(),
@@ -1218,7 +1280,7 @@ impl App {
 			Some(audio::start(
 				logger.clone(),
 				connections.clone(),
-				settings.get_global_volume().unwrap_or(1.0),
+				&settings,
 			)?)
 		};
 
@@ -1326,6 +1388,7 @@ impl App {
 				.service(create_ws)
 				.service(run_hotkey)
 				.service(audio_reset)
+				.service(audio_device_list)
 				.service(list_plugins)
 				.service(get_plugin)
 				.service(put_plugin)
@@ -1396,7 +1459,9 @@ impl App {
 		settings.listen_address
 	}
 
-	pub fn get_token(&self) -> &str { &self.0.token }
+	pub fn get_token(&self) -> &str {
+		&self.0.token
+	}
 }
 
 /// Tests need a running TeamSpeak server on localhost. The default channel has to be channel 1,
@@ -1456,7 +1521,9 @@ mod tests {
 		}
 
 		async fn graphql<T>(&self, request: &GraphQLRequest) -> Result<T>
-		where for<'a> T: Deserialize<'a> {
+		where
+			for<'a> T: Deserialize<'a>,
+		{
 			let client = awc::Client::default();
 			let url = format!("http://127.0.0.1:{}/db", self.port);
 			debug!(self.logger, "GraphQL request"; "body" => serde_json::to_string(&request).unwrap());

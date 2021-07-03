@@ -27,11 +27,6 @@ pub(crate) struct SetPacketlossMsg(pub f32);
 /// An audio packet and `true` if this is the last packet.
 pub(crate) struct PlayPacketMsg(Option<(OutPacket, bool)>, Option<f64>);
 pub(crate) struct SetLoudnessThresholdMsg(pub f64);
-pub(crate) struct ResetMsg;
-// (Input, Output)
-pub(crate) struct GetAudioDevices(pub (Vec<String>, Vec<String>));
-// (Input, Output)
-pub(crate) struct SetAudioDevices(pub (Option<String>, Option<String>));
 
 /// Threshold for voice activation detection.
 const VAD_THRESHOLD: f32 = 0.3;
@@ -48,6 +43,7 @@ const LOUDNESS_END_MAGIC: f64 = -1000.0;
 pub struct AudioToTs {
 	logger: Logger,
 	audio_subsystem: AudioSubsystem,
+	preferred_device: Option<String>,
 	spawn_send: mpsc::Sender<PlayPacketMsg>,
 	connections: HashSet<Addr<Ws>>,
 	loudness_cons: HashSet<Addr<LoudnessService>>,
@@ -92,12 +88,12 @@ impl Actor for AudioToTs {
 	type Context = Context<Self>;
 
 	fn started(&mut self, ctx: &mut Self::Context) {
-		self.open_device();
+		self.open_capture();
 
 		ctx.run_interval(Duration::from_secs(1), |a2t, _| {
 			if a2t.device.as_ref().map(|d| d.status() == AudioStatus::Stopped).unwrap_or(true) {
 				// Try to reconnect to audio
-				a2t.open_device();
+				a2t.open_capture();
 			}
 		});
 	}
@@ -124,9 +120,6 @@ impl Message for PlayPacketMsg {
 	type Result = ();
 }
 impl Message for SetLoudnessThresholdMsg {
-	type Result = ();
-}
-impl Message for ResetMsg {
 	type Result = ();
 }
 
@@ -251,18 +244,47 @@ impl Handler<SetLoudnessThresholdMsg> for AudioToTs {
 
 impl Handler<ResetMsg> for AudioToTs {
 	type Result = ();
-	fn handle(&mut self, _: ResetMsg, _: &mut Self::Context) -> Self::Result { self.open_device(); }
+	fn handle(&mut self, _: ResetMsg, _: &mut Self::Context) -> Self::Result {
+		self.open_capture();
+	}
+}
+
+impl Handler<GetAudioDevices> for AudioToTs {
+	type Result = Vec<String>;
+	fn handle(&mut self, _: GetAudioDevices, _: &mut Self::Context) -> Self::Result {
+		let mut devices = Vec::new();
+		if let Some(dev_cnt) = self.audio_subsystem.num_audio_capture_devices() {
+			for dev_index in 0..dev_cnt {
+				if let Ok(dev_name) = self.audio_subsystem.audio_capture_device_name(dev_index) {
+					devices.push(dev_name);
+				}
+			}
+		}
+		devices
+	}
+}
+
+impl Handler<SetAudioDevice> for AudioToTs {
+	type Result = ();
+	fn handle(&mut self, set: SetAudioDevice, _: &mut Self::Context) -> Self::Result {
+		if self.preferred_device != set.0 {
+			self.preferred_device = set.0;
+			self.open_capture();
+		}
+	}
 }
 
 impl AudioToTs {
 	pub(crate) fn new(
-		logger: Logger, audio_subsystem: AudioSubsystem, spawn_send: mpsc::Sender<PlayPacketMsg>,
+		logger: Logger, audio_subsystem: AudioSubsystem, preferred_device: Option<String>,
+		spawn_send: mpsc::Sender<PlayPacketMsg>,
 	) -> Result<Self> {
 		let logger = logger.new(o!("pipeline" => "audio-to-ts"));
 
 		Ok(Self {
 			logger,
 			audio_subsystem,
+			preferred_device,
 			spawn_send,
 			connections: Default::default(),
 			loudness_cons: Default::default(),
@@ -274,7 +296,7 @@ impl AudioToTs {
 		})
 	}
 
-	fn open_device(&mut self) {
+	fn open_capture(&mut self) {
 		let desired_spec = AudioSpecDesired {
 			freq: Some(SAMPLE_RATE as i32),
 			channels: Some(1),
@@ -285,7 +307,7 @@ impl AudioToTs {
 		let spawn_send = self.spawn_send.clone();
 		match self
 			.audio_subsystem
-			.open_capture(None, &desired_spec, |spec| {
+			.open_capture(self.preferred_device.as_deref(), &desired_spec, |spec| {
 				// This spec will always be the desired spec, the sdl wrapper
 				// passes zero as `allowed_changes`.
 				debug!(self.logger, "Got capture spec"; "spec" => ?spec,

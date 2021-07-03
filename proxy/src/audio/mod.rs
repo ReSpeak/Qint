@@ -11,7 +11,7 @@ use tokio::sync::mpsc;
 use tokio::task;
 
 use crate::websocket::Ws;
-use crate::ConnectionId;
+use crate::{ConnectionId, Settings};
 use audio_to_ts::AudioToTs;
 use ts_to_audio::TsToAudio;
 
@@ -39,14 +39,31 @@ const MAX_OPUS_FRAME_SIZE: usize = 1275;
 
 #[derive(Clone)]
 pub(crate) struct AudioData {
-	pub pool: Handle,
+	pub pool: Handle, // @Seebi?
 	pub a2ts: Addr<AudioToTs>,
 	pub ts2a: Addr<TsToAudio>,
 }
 
+pub struct ResetMsg;
+pub(crate) struct GetAudioDevices();
+pub(crate) struct SetAudioDevice(pub Option<String>);
+
+impl Message for ResetMsg {
+	type Result = ();
+}
+impl Message for GetAudioDevices {
+	type Result = Vec<String>;
+}
+impl Message for SetAudioDevice {
+	type Result = ();
+}
+
 pub(crate) fn start(
-	logger: Logger, connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>, global_volume: f32,
+	logger: Logger, connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>, settings: &Settings,
 ) -> Result<AudioData> {
+	let global_volume = settings.get_global_volume().unwrap_or(1.0);
+	let (capture, playback) = settings.get_preferred_audio_device();
+
 	let sdl_context = sdl2::init().unwrap();
 
 	let audio_subsystem = sdl_context.audio().unwrap();
@@ -61,9 +78,15 @@ pub(crate) fn start(
 	// Create thread local runtime for non-send tasks
 	// A channel size of 1 leads to audio drops when cpu is fully used
 	let (spawn_send, mut spawn_recv) = mpsc::channel(5);
-	let ts2a = TsToAudio::new(logger.clone(), audio_subsystem.clone(), connections, global_volume)?
-		.start();
-	let a2ts = AudioToTs::new(logger.clone(), audio_subsystem, spawn_send)?.start();
+	let ts2a = TsToAudio::new(
+		logger.clone(),
+		audio_subsystem.clone(),
+		playback,
+		connections,
+		global_volume,
+	)?
+	.start();
+	let a2ts = AudioToTs::new(logger.clone(), audio_subsystem, capture, spawn_send)?.start();
 
 	let a2ts2 = a2ts.clone();
 	thread::spawn(move || {

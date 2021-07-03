@@ -24,11 +24,11 @@ type AudioHandler = tsclientlib::audio::AudioHandler<Id>;
 pub struct PlayMsg(pub Id, pub InAudioBuf);
 pub struct SetGlobalVolumeMsg(pub f32);
 pub struct SetVolumeMsg(pub Id, pub f32);
-pub struct ResetMsg;
 
 pub(crate) struct TsToAudio {
 	logger: Logger,
 	audio_subsystem: AudioSubsystem,
+	preferred_device: Option<String>,
 	device: Option<AudioDevice<SdlCallback>>,
 	data: Arc<Mutex<AudioHandler>>,
 	connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
@@ -55,9 +55,6 @@ impl Message for SetGlobalVolumeMsg {
 }
 impl Message for SetVolumeMsg {
 	type Result = Result<()>;
-}
-impl Message for ResetMsg {
-	type Result = ();
 }
 
 impl Actor for TsToAudio {
@@ -89,7 +86,7 @@ impl Actor for TsToAudio {
 
 impl TsToAudio {
 	pub(crate) fn new(
-		logger: Logger, audio_subsystem: AudioSubsystem,
+		logger: Logger, audio_subsystem: AudioSubsystem, preferred_device: Option<String>,
 		connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>, global_volume: f32,
 	) -> Result<Self> {
 		let logger = logger.new(o!("pipeline" => "ts-to-audio"));
@@ -98,6 +95,7 @@ impl TsToAudio {
 		Ok(Self {
 			logger,
 			audio_subsystem,
+			preferred_device,
 			device: None,
 			data,
 			connections,
@@ -115,20 +113,24 @@ impl TsToAudio {
 		let logger = self.logger.clone();
 		let data = self.data.clone();
 		let connections = self.connections.clone();
-		match self.audio_subsystem.open_playback(None, &desired_spec, |spec| {
-			// This spec will always be the desired spec, the sdl wrapper passes
-			// zero as `allowed_changes`.
-			debug!(logger, "Got playback spec"; "spec" => ?spec,
+		match self.audio_subsystem.open_playback(
+			self.preferred_device.as_deref(),
+			&desired_spec,
+			|spec| {
+				// This spec will always be the desired spec, the sdl wrapper passes
+				// zero as `allowed_changes`.
+				debug!(logger, "Got playback spec"; "spec" => ?spec,
 				"driver" => self.audio_subsystem.current_audio_driver());
-			SdlCallback {
-				logger,
-				data,
-				connections,
-				loudness: Default::default(),
-				handle: Handle::current(),
-				global_volume: self.global_volume.clone(),
-			}
-		}) {
+				SdlCallback {
+					logger,
+					data,
+					connections,
+					loudness: Default::default(),
+					handle: Handle::current(),
+					global_volume: self.global_volume.clone(),
+				}
+			},
+		) {
 			Ok(device) => self.device = Some(device),
 			Err(e) => {
 				self.device = None;
@@ -149,7 +151,11 @@ impl Handler<PlayMsg> for TsToAudio {
 					.get_queues()
 					.iter()
 					.filter_map(|((con, client), queue)| {
-						if *con == new_id.0 { Some((*client, queue.is_whispering())) } else { None }
+						if *con == new_id.0 {
+							Some((*client, queue.is_whispering()))
+						} else {
+							None
+						}
 					})
 					.collect();
 				if let Some(con) = cons.get(&new_id.0) {
@@ -217,6 +223,31 @@ impl Handler<ResetMsg> for TsToAudio {
 	}
 }
 
+impl Handler<GetAudioDevices> for TsToAudio {
+	type Result = Vec<String>;
+	fn handle(&mut self, _: GetAudioDevices, _: &mut Self::Context) -> Self::Result {
+		let mut devices = Vec::new();
+		if let Some(dev_cnt) = self.audio_subsystem.num_audio_playback_devices() {
+			for dev_index in 0..dev_cnt {
+				if let Ok(dev_name) = self.audio_subsystem.audio_playback_device_name(dev_index) {
+					devices.push(dev_name);
+				}
+			}
+		}
+		devices
+	}
+}
+
+impl Handler<SetAudioDevice> for TsToAudio {
+	type Result = ();
+	fn handle(&mut self, set: SetAudioDevice, _: &mut Self::Context) -> Self::Result {
+		if self.preferred_device != set.0 {
+			self.preferred_device = set.0;
+			self.open_playback();
+		}
+	}
+}
+
 impl AudioCallback for SdlCallback {
 	type Channel = f32;
 	fn callback(&mut self, buffer: &mut [Self::Channel]) {
@@ -263,7 +294,11 @@ impl AudioCallback for SdlCallback {
 					.get_queues()
 					.iter()
 					.filter_map(|((con, client), queue)| {
-						if *con == c { Some((*client, queue.is_whispering())) } else { None }
+						if *con == c {
+							Some((*client, queue.is_whispering()))
+						} else {
+							None
+						}
 					})
 					.collect();
 				if let Some(con) = cons.get(&c) {

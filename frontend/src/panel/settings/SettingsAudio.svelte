@@ -15,6 +15,7 @@
 	import TabSlot from "../../ui/container/TabSlot.svelte";
 	import KeyValue from "../../ui/util/KeyValue.svelte";
 	import Slider from "../../ui/html/Slider.svelte";
+	import DropDown from "../../ui/html/DropDown.svelte";
 	import VoiceGraph from "../../ui/specialized/VoiceGraph.svelte";
 
 	let selected: boolean;
@@ -36,8 +37,19 @@
 	const LOUDNESS_HEIGHT = 300;
 	const LOUDNESS_COUNT = 500;
 
+	let useDefaultCapture = audioSett.capture === null;
+	let useDefaultPlayback = audioSett.playback === null;
+	let captureDevices: string[] = [];
+	let playbackDevices: string[] = [];
+	let selectedCaptureDevice: string | null = audioSett.capture;
+	let selectedPlaybackDevice: string | null = audioSett.playback;
+
 	function syncSettings() {
 		app.transientSettings.save();
+	}
+	function syncSettingsImmediately() {
+		app.transientSettings.save();
+		app.transientSettings.flush();
 	}
 
 	function updateLoudness() {
@@ -48,9 +60,7 @@
 
 	function updateGlobalVolume() {
 		audioSett.globalVolume = dbToFactor(globalVolume);
-		syncSettings();
-		// Update global volume instantly
-		app.transientSettings.flush();
+		syncSettingsImmediately();
 	}
 
 	function requestRenderLoudnessGraphs() {
@@ -65,6 +75,23 @@
 		if (hasRequest) {
 			requestRenderLoudnessGraphs();
 		}
+	}
+
+	async function fetchAvailableDevices() {
+		const req = await backend.fetch("/audio/device_list", {
+			method: "GET",
+		});
+		const list = (await req.json()) as { capture: string[]; playback: string[] };
+		captureDevices = list.capture;
+		playbackDevices = list.playback;
+	}
+
+	function changeAudioDevice() {
+		if (useDefaultCapture) audioSett.capture = null;
+		else audioSett.capture = selectedCaptureDevice;
+		if (useDefaultPlayback) audioSett.playback = null;
+		else audioSett.playback = selectedPlaybackDevice;
+		syncSettingsImmediately();
 	}
 
 	$: on(selected, changeSelected());
@@ -87,6 +114,8 @@
 		} else {
 			closeSocket();
 		}
+
+		fetchAvailableDevices();
 	}
 
 	function closeSocket() {
@@ -94,12 +123,61 @@
 		loudnessSocket = undefined;
 	}
 
+	fetchAvailableDevices();
+
 	onDestroy(() => {
 		closeSocket();
 	});
 </script>
 
 <TabSlot title="Audio" bind:selected>
+	<KeyValue label="Capture Device">
+		<div class="field is-horizontal">
+			<div class="field-label toggleDefaultSwitch">
+				<input
+					type="checkbox"
+					class="checkbox-switch is-info"
+					bind:checked={useDefaultCapture}
+					on:change={changeAudioDevice} />
+			</div>
+			<div class="field-body">
+				<div class="field is-narrow">
+					{#if useDefaultCapture}
+						<span>Using default device</span>
+					{:else}
+						<DropDown
+							items={captureDevices}
+							bind:selected={selectedCaptureDevice}
+							on:change={changeAudioDevice} />
+					{/if}
+				</div>
+			</div>
+		</div>
+	</KeyValue>
+	<KeyValue label="Playback Device">
+		<div class="field is-horizontal">
+			<div class="field-label toggleDefaultSwitch">
+				<input
+					type="checkbox"
+					class="checkbox-switch is-info"
+					bind:checked={useDefaultPlayback}
+					on:change={changeAudioDevice} />
+			</div>
+			<div class="field-body">
+				<div class="field is-narrow">
+					{#if useDefaultPlayback}
+						<span>Using default device</span>
+					{:else}
+						<DropDown
+							items={playbackDevices}
+							bind:selected={selectedPlaybackDevice}
+							on:change={changeAudioDevice} />
+					{/if}
+				</div>
+			</div>
+		</div>
+	</KeyValue>
+
 	<KeyValue label="Global Volume">
 		<div class="volumeControl">
 			<Slider
@@ -143,5 +221,9 @@
 	.volumeControl {
 		display: flex;
 		align-items: center;
+	}
+
+	.toggleDefaultSwitch {
+		flex-grow: 0;
 	}
 </style>
