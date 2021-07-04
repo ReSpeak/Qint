@@ -27,4 +27,8 @@
 	$: [color, name] = refreshClient(client);
 </script>
 
-<span tabindex="0" class="button noBut" style="color: {color};" on:click={click}>{name}</span>
+<span class="nameTag" tabindex="0" style="color: {color};" on:click={click}>{name}</span>
+
+<style lang="scss">
+	@import "./nametag";
+</style>

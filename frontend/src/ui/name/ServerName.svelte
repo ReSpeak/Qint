@@ -6,27 +6,37 @@
 	import { ServerBase } from "../../bookBase";
 
 	export let connection: Connection | undefined = undefined;
-	export let server: ServerBase | undefined = undefined;
+	export let server: ServerBase;
 
 	const state = connection?.state;
-	const conServer = connection?.book.server;
 	const address =
-		connection !== undefined ? get(connection.connectOptions).address : (server instanceof GraphQlServer) ? server!.address : undefined;
-	$: realServer = conServer !== undefined ? $conServer : server!;
+		connection !== undefined
+			? get(connection.connectOptions).address
+			: server instanceof GraphQlServer
+			? server.address
+			: undefined;
 
 	function click() {
-		if (realServer instanceof Server && connection !== undefined) {
-			app.select(connection, realServer);
+		if (server instanceof Server && connection !== undefined) {
+			app.select(connection, server);
 		}
 	}
 </script>
 
 {#if state !== undefined && !$state.connected}
-	<span class="serverName">
+	<span>
 		{address}
 	</span>
 {:else}
-	<span class="serverName button noBut" style="color:{realServer.color};" tabindex="0" on:click={click}>
-		{realServer.name}
+	<span
+		class="nameTag"
+		style="color:{server.color};"
+		tabindex="0"
+		on:click={click}>
+		{server.name}
 	</span>
 {/if}
+
+<style lang="scss">
+	@import "./nametag";
+</style>

@@ -32,16 +32,16 @@
 </script>
 
 <h6 class="title is-6">
-	<ServerName server={connection.book.server} />
+	<ServerName server={connection.book.server} {connection} />
 </h6>
 <div class="content">
 	{#each notification.pieces as piece, i}
 		{piece}
 		{#if i < args.length}
 			{#if args[i] instanceof Client}
-				<ClientName client={toClient(args[i])} />
+				<ClientName client={toClient(args[i])} {connection} />
 			{:else if args[i] instanceof Server}
-				<ServerName server={toServer(args[i])} />
+				<ServerName server={toServer(args[i])} {connection} />
 			{:else if args[i] instanceof Channel}
 				<span class="channel">{getName(args[i])}</span>
 			{:else if args[i] instanceof ServerGroup}

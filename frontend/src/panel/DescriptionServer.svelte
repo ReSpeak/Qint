@@ -234,7 +234,7 @@
 			{#if editing}
 				<input class="input" type="text" bind:value={servEdit.name} />
 			{:else}
-				<ServerName {connection} />
+				<ServerName server={$server} {connection} />
 				{#if $server.nickname}
 					<span style="margin-left:1em;">(Nickname: </span>
 					<code class="nick">{$server.nickname}</code>

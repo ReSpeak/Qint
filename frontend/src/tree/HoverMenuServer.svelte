@@ -10,7 +10,7 @@
 </script>
 
 <div class="name">
-	<ServerName {server} />
+	<ServerName {server} {connection} />
 </div>
 {#if server.hostmessageRendered && server.hostmessageRendered.length > 0}
 	<div class="description">

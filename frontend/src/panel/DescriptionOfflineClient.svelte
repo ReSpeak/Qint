@@ -100,7 +100,7 @@
 		<div class="descTable">
 			{#each curOnline as c}
 			<div>
-				<ClientName connection={c[0]} client={c[1]} /> on <ServerName connection={c[0]} />
+				<ClientName connection={c[0]} client={c[1]} /> on <ServerName server={c[0].book.server} connection={c[0]} />
 			</div>
 			{/each}
 		</div>

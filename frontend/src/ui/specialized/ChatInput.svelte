@@ -270,6 +270,8 @@
 		background: unset;
 		color: mix($text, $background, 60%);
 		height: 100%;
+		pointer-events: none;
+		user-select: none;
 	}
 
 	.textBox {
