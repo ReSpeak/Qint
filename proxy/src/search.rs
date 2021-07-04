@@ -1,183 +1,125 @@
-use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 use std::path::Path;
-use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
-use anyhow::{format_err, Error};
+use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use futures::FutureExt;
-use meilisearch_core::settings::{SettingsUpdate, UpdateState};
-use meilisearch_core::store::Index;
-use meilisearch_core::Error as MError;
-use meilisearch_core::{Database, DatabaseOptions, Schema};
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::{FromPrimitive, ToPrimitive};
 use serde::{Deserialize, Serialize};
-use slog::{debug, error, info, trace, warn, Logger};
+use slog::{debug, error, info, warn, Logger};
+use tantivy::schema::Schema;
+use tantivy::{Document, Index, IndexReader, IndexWriter, ReloadPolicy, SnippetGenerator};
 use tsclientlib::Uid;
 use tsproto_types::crypto::EccKeyPubP256;
 
 use crate::{db, Result, State};
 
-const MESSAGES_INDEX: &str = "messages";
 /// Add documents in batches when creating the database.
 const INIT_BATCH_SIZE: usize = 1000;
-const CHANNEL_PREFIX: &str = "ch";
-const CLIENT_PREFIX: &str = "cl";
-const MESSAGES_PREFIX: &str = "m";
-const SERVER_PREFIX: &str = "s";
+
+#[derive(
+	Clone, Copy, Debug, Deserialize, Eq, FromPrimitive, Hash, PartialEq, Serialize, ToPrimitive,
+)]
+enum IndexEntryType {
+	Message,
+	Channel,
+	Client,
+	Server,
+}
 
 #[derive(Clone, Debug, Deserialize, Hash, Serialize)]
 pub enum SearchResultId {
 	Channel { server: Vec<u8>, id: u64 },
-	Client { id: Vec<u8> },
-	Message { id: u64 },
-	Server { id: Vec<u8> },
+	Client(Vec<u8>),
+	Message(u64),
+	Server(Vec<u8>),
 }
 
 pub struct Search {
 	logger: Logger,
-	database: Database,
 	index: Index,
+	schema: Schema,
+	reader: IndexReader,
+	writer: Arc<Mutex<Option<IndexWriter>>>,
+	/// If a commit is curently scheduled for execution.
+	will_commit: Arc<AtomicUsize>,
 }
 
-#[derive(Clone, Debug)]
-pub struct SearchResult {
-	pub id: SearchResultId,
-	/// Maps attribute name to highlights for this field.
-	pub highlights: HashMap<&'static str, Vec<Range<usize>>>,
-}
-
-#[derive(Clone, Debug)]
 pub struct SearchResults {
-	pub results: Vec<SearchResult>,
-	pub count: usize,
-}
-
-#[derive(Clone, Debug, Deserialize, Hash, Serialize)]
-pub struct ChannelDocument {
-	/// Needs to be "<prefix><database u64 id>"
-	pub id: String,
-	pub name: String,
-	pub topic: Option<String>,
-	pub description: Option<String>,
-}
-
-#[derive(Clone, Debug, Deserialize, Hash, Serialize)]
-pub struct ClientDocument {
-	pub id: String,
-	pub uid: String,
-	pub name: String,
-	pub phonetic_name: Option<String>,
-	pub custom_name: Option<String>,
-	pub custom_phonetic_name: Option<String>,
-	pub description: Option<String>,
-}
-
-#[derive(Clone, Debug, Deserialize, Hash, Serialize)]
-pub struct MessageDocument {
-	pub id: String,
-	pub content: String,
-}
-
-#[derive(Clone, Debug, Deserialize, Hash, Serialize)]
-pub struct ServerDocument {
-	pub id: String,
-	pub uid: String,
-	pub address: String,
-	pub name: String,
-	pub host_message: Option<String>,
-	pub welcome_message: Option<String>,
-}
-
-/// The highlight ranges of meilisearch are not with respect to the real source string, so try to
-/// guess the right range.
-pub fn meili_to_byte_range(index: usize, length: usize, text: &str) -> Range<usize> {
-	let mut start = index;
-	let mut end = index + length;
-
-	if start > text.len() {
-		start = text.len();
-	}
-	if end > text.len() {
-		end = text.len();
-	}
-
-	// Round down to char boundaries
-	while !text.is_char_boundary(start) {
-		start -= 1;
-	}
-	while !text.is_char_boundary(end) {
-		end -= 1;
-	}
-
-	Range { start, end }
-}
-
-impl FromStr for SearchResultId {
-	type Err = Error;
-	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		if s.starts_with(MESSAGES_PREFIX) {
-			Ok(SearchResultId::Message { id: s[1..].parse()? })
-		} else if s.starts_with(CHANNEL_PREFIX) {
-			let split =
-				s.find('_').ok_or_else(|| format_err!("No '_' found in channel search id"))?;
-			let channel = &s[2..split];
-			let server = &s[split + 1..];
-			Ok(SearchResultId::Channel {
-				server: base64::decode_config(server, base64::URL_SAFE_NO_PAD)?,
-				id: channel.parse()?,
-			})
-		} else if s.starts_with(CLIENT_PREFIX) {
-			Ok(SearchResultId::Client {
-				id: base64::decode_config(&s[2..], base64::URL_SAFE_NO_PAD)?,
-			})
-		} else if s.starts_with(SERVER_PREFIX) {
-			Ok(SearchResultId::Server {
-				id: base64::decode_config(&s[1..], base64::URL_SAFE_NO_PAD)?,
-			})
-		} else {
-			Err(format_err!("Unknown search result id type {:?}", s))
-		}
-	}
+	pub results: Vec<SearchResultId>,
+	/// To generate highlights for message content
+	pub content_snippet_generator: SnippetGenerator,
+	pub name_snippet_generator: SnippetGenerator,
+	pub address_snippet_generator: SnippetGenerator,
 }
 
 impl Search {
 	/// Creates a search databe and returns if it was newly created or not.
 	pub fn new(logger: Logger, path: &Path) -> Result<(Self, bool)> {
-		let database = match Database::open_or_create(path, DatabaseOptions::default()) {
-			Ok(r) => r,
-			Err(MError::VersionMismatch(msg)) => {
-				info!(logger, "Search database version mismatch, recreating database";
-					"old_version" => msg, "path" => ?path);
-				std::fs::remove_dir_all(path)?;
-				Database::open_or_create(path, DatabaseOptions::default())?
+		let schema = Self::schema();
+		let mut index = None;
+		let mut is_new = false;
+		if let Ok(dir) = tantivy::directory::MmapDirectory::open(path) {
+			if Index::exists(&dir).unwrap_or_default() {
+				let i = Index::open_in_dir(path)?;
+				// Check if the schema matches the current schema
+				if i.schema() == schema {
+					index = Some(i);
+				}
 			}
-			Err(e) => return Err(e.into()),
-		};
-		let (index, is_new) = match database.open_index(MESSAGES_INDEX) {
-			Some(index) => (index, false),
-			None => {
-				let schema = Schema::with_primary_key("id");
-				let index = database.create_index(MESSAGES_INDEX)?;
-				database.main_write(|w| index.main.put_schema(w, &schema))?;
-				let settings = SettingsUpdate {
-					primary_key: UpdateState::Update("id".into()),
-					..Default::default()
-				};
-				database.update_write(|w| index.settings_update(w, settings))?;
-				(index, true)
-			}
-		};
+		}
 
-		let logger2 = logger.clone();
-		database.set_update_callback(Box::new(move |_name, res| {
-			if let Some(e) = res.error {
-				error!(logger2, "Search db update failed"; "error" => e,
-					"code" => ?res.error_code, "link" => ?res.error_link);
-			}
-		}));
+		let index = index.map(Ok).unwrap_or_else(|| {
+			// Create new index
+			is_new = true;
+			let _ = std::fs::create_dir_all(path);
+			Index::create_in_dir(path, schema.clone())
+		})?;
 
-		Ok((Self { logger, database, index }, is_new))
+		let reader = index.reader_builder().reload_policy(ReloadPolicy::OnCommit).try_into()?;
+
+		Ok((
+			Self {
+				logger,
+				index,
+				schema,
+				reader,
+				writer: Default::default(),
+				will_commit: Default::default(),
+			},
+			is_new,
+		))
+	}
+
+	fn schema() -> Schema {
+		use tantivy::schema::*;
+
+		let mut schema_builder = Schema::builder();
+		// IndexEntryType
+		schema_builder.add_u64_field("type", STORED | INDEXED);
+		schema_builder.add_u64_field("message_id", STORED);
+		schema_builder.add_u64_field("channel_id", STORED);
+		schema_builder.add_bytes_field("server_key", STORED);
+		schema_builder.add_bytes_field("client_uid", STORED);
+
+		// Server address
+		schema_builder.add_text_field("address", TEXT);
+		// Message content
+		schema_builder.add_text_field("content", TEXT);
+		// Channel/Client description
+		schema_builder.add_text_field("description", TEXT);
+		schema_builder.add_text_field("name", TEXT);
+		// Message time
+		schema_builder.add_u64_field("time", FAST);
+		// Channel topic
+		schema_builder.add_text_field("topic", TEXT);
+		// Server/Client uid
+		schema_builder.add_text_field("uid", STRING);
+
+		schema_builder.build()
 	}
 
 	/// Setup default database settings.
@@ -198,29 +140,52 @@ impl Search {
 					// TODO Use some stop words and synonyms
 					//search.database.update_write(|w| search.index.settings_update(w, settings))?;
 
+					{
+						if let Some(mut writer) = search.writer.lock().unwrap().take() {
+							writer.commit()?;
+						}
+					}
+
+					// Use 50 MB for indexing
+					let mut index_writer = search.index.writer(50_000_000)?;
+
+					let typ = search.schema.get_field("type").unwrap();
+					let message_id = search.schema.get_field("message_id").unwrap();
+					let channel_id = search.schema.get_field("channel_id").unwrap();
+					let server_key = search.schema.get_field("server_key").unwrap();
+					let client_uid = search.schema.get_field("client_uid").unwrap();
+
+					let address = search.schema.get_field("address").unwrap();
+					let content = search.schema.get_field("content").unwrap();
+					//let description = search.schema.get_field("description").unwrap();
+					let name = search.schema.get_field("name").unwrap();
+					let time = search.schema.get_field("time").unwrap();
+					//let topic = search.schema.get_field("topic").unwrap();
+					let uid_field = search.schema.get_field("uid").unwrap();
+
 					// Fetch all messages from the database
 					let mut offset = 0;
 					loop {
 						use db::schema::messages;
 
 						let query = messages::table
-							.select((messages::id, messages::content))
+							.select((messages::id, messages::time, messages::content))
 							.order(messages::id)
 							.offset(offset)
 							.limit(INIT_BATCH_SIZE as i64);
-						let res = query.load::<(i64, String)>(&db.con)?;
+						let res = query.load::<(i64, NaiveDateTime, String)>(&db.con)?;
 						let len = res.len();
 
 						// Insert into search database
-						let mut additions = search.index.documents_addition();
 						for r in res {
-							let doc = MessageDocument {
-								id: format!("{}{}", MESSAGES_PREFIX, r.0 as u64),
-								content: r.1,
-							};
-							additions.update_document(doc);
+							let mut doc = Document::default();
+							doc.add_u64(typ, IndexEntryType::Message.to_u64().unwrap());
+							doc.add_u64(message_id, r.0 as u64);
+							doc.add_u64(time, r.1.timestamp() as u64);
+							doc.add_text(content, r.2);
+
+							index_writer.add_document(doc);
 						}
-						search.database.update_write(|w| additions.finalize(w))?;
 
 						debug!(state2.logger, "Writing messages into search db";
 							"count" => offset as usize + len);
@@ -244,18 +209,15 @@ impl Search {
 						let len = res.len();
 
 						// Insert into search database
-						let mut additions = search.index.documents_addition();
 						for r in res {
-							let server = base64::encode_config(&r.0, base64::URL_SAFE_NO_PAD);
-							let doc = ChannelDocument {
-								id: format!("{}{}_{}", CHANNEL_PREFIX, r.1 as u64, server),
-								name: r.2,
-								topic: None,
-								description: None,
-							};
-							additions.update_document(doc);
+							let mut doc = Document::default();
+							doc.add_u64(typ, IndexEntryType::Channel.to_u64().unwrap());
+							doc.add_u64(channel_id, r.1 as u64);
+							doc.add_bytes(server_key, r.0);
+							doc.add_text(name, r.2);
+
+							index_writer.add_document(doc);
 						}
-						search.database.update_write(|w| additions.finalize(w))?;
 
 						debug!(state2.logger, "Writing channels into search db";
 							"count" => offset as usize + len);
@@ -285,21 +247,16 @@ impl Search {
 						let len = res.len();
 
 						// Insert into search database
-						let mut additions = search.index.documents_addition();
 						for r in res {
 							let uid = base64::encode_config(&r.0, base64::URL_SAFE_NO_PAD);
-							let doc = ClientDocument {
-								id: format!("{}{}", CLIENT_PREFIX, uid),
-								uid: uid,
-								name: r.1,
-								phonetic_name: None,
-								custom_name: r.2,
-								custom_phonetic_name: r.3,
-								description: None,
-							};
-							additions.update_document(doc);
+							let mut doc = Document::default();
+							doc.add_u64(typ, IndexEntryType::Client.to_u64().unwrap());
+							doc.add_bytes(client_uid, r.0);
+							doc.add_text(uid_field, uid);
+							doc.add_text(name, r.1);
+
+							index_writer.add_document(doc);
 						}
-						search.database.update_write(|w| additions.finalize(w))?;
 
 						debug!(state2.logger, "Writing clients into search db";
 							"count" => offset as usize + len);
@@ -323,22 +280,17 @@ impl Search {
 						let len = res.len();
 
 						// Insert into search database
-						let mut additions = search.index.documents_addition();
 						for r in res {
-							let str_key = base64::encode_config(&r.0, base64::URL_SAFE_NO_PAD);
-							let public_key = EccKeyPubP256::from_short(&r.0)?;
-							let uid = public_key.get_uid();
-							let doc = ServerDocument {
-								id: format!("{}{}", SERVER_PREFIX, str_key),
-								uid: uid,
-								address: r.1,
-								name: r.2,
-								host_message: None,
-								welcome_message: None,
-							};
-							additions.update_document(doc);
+							let uid = EccKeyPubP256::from_short(&r.0)?.get_uid();
+							let mut doc = Document::default();
+							doc.add_u64(typ, IndexEntryType::Server.to_u64().unwrap());
+							doc.add_bytes(server_key, r.0);
+							doc.add_text(uid_field, uid);
+							doc.add_text(name, r.2);
+							doc.add_text(address, r.1);
+
+							index_writer.add_document(doc);
 						}
-						search.database.update_write(|w| additions.finalize(w))?;
 
 						debug!(state2.logger, "Writing servers into search db";
 							"count" => offset as usize + len);
@@ -347,6 +299,8 @@ impl Search {
 						}
 						offset += INIT_BATCH_SIZE as i64;
 					}
+
+					index_writer.commit()?;
 
 					Ok(())
 				}))
@@ -360,134 +314,256 @@ impl Search {
 		);
 	}
 
+	fn write(&self, doc: Document) {
+		// This potentially blocks for a while, so start a new thread.
+		let index = self.index.clone();
+		let writer = self.writer.clone();
+		let logger = self.logger.clone();
+		let will_commit = self.will_commit.clone();
+		std::thread::spawn(move || {
+			will_commit.fetch_add(1, Ordering::Relaxed);
+			let mut w = writer.lock().unwrap();
+			let w2 = if let Some(w) = &mut *w {
+				w
+			} else {
+				let writer = match index.writer_with_num_threads(1, 3_000_000) {
+					Ok(r) => r,
+					Err(e) => {
+						error!(logger, "Failed to create search database writer"; "error" => %e);
+						return;
+					}
+				};
+				*w = Some(writer);
+				w.as_mut().unwrap()
+			};
+			w2.add_document(doc);
+			drop(w);
+			std::thread::sleep(std::time::Duration::from_secs(1));
+			if will_commit.fetch_add(1, Ordering::Relaxed) == 0 {
+				// This thread is the last, so commit
+				let mut w = writer.lock().unwrap();
+				if let Some(w) = &mut *w {
+					if let Err(e) = w.commit() {
+						error!(logger, "Failed to commit to search database"; "error" => %e);
+					}
+				}
+			}
+		});
+	}
+
 	pub fn add_channel(
 		&self, server: EccKeyPubP256, id: u64, name: String, topic: Option<String>,
 		description: Option<String>,
-	) -> Result<u64> {
-		let server = base64::encode_config(server.to_short().as_slice(), base64::URL_SAFE_NO_PAD);
-		let mut additions = self.index.documents_addition();
-		additions.update_document(ChannelDocument {
-			id: format!("{}{}_{}", CHANNEL_PREFIX, id, server),
-			name,
-			topic,
-			description,
-		});
-		let update_id = self.database.update_write(|w| additions.finalize(w))?;
-		Ok(update_id)
+	) -> Result<()> {
+		let mut doc = Document::default();
+		doc.add_u64(
+			self.schema.get_field("type").unwrap(),
+			IndexEntryType::Channel.to_u64().unwrap(),
+		);
+		doc.add_u64(self.schema.get_field("channel_id").unwrap(), id);
+		doc.add_bytes(self.schema.get_field("server_key").unwrap(), server.to_short());
+		doc.add_text(self.schema.get_field("name").unwrap(), name);
+		if let Some(s) = description {
+			doc.add_text(self.schema.get_field("description").unwrap(), s);
+		}
+		if let Some(s) = topic {
+			doc.add_text(self.schema.get_field("topic").unwrap(), s);
+		}
+
+		self.write(doc);
+		Ok(())
 	}
 
 	pub fn add_client(
-		&self, uid: &Uid, name: String, phonetic_name: Option<String>, custom_name: Option<String>,
-		custom_phonetic_name: Option<String>, description: Option<String>,
-	) -> Result<u64> {
-		let uid = base64::encode_config(&uid.0, base64::URL_SAFE_NO_PAD);
-		let mut additions = self.index.documents_addition();
-		additions.update_document(ClientDocument {
-			id: format!("{}{}", CLIENT_PREFIX, uid),
-			uid,
-			name,
-			phonetic_name,
-			custom_name,
-			custom_phonetic_name,
-			description,
-		});
-		let update_id = self.database.update_write(|w| additions.finalize(w))?;
-		Ok(update_id)
+		&self, uid: &Uid, name: String, _phonetic_name: Option<String>,
+		_custom_name: Option<String>, _custom_phonetic_name: Option<String>,
+		description: Option<String>,
+	) -> Result<()> {
+		let mut doc = Document::default();
+		doc.add_u64(
+			self.schema.get_field("type").unwrap(),
+			IndexEntryType::Client.to_u64().unwrap(),
+		);
+		doc.add_bytes(self.schema.get_field("client_uid").unwrap(), &uid.0);
+		doc.add_text(self.schema.get_field("uid").unwrap(), uid);
+		doc.add_text(self.schema.get_field("name").unwrap(), name);
+		if let Some(s) = description {
+			doc.add_text(self.schema.get_field("description").unwrap(), s);
+		}
+
+		self.write(doc);
+		Ok(())
 	}
 
-	pub fn add_message(&self, id: u64, content: String) -> Result<u64> {
-		let mut additions = self.index.documents_addition();
-		additions
-			.update_document(MessageDocument { id: format!("{}{}", MESSAGES_PREFIX, id), content });
-		let update_id = self.database.update_write(|w| additions.finalize(w))?;
-		Ok(update_id)
+	pub fn add_message(&self, id: u64, time: NaiveDateTime, content: String) -> Result<()> {
+		let mut doc = Document::default();
+		doc.add_u64(
+			self.schema.get_field("type").unwrap(),
+			IndexEntryType::Message.to_u64().unwrap(),
+		);
+		doc.add_u64(self.schema.get_field("message_id").unwrap(), id);
+		doc.add_u64(self.schema.get_field("time").unwrap(), time.timestamp() as u64);
+		doc.add_text(self.schema.get_field("content").unwrap(), content);
+
+		self.write(doc);
+		Ok(())
 	}
 
 	pub fn add_server(
 		&self, public_key: EccKeyPubP256, address: String, name: String,
-		host_message: Option<String>, welcome_message: Option<String>,
-	) -> Result<u64> {
+		_host_message: Option<String>, _welcome_message: Option<String>,
+	) -> Result<()> {
 		let uid = public_key.get_uid();
-		let server =
-			base64::encode_config(public_key.to_short().as_slice(), base64::URL_SAFE_NO_PAD);
-		let mut additions = self.index.documents_addition();
-		additions.update_document(ServerDocument {
-			id: format!("{}{}", SERVER_PREFIX, server),
-			uid,
-			address,
-			name,
-			host_message,
-			welcome_message,
-		});
-		let update_id = self.database.update_write(|w| additions.finalize(w))?;
-		Ok(update_id)
+		let mut doc = Document::default();
+		doc.add_u64(
+			self.schema.get_field("type").unwrap(),
+			IndexEntryType::Server.to_u64().unwrap(),
+		);
+		doc.add_bytes(self.schema.get_field("server_key").unwrap(), public_key.to_short());
+		doc.add_text(self.schema.get_field("uid").unwrap(), uid);
+		doc.add_text(self.schema.get_field("name").unwrap(), name);
+		doc.add_text(self.schema.get_field("address").unwrap(), address);
+
+		self.write(doc);
+		Ok(())
 	}
 
-	pub fn search(&self, query: &str, range: Range<usize>) -> Result<SearchResults> {
-		let reader = self.database.main_read_txn()?;
-		let builder = self.index.query_builder();
-		trace!(self.logger, "Search query"; "query" => query, "range" => ?range);
-		let result = builder.query(&reader, Some(query), range)?;
-		let mut attrs = HashSet::new();
-		attrs.insert("id");
+	/// Returns a list of message ids.
+	pub fn search(
+		&self, query: &str, range: Range<usize>, messages: bool,
+	) -> Result<SearchResults> {
+		use tantivy::collector::TopDocs;
+		use tantivy::query::*;
+		use tantivy::schema::{IndexRecordOption, Term, Value};
 
-		let schema =
-			self.index.main.schema(&reader)?.ok_or_else(|| format_err!("Schema not found"))?;
-		let mut attr_map = HashMap::<u16, &'static str>::new();
-		// All attributes of search structs except id
-		for a in &[
-			"name",
-			"topic",
-			"description",
-			"uid",
-			"phonetic_name",
-			"custom_name",
-			"custom_phonetic_name",
-			"content",
-			"address",
-			"name",
-			"host_message",
-			"welcome_message",
-		] {
-			// Attributes do not exist if there is no entry using it
-			if let Some(attr) = schema.id(a) {
-				attr_map.insert(attr.0, a);
+		debug!(self.logger, "Search"; "query" => query, "messages" => ?messages, "range" => ?range);
+		let mut time_reporter = slog_perf::TimeReporter::new_with_level(
+			"Search",
+			self.logger.clone(),
+			slog::Level::Debug,
+		);
+		time_reporter.start("");
+
+		let typ = self.schema.get_field("type").unwrap();
+		let channel_id = self.schema.get_field("channel_id").unwrap();
+		let client_uid = self.schema.get_field("client_uid").unwrap();
+		let message_id = self.schema.get_field("message_id").unwrap();
+		let server_key = self.schema.get_field("server_key").unwrap();
+
+		let address = self.schema.get_field("address").unwrap();
+		let content = self.schema.get_field("content").unwrap();
+		let description = self.schema.get_field("description").unwrap();
+		let name = self.schema.get_field("name").unwrap();
+		let time = self.schema.get_field("time").unwrap();
+		let topic = self.schema.get_field("topic").unwrap();
+		let uid = self.schema.get_field("uid").unwrap();
+
+		let searcher = self.reader.searcher();
+		let query_parser = QueryParser::for_index(&self.index, vec![
+			address,
+			content,
+			description,
+			name,
+			topic,
+			uid,
+		]);
+		let query = query_parser.parse_query(query)?;
+		// TODO Use prefix FuzzyTermQueries
+		// Build cross product of fields and items in the query
+
+		let query: Box<dyn Query> = if messages {
+			Box::new(BooleanQuery::new(vec![
+				(
+					Occur::Must,
+					Box::new(TermQuery::new(
+						Term::from_field_u64(typ, IndexEntryType::Message.to_u64().unwrap()),
+						IndexRecordOption::Basic,
+					)),
+				),
+				(Occur::Must, query),
+			]))
+		} else {
+			Box::new(BooleanQuery::new(vec![
+				(
+					Occur::MustNot,
+					Box::new(TermQuery::new(
+						Term::from_field_u64(typ, IndexEntryType::Message.to_u64().unwrap()),
+						IndexRecordOption::Basic,
+					)),
+				),
+				(Occur::Must, query),
+			]))
+		};
+
+		let top_docs = searcher.search(
+			&query,
+			&TopDocs::with_limit(range.end - range.start)
+			.and_offset(range.start)
+			// Sort descreasing by time
+			.order_by_u64_field(time),
+		)?;
+
+		let mut res = Vec::new();
+		for (_score, doc_address) in top_docs {
+			let doc = searcher.doc(doc_address)?;
+			let t = doc.get_first(typ).and_then(|v| {
+				if let Value::U64(v) = v { IndexEntryType::from_u64(*v) } else { None }
+			});
+			let t = if let Some(t) = t {
+				t
 			} else {
-				debug!(self.logger, "Attribute not found in search schema"; "attribute" => a);
-			}
-		}
+				warn!(self.logger, "Search found entry without type");
+				continue;
+			};
 
-		let mut res = SearchResults { results: Vec::new(), count: result.nb_hits };
-		for r in result.documents {
-			#[derive(Clone, Debug, Deserialize, Hash, Serialize)]
-			struct IdDocument {
-				id: String,
-			}
-
-			if let Some(id) = self.index.document::<IdDocument>(&reader, Some(&attrs), r.id)? {
-				let id: SearchResultId = id.id.parse()?;
-				let mut highlights = HashMap::new();
-
-				for h in &r.highlights {
-					if let Some(attr) = attr_map.get(&h.attribute) {
-						let hs = highlights.entry(*attr).or_insert_with(Vec::new);
-						hs.push(h.char_index as usize..h.char_length as usize);
-					} else if h.attribute != 0 {
-						// 0 is id
-						warn!(self.logger, "Unknown attribute in search"; "attr" => h.attribute);
+			match t {
+				IndexEntryType::Channel => {
+					if let (Some(Value::U64(id)), Some(Value::Bytes(server))) =
+						(doc.get_first(channel_id), doc.get_first(server_key))
+					{
+						res.push(SearchResultId::Channel { server: server.clone(), id: *id });
+					} else {
+						warn!(self.logger, "Search found entry without id"; "type" => ?t);
 					}
 				}
-
-				if !highlights.is_empty() {
-					// Only add if there are highlights in known attributes (ignore id)
-					res.results.push(SearchResult { id, highlights });
+				IndexEntryType::Client => {
+					if let Some(Value::Bytes(id)) = doc.get_first(client_uid) {
+						res.push(SearchResultId::Client(id.clone()));
+					} else {
+						warn!(self.logger, "Search found entry without id"; "type" => ?t);
+					}
 				}
-			} else {
-				warn!(self.logger, "Search document not found"; "id" => ?r.id);
+				IndexEntryType::Message => {
+					if let Some(Value::U64(id)) = doc.get_first(message_id) {
+						res.push(SearchResultId::Message(*id));
+					} else {
+						warn!(self.logger, "Search found entry without id"; "type" => ?t);
+					}
+				}
+				IndexEntryType::Server => {
+					if let Some(Value::Bytes(id)) = doc.get_first(server_key) {
+						res.push(SearchResultId::Server(id.clone()));
+					} else {
+						warn!(self.logger, "Search found entry without id"; "type" => ?t);
+					}
+				}
 			}
 		}
 
-		trace!(self.logger, "Search query result"; "result" => ?res);
-		Ok(res)
+		let mut content_snippet_generator = SnippetGenerator::create(&searcher, &query, content)?;
+		content_snippet_generator.set_max_num_chars(5000);
+		let mut name_snippet_generator = SnippetGenerator::create(&searcher, &query, name)?;
+		name_snippet_generator.set_max_num_chars(1000);
+		let mut address_snippet_generator = SnippetGenerator::create(&searcher, &query, address)?;
+		address_snippet_generator.set_max_num_chars(1000);
+
+		time_reporter.finish();
+
+		Ok(SearchResults {
+			results: res,
+			content_snippet_generator,
+			name_snippet_generator,
+			address_snippet_generator,
+		})
 	}
 }

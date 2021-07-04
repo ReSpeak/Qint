@@ -6,7 +6,7 @@ use actix::*;
 use anyhow::Result;
 use futures::FutureExt;
 use slog::{error, Logger};
-use tokio::runtime::{Handle, Runtime};
+use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 use tokio::task;
 
@@ -39,7 +39,6 @@ const MAX_OPUS_FRAME_SIZE: usize = 1275;
 
 #[derive(Clone)]
 pub(crate) struct AudioData {
-	pub pool: Handle, // @Seebi?
 	pub a2ts: Addr<AudioToTs>,
 	pub ts2a: Addr<TsToAudio>,
 }
@@ -73,7 +72,6 @@ pub(crate) fn start(
 	}
 
 	let mut runtime = Runtime::new().unwrap();
-	let pool = runtime.handle().clone();
 
 	// Create thread local runtime for non-send tasks
 	// A channel size of 1 leads to audio drops when cpu is fully used
@@ -105,5 +103,5 @@ pub(crate) fn start(
 		});
 	});
 
-	Ok(AudioData { pool, a2ts, ts2a })
+	Ok(AudioData { a2ts, ts2a })
 }

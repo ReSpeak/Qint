@@ -9,11 +9,12 @@
 	import type { NodeSelection } from "../app";
 	import type { LinksMap } from "../ui/specialized/uiRenderedText";
 
-	export let unread: boolean;
+	export let unread: boolean = false;
 	export let message: Message;
 	export let messageHighlightedContent: string | undefined = undefined;
 	export let nodeSel: NodeSelection | undefined = undefined;
 	export let server: string | undefined = undefined;
+	export let timeFormat: string = "HH:mm";
 
 	let viewRaw = false;
 	let links: LinksMap | undefined;
@@ -23,7 +24,7 @@
 <div class="messageRow" class:unread>
 	<div class="hover-container" style="border-color:{message.clientColor};">
 		<div class="messageTime chat-left-col">
-			<span title={message.date.format(LONG_DATETIME)}> {message.date.format("HH:mm")} </span>
+			<span title={message.date.format(LONG_DATETIME)}> {message.date.format(timeFormat)} </span>
 		</div>
 		<!-- msg.status === MessageStatus::Sending -->
 		<!-- msg.status === MessageStatus::Error -->

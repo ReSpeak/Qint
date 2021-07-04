@@ -17,9 +17,13 @@
 				source={content.Channel.channel}
 				server={content.Channel.server.publicKeyStr} />
 		{:else if "Client" in content}
+			<!-- Icon of which server? -->
 			<Icon name={CLIENT_ICON} />
 		{:else}
-			<Icon name={SERVER_ICON} />
+			<TsIcon
+				type="server"
+				source={content.Server.server}
+				server={content.Server.server.publicKeyStr} />
 		{/if}
 	</div>
 	<div class="resultName has-text-weight-bold">
@@ -41,16 +45,18 @@
 			<ServerName server={content.Channel.server} />
 			<span class="serverAddress">({content.Channel.server.address})</span>
 		{:else if "Server" in content}
-			{content.Server.server.address}
+			{@html content.Server.highlightedAddress}
 		{/if}
 	</div>
 </div>
 
 <style lang="scss">
-	// TODO Share css
 	@import "../style/global_mixin";
-	@mixin block-margin {
-		margin-top: 0.5em;
+	@import "../chat/chat_style";
+
+	.searchResult :global(.chat-left-col) {
+		@include chat-left-col;
+		width: 40px;
 	}
 
 	.searchResult {

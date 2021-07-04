@@ -9,7 +9,8 @@ description = "Qint is a TeamSpeak client"
 actix = "0.12"
 actix-cors = "=0.6.0-beta.2"
 actix-files = "=0.6.0-beta.6"
-actix-web = "=4.0.0-beta.8"
+# Exclude zstd from dependencies because a newer version is pulled in by tauri and milli
+actix-web = { version = "=4.0.0-beta.8", default-features = false, features = ["compress-brotli", "cookies"] }
 actix-web-actors = "=4.0.0-beta.6"
 actix-rt = "2"
 actix-service = "2"
@@ -31,9 +32,10 @@ git-testament = "0.2"
 juniper = "0.15"
 libsqlite3-sys = { version = "0.18", features = [ "bundled" ] }
 livesplit-hotkey = { git = "https://github.com/LiveSplit/livesplit-core", rev = "624783aebf83fc23e040da174accffae44e5ed12", version = "0.5" }
-meilisearch-core = { git = "https://github.com/meilisearch/MeiliSearch", rev = "ff38220b6821e7bf394f8e807f410a8a701414c9", version = "0.18" }
 nnnoiseless = "0.3"
 nom = "6"
+num-traits = "0.2"
+num-derive = "0.3"
 open = "1"
 percent-encoding = "2.1"
 proxy-codegen = { path = "../proxy-codegen" }
@@ -50,10 +52,12 @@ serde_ini = "0.2"
 sled = "0.34"
 slog-async = "2"
 slog-envlogger = "2"
+slog-perf = "0.2"
 slog-scope = "4"
 slog-stdlog = "4"
 slog-term = "2"
 structopt = { version = "0.3", default-features = false }
+tantivy = "0.15"
 thiserror = "1"
 time = "0.2"
 toml = "0.5"
@@ -82,7 +86,8 @@ libsqlite3-sys = { version = "0.18", features = [ "bundled" ] }
 
 [dev-dependencies]
 actix-codec = "0.4.0-beta.1"
-awc = "3.0.0-beta.1"
+# Exclude zstd from dependencies because a newer version is pulled in by tauri and milli
+awc = { version = "3.0.0-beta.7", default-features = false, features = ["compress-brotli", "cookies"] }
 rand = "0.8"
 tempfile = "3"
 uuid = { version = "0.8", features = [ "v4" ] }

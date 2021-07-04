@@ -209,9 +209,7 @@ struct MuteStates {
 
 pub struct App(Arc<State>);
 
-fn default_listen_address() -> SocketAddr {
-	"127.0.0.1:4422".parse().unwrap()
-}
+fn default_listen_address() -> SocketAddr { "127.0.0.1:4422".parse().unwrap() }
 
 fn default_cache_path() -> PathBuf {
 	let proj_dirs = match directories_next::ProjectDirs::from("", DIR_ORGANIZATION, DIR_PROJECT) {
@@ -409,9 +407,7 @@ impl Settings {
 		Ok(())
 	}
 
-	fn merge(&mut self, v: &Value) {
-		merge_json(&mut self.0, v);
-	}
+	fn merge(&mut self, v: &Value) { merge_json(&mut self.0, v); }
 
 	fn get_global_volume(&self) -> Option<f32> {
 		Some(self.0.as_object()?.get("audio")?.as_object()?.get("globalVolume")?.as_f64()? as f32)
@@ -667,9 +663,7 @@ struct GetFileOptions {
 }
 
 impl ResultDetails {
-	fn gone() -> Self {
-		Self::from_desc("gone".into())
-	}
+	fn gone() -> Self { Self::from_desc("gone".into()) }
 }
 
 #[get("/con/{id}/file/{channel}/{path:.*}")]
@@ -983,10 +977,10 @@ async fn put_ident(
 	let query = query_opt.into_inner();
 	match state
 		.database
-		.send(UpdateIdentityMsg(
-			FindIdentity::ById(path.into_inner()),
-			UpdateIdentity { name: query.name, ..Default::default() },
-		))
+		.send(UpdateIdentityMsg(FindIdentity::ById(path.into_inner()), UpdateIdentity {
+			name: query.name,
+			..Default::default()
+		}))
 		.await
 	{
 		Ok(Ok(())) => HttpResponse::Ok().finish(),
@@ -1452,9 +1446,7 @@ impl App {
 		settings.listen_address
 	}
 
-	pub fn get_token(&self) -> &str {
-		&self.0.token
-	}
+	pub fn get_token(&self) -> &str { &self.0.token }
 }
 
 /// Tests need a running TeamSpeak server on localhost. The default channel has to be channel 1,
@@ -1514,9 +1506,7 @@ mod tests {
 		}
 
 		async fn graphql<T>(&self, request: &GraphQLRequest) -> Result<T>
-		where
-			for<'a> T: Deserialize<'a>,
-		{
+		where for<'a> T: Deserialize<'a> {
 			let client = awc::Client::default();
 			let url = format!("http://127.0.0.1:{}/db", self.port);
 			debug!(self.logger, "GraphQL request"; "body" => serde_json::to_string(&request).unwrap());

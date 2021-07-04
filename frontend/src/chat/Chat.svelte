@@ -382,6 +382,15 @@
 <style lang="scss">
 	@import "./chat_style";
 
+	.invoker-row {
+		@include invoker-row;
+	}
+
+	.chat :global(.chat-left-col) {
+		@include chat-left-col;
+		width: 48px;
+	}
+
 	.chat {
 		overflow: hidden;
 		display: flex;
@@ -427,10 +436,6 @@
 		padding-bottom: 0.5em;
 	}
 
-	@mixin block-margin {
-		margin-top: 0.5em;
-	}
-
 	.chat-date {
 		flex: 1;
 		display: flex;
@@ -448,23 +453,6 @@
 			left: 0.5em;
 			right: 0.5em;
 		}
-	}
-
-	.invoker-row {
-		display: flex;
-		align-items: center;
-		@include block-margin;
-		margin-left: $side-pad-width;
-		margin-right: $side-pad-width;
-	}
-
-	.chat :global(.chat-left-col) {
-		width: 48px;
-		padding-right: 0.5em;
-
-		display: flex;
-		justify-content: center;
-		text-align: center;
 	}
 
 	.chatFiller {

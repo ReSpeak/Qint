@@ -1,9 +1,7 @@
 // Broken warning with juniper derive
 #![allow(unused_braces)]
 
-use std::collections::HashMap;
 use std::convert::TryInto;
-use std::ops::Range;
 use std::sync::Arc;
 
 use actix_web::*;
@@ -14,6 +12,7 @@ use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
 use juniper::{EmptySubscription, FieldError, RootNode, ID};
 use proxy_codegen::markdown::markdown_highlighted;
+use tantivy::SnippetGenerator;
 use tsproto_types::crypto::EccKeyPubP256;
 
 use super::models::MessageStatus;
@@ -52,15 +51,15 @@ struct Message {
 struct Server(models::Server);
 struct ServerClient(models::ServersClients);
 
-struct Highlight(Range<usize>);
-struct SearchResult {
-	id: SearchResultId,
-	highlights: HashMap<&'static str, Vec<Highlight>>,
+struct SnippetGenerators {
+	content_snippet_generator: SnippetGenerator,
+	name_snippet_generator: SnippetGenerator,
+	address_snippet_generator: SnippetGenerator,
 }
 
-struct SearchResults {
-	results: Vec<SearchResult>,
-	count: usize,
+struct SearchResult {
+	id: SearchResultId,
+	snippet_generators: Arc<SnippetGenerators>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, juniper::GraphQLEnum)]
@@ -707,16 +706,10 @@ impl ServerClient {
 	fn timezone(&self) -> i32 { self.0.timezone }
 }
 
-#[juniper::graphql_object(Context = State)]
-impl Highlight {
-	fn start(&self) -> i32 { self.0.start as i32 }
-	fn end(&self) -> i32 { self.0.end as i32 }
-}
-
 impl SearchResult {
 	async fn get_attribute(&self, state: &State, attr: &str) -> GResult<Option<String>> {
 		match self.id {
-			SearchResultId::Message { id } => {
+			SearchResultId::Message(id) => {
 				if attr != "content" {
 					return Ok(None);
 				}
@@ -759,7 +752,7 @@ impl SearchResult {
 					_ => Ok(None),
 				}
 			}
-			SearchResultId::Client { ref id } => {
+			SearchResultId::Client(ref id) => {
 				let id = id.clone();
 				match attr {
 					"uid" => Ok(Some(base64::encode(&id))),
@@ -808,7 +801,7 @@ impl SearchResult {
 					_ => Ok(None),
 				}
 			}
-			SearchResultId::Server { ref id } => {
+			SearchResultId::Server(ref id) => {
 				match attr {
 					"uid" => {
 						let public_key = EccKeyPubP256::from_short(id.as_slice())?;
@@ -858,12 +851,28 @@ impl SearchResult {
 	}
 }
 
-#[juniper::graphql_object(Context = State)]
-impl SearchResult {
-	fn highlights(&self, attribute: String) -> Option<&[Highlight]> {
-		self.highlights.get(attribute.as_str()).map(|v| v.as_slice())
+/// A helper function that robustly aligns a range to char boundaries.
+/*fn highlight_to_byte_range(range: Range<usize>, text: &str) -> Range<usize> {
+	if range.start > text.len() {
+		range.start = text.len();
+	}
+	if range.end > text.len() {
+		range.end = text.len();
 	}
 
+	// Round down to char boundaries
+	while !text.is_char_boundary(range.start) {
+		range.start -= 1;
+	}
+	while !text.is_char_boundary(range.end) {
+		range.end -= 1;
+	}
+
+	range
+}*/
+
+#[juniper::graphql_object(Context = State)]
+impl SearchResult {
 	async fn attribute(&self, state: &State, attribute: String) -> GResult<Option<String>> {
 		Ok(self.get_attribute(state, &attribute).await?)
 	}
@@ -872,26 +881,28 @@ impl SearchResult {
 	async fn highlighted_attribute(
 		&self, state: &State, attribute: String,
 	) -> GResult<Option<String>> {
-		let highlights = match self.highlights.get(attribute.as_str()) {
-			Some(r) => r,
-			None => return Ok(None),
-		};
 		let attr: String = match self.get_attribute(state, &attribute).await? {
 			Some(r) => r,
 			None => return Ok(None),
 		};
-		let mut sorted_hls = highlights
-			.iter()
-			.map(|h| crate::search::meili_to_byte_range(h.0.start, h.0.end, &attr))
-			.collect::<Vec<_>>();
-		sorted_hls.sort_by_key(|h| h.start);
-
-		Ok(Some(markdown_highlighted(&attr, &sorted_hls)))
+		let snippet_generator = match attribute.as_str() {
+			"content" => Some(&self.snippet_generators.content_snippet_generator),
+			"name" => Some(&self.snippet_generators.name_snippet_generator),
+			"address" => Some(&self.snippet_generators.address_snippet_generator),
+			_ => None,
+		};
+		if let Some(gen) = snippet_generator {
+			//let highlights = gen.snippet(&attr).highlighted().iter(|r| highlight_to_byte_range(r.clone(), attr)).collect::<Vec<_>>();
+			let snippet = gen.snippet(&attr);
+			Ok(Some(markdown_highlighted(snippet.fragments(), snippet.highlighted())))
+		} else {
+			Ok(Some(markdown_highlighted(&attr, &[])))
+		}
 	}
 
 	/// Get as message
 	async fn message(&self, state: &State) -> GResult<Option<Message>> {
-		let id = if let SearchResultId::Message { id } = self.id {
+		let id = if let SearchResultId::Message(id) = self.id {
 			id as i64
 		} else {
 			return Ok(None);
@@ -937,7 +948,7 @@ impl SearchResult {
 	}
 
 	async fn client(&self, state: &State) -> GResult<Option<Client>> {
-		let id = if let SearchResultId::Client { id } = &self.id {
+		let id = if let SearchResultId::Client(id) = &self.id {
 			id.clone()
 		} else {
 			return Ok(None);
@@ -958,7 +969,7 @@ impl SearchResult {
 	}
 
 	async fn server(&self, state: &State) -> GResult<Option<Server>> {
-		let id = if let SearchResultId::Server { id } = &self.id {
+		let id = if let SearchResultId::Server(id) = &self.id {
 			id.clone()
 		} else {
 			return Ok(None);
@@ -977,12 +988,6 @@ impl SearchResult {
 				.await??,
 		))
 	}
-}
-
-#[juniper::graphql_object(Context = State)]
-impl SearchResults {
-	fn results(&self) -> &[SearchResult] { &self.results }
-	fn count(&self) -> i32 { self.count as i32 }
 }
 
 #[juniper::graphql_object(Context = State)]
@@ -1110,25 +1115,26 @@ impl Query {
 	/// Search for a query string and returns 50 results.
 	///
 	/// A start offset can be specified to fetch further results.
-	async fn search(state: &State, query: String, start: Option<i32>) -> GResult<SearchResults> {
+	async fn search(
+		state: &State, query: String, messages: bool, start: Option<i32>,
+	) -> GResult<Vec<SearchResult>> {
 		if let Some(search) = &state.search {
 			let start = start.unwrap_or_default() as usize;
-			let search_res = search.search(&query, start..start + MESSAGES_LIMIT as usize)?;
+			let search_res =
+				search.search(&query, start..start + MESSAGES_LIMIT as usize, messages)?;
+			let snippet_generators = Arc::new(SnippetGenerators {
+				content_snippet_generator: search_res.content_snippet_generator,
+				name_snippet_generator: search_res.name_snippet_generator,
+				address_snippet_generator: search_res.address_snippet_generator,
+			});
 			let results = search_res
 				.results
 				.into_iter()
-				.map(|r| SearchResult {
-					id: r.id,
-					highlights: r
-						.highlights
-						.into_iter()
-						.map(|(k, v)| (k, v.into_iter().map(Highlight).collect()))
-						.collect(),
-				})
+				.map(|r| SearchResult { id: r, snippet_generators: snippet_generators.clone() })
 				.collect();
-			Ok(SearchResults { results, count: search_res.count })
+			Ok(results)
 		} else {
-			Ok(SearchResults { results: Vec::new(), count: 0 })
+			Ok(Vec::new())
 		}
 	}
 }

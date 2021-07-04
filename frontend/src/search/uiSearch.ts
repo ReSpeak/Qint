@@ -6,17 +6,14 @@ import { FetchResult } from "../ui/container/uiLazyList";
 import { datetimeDeserialize, urlBase64Encode } from "../util";
 
 type GraphQlSearchResult = {
-	count: number;
-	results: {
-		highlightedContent: string | null;
-		highlightedName: string | null;
-		highlightedAddress: string | null;
-		message: any | null;
-		channel: any | null;
-		client: any | null;
-		server: any | null;
-	}[];
-};
+	highlightedContent: string | null;
+	highlightedName: string | null;
+	highlightedAddress: string | null;
+	message: any | null;
+	channel: any | null;
+	client: any | null;
+	server: any | null;
+}[];
 
 export const EmptyMessageFetch: FetchResult<MessageSearchResult> = {
 	items: [],
@@ -30,58 +27,39 @@ export const EmptyOtherFetch: FetchResult<OtherSearchResult> = {
 	canLoadAfterEnd: false,
 };
 
-export async function search(s: string, start: number = 0): Promise<SearchResults> {
+export async function search(s: string, messages: boolean, start: number = 0): Promise<SearchResults> {
 	const res = await backend.graphql<{ search: GraphQlSearchResult }>(
-		`query Search($query: String!, $start: Int!) {
-			search(query: $query, start: $start) {
-				count
-				results {
-					highlightedContent: highlightedAttribute(attribute: "content")
-					highlightedName: highlightedAttribute(attribute: "name")
-					highlightedAddress: highlightedAttribute(attribute: "address")
+		`query Search($query: String!, $messages: Boolean!, $start: Int!) {
+			search(query: $query, messages: $messages, start: $start) {
+				highlightedContent: highlightedAttribute(attribute: "content")
+				highlightedName: highlightedAttribute(attribute: "name")
+				highlightedAddress: highlightedAttribute(attribute: "address")
 
-					message {
-						id
-						invoker {
-							server {
-								publicKey
-							}
-							client {
-								uid
-								name
-								customName
-							}
-							icon
-							avatar
-						}
-						invokerName
-						content
-						rendered
-						status
-						isPoke
-						time
-						timezone
-					}
-
-					channel {
-						id
+				message {
+					id
+					invoker {
 						server {
 							publicKey
+						}
+						client {
 							uid
 							name
-							address
-							icon
+							customName
 						}
-						name
 						icon
+						avatar
 					}
+					invokerName
+					content
+					rendered
+					status
+					isPoke
+					time
+					timezone
+				}
 
-					client {
-						uid
-						name
-						customName
-					}
-
+				channel {
+					id
 					server {
 						publicKey
 						uid
@@ -89,20 +67,41 @@ export async function search(s: string, start: number = 0): Promise<SearchResult
 						address
 						icon
 					}
+					name
+					icon
+				}
+
+				client {
+					uid
+					name
+					customName
+				}
+
+				server {
+					publicKey
+					uid
+					name
+					address
+					icon
 				}
 			}
 		}`,
 		{
 			query: s,
+			messages,
 			start,
 		}
 	);
 	if ("data" in res) {
+		if (res.data === null && "errors" in res) {
+			throw (res as any).errors[0].message;
+		}
+
 		const messages: MessageSearchResult[] = [];
 		const others: OtherSearchResult[] = [];
 
 		let id = start;
-		res.data.search.results.forEach((res) => {
+		res.data.search.forEach((res) => {
 			let client;
 			if (res.message !== null) {
 				const msg = res.message;
@@ -160,20 +159,18 @@ export async function search(s: string, start: number = 0): Promise<SearchResult
 		});
 
 		return {
-			count: res.data.search.count,
 			messages,
 			others,
 		};
 	} else {
 		console.error("Search result does not contain data", res);
-		return { messages: [], others: [], count: 0 };
+		return { messages: [], others: [] };
 	}
 }
 
 export interface SearchResults {
 	messages: MessageSearchResult[];
 	others: OtherSearchResult[];
-	count: number;
 }
 
 export interface MessageSearchResult {

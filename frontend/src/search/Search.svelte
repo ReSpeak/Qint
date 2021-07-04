@@ -8,6 +8,7 @@
 	import { EmptyMessageFetch, EmptyOtherFetch, search } from "./uiSearch";
 	import type { MessageSearchResult, OtherSearchResult } from "./uiSearch";
 	import debug from "debug";
+	import { on } from "../util";
 	const log = debug("SEARCH");
 
 	export let filter: string;
@@ -15,8 +16,6 @@
 	let searchList: LazyList<MessageSearchResult> | undefined;
 	let otherSearchList: LazyList<OtherSearchResult> | undefined;
 	let searchError: unknown | undefined;
-	let messageResultCount = 0;
-	let otherResultCount = 0;
 
 	$: {
 		if (searchList) {
@@ -37,6 +36,12 @@
 		}
 	}
 
+	$: on(filter, resetError());
+
+	function resetError() {
+		searchError = undefined;
+	}
+
 	async function fetchOtherElements(
 		idFrom: OtherSearchResult | undefined,
 		dir: ListFetchDir
@@ -49,13 +54,11 @@
 			if (dir === ListFetchDir.Before && idFrom) {
 				const start = Math.max(0, idFrom.id - 50);
 				canLoadBeforeStart = start !== 0;
-				res = await search(filter, start);
+				res = await search(filter, false, start);
 				res.others = res.others.slice(0, idFrom.id - start);
-				otherResultCount = res.count;
 			} else {
 				if (idFrom !== undefined) canLoadBeforeStart = idFrom.id !== 0;
-				res = await search(filter, idFrom !== undefined ? idFrom.id + 1 : undefined);
-				otherResultCount = res.count;
+				res = await search(filter, false, idFrom !== undefined ? idFrom.id + 1 : undefined);
 				if (res.others.length < 50) canLoadAfterEnd = false;
 			}
 			if (res.others.length === 0) {
@@ -87,13 +90,11 @@
 			if (dir === ListFetchDir.Before && idFrom) {
 				const start = Math.max(0, idFrom.id - 50);
 				canLoadBeforeStart = start !== 0;
-				res = await search(filter, start);
+				res = await search(filter, true, start);
 				res.messages = res.messages.slice(0, idFrom.id - start);
-				messageResultCount = res.count;
 			} else {
 				if (idFrom !== undefined) canLoadBeforeStart = idFrom.id !== 0;
-				res = await search(filter, idFrom !== undefined ? idFrom.id + 1 : undefined);
-				messageResultCount = res.count;
+				res = await search(filter, true, idFrom !== undefined ? idFrom.id + 1 : undefined);
 				if (res.messages.length < 50) canLoadAfterEnd = false;
 			}
 			if (res.messages.length === 0) {
@@ -119,13 +120,14 @@
 		<div>
 			<article class="message is-danger">
 				<div class="message-header">
-					<p>Error</p>
+					<p>Search failed</p>
+					<button class="delete" aria-label="delete" on:click={resetError}></button>
 				</div>
-				<div class="message-body">Search failed</div>
+				<div class="message-body">{searchError}</div>
 			</article>
 		</div>
 	{:else if filter.length >= 2}
-		<div>{otherResultCount} results</div>
+		<h3 class="title is-3">Results</h3>
 		<LazyList
 			bind:this={otherSearchList}
 			fetchElements={fetchOtherElements}
@@ -139,7 +141,7 @@
 			<UiOtherSearchResult content={item} />
 		</LazyList>
 
-		<div>Found {messageResultCount} messages</div>
+		<h3 class="title is-3">Messages</h3>
 		<LazyList
 			bind:this={searchList}
 			fetchElements={fetchMessageElements}

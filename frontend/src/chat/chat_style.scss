@@ -1,1 +1,20 @@
 $side-pad-width: 0.2em;
+
+@mixin block-margin {
+	margin-top: 0.5em;
+}
+
+@mixin invoker-row {
+	display: flex;
+	align-items: center;
+	@include block-margin;
+	margin-left: $side-pad-width;
+	margin-right: $side-pad-width;
+}
+
+@mixin chat-left-col {
+	padding-right: 0.5em;
+
+	display: flex;
+	justify-content: center;
+}

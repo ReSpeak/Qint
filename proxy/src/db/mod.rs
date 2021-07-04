@@ -633,7 +633,7 @@ impl Handler<WriteMessageMsg> for DbHandler {
 
 		// Add to search db
 		if let Some(search) = &self.search {
-			search.add_message(message_id as u64, message.message)?;
+			search.add_message(message_id as u64, utc_time, message.message)?;
 		}
 
 		Ok(())
@@ -1724,7 +1724,7 @@ impl<'a> EventHandler<'a> {
 			})?;
 			// Add to search db
 			if let Some(search) = search {
-				search.add_message(db.last_message_id as u64, message)?;
+				search.add_message(db.last_message_id as u64, utc_time, message)?;
 			}
 
 			Ok(())
