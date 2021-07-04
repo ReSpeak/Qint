@@ -6,6 +6,7 @@
 	import { pathJoin } from "./fileUtil";
 	import { base64Encode, javaHash, on, tsHexDecode } from "../util";
 	import ImageModal from "../chat/ImageModal.svelte";
+	import FileIO from "../ui/util/FileIO.svelte";
 
 	export let connection: Connection;
 	export let path: string[];
@@ -30,8 +31,7 @@
 	let fileBrowserHasFocus = false;
 	let displayFiles: SelectableFileTreeNode[] = [];
 	let fileSelection: SelectableFileTreeNode[] = [];
-	let dummyDownloader: HTMLIFrameElement;
-	let dummyUploader: HTMLInputElement;
+	let fileIo: FileIO;
 	let invalidateCache = true;
 	let showBig: FileTreeNode | undefined = undefined;
 	let showBigVisible = false;
@@ -178,13 +178,9 @@
 		uploadFiles(...files);
 	}
 
-	function uploadSelected() {
+	function uploadSelected(files: CustomEvent<FileList>) {
 		if (!canUpload) return;
-		const files = dummyUploader.files;
-		if (files && files.length > 0) {
-			uploadFiles(...files);
-			dummyUploader.value = null!;
-		}
+		uploadFiles(...files.detail);
 	}
 
 	function clickBackground(this: HTMLElement, e: MouseEvent) {
@@ -270,7 +266,7 @@
 		{#if canUpload}
 			<button
 				title="Upload files"
-				on:click={() => dummyUploader.click()}
+				on:click={() => fileIo.askUpload()}
 				class:is-info={currentUploadTask !== undefined}
 				class="button">
 				<Icon name={currentUploadTask === undefined ? "upload" : "orbit mdi-spin"} />
@@ -326,18 +322,7 @@
 	{/if}
 
 	{#if canUpload}
-		<input
-			title="Dummy Uploader"
-			style="display: none;"
-			bind:this={dummyUploader}
-			on:change={uploadSelected}
-			type="file"
-			multiple />
-		<iframe
-			title="Dummy Downloader"
-			style="display: none;"
-			bind:this={dummyDownloader}
-			sandbox="allow-downloads" />
+		<FileIO bind:this={fileIo} on:uploadRequest={uploadSelected} />
 	{/if}
 </div>
 

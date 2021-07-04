@@ -5,11 +5,11 @@
 	import KeyValue from "../../ui/util/KeyValue.svelte";
 	import Icon from "../../ui/icon/Icon.svelte";
 	import EmojiString from "../../ui/specialized/EmojiString.svelte";
+	import FileIO from "../../ui/util/FileIO.svelte";
 	import { loadIdentities as liArr } from "./identity";
 	import type { ApiIdentity } from "./identity";
 
-	let dummyUploader: HTMLInputElement;
-	let dummyDownloader: HTMLIFrameElement;
+	let fileIo: FileIO;
 	let identities: ApiIdentity[] = [];
 	let selectedIndex: number = -1;
 	let selectedIdentity: ApiIdentity | undefined;
@@ -44,13 +44,9 @@
 		}
 	}
 
-	async function clickImportIdentity() {
-		const files = dummyUploader.files;
-		if (files && files.length > 0) {
-			const content = await files[0].text();
-			await importIdentityFromString(content);
-			dummyUploader.value = null!;
-		}
+	async function clickImportIdentity(files: CustomEvent<FileList>) {
+		const content = await files.detail[0].text();
+		await importIdentityFromString(content);
 	}
 
 	async function importIdentityFromString(data: string) {
@@ -109,7 +105,7 @@
 				New
 			</a>
 
-			<a class="panel-block is-active" on:click={() => dummyUploader.click()}>
+			<a class="panel-block is-active" on:click={() => fileIo.askUpload()}>
 				<Icon name="file-upload-outline" />
 				Import
 			</a>
@@ -218,17 +214,7 @@
 		</form>
 	</div>
 
-	<input
-		title="Dummy Uploader"
-		style="display: none;"
-		bind:this={dummyUploader}
-		on:change={clickImportIdentity}
-		type="file" />
-	<iframe
-		title="Dummy Downloader"
-		style="display: none;"
-		bind:this={dummyDownloader}
-		sandbox="allow-downloads" />
+	<FileIO bind:this={fileIo} useDownload={false} on:uploadRequest={clickImportIdentity} />
 </TabSlot>
 
 <style lang="scss">

@@ -12,6 +12,7 @@
 		IDragOptions,
 		TableSortFn,
 	} from "../ui/html/uiTable";
+	import FileIO from "../ui/util/FileIO.svelte";
 	import { FolderState } from "../fileTreeCache";
 	import type { FileTreeNode } from "../fileTreeCache";
 	import { extensionToIcon, formatBytes, pathJoin, pathSplit } from "./fileUtil";
@@ -35,8 +36,7 @@
 	let fileTable: Table<FileTreeNode>;
 	let displayChannel: FileTreeNode | null;
 	let displayChildren: FileTreeNode[];
-	let dummyDownloader: HTMLIFrameElement;
-	let dummyUploader: HTMLInputElement;
+	let fileIo: FileIO;
 	let invalidateCache = true;
 	let fileSelection: FileTreeNode[] = [];
 	let createNewFolderName = "";
@@ -109,7 +109,7 @@
 				const fileUrl = `${connection.backend.serverFileSrc}/file/${cachePathStr}/${
 					row.name
 				}?dl=${encodeURIComponent(row.name)}`;
-				dummyDownloader.src = fileUrl;
+				fileIo.askDownload(fileUrl);
 			} else {
 				pushFolder(row.name);
 			}
@@ -253,12 +253,8 @@
 		uploadFiles(...files);
 	}
 
-	function uploadSelected() {
-		const files = dummyUploader.files;
-		if (files && files.length > 0) {
-			uploadFiles(...files);
-			dummyUploader.value = null!;
-		}
+	function uploadSelected(files: CustomEvent<FileList>) {
+		uploadFiles(...files.detail);
 	}
 
 	function clickBackground(this: HTMLElement, e: MouseEvent) {
@@ -366,7 +362,7 @@
 		</button>
 		<button
 			title="Upload files"
-			on:click={() => dummyUploader.click()}
+			on:click={() => fileIo.askUpload()}
 			class:is-info={currentUploadTask !== undefined}
 			class="button">
 			<Icon name={currentUploadTask === undefined ? "upload" : "orbit mdi-spin"} />
@@ -501,19 +497,7 @@
 			<th class="noFiles" colspan="4">No files</th>
 		</tr>
 	</Table>
-
-	<input
-		title="Dummy Uploader"
-		style="display: none;"
-		bind:this={dummyUploader}
-		on:change={uploadSelected}
-		type="file"
-		multiple />
-	<iframe
-		title="Dummy Downloader"
-		style="display: none;"
-		bind:this={dummyDownloader}
-		sandbox="allow-downloads" />
+	<FileIO bind:this={fileIo} on:uploadRequest={uploadSelected} />
 </div>
 
 <style lang="scss">

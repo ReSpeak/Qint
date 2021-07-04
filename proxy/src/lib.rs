@@ -277,27 +277,19 @@ impl State {
 			let (new_capture, new_playback) = settings.get_preferred_audio_device();
 			if old_capture != new_capture {
 				let logger = state.logger.clone();
-				actix::spawn(
-					ad.a2ts.send(audio::SetAudioDevice(new_capture)).map(
-						move |r| {
-							if let Err(e) = r {
-								error!(logger, "Failed to apply global volume"; "error" => %e);
-							}
-						},
-					),
-				);
+				actix::spawn(ad.a2ts.send(audio::SetAudioDevice(new_capture)).map(move |r| {
+					if let Err(e) = r {
+						error!(logger, "Failed to apply global volume"; "error" => %e);
+					}
+				}));
 			}
 			if old_playback != new_playback {
 				let logger = state.logger.clone();
-				actix::spawn(
-					ad.ts2a.send(audio::SetAudioDevice(new_playback)).map(
-						move |r| {
-							if let Err(e) = r {
-								error!(logger, "Failed to apply global volume"; "error" => %e);
-							}
-						},
-					),
-				);
+				actix::spawn(ad.ts2a.send(audio::SetAudioDevice(new_playback)).map(move |r| {
+					if let Err(e) = r {
+						error!(logger, "Failed to apply global volume"; "error" => %e);
+					}
+				}));
 			}
 		}
 
@@ -703,10 +695,21 @@ async fn download_file(
 				return HttpResponse::Gone().json(ResultDetails::gone());
 			}
 		};
+
+		let process_answer = |response: &mut HttpResponseBuilder, len: u64| {
+			response.no_chunking(len);
+			if let Some(filename) = dl.as_ref() {
+				response.insert_header((
+					"Content-Disposition",
+					format!("attachment; filename=\"{}\"", filename),
+				));
+			}
+		};
+
 		if let Some((len, stream)) = state.file_cache.get_cached_file(&server, channel, &path).await
 		{
 			let (stream, mut response) = guess_content_type(stream).await;
-			response.no_chunking(len);
+			process_answer(&mut response, len);
 			return response.streaming(stream);
 		}
 
@@ -741,13 +744,7 @@ async fn download_file(
 		let stream =
 			FramedRead::new(file_stream, BytesCodec::new()).map(|r| r.map(web::BytesMut::freeze));
 		let (stream, mut response) = guess_content_type(stream).await;
-		response.no_chunking(len);
-		if let Some(filename) = dl.as_ref() {
-			response.insert_header((
-				"Content-Disposition",
-				format!("attachment; filename=\"{}\"", filename),
-			));
-		}
+		process_answer(&mut response, len);
 
 		// Cache for offline usage if smaller than 5 MiB
 		if cache && len < 5 * 1024 * 1024 {
@@ -1277,11 +1274,7 @@ impl App {
 		let audio_data = if launch_config.no_audio {
 			None
 		} else {
-			Some(audio::start(
-				logger.clone(),
-				connections.clone(),
-				&settings,
-			)?)
+			Some(audio::start(logger.clone(), connections.clone(), &settings)?)
 		};
 
 		// Read hotkeys config

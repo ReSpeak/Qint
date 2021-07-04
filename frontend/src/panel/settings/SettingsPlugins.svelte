@@ -3,9 +3,9 @@
 	import { backend } from "../../backend/backend";
 	import TabSlot from "../../ui/container/TabSlot.svelte";
 	import Icon from "../../ui/icon/Icon.svelte";
+	import FileIO from "../../ui/util/FileIO.svelte";
 
-	let dummyUploader: HTMLInputElement;
-	let dummyDownloader: HTMLIFrameElement;
+	let fileIo: FileIO;
 	// Plugin names
 	let plugins: string[] = [];
 	// Created but not yet saved plugins
@@ -25,9 +25,12 @@
 		try {
 			const req = await backend.fetch("/plugins");
 			plugins = await req.json();
-			for (const p of plugins)
-				newPlugins.remove_item(p);
-			if (selectedPlugin !== undefined && !plugins.includes(selectedPlugin) && !newPlugins.includes(selectedPlugin))
+			for (const p of plugins) newPlugins.remove_item(p);
+			if (
+				selectedPlugin !== undefined &&
+				!plugins.includes(selectedPlugin) &&
+				!newPlugins.includes(selectedPlugin)
+			)
 				selectedPlugin = undefined;
 		} catch (ex) {
 			// TODO: change to debug and show on ui
@@ -73,14 +76,11 @@
 		selectedPlugin = name;
 	}
 
-	async function clickImportPlugin() {
+	async function clickImportPlugin(files: CustomEvent<FileList>) {
 		try {
-			const files = dummyUploader.files;
-			if (files && files.length > 0) {
-				const content = await files[0].text();
-				await updatePlugin(files[0].name, content);
-				dummyUploader.value = null!;
-			}
+			const file0 = files.detail[0];
+			const content = await file0.text();
+			await updatePlugin(file0.name, content);
 		} catch (ex) {
 			// TODO: change to debug and show on ui
 			console.log("Failed to import: ", ex);
@@ -96,7 +96,12 @@
 	}
 
 	async function savePlugin() {
-		if (selectedPluginName === undefined || selectedPlugin === undefined || editArea === undefined) return;
+		if (
+			selectedPluginName === undefined ||
+			selectedPlugin === undefined ||
+			editArea === undefined
+		)
+			return;
 		try {
 			const sel = selectedPlugin;
 			if (selectedPluginName === selectedPlugin) {
@@ -150,7 +155,7 @@
 				New
 			</a>
 
-			<a class="panel-block is-active" on:click={() => dummyUploader.click()}>
+			<a class="panel-block is-active" on:click={() => fileIo.askUpload()}>
 				<Icon name="file-upload-outline" />
 				Import
 			</a>
@@ -182,10 +187,7 @@
 		<form class="pluginOption" on:submit|preventDefault={savePlugin}>
 			{#if selectedPlugin !== undefined}
 				<p class="buttons is-right">
-					<button
-						type="button"
-						class="button is-danger"
-						on:click={deletePlugin}>
+					<button type="button" class="button is-danger" on:click={deletePlugin}>
 						<Icon name="delete" />
 						<span>Delete</span>
 					</button>
@@ -201,7 +203,11 @@
 						<span>Download</span>
 					</a>
 
-					<button type="submit" class="button is-success" disabled={!(selectedPlugin in editingPlugins) && selectedPluginName === selectedPlugin}>
+					<button
+						type="submit"
+						class="button is-success"
+						disabled={!(selectedPlugin in editingPlugins) &&
+							selectedPluginName === selectedPlugin}>
 						<Icon name="content-save" />
 						<span>Save</span>
 					</button>
@@ -212,23 +218,18 @@
 				</div>
 
 				<div class="control" class:is-loading={isLoading}>
-					<textarea bind:value={editArea} class="textarea editArea" on:keyup={editAreaChanged} on:change={editAreaChanged} disabled={isLoading}></textarea>
+					<textarea
+						bind:value={editArea}
+						class="textarea editArea"
+						on:keyup={editAreaChanged}
+						on:change={editAreaChanged}
+						disabled={isLoading} />
 				</div>
 			{/if}
 		</form>
 	</div>
 
-	<input
-		title="Dummy Uploader"
-		style="display: none;"
-		bind:this={dummyUploader}
-		on:change={clickImportPlugin}
-		type="file" />
-	<iframe
-		title="Dummy Downloader"
-		style="display: none;"
-		bind:this={dummyDownloader}
-		sandbox="allow-downloads" />
+	<FileIO bind:this={fileIo} useDownload={false} on:uploadRequest={clickImportPlugin} />
 </TabSlot>
 
 <style lang="scss">
