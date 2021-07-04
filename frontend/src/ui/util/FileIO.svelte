@@ -11,12 +11,27 @@
 		uploadRequest: FileList;
 	}>();
 
-	export async function askDownload(file: string) {
+	export async function askDownload(src: string, fileName?: string | null) {
 		if (!useDownload) {
 			useDownload = true;
 			await tick();
 		}
-		downloader.src = file;
+		let link = src;
+		if (fileName === undefined || fileName !== null) {
+			let dlName: string;
+			if (fileName === undefined) {
+				const lastSlash = src.lastIndexOf("/");
+				if (lastSlash >= 0) {
+					dlName = src.substring(lastSlash + 1);
+				} else {
+					dlName = "file";
+				}
+			} else {
+				dlName = fileName;
+			}
+			link += `?dl=${encodeURIComponent(dlName)}`;
+		}
+		downloader.src = link;
 	}
 
 	export async function askUpload() {

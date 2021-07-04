@@ -1,11 +1,13 @@
 <script lang="ts">
 	import ImageModal from "../../chat/ImageModal.svelte";
+	import FileIO from "../util/FileIO.svelte";
 	import katex from "katex";
 	import { hljsHighlight } from "../util/hljs";
 	import { onMount } from "svelte";
 	import { parseTsScheme, schemeToLink } from "./uiRenderedText";
 	import type { LinksMap } from "./uiRenderedText";
 	import type { Connection } from "../../connection";
+	import { extensionToIcon } from "../../panel/fileUtil";
 
 	export let connection: Connection | undefined;
 	export let server: string | undefined = undefined;
@@ -15,6 +17,8 @@
 	let showBig = false;
 	let showBigSrc = "";
 	let rendered: HTMLElement;
+	let hasDownload = false;
+	let fileIo: FileIO;
 	$: renderedObj = render(text);
 
 	function render(html: string) {
@@ -27,7 +31,7 @@
 		}
 
 		// Apply KaTeX
-		for (const elem of (obj.getElementsByClassName("latex") as any) as HTMLElement[]) {
+		for (const elem of obj.getElementsByClassName("latex") as any as HTMLElement[]) {
 			const code = elem.getAttribute("data-latex");
 			const mode = elem.getAttribute("data-displaymode");
 			try {
@@ -49,10 +53,32 @@
 		for (const a of obj.querySelectorAll("a")) {
 			const href = a.href;
 			if (!href || links.has(href)) continue;
-			links.set(href, {
-				link: href,
-				title: a.textContent ?? "",
-			});
+
+			const scheme = parseTsScheme(href);
+			if (scheme?.scheme === "ts3file") {
+				let proxyFileSrc = schemeToLink(connection, server, scheme);
+				if (proxyFileSrc === null) {
+					a.parentElement?.removeChild(a);
+					continue;
+				}
+				hasDownload = true;
+				a.classList.add("file_download");
+				a.onclick = function (e) {
+					e.preventDefault();
+					fileIo.askDownload(proxyFileSrc!, scheme.attrs.filename);
+				};
+				a.insertAdjacentHTML(
+					"afterbegin",
+					`<span class="icon" style="font-size: 1.5em;">
+						<i class="mdi mdi-${extensionToIcon(scheme.attrs.filename ?? "")}"></i>
+					</span>`
+				);
+			} else {
+				links.set(href, {
+					link: href,
+					title: a.textContent ?? "",
+				});
+			}
 		}
 
 		// process ts3file links
@@ -102,6 +128,9 @@
 {#if showBig}
 	<ImageModal src={showBigSrc} bind:visible={showBig} />
 {/if}
+{#if hasDownload}
+	<FileIO bind:this={fileIo} />
+{/if}
 
 <style lang="scss">
 	.textRendered {
@@ -138,5 +167,21 @@
 			text-transform: uppercase;
 			pointer-events: none;
 		}
+	}
+
+	:global(.file_download) {
+		&:hover {
+			text-decoration: none;
+		}
+
+		display: inline-flex;
+		align-items: center;
+
+		background-color: $grey-accent;
+		border: 1px solid $box-background-color;
+		border-radius: 3px;
+
+		padding: 0.5em;
+		margin: 0 0.5em;
 	}
 </style>

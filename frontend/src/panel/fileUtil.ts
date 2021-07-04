@@ -106,6 +106,7 @@ export function extensionToIcon(file: string): string {
 		case "cfg":
 		case "editorconfig":
 		case "ini":
+		case "toml":
 		case "txt":
 			return "file-document-outline";
 		case "csv":

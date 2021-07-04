@@ -187,7 +187,7 @@
 	.description {
 		overflow-y: hidden;
 		overflow-x: hidden;
-		background-color: #242424;
+		background-color: $box-background-color;
 		box-shadow: -3px 0 3px #0005;
 		display: flex;
 		flex-direction: column;

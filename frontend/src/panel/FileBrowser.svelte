@@ -106,10 +106,8 @@
 		if (dblclick) {
 			if (row.isFile) {
 				const cachePathStr = getCachePath().join("/");
-				const fileUrl = `${connection.backend.serverFileSrc}/file/${cachePathStr}/${
-					row.name
-				}?dl=${encodeURIComponent(row.name)}`;
-				fileIo.askDownload(fileUrl);
+				const fileUrl = `${connection.backend.serverFileSrc}/file/${cachePathStr}/${row.name}`;
+				fileIo.askDownload(fileUrl, row.name);
 			} else {
 				pushFolder(row.name);
 			}
