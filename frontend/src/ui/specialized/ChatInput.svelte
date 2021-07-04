@@ -191,7 +191,10 @@
 				const dom = domparser.parseFromString(text_html, "text/html");
 				const domImg = dom.querySelector("img");
 				log("pasting as html %o", domImg);
-				if (domImg !== null && domImg.src && !domImg.src.startsWith("file://")) {
+				if (
+					domImg?.src &&
+					(domImg.src.startsWith("http://") || domImg.src.startsWith("https://"))
+				) {
 					const qintImg = domImg.dataset.qintimg
 						? ` data-qintimg="${escapeHtml(domImg.dataset.qintimg)}"`
 						: "";
@@ -212,7 +215,6 @@
 					const canvas = document.createElement("canvas");
 					canvas.width = loaderImg.naturalWidth;
 					canvas.height = loaderImg.naturalHeight;
-					// TODO check when contoext might be null?
 					canvas.getContext("2d")!.drawImage(loaderImg, 0, 0);
 					const imgData = canvas.toDataURL("image/jpeg", 0.9);
 					displayImg.src = imgData;
@@ -225,6 +227,8 @@
 					// TODO move to a 'final' block.
 					URL.revokeObjectURL(fileUrl);
 				};
+				loaderImg.onerror = () => URL.revokeObjectURL(fileUrl);
+				loaderImg.onabort = () => URL.revokeObjectURL(fileUrl);
 				loaderImg.src = fileUrl;
 				range.insertNode(displayImg);
 			}
