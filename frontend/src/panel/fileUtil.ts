@@ -32,50 +32,130 @@ export function extensionToIcon(file: string): string {
 		case "xz":
 		case "zip":
 			return "zip-box-outline";
+		case "cue":
 		case "dmg":
 		case "iso":
+		case "mdf":
+		case "vcd":
 			return "disc";
-		// Code
+		// Keys
+		case "ca-bundle":
+		case "cer":
+		case "crt":
+		case "der":
+		case "p12":
+		case "p7b":
+		case "p7c":
+		case "p7s":
+		case "pem":
+		case "pfx":
+			return "file-certificate-outline";
+		case "gpg":
+		case "kbdx":
+		case "pgp":
+		case "pub":
+			return "file-key-outline";
+		// Code (file-code-outline)
 		case "c":
-		case "cpp":
-		case "cs":
-		case "css":
-		case "cxx":
-		case "go":
 		case "h":
+			return "language-c";
+		case "cpp":
+		case "cxx":
 		case "hpp":
-		case "html":
-		case "java":
-		case "js":
-		case "php":
-		case "ps1":
-		case "py":
-		case "r":
-		case "rs":
+			return "language-cpp";
+		case "cs":
+			return "language-csharp";
+		case "css":
+		case "less":
 		case "sass":
 		case "scss":
-		case "sh":
-		case "swift":
-		case "ts":
-			return "file-code-outline";
-		case "jar":
+			return "language-css3";
+		case "go":
+			return "language-go";
+		case "hs":
+			return "language-haskell";
+		case "htm":
+		case "html":
+			return "language-html5";
+		case "java":
 			return "language-java";
+		case "js":
+			return "language-javascript";
+		case "json":
+			return "code-json";
+		case "kt":
+			return "language-kotlin";
+		case "lua":
+			return "language-lua";
+		case "md":
+			return "language-markdown-outline";
+		case "php":
+			return "language-php";
+		case "py":
+			return "language-python";
+		case "r":
+			return "language-r";
+		case "rb":
+			return "language-ruby";
+		case "rs":
+			return "language-rust";
+		case "swift":
+			return "language-swift";
+		case "ts":
+			return "language-typescript";
+		case "xaml":
+			return "language-xaml";
+		case "xml":
+			return "xml";
+		case "ps1":
+			return "powershell";
+		case "sh":
+			return "bash";
+		case "vbs":
+			return "script-text-outline";
+		case "csproj":
+		case "fsproj":
+		case "sln":
+		case "suo":
+		case "vbproj":
+		case "vcproj":
+		case "vcxproj":
+			return "microsoft-visual-studio";
+		// Database
+		case "db":
+		case "dbf":
+		case "mdb":
+		case "sql":
+			return "database-outline";
 		// Images
 		case "bmp":
 		case "cr2":
 		case "gif":
+		case "ico":
 		case "jpeg":
 		case "jpg":
 		case "png":
+		case "psd":
 		case "raw":
+		case "tga":
+		case "tif":
 		case "tiff":
 		case "webp":
 			return "file-image-outline";
+		case "eps":
+		case "svg":
+			return "vector-polyline";
 		// Music
 		case "aac":
+		case "aif":
+		case "aiff":
 		case "flac":
+		case "m3u":
 		case "m4a":
+		case "mid":
+		case "mp2":
 		case "mp3":
+		case "mpa":
 		case "ogg":
 		case "opus":
 		case "wav":
@@ -98,22 +178,32 @@ export function extensionToIcon(file: string): string {
 		case "xlsx":
 			return "file-excel-outline";
 		// Other
+		case "apk":
+			return "android-debug-bridge";
+		case "blend":
+			return "blender-software";
 		case "exe":
+		case "jar":
+		case "msi":
 			return "application-cog";
 		case "pdf":
 			return "file-pdf-outline";
 		// Text
 		case "cfg":
+		case "conf":
 		case "editorconfig":
 		case "ini":
+		case "rtf":
 		case "toml":
 		case "txt":
 			return "file-document-outline";
 		case "csv":
 			return "file-delimited-outline";
 		// Video
+		case "3gp":
 		case "avi":
 		case "flv":
+		case "m4v":
 		case "mkv":
 		case "mov":
 		case "mp4":

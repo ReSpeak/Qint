@@ -176,13 +176,16 @@
 			key: "type",
 			title: "",
 			value: (v) => v.isFile,
-			headerClass: "text-left",
+			headerClass: "text-left colIcon",
+			class: "colIcon",
 			customRender: true,
 		},
 		{
 			key: "name",
 			title: "Name",
 			value: (v) => v.name,
+			headerClass: "colName",
+			class: "colName",
 			sort: sortFoldersFirst(
 				(a, b, order) => a.name.localeCompare(b.name, undefined, sortOpt) * order
 			),
@@ -191,6 +194,8 @@
 			key: "size",
 			title: "Size",
 			value: (v) => (v.isFile ? v.size : 0),
+			headerClass: "colSize",
+			class: "colSize",
 			renderValue: (v) => (v.isFile ? formatBytes(v.size) : ""),
 			sort: sortFoldersFirst(
 				(a, b, order) => ((a.isFile ? a.size : -1) - (b.isFile ? b.size : -1)) * order
@@ -198,9 +203,11 @@
 		},
 		{
 			key: "lastModified",
-			title: "Last Modified",
+			title: "Last\u00A0Modified",
 			value: (v) => v.lastModified,
-			renderValue: (v) => v.lastModified.format("D.M.YY HH:mm"),
+			headerClass: "colModDate",
+			class: "colModDate",
+			renderValue: (v) => v.lastModified.format("DD.MM.YY\u00A0HH:mm"),
 			sort: sortFoldersFirst((a, b, order) =>
 				a.lastModified.isAfter(b.lastModified) ? order : -order
 			),
@@ -565,5 +572,22 @@
 		height: 100%;
 		border-radius: 3em;
 		pointer-events: none;
+	}
+
+	// Table formatting helper
+
+	:global(.colIcon) {
+		width: 0.1%;
+		padding-right: 0 !important;
+	}
+	:global(.colName) {
+		padding-right: 0 !important;
+	}
+	:global(.colSize) {
+		width: 0.1%;
+		padding-right: 0 !important;
+	}
+	:global(.colModDate) {
+		width: 0.1%;
 	}
 </style>
