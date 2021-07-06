@@ -6,14 +6,14 @@ use futures::prelude::*;
 use slog::warn;
 
 use crate::websocket::CaptureLoudnessMsg;
-use crate::{audio, State};
+use crate::{audio, QintState};
 
 pub(crate) struct LoudnessService {
-	state: Arc<State>,
+	state: Arc<QintState>,
 }
 
 impl LoudnessService {
-	pub fn new(state: Arc<State>) -> Self { LoudnessService { state } }
+	pub fn new(state: Arc<QintState>) -> Self { LoudnessService { state } }
 }
 
 impl Actor for LoudnessService {

@@ -21,7 +21,7 @@ use tsproto_types::crypto::EccKeyPubP256;
 use crate::filecache::FileCache;
 use crate::search::Search;
 use crate::secret::Secret;
-use crate::{LaunchConfig, State};
+use crate::{LaunchConfig, QintState};
 use models::MessageStatus;
 
 pub(crate) mod graphql;
@@ -43,7 +43,7 @@ pub struct DbHandler {
 
 struct EventHandler<'a> {
 	logger: &'a Logger,
-	state: &'a State,
+	state: &'a QintState,
 	con: &'a TsConnection,
 	data: &'a TsData,
 }
@@ -871,7 +871,7 @@ impl Handler<RunMsg> for DbHandler {
 
 impl DbHandler {
 	pub(crate) fn handle_events(
-		logger: &Logger, state: &State, con: &TsConnection, data: &TsData, events: &[Event],
+		logger: &Logger, state: &QintState, con: &TsConnection, data: &TsData, events: &[Event],
 		connected_msg: Option<ConnectedMsg>, ws: Addr<crate::websocket::Ws>,
 	) -> Result<()> {
 		let handler = EventHandler::new(logger, state, con, data);
@@ -975,7 +975,7 @@ impl DbHandler {
 	}
 
 	pub(crate) fn handle_message(
-		logger: &Logger, state: &State, con: &TsConnection, data: &TsData, msg: &InMessage,
+		logger: &Logger, state: &QintState, con: &TsConnection, data: &TsData, msg: &InMessage,
 	) -> Result<()> {
 		let handler = EventHandler::new(logger, state, con, data);
 		if let InMessage::ChannelListFinished(_) = msg {
@@ -986,7 +986,7 @@ impl DbHandler {
 	}
 
 	pub fn create_client(
-		logger: &Logger, state: &State, con: &TsConnection, data: &TsData, client: &Client,
+		logger: &Logger, state: &QintState, con: &TsConnection, data: &TsData, client: &Client,
 	) -> Result<()> {
 		let handler = EventHandler::new(logger, state, con, data);
 		handler.handle_add_client(client, true)
@@ -1096,7 +1096,7 @@ impl DbHandler {
 }
 
 impl<'a> EventHandler<'a> {
-	fn new(logger: &'a Logger, state: &'a State, con: &'a TsConnection, data: &'a TsData) -> Self {
+	fn new(logger: &'a Logger, state: &'a QintState, con: &'a TsConnection, data: &'a TsData) -> Self {
 		Self { logger, state, con, data }
 	}
 

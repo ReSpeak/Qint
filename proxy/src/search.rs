@@ -15,7 +15,7 @@ use tantivy::{Document, Index, IndexReader, IndexWriter, ReloadPolicy, SnippetGe
 use tsclientlib::Uid;
 use tsproto_types::crypto::EccKeyPubP256;
 
-use crate::{db, Result, State};
+use crate::{db, Result, QintState};
 
 /// Add documents in batches when creating the database.
 const INIT_BATCH_SIZE: usize = 1000;
@@ -123,7 +123,7 @@ impl Search {
 	}
 
 	/// Setup default database settings.
-	pub fn start_setup(state: &Arc<State>) {
+	pub fn start_setup(state: &Arc<QintState>) {
 		let logger = state.logger.clone();
 		let state2 = state.clone();
 		let search = if let Some(search) = state.search.clone() {

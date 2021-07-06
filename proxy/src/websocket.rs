@@ -27,15 +27,15 @@ use tsproto_types::crypto::EccKeyPubP256;
 
 use crate::db::{ChannelListMsg, ChatId, ChatType, SetClientVolumeMsg};
 use crate::messages::{self, MessageF2P, MessageP2F, ResultDetails, ResultStruct};
-use crate::{AppToFrontendBridge, ConnectionId, State, WsFormat, WsOptions, audio, db};
+use crate::{AppToFrontendBridge, ConnectionId, FrontBridge, QintState, WsFormat, WsOptions, audio, db};
 
 /// A websocket connection
-pub(crate) struct Ws {
+pub struct Ws {
 	pub id: ConnectionId,
 	logger: Logger,
-	state: Arc<State>,
+	state: Arc<QintState>,
+	sender: FrontBridge,
 	options: WsOptions,
-	sender: Box<dyn AppToFrontendBridge>,
 	connection: Option<Connection>,
 	connect_options: Option<messages::ConnectOptions>,
 	channel_list_finished_msg: Option<ChannelListMsg>,
@@ -154,7 +154,10 @@ impl<R: 'static, F: FnOnce(&mut Ws) -> R> Message for RunOnConMsg<R, F> {
 }
 
 impl Ws {
-	pub fn new(logger: Logger, state: Arc<State>, options: WsOptions, id: ConnectionId, sender: Box<dyn AppToFrontendBridge>) -> Self {
+	pub fn new(
+		logger: Logger, state: Arc<QintState>, options: WsOptions, id: ConnectionId,
+		sender: FrontBridge,
+	) -> Self {
 		let logger = logger.new(o!("id" => id.0.to_string()));
 		Self {
 			logger,
@@ -1366,7 +1369,7 @@ impl ActorFuture<Ws> for ConnectionPoller {
 					break Poll::Ready(());
 				}
 				Poll::Ready(Some(Err(e))) => {
-					error!(actor.state.logger, "Connection failed"; "error" => %e);
+					error!(actor.logger, "Connection failed"; "error" => %e);
 					actor.connection = None;
 
 					// Send to frontend

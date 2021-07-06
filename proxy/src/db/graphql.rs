@@ -19,7 +19,7 @@ use super::models::MessageStatus;
 use super::schema::bookmarks;
 use super::{models, schema, DbHandler, RunOnDbMsg};
 use crate::search::SearchResultId;
-use crate::State;
+use crate::QintState;
 
 const BOOKMARKS_LIMIT: i64 = 20;
 const MESSAGES_LIMIT: i64 = 50;
@@ -34,7 +34,7 @@ struct Void {
 	void: bool,
 }
 
-pub(crate) type Schema = RootNode<'static, Query, Mutation, EmptySubscription<State>>;
+pub(crate) type Schema = RootNode<'static, Query, Mutation, EmptySubscription<QintState>>;
 type GResult<T> = std::result::Result<T, FieldError>;
 
 struct Bookmark(models::Bookmark);
@@ -94,7 +94,7 @@ pub async fn graphiql() -> impl Responder {
 
 #[post("/db")]
 pub(crate) async fn db_graphql(
-	state: web::Data<Arc<State>>, req: web::Json<GraphQLRequest>,
+	state: web::Data<Arc<QintState>>, req: web::Json<GraphQLRequest>,
 ) -> Result<impl Responder> {
 	let res = req.execute(&state.graphql_schema, &*state).await;
 	let json_res = serde_json::to_string(&res)?;
@@ -162,7 +162,7 @@ fn get_chat_ids(
 	GResult::Ok(res)
 }
 
-#[juniper::graphql_object(Context = State)]
+#[juniper::graphql_object(Context = QintState)]
 /// A previously visited server.
 impl Bookmark {
 	/// The internal id.
@@ -174,7 +174,7 @@ impl Bookmark {
 	/// The server address.
 	fn address(&self) -> &str { &self.0.address }
 
-	async fn channel(&self, state: &State) -> GResult<Option<Channel>> {
+	async fn channel(&self, state: &QintState) -> GResult<Option<Channel>> {
 		if let Some(server) = self.0.server.clone() {
 			if let Some(id) = self.0.channel {
 				let res = state
@@ -197,7 +197,7 @@ impl Bookmark {
 	}
 
 	/// The identity that is used with this bookmark.
-	async fn identity(&self, state: &State) -> GResult<Identity> {
+	async fn identity(&self, state: &QintState) -> GResult<Identity> {
 		let id = self.0.identity;
 		let res = state
 			.database
@@ -218,7 +218,7 @@ impl Bookmark {
 	fn last_used(&self) -> Option<&NaiveDateTime> { self.0.last_used.as_ref() }
 	fn timezone(&self) -> i32 { self.0.timezone }
 
-	async fn server(&self, state: &State) -> GResult<Option<Server>> {
+	async fn server(&self, state: &QintState) -> GResult<Option<Server>> {
 		if let Some(id) = self.0.server.clone() {
 			let res = state
 				.database
@@ -236,11 +236,11 @@ impl Bookmark {
 	}
 }
 
-#[juniper::graphql_object(Context = State)]
+#[juniper::graphql_object(Context = QintState)]
 impl Channel {
 	fn id(&self) -> ID { ID::new(self.0.id.to_string()) }
 
-	async fn server(&self, state: &State) -> GResult<Option<Server>> {
+	async fn server(&self, state: &QintState) -> GResult<Option<Server>> {
 		let id = self.0.server.clone();
 		let res = state
 			.database
@@ -262,7 +262,7 @@ impl Channel {
 	fn deleted(&self) -> bool { self.0.deleted }
 
 	/// The channel chat.
-	async fn chat(&self, state: &State) -> GResult<Option<Chat>> {
+	async fn chat(&self, state: &QintState) -> GResult<Option<Chat>> {
 		let server = self.0.server.clone();
 		let id = self.0.id;
 		let res = state
@@ -286,7 +286,7 @@ impl Channel {
 	}
 
 	/// The full path of the channel on the server, starting at the root
-	async fn full_path(&self, state: &State) -> GResult<String> {
+	async fn full_path(&self, state: &QintState) -> GResult<String> {
 		let id = self.0.server.clone();
 		let mut path = self.0.name.clone();
 		let mut parent = self.0.parent;
@@ -310,7 +310,7 @@ impl Channel {
 	}
 }
 
-#[juniper::graphql_object(Context = State)]
+#[juniper::graphql_object(Context = QintState)]
 impl Chat {
 	/// Take max(last_read)
 	fn last_read(&self) -> NaiveDateTime { self.0.iter().map(|c| c.0.last_read).max().unwrap() }
@@ -323,7 +323,7 @@ impl Chat {
 	/// If `before_start` is `true`, get messages older than the start if it is
 	/// `false`, get messages that were sent after the start.
 	async fn messages(
-		&self, state: &State, start_time: Option<NaiveDateTime>, start_id: Option<ID>,
+		&self, state: &QintState, start_time: Option<NaiveDateTime>, start_id: Option<ID>,
 		before_start: Option<bool>,
 	) -> GResult<Vec<Message>> {
 		let start_id = start_id.map(|i| i.parse::<u64>().map(|i| i as i64)).transpose()?;
@@ -388,7 +388,7 @@ impl Chat {
 	}
 
 	/// How many messages in this chat were not yet read.
-	async fn unread_count(&self, state: &State) -> GResult<i32> {
+	async fn unread_count(&self, state: &QintState) -> GResult<i32> {
 		let ids = self.0.iter().map(|c| c.0.id).collect::<Vec<_>>();
 		let res: i64 = state
 			.database
@@ -412,7 +412,7 @@ impl Chat {
 	/// `id = 0` references the last sent message, an increasing value the one before that, etc.
 	/// `from` is the author’s uid for the searched messages.
 	async fn send_history(
-		&self, state: &State, from: Vec<i32>, id: i32,
+		&self, state: &QintState, from: Vec<i32>, id: i32,
 	) -> GResult<Option<Message>> {
 		let from = from.into_iter().map(|i| i as u8).collect::<Vec<_>>();
 		// Ignore pokes
@@ -452,7 +452,7 @@ impl Chat {
 	}
 }
 
-#[juniper::graphql_object(Context = State)]
+#[juniper::graphql_object(Context = QintState)]
 impl Client {
 	/// The uid of the client as a byte array.
 	fn uid(&self) -> Vec<i32> { self.0.uid.iter().map(|i| *i as i32).collect() }
@@ -466,7 +466,7 @@ impl Client {
 	fn volume(&self) -> f64 { self.0.volume as f64 }
 
 	/// The chat with this client on the specified server (including pokes).
-	async fn chat(&self, state: &State, server: Vec<i32>) -> GResult<Option<Chat>> {
+	async fn chat(&self, state: &QintState, server: Vec<i32>) -> GResult<Option<Chat>> {
 		let server = server.into_iter().map(|i| i as u8).collect::<Vec<_>>();
 		let id = self.0.uid.clone();
 		let res = state
@@ -497,18 +497,18 @@ impl Client {
 	}
 }
 
-#[juniper::graphql_object(Context = State)]
+#[juniper::graphql_object(Context = QintState)]
 impl Identity {
 	/// The internal id.
 	fn id(&self) -> ID { ID::new(self.0.id.to_string()) }
 	fn name(&self) -> &str { &self.0.name }
 
-	fn level(&self, state: &State) -> GResult<i32> {
+	fn level(&self, state: &QintState) -> GResult<i32> {
 		Ok(i32::from(self.0.clone().into_identity(&state.secret)?.level()))
 	}
 
 	/// The publicly visible client associated with this identity.
-	async fn client(&self, state: &State) -> GResult<Client> {
+	async fn client(&self, state: &QintState) -> GResult<Client> {
 		let id = self.0.client.clone();
 		let res = state
 			.database
@@ -523,7 +523,7 @@ impl Identity {
 	}
 }
 
-#[juniper::graphql_object(Context = State)]
+#[juniper::graphql_object(Context = QintState)]
 impl Message {
 	/// The internal id.
 	fn id(&self) -> ID { ID::new(self.msg.id.to_string()) }
@@ -531,7 +531,7 @@ impl Message {
 	fn is_poke(&self) -> bool { self.is_poke }
 
 	/// The sender of the message or `None` if we got the message from the server.
-	async fn invoker(&self, state: &State) -> GResult<Option<ServerClient>> {
+	async fn invoker(&self, state: &QintState) -> GResult<Option<ServerClient>> {
 		if let Some(id) = self.msg.invoker.clone() {
 			let chat = self.msg.chat;
 			let res = state
@@ -588,7 +588,7 @@ impl Message {
 	fn timezone(&self) -> i32 { self.msg.timezone }
 }
 
-#[juniper::graphql_object(Context = State)]
+#[juniper::graphql_object(Context = QintState)]
 impl Server {
 	/// The public key of the server as a byte array.
 	fn public_key(&self) -> Vec<i32> { self.0.public_key.iter().map(|i| *i as i32).collect() }
@@ -602,7 +602,7 @@ impl Server {
 	fn icon(&self) -> Option<ID> { self.0.icon.map(|i| ID::new((i as u32).to_string())) }
 
 	/// The server chat.
-	async fn chat(&self, state: &State) -> GResult<Option<Chat>> {
+	async fn chat(&self, state: &QintState) -> GResult<Option<Chat>> {
 		let id = self.0.public_key.clone();
 		let res = state
 			.database
@@ -625,7 +625,7 @@ impl Server {
 	}
 
 	/// The channels on this server.
-	async fn channels(&self, state: &State, include_deleted: bool) -> GResult<Vec<Channel>> {
+	async fn channels(&self, state: &QintState, include_deleted: bool) -> GResult<Vec<Channel>> {
 		let id = self.0.public_key.clone();
 		let res = state
 			.database
@@ -646,7 +646,7 @@ impl Server {
 
 	/// The clients that we saw on this server.
 	// TODO Pagination
-	async fn clients(&self, state: &State) -> GResult<Vec<ServerClient>> {
+	async fn clients(&self, state: &QintState) -> GResult<Vec<ServerClient>> {
 		let id = self.0.public_key.clone();
 		let res = state
 			.database
@@ -667,9 +667,9 @@ impl Server {
 	}
 }
 
-#[juniper::graphql_object(Context = State)]
+#[juniper::graphql_object(Context = QintState)]
 impl ServerClient {
-	async fn server(&self, state: &State) -> GResult<Server> {
+	async fn server(&self, state: &QintState) -> GResult<Server> {
 		let id = self.0.server.clone();
 		let res = state
 			.database
@@ -683,7 +683,7 @@ impl ServerClient {
 		Ok(res)
 	}
 
-	async fn client(&self, state: &State) -> GResult<Client> {
+	async fn client(&self, state: &QintState) -> GResult<Client> {
 		let id = self.0.client.clone();
 		let res = state
 			.database
@@ -707,7 +707,7 @@ impl ServerClient {
 }
 
 impl SearchResult {
-	async fn get_attribute(&self, state: &State, attr: &str) -> GResult<Option<String>> {
+	async fn get_attribute(&self, state: &QintState, attr: &str) -> GResult<Option<String>> {
 		match self.id {
 			SearchResultId::Message(id) => {
 				if attr != "content" {
@@ -871,15 +871,15 @@ impl SearchResult {
 	range
 }*/
 
-#[juniper::graphql_object(Context = State)]
+#[juniper::graphql_object(Context = QintState)]
 impl SearchResult {
-	async fn attribute(&self, state: &State, attribute: String) -> GResult<Option<String>> {
+	async fn attribute(&self, state: &QintState, attribute: String) -> GResult<Option<String>> {
 		Ok(self.get_attribute(state, &attribute).await?)
 	}
 
 	/// Gives a rendered view of the content which contains parts of the content and highlighting.
 	async fn highlighted_attribute(
-		&self, state: &State, attribute: String,
+		&self, state: &QintState, attribute: String,
 	) -> GResult<Option<String>> {
 		let attr: String = match self.get_attribute(state, &attribute).await? {
 			Some(r) => r,
@@ -901,7 +901,7 @@ impl SearchResult {
 	}
 
 	/// Get as message
-	async fn message(&self, state: &State) -> GResult<Option<Message>> {
+	async fn message(&self, state: &QintState) -> GResult<Option<Message>> {
 		let id = if let SearchResultId::Message(id) = self.id {
 			id as i64
 		} else {
@@ -926,7 +926,7 @@ impl SearchResult {
 		))
 	}
 
-	async fn channel(&self, state: &State) -> GResult<Option<Channel>> {
+	async fn channel(&self, state: &QintState) -> GResult<Option<Channel>> {
 		let id = if let SearchResultId::Channel { server, id } = &self.id {
 			(server.clone(), *id as i64)
 		} else {
@@ -947,7 +947,7 @@ impl SearchResult {
 		))
 	}
 
-	async fn client(&self, state: &State) -> GResult<Option<Client>> {
+	async fn client(&self, state: &QintState) -> GResult<Option<Client>> {
 		let id = if let SearchResultId::Client(id) = &self.id {
 			id.clone()
 		} else {
@@ -968,7 +968,7 @@ impl SearchResult {
 		))
 	}
 
-	async fn server(&self, state: &State) -> GResult<Option<Server>> {
+	async fn server(&self, state: &QintState) -> GResult<Option<Server>> {
 		let id = if let SearchResultId::Server(id) = &self.id {
 			id.clone()
 		} else {
@@ -990,10 +990,10 @@ impl SearchResult {
 	}
 }
 
-#[juniper::graphql_object(Context = State)]
+#[juniper::graphql_object(Context = QintState)]
 impl Query {
 	// TODO Support pagination: https://relay.dev/graphql/connections.htm
-	async fn bookmarks(state: &State) -> GResult<Vec<Bookmark>> {
+	async fn bookmarks(state: &QintState) -> GResult<Vec<Bookmark>> {
 		let res = state
 			.database
 			.send(RunOnDbMsg(|db| {
@@ -1021,7 +1021,7 @@ impl Query {
 	}
 
 	/// The most recently used connection
-	async fn most_recent_bookmark(state: &State) -> GResult<Option<Bookmark>> {
+	async fn most_recent_bookmark(state: &QintState) -> GResult<Option<Bookmark>> {
 		let res = state
 			.database
 			.send(RunOnDbMsg(|db| {
@@ -1035,7 +1035,7 @@ impl Query {
 	}
 
 	async fn chat(
-		state: &State, typ: GMessageTarget, server: Vec<i32>, id: Option<ID>,
+		state: &QintState, typ: GMessageTarget, server: Vec<i32>, id: Option<ID>,
 	) -> GResult<Option<Chat>> {
 		let server = server.into_iter().map(|i| i as u8).collect::<Vec<_>>();
 		let res = state
@@ -1066,7 +1066,7 @@ impl Query {
 		Ok(res)
 	}
 
-	async fn server(state: &State, server: Vec<i32>) -> GResult<Server> {
+	async fn server(state: &QintState, server: Vec<i32>) -> GResult<Server> {
 		let server = server.into_iter().map(|i| i as u8).collect::<Vec<_>>();
 		let res = state
 			.database
@@ -1080,7 +1080,7 @@ impl Query {
 		Ok(res)
 	}
 
-	async fn server_by_address(state: &State, address: String) -> GResult<Option<Server>> {
+	async fn server_by_address(state: &QintState, address: String) -> GResult<Option<Server>> {
 		let res = state
 			.database
 			.send(RunOnDbMsg(move |db| {
@@ -1098,7 +1098,7 @@ impl Query {
 		Ok(res)
 	}
 
-	async fn client(state: &State, uid: Vec<i32>) -> GResult<Client> {
+	async fn client(state: &QintState, uid: Vec<i32>) -> GResult<Client> {
 		let client = uid.into_iter().map(|i| i as u8).collect::<Vec<_>>();
 		let res = state
 			.database
@@ -1116,7 +1116,7 @@ impl Query {
 	///
 	/// A start offset can be specified to fetch further results.
 	async fn search(
-		state: &State, query: String, messages: bool, start: Option<i32>,
+		state: &QintState, query: String, messages: bool, start: Option<i32>,
 	) -> GResult<Vec<SearchResult>> {
 		if let Some(search) = &state.search {
 			let start = start.unwrap_or_default() as usize;
@@ -1139,9 +1139,9 @@ impl Query {
 	}
 }
 
-#[juniper::graphql_object(Context = State)]
+#[juniper::graphql_object(Context = QintState)]
 impl Mutation {
-	async fn update_bookmark(state: &State, update: UpdateBookmark) -> GResult<Void> {
+	async fn update_bookmark(state: &QintState, update: UpdateBookmark) -> GResult<Void> {
 		let res = state
 			.database
 			.send(RunOnDbMsg(|db| {
@@ -1203,7 +1203,7 @@ impl Mutation {
 
 	/// Mark messages as read or unread and returns the current unread count.
 	async fn set_last_read(
-		state: &State, typ: GMessageTarget, server: Vec<i32>, id: Option<ID>, message: ID,
+		state: &QintState, typ: GMessageTarget, server: Vec<i32>, id: Option<ID>, message: ID,
 	) -> GResult<i32> {
 		let server = server.into_iter().map(|i| i as u8).collect::<Vec<_>>();
 		let message = message.parse::<u64>()? as i64;
@@ -1244,5 +1244,5 @@ impl Mutation {
 }
 
 pub(crate) fn create_schema() -> Arc<Schema> {
-	Arc::new(Schema::new(Query, Mutation, EmptySubscription::<State>::new()))
+	Arc::new(Schema::new(Query, Mutation, EmptySubscription::<QintState>::new()))
 }

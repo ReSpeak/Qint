@@ -42,9 +42,9 @@ export class TauriBackend implements IBackend {
 		log("Using tauri backend");
 		this.cacheFileSrc = `${BASE_ADDRESS}/filecache`;
 
-		listen<string>("ws", (ev) => {
+		listen<TauriMsgP2F>("ws", (ev) => {
 			log("Ws: %o", ev);
-			const msg = JSON.parse(ev.payload) as TauriMsgP2F;
+			const msg = ev.payload;
 			const con = this.connections.get(msg.connection);
 			if (con !== undefined) {
 				if (msg.msg === "Close") {

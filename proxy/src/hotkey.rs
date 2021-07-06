@@ -5,6 +5,7 @@ use futures::{future, StreamExt};
 use serde::{Deserialize, Serialize};
 use slog::error;
 use tsclientlib::prelude::*;
+use crate::QintState;
 
 use crate::{websocket, MuteState};
 use websocket::Ws;
@@ -32,7 +33,7 @@ pub enum Action {
 /// Get input mute state for all current connections.
 /// The `bool` is `false` if the connection cannot talk, even if unmuted, because it is away or the
 /// output is disabled
-async fn get_input_mute_states(state: &crate::State) -> Vec<(MuteState, bool, Addr<Ws>)> {
+async fn get_input_mute_states(state: &QintState) -> Vec<(MuteState, bool, Addr<Ws>)> {
 	state
 		.aggregate(|con, con_addr| {
 			// Ignore servers where output is muted or disabled or away
@@ -56,7 +57,7 @@ async fn get_input_mute_states(state: &crate::State) -> Vec<(MuteState, bool, Ad
 }
 
 /// Get output mute state for all current connections.
-async fn get_output_mute_states(state: &crate::State) -> Vec<(MuteState, Addr<Ws>)> {
+async fn get_output_mute_states(state: &QintState) -> Vec<(MuteState, Addr<Ws>)> {
 	state
 		.aggregate(|con, con_addr| {
 			con.get_own_client().map(|c| {
@@ -80,7 +81,7 @@ async fn get_output_mute_states(state: &crate::State) -> Vec<(MuteState, Addr<Ws
 /// Get away state for all current connections.
 ///
 /// Returns `true` for every connection that is muted.
-async fn get_away_states(state: &crate::State) -> Vec<(bool, Addr<Ws>)> {
+async fn get_away_states(state: &QintState) -> Vec<(bool, Addr<Ws>)> {
 	state
 		.aggregate(|con, con_addr| {
 			con.get_own_client().map(|c| (c.away_message.is_some(), con_addr))
@@ -91,13 +92,13 @@ async fn get_away_states(state: &crate::State) -> Vec<(bool, Addr<Ws>)> {
 }
 
 impl Action {
-	pub async fn run(&self, state: &Arc<crate::State>) {
+	pub async fn run(&self, state: &Arc<QintState>) {
 		match self {
 			Self::InputMute => {
 				let states = get_input_mute_states(state).await;
 				if states.is_empty() {
 					// No connections, toggle default
-					if let (Err(e), _) = crate::State::modify_settings(state, |settings| {
+					if let (Err(e), _) = QintState::modify_settings(state, |settings| {
 						let mut state = settings.get_default_mute_states();
 						if state.input != MuteState::None {
 							state.input = MuteState::None;
@@ -149,7 +150,7 @@ impl Action {
 				let states = get_output_mute_states(state).await;
 				if states.is_empty() {
 					// No connections, toggle default
-					if let (Err(e), _) = crate::State::modify_settings(state, |settings| {
+					if let (Err(e), _) = QintState::modify_settings(state, |settings| {
 						let mut state = settings.get_default_mute_states();
 						if state.output != MuteState::None {
 							state.output = MuteState::None;
@@ -191,7 +192,7 @@ impl Action {
 				let states = get_away_states(state).await;
 				if states.is_empty() {
 					// No connections, toggle default
-					if let (Err(e), _) = crate::State::modify_settings(state, |settings| {
+					if let (Err(e), _) = QintState::modify_settings(state, |settings| {
 						let mut state = settings.get_default_mute_states();
 						state.away = !state.away;
 						settings.set_default_mute_states(state);
@@ -234,7 +235,7 @@ mod imp {
 	use tokio::runtime::Handle;
 
 	use super::HotkeyConfig;
-	use crate::State;
+	use crate::QintState;
 
 	pub use livesplit_hotkey::KeyCode;
 
@@ -427,7 +428,7 @@ mod imp {
 			Ok(Self { hook: Hook::new()?, registered: Vec::new().into() })
 		}
 
-		pub fn apply_config(&self, state: &Arc<State>, config: HotkeyConfig) -> Result<()> {
+		pub fn apply_config(&self, state: &Arc<QintState>, config: HotkeyConfig) -> Result<()> {
 			let mut reg = self.registered.lock().unwrap();
 			for key in &*reg {
 				let _ = self.hook.unregister(*key);
@@ -459,7 +460,7 @@ mod imp {
 	use serde::{Deserialize, Serialize};
 
 	use super::HotkeyConfig;
-	use crate::State;
+	use crate::QintState;
 
 	#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Deserialize, Serialize)]
 	pub enum KeyCode {}

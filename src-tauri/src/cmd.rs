@@ -1,12 +1,12 @@
-use std::{fmt::Debug, thread, time::Duration};
+use std::{fmt::Debug};
 
+use actix::Addr;
 use qint_proxy::{
 	messages::{MessageF2P, MessageP2F},
-	App, AppToFrontendBridge, ConnectionId,
+	AppToFrontendBridge, ConnectionId, CreateWs, DispatchWsMsg, QintCore,
 };
 use serde::{Deserialize, Serialize};
 use tauri::{command, State, Window};
-use tokio::runtime::Runtime;
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -45,28 +45,38 @@ impl AppToFrontendBridge for WindowBridge {
 }
 
 #[command]
-pub async fn create_ws(app: State<'_, App>, window: Window, uuid: Uuid) -> Result<String, ()> {
+pub async fn create_ws(
+	qc_act: State<'_, Addr<QintCore>>, window: Window, uuid: Uuid,
+) -> Result<String, ()> {
 	let id = ConnectionId(uuid);
-	println!("CREATE WS: {:?}", uuid);
+	let state = qc_act.inner();
+	println!("CREATE WS: {:?}", id);
 
-	let state = app.inner().0.clone();
-	qint_proxy::State::create_ws(
-		uuid,
-		state,
-		Box::new(WindowBridge { window, id }),
-	).await;
+	let sender = Box::new(WindowBridge { window, id: id.clone() });
+	state.send(CreateWs { id, sender }).await.unwrap();
 
 	Ok("OK".into())
 }
 
 #[command]
 pub async fn pass_ws_msg(
-	app: State<'_, App>, connection: Uuid, msg: TauriMsg<MessageF2P>,
+	qc_act: State<'_, Addr<QintCore>>, connection: Uuid, msg: TauriMsg<MessageF2P>,
 ) -> Result<(), ()> {
-	println!("WS: {:?} {:?}", connection, msg);
+	let id = ConnectionId(connection);
+	let state = qc_act.inner();
+	println!("WS: {:?} {:?}", id, msg);
+
 	match msg {
 		TauriMsg::Close => {}
-		TauriMsg::Msg(msg) => app.inner().0.send_ws(ConnectionId(connection), msg).await,
+		TauriMsg::Msg(msg) => state.send(DispatchWsMsg { id, msg }).await.unwrap(),
 	}
+	Ok(())
+}
+
+#[command]
+pub async fn pass_ws_msg2(
+	qc_act: State<'_, QintCore>, connection: Uuid, msg: TauriMsg<MessageF2P>,
+) -> Result<(), ()> {
+	qc_act.state.connections.lock();
 	Ok(())
 }

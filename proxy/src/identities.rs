@@ -1,4 +1,4 @@
-use crate::{db::AddIdentityMsg, State};
+use crate::{db::AddIdentityMsg, QintState};
 use anyhow::Result;
 use proxy_codegen::book_events::{deserialize_u64, serialize_u64};
 use serde::{Deserialize, Serialize};
@@ -48,7 +48,7 @@ impl ApiIdentity {
 
 // TODO thiserror
 
-pub async fn import_ts_identities_from_string(state: &State, any: &str) -> Result<()> {
+pub async fn import_ts_identities_from_string(state: &QintState, any: &str) -> Result<()> {
 	let import_result = if let Ok(exp) = from_str::<TsExportIdentityFile>(any) {
 		let exp = exp.identity;
 		match tsclientlib::Identity::new_from_str(&exp.identity.trim_matches('"')) {

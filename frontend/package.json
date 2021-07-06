@@ -10,7 +10,7 @@
 		"@types/katex": "0.11.0",
 		"@typescript-eslint/eslint-plugin": "4.28.1",
 		"@typescript-eslint/parser": "4.28.1",
-		"eslint": "7.29.0",
+		"eslint": "7.30.0",
 		"eslint-config-prettier": "8.3.0",
 		"eslint-plugin-svelte3": "3.2.0",
 		"prettier": "2.3.2",
@@ -19,10 +19,9 @@
 		"svelte": "3.38.3",
 		"svelte-check": "2.2.0",
 		"svelte-preprocess": "4.7.3",
-
 		"tslib": "2.3.0",
 		"typescript": "4.3.5",
-		"vite": "2.3.7"
+		"vite": "2.4.0"
 	},
 	"dependencies": {
 		"@mdi/font": "5.9.55",
@@ -32,10 +31,10 @@
 		"bulma-slider": "2.0.4",
 		"bulma-switch": "2.0.0",
 		"bulmaswatch": "0.8.1",
-		"chart.js": "3.4.0",
+		"chart.js": "3.4.1",
 		"chartjs-adapter-moment": "1.0.0",
 		"chroma-js": "2.1.2",
-		"debug": "4.3.1",
+		"debug": "4.3.2",
 		"highlight.js": "11.0.1",
 		"katex": "0.13.11",
 		"moment": "2.29.1",

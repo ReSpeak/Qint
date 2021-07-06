@@ -16,6 +16,7 @@ default = [ "custom-protocol" ]
 custom-protocol = [ "tauri/custom-protocol" ]
 
 [dependencies]
+actix = "0.12"
 actix-rt = "2"
 anyhow = "1"
 qint-proxy = { path = "../proxy" }

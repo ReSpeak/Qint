@@ -20,7 +20,7 @@
 		"scope": "svelte",
 		"prefix": "svt",
 		"body": [
-			"<script lang=\"typescript\">",
+			"<script lang=\"ts\">",
 			"\t$1",
 			"</script>",
 		],
@@ -30,7 +30,7 @@
 		"scope": "svelte",
 		"prefix": "svtmod",
 		"body": [
-			"<script lang=\"typescript\" context=\"module\">",
+			"<script lang=\"ts\" context=\"module\">",
 			"\t$1",
 			"</script>",
 		],
