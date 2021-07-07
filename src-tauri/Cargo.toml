@@ -2,6 +2,7 @@
 name = "qint"
 version = "0.1.0"
 authors = [ "Flakebi <flakebi@t-online.de>" ]
+description = ""
 edition = "2018"
 build = "src/build.rs"
 
@@ -30,7 +31,7 @@ slog-scope = "4"
 slog-stdlog = "4"
 slog-term = "2"
 structopt = { version = "0.3", default-features = false }
-tauri = { version = "1.0.0-beta.4", features = ["api-all", "system-tray", "menu"] }
+tauri = { version = "1.0.0-beta.4", features = ["api-all", "menu", "system-tray"] }
 tokio = "1"
 uuid = { version = "0.8", features = [ "serde" ] }
 

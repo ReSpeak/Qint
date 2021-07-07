@@ -473,6 +473,6 @@ mod imp {
 	impl Hotkeys {
 		pub fn new() -> Result<Self> { Ok(Self {}) }
 
-		pub fn apply_config(&self, _: &Arc<State>, _: HotkeyConfig) -> Result<()> { Ok(()) }
+		pub fn apply_config(&self, _: &Arc<QintState>, _: HotkeyConfig) -> Result<()> { Ok(()) }
 	}
 }
