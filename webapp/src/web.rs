@@ -583,14 +583,13 @@ async fn render_md_service(
 	}
 }
 
-// TODO Rename endpoint
-#[get("/transient")]
+#[get("/settings")]
 async fn get_setting(state: web::Data<Arc<QintState>>) -> impl Responder {
 	let values = state.settings.read().unwrap();
 	HttpResponse::Ok().json(serde_json::to_value(&*values).unwrap())
 }
 
-#[put("/transient")]
+#[put("/settings")]
 async fn set_setting(state: web::Data<Arc<QintState>>, body: web::Json<Value>) -> impl Responder {
 	let (r, res) = QintState::modify_settings(&state.into_inner(), |values| {
 		let hotkeys_changed;

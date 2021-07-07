@@ -99,6 +99,14 @@ export class TauriBackend implements IBackend {
 		if (icon !== null) icon.href = url ?? "icon.png";
 		else console.log("Tried to set icon but did not find icon element");
 	}
+
+	public async get_settings(): Promise<Record<string, unknown>> {
+		return await invoke<Record<string, unknown>>("get_settings");
+	}
+
+	public async set_settings(diff: Record<string, unknown>): Promise<void> {
+		await invoke("set_settings", { diff });
+	}
 }
 
 export class TauriBackendConnection implements IBackendConnection {

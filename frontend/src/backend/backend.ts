@@ -14,9 +14,15 @@ export interface IBackend {
 	readonly wsBaseAddress: string;
 	createNewConnection(): IBackendConnection;
 	fetch(cmd: string, data?: RequestInit): Promise<IFetchLike>;
-	graphql<T = any>(query: string, variables?: Record<string, unknown>): Promise<{ data: T }>;
 	setTitle(name: string): void;
 	setIcon(url: string | undefined): void;
+
+	// common interface
+
+	graphql<T = any>(query: string, variables?: Record<string, unknown>): Promise<{ data: T }>;
+
+	get_settings(): Promise<Record<string, unknown>>;
+	set_settings(diff: Record<string, unknown>): Promise<void>;
 }
 
 export interface IBackendConnection {

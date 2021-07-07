@@ -34,8 +34,7 @@ export class TransientSettings {
 
 	public async loadAsync(): Promise<void> {
 		try {
-			const resp = await backend.fetch(`/transient`);
-			const data = await resp.json();
+			const data = await backend.get_settings();
 			this._lastSave = data;
 			deep_merge(this, data);
 		} catch (e) {
@@ -61,11 +60,7 @@ export class TransientSettings {
 		this._lastSave = newSave;
 
 		try {
-			await backend.fetch(`/transient`, {
-				method: "PUT",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(diff),
-			});
+			await backend.set_settings(diff);
 		} catch (e) {
 			console.error("Failed to save transient settings", e);
 		}

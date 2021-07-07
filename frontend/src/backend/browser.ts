@@ -16,7 +16,7 @@ export class BrowserBackend implements IBackend {
 		return new BrowserBackendConnection(this);
 	}
 
-	public fetch(cmd: string, data: RequestInit): Promise<IFetchLike> {
+	public fetch(cmd: string, data?: RequestInit): Promise<IFetchLike> {
 		return fetch(`${BASE_ADDRESS}${cmd}`, data);
 	}
 
@@ -40,6 +40,19 @@ export class BrowserBackend implements IBackend {
 		const icon = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
 		if (icon !== null) icon.href = url ?? "icon.png";
 		else console.log("Tried to set icon but did not find icon element");
+	}
+
+	public async get_settings(): Promise<Record<string, unknown>> {
+		const resp = await this.fetch("/settings");
+		return await resp.json();
+	}
+
+	public async set_settings(diff: Record<string, unknown>): Promise<void> {
+		await this.fetch(`/settings`, {
+			method: "PUT",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(diff),
+		});
 	}
 }
 

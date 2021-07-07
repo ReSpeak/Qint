@@ -98,10 +98,11 @@ fn main() {
 	// Parse command line options
 	let args = Args::from_args();
 
+	let mut runtime = Runtime::new().unwrap();
+
 	let (addr, app) = {
 		let (sender, receiver) = std::sync::mpsc::channel();
 
-		let mut runtime = Runtime::new().unwrap();
 		let logger2 = logger.clone();
 		thread::spawn(move || {
 			let local = tokio::task::LocalSet::new();
@@ -122,7 +123,7 @@ fn main() {
 
 	tauri::Builder::default()
 		.manage(addr)
-		.manage(app)
+		.manage(app.state)
 		.manage(logger)
 		.on_page_load(|window, _| {
 			if let Err(e) = window.set_title("Qint") {
@@ -155,7 +156,13 @@ fn main() {
 			},
 			_ => {}
 		})
-		.invoke_handler(tauri::generate_handler![cmd::create_ws, cmd::pass_ws_msg, cmd::db])
+		.invoke_handler(tauri::generate_handler![
+			cmd::create_ws,
+			cmd::pass_ws_msg,
+			cmd::db,
+			cmd::get_settings,
+			cmd::set_settings,
+		])
 		.run(tauri::generate_context!())
 		.map_err(|e| format_err!("tauri error: {}", e))
 		.unwrap();

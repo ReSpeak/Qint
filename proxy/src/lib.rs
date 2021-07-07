@@ -19,6 +19,7 @@ use serde::de::IntoDeserializer;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use slog::{debug, error, info, warn, Logger};
+use tokio::runtime::Handle;
 use uuid::Uuid;
 
 pub mod audio;
@@ -136,6 +137,7 @@ pub struct LaunchConfig {
 }
 
 pub struct QintState {
+	pub handle: Handle,
 	pub logger: Logger,
 	/// The list of all currently existing connections
 	pub connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>,
@@ -217,7 +219,7 @@ impl QintState {
 			if let Some(v) = settings.get_loudness_threshold() {
 				if Some(v) != old_loudness_threshold {
 					let logger = state.logger.clone();
-					actix::spawn(ad.a2ts.send(audio::audio_to_ts::SetLoudnessThresholdMsg(v)).map(
+					state.handle.spawn(ad.a2ts.send(audio::audio_to_ts::SetLoudnessThresholdMsg(v)).map(
 						move |r| {
 							if let Err(e) = r {
 								error!(logger, "Failed to apply loudness threshold";
@@ -231,7 +233,7 @@ impl QintState {
 			if let Some(v) = settings.get_global_volume() {
 				if Some(v) != old_global_volume {
 					let logger = state.logger.clone();
-					actix::spawn(ad.ts2a.send(audio::ts_to_audio::SetGlobalVolumeMsg(v)).map(
+					state.handle.spawn(ad.ts2a.send(audio::ts_to_audio::SetGlobalVolumeMsg(v)).map(
 						move |r| {
 							if let Err(e) = r {
 								error!(logger, "Failed to apply global volume"; "error" => %e);
@@ -244,7 +246,7 @@ impl QintState {
 			let (new_capture, new_playback) = settings.get_preferred_audio_device();
 			if old_capture != new_capture {
 				let logger = state.logger.clone();
-				actix::spawn(ad.a2ts.send(audio::SetAudioDevice(new_capture)).map(move |r| {
+				state.handle.spawn(ad.a2ts.send(audio::SetAudioDevice(new_capture)).map(move |r| {
 					if let Err(e) = r {
 						error!(logger, "Failed to apply global volume"; "error" => %e);
 					}
@@ -252,7 +254,7 @@ impl QintState {
 			}
 			if old_playback != new_playback {
 				let logger = state.logger.clone();
-				actix::spawn(ad.ts2a.send(audio::SetAudioDevice(new_playback)).map(move |r| {
+				state.handle.spawn(ad.ts2a.send(audio::SetAudioDevice(new_playback)).map(move |r| {
 					if let Err(e) = r {
 						error!(logger, "Failed to apply global volume"; "error" => %e);
 					}
@@ -575,6 +577,8 @@ impl QintState {
 			"profile" => profile,
 		);
 
+		let handle = Handle::current().clone(); // could also get as param
+
 		let config_path: PathBuf = if let Some(p) = args.config_path {
 			p
 		} else {
@@ -694,7 +698,7 @@ impl QintState {
 		if let Some(threshold) = settings.get_loudness_threshold() {
 			let logger = logger.clone();
 			if let Some(ad) = &audio_data {
-				actix::spawn(
+				handle.spawn(
 					ad.a2ts.send(audio::audio_to_ts::SetLoudnessThresholdMsg(threshold)).map(
 						move |r| {
 							if let Err(e) = r {
@@ -709,7 +713,7 @@ impl QintState {
 		if let Some(volume) = settings.get_global_volume() {
 			let logger = logger.clone();
 			if let Some(ad) = &audio_data {
-				actix::spawn(ad.ts2a.send(audio::ts_to_audio::SetGlobalVolumeMsg(volume)).map(
+				handle.spawn(ad.ts2a.send(audio::ts_to_audio::SetGlobalVolumeMsg(volume)).map(
 					move |r| {
 						if let Err(e) = r {
 							error!(logger, "Failed to apply global volume"; "error" => %e);
@@ -726,6 +730,7 @@ impl QintState {
 		);
 
 		let state = Arc::new(QintState {
+			handle,
 			logger,
 			connections,
 			audio_data,
