@@ -3884,6 +3884,8 @@ dependencies = [
  "actix",
  "actix-rt",
  "anyhow",
+ "futures",
+ "juniper",
  "log",
  "qint-proxy",
  "serde",
@@ -3908,7 +3910,6 @@ version = "0.1.0"
 dependencies = [
  "actix",
  "actix-codec",
- "actix-cors",
  "actix-files",
  "actix-rt",
  "actix-service",
@@ -3938,7 +3939,6 @@ dependencies = [
  "nom 6.1.2",
  "num-derive",
  "num-traits",
- "open",
  "percent-encoding",
  "proxy-codegen",
  "pulldown-cmark",
@@ -6150,6 +6150,45 @@ checksum = "e828417b379f3df7111d3a2a9e5753706cae29c41f7c4029ee9fd77f3e09e582"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "webapp"
+version = "0.1.0"
+dependencies = [
+ "actix",
+ "actix-cors",
+ "actix-files",
+ "actix-rt",
+ "actix-web",
+ "actix-web-actors",
+ "anyhow",
+ "base64",
+ "futures",
+ "juniper",
+ "log",
+ "open",
+ "proxy-codegen",
+ "qint-proxy",
+ "rand 0.8.3",
+ "serde",
+ "serde_ini",
+ "serde_json",
+ "slog",
+ "slog-async",
+ "slog-envlogger",
+ "slog-perf",
+ "slog-scope",
+ "slog-stdlog",
+ "slog-term",
+ "structopt",
+ "tokio",
+ "tokio-util",
+ "tsclientlib",
+ "tsproto",
+ "tsproto-packets",
+ "tsproto-types",
+ "uuid",
 ]
 
 [[package]]

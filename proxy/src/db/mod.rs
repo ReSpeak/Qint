@@ -872,7 +872,7 @@ impl Handler<RunMsg> for DbHandler {
 impl DbHandler {
 	pub(crate) fn handle_events(
 		logger: &Logger, state: &QintState, con: &TsConnection, data: &TsData, events: &[Event],
-		connected_msg: Option<ConnectedMsg>, ws: Addr<crate::websocket::Ws>,
+		connected_msg: Option<ConnectedMsg>, ws: Addr<crate::connection::QintConnection>,
 	) -> Result<()> {
 		let handler = EventHandler::new(logger, state, con, data);
 
@@ -959,7 +959,7 @@ impl DbHandler {
 				Err(e) => warn!(logger, "Failed to save connection in database"; "error" => %e),
 				Ok(Err(e)) => warn!(logger, "Failed to save connection in database"; "error" => %e),
 				Ok(Ok(Some(msg))) => {
-					actix::spawn(ws.send(crate::websocket::SetChannelListMsgMsg(msg)).map(
+					actix::spawn(ws.send(crate::connection::SetChannelListMsgMsg(msg)).map(
 						move |r| match r {
 							Err(e) => warn!(logger, "Failed to set update bookmark message";
 							"error" => %e),

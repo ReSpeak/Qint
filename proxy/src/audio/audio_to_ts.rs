@@ -16,17 +16,23 @@ use tokio::sync::mpsc;
 use tsproto_packets::packets::{AudioData, CodecType, OutAudio, OutPacket};
 
 use super::*;
-use crate::loudness_ws::LoudnessService;
-use crate::websocket::{CaptureLoudnessMsg, SendPacketMsg, SetSelfTalkingMsg, Ws};
+//use crate::loudness_ws::LoudnessService;
+use crate::connection::{CaptureLoudnessMsg, SendPacketMsg, SetSelfTalkingMsg, QintConnection};
 
-pub(crate) struct AddListenerMsg(pub Addr<Ws>);
-pub(crate) struct RemoveListenerMsg(pub Addr<Ws>);
-pub(crate) struct AddLoudnessListenerMsg(pub Addr<LoudnessService>);
-pub(crate) struct RemoveLoudnessListenerMsg(pub Addr<LoudnessService>);
-pub(crate) struct SetPacketlossMsg(pub f32);
+pub trait LoudnessTrait {
+	fn send(&self, msg: CaptureLoudnessMsg);
+	fn connected(&self) -> bool;
+}
+pub type LoudnessListener = Box<dyn LoudnessTrait + Send>;
+
+pub struct AddListenerMsg(pub Addr<QintConnection>);
+pub struct RemoveListenerMsg(pub Addr<QintConnection>);
+pub struct AddLoudnessListenerMsg(pub LoudnessListener);
+pub struct RemoveLoudnessListenerMsg(pub usize);
+pub struct SetPacketlossMsg(pub f32);
 /// An audio packet and `true` if this is the last packet.
-pub(crate) struct PlayPacketMsg(Option<(OutPacket, bool)>, Option<f64>);
-pub(crate) struct SetLoudnessThresholdMsg(pub f64);
+pub struct PlayPacketMsg(Option<(OutPacket, bool)>, Option<f64>);
+pub struct SetLoudnessThresholdMsg(pub f64);
 
 /// Threshold for voice activation detection.
 const VAD_THRESHOLD: f32 = 0.3;
@@ -45,8 +51,9 @@ pub struct AudioToTs {
 	audio_subsystem: AudioSubsystem,
 	preferred_device: Option<String>,
 	spawn_send: mpsc::Sender<PlayPacketMsg>,
-	connections: HashSet<Addr<Ws>>,
-	loudness_cons: HashSet<Addr<LoudnessService>>,
+	connections: HashSet<Addr<QintConnection>>,
+	loudness_cons: HashMap<usize, LoudnessListener>,
+	loudness_id_cnt: usize,
 	/// The loudness threshold in LUFS (Loudness Unit Full Scale).
 	///
 	/// This is actually a `f64`, there is no `AtomicF64` though.
@@ -107,7 +114,7 @@ impl Message for RemoveListenerMsg {
 	type Result = bool;
 }
 impl Message for AddLoudnessListenerMsg {
-	type Result = ();
+	type Result = usize;
 }
 impl Message for RemoveLoudnessListenerMsg {
 	/// `true` if there was a listener registered before, `false` if not.
@@ -151,10 +158,13 @@ impl Handler<RemoveListenerMsg> for AudioToTs {
 }
 
 impl Handler<AddLoudnessListenerMsg> for AudioToTs {
-	type Result = ();
+	type Result = usize;
 	fn handle(&mut self, msg: AddLoudnessListenerMsg, _: &mut Self::Context) -> Self::Result {
-		self.loudness_cons.insert(msg.0);
+		self.loudness_id_cnt += 1;
+		let id = self.loudness_id_cnt;
+		self.loudness_cons.insert(id, msg.0);
 		self.update_device_state();
+		id
 	}
 }
 
@@ -163,7 +173,7 @@ impl Handler<RemoveLoudnessListenerMsg> for AudioToTs {
 	fn handle(&mut self, msg: RemoveLoudnessListenerMsg, _: &mut Self::Context) -> Self::Result {
 		let r = self.loudness_cons.remove(&msg.0);
 		self.update_device_state();
-		r
+		r.is_some()
 	}
 }
 
@@ -213,17 +223,11 @@ impl Handler<PlayPacketMsg> for AudioToTs {
 		}
 
 		if let Some(loudness) = loudness {
-			self.loudness_cons.retain(|con| {
+			self.loudness_cons.retain(|_id, con| {
 				if !con.connected() {
 					false
 				} else {
-					let logger = logger.clone();
-					tokio::spawn(con.send(CaptureLoudnessMsg(loudness)).map(move |r| {
-						if let Err(e) = r {
-							warn!(logger, "Failed to send loudness"; "error" => %e);
-						}
-					}));
-
+					con.send(CaptureLoudnessMsg(loudness));
 					true
 				}
 			});
@@ -288,6 +292,7 @@ impl AudioToTs {
 			spawn_send,
 			connections: Default::default(),
 			loudness_cons: Default::default(),
+			loudness_id_cnt: 0,
 			loudness_threshold: Arc::new(AtomicU64::new(DEFAULT_LOUDNESS_THRESHOLD.to_bits())),
 			packet_loss: Arc::new(AtomicU8::new(0)),
 

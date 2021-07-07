@@ -1,13 +1,17 @@
-use std::{fmt::Debug};
+use std::fmt::Debug;
 
 use actix::Addr;
+use juniper::http::GraphQLRequest;
 use qint_proxy::{
 	messages::{MessageF2P, MessageP2F},
-	AppToFrontendBridge, ConnectionId, CreateWs, DispatchWsMsg, QintCore,
+	AppToFrontendBridge, ConnectionId,
 };
 use serde::{Deserialize, Serialize};
+use slog::{debug, info, warn, Logger};
 use tauri::{command, State, Window};
 use uuid::Uuid;
+
+use crate::core::{CreateWs, DispatchWsMsg, QintCore};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum TauriMsg<T>
@@ -29,30 +33,35 @@ where
 }
 
 struct WindowBridge {
+	logger: Logger,
 	window: Window,
 	id: ConnectionId,
 }
 
 impl AppToFrontendBridge for WindowBridge {
 	fn send(&self, msg: &MessageP2F) {
-		println!("SEND: {:?}", msg);
+		debug!(self.logger, "Sending to frontend"; "msg" => ?msg);
 		let res =
 			self.window.emit("ws", TauriWs { connection: self.id.0, msg: TauriMsg::Msg(msg) });
-		if res.is_err() {
-			println!("Hey can you put this into the logger? {:?}", res);
+		if let Err(e) = res {
+			warn!(self.logger, "Failed sending to frontend"; "error" => %e);
 		}
+	}
+
+	fn close(&self) {
+		// (TODO: Check that there is) nothing to do here for now ?
 	}
 }
 
 #[command]
 pub async fn create_ws(
-	qc_act: State<'_, Addr<QintCore>>, window: Window, uuid: Uuid,
+	logger: State<'_, Logger>, qc_act: State<'_, Addr<QintCore>>, window: Window, uuid: Uuid,
 ) -> Result<String, ()> {
 	let id = ConnectionId(uuid);
 	let state = qc_act.inner();
-	println!("CREATE WS: {:?}", id);
+	info!(logger.inner().clone(), "Creating tauri connection"; "id" => ?id);
 
-	let sender = Box::new(WindowBridge { window, id: id.clone() });
+	let sender = Box::new(WindowBridge { logger: logger.inner().clone(), window, id: id.clone() });
 	state.send(CreateWs { id, sender }).await.unwrap();
 
 	Ok("OK".into())
@@ -64,8 +73,6 @@ pub async fn pass_ws_msg(
 ) -> Result<(), ()> {
 	let id = ConnectionId(connection);
 	let state = qc_act.inner();
-	println!("WS: {:?} {:?}", id, msg);
-
 	match msg {
 		TauriMsg::Close => {}
 		TauriMsg::Msg(msg) => state.send(DispatchWsMsg { id, msg }).await.unwrap(),
@@ -74,9 +81,11 @@ pub async fn pass_ws_msg(
 }
 
 #[command]
-pub async fn pass_ws_msg2(
-	qc_act: State<'_, QintCore>, connection: Uuid, msg: TauriMsg<MessageF2P>,
-) -> Result<(), ()> {
-	qc_act.state.connections.lock();
-	Ok(())
+pub async fn db(core: State<'_, QintCore>, request: GraphQLRequest) -> Result<String, ()> {
+	let res = request.execute(&core.state.graphql_schema, &*core.state).await;
+	if res.is_ok() {
+		Ok(serde_json::to_string(&res).unwrap())
+	} else {
+		Err(())
+	}
 }

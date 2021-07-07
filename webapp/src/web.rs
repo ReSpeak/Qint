@@ -1,0 +1,1159 @@
+use std::fs;
+use std::net::SocketAddr;
+use std::pin::Pin;
+use std::sync::Arc;
+
+use actix::prelude::*;
+use actix_cors::Cors;
+use actix_files::Files;
+use actix_web::dev::{Service, ServiceResponse};
+use actix_web::middleware::Condition;
+use actix_web::web::Bytes;
+use actix_web::web::{Data, Query};
+use actix_web::*;
+
+use actix_web_actors::ws;
+use anyhow::{bail, Result};
+use futures::prelude::*;
+use futures::stream::Peekable;
+use http::{header::CACHE_CONTROL, header::ETAG, HeaderValue};
+use juniper::http::graphiql::graphiql_source;
+use juniper::http::GraphQLRequest;
+use tsproto_types::crypto::EccKeyPubP256;
+
+use rand::Rng;
+use serde::Deserialize;
+use serde_json::Value;
+use slog::{debug, error, info, warn};
+use tokio::time::{self, Duration};
+use tokio_util::codec::{BytesCodec, FramedRead};
+use tsclientlib::ChannelId;
+use tsclientlib::Error as TsError;
+use uuid::Uuid;
+
+use qint_proxy::connection::QintConnection;
+use qint_proxy::db::{
+	models::UpdateIdentity, DeleteIdentityMsg, FindIdentity, GenrateNewIdentityMsg,
+	GetIdentitiesMsg, UpdateIdentityMsg,
+};
+use qint_proxy::identities::import_ts_identities_from_string;
+use qint_proxy::messages::ResultDetails;
+use qint_proxy::{ConnectionId, QintState, Settings, SettingsUpdate};
+
+use crate::loudness_ws::LoudnessService;
+use crate::markdown_ws::MarkdownService;
+use crate::websocket::{SetConnectionMsg, Ws, WsBridge};
+
+pub struct WebApp {
+	state: Arc<QintState>,
+	/// Authentication token, this needs to be set in the qint-auth cookie.
+	token: String,
+}
+
+impl WebApp {
+	pub fn new(state: Arc<QintState>) -> Self {
+		let mut rng = rand::thread_rng();
+		let token = format!("{:0x}{:0x}", rng.gen::<u64>(), rng.gen::<u64>());
+
+		Self { state, token }
+	}
+
+	pub async fn serve(self) -> Result<()> {
+		let frontend_path = std::option_env!("FRONTEND_PATH").unwrap_or("../frontend/dist/");
+		let is_production = std::option_env!("FRONTEND_PATH").is_some();
+		info!(self.state.logger, "Serving frontend"; "path" => frontend_path);
+		let state2 = self.state.clone();
+		let addr = self.get_listen_address();
+		let token = self.get_token().to_string();
+
+		HttpServer::new(move || {
+			let state = state2.clone();
+			let token = token.clone();
+			actix_web::App::new()
+				//.wrap(middleware::Logger::default())
+				// Return error messages
+				.app_data(web::JsonConfig::default().error_handler(|err, _| {
+					let err_string = err.to_string();
+					error::InternalError::from_response(
+						err, HttpResponse::BadRequest().body(err_string)).into()
+				}))
+				.wrap(Condition::new(!is_production, Cors::permissive().max_age(3600)))
+				.wrap_fn(move |req, srv| {
+					if is_production {
+						if let Some(resp) = check_authentication(&token, &req) {
+							return future::Either::Left(future::ok(ServiceResponse::new(req.into_parts().0, resp)));
+						}
+					}
+					// Token is ok
+					future::Either::Right(srv.call(req))
+				})
+				.app_data(Data::new(state))
+				.service(create_ws)
+				.service(run_hotkey)
+				.service(audio_reset)
+				.service(audio_device_list)
+				.service(list_plugins)
+				.service(get_plugin)
+				.service(put_plugin)
+				.service(delete_plugin)
+				.service(download_file)
+				.service(upload_file)
+				.service(download_cache_file)
+				.service(get_setting)
+				.service(set_setting)
+				.service(get_link_preview)
+				.service(loudness_service)
+				.service(render_md_service)
+				.service(get_ident_all)
+				.service(get_ident_by_id)
+				.service(get_ident_by_name)
+				.service(put_ident)
+				.service(delete_ident)
+				.service(post_ident_import)
+				.service(post_ident_new)
+				.service(get_mute_state)
+				.service(db_graphql)
+				.service(graphiql)
+				.service(Files::new("", frontend_path).index_file("index.html"))
+				.wrap_fn(|req, srv| {
+					let fut = srv.call(req);
+					async {
+						let mut res = fut.await?;
+						let headers = res.headers_mut();
+						if headers.contains_key(ETAG) {
+							headers.insert(
+								CACHE_CONTROL,
+								HeaderValue::from_static("no-cache,must-revalidate"),
+							);
+						}
+						Ok(res)
+					}
+				})
+		})
+		.bind(addr)?
+		.run()
+		.await?;
+
+		// Quit all connections
+		info!(self.state.logger, "Closing remaining connections");
+		{
+			let cons = self.state.connections.lock().unwrap();
+			for con in cons.values() {
+				actix::spawn(con.send(qint_proxy::connection::DisconnectMsg).map(|_| ()));
+			}
+		}
+
+		// Wait at max a second and poll
+		for _ in 0u8..100 {
+			{
+				let cons = self.state.connections.lock().unwrap();
+				if cons.is_empty() {
+					break;
+				}
+			}
+			time::sleep(Duration::from_millis(10)).await;
+		}
+
+		Ok(())
+	}
+
+	pub fn get_listen_address(&self) -> SocketAddr {
+		let settings = self.state.launch_config.read().unwrap();
+		settings.listen_address
+	}
+
+	pub fn get_token(&self) -> &str {
+		&self.token
+	}
+}
+
+#[get("/con/{id}/ws")]
+async fn create_ws(
+	state: web::Data<Arc<QintState>>, uuid: web::Path<Uuid>, req: HttpRequest, stream: web::Payload,
+) -> impl Responder {
+	let id = ConnectionId(*uuid);
+
+	// Check that the id does not exist
+	let mut cons = state.connections.lock().unwrap();
+	if cons.contains_key(&id) || uuid.is_nil() {
+		return Either::Left(
+			HttpResponse::PreconditionFailed()
+				.body("Connection id is already occupied".to_string()),
+		);
+	}
+
+	// Due to cyclic dependencies Ws will have to wait for it's connection actor
+	// to be injected delayed.
+	// Dependecy chain: QintConnection -> WsBridge -> Ws -> QintConnection
+	let webws = Ws::new(state.logger.clone(), None);
+	match ws::start_with_addr(webws, &req, stream) {
+		Err(e) => {
+			error!(state.logger, "Failed to create websocket actor"; "error" => %e);
+			Either::Left(HttpResponse::InternalServerError().body("Failed to start connection"))
+		}
+		Ok((addr, ws)) => {
+			let sender = WsBridge(addr.clone());
+			let qint_con =
+				QintConnection::new(state.logger.clone(), (**state).clone(), id, Box::new(sender));
+			let qint_con = qint_con.start();
+			let logger = state.logger.clone();
+			actix::spawn(addr.send(SetConnectionMsg(qint_con.clone())).map(move |r| {
+				if let Err(e) = r {
+					error!(logger, "Failed to delayed inject con"; "error" => %e);
+				}
+			}));
+			cons.insert(id, qint_con);
+			Either::Right(ws)
+		}
+	}
+}
+
+#[post("/hotkey")]
+async fn run_hotkey(
+	state: web::Data<Arc<QintState>>, action: web::Json<qint_proxy::hotkey::Action>,
+) -> impl Responder {
+	action.run(&state).await;
+	HttpResponse::Ok()
+}
+
+#[post("/audio/reset")]
+async fn audio_reset(state: web::Data<Arc<QintState>>) -> impl Responder {
+	if let Some(ad) = &state.audio_data {
+		if ad.a2ts.send(qint_proxy::audio::ResetMsg).await.is_err() {
+			error!(state.logger, "Failed to reset audio pipeline");
+			HttpResponse::InternalServerError()
+		} else if ad.ts2a.send(qint_proxy::audio::ResetMsg).await.is_err() {
+			error!(state.logger, "Failed to reset audio pipeline");
+			HttpResponse::InternalServerError()
+		} else {
+			HttpResponse::Ok()
+		}
+	} else {
+		HttpResponse::Ok()
+	}
+}
+
+#[get("/audio/device_list")]
+async fn audio_device_list(state: web::Data<Arc<QintState>>) -> impl Responder {
+	if let Some(ad) = &state.audio_data {
+		let captures =
+			ad.a2ts.send(qint_proxy::audio::GetAudioDevices()).await.unwrap_or(Vec::new());
+		let playbacks =
+			ad.ts2a.send(qint_proxy::audio::GetAudioDevices()).await.unwrap_or(Vec::new());
+		HttpResponse::Ok().json(&serde_json::json!({
+			"capture": captures,
+			"playback": playbacks,
+		}))
+	} else {
+		HttpResponse::Ok().json(&serde_json::json!({ "capture": [], "playback": [] }))
+	}
+}
+
+fn list_plugins_intern(state: &QintState) -> Vec<String> {
+	let path = &state.launch_config.read().unwrap().plugin_path;
+	let mut res = Vec::new();
+	let dir = match path.read_dir() {
+		Ok(r) => r,
+		Err(e) => {
+			warn!(state.logger, "Failed to list plugins"; "dir" => ?path, "error" => %e);
+			return Vec::new();
+		}
+	};
+	for p in dir {
+		if let Some(p) = p.ok().and_then(|p| p.file_name().into_string().ok()) {
+			res.push(p);
+		}
+	}
+	res
+}
+
+#[get("/plugins")]
+async fn list_plugins(state: web::Data<Arc<QintState>>) -> impl Responder {
+	web::Json(list_plugins_intern(&**state))
+}
+
+#[get("/plugins/{name}")]
+async fn get_plugin(state: web::Data<Arc<QintState>>, name: web::Path<String>) -> impl Responder {
+	let path = state.launch_config.read().unwrap().plugin_path.join(&*name);
+	fs::read_to_string(path)
+		.with_header((http::header::CONTENT_TYPE, "application/javascript; charset=utf-8"))
+}
+
+#[put("/plugins/{name}")]
+async fn put_plugin(
+	state: web::Data<Arc<QintState>>, name: web::Path<String>, body: web::Bytes,
+) -> impl Responder {
+	if let Ok(s) = std::str::from_utf8(body.as_ref()) {
+		let path = state.launch_config.read().unwrap().plugin_path.join(&*name);
+		if let Err(e) = fs::write(path, s) {
+			HttpResponse::InternalServerError().body(e.to_string())
+		} else {
+			HttpResponse::Ok().finish()
+		}
+	} else {
+		HttpResponse::BadRequest().body("Invalid text data")
+	}
+}
+
+#[delete("/plugins/{name}")]
+async fn delete_plugin(
+	state: web::Data<Arc<QintState>>, name: web::Path<String>,
+) -> impl Responder {
+	let path = state.launch_config.read().unwrap().plugin_path.join(&*name);
+	if let Err(e) = fs::remove_file(path) {
+		HttpResponse::InternalServerError().body(e.to_string())
+	} else {
+		HttpResponse::Ok().finish()
+	}
+}
+
+#[derive(Deserialize)]
+struct GetFileOptions {
+	dl: Option<String>,
+	return_code: Option<String>,
+	#[serde(default)]
+	cache: bool,
+}
+
+fn result_details_gone() -> ResultDetails {
+	ResultDetails::from_desc("gone".into())
+}
+
+async fn guess_content_type<
+	E: Into<Error> + 'static,
+	S: Stream<Item = Result<Bytes, E>> + Unpin + 'static,
+>(
+	stream: S,
+) -> (Peekable<S>, HttpResponseBuilder) {
+	let mut stream = stream.peekable();
+	let mut response = HttpResponse::Ok();
+	if let Some(Ok(r)) = Pin::new(&mut stream).peek().await {
+		// https://en.wikipedia.org/wiki/List_of_file_signatures
+		if r.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
+			response.content_type("image/png");
+		} else if r.starts_with(&[0xFF, 0xD8, 0xFF, 0xDB])
+			|| r.starts_with(&[0xFF, 0xD8, 0xFF, 0xE0])
+			|| r.starts_with(&[0xFF, 0xD8, 0xFF, 0xEE])
+		{
+			response.content_type("image/jpeg");
+		} else if r.windows(3).any(|w| w == b"svg") {
+			response.content_type("image/svg+xml");
+		} else if r.starts_with(&[0x42, 0x4D]) {
+			response.content_type("image/bmp");
+		} else if r.starts_with(&[0x47, 0x49, 0x46, 0x38, 0x37, 0x61])
+			|| r.starts_with(&[0x47, 0x49, 0x46, 0x38, 0x39, 0x61])
+		{
+			response.content_type("image/gif");
+		} else if r
+			.starts_with(&[0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6F, 0x6D])
+		{
+			response.content_type("video/mp4");
+		}
+	}
+	(stream, response)
+}
+
+#[get("/con/{id}/file/{channel}/{path:.*}")]
+async fn download_file(
+	state: web::Data<Arc<QintState>>, path: web::Path<(Uuid, u64, String)>,
+	query_opt: Query<GetFileOptions>,
+) -> impl Responder {
+	let cons = state.connections.lock().unwrap();
+	let (id, channel, path) = path.into_inner();
+	let channel = ChannelId(channel);
+	let GetFileOptions { dl, return_code, cache } = query_opt.into_inner();
+	if let Some(con) = cons.get(&ConnectionId(id)).cloned() {
+		drop(cons);
+
+		// Lookup in cache
+		let server = match con.send(qint_proxy::connection::GetPublicKeyMsg).await {
+			Ok(Ok(r)) => r,
+			Ok(Err(e)) => {
+				error!(state.logger, "Failed to get server public key"; "error" => %e);
+				return HttpResponse::Gone().json(result_details_gone());
+			}
+			Err(_) => {
+				return HttpResponse::Gone().json(result_details_gone());
+			}
+		};
+
+		let process_answer = |response: &mut HttpResponseBuilder, len: u64| {
+			response.no_chunking(len);
+			if let Some(filename) = dl.as_ref() {
+				response.insert_header((
+					"Content-Disposition",
+					format!("attachment; filename=\"{}\"", filename),
+				));
+			}
+		};
+
+		if let Some((len, stream)) = state.file_cache.get_cached_file(&server, channel, &path).await
+		{
+			let (stream, mut response) = guess_content_type(stream).await;
+			process_answer(&mut response, len);
+			return response.streaming(stream);
+		}
+
+		debug!(state.logger, "Downloading file"; "channel" => channel.0, "path" => &path);
+		let (len, file_stream, server) = match con
+			.send(qint_proxy::connection::DownloadFile { channel, path: path.clone(), return_code })
+			.await
+		{
+			Err(_) => {
+				return HttpResponse::Gone().json(result_details_gone());
+			}
+			Ok(Err(qint_proxy::connection::Error::TsError(TsError::CommandError(err)))) => {
+				debug!(state.logger, "File download error"; "error" => %err, "path" => &path);
+				return match err.error {
+					tsclientlib::TsError::FileInvalidPath => {
+						HttpResponse::NotFound().json(Into::<ResultDetails>::into(err))
+					}
+					tsclientlib::TsError::PermissionsClientInsufficient => {
+						HttpResponse::Forbidden().json(Into::<ResultDetails>::into(err))
+					}
+					_ => HttpResponse::BadRequest().json(Into::<ResultDetails>::into(err)),
+				};
+			}
+			Ok(Err(e)) => {
+				error!(state.logger, "File download failed"; "error" => %e, "path" => &path);
+				return HttpResponse::InternalServerError()
+					.json(ResultDetails::from_desc(format!("Failed to download file: {}", e)));
+			}
+			Ok(Ok(r)) => r,
+		};
+
+		let stream =
+			FramedRead::new(file_stream, BytesCodec::new()).map(|r| r.map(web::BytesMut::freeze));
+		let (stream, mut response) = guess_content_type(stream).await;
+		process_answer(&mut response, len);
+
+		// Cache for offline usage if smaller than 5 MiB
+		if cache && len < 5 * 1024 * 1024 {
+			let stream = state.file_cache.cache_file(&server, channel, &path, stream).await;
+			response.streaming(stream)
+		} else {
+			response.streaming(stream)
+		}
+	} else {
+		HttpResponse::Gone().json(result_details_gone())
+	}
+}
+
+#[derive(Deserialize)]
+struct PutFileOptions {
+	return_code: Option<String>,
+}
+
+#[put("/con/{id}/file/{channel}/{path:.*}")]
+async fn upload_file(
+	state: web::Data<Arc<QintState>>, path: web::Path<(Uuid, u64, String)>, req: web::HttpRequest,
+	body: web::Payload, query_opt: Query<PutFileOptions>,
+) -> impl Responder {
+	let (id, channel, path) = path.into_inner();
+	let channel = ChannelId(channel);
+	let cons = state.connections.lock().unwrap();
+	if let Some(con) = cons.get(&ConnectionId(id)).cloned() {
+		drop(cons);
+
+		debug!(state.logger, "Uploading file"; "channel" => channel.0, "path" => &path);
+		let size = if let Some(r) = req.headers().get(http::header::CONTENT_LENGTH) {
+			match r.to_str() {
+				Err(e) => {
+					warn!(state.logger, "Invalid content length header"; "error" => %e);
+					return HttpResponse::BadRequest().body("Invalid content length header");
+				}
+				Ok(s) => match s.parse() {
+					Err(e) => {
+						warn!(state.logger, "Invalid content length header value"; "error" => %e);
+						return HttpResponse::BadRequest()
+							.body("Invalid content length header - not a number");
+					}
+					Ok(r) => r,
+				},
+			}
+		} else {
+			return HttpResponse::BadRequest().body("Content length header is missing");
+		};
+		let mut file_stream = match con
+			.send(qint_proxy::connection::UploadFile {
+				channel,
+				path: path.clone(),
+				channel_password: None,
+				size,
+				overwrite: true,
+				resume: false,
+				return_code: query_opt.return_code.clone(),
+			})
+			.await
+		{
+			Err(_) => {
+				return HttpResponse::Gone().json(result_details_gone());
+			}
+			Ok(Err(qint_proxy::connection::Error::TsError(TsError::CommandError(err)))) => {
+				debug!(state.logger, "File upload error"; "error" => %err, "path" => &path);
+				return match err.error {
+					tsclientlib::TsError::FileInvalidPath => {
+						HttpResponse::NotFound().json(Into::<ResultDetails>::into(err))
+					}
+					tsclientlib::TsError::PermissionsClientInsufficient => {
+						HttpResponse::Forbidden().json(Into::<ResultDetails>::into(err))
+					}
+					_ => HttpResponse::BadRequest().json(Into::<ResultDetails>::into(err)),
+				};
+			}
+			Ok(Err(e)) => {
+				error!(state.logger, "File upload failed"; "error" => %e, "path" => &path);
+				return HttpResponse::InternalServerError()
+					.json(ResultDetails::from_desc(format!("Failed to upload file: {}", e)));
+			}
+			Ok(Ok(r)) => r,
+		};
+		// Upload
+		let mut body_reader = tokio_util::io::StreamReader::new(body.map_err(|e| {
+			std::io::Error::new(std::io::ErrorKind::Other, format!("Payload error {}", e))
+		}));
+		if let Err(e) = tokio::io::copy(&mut body_reader, &mut file_stream).await {
+			warn!(state.logger, "File upload aborted"; "error" => %e);
+			return HttpResponse::BadGateway()
+				.json(ResultDetails::from_desc(format!("Upload failed: {}", e)));
+		}
+		HttpResponse::Ok().json(ResultDetails::ok())
+	} else {
+		HttpResponse::Gone().json(result_details_gone())
+	}
+}
+
+/// Get a cached file by server id, channel and path.
+#[get("/filecache/{id}/{channel}/{path:.*}")]
+async fn download_cache_file(
+	state: web::Data<Arc<QintState>>, path: web::Path<(String, u64, String)>,
+) -> impl Responder {
+	let (id, channel, path) = path.into_inner();
+	let server = match base64::decode_config(&id, base64::URL_SAFE_NO_PAD)
+		.map_err(|e| e.into())
+		.and_then(|id| EccKeyPubP256::from_short(&id))
+	{
+		Err(e) => {
+			return HttpResponse::BadRequest().body(format!("Not a valid server id: {}", e));
+		}
+		Ok(id) => id,
+	};
+	let channel = ChannelId(channel);
+	if let Some((len, stream)) = state.file_cache.get_cached_file(&server, channel, &path).await {
+		let (stream, mut response) = guess_content_type(stream).await;
+		response.no_chunking(len);
+		response.streaming(stream)
+	} else {
+		HttpResponse::NotFound().finish()
+	}
+}
+
+#[get("/peek_link/{url}")]
+async fn get_link_preview(
+	state: web::Data<Arc<QintState>>, url: web::Path<String>,
+) -> impl Responder {
+	HttpResponse::Ok().json(state.link_previewer.decode_and_analyze_link(&url).await)
+}
+
+#[get("/loudness")]
+async fn loudness_service(
+	state: web::Data<Arc<QintState>>, req: HttpRequest, stream: web::Payload,
+) -> impl Responder {
+	let ws = LoudnessService::new(Arc::clone(&state));
+	match ws::start_with_addr(ws, &req, stream) {
+		Err(e) => {
+			error!(state.logger, "Failed to create websocket actor"; "error" => %e);
+			Either::Left(HttpResponse::InternalServerError().body("Failed to start connection"))
+		}
+		Ok((_, ws)) => Either::Right(ws),
+	}
+}
+
+#[get("/render_md_service")]
+async fn render_md_service(
+	state: web::Data<Arc<QintState>>, req: HttpRequest, stream: web::Payload,
+) -> impl Responder {
+	let ws = MarkdownService::new();
+	match ws::start_with_addr(ws, &req, stream) {
+		Err(e) => {
+			error!(state.logger, "Failed to create websocket actor"; "error" => %e);
+			Either::Left(HttpResponse::InternalServerError().body("Failed to start connection"))
+		}
+		Ok((_, ws)) => Either::Right(ws),
+	}
+}
+
+// TODO Rename endpoint
+#[get("/transient")]
+async fn get_setting(state: web::Data<Arc<QintState>>) -> impl Responder {
+	let values = state.settings.read().unwrap();
+	HttpResponse::Ok().json(serde_json::to_value(&*values).unwrap())
+}
+
+#[put("/transient")]
+async fn set_setting(state: web::Data<Arc<QintState>>, body: web::Json<Value>) -> impl Responder {
+	let (r, res) = QintState::modify_settings(&state.into_inner(), |values| {
+		let hotkeys_changed;
+		if let Value::Object(o) = &body.0 {
+			hotkeys_changed = o.contains_key(Settings::KEY_HOTKEYS);
+			values.merge(&body.0);
+		} else {
+			bail!("body must be an object");
+		}
+		Ok(SettingsUpdate { hotkeys_changed })
+	});
+
+	if let Err(e) = r {
+		HttpResponse::BadRequest().body(e.to_string())
+	} else if let Err(e) = res {
+		HttpResponse::InternalServerError().body(e.to_string())
+	} else {
+		HttpResponse::Ok().finish()
+	}
+}
+
+// get /ident/all
+// get /ident/by_name/{name}
+// put /ident/{name}?nickname?phonetic_name
+// post /ident/import [Body:ini_file]
+
+#[get("/ident/all")]
+async fn get_ident_all(state: web::Data<Arc<QintState>>) -> impl Responder {
+	match state.database.send(GetIdentitiesMsg(FindIdentity::All)).await {
+		Ok(Ok(idents)) => HttpResponse::Ok().json(idents),
+		Ok(Err(err)) => HttpResponse::BadRequest().body(err.to_string()),
+		Err(_) => HttpResponse::Gone().finish(),
+	}
+}
+
+#[get("/ident/by_id/{id}")]
+async fn get_ident_by_id(state: web::Data<Arc<QintState>>, path: web::Path<u64>) -> impl Responder {
+	let id = path.into_inner();
+	get_single_ident_by(state, FindIdentity::ById(id)).await
+}
+
+#[get("/ident/by_name/{name}")]
+async fn get_ident_by_name(
+	state: web::Data<Arc<QintState>>, path: web::Path<String>,
+) -> impl Responder {
+	let name = path.into_inner();
+	get_single_ident_by(state, FindIdentity::ByName(name)).await
+}
+
+async fn get_single_ident_by(state: web::Data<Arc<QintState>>, by: FindIdentity) -> impl Responder {
+	match state.database.send(GetIdentitiesMsg(by)).await {
+		Ok(Ok(idents)) => {
+			if let Some(ident) = idents.first() {
+				HttpResponse::Ok().json(ident)
+			} else {
+				HttpResponse::NotFound().finish()
+			}
+		}
+		Ok(Err(err)) => HttpResponse::BadRequest().body(err.to_string()),
+		Err(_) => HttpResponse::Gone().finish(),
+	}
+}
+
+#[derive(Deserialize)]
+struct UpdateIdentityOptions {
+	name: Option<String>,
+}
+
+#[put("/ident/{id}")]
+async fn put_ident(
+	state: web::Data<Arc<QintState>>, path: web::Path<u64>, query_opt: Query<UpdateIdentityOptions>,
+) -> impl Responder {
+	let query = query_opt.into_inner();
+	match state
+		.database
+		.send(UpdateIdentityMsg(
+			FindIdentity::ById(path.into_inner()),
+			UpdateIdentity { name: query.name, ..Default::default() },
+		))
+		.await
+	{
+		Ok(Ok(())) => HttpResponse::Ok().finish(),
+		Ok(Err(err)) => HttpResponse::BadRequest().body(err.to_string()),
+		Err(_) => HttpResponse::Gone().finish(),
+	}
+}
+
+#[delete("/ident/{id}")]
+async fn delete_ident(state: web::Data<Arc<QintState>>, path: web::Path<u64>) -> impl Responder {
+	match state.database.send(DeleteIdentityMsg(FindIdentity::ById(path.into_inner()))).await {
+		Ok(Ok(_)) => HttpResponse::Ok().finish(),
+		Ok(Err(err)) => HttpResponse::BadRequest().body(err.to_string()),
+		Err(_) => HttpResponse::Gone().finish(),
+	}
+}
+
+#[post("/ident/import")]
+async fn post_ident_import(state: web::Data<Arc<QintState>>, body: web::Bytes) -> impl Responder {
+	if let Ok(import_str) = std::str::from_utf8(body.as_ref()) {
+		match import_ts_identities_from_string(&state, import_str).await {
+			Ok(_) => HttpResponse::Ok().finish(),
+			Err(e) => HttpResponse::BadRequest().body(e.to_string()),
+		}
+	} else {
+		HttpResponse::BadRequest().body("Invalid text data")
+	}
+}
+
+#[post("/ident/new")]
+async fn post_ident_new(state: web::Data<Arc<QintState>>) -> impl Responder {
+	match state.database.send(GenrateNewIdentityMsg()).await {
+		Ok(Ok(ident)) => HttpResponse::Ok().json(ident),
+		Ok(Err(err)) => HttpResponse::BadRequest().body(err.to_string()),
+		Err(_) => HttpResponse::Gone().finish(),
+	}
+}
+
+#[get("/mutestate")]
+async fn get_mute_state(state: web::Data<Arc<QintState>>) -> impl Responder {
+	HttpResponse::Ok().json(state.get_mute_state().await)
+}
+
+#[get("/graphiql")]
+pub async fn graphiql() -> impl Responder {
+	HttpResponse::Ok().content_type("text/html; charset=utf-8").body(graphiql_source("/db", None))
+}
+
+#[post("/db")]
+pub async fn db_graphql(
+	state: web::Data<Arc<QintState>>, req: web::Json<GraphQLRequest>,
+) -> impl Responder {
+	let res = req.execute(&state.graphql_schema, &*state).await;
+	let mut resp = if res.is_ok() { HttpResponse::Ok() } else { HttpResponse::BadRequest() };
+	if let Ok(json_res) = serde_json::to_string(&res) {
+		resp.content_type("application/json").body(json_res)
+	} else {
+		resp.finish()
+	}
+}
+
+/// Check the authentication token.
+///
+/// Returns an http response if this request is handled by an error or redirect.
+/// If the result is `None`, the token is ok.
+fn check_authentication(token: &str, req: &actix_web::dev::ServiceRequest) -> Option<HttpResponse> {
+	#[derive(Deserialize)]
+	pub struct TokenQuery {
+		token: String,
+	}
+
+	if req.path() == "/" {
+		if let Ok(Query(TokenQuery { token })) = Query::from_query(req.query_string()) {
+			// Redirect to / and set cookie with token
+			return Some(
+				HttpResponse::SeeOther()
+					.append_header((http::header::LOCATION, "/"))
+					.cookie(cookie::Cookie::build("qint-auth", token).http_only(true).finish())
+					.finish(),
+			);
+		}
+	}
+
+	// Check auth cookie
+	if let Some(cookie) = req.cookie("qint-auth") {
+		if cookie.value() == token {
+			None
+		} else {
+			Some(HttpResponse::Forbidden().body(
+				"Authentication token is wrong, please get a valid authentication token from the \
+				 qint proxy",
+			))
+		}
+	} else {
+		Some(HttpResponse::Forbidden().body(
+			"Authentication token is missing, please get a valid authentication token from the \
+			 qint proxy",
+		))
+	}
+}
+
+// / Tests need a running TeamSpeak server on localhost. The default channel has to be channel 1,
+// / this is used to access messages.
+// #[cfg(test)]
+// mod tests {
+// 	use anyhow::format_err;
+// 	use awc::ws;
+// 	use rand::Rng;
+
+// 	use juniper::http::GraphQLRequest;
+// 	use slog::{o, Drain};
+// 	use tsclientlib::ClientId;
+
+// 	use super::*;
+// 	use messages::{ConnectOptions, JsMessageTarget, MessageF2P, MessageP2F};
+
+// 	struct TestProxy {
+// 		logger: Logger,
+// 		port: u16,
+// 	}
+
+// 	struct Connection {
+// 		socket: actix_codec::Framed<awc::BoxedSocket, ws::Codec>,
+// 	}
+
+// 	#[derive(Deserialize)]
+// 	struct GraphQLResponse<T> {
+// 		data: T,
+// 	}
+
+// 	#[derive(Deserialize)]
+// 	struct ClientServerKey {
+// 		/// Public key of the server.
+// 		server: Vec<u8>,
+// 		/// Uid of the own identity.
+// 		client: Vec<u8>,
+// 	}
+
+// 	impl TestProxy {
+// 		fn new(logger: Logger) -> Self {
+// 			let mut rng = rand::thread_rng();
+// 			Self { logger, port: rng.gen_range(1025..=65535) }
+// 		}
+
+// 		async fn create_connection(&self) -> Result<Connection> {
+// 			let client = awc::Client::default();
+// 			let id = Uuid::new_v4();
+// 			let url = format!("ws://127.0.0.1:{}/con/{}/ws?format=Json", self.port, id);
+// 			info!(self.logger, "Connecting to proxy"; "url" => &url);
+// 			let (_resp, socket) = client
+// 				.ws(url)
+// 				.connect()
+// 				.await
+// 				.map_err(|e| format_err!("Websocket client error: {:?}", e))?;
+// 			Ok(Connection { socket })
+// 		}
+
+// 		async fn graphql<T>(&self, request: &GraphQLRequest) -> Result<T>
+// 		where
+// 			for<'a> T: Deserialize<'a>,
+// 		{
+// 			let client = awc::Client::default();
+// 			let url = format!("http://127.0.0.1:{}/db", self.port);
+// 			debug!(self.logger, "GraphQL request"; "body" => serde_json::to_string(&request).unwrap());
+// 			let mut resp = client
+// 				.post(url)
+// 				.send_json(request)
+// 				.await
+// 				.map_err(|_| format_err!("GraphQL failed"))?;
+// 			if !resp.status().is_success() {
+// 				let body = resp
+// 					.body()
+// 					.await
+// 					.map_err(|e| format_err!("Failed to receive body: {:?}", e))?;
+// 				bail!("GraphQL request failed: {}", String::from_utf8_lossy(body.as_ref()));
+// 			}
+// 			let resp: GraphQLResponse<T> =
+// 				resp.json().await.map_err(|e| format_err!("Failed to decode json: {:?}", e))?;
+// 			Ok(resp.data)
+// 		}
+
+// 		async fn get_client_server_key(&self) -> Result<ClientServerKey> {
+// 			#[derive(Deserialize)]
+// 			#[serde(rename_all = "camelCase")]
+// 			struct Server {
+// 				public_key: Vec<u8>,
+// 			}
+// 			#[derive(Deserialize)]
+// 			struct Client {
+// 				uid: Vec<u8>,
+// 			}
+// 			#[derive(Deserialize)]
+// 			struct Identity {
+// 				client: Client,
+// 			}
+// 			#[derive(Deserialize)]
+// 			struct Bookmark {
+// 				server: Server,
+// 				identity: Identity,
+// 			}
+// 			#[derive(Deserialize)]
+// 			#[serde(rename_all = "camelCase")]
+// 			struct Query {
+// 				most_recent_bookmark: Bookmark,
+// 			}
+
+// 			let resp: Query = self
+// 				.graphql(&GraphQLRequest::new(
+// 					"{
+// 					mostRecentBookmark {
+// 						server {
+// 							publicKey
+// 						}
+// 						identity {
+// 							client {
+// 								uid
+// 							}
+// 						}
+// 					}
+// 				}"
+// 					.into(),
+// 					None,
+// 					None,
+// 				))
+// 				.await?;
+// 			Ok(ClientServerKey {
+// 				client: resp.most_recent_bookmark.identity.client.uid,
+// 				server: resp.most_recent_bookmark.server.public_key,
+// 			})
+// 		}
+
+// 		/// Returns uid and name of the client and messages.
+// 		async fn get_messages(
+// 			&self, server: &[u8], type_s: &str, id: &str,
+// 		) -> Result<Vec<(Vec<u8>, String, String)>> {
+// 			#![allow(non_snake_case)]
+
+// 			#[derive(Deserialize)]
+// 			struct Client {
+// 				uid: Vec<u8>,
+// 				name: String,
+// 			}
+// 			#[derive(Deserialize)]
+// 			struct Invoker {
+// 				client: Client,
+// 			}
+// 			#[derive(Deserialize)]
+// 			struct Message {
+// 				invoker: Invoker,
+// 				content: String,
+// 			}
+// 			#[derive(Deserialize)]
+// 			struct Chat {
+// 				messages: Vec<Message>,
+// 			}
+// 			#[derive(Deserialize)]
+// 			struct Query {
+// 				chat: Chat,
+// 			}
+
+// 			let vars = vec![("typ", type_s), ("id", id)];
+// 			let vars = juniper::InputValue::Object({
+// 				let mut vars: Vec<_> = vars
+// 					.into_iter()
+// 					.map(|(k, v)| {
+// 						(
+// 							juniper::parser::Spanning::unlocated(k.to_string()),
+// 							juniper::parser::Spanning::unlocated(juniper::InputValue::scalar(v)),
+// 						)
+// 					})
+// 					.collect();
+// 				vars.push((
+// 					juniper::parser::Spanning::unlocated("server".to_string()),
+// 					juniper::parser::Spanning::unlocated(juniper::InputValue::list(
+// 						server.iter().map(|b| juniper::InputValue::scalar(*b as i32)).collect(),
+// 					)),
+// 				));
+// 				vars
+// 			});
+// 			let resp: Query = self
+// 				.graphql(&GraphQLRequest::new(
+// 					"query ($typ: GMessageTarget!, $server: [Int!]!, $id: ID!) {
+// 					chat(typ: $typ, server: $server, id: $id) {
+// 						messages {
+// 							invoker {
+// 								client {
+// 									uid
+// 									name
+// 								}
+// 							}
+// 							content
+// 						}
+// 					}
+// 				}"
+// 					.into(),
+// 					None,
+// 					Some(vars),
+// 				))
+// 				.await?;
+// 			Ok(resp
+// 				.chat
+// 				.messages
+// 				.into_iter()
+// 				.map(|m| (m.invoker.client.uid, m.invoker.client.name, m.content))
+// 				.collect())
+// 		}
+
+// 		fn run(&self) -> impl Future<Output = Result<()>> {
+// 			let logger = self.logger.clone();
+// 			let port = self.port;
+// 			async move {
+// 				let dir = tempfile::Builder::new().prefix("qint-proxy").tempdir()?;
+// 				info!(logger, "Using config directory"; "dir" => dir.path().display());
+// 				let args = Args {
+// 					listen_address: Some(format!("127.0.0.1:{}", port).parse().unwrap()),
+// 					default_identity: None,
+// 					config_path: Some(dir.path().join("config")),
+// 					cache_path: Some(dir.path().join("cache")),
+// 					plugin_path: None,
+// 					no_audio: true,
+// 					no_search: false,
+// 					no_link_cache: false,
+// 					verbosity: 1,
+// 				};
+// 				let app = App::new(logger, args);
+// 				app.serve().await?;
+// 				dir.close()?;
+// 				Ok(())
+// 			}
+// 		}
+
+// 		fn run_log_errors(&self) -> impl Future<Output = ()> {
+// 			let fut = self.run();
+// 			let logger = self.logger.clone();
+// 			async move {
+// 				if let Err(e) = fut.await {
+// 					error!(logger, "Proxy encountered an error"; "error" => %e);
+// 				}
+// 			}
+// 		}
+// 	}
+
+// 	impl Connection {
+// 		async fn connect(&mut self) -> Result<ClientId> {
+// 			self.send(&MessageF2P::Connect(ConnectOptions {
+// 				address: "localhost".to_string(),
+// 				name: "Test".to_string(),
+// 				..Default::default()
+// 			}))
+// 			.await?;
+// 			loop {
+// 				let msg = self.recv().await?;
+// 				if let MessageP2F::Connected { own_client, .. } = msg {
+// 					return Ok(ClientId(own_client.parse().unwrap()));
+// 				} else if let MessageP2F::Error(e) = msg {
+// 					bail!("Got proxy error: {}", e);
+// 				}
+// 			}
+// 		}
+
+// 		async fn send(&mut self, msg: &MessageF2P) -> Result<()> {
+// 			println!("Sending message to proxy: {}", serde_json::to_string(msg).unwrap());
+// 			self.socket
+// 				.send(ws::Message::Text(serde_json::to_string(msg)?.into()))
+// 				.await
+// 				.map_err(|e| format_err!("Websocket client protocol error: {:?}", e))?;
+// 			Ok(())
+// 		}
+
+// 		async fn recv(&mut self) -> Result<MessageP2F> {
+// 			match self.socket.next().await {
+// 				Some(Ok(ws::Frame::Binary(msg))) => Ok(rmp_serde::from_read_ref(msg.as_ref())?),
+// 				Some(Ok(ws::Frame::Text(msg))) => {
+// 					Ok(serde_json::from_str(std::str::from_utf8(&msg)?)?)
+// 				}
+// 				f => bail!("Websocket client received unexpected packet: {:?}", f),
+// 			}
+// 		}
+// 	}
+
+// 	fn create_logger() -> Logger {
+// 		let decorator = slog_term::PlainDecorator::new(slog_term::TestStdoutWriter);
+// 		let drain = Mutex::new(slog_term::FullFormat::new(decorator).build()).fuse();
+
+// 		slog::Logger::root(drain, o!())
+// 	}
+
+// 	/// Check that connecting to a server adds this server to the recent connections and updates
+// 	/// it when reconnecting.
+// 	#[actix_rt::test]
+// 	async fn test_save_server() -> Result<()> {
+// 		let proxy = TestProxy::new(create_logger());
+// 		actix::spawn(proxy.run_log_errors());
+// 		// Wait for server to come up
+// 		time::sleep(Duration::from_millis(100)).await;
+// 		let mut con = proxy.create_connection().await?;
+// 		con.connect().await?;
+// 		// Wait for saving the connection in the database
+// 		time::sleep(Duration::from_millis(100)).await;
+// 		drop(con);
+
+// 		#[derive(Deserialize)]
+// 		#[serde(rename_all = "camelCase")]
+// 		struct ServerServer {
+// 			#[allow(dead_code)]
+// 			public_key: Vec<u8>,
+// 		}
+// 		#[derive(Deserialize)]
+// 		struct ServerBookmark {
+// 			#[allow(dead_code)]
+// 			server: ServerServer,
+// 		}
+// 		#[derive(Deserialize)]
+// 		struct ServerResponse {
+// 			bookmarks: Vec<ServerBookmark>,
+// 		}
+
+// 		// Check for the server in the database
+// 		let response: ServerResponse = proxy
+// 			.graphql(&GraphQLRequest::new(
+// 				"{
+// 				bookmarks {
+// 					server {
+// 						publicKey
+// 					}
+// 				}
+// 			}"
+// 				.into(),
+// 				None,
+// 				None,
+// 			))
+// 			.await?;
+// 		assert_eq!(response.bookmarks.len(), 1, "Recent connection not saved in the database");
+// 		Ok(())
+// 	}
+
+// 	/// Check that getting or sending a message from a client saves the other client and the
+// 	/// message.
+// 	#[actix_rt::test]
+// 	async fn test_save_client() -> Result<()> {
+// 		let logger = create_logger();
+// 		let proxy0 = TestProxy::new(logger.clone());
+// 		actix::spawn(proxy0.run_log_errors());
+// 		let proxy1 = TestProxy::new(logger);
+// 		actix::spawn(proxy1.run_log_errors());
+// 		// Wait for server to come up
+// 		time::sleep(Duration::from_millis(100)).await;
+// 		let mut con0 = proxy0.create_connection().await?;
+// 		con0.connect().await?;
+// 		let mut con1 = proxy1.create_connection().await?;
+// 		let con1_id = con1.connect().await?;
+
+// 		// con0 sends a message to con1
+// 		let msg = "Hello 1";
+// 		con0.send(&MessageF2P::SendMessage {
+// 			target: JsMessageTarget::Client(con1_id),
+// 			message: msg.to_string(),
+// 			return_code: None,
+// 		})
+// 		.await?;
+
+// 		// Wait for saving the message in the database
+// 		time::sleep(Duration::from_millis(100)).await;
+// 		drop(con0);
+// 		drop(con1);
+
+// 		let key0 = proxy0.get_client_server_key().await?;
+// 		let key1 = proxy1.get_client_server_key().await?;
+
+// 		// Check for the message in the database of con0
+// 		let msgs =
+// 			proxy0.get_messages(&key0.server, "CLIENT", &base64::encode(&key1.client)).await?;
+// 		assert_eq!(msgs.len(), 1, "Message not saved in the database");
+// 		assert_eq!(msgs[0].0, key0.client, "Sender uid is wrong");
+// 		assert_eq!(msgs[0].2, msg, "Message is wrong");
+// 		assert!(msgs[0].1.starts_with("Test"), "Client name has to start with 'Test'");
+
+// 		// Check for the message in the database of con1
+// 		let msgs =
+// 			proxy1.get_messages(&key0.server, "CLIENT", &base64::encode(&key0.client)).await?;
+// 		assert_eq!(msgs.len(), 1, "Message not saved in the database");
+// 		assert_eq!(msgs[0].0, key0.client, "Sender uid is wrong");
+// 		assert_eq!(msgs[0].2, msg, "Message is wrong");
+// 		assert!(msgs[0].1.starts_with("Test"), "Client name has to start with 'Test'");
+// 		Ok(())
+// 	}
+// }

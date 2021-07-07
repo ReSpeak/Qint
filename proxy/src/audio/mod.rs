@@ -10,7 +10,7 @@ use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 use tokio::task;
 
-use crate::websocket::Ws;
+use crate::connection::QintConnection;
 use crate::{ConnectionId, Settings};
 use audio_to_ts::AudioToTs;
 use ts_to_audio::TsToAudio;
@@ -38,14 +38,14 @@ const USUAL_SAMPLE_COUNT: usize = USUAL_FRAME_SIZE;
 const MAX_OPUS_FRAME_SIZE: usize = 1275;
 
 #[derive(Clone)]
-pub(crate) struct AudioData {
+pub struct AudioData {
 	pub a2ts: Addr<AudioToTs>,
 	pub ts2a: Addr<TsToAudio>,
 }
 
 pub struct ResetMsg;
-pub(crate) struct GetAudioDevices();
-pub(crate) struct SetAudioDevice(pub Option<String>);
+pub struct GetAudioDevices();
+pub struct SetAudioDevice(pub Option<String>);
 
 impl Message for ResetMsg {
 	type Result = ();
@@ -58,7 +58,7 @@ impl Message for SetAudioDevice {
 }
 
 pub(crate) fn start(
-	logger: Logger, connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>, settings: &Settings,
+	logger: Logger, connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>, settings: &Settings,
 ) -> Result<AudioData> {
 	let global_volume = settings.get_global_volume().unwrap_or(1.0);
 	let (capture, playback) = settings.get_preferred_audio_device();

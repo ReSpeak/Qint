@@ -7,8 +7,8 @@ use slog::error;
 use tsclientlib::prelude::*;
 use crate::QintState;
 
-use crate::{websocket, MuteState};
-use websocket::Ws;
+use crate::{connection, MuteState};
+use connection::QintConnection;
 
 pub use imp::{Hotkeys, KeyCode};
 
@@ -33,7 +33,7 @@ pub enum Action {
 /// Get input mute state for all current connections.
 /// The `bool` is `false` if the connection cannot talk, even if unmuted, because it is away or the
 /// output is disabled
-async fn get_input_mute_states(state: &QintState) -> Vec<(MuteState, bool, Addr<Ws>)> {
+async fn get_input_mute_states(state: &QintState) -> Vec<(MuteState, bool, Addr<QintConnection>)> {
 	state
 		.aggregate(|con, con_addr| {
 			// Ignore servers where output is muted or disabled or away
@@ -57,7 +57,7 @@ async fn get_input_mute_states(state: &QintState) -> Vec<(MuteState, bool, Addr<
 }
 
 /// Get output mute state for all current connections.
-async fn get_output_mute_states(state: &QintState) -> Vec<(MuteState, Addr<Ws>)> {
+async fn get_output_mute_states(state: &QintState) -> Vec<(MuteState, Addr<QintConnection>)> {
 	state
 		.aggregate(|con, con_addr| {
 			con.get_own_client().map(|c| {
@@ -81,7 +81,7 @@ async fn get_output_mute_states(state: &QintState) -> Vec<(MuteState, Addr<Ws>)>
 /// Get away state for all current connections.
 ///
 /// Returns `true` for every connection that is muted.
-async fn get_away_states(state: &QintState) -> Vec<(bool, Addr<Ws>)> {
+async fn get_away_states(state: &QintState) -> Vec<(bool, Addr<QintConnection>)> {
 	state
 		.aggregate(|con, con_addr| {
 			con.get_own_client().map(|c| (c.away_message.is_some(), con_addr))

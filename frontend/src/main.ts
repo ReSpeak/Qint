@@ -5,9 +5,9 @@ import { get } from "svelte/store";
 import { app } from "./app";
 import { ConnectData } from "./connect/uiConnect";
 import debug from "debug";
+import { backend } from "./backend/backend";
 
-//if (localStorage.getItem("debug") === null) debug.enable("error:*");
-debug.enable("*");
+if (localStorage.getItem("debug") === null) debug.enable("error:*");
 
 (window as any).qint = app; // DEBUG
 (window as any).get = get; // DEBUG
@@ -17,6 +17,7 @@ debug.enable("*");
 	localStorage.setItem("debug", s);
 };
 console.log("BUILD", BUILD_ENV, BUILD_DAT);
+console.log(`Using ${backend.name} backend`);
 
 window.onbeforeunload = function (e: any) {
 	app.transientSettings.flush();

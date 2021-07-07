@@ -3,17 +3,41 @@ use std::sync::Arc;
 use actix::*;
 use actix_web_actors::ws;
 use futures::prelude::*;
-use slog::warn;
+use qint_proxy::audio::audio_to_ts::LoudnessTrait;
+use slog::{warn, Logger};
 
-use crate::websocket::CaptureLoudnessMsg;
-use crate::{audio, QintState};
+use crate::web::WebApp;
+use qint_proxy::connection::CaptureLoudnessMsg;
+use qint_proxy::{audio, QintState};
 
 pub(crate) struct LoudnessService {
 	state: Arc<QintState>,
 }
 
 impl LoudnessService {
-	pub fn new(state: Arc<QintState>) -> Self { LoudnessService { state } }
+	pub fn new(state: Arc<QintState>) -> Self {
+		LoudnessService { state }
+	}
+}
+
+struct LoudnessCallback {
+	logger: Logger,
+	addr: Addr<LoudnessService>,
+}
+
+impl LoudnessTrait for LoudnessCallback {
+	fn send(&self, msg: CaptureLoudnessMsg) {
+		let logger = self.logger.clone();
+		tokio::spawn(self.addr.send(msg).map(move |r| {
+			if let Err(e) = r {
+				warn!(logger, "Failed to send loudness"; "error" => %e);
+			}
+		}));
+	}
+
+	fn connected(&self) -> bool {
+		self.addr.connected()
+	}
 }
 
 impl Actor for LoudnessService {
@@ -22,13 +46,16 @@ impl Actor for LoudnessService {
 		if let Some(ad) = &self.state.audio_data {
 			let logger = self.state.logger.clone();
 			actix::spawn(
-				ad.a2ts.send(audio::audio_to_ts::AddLoudnessListenerMsg(ctx.address())).map(
-					move |r| {
+				ad.a2ts
+					.send(audio::audio_to_ts::AddLoudnessListenerMsg(Box::new(LoudnessCallback {
+						logger: logger.clone(),
+						addr: ctx.address(),
+					})))
+					.map(move |r| {
 						if let Err(e) = r {
 							warn!(logger, "Failed to add loudness listener: {}", e);
 						}
-					},
-				),
+					}),
 			);
 		}
 	}
@@ -54,3 +81,5 @@ impl Handler<CaptureLoudnessMsg> for LoudnessService {
 		ctx.binary(loudness.to_be_bytes().to_vec());
 	}
 }
+
+impl WebApp {}

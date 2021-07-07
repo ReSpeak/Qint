@@ -4,6 +4,7 @@ import { closedFn, errorFn, IBackend, IBackendConnection, IFetchLike, msgFn } fr
 import { urlToWebSocket } from "./backendUtil";
 
 export class BrowserBackend implements IBackend {
+	public name = "Browser";
 	public readonly cacheFileSrc: string;
 	public readonly wsBaseAddress: string = urlToWebSocket(BASE_ADDRESS);
 
@@ -60,7 +61,7 @@ export class BrowserBackendConnection implements IBackendConnection {
 		this.close();
 
 		this.serverFileSrc = `${BASE_ADDRESS}/con/${this.id}`;
-		this.socket = new WebSocket(`${this.parent.wsBaseAddress}/con/${this.id}/ws?format=Json`);
+		this.socket = new WebSocket(`${this.parent.wsBaseAddress}/con/${this.id}/ws`);
 		this.socket.onerror = (error) => onError(String(error));
 		this.socket.onclose = onClose;
 		this.socket.onmessage = (evt) => {

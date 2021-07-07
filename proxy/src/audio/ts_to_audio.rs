@@ -15,7 +15,7 @@ use tsclientlib::ClientId;
 use tsproto_packets::packets::InAudioBuf;
 
 use super::*;
-use crate::websocket::{GetClientVolumeMsg, LoudnessesMsg, TalkersChangedMsg, Ws};
+use crate::connection::{GetClientVolumeMsg, LoudnessesMsg, TalkersChangedMsg, QintConnection};
 use crate::ConnectionId;
 
 type Id = (ConnectionId, ClientId);
@@ -25,13 +25,13 @@ pub struct PlayMsg(pub Id, pub InAudioBuf);
 pub struct SetGlobalVolumeMsg(pub f32);
 pub struct SetVolumeMsg(pub Id, pub f32);
 
-pub(crate) struct TsToAudio {
+pub struct TsToAudio {
 	logger: Logger,
 	audio_subsystem: AudioSubsystem,
 	preferred_device: Option<String>,
 	device: Option<AudioDevice<SdlCallback>>,
 	data: Arc<Mutex<AudioHandler>>,
-	connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
+	connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>,
 	/// The global volume to multiply all output with.
 	///
 	/// This is actually a `f32`, there is no `AtomicF32` though.
@@ -41,7 +41,7 @@ pub(crate) struct TsToAudio {
 struct SdlCallback {
 	logger: Logger,
 	data: Arc<Mutex<AudioHandler>>,
-	connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>,
+	connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>,
 	loudness: HashMap<Id, EbuR128>,
 	handle: Handle,
 	global_volume: Arc<AtomicU32>,
@@ -87,7 +87,7 @@ impl Actor for TsToAudio {
 impl TsToAudio {
 	pub(crate) fn new(
 		logger: Logger, audio_subsystem: AudioSubsystem, preferred_device: Option<String>,
-		connections: Arc<Mutex<HashMap<ConnectionId, Addr<Ws>>>>, global_volume: f32,
+		connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>, global_volume: f32,
 	) -> Result<Self> {
 		let logger = logger.new(o!("pipeline" => "ts-to-audio"));
 		let data = Arc::new(Mutex::new(AudioHandler::new(logger.clone())));

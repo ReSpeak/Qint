@@ -33,6 +33,7 @@ class FetchLike implements IFetchLike {
 }
 
 export class TauriBackend implements IBackend {
+	public name = "Tauri";
 	public cacheFileSrc: string;
 	public readonly wsBaseAddress: string = urlToWebSocket(BASE_ADDRESS);
 
@@ -43,7 +44,7 @@ export class TauriBackend implements IBackend {
 		this.cacheFileSrc = `${BASE_ADDRESS}/filecache`;
 
 		listen<TauriMsgP2F>("ws", (ev) => {
-			log("Ws: %o", ev);
+			log("QintConnection: %o", ev);
 			const msg = ev.payload;
 			const con = this.connections.get(msg.connection);
 			if (con !== undefined) {
@@ -85,8 +86,8 @@ export class TauriBackend implements IBackend {
 		query: string,
 		variables?: Record<string, unknown>
 	): Promise<{ data: T }> {
-		//return (await promisified<{ Graphql: any }>({ Graphql: { query, variables } })).Graphql;
-		return { data: undefined as any }; // ?TAURI
+		const resp = await invoke<string>("db", { request: { query, variables } });
+		return JSON.parse(resp);
 	}
 
 	public setTitle(name: string): void {

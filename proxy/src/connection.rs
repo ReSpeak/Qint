@@ -6,7 +6,6 @@ use std::task::{self, Poll};
 
 use actix::fut::wrap_future;
 use actix::*;
-use actix_web_actors::ws;
 use anyhow::{bail, format_err, Result};
 use futures::prelude::*;
 use proxy_codegen::book_events::{self, JsM2B};
@@ -27,22 +26,20 @@ use tsproto_types::crypto::EccKeyPubP256;
 
 use crate::db::{ChannelListMsg, ChatId, ChatType, SetClientVolumeMsg};
 use crate::messages::{self, MessageF2P, MessageP2F, ResultDetails, ResultStruct};
-use crate::{AppToFrontendBridge, ConnectionId, FrontBridge, QintState, WsFormat, WsOptions, audio, db};
+use crate::{audio, db, ConnectionId, FrontBridge, QintState};
 
 /// A websocket connection
-pub struct Ws {
+pub struct QintConnection {
 	pub id: ConnectionId,
 	logger: Logger,
 	state: Arc<QintState>,
 	sender: FrontBridge,
-	options: WsOptions,
 	connection: Option<Connection>,
 	connect_options: Option<messages::ConnectOptions>,
 	channel_list_finished_msg: Option<ChannelListMsg>,
 	file_downloads: HashMap<FiletransferHandle, oneshot::Sender<Result<FileDownloadResult, Error>>>,
 	file_uploads: HashMap<FiletransferHandle, oneshot::Sender<Result<FileUploadResult, Error>>>,
 
-	websocket_closed: bool,
 	self_talking: bool,
 	own_loudness: VecDeque<f64>,
 	talkers: Vec<(ClientId, bool)>,
@@ -51,26 +48,26 @@ pub struct Ws {
 /// Polls the connection for events.
 struct ConnectionPoller;
 
-pub(crate) struct CustomWsMsg(pub MessageF2P);
-pub(crate) struct GetPublicKeyMsg;
-pub(crate) struct GetClientVolumeMsg(pub ClientId);
-/// Audio detection tells us if we are talking.
-pub(crate) struct SetSelfTalkingMsg(pub bool);
-pub(crate) struct TalkersChangedMsg(pub Vec<(ClientId, bool)>);
-pub(crate) struct LoudnessesMsg(pub HashMap<ClientId, f64>);
-pub(crate) struct SendPacketMsg(pub OutPacket);
-pub(crate) struct CaptureLoudnessMsg(pub f64);
-pub(crate) struct DisconnectMsg;
-pub(crate) struct SetChannelListMsgMsg(pub ChannelListMsg);
-pub(crate) struct RunOnConMsg<R: 'static, F: FnOnce(&mut Ws) -> R>(pub F);
+pub struct MessageF2PWrapper(pub MessageF2P);
+pub struct GetPublicKeyMsg;
+pub struct GetClientVolumeMsg(pub ClientId);
+///detection tells us if we are talking.
+pub struct SetSelfTalkingMsg(pub bool);
+pub struct TalkersChangedMsg(pub Vec<(ClientId, bool)>);
+pub struct LoudnessesMsg(pub HashMap<ClientId, f64>);
+pub struct SendPacketMsg(pub OutPacket);
+pub struct CaptureLoudnessMsg(pub f64);
+pub struct DisconnectMsg;
+pub struct SetChannelListMsgMsg(pub ChannelListMsg);
+pub struct RunOnConMsg<R: 'static, F: FnOnce(&mut QintConnection) -> R>(pub F);
 
-pub(crate) struct DownloadFile {
+pub struct DownloadFile {
 	pub channel: ChannelId,
 	pub path: String,
 	pub return_code: Option<String>,
 }
 
-pub(crate) struct UploadFile {
+pub struct UploadFile {
 	pub channel: ChannelId,
 	pub path: String,
 	pub channel_password: Option<String>,
@@ -81,7 +78,7 @@ pub(crate) struct UploadFile {
 }
 
 #[derive(Debug, Error)]
-pub(crate) enum Error {
+pub enum Error {
 	#[error(transparent)]
 	TsError(#[from] TsclError),
 	#[error(transparent)]
@@ -92,7 +89,7 @@ pub(crate) enum Error {
 	NoUid(#[source] TsclError),
 }
 
-impl Actor for Ws {
+impl Actor for QintConnection {
 	type Context = actix::Context<Self>;
 
 	fn stopping(&mut self, ctx: &mut Self::Context) -> Running {
@@ -101,7 +98,7 @@ impl Actor for Ws {
 			self.disconnect(ctx);
 			Running::Continue
 		} else {
-			debug!(self.logger, "Stopping connection");
+			debug!(self.logger, "Stopping QintConnection");
 			Running::Stop
 		}
 	}
@@ -112,7 +109,7 @@ impl Actor for Ws {
 	}
 }
 
-impl Message for CustomWsMsg {
+impl Message for MessageF2PWrapper {
 	type Result = ();
 }
 impl Message for GetPublicKeyMsg {
@@ -149,20 +146,18 @@ impl Message for DownloadFile {
 impl Message for UploadFile {
 	type Result = Result<TcpStream, Error>;
 }
-impl<R: 'static, F: FnOnce(&mut Ws) -> R> Message for RunOnConMsg<R, F> {
+impl<R: 'static, F: FnOnce(&mut QintConnection) -> R> Message for RunOnConMsg<R, F> {
 	type Result = R;
 }
 
-impl Ws {
+impl QintConnection {
 	pub fn new(
-		logger: Logger, state: Arc<QintState>, options: WsOptions, id: ConnectionId,
-		sender: FrontBridge,
+		logger: Logger, state: Arc<QintState>, id: ConnectionId, sender: FrontBridge,
 	) -> Self {
 		let logger = logger.new(o!("id" => id.0.to_string()));
 		Self {
 			logger,
 			state,
-			options,
 			id,
 			sender,
 			connection: None,
@@ -171,7 +166,6 @@ impl Ws {
 			file_downloads: Default::default(),
 			file_uploads: Default::default(),
 
-			websocket_closed: false,
 			self_talking: false,
 			own_loudness: Default::default(),
 			talkers: Default::default(),
@@ -190,17 +184,17 @@ impl Ws {
 		self.get_book().and_then(|b| b.clients.get(&b.own_client))
 	}
 
-	fn update_talkers(&mut self, ctx: &mut <Self as Actor>::Context) {
+	fn update_talkers(&mut self) {
 		if let Some(state) = self.get_book() {
 			let mut talkers = self.talkers.clone();
 			if self.self_talking {
 				talkers.push((state.own_client, false));
 			}
 			let talkers = talkers.into_iter().map(|(i, t)| (i.to_string(), t)).collect();
-			self.send_message(&MessageP2F::TalkersChanged(talkers), ctx);
+			self.send_message(&MessageP2F::TalkersChanged(talkers));
 			return;
 		}
-		self.send_message(&MessageP2F::TalkersChanged(Vec::new()), ctx);
+		self.send_message(&MessageP2F::TalkersChanged(Vec::new()));
 	}
 
 	fn send_to_ts2a<T: Message<Result = Result<()>> + Send + 'static>(&self, msg: T)
@@ -259,17 +253,14 @@ impl Ws {
 						if let Some(return_code) =
 							self.connect_options.as_mut().and_then(|o| o.return_code.take())
 						{
-							self.send_message(
-								&MessageP2F::Result(ResultStruct {
-									return_code,
-									details: ResultDetails {
-										ts_result: None,
-										missing_permission: None,
-										description: None,
-									},
-								}),
-								ctx,
-							);
+							self.send_message(&MessageP2F::Result(ResultStruct {
+								return_code,
+								details: ResultDetails {
+									ts_result: None,
+									missing_permission: None,
+									description: None,
+								},
+							}));
 						}
 
 						match self.connection.as_ref().and_then(|c| {
@@ -279,13 +270,10 @@ impl Ws {
 						}) {
 							Some((server_key, own_client)) => {
 								// Send server uid and own client id
-								self.send_message(
-									&MessageP2F::Connected {
-										server: server_key.get_uid_no_base64(),
-										own_client: own_client.to_string(),
-									},
-									ctx,
-								);
+								self.send_message(&MessageP2F::Connected {
+									server: server_key.get_uid_no_base64(),
+									own_client: own_client.to_string(),
+								});
 
 								// Save in database
 								let opts = self.connect_options.as_ref().unwrap();
@@ -355,7 +343,7 @@ impl Ws {
 								})
 								.collect(),
 						);
-						self.send_message(msg, ctx);
+						self.send_message(msg);
 					}
 				}
 			}
@@ -400,21 +388,18 @@ impl Ws {
 				if let InMessage::CommandError(error) = &msg {
 					for e in error.iter() {
 						if let Some(return_code) = &e.return_code {
-							self.send_message(
-								&MessageP2F::Result(ResultStruct {
-									return_code: return_code.clone(),
-									details: ResultDetails {
-										ts_result: Some(e.id),
-										missing_permission: e.missing_permission_id,
-										description: None,
-									},
-								}),
-								ctx,
-							);
+							self.send_message(&MessageP2F::Result(ResultStruct {
+								return_code: return_code.clone(),
+								details: ResultDetails {
+									ts_result: Some(e.id),
+									missing_permission: e.missing_permission_id,
+									description: None,
+								},
+							}));
 						}
 					}
 				} else if let Some(m) = book_events::convert_message(&msg) {
-					self.send_message(&MessageP2F::Message(m), ctx);
+					self.send_message(&MessageP2F::Message(m));
 				} else if !matches!(msg, InMessage::ClientNeededPermissions(_)) {
 					warn!(self.logger, "Message could not be converted for frontend";
 						"mesage" => ?msg);
@@ -452,9 +437,9 @@ impl Ws {
 				}
 			}
 			TsStreamItem::DisconnectedTemporarily(_) => {
-				self.send_message(&MessageP2F::DisconnectedTemporarily(), ctx);
+				self.send_message(&MessageP2F::DisconnectedTemporarily());
 				self.talkers.clear();
-				self.update_talkers(ctx);
+				self.update_talkers();
 			}
 			TsStreamItem::FileDownload(handle, file) => {
 				if let Some(transfer) = self.file_downloads.remove(&handle) {
@@ -483,13 +468,10 @@ impl Ws {
 				}
 			}
 			TsStreamItem::MessageResult(handle, res) => {
-				self.send_message(
-					&MessageP2F::Result(ResultStruct {
-						return_code: handle.0.to_string(),
-						details: res.into(),
-					}),
-					ctx,
-				);
+				self.send_message(&MessageP2F::Result(ResultStruct {
+					return_code: handle.0.to_string(),
+					details: res.into(),
+				}));
 			}
 			_ => {}
 		}
@@ -597,13 +579,9 @@ impl Ws {
 				self.connection = None;
 			}
 		}
-		if !self.websocket_closed {
-			debug!(self.logger, "Closing websocket");
-			ctx.stop(); // ?TAURI
-		} else {
-			debug!(self.logger, "Stopping websocket");
-			ctx.stop();
-		}
+		debug!(self.logger, "Disconnecting QintConnection");
+		self.sender.close();
+		ctx.stop();
 	}
 
 	fn handle_ws_message(&mut self, msg: MessageF2P, ctx: &mut <Self as Actor>::Context) {
@@ -669,13 +647,13 @@ impl Ws {
 							Ok(())
 						})
 					})
-					.map(move |r, actor: &mut Self, ctx| {
+					.map(move |r, actor: &mut Self, _| {
 						if let Err(e) = r {
 							warn!(actor.logger, "Failed to connect"; "error" => %e);
-							actor.send_message(
-								&MessageP2F::Error(format!("Failed to connect ({})", e)),
-								ctx,
-							);
+							actor.send_message(&MessageP2F::Error(format!(
+								"Failed to connect ({})",
+								e
+							)));
 						}
 					}),
 				);
@@ -731,10 +709,10 @@ impl Ws {
 				));
 			}
 			MessageF2P::SendMessage { target, message, return_code } => {
-				self.send_chat_message(target.into(), message, return_code.as_deref(), ctx);
+				self.send_chat_message(target.into(), message, return_code.as_deref());
 			}
 			MessageF2P::SendCommand { command, return_code } => {
-				self.send_command(command, return_code.as_deref(), ctx)
+				self.send_command(command, return_code.as_deref())
 			}
 			MessageF2P::Change { mut change, return_code } => {
 				if let Some(state) = self.get_book() {
@@ -858,45 +836,36 @@ impl Ws {
 
 					match change.to_packet(state) {
 						Ok(msg) => {
-							let _ = self.send_ts_message(msg, return_code.as_deref(), ctx);
+							let _ = self.send_ts_message(msg, return_code.as_deref());
 						}
 						Err(e) => {
 							self.send_error(
 								return_code.as_deref(),
 								format!("Failed to create packet for change {:?}: {}", change, e),
-								ctx,
 							);
 						}
 					}
 				} else {
-					self.send_error(return_code.as_deref(), format!("Failed to get state"), ctx);
+					self.send_error(return_code.as_deref(), format!("Failed to get state"));
 				}
 			}
 		}
 	}
 
-	fn send_message(&mut self, msg: &MessageP2F, ctx: &mut <Self as Actor>::Context) {
-		match self.options.format {
-			WsFormat::Msgpack => panic!("Not implemented"),
-			WsFormat::Json => self.sender.send(msg),
-		}
+	fn send_message(&self, msg: &MessageP2F) {
+		self.sender.send(msg)
 	}
 
-	fn send_error(
-		&mut self, return_code: Option<&str>, error: String, ctx: &mut <Self as Actor>::Context,
-	) {
+	fn send_error(&self, return_code: Option<&str>, error: String) {
 		if let Some(code) = return_code {
-			self.send_message(
-				&MessageP2F::Result(ResultStruct {
-					return_code: code.into(),
-					details: ResultDetails {
-						ts_result: None,
-						missing_permission: None,
-						description: Some(error),
-					},
-				}),
-				ctx,
-			);
+			self.send_message(&MessageP2F::Result(ResultStruct {
+				return_code: code.into(),
+				details: ResultDetails {
+					ts_result: None,
+					missing_permission: None,
+					description: Some(error),
+				},
+			}));
 		} else {
 			warn!(self.logger, "Proxy error"; "error" => error);
 		}
@@ -904,15 +873,14 @@ impl Ws {
 
 	fn send_chat_message(
 		&mut self, target: MessageTarget, message: String, return_code: Option<&str>,
-		ctx: &mut <Self as Actor>::Context,
 	) {
 		if let Some(state) = self.get_book() {
 			let msg = state.send_message(target, &message);
-			if self.send_ts_message(msg, return_code, ctx).is_err() {
+			if self.send_ts_message(msg, return_code).is_err() {
 				return;
 			}
 		} else {
-			self.send_error(return_code.as_deref(), format!("Failed to get state"), ctx);
+			self.send_error(return_code.as_deref(), format!("Failed to get state"));
 			return;
 		}
 
@@ -921,7 +889,7 @@ impl Ws {
 		let server = match con.get_server_key() {
 			Ok(key) => key,
 			Err(e) => {
-				self.send_error(return_code, format!("Failed to get server key: {}", e), ctx);
+				self.send_error(return_code, format!("Failed to get server key: {}", e));
 				return;
 			}
 		};
@@ -935,11 +903,11 @@ impl Ws {
 					if let Some(uid) = own_client.uid.as_ref() {
 						uid.clone()
 					} else {
-						self.send_error(return_code, "Failed to get own client uid".into(), ctx);
+						self.send_error(return_code, "Failed to get own client uid".into());
 						return;
 					}
 				} else {
-					self.send_error(return_code, "Failed to get own client".into(), ctx);
+					self.send_error(return_code, "Failed to get own client".into());
 					return;
 				}
 			};
@@ -983,7 +951,7 @@ impl Ws {
 							ChatType::Poke(uid.0.clone())
 						}
 					} else {
-						self.send_error(return_code, "Failed to get uid of client".into(), ctx);
+						self.send_error(return_code, "Failed to get uid of client".into());
 						return;
 					}
 				}
@@ -1006,43 +974,38 @@ impl Ws {
 				}
 			}));
 		} else {
-			self.send_error(return_code, "Failed to get connection state".into(), ctx);
+			self.send_error(return_code, "Failed to get connection state".into());
 		}
 	}
 
-	fn send_ts_message(
-		&mut self, mut msg: OutCommand, return_code: Option<&str>,
-		ctx: &mut <Self as Actor>::Context,
-	) -> Result<()> {
+	fn send_ts_message(&mut self, mut msg: OutCommand, return_code: Option<&str>) -> Result<()> {
 		if let Some(code) = &return_code {
 			msg.write_arg("return_code", code);
 		}
 		if let Some(con) = &mut self.connection {
 			let r = msg.send(con);
 			if let Err(e) = &r {
-				self.send_error(return_code, format!("Failed to send message: {}", e), ctx);
+				self.send_error(return_code, format!("Failed to send message: {}", e));
 			}
 			r.map_err(|e| e.into())
 		} else {
-			self.send_error(return_code, "Not connected".into(), ctx);
+			self.send_error(return_code, "Not connected".into());
 			bail!("Not connected");
 		}
 	}
 
-	fn send_command(
-		&mut self, command: String, return_code: Option<&str>, ctx: &mut <Self as Actor>::Context,
-	) {
+	fn send_command(&mut self, command: String, return_code: Option<&str>) {
 		let cmd = tsproto_packets::packets::OutCommand::new(
 			tsproto_packets::packets::Direction::C2S,
 			tsproto_packets::packets::Flags::empty(),
 			tsproto_packets::packets::PacketType::Command,
 			&command,
 		);
-		let _ = self.send_ts_message(cmd, return_code, ctx);
+		let _ = self.send_ts_message(cmd, return_code);
 	}
 }
 
-impl Handler<DownloadFile> for Ws {
+impl Handler<DownloadFile> for QintConnection {
 	type Result = ActorResponse<Self, Result<(u64, TcpStream, EccKeyPubP256), Error>>;
 	fn handle(&mut self, msg: DownloadFile, _: &mut Self::Context) -> Self::Result {
 		if let Some(con) = &mut self.connection {
@@ -1065,22 +1028,19 @@ impl Handler<DownloadFile> for Ws {
 
 			let (send, recv) = oneshot::channel();
 			self.file_downloads.insert(handle, send);
-			ActorResponse::r#async(wrap_future(recv).map(|r, this: &mut Self, ctx| {
+			ActorResponse::r#async(wrap_future(recv).map(|r, this: &mut Self, _| {
 				let result = match r {
 					Ok(Ok(r)) => Ok((r.size, r.stream, public_key)),
 					Ok(Err(e)) => Err(e.into()),
 					Err(e) => Err(e.into()),
 				};
 				if let Some(return_code) = msg.return_code {
-					this.send_message(
-						&MessageP2F::Result(ResultStruct {
-							return_code,
-							details: (&result).try_into().unwrap_or_else(|e| {
-								ResultDetails::from_desc(format!("Download failed, {}", e))
-							}),
+					this.send_message(&MessageP2F::Result(ResultStruct {
+						return_code,
+						details: (&result).try_into().unwrap_or_else(|e| {
+							ResultDetails::from_desc(format!("Download failed, {}", e))
 						}),
-						ctx,
-					);
+					}));
 				}
 				result
 			}))
@@ -1090,7 +1050,7 @@ impl Handler<DownloadFile> for Ws {
 	}
 }
 
-impl Handler<UploadFile> for Ws {
+impl Handler<UploadFile> for QintConnection {
 	type Result = ActorResponse<Self, Result<TcpStream, Error>>;
 	fn handle(&mut self, msg: UploadFile, _: &mut Self::Context) -> Self::Result {
 		if let Some(con) = &mut self.connection {
@@ -1109,22 +1069,19 @@ impl Handler<UploadFile> for Ws {
 			};
 			let (send, recv) = oneshot::channel();
 			self.file_uploads.insert(handle, send);
-			ActorResponse::r#async(wrap_future(recv).map(|r, this: &mut Self, ctx| {
+			ActorResponse::r#async(wrap_future(recv).map(|r, this: &mut Self, _| {
 				let result = match r {
 					Ok(Ok(r)) => Ok(r.stream),
 					Ok(Err(e)) => Err(e.into()),
 					Err(e) => Err(e.into()),
 				};
 				if let Some(return_code) = msg.return_code {
-					this.send_message(
-						&MessageP2F::Result(ResultStruct {
-							return_code,
-							details: (&result).try_into().unwrap_or_else(|e| {
-								ResultDetails::from_desc(format!("Upload failed, {}", e))
-							}),
+					this.send_message(&MessageP2F::Result(ResultStruct {
+						return_code,
+						details: (&result).try_into().unwrap_or_else(|e| {
+							ResultDetails::from_desc(format!("Upload failed, {}", e))
 						}),
-						ctx,
-					);
+					}));
 				}
 				result
 			}))
@@ -1134,7 +1091,7 @@ impl Handler<UploadFile> for Ws {
 	}
 }
 
-impl Handler<GetPublicKeyMsg> for Ws {
+impl Handler<GetPublicKeyMsg> for QintConnection {
 	type Result = Result<EccKeyPubP256>;
 	fn handle(&mut self, _: GetPublicKeyMsg, _: &mut Self::Context) -> Self::Result {
 		if let Some(con) = &self.connection {
@@ -1145,7 +1102,7 @@ impl Handler<GetPublicKeyMsg> for Ws {
 	}
 }
 
-impl Handler<GetClientVolumeMsg> for Ws {
+impl Handler<GetClientVolumeMsg> for QintConnection {
 	type Result = ActorResponse<Self, Result<f32>>;
 	fn handle(
 		&mut self, GetClientVolumeMsg(client): GetClientVolumeMsg, _: &mut Self::Context,
@@ -1192,14 +1149,14 @@ impl Handler<GetClientVolumeMsg> for Ws {
 	}
 }
 
-impl Handler<SetSelfTalkingMsg> for Ws {
+impl Handler<SetSelfTalkingMsg> for QintConnection {
 	type Result = ();
 	fn handle(
-		&mut self, SetSelfTalkingMsg(talking): SetSelfTalkingMsg, ctx: &mut Self::Context,
+		&mut self, SetSelfTalkingMsg(talking): SetSelfTalkingMsg, _: &mut Self::Context,
 	) -> Self::Result {
 		if self.self_talking != talking {
 			self.self_talking = talking;
-			self.update_talkers(ctx);
+			self.update_talkers();
 			if !talking {
 				self.own_loudness.clear();
 			}
@@ -1207,22 +1164,22 @@ impl Handler<SetSelfTalkingMsg> for Ws {
 	}
 }
 
-impl Handler<TalkersChangedMsg> for Ws {
+impl Handler<TalkersChangedMsg> for QintConnection {
 	type Result = ();
 	fn handle(
-		&mut self, TalkersChangedMsg(talkers): TalkersChangedMsg, ctx: &mut Self::Context,
+		&mut self, TalkersChangedMsg(talkers): TalkersChangedMsg, _: &mut Self::Context,
 	) -> Self::Result {
 		if self.talkers != talkers {
 			self.talkers = talkers;
-			self.update_talkers(ctx);
+			self.update_talkers();
 		}
 	}
 }
 
-impl Handler<LoudnessesMsg> for Ws {
+impl Handler<LoudnessesMsg> for QintConnection {
 	type Result = ();
 	fn handle(
-		&mut self, LoudnessesMsg(loudnesses): LoudnessesMsg, ctx: &mut Self::Context,
+		&mut self, LoudnessesMsg(loudnesses): LoudnessesMsg, _: &mut Self::Context,
 	) -> Self::Result {
 		let mut ls;
 		if self.talkers.is_empty() {
@@ -1238,14 +1195,14 @@ impl Handler<LoudnessesMsg> for Ws {
 				ls.insert(state.own_client.to_string(), own_loudness as f32);
 			}
 		}
-		self.send_message(&MessageP2F::Loudnesses(ls), ctx);
+		self.send_message(&MessageP2F::Loudnesses(ls));
 	}
 }
 
-impl Handler<CaptureLoudnessMsg> for Ws {
+impl Handler<CaptureLoudnessMsg> for QintConnection {
 	type Result = ();
 	fn handle(
-		&mut self, CaptureLoudnessMsg(loudness): CaptureLoudnessMsg, ctx: &mut Self::Context,
+		&mut self, CaptureLoudnessMsg(loudness): CaptureLoudnessMsg, _: &mut Self::Context,
 	) -> Self::Result {
 		// If nobody else is talking, sent it as a packet.
 		if self.talkers.is_empty() {
@@ -1253,7 +1210,7 @@ impl Handler<CaptureLoudnessMsg> for Ws {
 			if let Some(state) = self.get_book() {
 				let mut loudnesses = HashMap::new();
 				loudnesses.insert(state.own_client.to_string(), loudness as f32);
-				self.send_message(&MessageP2F::Loudnesses(loudnesses), ctx);
+				self.send_message(&MessageP2F::Loudnesses(loudnesses));
 			}
 		} else {
 			self.own_loudness.push_back(loudness);
@@ -1261,7 +1218,7 @@ impl Handler<CaptureLoudnessMsg> for Ws {
 	}
 }
 
-impl Handler<SendPacketMsg> for Ws {
+impl Handler<SendPacketMsg> for QintConnection {
 	type Result = Result<()>;
 	fn handle(
 		&mut self, SendPacketMsg(packet): SendPacketMsg, _: &mut Self::Context,
@@ -1275,84 +1232,42 @@ impl Handler<SendPacketMsg> for Ws {
 	}
 }
 
-impl Handler<DisconnectMsg> for Ws {
+impl Handler<DisconnectMsg> for QintConnection {
 	type Result = ();
 	fn handle(&mut self, _: DisconnectMsg, ctx: &mut Self::Context) -> Self::Result {
 		self.disconnect(ctx);
 	}
 }
 
-impl Handler<SetChannelListMsgMsg> for Ws {
+impl Handler<SetChannelListMsgMsg> for QintConnection {
 	type Result = ();
 	fn handle(&mut self, msg: SetChannelListMsgMsg, _: &mut Self::Context) -> Self::Result {
 		self.channel_list_finished_msg = Some(msg.0);
 	}
 }
 
-impl<R: 'static, F: FnOnce(&mut Ws) -> R> Handler<RunOnConMsg<R, F>> for Ws {
+impl<R: 'static, F: FnOnce(&mut QintConnection) -> R> Handler<RunOnConMsg<R, F>>
+	for QintConnection
+{
 	type Result = MessageResult<RunOnConMsg<R, F>>;
 	fn handle(&mut self, msg: RunOnConMsg<R, F>, _: &mut Self::Context) -> Self::Result {
 		MessageResult(msg.0(self))
 	}
 }
 
-// impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
-// 	fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
-// 		match msg {
-// 			Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
-// 			Ok(ws::Message::Text(msg)) => {
-// 				let msg: MessageF2P = match serde_json::from_str(&msg) {
-// 					Ok(r) => r,
-// 					Err(e) => {
-// 						let msg_str: &str = msg.as_ref();
-// 						error!(self.logger, "json deserializing error"; "error" => %e,
-// 							"message" => msg_str);
-// 						self.send_message(
-// 							&MessageP2F::Error(format!("json deserializing error: {}", e)),
-// 							ctx,
-// 						);
-// 						return;
-// 					}
-// 				};
-// 				self.handle_ws_message(msg, ctx);
-// 			}
-// 			Ok(ws::Message::Binary(msg)) => {
-// 				let msg: MessageF2P = match rmp_serde::from_read_ref(msg.as_ref()) {
-// 					Ok(r) => r,
-// 					Err(e) => {
-// 						error!(self.logger, "msgpack deserializing error"; "error" => %e);
-// 						self.send_message(
-// 							&MessageP2F::Error(format!("msgpack deserializing error: {}", e)),
-// 							ctx,
-// 						);
-// 						return;
-// 					}
-// 				};
-// 				self.handle_ws_message(msg, ctx);
-// 			}
-// 			Ok(ws::Message::Close(_)) => {
-// 				debug!(self.logger, "Websocket closed");
-// 				self.websocket_closed = true;
-// 				self.disconnect(ctx);
-// 			}
-// 			_ => {}
-// 		}
-// 	}
-// }
-
-impl Handler<CustomWsMsg> for Ws {
+impl Handler<MessageF2PWrapper> for QintConnection {
 	type Result = ();
-	fn handle(&mut self, msg: CustomWsMsg, ctx: &mut Self::Context) -> Self::Result {
+	fn handle(&mut self, msg: MessageF2PWrapper, ctx: &mut Self::Context) -> Self::Result {
 		println!("CutomWsMsg {:?}", msg.0);
 		self.handle_ws_message(msg.0, ctx);
 	}
 }
 
-impl ActorFuture<Ws> for ConnectionPoller {
+impl ActorFuture<QintConnection> for ConnectionPoller {
 	type Output = ();
 	fn poll(
-		self: Pin<&mut Self>, actor: &mut Ws, ctx: &mut <Ws as Actor>::Context,
-		task: &mut task::Context,
+		self: Pin<&mut Self>, actor: &mut QintConnection,
+		ctx: &mut <QintConnection as Actor>::Context, task: &mut task::Context,
 	) -> Poll<Self::Output> {
 		loop {
 			let res = if let Some(con) = &mut actor.connection {
@@ -1384,19 +1299,16 @@ impl ActorFuture<Ws> for ConnectionPoller {
 							description = Some(e.to_string());
 						}
 
-						actor.send_message(
-							&MessageP2F::Result(ResultStruct {
-								return_code,
-								details: ResultDetails {
-									ts_result,
-									missing_permission: None,
-									description,
-								},
-							}),
-							ctx,
-						);
+						actor.send_message(&MessageP2F::Result(ResultStruct {
+							return_code,
+							details: ResultDetails {
+								ts_result,
+								missing_permission: None,
+								description,
+							},
+						}));
 					} else {
-						actor.send_message(&MessageP2F::Error(e.to_string()), ctx);
+						actor.send_message(&MessageP2F::Error(e.to_string()));
 					}
 					break Poll::Ready(());
 				}

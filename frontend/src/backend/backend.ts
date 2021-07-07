@@ -8,6 +8,7 @@ export type msgFn = (msg: InMsg) => void;
 export type closedFn = () => void;
 
 export interface IBackend {
+	readonly name: string;
 	readonly cacheFileSrc: string;
 	/** The url address prefix for websockets */
 	readonly wsBaseAddress: string;

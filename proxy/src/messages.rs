@@ -12,7 +12,7 @@ use tsclientlib::{
 	TsError, Version,
 };
 
-use super::websocket::Error as WsError;
+use super::connection::Error as WsError;
 
 /// A message sent over a websocket connection from the frontend to the proxy.
 #[derive(Clone, Debug, Deserialize)]

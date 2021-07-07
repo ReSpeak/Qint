@@ -1,29 +1,23 @@
-// Don't show terminal in release mode
-#![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
-
-mod cmd;
-mod core;
-
+use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
-use std::thread;
-use std::time::Duration;
 
-use actix::prelude::*;
-use anyhow::format_err;
+use anyhow::Result;
 use qint_proxy::QintState;
-use slog::{o, Drain};
+use slog::{debug, error, o, Drain};
 use structopt::StructOpt;
-use tauri::SystemTray;
-use tauri::SystemTrayEvent;
-use tauri::SystemTrayMenu;
-use tauri::{CustomMenuItem, Manager};
-use tokio::runtime::Runtime;
+use web::WebApp;
 
-use crate::core::QintCore;
+mod web;
+mod websocket;
+mod loudness_ws;
+mod markdown_ws;
 
 #[derive(Clone, Debug, StructOpt)]
 #[structopt(author, about)]
 struct Args {
+	/// The address where the server listens
+	#[structopt(short = "l", long)]
+	listen_address: Option<SocketAddr>,
 	/// The id of the identity that is used by default
 	#[structopt(short = "i", long)]
 	default_identity: Option<u64>,
@@ -51,10 +45,13 @@ struct Args {
 	no_audio: bool,
 	/// Do not open database to search messages.
 	#[structopt(long)]
-	pub no_search: bool,
+	no_search: bool,
 	/// Do not cache link previews.
 	#[structopt(long)]
-	pub no_link_cache: bool,
+	no_link_cache: bool,
+	/// Open the frontend in the browser on start.
+	#[structopt(long)]
+	no_open: bool,
 	/// How much log output do you want?
 	///
 	/// 0. Print nothing
@@ -68,7 +65,7 @@ struct Args {
 impl Into<qint_proxy::Args> for Args {
 	fn into(self) -> qint_proxy::Args {
 		qint_proxy::Args {
-			listen_address: None,
+			listen_address: self.listen_address,
 			default_identity: self.default_identity,
 			config_path: self.config_path,
 			cache_path: self.cache_path,
@@ -81,7 +78,11 @@ impl Into<qint_proxy::Args> for Args {
 	}
 }
 
-fn main() {
+#[allow(unused_braces)]
+#[actix_rt::main]
+async fn main() -> Result<()> { real_main().await }
+
+async fn real_main() -> Result<()> {
 	let logger = {
 		let decorator = slog_term::TermDecorator::new().build();
 		let drain = slog_term::CompactFormat::new(decorator).build();
@@ -97,66 +98,33 @@ fn main() {
 
 	// Parse command line options
 	let args = Args::from_args();
+	let no_open = args.no_open;
 
-	let (addr, app) = {
-		let (sender, receiver) = std::sync::mpsc::channel();
+	let app = WebApp::new(QintState::new(logger.clone(), args.into())?);
 
-		let mut runtime = Runtime::new().unwrap();
-		let logger2 = logger.clone();
-		thread::spawn(move || {
-			let local = tokio::task::LocalSet::new();
-			local.block_on(&mut runtime, async move {
-				let app = QintState::new(logger2, args.into()).unwrap();
-				let core = QintCore { state: app };
-
-				sender.send((core.clone().start(), core)).unwrap();
-
-				loop {
-					tokio::time::sleep(Duration::from_secs(1)).await;
-				}
-			});
-		});
-
-		receiver.recv().unwrap()
-	};
-
-	tauri::Builder::default()
-		.manage(addr)
-		.manage(app)
-		.manage(logger)
-		.on_page_load(|window, _| {
-			if let Err(e) = window.set_title("Qint") {
-				println!("Failed to set title: {}", e);
+	if !no_open {
+		// Open browser
+		let addr = app.get_listen_address();
+		let port = addr.port();
+		let token = app.get_token().to_string();
+		actix::spawn(async move {
+			// Connect to localhost if == 0.0.0.0 or ::
+			let url = if addr.ip() == "0.0.0.0".parse::<IpAddr>().unwrap()
+				|| addr.ip() == "::".parse::<IpAddr>().unwrap()
+				|| addr.ip() == "127.0.0.1".parse::<IpAddr>().unwrap()
+				|| addr.ip() == "::1".parse::<IpAddr>().unwrap()
+			{
+				format!("http://localhost:{}", port)
+			} else {
+				format!("http://{}", addr)
+			};
+			let url = format!("{}/?token={}", url, token);
+			debug!(logger, "Opening url"; "url" => &url);
+			if let Err(e) = open::that(url) {
+				error!(logger, "Failed to open frontend in browser"; "error" => %e);
 			}
+		});
+	}
 
-			window.listen("js-event", move |event| {
-				println!("got js-event with message '{:?}'", event.payload());
-			});
-		})
-		.system_tray(
-			SystemTray::new().with_menu(
-				SystemTrayMenu::new()
-					.add_item(CustomMenuItem::new("toggle".into(), "Toggle"))
-					.add_item(CustomMenuItem::new("new".into(), "New window")),
-			),
-		)
-		.on_system_tray_event(|app, event| match event {
-			SystemTrayEvent::LeftClick { position: _, size: _, .. } => {}
-			SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
-				"toggle" => {
-					let window = app.get_window("main").unwrap();
-					window.hide().unwrap();
-				}
-				"show" => {
-					let window = app.get_window("main").unwrap();
-					window.show().unwrap();
-				}
-				_ => {}
-			},
-			_ => {}
-		})
-		.invoke_handler(tauri::generate_handler![cmd::create_ws, cmd::pass_ws_msg, cmd::db])
-		.run(tauri::generate_context!())
-		.map_err(|e| format_err!("tauri error: {}", e))
-		.unwrap();
+	app.serve().await
 }

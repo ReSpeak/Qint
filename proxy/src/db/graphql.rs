@@ -4,12 +4,9 @@
 use std::convert::TryInto;
 use std::sync::Arc;
 
-use actix_web::*;
 use anyhow::format_err;
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
-use juniper::http::graphiql::graphiql_source;
-use juniper::http::GraphQLRequest;
 use juniper::{EmptySubscription, FieldError, RootNode, ID};
 use proxy_codegen::markdown::markdown_highlighted;
 use tantivy::SnippetGenerator;
@@ -85,21 +82,6 @@ struct UpdateBookmarkDb {
 	username: Option<String>,
 	channel: Option<i64>,
 	bookmark: Option<bool>,
-}
-
-#[get("/graphiql")]
-pub async fn graphiql() -> impl Responder {
-	HttpResponse::Ok().content_type("text/html; charset=utf-8").body(graphiql_source("/db", None))
-}
-
-#[post("/db")]
-pub(crate) async fn db_graphql(
-	state: web::Data<Arc<QintState>>, req: web::Json<GraphQLRequest>,
-) -> Result<impl Responder> {
-	let res = req.execute(&state.graphql_schema, &*state).await;
-	let json_res = serde_json::to_string(&res)?;
-	let mut resp = if res.is_ok() { HttpResponse::Ok() } else { HttpResponse::BadRequest() };
-	Ok(resp.content_type("application/json").body(json_res))
 }
 
 impl Void {

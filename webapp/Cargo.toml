@@ -1,0 +1,48 @@
+[package]
+name = "webapp"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+actix = "0.12"
+actix-cors = "=0.6.0-beta.2"
+actix-files = "=0.6.0-beta.6"
+# Exclude zstd from dependencies because a newer version is pulled in by tauri and milli
+actix-web = { version = "=4.0.0-beta.8", default-features = false, features = ["compress-brotli", "cookies"] }
+actix-web-actors = "=4.0.0-beta.6"
+actix-rt = "2"
+anyhow = "1"
+base64 = "0.13"
+futures = "0.3"
+juniper = "0.15"
+open = "1"
+proxy-codegen = { path = "../proxy-codegen" }
+qint-proxy = { path = "../proxy" }
+rand = "0.8"
+slog-async = "2"
+slog-envlogger = "2"
+slog-perf = "0.2"
+slog-scope = "4"
+slog-stdlog = "4"
+slog-term = "2"
+serde = { version = "1", features = [ "derive" ] }
+serde_json = "1"
+serde_ini = "0.2"
+structopt = { version = "0.3", default-features = false }
+tsclientlib = { path = "../../tsclientlib/tsclientlib", features = [ "unstable" ] }
+tsproto = { path = "../../tsclientlib/tsproto" }
+tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }
+tsproto-types = { path = "../../tsclientlib/utils/tsproto-types" }
+tokio = { version = "1", features = [ "fs" ] }
+tokio-util = { version = "0.6", features = [ "io" ] }
+uuid = { version = "0.8", features = [ "serde" ] }
+
+[dependencies.log]
+version = "0.4"
+features = [ "max_level_info", "release_max_level_info" ]
+
+[dependencies.slog]
+version = "2"
+features = [ "max_level_trace", "release_max_level_debug" ]

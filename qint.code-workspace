@@ -17,6 +17,10 @@
 			"path": "src-tauri"
 		},
 		{
+			"name": "WebApp",
+			"path": "webapp"
+		},
+		{
 			"name": "Build Target",
 			"path": "target"
 		},
