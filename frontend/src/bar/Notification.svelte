@@ -41,7 +41,7 @@
 			{#if args[i] instanceof Client}
 				<ClientName client={toClient(args[i])} {connection} />
 			{:else if args[i] instanceof Server}
-				<ServerName server={toServer(args[i])} {connection} />
+				<ServerName server={toServer(args[i])} />
 			{:else if args[i] instanceof Channel}
 				<span class="channel">{getName(args[i])}</span>
 			{:else if args[i] instanceof ServerGroup}
