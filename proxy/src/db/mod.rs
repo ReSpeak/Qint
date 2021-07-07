@@ -21,6 +21,7 @@ use tsproto_types::crypto::EccKeyPubP256;
 use crate::filecache::FileCache;
 use crate::search::Search;
 use crate::secret::Secret;
+use crate::with_log;
 use crate::{LaunchConfig, QintState};
 use models::MessageStatus;
 
@@ -567,7 +568,7 @@ impl Handler<GetClientVolumeMsg> for DbHandler {
 	type Result = Result<Option<f32>>;
 	fn handle(&mut self, msg: GetClientVolumeMsg, _: &mut Self::Context) -> Self::Result {
 		use schema::clients::dsl::*;
-		Ok(clients.find(&msg.0.0).select(volume).first::<f32>(&self.con).optional()?)
+		Ok(clients.find(&msg.0 .0).select(volume).first::<f32>(&self.con).optional()?)
 	}
 }
 
@@ -576,7 +577,7 @@ impl Handler<SetClientVolumeMsg> for DbHandler {
 	fn handle(&mut self, msg: SetClientVolumeMsg, _: &mut Self::Context) -> Self::Result {
 		use schema::clients::dsl::*;
 		let res =
-			diesel::update(clients.find(&msg.0.0)).set(volume.eq(msg.1)).execute(&self.con)?;
+			diesel::update(clients.find(&msg.0 .0)).set(volume.eq(msg.1)).execute(&self.con)?;
 		if res != 1 {
 			bail!("Failed to find client in database");
 		}
@@ -959,12 +960,10 @@ impl DbHandler {
 				Err(e) => warn!(logger, "Failed to save connection in database"; "error" => %e),
 				Ok(Err(e)) => warn!(logger, "Failed to save connection in database"; "error" => %e),
 				Ok(Ok(Some(msg))) => {
-					actix::spawn(ws.send(crate::connection::SetChannelListMsgMsg(msg)).map(
-						move |r| match r {
-							Err(e) => warn!(logger, "Failed to set update bookmark message";
-							"error" => %e),
-							Ok(()) => {}
-						},
+					actix::spawn(with_log!(
+						ws.send(crate::connection::SetChannelListMsgMsg(msg)),
+						logger,
+						"Failed to set update bookmark message"
 					));
 				}
 				Ok(Ok(None)) => {}
@@ -1096,7 +1095,9 @@ impl DbHandler {
 }
 
 impl<'a> EventHandler<'a> {
-	fn new(logger: &'a Logger, state: &'a QintState, con: &'a TsConnection, data: &'a TsData) -> Self {
+	fn new(
+		logger: &'a Logger, state: &'a QintState, con: &'a TsConnection, data: &'a TsData,
+	) -> Self {
 		Self { logger, state, con, data }
 	}
 
@@ -1208,14 +1209,17 @@ impl<'a> EventHandler<'a> {
 			Some(client) => self.handle_add_client(client, true),
 			None => {
 				if let Some(uid) = &invoker.uid {
-					self.handle_add_client_internal(true, ClientData {
-						name: invoker.name.clone(),
-						uid: uid.clone(),
-						icon: None,
-						avatar: None,
-						phonetic_name: None,
-						description: None,
-					})
+					self.handle_add_client_internal(
+						true,
+						ClientData {
+							name: invoker.name.clone(),
+							uid: uid.clone(),
+							icon: None,
+							avatar: None,
+							phonetic_name: None,
+							description: None,
+						},
+					)
 				} else {
 					Ok(())
 				}
@@ -1232,22 +1236,25 @@ impl<'a> EventHandler<'a> {
 		let icon = if client.icon.0 == 0 { None } else { Some(client.icon.0 as i32) };
 		let avatar =
 			if client.avatar_hash.is_empty() { None } else { Some(client.avatar_hash.clone()) };
-		self.handle_add_client_internal(create, ClientData {
-			name: client.name.clone(),
-			uid: client_uid,
-			icon,
-			avatar,
-			phonetic_name: if client.phonetic_name != "" {
-				Some(client.phonetic_name.clone())
-			} else {
-				None
+		self.handle_add_client_internal(
+			create,
+			ClientData {
+				name: client.name.clone(),
+				uid: client_uid,
+				icon,
+				avatar,
+				phonetic_name: if client.phonetic_name != "" {
+					Some(client.phonetic_name.clone())
+				} else {
+					None
+				},
+				description: if client.description != "" {
+					Some(client.description.clone())
+				} else {
+					None
+				},
 			},
-			description: if client.description != "" {
-				Some(client.description.clone())
-			} else {
-				None
-			},
-		})
+		)
 	}
 
 	fn handle_add_client_internal(&self, create: bool, client: ClientData) -> Result<()> {

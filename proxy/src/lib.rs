@@ -48,6 +48,18 @@ const SEARCH_FILENAME: &str = "search.db";
 // The build environment of qint.
 git_testament::git_testament!(TESTAMENT);
 
+#[macro_export]
+macro_rules! with_log {
+	($fut:expr, $logger:expr, $err:expr) => {{
+		let logger = $logger;
+		$fut.map(move |r| {
+			if let Err(e) = r {
+				error!(logger, $err; "error" => %e);
+			}
+		})
+	}};
+}
+
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct ConnectionId(pub Uuid);
 
@@ -218,47 +230,38 @@ impl QintState {
 		if let Some(ad) = &state.audio_data {
 			if let Some(v) = settings.get_loudness_threshold() {
 				if Some(v) != old_loudness_threshold {
-					let logger = state.logger.clone();
-					state.handle.spawn(ad.a2ts.send(audio::audio_to_ts::SetLoudnessThresholdMsg(v)).map(
-						move |r| {
-							if let Err(e) = r {
-								error!(logger, "Failed to apply loudness threshold";
-										"error" => %e);
-							}
-						},
+					state.handle.spawn(with_log!(
+						ad.a2ts.send(audio::audio_to_ts::SetLoudnessThresholdMsg(v)),
+						state.logger.clone(),
+						"Failed to apply loudness threshold"
 					));
 				}
 			}
 
 			if let Some(v) = settings.get_global_volume() {
 				if Some(v) != old_global_volume {
-					let logger = state.logger.clone();
-					state.handle.spawn(ad.ts2a.send(audio::ts_to_audio::SetGlobalVolumeMsg(v)).map(
-						move |r| {
-							if let Err(e) = r {
-								error!(logger, "Failed to apply global volume"; "error" => %e);
-							}
-						},
+					state.handle.spawn(with_log!(
+						ad.ts2a.send(audio::ts_to_audio::SetGlobalVolumeMsg(v)),
+						state.logger.clone(),
+						"Failed to apply global volume"
 					));
 				}
 			}
 
 			let (new_capture, new_playback) = settings.get_preferred_audio_device();
 			if old_capture != new_capture {
-				let logger = state.logger.clone();
-				state.handle.spawn(ad.a2ts.send(audio::SetAudioDevice(new_capture)).map(move |r| {
-					if let Err(e) = r {
-						error!(logger, "Failed to apply global volume"; "error" => %e);
-					}
-				}));
+				state.handle.spawn(with_log!(
+					ad.a2ts.send(audio::SetAudioDevice(new_capture)),
+					state.logger.clone(),
+					"Failed to set new capture device"
+				));
 			}
 			if old_playback != new_playback {
-				let logger = state.logger.clone();
-				state.handle.spawn(ad.ts2a.send(audio::SetAudioDevice(new_playback)).map(move |r| {
-					if let Err(e) = r {
-						error!(logger, "Failed to apply global volume"; "error" => %e);
-					}
-				}));
+				state.handle.spawn(with_log!(
+					ad.ts2a.send(audio::SetAudioDevice(new_playback)),
+					state.logger.clone(),
+					"Failed to set new playback device"
+				));
 			}
 		}
 
@@ -696,29 +699,21 @@ impl QintState {
 		let hotkeys = hotkey::Hotkeys::new()?;
 
 		if let Some(threshold) = settings.get_loudness_threshold() {
-			let logger = logger.clone();
 			if let Some(ad) = &audio_data {
-				handle.spawn(
-					ad.a2ts.send(audio::audio_to_ts::SetLoudnessThresholdMsg(threshold)).map(
-						move |r| {
-							if let Err(e) = r {
-								error!(logger, "Failed to apply loudness threshold"; "error" => %e);
-							}
-						},
-					),
-				);
+				handle.spawn(with_log!(
+					ad.a2ts.send(audio::audio_to_ts::SetLoudnessThresholdMsg(threshold)),
+					logger.clone(),
+					"Failed to apply loudness threshold"
+				));
 			}
 		}
 
 		if let Some(volume) = settings.get_global_volume() {
-			let logger = logger.clone();
 			if let Some(ad) = &audio_data {
-				handle.spawn(ad.ts2a.send(audio::ts_to_audio::SetGlobalVolumeMsg(volume)).map(
-					move |r| {
-						if let Err(e) = r {
-							error!(logger, "Failed to apply global volume"; "error" => %e);
-						}
-					},
+				handle.spawn(with_log!(
+					ad.ts2a.send(audio::ts_to_audio::SetGlobalVolumeMsg(volume)),
+					logger.clone(),
+					"Failed to apply global volume"
 				));
 			}
 		}

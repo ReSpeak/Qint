@@ -15,8 +15,8 @@ use tsclientlib::ClientId;
 use tsproto_packets::packets::InAudioBuf;
 
 use super::*;
-use crate::connection::{GetClientVolumeMsg, LoudnessesMsg, TalkersChangedMsg, QintConnection};
-use crate::ConnectionId;
+use crate::connection::{GetClientVolumeMsg, LoudnessesMsg, QintConnection, TalkersChangedMsg};
+use crate::{ConnectionId};
 
 type Id = (ConnectionId, ClientId);
 type AudioHandler = tsclientlib::audio::AudioHandler<Id>;
@@ -151,7 +151,11 @@ impl Handler<PlayMsg> for TsToAudio {
 					.get_queues()
 					.iter()
 					.filter_map(|((con, client), queue)| {
-						if *con == new_id.0 { Some((*client, queue.is_whispering())) } else { None }
+						if *con == new_id.0 {
+							Some((*client, queue.is_whispering()))
+						} else {
+							None
+						}
 					})
 					.collect();
 				if let Some(con) = cons.get(&new_id.0) {
@@ -290,7 +294,11 @@ impl AudioCallback for SdlCallback {
 					.get_queues()
 					.iter()
 					.filter_map(|((con, client), queue)| {
-						if *con == c { Some((*client, queue.is_whispering())) } else { None }
+						if *con == c {
+							Some((*client, queue.is_whispering()))
+						} else {
+							None
+						}
 					})
 					.collect();
 				if let Some(con) = cons.get(&c) {

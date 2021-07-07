@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate qint_proxy;
+
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 

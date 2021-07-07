@@ -8,14 +8,25 @@ use qint_proxy::{
 };
 use slog::{debug, error, Logger};
 
-pub struct WsBridge(pub Addr<Ws>);
+pub struct WsBridge {
+	pub logger: Logger,
+	pub ws: Addr<Ws>,
+}
 impl AppToFrontendBridge for WsBridge {
 	fn send(&self, msg: &MessageP2F) {
-		actix::spawn(self.0.send(SendToFrontendMsg(serde_json::to_string(msg).unwrap())).map(|_| ()));
+		actix::spawn(with_log!(
+			self.ws.send(SendToFrontendMsg(serde_json::to_string(msg).unwrap())),
+			self.logger.clone(),
+			"Failed to forward msg to frontend"
+		));
 	}
 
 	fn close(&self) {
-		actix::spawn(self.0.send(CloseMsg()).map(|_| ()));
+		actix::spawn(with_log!(
+			self.ws.send(CloseMsg()),
+			self.logger.clone(),
+			"Failed to send close msg to websocket"
+		));
 	}
 }
 
@@ -71,7 +82,11 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 					}
 				};
 				if let Some(qint_con) = &self.qint_con {
-					actix::spawn(qint_con.send(MessageF2PWrapper(msg)).map(|_| ()));
+					actix::spawn(with_log!(
+						qint_con.send(MessageF2PWrapper(msg)),
+						self.logger.clone(),
+						"Failed to forward message to proxy"
+					));
 				} else {
 					panic!("Connection was not yet set. How should we handle this?");
 				}
@@ -82,7 +97,11 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 			Ok(ws::Message::Close(_)) => {
 				debug!(self.logger, "Websocket closed");
 				if let Some(qint_con) = &self.qint_con {
-					actix::spawn(qint_con.send(DisconnectMsg).map(|_| ()));
+					actix::spawn(with_log!(
+						qint_con.send(DisconnectMsg),
+						self.logger.clone(),
+						"Failed to send disconnect msg to QintConnection"
+					));
 				}
 			}
 			_ => {}

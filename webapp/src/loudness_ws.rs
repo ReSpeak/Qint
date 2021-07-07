@@ -4,11 +4,11 @@ use actix::*;
 use actix_web_actors::ws;
 use futures::prelude::*;
 use qint_proxy::audio::audio_to_ts::LoudnessTrait;
-use slog::{warn, Logger};
+use slog::Logger;
 
 use crate::web::WebApp;
 use qint_proxy::connection::CaptureLoudnessMsg;
-use qint_proxy::{audio, QintState};
+use qint_proxy::{audio, with_log, QintState};
 
 pub(crate) struct LoudnessService {
 	state: Arc<QintState>,
@@ -27,12 +27,11 @@ struct LoudnessCallback {
 
 impl LoudnessTrait for LoudnessCallback {
 	fn send(&self, msg: CaptureLoudnessMsg) {
-		let logger = self.logger.clone();
-		tokio::spawn(self.addr.send(msg).map(move |r| {
-			if let Err(e) = r {
-				warn!(logger, "Failed to send loudness"; "error" => %e);
-			}
-		}));
+		actix::spawn(with_log!(
+			self.addr.send(msg),
+			self.logger.clone(),
+			"Failed to send loudness"
+		));
 	}
 
 	fn connected(&self) -> bool {
@@ -44,19 +43,13 @@ impl Actor for LoudnessService {
 	type Context = ws::WebsocketContext<Self>;
 	fn started(&mut self, ctx: &mut Self::Context) {
 		if let Some(ad) = &self.state.audio_data {
-			let logger = self.state.logger.clone();
-			actix::spawn(
-				ad.a2ts
-					.send(audio::audio_to_ts::AddLoudnessListenerMsg(Box::new(LoudnessCallback {
-						logger: logger.clone(),
-						addr: ctx.address(),
-					})))
-					.map(move |r| {
-						if let Err(e) = r {
-							warn!(logger, "Failed to add loudness listener: {}", e);
-						}
-					}),
-			);
+			actix::spawn(with_log!(
+				ad.a2ts.send(audio::audio_to_ts::AddLoudnessListenerMsg(Box::new(
+					LoudnessCallback { logger: self.state.logger.clone(), addr: ctx.address() }
+				))),
+				self.state.logger.clone(),
+				"Failed to add loudness listener"
+			));
 		}
 	}
 }

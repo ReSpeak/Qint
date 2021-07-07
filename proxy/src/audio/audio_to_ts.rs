@@ -17,7 +17,8 @@ use tsproto_packets::packets::{AudioData, CodecType, OutAudio, OutPacket};
 
 use super::*;
 //use crate::loudness_ws::LoudnessService;
-use crate::connection::{CaptureLoudnessMsg, SendPacketMsg, SetSelfTalkingMsg, QintConnection};
+use crate::connection::{CaptureLoudnessMsg, QintConnection, SendPacketMsg, SetSelfTalkingMsg};
+use crate::with_log;
 
 pub trait LoudnessTrait {
 	fn send(&self, msg: CaptureLoudnessMsg);
@@ -137,7 +138,11 @@ impl Handler<AddListenerMsg> for AudioToTs {
 		self.update_device_state();
 		if self.is_talking {
 			// Update is_talking for this connection
-			tokio::spawn(msg.0.send(SetSelfTalkingMsg(self.is_talking)));
+			actix::spawn(with_log!(
+				msg.0.send(SetSelfTalkingMsg(self.is_talking)),
+				self.logger.clone(),
+				"Failed to set self talking status"
+			));
 		}
 		debug!(self.logger, "Add listener");
 	}
@@ -149,7 +154,11 @@ impl Handler<RemoveListenerMsg> for AudioToTs {
 		debug!(self.logger, "Removing listener");
 		if self.is_talking {
 			// Update is_talking for this connection
-			tokio::spawn(msg.0.send(SetSelfTalkingMsg(false)));
+			actix::spawn(with_log!(
+				msg.0.send(SetSelfTalkingMsg(false)),
+				self.logger.clone(),
+				"Failed to set self talking status"
+			));
 		}
 		let r = self.connections.remove(&msg.0);
 		self.update_device_state();
@@ -196,20 +205,18 @@ impl Handler<PlayPacketMsg> for AudioToTs {
 				if !con.connected() {
 					false
 				} else {
-					let logger2 = logger.clone();
-					tokio::spawn(con.send(SendPacketMsg(packet.clone())).map(move |r| {
-						if let Err(e) = r {
-							warn!(logger2, "Failed to send audio packet"; "error" => %e);
-						}
-					}));
+					actix::spawn(with_log!(
+						con.send(SendPacketMsg(packet.clone())),
+						logger.clone(),
+						"Failed to send audio packet"
+					));
 
 					if let Some(loudness) = loudness {
-						let logger2 = logger.clone();
-						tokio::spawn(con.send(CaptureLoudnessMsg(loudness)).map(move |r| {
-							if let Err(e) = r {
-								warn!(logger2, "Failed to send loudness"; "error" => %e);
-							}
-						}));
+						actix::spawn(with_log!(
+							con.send(CaptureLoudnessMsg(loudness)),
+							logger.clone(),
+							"Failed to send loudness"
+						));
 					}
 
 					true
@@ -346,7 +353,11 @@ impl AudioToTs {
 
 	fn update_talking(&self) {
 		for con in &self.connections {
-			tokio::spawn(con.send(SetSelfTalkingMsg(self.is_talking)));
+			actix::spawn(with_log!(
+				con.send(SetSelfTalkingMsg(self.is_talking)),
+				self.logger.clone(),
+				"Failed to update self talking status"
+			));
 		}
 	}
 

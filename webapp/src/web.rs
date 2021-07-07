@@ -192,16 +192,15 @@ async fn create_ws(
 			Either::Left(HttpResponse::InternalServerError().body("Failed to start connection"))
 		}
 		Ok((addr, ws)) => {
-			let sender = WsBridge(addr.clone());
+			let sender = WsBridge { logger: state.logger.clone(), ws: addr.clone() };
 			let qint_con =
 				QintConnection::new(state.logger.clone(), (**state).clone(), id, Box::new(sender));
 			let qint_con = qint_con.start();
-			let logger = state.logger.clone();
-			actix::spawn(addr.send(SetConnectionMsg(qint_con.clone())).map(move |r| {
-				if let Err(e) = r {
-					error!(logger, "Failed to delayed inject con"; "error" => %e);
-				}
-			}));
+			actix::spawn(with_log!(
+				addr.send(SetConnectionMsg(qint_con.clone())),
+				state.logger.clone(),
+				"Failed to delayed inject con"
+			));
 			cons.insert(id, qint_con);
 			Either::Right(ws)
 		}
@@ -718,16 +717,13 @@ pub async fn graphiql() -> impl Responder {
 }
 
 #[post("/db")]
-pub async fn db_graphql(
+pub(crate) async fn db_graphql(
 	state: web::Data<Arc<QintState>>, req: web::Json<GraphQLRequest>,
-) -> impl Responder {
+) -> actix_web::Result<impl Responder> {
 	let res = req.execute(&state.graphql_schema, &*state).await;
+	let json_res = serde_json::to_string(&res)?;
 	let mut resp = if res.is_ok() { HttpResponse::Ok() } else { HttpResponse::BadRequest() };
-	if let Ok(json_res) = serde_json::to_string(&res) {
-		resp.content_type("application/json").body(json_res)
-	} else {
-		resp.finish()
-	}
+	Ok(resp.content_type("application/json").body(json_res))
 }
 
 /// Check the authentication token.

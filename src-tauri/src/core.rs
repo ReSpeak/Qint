@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
 use actix::prelude::*;
-use qint_proxy::FrontBridge;
+use futures::prelude::*;
 use qint_proxy::connection::MessageF2PWrapper;
 use qint_proxy::connection::QintConnection;
 use qint_proxy::messages::MessageF2P;
+use qint_proxy::with_log;
 use qint_proxy::ConnectionId;
+use qint_proxy::FrontBridge;
 use qint_proxy::QintState;
-use futures::prelude::*;
 use slog::warn;
 
 #[derive(Clone)]
@@ -70,6 +71,10 @@ impl Handler<DispatchWsMsg> for QintCore {
 			}
 		};
 
-		actix::spawn(con.send(MessageF2PWrapper(msg)).map(move |r| {}));
+		actix::spawn(with_log!(
+			con.send(MessageF2PWrapper(msg)),
+			self.state.logger.clone(),
+			"Failed to forward Message to Proxy"
+		));
 	}
 }

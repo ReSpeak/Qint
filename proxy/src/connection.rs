@@ -26,7 +26,7 @@ use tsproto_types::crypto::EccKeyPubP256;
 
 use crate::db::{ChannelListMsg, ChatId, ChatType, SetClientVolumeMsg};
 use crate::messages::{self, MessageF2P, MessageP2F, ResultDetails, ResultStruct};
-use crate::{audio, db, ConnectionId, FrontBridge, QintState};
+use crate::{ConnectionId, FrontBridge, QintState, audio, db, with_log};
 
 /// A websocket connection
 pub struct QintConnection {
@@ -220,12 +220,11 @@ impl QintConnection {
 		audio::audio_to_ts::AudioToTs: Handler<T>,
 	{
 		if let Some(ad) = &self.state.audio_data {
-			let logger = self.logger.clone();
-			actix::spawn(ad.a2ts.send(msg).map(move |r| {
-				if let Err(e) = r {
-					warn!(logger, "Failed to send audio to handler: {}", e);
-				}
-			}));
+			actix::spawn(with_log!(
+				ad.a2ts.send(msg),
+				self.logger.clone(),
+				"Failed to send audio to handler"
+			));
 		}
 	}
 
@@ -234,12 +233,11 @@ impl QintConnection {
 		audio::audio_to_ts::AudioToTs: Handler<T>,
 	{
 		if let Some(ad) = &self.state.audio_data {
-			let logger = self.logger.clone();
-			actix::spawn(ad.a2ts.send(msg).map(move |r| {
-				if let Err(e) = r {
-					warn!(logger, "Failed to send message to audio input handler: {}", e);
-				}
-			}));
+			actix::spawn(with_log!(
+				ad.a2ts.send(msg),
+				self.logger.clone(),
+				"Failed to send message to audio input handler"
+			));
 		}
 	}
 
@@ -753,7 +751,7 @@ impl QintConnection {
 										})
 										.collect::<Vec<_>>();
 									let state = self.state.clone();
-									tokio::spawn(async move {
+									actix::spawn(async move {
 										state
 											.send_each_con(cons.into_iter(), |con| {
 												if let Some(client) =
@@ -809,7 +807,7 @@ impl QintConnection {
 										})
 										.collect::<Vec<_>>();
 									let state = self.state.clone();
-									tokio::spawn(async move {
+									actix::spawn(async move {
 										state
 											.send_each_con(cons.into_iter(), |con| {
 												if let Some(client) =
