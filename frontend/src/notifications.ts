@@ -10,6 +10,8 @@ import { InMessage, Reason } from "./book_events";
 import { getClientIconPath, getIconPath, IconSourceLike } from "./ui/icon/tsIcons";
 import debug from "debug";
 import { NotificationCategory } from "./transientSettings";
+import { Moment } from "moment";
+import moment from "moment";
 const error = debug("error:NTFY");
 
 type NotificationArg =
@@ -24,6 +26,8 @@ type NotificationArg =
 	| undefined;
 
 export class TsNotification {
+	public date: Moment = moment();
+
 	constructor(
 		/** The string pieces */
 		public pieces: TemplateStringsArray,

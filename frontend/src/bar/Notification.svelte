@@ -7,6 +7,7 @@
 	import ClientName from "../ui/name/ClientName.svelte";
 	import ServerName from "../ui/name/ServerName.svelte";
 	import type { Invoker } from "../backend/ws";
+	import { LONG_DATETIME } from "../util";
 
 	export let connection: Connection;
 	export let notification: TsNotification;
@@ -32,6 +33,9 @@
 </script>
 
 <h6 class="title is-6">
+	<span class="date" title={notification.date.format(LONG_DATETIME)}>
+		{notification.date.format("HH:mm")}
+	</span>
 	<ServerName server={connection.book.server} {connection} />
 </h6>
 <div class="content">
@@ -66,6 +70,10 @@
 	.title.is-6 {
 		font-size: 0.8em;
 		margin-bottom: 0.1em;
+	}
+
+	.date {
+		font-weight: normal;
 	}
 
 	.unknown {
