@@ -131,7 +131,7 @@
 			if (isSending) return;
 			isSending = true;
 			const sel = $selected;
-			if (sel === undefined || sel.connection === undefined) return;
+			if (sel === undefined) return;
 			const textData = messageInput.getStructuredView();
 			if (textData.length === 0) return;
 			const channelId: ChannelId = get(sel.connection.book.ownClient)?.channel ?? "";

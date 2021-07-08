@@ -5,6 +5,7 @@
 	import ClientName from "../ui/name/ClientName.svelte";
 	import Message from "../chat/Message.svelte";
 	import type { MessageSearchResult } from "./uiSearch";
+	import { OfflineConnection } from "../connection";
 
 	export let content: MessageSearchResult;
 </script>
@@ -13,7 +14,10 @@
 	<div class="invoker-row">
 		<div class="invoker-icon chat-left-col">
 			{#if content.message.invoker}
-				<TsIcon type="client" source={content.message.invoker} server={content.server} />
+				<TsIcon
+					type="client"
+					source={content.message.invoker}
+					connection={new OfflineConnection(content.server)} />
 			{:else}
 				<Icon name={SERVER_ICON} />
 			{/if}

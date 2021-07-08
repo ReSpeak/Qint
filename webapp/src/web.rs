@@ -1,6 +1,5 @@
 use std::fs;
 use std::net::SocketAddr;
-use std::pin::Pin;
 use std::sync::Arc;
 
 use actix::prelude::*;
@@ -8,17 +7,16 @@ use actix_cors::Cors;
 use actix_files::Files;
 use actix_web::dev::{Service, ServiceResponse};
 use actix_web::middleware::Condition;
-use actix_web::web::Bytes;
 use actix_web::web::{Data, Query};
 use actix_web::*;
 
 use actix_web_actors::ws;
 use anyhow::{bail, Result};
 use futures::prelude::*;
-use futures::stream::Peekable;
 use http::{header::CACHE_CONTROL, header::ETAG, HeaderValue};
 use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
+use qint_proxy::filecache::guess_content_type;
 use tsproto_types::crypto::EccKeyPubP256;
 
 use rand::Rng;
@@ -318,40 +316,6 @@ fn result_details_gone() -> ResultDetails {
 	ResultDetails::from_desc("gone".into())
 }
 
-async fn guess_content_type<
-	E: Into<Error> + 'static,
-	S: Stream<Item = Result<Bytes, E>> + Unpin + 'static,
->(
-	stream: S,
-) -> (Peekable<S>, HttpResponseBuilder) {
-	let mut stream = stream.peekable();
-	let mut response = HttpResponse::Ok();
-	if let Some(Ok(r)) = Pin::new(&mut stream).peek().await {
-		// https://en.wikipedia.org/wiki/List_of_file_signatures
-		if r.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
-			response.content_type("image/png");
-		} else if r.starts_with(&[0xFF, 0xD8, 0xFF, 0xDB])
-			|| r.starts_with(&[0xFF, 0xD8, 0xFF, 0xE0])
-			|| r.starts_with(&[0xFF, 0xD8, 0xFF, 0xEE])
-		{
-			response.content_type("image/jpeg");
-		} else if r.windows(3).any(|w| w == b"svg") {
-			response.content_type("image/svg+xml");
-		} else if r.starts_with(&[0x42, 0x4D]) {
-			response.content_type("image/bmp");
-		} else if r.starts_with(&[0x47, 0x49, 0x46, 0x38, 0x37, 0x61])
-			|| r.starts_with(&[0x47, 0x49, 0x46, 0x38, 0x39, 0x61])
-		{
-			response.content_type("image/gif");
-		} else if r
-			.starts_with(&[0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6F, 0x6D])
-		{
-			response.content_type("video/mp4");
-		}
-	}
-	(stream, response)
-}
-
 #[get("/con/{id}/file/{channel}/{path:.*}")]
 async fn download_file(
 	state: web::Data<Arc<QintState>>, path: web::Path<(Uuid, u64, String)>,
@@ -359,6 +323,7 @@ async fn download_file(
 ) -> impl Responder {
 	let cons = state.connections.lock().unwrap();
 	let (id, channel, path) = path.into_inner();
+	let path = format!("/{}", path);
 	let channel = ChannelId(channel);
 	let GetFileOptions { dl, return_code, cache } = query_opt.into_inner();
 	if let Some(con) = cons.get(&ConnectionId(id)).cloned() {
@@ -376,20 +341,25 @@ async fn download_file(
 			}
 		};
 
-		let process_answer = |response: &mut HttpResponseBuilder, len: u64| {
+		let build_response = |len: u64, mime: Option<&str>| {
+			let mut response = HttpResponse::Ok();
 			response.no_chunking(len);
+			if let Some(mime) = mime {
+				response.content_type(mime);
+			}
 			if let Some(filename) = dl.as_ref() {
 				response.insert_header((
 					"Content-Disposition",
 					format!("attachment; filename=\"{}\"", filename),
 				));
 			}
+			response
 		};
 
 		if let Some((len, stream)) = state.file_cache.get_cached_file(&server, channel, &path).await
 		{
-			let (stream, mut response) = guess_content_type(stream).await;
-			process_answer(&mut response, len);
+			let (stream, mime) = guess_content_type(stream).await;
+			let mut response = build_response(len, mime);
 			return response.streaming(stream);
 		}
 
@@ -423,8 +393,8 @@ async fn download_file(
 
 		let stream =
 			FramedRead::new(file_stream, BytesCodec::new()).map(|r| r.map(web::BytesMut::freeze));
-		let (stream, mut response) = guess_content_type(stream).await;
-		process_answer(&mut response, len);
+		let (stream, mime) = guess_content_type(stream).await;
+		let mut response = build_response(len, mime);
 
 		// Cache for offline usage if smaller than 5 MiB
 		if cache && len < 5 * 1024 * 1024 {
@@ -539,8 +509,12 @@ async fn download_cache_file(
 	};
 	let channel = ChannelId(channel);
 	if let Some((len, stream)) = state.file_cache.get_cached_file(&server, channel, &path).await {
-		let (stream, mut response) = guess_content_type(stream).await;
+		let (stream, mime) = guess_content_type(stream).await;
+		let mut response = HttpResponse::Ok();
 		response.no_chunking(len);
+		if let Some(mime) = mime {
+			response.content_type(mime);
+		}
 		response.streaming(stream)
 	} else {
 		HttpResponse::NotFound().finish()

@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { CLIENT_ICON, SERVER_ICON } from "../util";
+	import { CLIENT_ICON } from "../util";
 	import Icon from "../ui/icon/Icon.svelte";
 	import TsIcon from "../ui/icon/TsIcon.svelte";
 	import ClientName from "../ui/name/ClientName.svelte";
 	import type { OtherSearchResult } from "./uiSearch";
 	import ServerName from "../ui/name/ServerName.svelte";
+	import { OfflineConnection } from "../connection";
 
 	export let content: OtherSearchResult;
 </script>
@@ -15,7 +16,7 @@
 			<TsIcon
 				type="channel"
 				source={content.Channel.channel}
-				server={content.Channel.server.publicKeyStr} />
+				connection={new OfflineConnection(content.Channel.server.publicKeyStr)} />
 		{:else if "Client" in content}
 			<!-- Icon of which server? -->
 			<Icon name={CLIENT_ICON} />
@@ -23,7 +24,7 @@
 			<TsIcon
 				type="server"
 				source={content.Server.server}
-				server={content.Server.server.publicKeyStr} />
+				connection={new OfflineConnection(content.Server.server.publicKeyStr)} />
 		{/if}
 	</div>
 	<div class="resultName has-text-weight-bold">
@@ -41,7 +42,7 @@
 			<TsIcon
 				type="server"
 				source={content.Channel.server}
-				server={content.Channel.server.publicKeyStr} />
+				connection={new OfflineConnection(content.Channel.server.publicKeyStr)} />
 			<ServerName server={content.Channel.server} />
 			<span class="serverAddress">({content.Channel.server.address})</span>
 		{:else if "Server" in content}

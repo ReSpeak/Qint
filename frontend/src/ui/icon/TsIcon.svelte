@@ -1,12 +1,10 @@
 <script lang="ts">
 	import Icon from "./Icon.svelte";
-	import { Connection } from "../../connection";
+	import type { IConnection } from "../../connection";
 	import { getClientIconPath } from "./tsIcons";
 	import type { IconSourceLike } from "./tsIcons";
 
-	// Either connection or server has to be set to fetch the icon
-	export let connection: Connection | undefined = undefined;
-	export let server: string | undefined = undefined;
+	export let connection: IConnection | undefined;
 	export let source: IconSourceLike | null | undefined;
 	export let type: "server" | "channel" | "client";
 
@@ -26,7 +24,13 @@
 			break;
 	}
 
-	$: iconPath = getClientIconPath(source, connection, server);
+	let iconPath: string | undefined;
+	$: {
+		if (connection)
+			getClientIconPath(connection, source).then(path => iconPath = path);
+		else
+			iconPath = undefined;
+	}
 </script>
 
 {#if iconPath}

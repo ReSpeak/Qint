@@ -8,6 +8,7 @@
 	import RenderedText from "../ui/specialized/RenderedText.svelte";
 	import type { NodeSelection } from "../app";
 	import type { LinksMap } from "../ui/specialized/uiRenderedText";
+	import { DDConnection } from "../connection";
 
 	export let unread: boolean = false;
 	export let message: Message;
@@ -24,7 +25,9 @@
 <div class="messageRow" class:unread>
 	<div class="hover-container" style="border-color:{message.clientColor};">
 		<div class="messageTime chat-left-col">
-			<span title={message.date.format(LONG_DATETIME)}> {message.date.format(timeFormat)} </span>
+			<span title={message.date.format(LONG_DATETIME)}>
+				{message.date.format(timeFormat)}
+			</span>
 		</div>
 		<!-- msg.status === MessageStatus::Sending -->
 		<!-- msg.status === MessageStatus::Error -->
@@ -36,8 +39,7 @@
 			class:viewRaw>
 			<div class="messageRendered">
 				<RenderedText
-					connection={nodeSel?.connection}
-					{server}
+					connection={new DDConnection(nodeSel?.connection, server)}
 					text={messageHighlightedContent || message.rendered}
 					bind:links />
 				{#each linksArr as { link, title } (link)}

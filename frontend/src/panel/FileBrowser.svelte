@@ -17,6 +17,7 @@
 	import type { FileTreeNode } from "../fileTreeCache";
 	import { extensionToIcon, formatBytes, pathJoin, pathSplit } from "./fileUtil";
 	import { assert, focus, on } from "../util";
+	import type { IConFileRequest } from "../backend/backend";
 
 	export let connection: Connection;
 	export let channelId: ChannelId;
@@ -105,9 +106,14 @@
 		const { row, dblclick } = evt.detail;
 		if (dblclick) {
 			if (row.isFile) {
-				const cachePathStr = getCachePath().join("/");
-				const fileUrl = `${connection.backend.serverFileSrc}/file/${cachePathStr}/${row.name}`;
-				fileIo.askDownload(fileUrl, row.name);
+				const filePath = pathJoin(...path, row.name);
+				const req: IConFileRequest = {
+					con: connection,
+					channel: channelId,
+					path: filePath,
+					cache: false,
+				};
+				fileIo.askDownload(req, row.name);
 			} else {
 				pushFolder(row.name);
 			}

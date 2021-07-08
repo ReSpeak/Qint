@@ -56,7 +56,8 @@
 	let showBigAvatar = false;
 
 	const serverGroups = connection.book.serverGroups;
-	$: avatarPath = getClientAvatarPath($client, connection);
+	let avatarPath: string | undefined;
+	$: getClientAvatarPath(connection, $client).then(path => avatarPath = path);
 	$: ownClient = client.id === connection.book.ownClientId;
 	$: {
 		if ($client.optionalData == null) getOptionalData();

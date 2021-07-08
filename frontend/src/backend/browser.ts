@@ -1,6 +1,6 @@
 import { InMsg, OutMsg } from "./ws";
 import { BASE_ADDRESS, createUuidV4 } from "../util";
-import { closedFn, errorFn, IBackend, IBackendConnection, IFetchLike, msgFn } from "./backend";
+import { closedFn, errorFn, IBackend, IBackendConnection, ICacheFileRequest, IFetchLike, IFileRequest, msgFn } from "./backend";
 import { urlToWebSocket } from "./backendUtil";
 
 export class BrowserBackend implements IBackend {
@@ -54,6 +54,13 @@ export class BrowserBackend implements IBackend {
 			body: JSON.stringify(diff),
 		});
 	}
+
+	public fetch_cache_image(req: ICacheFileRequest): Promise<string> {
+		let str = `${this.cacheFileSrc}/${req.server}/${req.channel}${req.path}`;
+		let hasQ = false;
+		if (req.hash) { str += (hasQ ? "&" : "?") + "hash=" + encodeURIComponent(req.hash); hasQ = true; }
+		return Promise.resolve(str);
+	}
 }
 
 export class BrowserBackendConnection implements IBackendConnection {
@@ -94,5 +101,13 @@ export class BrowserBackendConnection implements IBackendConnection {
 
 	public fetch(cmd: string, data: RequestInit): Promise<IFetchLike> {
 		return fetch(`${this.serverFileSrc}${cmd}`, data);
+	}
+
+	public fetch_image(req: IFileRequest): Promise<string> {
+		let str = `${this.serverFileSrc}/file/${req.channel}${req.path}`;
+		let hasQ = false;
+		if (req.cache) { str += (hasQ ? "&" : "?") + "cache=true"; hasQ = true; }
+		if (req.hash) { str += (hasQ ? "&" : "?") + "hash=" + encodeURIComponent(req.hash); hasQ = true; }
+		return Promise.resolve(str);
 	}
 }

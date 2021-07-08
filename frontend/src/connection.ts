@@ -3,7 +3,7 @@ import { get, writable, Writable, Readable } from "svelte/store";
 import { Book, Channel, ChatData, Client } from "./book";
 import { oneshot, fnBroadcast, LOUDNESS_MIN } from "./util";
 import { handleMessage } from "./notifications";
-import { backend, IBackendConnection } from "./backend/backend";
+import { backend, IBackendConnection, IFileRequest } from "./backend/backend";
 import { app } from "./app";
 import { ConnectData, MuteState } from "./connect/uiConnect";
 import { OChange, Reason, IMsgPluginCommandPart, TsError, IMsgServerLogPart } from "./book_events";
@@ -31,7 +31,11 @@ const ConnectionClosedResult: ResultDetails = {
 
 export type ChangePromise = Promise<ResultDetails | undefined>;
 
-export class Connection {
+export interface IConnection {
+	fileProvider(req: IFileRequest): Promise<string>;
+}
+
+export class Connection implements IConnection {
 	private readonly _state = writable(new ConnectionState());
 	private curReturnCode = 0;
 	private returnCodes = new Map<string, ResultPromise>();
@@ -92,6 +96,10 @@ export class Connection {
 					}
 				});
 			});
+	}
+
+	public fileProvider(req: IFileRequest): Promise<string> {
+		return this.backend.fetch_image(req);
 	}
 
 	public getState(): Readonly<ConnectionState> {
@@ -407,8 +415,8 @@ export class Connection {
 								// Reset chat if the selected node is from this client.
 								app.selectedNode.update((n) =>
 									n?.connection === this &&
-									n.node instanceof Client &&
-									n.node.id === id
+										n.node instanceof Client &&
+										n.node.id === id
 										? undefined
 										: n
 								);
@@ -573,6 +581,37 @@ export class Connection {
 	}
 }
 
+export class OfflineConnection implements IConnection {
+	constructor(
+		public server: string
+	) {
+
+	}
+
+	public fileProvider(req: IFileRequest): Promise<string> {
+		return backend.fetch_cache_image({ server: this.server, ...req});
+	}
+}
+
+// Dynamic dispatch
+// Just for transitioning to a better architecture
+export class DDConnection implements IConnection {
+	private offlineConnection: OfflineConnection | undefined;
+	constructor(
+		public connection: Connection | undefined,
+		server: string | undefined
+	) {
+		if (!connection && !server) throw new Error("Missing connection data");
+		if (server) this.offlineConnection = new OfflineConnection(server);
+	}
+
+	public fileProvider(req: IFileRequest): Promise<string> {
+		if (this.connection) return this.connection.fileProvider(req);
+		else if (this.offlineConnection) return this.offlineConnection.fileProvider(req);
+		throw new Error("Missing connection data");
+	}
+}
+
 export enum ConnectionStateEnum {
 	Uninitialized,
 	Connecting,
@@ -642,8 +681,7 @@ export class ConnectionState {
 
 	private throwTransition(newState: ConnectionStateEnum): never {
 		throw Error(
-			`Cannot transition this connection from '${ConnectionStateEnum[this.rawState]}' to ${
-				ConnectionStateEnum[newState]
+			`Cannot transition this connection from '${ConnectionStateEnum[this.rawState]}' to ${ConnectionStateEnum[newState]
 			}`
 		);
 	}

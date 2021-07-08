@@ -10,7 +10,7 @@
 	import type { ITreeNode } from "../book";
 	import UiClient from "./ClientWrap.svelte";
 	import UiChannel from "./ChannelWrap.svelte";
-	import { Connection } from "../connection";
+	import { Connection, DDConnection } from "../connection";
 	import { draggable, DragData, MouseButton } from "../ui/util/draggable";
 	import { findParent, assert, flash, focus, render_updates } from "../util";
 	import { SpacerType } from "./tree";
@@ -241,7 +241,7 @@
 				class:spacer={spacerType !== SpacerType.None}
 				on:click={() => (collapsed = !collapsed)}>
 				<Icon name="chevron-right{collapsed ? '' : ' mdi-rotate-90'}" />
-				<TsIcon type="channel" source={$channel} {connection} {server} />
+				<TsIcon type="channel" source={$channel} connection={new DDConnection(connection, server)} />
 			</button>
 			<span
 				class:spacerC={spacerType === SpacerType.CSpacer ||

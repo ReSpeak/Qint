@@ -8,9 +8,10 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use actix_web::web::{self, Buf, Bytes};
+use bytes::{Buf, Bytes, BytesMut};
 use anyhow::Result;
 use futures::prelude::*;
+use futures::stream::Peekable;
 use slog::{debug, error, Logger};
 use tokio::fs;
 use tokio::io::AsyncWrite;
@@ -39,9 +40,13 @@ struct FileWriter<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin> {
 }
 
 impl FileCache {
-	pub fn new(logger: Logger, cache_path: PathBuf) -> Self { Self { logger, cache_path } }
+	pub fn new(logger: Logger, cache_path: PathBuf) -> Self {
+		Self { logger, cache_path }
+	}
 
-	fn path_encode(data: &[u8]) -> String { base64::encode_config(data, base64::URL_SAFE_NO_PAD) }
+	fn path_encode(data: &[u8]) -> String {
+		base64::encode_config(data, base64::URL_SAFE_NO_PAD)
+	}
 
 	fn get_path(&self, server: &EccKeyPubP256, channel: ChannelId, path: &str) -> PathBuf {
 		let mut p = self.cache_path.clone();
@@ -102,7 +107,7 @@ impl FileCache {
 			}
 			Ok(file) => {
 				let stream =
-					FramedRead::new(file, BytesCodec::new()).map(|r| r.map(web::BytesMut::freeze));
+					FramedRead::new(file, BytesCodec::new()).map(|r| r.map(BytesMut::freeze));
 				Some((meta.len(), stream))
 			}
 		}
@@ -166,4 +171,38 @@ impl<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin> Stream for FileWri
 			}
 		}
 	}
+}
+
+pub async fn guess_content_type<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin + 'static>(
+	stream: S,
+) -> (Peekable<S>, Option<&'static str>) {
+	let mut stream = stream.peekable();
+	let mime = if let Some(Ok(r)) = Pin::new(&mut stream).peek().await {
+		// https://en.wikipedia.org/wiki/List_of_file_signatures
+		if r.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
+			Some("image/png")
+		} else if r.starts_with(&[0xFF, 0xD8, 0xFF, 0xDB])
+			|| r.starts_with(&[0xFF, 0xD8, 0xFF, 0xE0])
+			|| r.starts_with(&[0xFF, 0xD8, 0xFF, 0xEE])
+		{
+			Some("image/jpeg")
+		} else if r.windows(3).any(|w| w == b"svg") {
+			Some("image/svg+xml")
+		} else if r.starts_with(&[0x42, 0x4D]) {
+			Some("image/bmp")
+		} else if r.starts_with(&[0x47, 0x49, 0x46, 0x38, 0x37, 0x61])
+			|| r.starts_with(&[0x47, 0x49, 0x46, 0x38, 0x39, 0x61])
+		{
+			Some("image/gif")
+		} else if r
+			.starts_with(&[0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6F, 0x6D])
+		{
+			Some("video/mp4")
+		} else {
+			None
+		}
+	} else {
+		None
+	};
+	(stream, mime)
 }

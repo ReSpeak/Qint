@@ -1,7 +1,7 @@
 import { InMsg, OutMsg } from "./ws";
 import { BASE_ADDRESS, createUuidV4 } from "../util";
-import { closedFn, errorFn, IBackend, IBackendConnection, IFetchLike, msgFn } from "./backend";
-import { emit, listen } from "@tauri-apps/api/event";
+import { closedFn, errorFn, IBackend, IBackendConnection, ICacheFileRequest, IFetchLike, IFileRequest, msgFn } from "./backend";
+import { listen } from "@tauri-apps/api/event";
 import { urlToWebSocket } from "./backendUtil";
 import debug from "debug";
 import { invoke } from "@tauri-apps/api/tauri";
@@ -32,7 +32,48 @@ class FetchLike implements IFetchLike {
 	}
 }
 
-export class TauriBackend implements IBackend {
+
+class ImageTracking {
+	private trackedImages: Map<string, string | Promise<string>> = new Map();
+
+	protected async fetchImgInternal(ep: string, req: IFileRequest, con: string) {
+		const key = reqAsKey(req);
+		let url = this.trackedImages.get(key);
+		if (url === undefined) {
+			const task = (async () => {
+				const response = await invoke<GetFileResponse>(ep, {
+					req: {
+						con,
+						channel: req.channel,
+						path: req.path,
+						hash: req.hash,
+						cache: req.cache,
+					}
+				});
+				const buffer = new Uint8Array(response.data);
+				const blob = new Blob([buffer], {
+					type: response.mime,
+				});
+				url = URL.createObjectURL(blob);
+				return url;
+			})();
+			this.trackedImages.set(key, task);
+			url = await task;
+			this.trackedImages.set(key, url);
+			return url;
+
+		} else {
+			return await url;
+		}
+	}
+
+	protected releaseImages() {
+		this.trackedImages.forEach(async (v) => URL.revokeObjectURL(await v));
+		this.trackedImages.clear();
+	}
+}
+
+export class TauriBackend extends ImageTracking implements IBackend {
 	public name = "Tauri";
 	public cacheFileSrc: string;
 	public readonly wsBaseAddress: string = urlToWebSocket(BASE_ADDRESS);
@@ -40,6 +81,7 @@ export class TauriBackend implements IBackend {
 	private connections: Map<string, TauriBackendConnection> = new Map();
 
 	constructor() {
+		super();
 		log("Using tauri backend");
 		this.cacheFileSrc = `${BASE_ADDRESS}/filecache`;
 
@@ -107,15 +149,20 @@ export class TauriBackend implements IBackend {
 	public async set_settings(diff: Record<string, unknown>): Promise<void> {
 		await invoke("set_settings", { diff });
 	}
+
+	public async fetch_cache_image(req: ICacheFileRequest): Promise<string> {
+		return await this.fetchImgInternal("get_cache_file", req, req.server);
+	}
 }
 
-export class TauriBackendConnection implements IBackendConnection {
+export class TauriBackendConnection extends ImageTracking implements IBackendConnection {
 	public serverFileSrc: string;
 	public id: string;
 	onMsg?: msgFn;
 	onClose?: closedFn;
 
 	constructor() {
+		super();
 		this.serverFileSrc = "";
 		this.id = createUuidV4();
 	}
@@ -124,32 +171,47 @@ export class TauriBackendConnection implements IBackendConnection {
 		this.onMsg = onMsg;
 		this.onClose = onClose;
 
-		invoke("create_ws", { uuid: this.id });
+		await invoke("create_ws", { uuid: this.id });
 		log("create_ws %j", this.id);
 
 		this.serverFileSrc = `${BASE_ADDRESS}/con/${this.id}`;
 	}
 
-	public send(data: OutMsg): void {
+	public async send(data: OutMsg): Promise<void> {
 		const i: TauriMsgF2P = {
 			connection: this.id,
 			msg: { Msg: data },
 		};
-		invoke("pass_ws_msg", i);
+		await invoke("pass_ws_msg", i);
 		log("pass_ws_msg %j", i);
 	}
 
-	public close(): void {
+	public async close(): Promise<void> {
 		const i: TauriMsgF2P = {
 			connection: this.id,
 			msg: "Close",
 		};
-		invoke("pass_ws_msg", i);
-		log("close %j", i);
+		log("closing %j", i);
+		this.releaseImages();
+		await invoke("pass_ws_msg", i);
 		this.id = createUuidV4();
+		log("closed %j", i);
 	}
 
 	public async fetch(cmd: string, data: RequestInit): Promise<IFetchLike> {
 		return fetch(`${this.serverFileSrc}${cmd}`, data);
 	}
+
+	public async fetch_image(req: IFileRequest): Promise<string> {
+		return await this.fetchImgInternal("get_file", req, this.id);
+	}
+}
+
+
+function reqAsKey(req: IFileRequest | ICacheFileRequest): string {
+	return `${req.channel}/${req.path}`;
+}
+interface GetFileResponse {
+	data: ArrayLike<number>;
+	mime: string | undefined;
 }

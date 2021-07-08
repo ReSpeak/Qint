@@ -165,6 +165,10 @@ fn main() {
 			cmd::db,
 			cmd::get_settings,
 			cmd::set_settings,
+			cmd::get_file,
+			cmd::get_cache_file,
+			cmd::download_file,
+			cmd::upload_file,
 		])
 		.run(tauri::generate_context!())
 		.map_err(|e| format_err!("tauri error: {}", e))

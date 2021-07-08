@@ -214,7 +214,7 @@
 		</form>
 	</div>
 
-	<FileIO bind:this={fileIo} useDownload={false} on:uploadRequest={clickImportIdentity} />
+	<FileIO bind:this={fileIo} on:uploadRequest={clickImportIdentity} />
 </TabSlot>
 
 <style lang="scss">

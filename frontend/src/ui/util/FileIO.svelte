@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { IConFileRequest } from "../../backend/backend";
 	import { createEventDispatcher, tick } from "svelte";
 
 	let useUpload = false;
@@ -11,11 +12,12 @@
 		uploadRequest: FileList;
 	}>();
 
-	export async function askDownload(src: string, fileName?: string | null) {
+	export async function askDownload(req: IConFileRequest, fileName?: string | null) {
 		if (!useDownload) {
 			useDownload = true;
 			await tick();
 		}
+		let src = await req.con.fileProvider(req); // TODO not for tauri
 		let link = src;
 		if (fileName === undefined || fileName !== null) {
 			let dlName: string;

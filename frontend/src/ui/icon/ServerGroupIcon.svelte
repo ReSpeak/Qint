@@ -1,18 +1,16 @@
 <script lang="ts">
 	import Icon from "./Icon.svelte";
-	import { Connection } from "../../connection";
+	import type { Connection } from "../../connection";
 	import { getIconPath, DummyStore } from "./tsIcons";
 	import { ServerGroup } from "../../book";
 	import type { ServerGroupId } from "../../ts";
 
 	export let id: ServerGroupId;
-	// Either connection or server has to be set to fetch the icon
 	export let connection: Connection;
-	export let server: string | undefined = undefined;
 
 	const sgs = connection.book.serverGroups;
 	$: seg = $sgs.get(id) ?? DummyStore;
-	$: iconPath = getIconPath($seg, connection, server) ?? "";
+	$: iconPromise = getIconPath(connection, $seg) ?? "";
 	let name: string | undefined;
 	$: {
 		const group = $seg;
@@ -24,17 +22,19 @@
 	}
 </script>
 
-{#if iconPath}
-	<span title={name} class="serverGroupIcon">
-		{#if iconPath.startsWith("alpha")}
-			<Icon name={iconPath} />
-		{:else}
-			<span class="icon">
-				<img src={iconPath} alt="" />
-			</span>
-		{/if}
-	</span>
-{/if}
+{#await iconPromise then iconPath}
+	{#if iconPath}
+		<span title={name} class="serverGroupIcon">
+			{#if iconPath.startsWith("alpha")}
+				<Icon name={iconPath} />
+			{:else}
+				<span class="icon">
+					<img src={iconPath} alt="" />
+				</span>
+			{/if}
+		</span>
+	{/if}
+{/await}
 
 <style>
 	img {

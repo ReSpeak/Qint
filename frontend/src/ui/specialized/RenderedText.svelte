@@ -6,11 +6,10 @@
 	import { onMount } from "svelte";
 	import { parseTsScheme, schemeToLink } from "./uiRenderedText";
 	import type { LinksMap } from "./uiRenderedText";
-	import type { Connection } from "../../connection";
+	import type { IConnection } from "../../connection";
 	import { extensionToIcon } from "../../panel/fileUtil";
 
-	export let connection: Connection | undefined;
-	export let server: string | undefined = undefined;
+	export let connection: IConnection;
 	export let text: string;
 	export let links: LinksMap = new Map();
 
@@ -56,16 +55,14 @@
 
 			const scheme = parseTsScheme(href);
 			if (scheme?.scheme === "ts3file") {
-				let proxyFileSrc = schemeToLink(connection, server, scheme);
-				if (proxyFileSrc === null) {
-					a.parentElement?.removeChild(a);
-					continue;
-				}
 				hasDownload = true;
 				a.classList.add("file_download");
 				a.onclick = function (e) {
 					e.preventDefault();
-					fileIo.askDownload(proxyFileSrc!, scheme.attrs.filename);
+					let proxyFileSrc = schemeToLink(connection, scheme);
+					if (proxyFileSrc !== null) {
+						fileIo.askDownload(proxyFileSrc, scheme.attrs.filename);
+					}
 				};
 				a.insertAdjacentHTML(
 					"afterbegin",
@@ -84,27 +81,30 @@
 		// process ts3file links
 		for (const img of obj.querySelectorAll("img")) {
 			const src = img.src;
-			let imageSrc = src;
 			if (!src) continue;
-			const scheme = parseTsScheme(src);
-			if (scheme !== null) {
-				// Cache images in text fields
-				let proxyFileSrc = schemeToLink(connection, server, scheme);
-				if (connection !== undefined) proxyFileSrc += "?cache=true";
-				if (proxyFileSrc === null) {
-					img.parentElement?.removeChild(img);
-					continue;
-				} else {
-					imageSrc = proxyFileSrc;
-					img.src = proxyFileSrc;
-					img.dataset.qintimg = src;
-				}
-			}
+
 			img.classList.add("limitChatSize", "previewImg", "padTop");
 			img.onclick = () => {
-				showBigSrc = imageSrc;
+				showBigSrc = img.src;
 				showBig = true;
 			};
+			img.dataset.qintimg = src;
+
+			const scheme = parseTsScheme(src);
+			if (scheme !== null) {
+				const req = schemeToLink(connection, scheme);
+				if (req !== null) {
+					req.con.fileProvider(req).then((proxyFileSrc) => {
+						if (proxyFileSrc === null) {
+							img.parentElement?.removeChild(img);
+						} else {
+							img.src = proxyFileSrc;
+						}
+					}).catch(err => {
+						console.warn("Failed to load", err, req);
+					});
+				}
+			}
 		}
 
 		if (links.size > 0) {

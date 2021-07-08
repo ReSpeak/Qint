@@ -48,8 +48,8 @@ export class App {
 				const name =
 					s.connection.book.server.name ?? get(s.connection.connectOptions).address;
 				backend.setTitle(name + " – Qint");
-				const iconPath = getIconPath(s.connection.book.server, s.connection);
-				backend.setIcon(iconPath);
+				getIconPath(s.connection, s.connection.book.server)
+					.then(iconPath => backend.setIcon(iconPath));
 			} else {
 				backend.setTitle("Qint");
 				backend.setIcon(undefined);

@@ -909,7 +909,7 @@ function handleInMessage(con: Connection, msg: InMessage, handler: NotificationH
 	}
 }
 
-function defaultNotificationHandler(
+async function defaultNotificationHandler(
 	con: Connection,
 	_e: InMsg | InBookMsg | InMessage,
 	category: NotificationCategory,
@@ -940,8 +940,8 @@ function defaultNotificationHandler(
 	if (settings.notification && Notification.permission === "granted") {
 		//  By default, set server name as title, tts as content and server as icon
 		const iconPath = notification?.icon
-			? getClientIconPath(notification.icon, con)
-			: getIconPath(con.book.server, con);
+			? await getClientIconPath(con, notification.icon)
+			: await getIconPath(con, con.book.server);
 		const options = {
 			body:
 				notification === undefined

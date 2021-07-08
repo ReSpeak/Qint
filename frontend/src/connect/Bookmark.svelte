@@ -4,12 +4,18 @@
 	import { Bookmark } from "./uiBookmark";
 	import { ConnectData } from "./uiConnect";
 	import { app } from "../app";
+	import { OfflineConnection } from "../connection";
 
 	export let connectData: ConnectData;
 	export let bookmark: Bookmark;
 	let error: string | undefined = undefined;
 	let fullAddress: string;
+	let connection: OfflineConnection | undefined;
 	$: {
+		connection =
+			bookmark.server !== null
+				? new OfflineConnection(bookmark.server.urlBase64PublicKey)
+				: undefined;
 		fullAddress = bookmark.address ?? "";
 		if (bookmark.channel !== null) fullAddress += "/" + bookmark.channel.fullPath;
 	}
@@ -49,10 +55,7 @@
 	title={bookmark.server?.name}
 	class:bookmark={bookmark.bookmark}>
 	<div class="bookmarkIcon">
-		<TsIcon
-			type="server"
-			source={{ icon: bookmark.server?.icon }}
-			server={bookmark.server?.urlBase64PublicKey} />
+		<TsIcon type="server" source={{ icon: bookmark.server?.icon }} {connection} />
 	</div>
 	<div class="bookmarkName">{bookmark.name || bookmark.server?.name}</div>
 	<div class="bookmarkInfo" title={bookmark.lastUsed?.format(LONG_DATETIME)}>

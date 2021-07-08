@@ -1,3 +1,4 @@
+import { IConnection } from "../connection";
 import { IS_TAURI } from "../util";
 import { BrowserBackend } from "./browser";
 import { TauriBackend } from "./tauri";
@@ -23,6 +24,7 @@ export interface IBackend {
 
 	get_settings(): Promise<Record<string, unknown>>;
 	set_settings(diff: Record<string, unknown>): Promise<void>;
+	fetch_cache_image(img: ICacheFileRequest): Promise<string>;
 }
 
 export interface IBackendConnection {
@@ -32,11 +34,31 @@ export interface IBackendConnection {
 	connect(onMsg: msgFn, onError: errorFn, onClose: closedFn): Promise<void>;
 	close(): void;
 	fetch(cmd: string, data?: RequestInit): Promise<IFetchLike>;
+	fetch_image(img: IFileRequest): Promise<string>;
 }
 
 export interface IFetchLike {
 	json(): Promise<any>;
 	text(): Promise<string>;
+}
+
+export interface IFileRequest {
+	channel: string;
+	path: string;
+	hash?: string;
+	cache: boolean;
+}
+
+export interface IConFileRequest extends IFileRequest {
+	con: IConnection;
+}
+export interface ICacheFileRequest extends IFileRequest {
+	server: string;
+}
+
+export const enum ImageProvider {
+	Server,
+	Cache,
 }
 
 export const backend: IBackend = IS_TAURI ? new TauriBackend() : new BrowserBackend();

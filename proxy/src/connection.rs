@@ -1016,7 +1016,7 @@ impl Handler<DownloadFile> for QintConnection {
 				}
 			};
 
-			let handle = match con.download_file(msg.channel, &format!("/{}", msg.path), None, None)
+			let handle = match con.download_file(msg.channel, &msg.path, None, None)
 			{
 				Ok(r) => r,
 				Err(e) => {

@@ -229,7 +229,7 @@
 		</form>
 	</div>
 
-	<FileIO bind:this={fileIo} useDownload={false} on:uploadRequest={clickImportPlugin} />
+	<FileIO bind:this={fileIo} on:uploadRequest={clickImportPlugin} />
 </TabSlot>
 
 <style lang="scss">

@@ -9,11 +9,10 @@ description = "Qint is a TeamSpeak client"
 actix = "0.12"
 actix-rt = "2"
 actix-service = "2"
-# Exclude zstd from dependencies because a newer version is pulled in by tauri and milli
-actix-web = { version = "=4.0.0-beta.8", default-features = false, features = ["compress-brotli", "cookies"] }
 anyhow = "1"
 audiopus = "0.2"
 base64 = "0.13"
+bytes = "1"
 chacha20poly1305 = "0.8"
 chrono = { version = "0.4", features = [ "serde" ] }
 cookie = "0.15"
