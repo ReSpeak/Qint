@@ -68,8 +68,9 @@
 	<div class="is-horizontal field">
 		<div class="control">
 			<DropDown
+				items={[...hotkeySubjects.keys()]}
+				display={(i) => hotkeySubjects.get(i) ?? "<?>"}
 				on:change={onDropdownChange}
-				items={hotkeySubjects}
 				bind:selected={selectedSubject} />
 		</div>
 		<div class="control">

@@ -6,7 +6,7 @@
 	import Slider from "../../ui/html/Slider.svelte";
 
 	const synthSett = app.transientSettings.synth;
-	const voices = synthSett.getVoices();
+	const voices = synthSett._voices;
 	let previewText!: HTMLInputElement;
 
 	function syncSettings() {
@@ -22,8 +22,9 @@
 <TabSlot title="Text to Speech">
 	<KeyValue label="Voice" labelStyle="is-normal">
 		<DropDown
-			items={voices}
+			items={$voices}
 			display={(v) => v.name}
+			compare={(a, b) => a.voiceURI === b?.voiceURI}
 			bind:selected={synthSett.voice}
 			on:change={() => syncSettings()} />
 	</KeyValue>

@@ -37,10 +37,9 @@
 	const LOUDNESS_HEIGHT = 300;
 	const LOUDNESS_COUNT = 500;
 
-	let useDefaultCapture = audioSett.capture === null;
-	let useDefaultPlayback = audioSett.playback === null;
-	let captureDevices: string[] = [];
-	let playbackDevices: string[] = [];
+	type DeviceList = [null, ...string[]];
+	let captureDevices: DeviceList = [null];
+	let playbackDevices: DeviceList = [null];
 	let selectedCaptureDevice: string | null = audioSett.capture;
 	let selectedPlaybackDevice: string | null = audioSett.playback;
 
@@ -82,15 +81,13 @@
 			method: "GET",
 		});
 		const list = (await req.json()) as { capture: string[]; playback: string[] };
-		captureDevices = list.capture;
-		playbackDevices = list.playback;
+		captureDevices = [null, ...list.capture];
+		playbackDevices = [null, ...list.playback];
 	}
 
 	function changeAudioDevice() {
-		if (useDefaultCapture) audioSett.capture = null;
-		else audioSett.capture = selectedCaptureDevice;
-		if (useDefaultPlayback) audioSett.playback = null;
-		else audioSett.playback = selectedPlaybackDevice;
+		audioSett.capture = selectedCaptureDevice;
+		audioSett.playback = selectedPlaybackDevice;
 		syncSettingsImmediately();
 	}
 
@@ -132,50 +129,18 @@
 
 <TabSlot title="Audio" bind:selected>
 	<KeyValue label="Capture Device">
-		<div class="field is-horizontal">
-			<div class="field-label toggleDefaultSwitch">
-				<input
-					type="checkbox"
-					class="checkbox-switch is-info"
-					bind:checked={useDefaultCapture}
-					on:change={changeAudioDevice} />
-			</div>
-			<div class="field-body">
-				<div class="field is-narrow">
-					{#if useDefaultCapture}
-						<span>Using default device</span>
-					{:else}
-						<DropDown
-							items={captureDevices}
-							bind:selected={selectedCaptureDevice}
-							on:change={changeAudioDevice} />
-					{/if}
-				</div>
-			</div>
-		</div>
+		<DropDown
+			items={captureDevices}
+			display={(d) => (d === null ? "System Default" : d)}
+			bind:selected={selectedCaptureDevice}
+			on:change={changeAudioDevice} />
 	</KeyValue>
 	<KeyValue label="Playback Device">
-		<div class="field is-horizontal">
-			<div class="field-label toggleDefaultSwitch">
-				<input
-					type="checkbox"
-					class="checkbox-switch is-info"
-					bind:checked={useDefaultPlayback}
-					on:change={changeAudioDevice} />
-			</div>
-			<div class="field-body">
-				<div class="field is-narrow">
-					{#if useDefaultPlayback}
-						<span>Using default device</span>
-					{:else}
-						<DropDown
-							items={playbackDevices}
-							bind:selected={selectedPlaybackDevice}
-							on:change={changeAudioDevice} />
-					{/if}
-				</div>
-			</div>
-		</div>
+		<DropDown
+			items={playbackDevices}
+			display={(d) => (d === null ? "System Default" : d)}
+			bind:selected={selectedPlaybackDevice}
+			on:change={changeAudioDevice} />
 	</KeyValue>
 
 	<KeyValue label="Global Volume">

@@ -14,7 +14,7 @@
 	let slot: HTMLElement | undefined;
 
 	onMount(() => {
-		if (slot) {
+		if (slot && labelId) {
 			const inputField = slot.querySelector("input");
 			if (inputField) {
 				inputField.id = labelId;

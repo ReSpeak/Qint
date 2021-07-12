@@ -257,6 +257,7 @@
 							<DropDown
 								items={identities}
 								display={(i) => i.name}
+								compare={(a, b) => a.id === b?.id}
 								bind:selected={identity}
 								on:change={onIdentityChange} />
 						{/if}

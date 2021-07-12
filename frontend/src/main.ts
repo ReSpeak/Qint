@@ -18,6 +18,7 @@ if (localStorage.getItem("debug") === null) debug.enable("error:*");
 };
 console.log("BUILD", BUILD_ENV, BUILD_DAT);
 console.log(`Using ${backend.name} backend`);
+app.transientSettings.synth.init();
 
 window.onbeforeunload = function (e: any) {
 	app.transientSettings.flush();

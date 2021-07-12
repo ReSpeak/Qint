@@ -1,12 +1,11 @@
 import { Hotkey, HotkeyAction, HotkeySubject } from "../../transientSettings";
 
-type Option<T> = Readonly<{ value: T | ""; text: string }>;
-export const hotkeySubjects: readonly Option<HotkeySubject>[] = [
-	{ value: "", text: "" },
-	{ value: "Away", text: "Away" },
-	{ value: "InputMute", text: "Mute Input" },
-	{ value: "OutputMute", text: "Mute Output" },
-];
+export const hotkeySubjects: ReadonlyMap<HotkeySubject | null, string> = new Map([
+	[null, ""],
+	["Away", "Away"],
+	["InputMute", "Mute Input"],
+	["OutputMute", "Mute Output"],
+]);
 
 export function isHotkeyComplete(hotkey: Hotkey): boolean {
 	return hotkey.keycode != null && hotkey.action != null;

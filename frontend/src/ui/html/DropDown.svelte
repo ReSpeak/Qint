@@ -1,51 +1,45 @@
 <svelte:options immutable={true} />
 
 <script lang="ts">
-	import { hasProperty } from "../../util";
 	import { createEventDispatcher, onMount } from "svelte";
-	type DDObjElement = { value: any };
-	export let items: readonly unknown[];
-	export let selected: unknown = undefined;
-	export let display: (item: any) => string = displayFn;
+
+	type T = $$Generic;
+
+	export let items: ReadonlyArray<T>;
+	export let selected: T | undefined = undefined;
+	export let display: (item: T) => string = displayFn;
+	export let compare: (a: T, sel: T | undefined) => boolean = compareFn;
 	export let id: string | undefined = undefined;
 	let dd: HTMLSelectElement;
-	const dispatch = createEventDispatcher<{ change: any }>();
+	const dispatch = createEventDispatcher<{ change: T }>();
 
 	$: selectedToIndex(selected);
 
-	function selectedToIndex(selected: any) {
+	function selectedToIndex(selected: T | undefined) {
 		if (dd == null || items.length === 0) return;
-		if (hasProperty(items[0], "value")) {
-			const index = (items as DDObjElement[]).findIndex((it) => it.value === selected);
-			if (index === -1) return;
-			dd.selectedIndex = index;
-		} else {
-			const newIndex = (items as string[]).findIndex((i) => i === selected);
-			if (newIndex !== -1) {
-				dd.selectedIndex = newIndex;
-			}
+		const newIndex = items.findIndex((i) => compare(i, selected));
+		if (newIndex !== -1) {
+			dd.selectedIndex = newIndex;
 		}
 	}
 
 	function indexToSelected() {
 		if (dd == null || dd.selectedIndex >= items.length) return;
 		const pickedItem = items[dd.selectedIndex];
-		if (hasProperty(pickedItem, "value")) {
-			selected = (pickedItem as DDObjElement).value;
-		} else {
-			selected = pickedItem;
-		}
+		selected = pickedItem;
 		dispatch("change", selected);
 	}
 
-	function displayFn(item: any): string {
+	function displayFn(item: T): string {
 		if (typeof item === "string") {
 			return item;
-		} else if ("text" in item) {
-			return item.text;
 		} else {
 			return String(item);
 		}
+	}
+
+	function compareFn(a: T, sel: T | undefined): boolean {
+		return a === sel;
 	}
 
 	onMount(() => {

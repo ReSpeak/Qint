@@ -1,4 +1,4 @@
-import { get, writable } from "svelte/store";
+import { get, Writable, writable } from "svelte/store";
 import { debounced, deep_diff, deep_merge } from "./util";
 import { backend } from "./backend/backend";
 import { NodeSelection } from "./app";
@@ -71,6 +71,7 @@ export class TransientSettingsSynth {
 	public voiceId?: string;
 	public volume: number = 1;
 	public speed: number = 1;
+	public readonly _voices: Writable<SpeechSynthesisVoice[]> = writable([]);
 	private _voiceIdCache?: string;
 	private _voiceCache?: SpeechSynthesisVoice;
 	private _previousUtter: SpeechSynthesisUtterance | undefined;
@@ -78,7 +79,7 @@ export class TransientSettingsSynth {
 		if (this._voiceIdCache !== this.voiceId) {
 			const synth = window.speechSynthesis;
 			if (synth) {
-				const voices = synth.getVoices();
+				const voices = get(this._voices);
 				this._voiceCache =
 					voices.find((v) => v.voiceURI === this.voiceId) ?? voices.find(() => true);
 				this._voiceIdCache = this.voiceId;
@@ -106,7 +107,8 @@ export class TransientSettingsSynth {
 
 	private getNewUtter(): SpeechSynthesisUtterance {
 		const utter = new SpeechSynthesisUtterance();
-		if (this.voice) utter.voice = this.voice;
+		const voice = this.voice;
+		if (voice) utter.voice = voice;
 		if (this.speed !== undefined) utter.rate = this.speed;
 		if (this.volume !== undefined) utter.volume = this.volume;
 		return utter;
@@ -133,12 +135,19 @@ export class TransientSettingsSynth {
 		}
 	}
 
-	public getVoices(): SpeechSynthesisVoice[] {
+	// See https://stackoverflow.com/questions/21513706/getting-the-list-of-voices-in-speechsynthesis-web-speech-api
+	public init(): void {
 		const synth = window.speechSynthesis;
 		if (synth) {
-			return synth.getVoices();
-		} else {
-			return [];
+			// TTS has multiple weirdinesses on different browsers.
+			// We need to call `getVoices()` once for some browsers to start loading available voices
+			// And in case the voices are then set (or updated) register for the list
+			synth.onvoiceschanged = () => { 
+				this._voiceCache = undefined;
+				this._voiceIdCache = undefined;
+				this._voices.set(synth.getVoices()); 
+			}
+			this._voices.set(synth.getVoices());
 		}
 	}
 }
