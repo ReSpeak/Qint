@@ -28,11 +28,11 @@ git -C tsclientlib checkout origin/master
 git -C tsclientlib submodule update --init --recursive
 
 echo ">>> Testing"
-cd ~/Qint/proxy
+cd ~/Qint/webapp
 #cargo test --release
 
 echo ">>> Building"
-cd ~/Qint/proxy
+cd ~/Qint/webapp
 RUSTFLAGS="-C link-args=-lssp -C link-args=-s" cargo build --release --target=x86_64-pc-windows-gnu
 
 cd ~/Qint/frontend
@@ -43,13 +43,14 @@ echo ">>> Packaging"
 cd ~
 rm -rf ~/Qint/target/publish
 mkdir -p ~/Qint/target/publish/ui
-cp ~/Qint/target/x86_64-pc-windows-gnu/release/qint-proxy.exe ~/Qint/target/publish/
+cp ~/Qint/target/x86_64-pc-windows-gnu/release/webapp.exe ~/Qint/target/publish/
 #cp ~/Qint/target/x86_64-pc-windows-gnu/release/WebView2Loader.dll ~/Qint/target/publish/
 cp ~/Qint/proxy-codegen/SDL2.dll ~/Qint/target/publish/
 cp /usr/lib/gcc/x86_64-w64-mingw32/10-win32/libssp-0.dll ~/Qint/target/publish/
 cp -r ~/Qint/frontend/dist/* ~/Qint/target/publish/ui/
 cd ~/Qint/target/publish/
 rm ~/out/Qint.zip
-zip ~/out/Qint.zip ui qint-proxy.exe libssp-0.dll SDL2.dll -r -9
+mv webapp.exe qint.exe
+zip ~/out/Qint.zip ui qint.exe libssp-0.dll SDL2.dll -r -9
 
 echo ">>> Done!"
