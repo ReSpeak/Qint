@@ -66,7 +66,8 @@ impl FileCache {
 			return file.left_stream();
 		}
 
-		debug!(self.logger, "Caching file {}/{} -> {:?}", channel.0, path, filepath);
+		debug!(self.logger, "Caching file"; "channel" => channel.0, "path" => %path,
+			"localpath" => ?filepath);
 		match fs::File::create(&filepath).await {
 			Ok(r) => FileWriter::new(file, r, filepath).right_stream(),
 			Err(e) => {
@@ -94,7 +95,7 @@ impl FileCache {
 		&self, server: &EccKeyPubP256, channel: ChannelId, path: &str,
 	) -> Option<(u64, impl Stream<Item = Result<Bytes, std::io::Error>>)> {
 		let filepath = self.get_path(server, channel, path);
-		let meta = match fs::metadata(&path).await {
+		let meta = match fs::metadata(&filepath).await {
 			Ok(r) => r,
 			Err(e) => {
 				debug!(self.logger, "File not in cache"; " filepath" => ?filepath, "error" => %e);
@@ -107,7 +108,8 @@ impl FileCache {
 				None
 			}
 			Ok(file) => {
-				debug!(self.logger, "Found cached file {}/{} -> {:?}", channel.0, path, filepath; "meta" => ?meta);
+				debug!(self.logger, "Found cached file"; "channel" => channel.0, "path" => %path,
+					"localpath" => ?filepath, "meta" => ?meta);
 				let stream =
 					FramedRead::new(file, BytesCodec::new()).map(|r| r.map(BytesMut::freeze));
 				Some((meta.len(), stream))

@@ -129,6 +129,7 @@ impl<'a> JsInMessages<'a> {
 			"ChannelListFinished",
 			"ChannelPasswordChanged",
 			"ChannelDescriptionChanged",
+			"ChannelPermList",
 			"ClientChatClosed",
 			"ClientChatComposing",
 			"FiletransferStatus",
@@ -138,6 +139,7 @@ impl<'a> JsInMessages<'a> {
 			"Filetransfer",
 			"OfflineMessage",
 			"OfflineMessageList",
+			"PermList",
 			"ServerLog",
 		];
 
@@ -393,7 +395,7 @@ impl JsStructs {
 
 trait RustTypeExt {
 	fn fmt_ts(&self, f: &mut fmt::Formatter) -> fmt::Result;
-	fn fmt_ts_opts(&self, f: &mut fmt::Formatter, convert: bool) -> fmt::Result;
+	fn fmt_ts_opts(&self, f: &mut fmt::Formatter, convert: bool, null: bool) -> fmt::Result;
 	fn peel_opt(&self) -> &Self;
 }
 
@@ -402,10 +404,11 @@ trait RustTypeExt {
 /// As these are mostly used as ids, we store them as strings instead. Benchmarks showed that
 /// comparing strings is also faster than comparing numbers.
 impl RustTypeExt for InnerRustType {
-	fn fmt_ts(&self, f: &mut fmt::Formatter) -> fmt::Result { self.fmt_ts_opts(f, true) }
+	fn fmt_ts(&self, f: &mut fmt::Formatter) -> fmt::Result { self.fmt_ts_opts(f, true, true) }
 
 	/// If `convert` is `true`, use `Moment` for `OffsetDateTime` instead of the rust type.
-	fn fmt_ts_opts(&self, f: &mut fmt::Formatter, convert: bool) -> fmt::Result {
+	/// If `null` is `true`, `Option`s are `null`, if it if false, `Option`s are `undefined`.
+	fn fmt_ts_opts(&self, f: &mut fmt::Formatter, convert: bool, null: bool) -> fmt::Result {
 		match self {
 			Self::Struct(s)
 				if s == "str" || s == "String" || s == "IpAddr" || s == "SocketAddr" =>
@@ -423,24 +426,28 @@ impl RustTypeExt for InnerRustType {
 			Self::Primitive(s) if s == "OffsetDateTime" && convert => write!(f, "Moment")?,
 			Self::Primitive(s) if s == "Duration" && !convert => write!(f, "RustDuration")?,
 			Self::Primitive(s) | Self::Struct(s) => write!(f, "{}", s)?,
-			Self::Ref(i) | Self::Cow(i) => i.fmt_ts_opts(f, convert)?,
+			Self::Ref(i) | Self::Cow(i) => i.fmt_ts_opts(f, convert, null)?,
 			Self::Option(i) => {
-				i.fmt_ts_opts(f, convert)?;
-				write!(f, " | null")?;
+				i.fmt_ts_opts(f, convert, null)?;
+				if null {
+					write!(f, " | null")?;
+				} else {
+					write!(f, " | undefined")?;
+				}
 			}
 			Self::Map(k, v) => {
 				write!(f, "Record<")?;
-				k.fmt_ts_opts(f, convert)?;
+				k.fmt_ts_opts(f, convert, null)?;
 				write!(f, ", ")?;
-				v.fmt_ts_opts(f, convert)?;
+				v.fmt_ts_opts(f, convert, null)?;
 				write!(f, ">")?;
 			}
 			Self::Set(i) => {
-				i.fmt_ts_opts(f, convert)?;
+				i.fmt_ts_opts(f, convert, null)?;
 				write!(f, "[]")?;
 			}
 			Self::Vec(i) => {
-				i.fmt_ts_opts(f, convert)?;
+				i.fmt_ts_opts(f, convert, null)?;
 				write!(f, "[]")?;
 			}
 		}

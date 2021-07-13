@@ -1,14 +1,14 @@
 import { ResultDetails, OutMsg, InMsg } from "./backend/ws";
 import { get, writable, Writable, Readable } from "svelte/store";
 import { Book, Channel, ChatData, Client } from "./book";
-import { oneshot, fnBroadcast, LOUDNESS_MIN } from "./util";
+import { oneshot, fnBroadcast, LOUDNESS_MIN, Lazy } from "./util";
 import { handleMessage } from "./notifications";
 import { backend, IBackendConnection, IFileRequest } from "./backend/backend";
 import { app } from "./app";
 import { ConnectData, MuteState } from "./connect/uiConnect";
-import { OChange, Reason, IMsgPluginCommandPart, TsError, IMsgServerLogPart } from "./book_events";
+import { OChange, Reason, IMsgPluginCommandPart, TsError, IMsgServerLogPart, IMsgPermListPart, IMsgChannelPermListPart } from "./book_events";
 import moment from "moment";
-import { ChannelId, ClientId } from "./ts";
+import { ChannelId, ClientId, Permission, PermissionDescription } from "./ts";
 import { FileTreeCache } from "./fileTreeCache";
 import { FiletransferManager } from "./panel/filetransferManager";
 import debug from "debug";
@@ -39,17 +39,20 @@ export class Connection implements IConnection {
 	private readonly _state = writable(new ConnectionState());
 	private curReturnCode = 0;
 	private returnCodes = new Map<string, ResultPromise>();
+	private permListResult: IMsgPermListPart[] | undefined;
 	public get state(): Readable<ConnectionState> {
 		return this._state;
 	}
 
 	public readonly book: Book = new Book();
+	public readonly channelPermCache: Writable<IMsgChannelPermListPart[]> = writable([]);
 	public readonly fileTreeCache: Writable<FileTreeCache> = writable(new FileTreeCache());
 	public readonly filetransferManager: FiletransferManager = new FiletransferManager(this);
 	public backend: IBackendConnection;
 
 	public readonly loudness: Writable<number> = writable(0);
 	public readonly connectOptions: Writable<ConnectData>;
+	public readonly permList: Lazy<Promise<Map<Permission, PermissionDescription>>>;
 	public pluginCmd = fnBroadcast<[IMsgPluginCommandPart]>();
 	public serverLogCmd = fnBroadcast<[IMsgServerLogPart[]]>();
 
@@ -96,6 +99,25 @@ export class Connection implements IConnection {
 					}
 				});
 			});
+		this.permList = new Lazy(async () => {
+			await this.sendChange({ ServerPermListRequest: {} });
+			if (this.permListResult === undefined) {
+				console.error("Failed to get permission list");
+				return new Map();
+			}
+			let res: Map<Permission, PermissionDescription> = new Map();
+			let i = 1;
+			for (const perm of this.permListResult) {
+				if (perm.permissionName !== undefined) {
+					res.set(i, {
+						name: perm.permissionName,
+						description: perm.permissionDescription,
+					});
+					i++;
+				}
+			}
+			return res;
+		});
 	}
 
 	public fileProvider(req: IFileRequest): Promise<string> {
@@ -549,12 +571,16 @@ export class Connection implements IConnection {
 			if ("ChannelListFinished" in message) {
 				this._state.update((s) => s.setChannelListFinished());
 				this.updateAllUnreadCounts();
+			} else if ("ChannelPermList" in message) {
+				this.channelPermCache.set(message.ChannelPermList);
 			} else if ("FileList" in message) {
 				this.fileTreeCache.update((ftc) => ftc.applyFileList(message));
 			} else if ("PluginCommand" in message) {
 				message.PluginCommand.forEach((pc) => this.pluginCmd(pc));
 			} else if ("ServerLog" in message) {
 				this.serverLogCmd(message.ServerLog);
+			} else if ("PermList" in message) {
+				this.permListResult = message.PermList;
 			}
 		} else if ("TalkersChanged" in msg) {
 			this.book.talkersHandler(msg.TalkersChanged);

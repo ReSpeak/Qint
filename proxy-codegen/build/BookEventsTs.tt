@@ -209,7 +209,7 @@ export interface IMsg<#= msg.name #>Part {
 <# for a in &msg.attributes {
 	let field = self.messages.get_field(a);
 	let rust_type = field.get_type(a)?; #>
-	<#= field.pretty.to_mixed_case() #>: <# rust_type.inner.fmt_ts_opts(_fmt, false)?; #>;
+	<#= field.pretty.to_mixed_case() #>: <# rust_type.inner.fmt_ts_opts(_fmt, false, false)?; #>;
 	<# if self.has_render(&msg.name, &field.pretty) { #>
 	<#= field.pretty.to_mixed_case() #>Rendered: string<# if rust_type.is_opt() { #> | null<# } #>;
 <# }
@@ -254,7 +254,7 @@ export interface OChange<#= get_prefixed_name(e) #> {
 		match r {
 			RuleKind::ArgumentMap { .. } |
 			RuleKind::ArgumentFunction { .. } => { #>
-		<#= r.from_name().to_mixed_case() #>: <# r.get_type().inner.fmt_ts_opts(_fmt, false)?; #>;
+		<#= r.from_name().to_mixed_case() #>: <# r.get_type().inner.fmt_ts_opts(_fmt, false, true)?; #>;
 			<# }
 			_ => {}
 		}
@@ -263,7 +263,7 @@ export interface OChange<#= get_prefixed_name(e) #> {
 	// Event Props
 	for r in &e.rules {
 		#>
-		<#= r.from_name().to_mixed_case() #>?: <# r.get_type_no_option().inner.fmt_ts_opts(_fmt, false)?; #>;
+		<#= r.from_name().to_mixed_case() #>?: <# r.get_type_no_option().inner.fmt_ts_opts(_fmt, false, true)?; #>;
 	<# }
 #>
 	};

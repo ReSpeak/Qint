@@ -27,6 +27,7 @@
 	import type { Duration } from "moment";
 	import ChangeResult from "../ui/specialized/ChangeResult.svelte";
 	import ImageFileBrowser from "./ImageFileBrowser.svelte";
+	import ChannelPermissions from "./ChannelPermissions.svelte";
 
 	export let connection: Connection;
 	export let channel: Channel;
@@ -68,7 +69,8 @@
 	let chanEditMaxFamilyClientsMode: MaxClientsMode;
 	let chanEditMaxFamilyClientsLimit: number;
 	let changeRequest: ChangePromise | undefined;
-	let iconSelection: string | undefined = undefined;
+	let iconSelection: string | undefined;
+	let uiPermissions: ChannelPermissions | undefined;
 
 	$: descRequest = requestDescription($channel);
 
@@ -196,6 +198,26 @@
 					id: channel.id,
 					permissionName: "i_icon_id",
 					value: parseInt(newIcon) >> 0, // Cast to signed i32, icon ids are u32s but permission values are i32s
+				},
+			});
+		}
+
+		// Permissions
+		let { added, removed } = uiPermissions!.getDiff();
+		for (const perm of added) {
+			changeRequest = connection.sendChange({
+				ChannelAddPerm: {
+					id: channel.id,
+					permissionId: perm.permissionId,
+					value: perm.permissionValue,
+				},
+			});
+		}
+		for (const perm of removed) {
+			changeRequest = connection.sendChange({
+				ChannelDelPerm: {
+					id: channel.id,
+					permissionId: perm,
 				},
 			});
 		}
@@ -470,15 +492,15 @@
 			{/await}
 		{/if}
 	</div>
+	{#if editing}
+		<StickySlot>Permissions</StickySlot>
+		<ChannelPermissions bind:this={uiPermissions} {connection} {channel} />
+	{/if}
 </StickyList>
 
 <style lang="scss">
 	.description {
 		margin: 1em;
-
-		:global(.editbox) {
-			height: 100%;
-		}
 	}
 
 	.disabled {

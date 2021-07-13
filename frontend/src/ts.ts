@@ -37,6 +37,11 @@ export enum MaxClientsMode {
 	Limited = "Limited",
 }
 
+export interface PermissionDescription {
+	name: string;
+	description: string | undefined;
+}
+
 export type MaxClients = "Inherited" | "Unlimited" | { Limited: number };
 export type OffsetDateTime = [number, number];
 export type RustDuration = [number, number];
