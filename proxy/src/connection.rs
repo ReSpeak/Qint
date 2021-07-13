@@ -1256,7 +1256,6 @@ impl<R: 'static, F: FnOnce(&mut QintConnection) -> R> Handler<RunOnConMsg<R, F>>
 impl Handler<MessageF2PWrapper> for QintConnection {
 	type Result = ();
 	fn handle(&mut self, msg: MessageF2PWrapper, ctx: &mut Self::Context) -> Self::Result {
-		println!("CutomWsMsg {:?}", msg.0);
 		self.handle_ws_message(msg.0, ctx);
 	}
 }

@@ -60,14 +60,15 @@ impl FileCache {
 		&self, server: &EccKeyPubP256, channel: ChannelId, path: &str,
 		file: impl Stream<Item = Result<Bytes, std::io::Error>> + Unpin,
 	) -> impl Stream<Item = Result<Bytes, std::io::Error>> {
-		let path = self.get_path(server, channel, path);
-		if let Err(e) = fs::create_dir_all(&path.parent().unwrap()).await {
+		let filepath = self.get_path(server, channel, path);
+		if let Err(e) = fs::create_dir_all(&filepath.parent().unwrap()).await {
 			error!(self.logger, "Failed to create cache directory"; "error" => %e);
 			return file.left_stream();
 		}
 
-		match fs::File::create(&path).await {
-			Ok(r) => FileWriter::new(file, r, path).right_stream(),
+		debug!(self.logger, "Caching file {}/{} -> {:?}", channel.0, path, filepath);
+		match fs::File::create(&filepath).await {
+			Ok(r) => FileWriter::new(file, r, filepath).right_stream(),
 			Err(e) => {
 				error!(self.logger, "Failed to create cache file"; "error" => %e);
 				file.left_stream()
@@ -92,20 +93,21 @@ impl FileCache {
 	pub async fn get_cached_file(
 		&self, server: &EccKeyPubP256, channel: ChannelId, path: &str,
 	) -> Option<(u64, impl Stream<Item = Result<Bytes, std::io::Error>>)> {
-		let path = self.get_path(server, channel, path);
+		let filepath = self.get_path(server, channel, path);
 		let meta = match fs::metadata(&path).await {
 			Ok(r) => r,
 			Err(e) => {
-				debug!(self.logger, "File not in cache"; " path" => ?path, "error" => %e);
+				debug!(self.logger, "File not in cache"; " filepath" => ?filepath, "error" => %e);
 				return None;
 			}
 		};
-		match fs::File::open(&path).await {
+		match fs::File::open(&filepath).await {
 			Err(e) => {
 				error!(self.logger, "Failed to open cached file"; "error" => %e);
 				None
 			}
 			Ok(file) => {
+				debug!(self.logger, "Found cached file {}/{} -> {:?}", channel.0, path, filepath; "meta" => ?meta);
 				let stream =
 					FramedRead::new(file, BytesCodec::new()).map(|r| r.map(BytesMut::freeze));
 				Some((meta.len(), stream))
