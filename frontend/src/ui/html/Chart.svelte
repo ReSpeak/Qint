@@ -43,7 +43,9 @@
 	let chart: Chart;
 
 	export function updateChart(): void {
-		chart.update();
+		// chartjs does not always update everything when using animations,
+		// so disable them
+		chart.update("none");
 	}
 
 	onMount(() => {

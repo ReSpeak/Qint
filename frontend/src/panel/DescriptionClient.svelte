@@ -209,7 +209,7 @@
 	function chartRefresh() {
 		addChartValue(
 			chartConfig.data.datasets[0].data,
-			client.connectionData ? client.connectionData.ping?.asMilliseconds() : undefined
+			client.connectionData?.ping?.asMilliseconds()
 		);
 		addChartValue(
 			chartConfig.data.datasets[1].data,
