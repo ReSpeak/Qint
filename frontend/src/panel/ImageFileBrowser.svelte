@@ -7,6 +7,7 @@
 	import { base64Encode, javaHash, on, tsHexDecode } from "../util";
 	import ImageModal from "../chat/ImageModal.svelte";
 	import FileIO from "../ui/util/FileIO.svelte";
+	import DeleteConfirmButton from "../ui/util/DeleteConfirmButton.svelte";
 
 	export let connection: Connection;
 	export let path: string[];
@@ -273,29 +274,7 @@
 			</button>
 		{/if}
 		{#if canDelete}
-			<div class="field has-addons">
-				{#if currentState === WorkState.DeletingFiles}
-					<p class="control">
-						<button class="button" on:click={() => (currentState = WorkState.None)}>
-							<Icon name="close" />
-						</button>
-					</p>
-					<p class="control">
-						<button class="button is-danger" on:click={deleteFiles}>
-							<Icon name="delete-alert" />
-						</button>
-					</p>
-				{:else}
-					<p class="control">
-						<button
-							disabled={fileSelection.length === 0}
-							class="button is-danger is-outlined"
-							on:click={() => (currentState = WorkState.DeletingFiles)}>
-							<Icon name="delete" />
-						</button>
-					</p>
-				{/if}
-			</div>
+			<DeleteConfirmButton disabled={fileSelection.length === 0} on:delete={deleteFiles} />
 		{/if}
 	</div>
 

@@ -18,6 +18,7 @@
 	import { extensionToIcon, formatBytes, pathJoin, pathSplit } from "./fileUtil";
 	import { assert, focus, on } from "../util";
 	import type { IConFileRequest } from "../backend/backend";
+	import DeleteConfirmButton from "../ui/util/DeleteConfirmButton.svelte";
 
 	export let connection: Connection;
 	export let channelId: ChannelId;
@@ -392,29 +393,7 @@
 			on:click={clickEditFile}>
 			<Icon name="pen" />
 		</button>
-		<div class="field has-addons">
-			{#if currentState === WorkState.DeletingFiles}
-				<p class="control">
-					<button class="button" on:click={() => (currentState = WorkState.None)}>
-						<Icon name="close" />
-					</button>
-				</p>
-				<p class="control">
-					<button class="button is-danger" on:click={deleteFiles}>
-						<Icon name="delete-alert" />
-					</button>
-				</p>
-			{:else}
-				<p class="control">
-					<button
-						disabled={fileSelection.length === 0}
-						class="button is-danger is-outlined"
-						on:click={() => (currentState = WorkState.DeletingFiles)}>
-						<Icon name="delete" />
-					</button>
-				</p>
-			{/if}
-		</div>
+		<DeleteConfirmButton disabled={fileSelection.length === 0} on:delete={deleteFiles} />
 	</div>
 
 	<nav class="breadcrumb" aria-label="path">
