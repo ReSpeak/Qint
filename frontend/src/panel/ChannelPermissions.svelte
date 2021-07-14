@@ -26,8 +26,8 @@
 		"i_ft_needed_directory_create_power",
 	];
 
+	const permissions = connection.channelPermCache;
 	let loadPermissions: ChangePromise | undefined;
-	let permissions = connection.channelPermCache;
 	let permissionList: [Permission, PermissionDescription][] = [];
 	let uiPermissions: PermissionList;
 

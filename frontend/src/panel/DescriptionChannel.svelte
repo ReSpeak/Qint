@@ -203,7 +203,7 @@
 		}
 
 		// Permissions
-		let { added, removed } = uiPermissions!.getDiff();
+		const { added, removed } = uiPermissions!.getDiff();
 		for (const perm of added) {
 			changeRequest = connection.sendChange({
 				ChannelAddPerm: {

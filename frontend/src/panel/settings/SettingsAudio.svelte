@@ -187,8 +187,4 @@
 		display: flex;
 		align-items: center;
 	}
-
-	.toggleDefaultSwitch {
-		flex-grow: 0;
-	}
 </style>

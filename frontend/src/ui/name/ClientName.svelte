@@ -12,9 +12,8 @@
 	let name: string = "";
 
 	function refreshClient(cl: ClientBase) {
-		let data, name;
-		data = cl.uid ?? cl.name;
-		name = cl.name;
+		const data = cl.uid ?? cl.name;
+		const name = cl.name;
 		return [getDataColor(data), name];
 	}
 

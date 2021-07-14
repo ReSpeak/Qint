@@ -59,7 +59,7 @@
 				a.classList.add("file_download");
 				a.onclick = function (e) {
 					e.preventDefault();
-					let proxyFileSrc = schemeToLink(connection, scheme);
+					const proxyFileSrc = schemeToLink(connection, scheme);
 					if (proxyFileSrc !== null) {
 						fileIo.askDownload(proxyFileSrc, scheme.attrs.filename);
 					}

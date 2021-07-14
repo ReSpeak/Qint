@@ -21,9 +21,9 @@
 
 	// Get changes from original permission state
 	export function getDiff(): PermissionDiff {
-		let added: InPermissionData[] = [];
-		let removed: Permission[] = [];
-		let allPerms = new Set(permissionList.map(([perm, _desc]) => perm));
+		const added: InPermissionData[] = [];
+		const removed: Permission[] = [];
+		const allPerms = new Set(permissionList.map(([perm, _desc]) => perm));
 		for (const perm of permissions) {
 			const newPerm = allPermissions[perm.permissionId];
 			if (isDefault(newPerm))

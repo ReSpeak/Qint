@@ -17,7 +17,7 @@
 			useDownload = true;
 			await tick();
 		}
-		let src = await req.con.fileProvider(req); // TODO not for tauri
+		const src = await req.con.fileProvider(req); // TODO not for tauri
 		let link = src;
 		if (fileName === undefined || fileName !== null) {
 			let dlName: string;

@@ -105,7 +105,7 @@ export class Connection implements IConnection {
 				console.error("Failed to get permission list");
 				return new Map();
 			}
-			let res: Map<Permission, PermissionDescription> = new Map();
+			const res: Map<Permission, PermissionDescription> = new Map();
 			let i = 1;
 			for (const perm of this.permListResult) {
 				if (perm.permissionName !== undefined) {
