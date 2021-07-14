@@ -513,19 +513,7 @@
 
 <style lang="scss">
 	@import "../style/global_mixin";
-
-	.padBox {
-		padding: 1em;
-		display: flex;
-		flex-direction: column;
-		height: 100%;
-		min-height: 0;
-		position: relative;
-
-		:global(.dropTarget) {
-			background-color: $highlight-strong;
-		}
-	}
+	@import "./fileBrowser";
 
 	.upIcon {
 		@include linkLike;
@@ -550,34 +538,6 @@
 			display: flex;
 			font-weight: bold;
 		}
-	}
-
-	.noFiles {
-		text-align: center;
-	}
-
-	.fileDropOverlay {
-		position: absolute;
-		z-index: 1;
-		top: 0;
-		bottom: 0;
-		left: 0;
-		right: 0;
-
-		background-color: rgba(50, 50, 50, 0.5);
-		padding: 2em;
-	}
-
-	.fileDropInnerBorder {
-		display: flex;
-		justify-content: center;
-		align-items: center;
-
-		border: 0.5em rgb(60, 60, 60) dashed;
-		width: 100%;
-		height: 100%;
-		border-radius: 3em;
-		pointer-events: none;
 	}
 
 	// Table formatting helper
