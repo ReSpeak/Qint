@@ -72,6 +72,7 @@ struct UpdateBookmark {
 	name: Option<String>,
 	username: Option<String>,
 	channel: Option<ID>,
+	identity: Option<ID>,
 	bookmark: Option<bool>,
 }
 
@@ -81,6 +82,7 @@ struct UpdateBookmarkDb {
 	name: Option<String>,
 	username: Option<String>,
 	channel: Option<i64>,
+	identity: Option<i64>,
 	bookmark: Option<bool>,
 }
 
@@ -1129,7 +1131,9 @@ impl Mutation {
 			.send(RunOnDbMsg(|db| {
 				use schema::channels;
 
-				let id: i64 = update.id.parse::<u64>()? as i64;
+				let id = update.id.parse::<u64>()? as i64;
+				let identity =
+					update.identity.map(|i| i.parse::<u64>()).transpose()?.map(|i| i as i64);
 
 				let ch = if let Some(c) = update.channel {
 					// Search server
@@ -1165,11 +1169,31 @@ impl Mutation {
 					name: update.name,
 					username: update.username,
 					channel: ch,
+					identity,
 					bookmark: update.bookmark,
 				};
 
 				let res = diesel::update(bookmarks::table.filter(bookmarks::id.eq(id)))
 					.set(db_update)
+					.execute(&db.con)?;
+
+				GResult::Ok(res)
+			}))
+			.await??;
+
+		if res == 0 {
+			return Err(format_err!("Bookmark not found").into());
+		}
+
+		Ok(Void::new())
+	}
+
+	async fn delete_bookmark(state: &QintState, id: ID) -> GResult<Void> {
+		let res = state
+			.database
+			.send(RunOnDbMsg(move |db| {
+				let id = id.parse::<u64>()? as i64;
+				let res = diesel::delete(bookmarks::table.filter(bookmarks::id.eq(id)))
 					.execute(&db.con)?;
 
 				GResult::Ok(res)

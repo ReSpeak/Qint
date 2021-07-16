@@ -5,9 +5,14 @@
 	import { ConnectData } from "./uiConnect";
 	import { app } from "../app";
 	import { OfflineConnection } from "../connection";
+	import { createEventDispatcher } from "svelte";
 
 	export let connectData: ConnectData;
 	export let bookmark: Bookmark;
+
+	const dispatch = createEventDispatcher<{
+		edit: undefined;
+	}>();
 	let error: string | undefined = undefined;
 	let fullAddress: string;
 	let connection: OfflineConnection | undefined;
@@ -43,10 +48,6 @@
 			error = "Failed to update bookmark";
 		});
 	}
-
-	function toggleEdit() {
-		// TODO
-	}
 </script>
 
 <div
@@ -62,7 +63,7 @@
 		{bookmark.username}@{fullAddress}
 	</div>
 
-	<button class="button bookmarkEdit" on:click|stopPropagation={toggleEdit}>
+	<button class="button bookmarkEdit" on:click|stopPropagation={() => dispatch("edit")}>
 		<i class="mdi mdi-{EDIT_ICON} mdi-24px" />
 	</button>
 	<button class="button bookmarkStar" on:click|stopPropagation={toggleBookmark} title="Bookmark">
@@ -81,7 +82,7 @@
 		margin: 0.5em;
 		display: grid;
 		justify-content: stretch;
-		grid-template-columns: 2em minmax(0, 1fr) 2em;
+		grid-template-columns: 2em minmax(0, 1fr) 2em 2em;
 		width: 100%;
 		height: 100%;
 	}
@@ -125,16 +126,16 @@
 	}
 
 	.bookmarkEdit {
-		grid-column: 2;
+		grid-column: 3;
+		grid-row: 1 / 3;
 		text-align: center;
 		background: none;
 		border: none;
 		box-shadow: none;
-		display: none; // TODO Remove when ready
 	}
 
 	.bookmarkStar {
-		grid-column: 3;
+		grid-column: 4;
 		grid-row: 1 / 3;
 		text-align: center;
 		color: $yellow;

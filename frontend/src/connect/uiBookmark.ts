@@ -50,8 +50,21 @@ export class Bookmark {
 					id: this.id,
 					name: this.name,
 					username: this.username,
+					channel: this.channel?.id,
+					identity: this.identity?.id,
 					bookmark: this.bookmark,
 				},
+			}
+		);
+	}
+
+	public async delete(): Promise<void> {
+		await backend.graphql(
+			`mutation DeleteBookmark($id: ID!) {
+			deleteBookmark(id: $id) { void }
+		}`,
+			{
+				id: this.id,
 			}
 		);
 	}

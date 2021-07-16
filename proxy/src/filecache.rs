@@ -12,7 +12,7 @@ use bytes::{Buf, Bytes, BytesMut};
 use anyhow::Result;
 use futures::prelude::*;
 use futures::stream::Peekable;
-use slog::{debug, error, Logger};
+use slog::{debug, error, trace, Logger};
 use tokio::fs;
 use tokio::io::AsyncWrite;
 use tokio_util::codec::{BytesCodec, FramedRead};
@@ -108,7 +108,7 @@ impl FileCache {
 				None
 			}
 			Ok(file) => {
-				debug!(self.logger, "Found cached file"; "channel" => channel.0, "path" => %path,
+				trace!(self.logger, "Found cached file"; "channel" => channel.0, "path" => %path,
 					"localpath" => ?filepath, "meta" => ?meta);
 				let stream =
 					FramedRead::new(file, BytesCodec::new()).map(|r| r.map(BytesMut::freeze));

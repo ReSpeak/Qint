@@ -30,6 +30,9 @@
 		identity = identities.find((i) => i.id === data.identityId?.toString());
 		return identities;
 	});
+	let bookmarks = loadBookmarks();
+
+	let editing: Bookmark | undefined;
 
 	$: on(data, dataChanged());
 
@@ -49,8 +52,29 @@
 		}
 	}
 
-	function onConnect() {
-		app.connect(data.clone());
+	async function onConnect() {
+		if (editing !== undefined) {
+			editing.username = data.name;
+			if (editing.address !== address) {
+				// TODO Error, cannot change address
+				data.address = editing.address ?? "";
+			}
+			if (data.channel === undefined) {
+				editing.channel = null;
+			} else if (data.channel !== editing.channel?.fullPath) {
+				// TODO
+			}
+			if ((await identities).length > 1 && identity !== undefined)
+				editing.identity = identity;
+			data.bookmark = editing.id;
+			// TODO Show errors
+			await editing.update();
+			editing = undefined;
+			// Await first, replace then to get instant replacement
+			bookmarks = Promise.resolve(await loadBookmarks());
+		} else {
+			app.connect(data.clone());
+		}
 	}
 
 	function unsetBookmark() {
@@ -160,6 +184,24 @@
 		}
 	}
 
+	async function editBookmark(bookmark: Bookmark) {
+		data.address = bookmark.address ?? "";
+		data.channel = bookmark.channel?.fullPath ?? undefined;
+		data.name = bookmark.username ?? "";
+		data.identityId = bookmark.identity?.id ?? undefined;
+		editing = bookmark;
+	}
+
+	async function deleteBookmark() {
+		if (editing !== undefined) {
+			// TODO Show errors
+			await editing.delete();
+			editing = undefined;
+			// Await first, replace then to get instant replacement
+			bookmarks = Promise.resolve(await loadBookmarks());
+		}
+	}
+
 	onMount(async () => {
 		const recent = await Bookmark.getRecent();
 		if (recent) {
@@ -181,6 +223,22 @@
 	<div class="inner-connect-container">
 		<div class="connect-blur blur" />
 		<form class="connect-form blur-shade" on:submit|preventDefault={onConnect}>
+			{#if editing !== undefined}
+				<div>
+					<p class="control has-icons-left">
+						<input
+							bind:value={editing.name}
+							name="bookmarkName"
+							id="bookmarkName"
+							class="input"
+							type="text"
+							autocomplete="bookmarkName"
+							title="Bookmark"
+							placeholder="Bookmark name" />
+						<Icon name="label-outline" isLeft />
+					</p>
+				</div>
+			{/if}
 			<div>
 				<p class="control has-icons-left">
 					<input
@@ -264,8 +322,24 @@
 					{/await}
 				</div>
 			</div>
-			<div>
-				<button class="button is-primary" name="connect" type="submit"> Connect </button>
+			<div class="buttonGrid">
+				<button class="button" class:is-primary={editing === undefined} class:is-success={editing !== undefined} name="connect" type="submit">
+					{#if editing !== undefined}
+						Save
+					{:else}
+						Connect
+					{/if}
+				</button>
+				{#if editing !== undefined}
+					<div>
+						<button class="button is-primary" name="cancel" on:click|preventDefault={() => (editing = undefined)}>
+								Cancel
+						</button>
+						<button class="button is-danger" name="remove" on:click|preventDefault={deleteBookmark}>
+								Delete Bookmark
+						</button>
+					</div>
+				{/if}
 			</div>
 		</form>
 
@@ -287,13 +361,13 @@
 	<div class="bookmark-container">
 		<div class="bookmark-blur blur" />
 		<div class="bookmark-list blur-shade">
-			{#await loadBookmarks()}
+			{#await bookmarks}
 				<div>Loading…</div>
 			{:then bookmarks}
 				<div class="viewContainer">
 					<div class="scollPane">
 						{#each bookmarks as item}
-							<UiBookmark bookmark={item} bind:connectData={data} />
+							<UiBookmark bookmark={item} bind:connectData={data} on:edit={() => editBookmark(item)} />
 						{/each}
 					</div>
 				</div>
@@ -404,9 +478,16 @@
 	}
 
 	.connect-form > div input:not([type="checkbox"]),
-	.connect-form > div button {
+	.buttonGrid > button {
 		box-sizing: border-box;
 		width: 100%;
+	}
+
+	.buttonGrid > div {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		margin-top: 0.4em;
+		gap: 0.5em;
 	}
 
 	// .connect-form > div button .loader {
