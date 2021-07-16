@@ -340,9 +340,9 @@ impl Search {
 			drop(w);
 			std::thread::sleep(std::time::Duration::from_secs(1));
 			if will_commit.fetch_add(1, Ordering::Relaxed) == 0 {
-				// This thread is the last, so commit
+				// This thread is the last, so commit and free the writer
 				let mut w = writer.lock().unwrap();
-				if let Some(w) = &mut *w {
+				if let Some(mut w) = w.take() {
 					if let Err(e) = w.commit() {
 						error!(logger, "Failed to commit to search database"; "error" => %e);
 					}
