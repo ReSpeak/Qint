@@ -15,9 +15,7 @@ pub(crate) struct LoudnessService {
 }
 
 impl LoudnessService {
-	pub fn new(state: Arc<QintState>) -> Self {
-		LoudnessService { state }
-	}
+	pub fn new(state: Arc<QintState>) -> Self { LoudnessService { state } }
 }
 
 struct LoudnessCallback {
@@ -34,9 +32,7 @@ impl LoudnessTrait for LoudnessCallback {
 		));
 	}
 
-	fn connected(&self) -> bool {
-		self.addr.connected()
-	}
+	fn connected(&self) -> bool { self.addr.connected() }
 }
 
 impl Actor for LoudnessService {

@@ -27,7 +27,11 @@ export const EmptyOtherFetch: FetchResult<OtherSearchResult> = {
 	canLoadAfterEnd: false,
 };
 
-export async function search(s: string, messages: boolean, start: number = 0): Promise<SearchResults> {
+export async function search(
+	s: string,
+	messages: boolean,
+	start: number = 0
+): Promise<SearchResults> {
 	const res = await backend.graphql<{ search: GraphQlSearchResult }>(
 		`query Search($query: String!, $messages: Boolean!, $start: Int!) {
 			search(query: $query, messages: $messages, start: $start) {

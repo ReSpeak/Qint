@@ -15,7 +15,7 @@ use tantivy::{Document, Index, IndexReader, IndexWriter, ReloadPolicy, SnippetGe
 use tsclientlib::Uid;
 use tsproto_types::crypto::EccKeyPubP256;
 
-use crate::{db, Result, QintState};
+use crate::{db, QintState, Result};
 
 /// Add documents in batches when creating the database.
 const INIT_BATCH_SIZE: usize = 1000;

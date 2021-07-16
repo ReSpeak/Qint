@@ -108,7 +108,11 @@
 </script>
 
 <div class="appContainer" style="grid-template-columns: {columnStyle}">
-	<Toolbar bind:showSidebar={$showSidebar} bind:displayPanel={$displayPanel} bind:connectData bind:filter />
+	<Toolbar
+		bind:showSidebar={$showSidebar}
+		bind:displayPanel={$displayPanel}
+		bind:connectData
+		bind:filter />
 
 	<Sidebar
 		{connections}

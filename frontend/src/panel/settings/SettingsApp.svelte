@@ -37,16 +37,18 @@
 	</KeyValue>
 	{#if browserNotificationPermission === "default"}
 		<KeyValue label="">
-			<button class="button is-warning" on:click={enableBrowserNotifications}>Enable browser notifications</button>
+			<button class="button is-warning" on:click={enableBrowserNotifications}
+				>Enable browser notifications</button>
 		</KeyValue>
 	{:else if browserNotificationPermission === "denied"}
 		<article class="message is-warning">
 			<div class="message-header">
 				<p>Notifications</p>
-				<button class="delete" aria-label="delete" on:click={updateNotificationSetting}></button>
+				<button class="delete" aria-label="delete" on:click={updateNotificationSetting} />
 			</div>
 			<div class="message-body">
-				Your browser blocked notifications for this page. If you want to use them, enable notifications in your browser settings and close this message.
+				Your browser blocked notifications for this page. If you want to use them, enable
+				notifications in your browser settings and close this message.
 			</div>
 		</article>
 	{/if}

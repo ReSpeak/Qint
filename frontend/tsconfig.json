@@ -39,7 +39,7 @@
 		"noImplicitReturns": true /* Report error when not all code paths in function return a value. */,
 		"noFallthroughCasesInSwitch": true /* Report errors for fallthrough cases in switch statement. */,
 		"allowUnusedLabels": true,
-		"noImplicitOverride": true,
+		"noImplicitOverride": true
 	},
 	"include": ["src/**/*.d.ts", "src/**/*.js", "src/**/*.ts", "src/**/*.svelte"]
 }

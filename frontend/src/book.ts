@@ -1,12 +1,7 @@
 import { Writable, writable, get, Readable } from "svelte/store";
 import { InBookChangeMsg, WsMessageTarget } from "./backend/ws";
 import { Connection } from "./connection";
-import {
-	binarySearchBy,
-	datetimeDeserialize,
-	assert,
-	factorToDb,
-} from "./util";
+import { binarySearchBy, datetimeDeserialize, assert, factorToDb } from "./util";
 import {
 	ChannelGroupId,
 	ChannelId,
@@ -626,7 +621,10 @@ export class Client extends book_events.ClientGen implements ITreeNode, Readable
 	}
 }
 
-export class Channel extends book_events.ChannelGen implements ITreeNode, ITreeParent, Readable<Channel> {
+export class Channel
+	extends book_events.ChannelGen
+	implements ITreeNode, ITreeParent, Readable<Channel>
+{
 	public readonly clients: Writable<Client[]> = writable([]);
 	public readonly channels: Writable<Channel[]> = writable([]);
 	// Cache last path in file browser
@@ -704,7 +702,10 @@ export class GraphQlServer extends ServerBase implements ITreeNode {
 	public readonly wsTarget = "Server";
 }
 
-export class Server extends book_events.ServerGen implements ITreeNode, ITreeParent, Readable<Server> {
+export class Server
+	extends book_events.ServerGen
+	implements ITreeNode, ITreeParent, Readable<Server>
+{
 	public readonly channels: Writable<Channel[]> = writable([]);
 
 	constructor() {

@@ -323,7 +323,12 @@
 				</div>
 			</div>
 			<div class="buttonGrid">
-				<button class="button" class:is-primary={editing === undefined} class:is-success={editing !== undefined} name="connect" type="submit">
+				<button
+					class="button"
+					class:is-primary={editing === undefined}
+					class:is-success={editing !== undefined}
+					name="connect"
+					type="submit">
 					{#if editing !== undefined}
 						Save
 					{:else}
@@ -332,11 +337,17 @@
 				</button>
 				{#if editing !== undefined}
 					<div>
-						<button class="button is-primary" name="cancel" on:click|preventDefault={() => (editing = undefined)}>
-								Cancel
+						<button
+							class="button is-primary"
+							name="cancel"
+							on:click|preventDefault={() => (editing = undefined)}>
+							Cancel
 						</button>
-						<button class="button is-danger" name="remove" on:click|preventDefault={deleteBookmark}>
-								Delete Bookmark
+						<button
+							class="button is-danger"
+							name="remove"
+							on:click|preventDefault={deleteBookmark}>
+							Delete Bookmark
 						</button>
 					</div>
 				{/if}
@@ -367,7 +378,10 @@
 				<div class="viewContainer">
 					<div class="scollPane">
 						{#each bookmarks as item}
-							<UiBookmark bookmark={item} bind:connectData={data} on:edit={() => editBookmark(item)} />
+							<UiBookmark
+								bookmark={item}
+								bind:connectData={data}
+								on:edit={() => editBookmark(item)} />
 						{/each}
 					</div>
 				</div>

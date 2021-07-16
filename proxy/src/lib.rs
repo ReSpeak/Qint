@@ -184,9 +184,7 @@ pub struct MuteStates {
 	pub away: bool,
 }
 
-fn default_listen_address() -> SocketAddr {
-	"127.0.0.1:4422".parse().unwrap()
-}
+fn default_listen_address() -> SocketAddr { "127.0.0.1:4422".parse().unwrap() }
 
 fn default_cache_path() -> PathBuf {
 	let proj_dirs = match directories_next::ProjectDirs::from("", DIR_ORGANIZATION, DIR_PROJECT) {
@@ -462,9 +460,7 @@ impl Settings {
 		Ok(())
 	}
 
-	pub fn merge(&mut self, v: &Value) {
-		merge_json(&mut self.0, v);
-	}
+	pub fn merge(&mut self, v: &Value) { merge_json(&mut self.0, v); }
 
 	fn get_global_volume(&self) -> Option<f32> {
 		Some(self.0.as_object()?.get("audio")?.as_object()?.get("globalVolume")?.as_f64()? as f32)

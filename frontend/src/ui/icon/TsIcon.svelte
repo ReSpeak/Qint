@@ -26,10 +26,8 @@
 
 	let iconPath: string | undefined;
 	$: {
-		if (connection)
-			getClientIconPath(connection, source).then(path => iconPath = path);
-		else
-			iconPath = undefined;
+		if (connection) getClientIconPath(connection, source).then((path) => (iconPath = path));
+		else iconPath = undefined;
 	}
 </script>
 

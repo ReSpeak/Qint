@@ -58,7 +58,8 @@ impl Message for SetAudioDevice {
 }
 
 pub(crate) fn start(
-	logger: Logger, connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>, settings: &Settings,
+	logger: Logger, connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>,
+	settings: &Settings,
 ) -> Result<AudioData> {
 	let global_volume = settings.get_global_volume().unwrap_or(1.0);
 	let (capture, playback) = settings.get_preferred_audio_device();

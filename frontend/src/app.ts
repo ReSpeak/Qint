@@ -15,7 +15,9 @@ export class App {
 	public readonly connections: Writable<Connection[]> = writable([]);
 	// JavaScript maps cannot take arrays as keys, so we use the string form of the uid
 	public readonly serversByUid: Writable<Map<string, Connection>> = writable(new Map());
-	public readonly clientsByUid: Writable<Map<string, [Connection, Client][]>> = writable(new Map());
+	public readonly clientsByUid: Writable<Map<string, [Connection, Client][]>> = writable(
+		new Map()
+	);
 	// $: hasConnected = derived(
 	// 	$connections.map((c) => c.state) as [Readable<ConnectionState>],
 	// 	(states) => states.some((s) => s.connected)
@@ -48,8 +50,9 @@ export class App {
 				const name =
 					s.connection.book.server.name ?? get(s.connection.connectOptions).address;
 				backend.setTitle(name + " – Qint");
-				getIconPath(s.connection, s.connection.book.server)
-					.then(iconPath => backend.setIcon(iconPath));
+				getIconPath(s.connection, s.connection.book.server).then((iconPath) =>
+					backend.setIcon(iconPath)
+				);
 			} else {
 				backend.setTitle("Qint");
 				backend.setIcon(undefined);
@@ -127,7 +130,7 @@ export class App {
 }
 
 export class NodeSelection {
-	constructor(public readonly connection: Connection, public readonly node: ITreeNode) { }
+	constructor(public readonly connection: Connection, public readonly node: ITreeNode) {}
 
 	public get uniqueStr(): string {
 		return `${this.node.qlType},${this.connection?.book.server.uidStr},${this.node.qlId}`;

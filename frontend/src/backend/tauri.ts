@@ -1,6 +1,15 @@
 import { InMsg, OutMsg } from "./ws";
 import { BASE_ADDRESS, createUuidV4 } from "../util";
-import { closedFn, errorFn, IBackend, IBackendConnection, ICacheFileRequest, IFetchLike, IFileRequest, msgFn } from "./backend";
+import {
+	closedFn,
+	errorFn,
+	IBackend,
+	IBackendConnection,
+	ICacheFileRequest,
+	IFetchLike,
+	IFileRequest,
+	msgFn,
+} from "./backend";
 import { listen } from "@tauri-apps/api/event";
 import { urlToWebSocket } from "./backendUtil";
 import debug from "debug";
@@ -9,12 +18,11 @@ const log = debug("TAURI");
 
 type TauriMsg<T> = { Msg: T } | "Close";
 type TauriWs<T> = {
-	connection: string,
-	msg: TauriMsg<T>,
-}
+	connection: string;
+	msg: TauriMsg<T>;
+};
 type TauriMsgP2F = TauriWs<InMsg>;
 type TauriMsgF2P = TauriWs<OutMsg>;
-
 
 type OutHttpRequest = OutListPluginsRequest;
 
@@ -23,7 +31,7 @@ interface OutListPluginsRequest {
 }
 
 class FetchLike implements IFetchLike {
-	constructor(private obj: any) { }
+	constructor(private obj: any) {}
 	public async json(): Promise<any> {
 		return this.obj;
 	}
@@ -31,7 +39,6 @@ class FetchLike implements IFetchLike {
 		return JSON.stringify(this.obj);
 	}
 }
-
 
 class ImageTracking {
 	private trackedImages: Map<string, string | Promise<string>> = new Map();
@@ -48,7 +55,7 @@ class ImageTracking {
 						path: req.path,
 						hash: req.hash,
 						cache: req.cache,
-					}
+					},
 				});
 				const buffer = new Uint8Array(response.data);
 				const blob = new Blob([buffer], {
@@ -61,7 +68,6 @@ class ImageTracking {
 			url = await task;
 			this.trackedImages.set(key, url);
 			return url;
-
 		} else {
 			return await url;
 		}
@@ -93,8 +99,7 @@ export class TauriBackend extends ImageTracking implements IBackend {
 				if (msg.msg === "Close") {
 					con.onClose?.();
 					this.connections.delete(msg.connection);
-				}
-				else con.onMsg?.(msg.msg.Msg);
+				} else con.onMsg?.(msg.msg.Msg);
 			}
 		});
 	}
@@ -206,7 +211,6 @@ export class TauriBackendConnection extends ImageTracking implements IBackendCon
 		return await this.fetchImgInternal("get_file", req, this.id);
 	}
 }
-
 
 function reqAsKey(req: IFileRequest | ICacheFileRequest): string {
 	return `${req.channel}/${req.path}`;

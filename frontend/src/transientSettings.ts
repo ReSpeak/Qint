@@ -142,11 +142,11 @@ export class TransientSettingsSynth {
 			// TTS has multiple weirdinesses on different browsers.
 			// We need to call `getVoices()` once for some browsers to start loading available voices
 			// And in case the voices are then set (or updated) register for the list
-			synth.onvoiceschanged = () => { 
+			synth.onvoiceschanged = () => {
 				this._voiceCache = undefined;
 				this._voiceIdCache = undefined;
-				this._voices.set(synth.getVoices()); 
-			}
+				this._voices.set(synth.getVoices());
+			};
 			this._voices.set(synth.getVoices());
 		}
 	}

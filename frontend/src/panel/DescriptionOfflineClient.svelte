@@ -20,7 +20,7 @@
 	$: on(client, onClientChanged());
 
 	$: clientsByUid = app.clientsByUid;
-	$: curOnline = client.uid === null ? [] : ($clientsByUid.get(client.uidStr) ?? []);
+	$: curOnline = client.uid === null ? [] : $clientsByUid.get(client.uidStr) ?? [];
 
 	function onClientChanged() {
 		editing = false;
@@ -62,10 +62,7 @@
 			{/if}
 		</StickyHeader>
 	</StickySlot>
-	TODO
-	- Known on Servers (offline)
-	- Currently online
-	- Click to go to chat
+	TODO - Known on Servers (offline) - Currently online - Click to go to chat
 	<div class="descGroup" class:editing>
 		{#await changeRequest then changeResult}
 			{#if changeResult !== undefined}
@@ -99,9 +96,11 @@
 		</div>
 		<div class="descTable">
 			{#each curOnline as c}
-			<div>
-				<ClientName connection={c[0]} client={c[1]} /> on <ServerName server={c[0].book.server} connection={c[0]} />
-			</div>
+				<div>
+					<ClientName connection={c[0]} client={c[1]} /> on <ServerName
+						server={c[0].book.server}
+						connection={c[0]} />
+				</div>
 			{/each}
 		</div>
 	</div>

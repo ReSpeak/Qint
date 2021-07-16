@@ -8,8 +8,8 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use bytes::{Buf, Bytes, BytesMut};
 use anyhow::Result;
+use bytes::{Buf, Bytes, BytesMut};
 use futures::prelude::*;
 use futures::stream::Peekable;
 use slog::{debug, error, trace, Logger};
@@ -40,13 +40,9 @@ struct FileWriter<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin> {
 }
 
 impl FileCache {
-	pub fn new(logger: Logger, cache_path: PathBuf) -> Self {
-		Self { logger, cache_path }
-	}
+	pub fn new(logger: Logger, cache_path: PathBuf) -> Self { Self { logger, cache_path } }
 
-	fn path_encode(data: &[u8]) -> String {
-		base64::encode_config(data, base64::URL_SAFE_NO_PAD)
-	}
+	fn path_encode(data: &[u8]) -> String { base64::encode_config(data, base64::URL_SAFE_NO_PAD) }
 
 	fn get_path(&self, server: &EccKeyPubP256, channel: ChannelId, path: &str) -> PathBuf {
 		let mut p = self.cache_path.clone();
@@ -177,7 +173,9 @@ impl<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin> Stream for FileWri
 	}
 }
 
-pub async fn guess_content_type<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin + 'static>(
+pub async fn guess_content_type<
+	S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin + 'static,
+>(
 	stream: S,
 ) -> (Peekable<S>, Option<&'static str>) {
 	let mut stream = stream.peekable();

@@ -47,8 +47,7 @@
 			await loadPermissions;
 			permissionList = [];
 			for (const [perm, desc] of permList) {
-				if (permFilterList.includes(desc.name))
-					permissionList.push([perm, desc]);
+				if (permFilterList.includes(desc.name)) permissionList.push([perm, desc]);
 			}
 		} catch (e) {
 			console.error("Failed to fetch permissions", e);

@@ -6,7 +6,15 @@ import { handleMessage } from "./notifications";
 import { backend, IBackendConnection, IFileRequest } from "./backend/backend";
 import { app } from "./app";
 import { ConnectData, MuteState } from "./connect/uiConnect";
-import { OChange, Reason, IMsgPluginCommandPart, TsError, IMsgServerLogPart, IMsgPermListPart, IMsgChannelPermListPart } from "./book_events";
+import {
+	OChange,
+	Reason,
+	IMsgPluginCommandPart,
+	TsError,
+	IMsgServerLogPart,
+	IMsgPermListPart,
+	IMsgChannelPermListPart,
+} from "./book_events";
 import moment from "moment";
 import { ChannelId, ClientId, Permission, PermissionDescription } from "./ts";
 import { FileTreeCache } from "./fileTreeCache";
@@ -132,7 +140,7 @@ export class Connection implements IConnection {
 		this.backend.close();
 		this._state.update((s) => s.setDisconnected());
 
-		app.clientsByUid.update(clients => {
+		app.clientsByUid.update((clients) => {
 			for (const c of this.book.clients.values()) {
 				if (c.uid !== null) {
 					const cs = clients.get(c.uidStr);
@@ -142,15 +150,14 @@ export class Connection implements IConnection {
 								cs.splice(i, 1);
 							}
 						}
-						if (cs.length === 0)
-							clients.delete(c.uidStr);
+						if (cs.length === 0) clients.delete(c.uidStr);
 					}
 				}
 			}
 			return clients;
 		});
 		if (this.book.server !== undefined) {
-			app.serversByUid.update(servers => {
+			app.serversByUid.update((servers) => {
 				servers.delete(this.book.server.uidStr);
 				return servers;
 			});
@@ -437,14 +444,14 @@ export class Connection implements IConnection {
 								// Reset chat if the selected node is from this client.
 								app.selectedNode.update((n) =>
 									n?.connection === this &&
-										n.node instanceof Client &&
-										n.node.id === id
+									n.node instanceof Client &&
+									n.node.id === id
 										? undefined
 										: n
 								);
 								const client = this.book.getClient(id);
 								if (client !== undefined && client.uid !== null) {
-									app.clientsByUid.update(clients => {
+									app.clientsByUid.update((clients) => {
 										const cs = clients.get(client.uidStr);
 										if (cs !== undefined) {
 											for (let i = 0; i < cs.length; i++) {
@@ -453,8 +460,7 @@ export class Connection implements IConnection {
 													break;
 												}
 											}
-											if (cs.length === 0)
-												clients.delete(client.uidStr);
+											if (cs.length === 0) clients.delete(client.uidStr);
 										}
 										return clients;
 									});
@@ -470,7 +476,7 @@ export class Connection implements IConnection {
 								"Server" in tsevt.PropertyAdded.prop
 							) {
 								this._state.update((s) => s.setConnected());
-								app.serversByUid.update(servers => {
+								app.serversByUid.update((servers) => {
 									servers.set(this.book.server.uidStr, this);
 									return servers;
 								});
@@ -481,12 +487,10 @@ export class Connection implements IConnection {
 								this.updateClientUnreadCount(tsevt.PropertyAdded.id.Client);
 								const client = this.book.getClient(tsevt.PropertyAdded.id.Client);
 								if (client !== undefined && client.uid !== null) {
-									app.clientsByUid.update(clients => {
+									app.clientsByUid.update((clients) => {
 										const cs = clients.get(client.uidStr);
-										if (cs !== undefined)
-											cs.push([this, client]);
-										else
-											clients.set(client.uidStr, [[this, client]]);
+										if (cs !== undefined) cs.push([this, client]);
+										else clients.set(client.uidStr, [[this, client]]);
 										return clients;
 									});
 								}
@@ -608,14 +612,10 @@ export class Connection implements IConnection {
 }
 
 export class OfflineConnection implements IConnection {
-	constructor(
-		public server: string
-	) {
-
-	}
+	constructor(public server: string) {}
 
 	public fileProvider(req: IFileRequest): Promise<string> {
-		return backend.fetch_cache_image({ server: this.server, ...req});
+		return backend.fetch_cache_image({ server: this.server, ...req });
 	}
 }
 
@@ -623,10 +623,7 @@ export class OfflineConnection implements IConnection {
 // Just for transitioning to a better architecture
 export class DDConnection implements IConnection {
 	private offlineConnection: OfflineConnection | undefined;
-	constructor(
-		public connection: Connection | undefined,
-		server: string | undefined
-	) {
+	constructor(public connection: Connection | undefined, server: string | undefined) {
 		if (!connection && !server) throw new Error("Missing connection data");
 		if (server) this.offlineConnection = new OfflineConnection(server);
 	}
@@ -707,7 +704,8 @@ export class ConnectionState {
 
 	private throwTransition(newState: ConnectionStateEnum): never {
 		throw Error(
-			`Cannot transition this connection from '${ConnectionStateEnum[this.rawState]}' to ${ConnectionStateEnum[newState]
+			`Cannot transition this connection from '${ConnectionStateEnum[this.rawState]}' to ${
+				ConnectionStateEnum[newState]
 			}`
 		);
 	}

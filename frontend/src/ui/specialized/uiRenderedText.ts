@@ -14,15 +14,15 @@ const ts3Scheme = /^(ts3file|ts3image):\/\/([^?]*)(\?(.*))?$/i;
 
 type Ts3Scheme =
 	| {
-		scheme: "ts3file";
-		server: string;
-		attrs: Partial<Ts3FileAtt>;
-	}
+			scheme: "ts3file";
+			server: string;
+			attrs: Partial<Ts3FileAtt>;
+	  }
 	| {
-		scheme: "ts3image";
-		file: string;
-		attrs: Partial<Ts3ImageAtt>;
-	};
+			scheme: "ts3image";
+			file: string;
+			attrs: Partial<Ts3ImageAtt>;
+	  };
 type Ts3FileAtt = {
 	port: string;
 	serverUID: string;
@@ -69,10 +69,7 @@ export function parseTsScheme(url: string): Ts3Scheme | null {
 	return null;
 }
 
-export function schemeToLink(
-	con: IConnection,
-	scheme: Ts3Scheme
-): IConFileRequest | null {
+export function schemeToLink(con: IConnection, scheme: Ts3Scheme): IConFileRequest | null {
 	if (scheme.attrs.path) {
 		let path: string;
 		let channel: string;

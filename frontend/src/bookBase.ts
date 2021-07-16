@@ -65,9 +65,9 @@ export abstract class Group {
 	}
 }
 
-export abstract class ChannelBase extends BookNode { }
+export abstract class ChannelBase extends BookNode {}
 
-export abstract class ChannelGroupBase extends Group { }
+export abstract class ChannelGroupBase extends Group {}
 
 export abstract class OptionalChannelDataBase {
 	public abstract update(obj: Partial<this>): this;
@@ -178,7 +178,7 @@ export abstract class ServerBase extends BookNode {
 	}
 }
 
-export class ServerGroupBase extends Group { }
+export class ServerGroupBase extends Group {}
 
 export abstract class OptionalServerDataBase {
 	public abstract update(obj: Partial<this>): this;

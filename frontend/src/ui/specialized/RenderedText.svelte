@@ -94,15 +94,18 @@
 			if (scheme !== null) {
 				const req = schemeToLink(connection, scheme);
 				if (req !== null) {
-					req.con.fileProvider(req).then((proxyFileSrc) => {
-						if (proxyFileSrc === null) {
-							img.parentElement?.removeChild(img);
-						} else {
-							img.src = proxyFileSrc;
-						}
-					}).catch(err => {
-						console.warn("Failed to load", err, req);
-					});
+					req.con
+						.fileProvider(req)
+						.then((proxyFileSrc) => {
+							if (proxyFileSrc === null) {
+								img.parentElement?.removeChild(img);
+							} else {
+								img.src = proxyFileSrc;
+							}
+						})
+						.catch((err) => {
+							console.warn("Failed to load", err, req);
+						});
 				}
 			}
 		}

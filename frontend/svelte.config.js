@@ -10,5 +10,5 @@ export default {
 				@import "bulma/sass/utilities/_all";
 			`,
 		},
-	})
+	}),
 };

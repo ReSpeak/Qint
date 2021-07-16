@@ -121,7 +121,7 @@
 			<article class="message is-danger">
 				<div class="message-header">
 					<p>Search failed</p>
-					<button class="delete" aria-label="delete" on:click={resetError}></button>
+					<button class="delete" aria-label="delete" on:click={resetError} />
 				</div>
 				<div class="message-body">{searchError}</div>
 			</article>

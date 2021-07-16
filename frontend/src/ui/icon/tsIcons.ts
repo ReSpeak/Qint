@@ -14,36 +14,31 @@ export const DummyStore: Writable<IconSource> = writable(undefined);
 
 export async function getClientIconPath(
 	connection: IConnection,
-	client: IconSourceLike | null | undefined,
+	client: IconSourceLike | null | undefined
 ): Promise<string | undefined> {
-	if (!client)
-		return undefined;
+	if (!client) return undefined;
 
-	if (client.avatarHash && client.uid)
-		return getClientAvatarPath(connection, client);
-	else if (client.icon && client.icon !== "0")
-		return getIconPath(connection, client);
-	else
-		return undefined;
+	if (client.avatarHash && client.uid) return getClientAvatarPath(connection, client);
+	else if (client.icon && client.icon !== "0") return getIconPath(connection, client);
+	else return undefined;
 }
 
 export async function getClientAvatarPath(
 	connection: IConnection,
-	client: IconSourceLike | null | undefined,
+	client: IconSourceLike | null | undefined
 ): Promise<string | undefined> {
-	if (!client || !client.avatarHash || !client.uid)
-		return undefined;
+	if (!client || !client.avatarHash || !client.uid) return undefined;
 	return await connection.fileProvider({
 		channel: "0",
 		path: `/avatar_${client.getAvatarUid!()}`,
 		cache: true,
-		hash: client.avatarHash
+		hash: client.avatarHash,
 	});
 }
 
 export async function getIconPath(
 	connection: IConnection,
-	source: IconSource,
+	source: IconSource
 ): Promise<string | undefined> {
 	if (!source || !source.icon || source.icon === "0") return;
 
@@ -57,6 +52,6 @@ export async function getIconPath(
 	return await connection.fileProvider({
 		channel: "0",
 		path: `/icon_${i}`,
-		cache: true
+		cache: true,
 	});
 }

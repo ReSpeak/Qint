@@ -241,7 +241,10 @@
 				class:spacer={spacerType !== SpacerType.None}
 				on:click={() => (collapsed = !collapsed)}>
 				<Icon name="chevron-right{collapsed ? '' : ' mdi-rotate-90'}" />
-				<TsIcon type="channel" source={$channel} connection={new DDConnection(connection, server)} />
+				<TsIcon
+					type="channel"
+					source={$channel}
+					connection={new DDConnection(connection, server)} />
 			</button>
 			<span
 				class:spacerC={spacerType === SpacerType.CSpacer ||

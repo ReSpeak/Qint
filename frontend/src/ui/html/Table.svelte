@@ -270,7 +270,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 							<slot name="headerCell" {col} />
 						{:else}{col.title}{/if}
 						{#if sortBy === col.key}
-							<slot name="orderIcon" {sortOrder}>{sortOrder === SortOrder.Asc ? "▲" : "▼"}</slot>
+							<slot name="orderIcon" {sortOrder}
+								>{sortOrder === SortOrder.Asc ? "▲" : "▼"}</slot>
 						{/if}
 					</th>
 				{/each}

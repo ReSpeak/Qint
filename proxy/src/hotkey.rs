@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
+use crate::QintState;
 use actix::Addr;
 use futures::{future, StreamExt};
 use serde::{Deserialize, Serialize};
 use slog::error;
 use tsclientlib::prelude::*;
-use crate::QintState;
 
 use crate::{connection, MuteState};
 use connection::QintConnection;

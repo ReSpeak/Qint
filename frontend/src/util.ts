@@ -27,7 +27,8 @@ export const MIN_VOLUME_DB = -30;
 export const PASSWORD_PLACEHOLDER = "**********";
 
 export const NARROW_NO_BREAK_SPACE = String.fromCharCode(0x202f);
-export const youtubeUrlRegex = /^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube\.com|youtu.be))(\/(?:[\w-]+\?v=|embed\/|v\/)?)([\w-]+)(\S+)?$/;
+export const youtubeUrlRegex =
+	/^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube\.com|youtu.be))(\/(?:[\w-]+\?v=|embed\/|v\/)?)([\w-]+)(\S+)?$/;
 
 export const LOUDNESS_MIN = -45;
 export const LOUDNESS_MAX = 0;

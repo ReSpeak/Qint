@@ -57,7 +57,7 @@
 
 	const serverGroups = connection.book.serverGroups;
 	let avatarPath: string | undefined;
-	$: getClientAvatarPath(connection, $client).then(path => avatarPath = path);
+	$: getClientAvatarPath(connection, $client).then((path) => (avatarPath = path));
 	$: ownClient = client.id === connection.book.ownClientId;
 	$: {
 		if ($client.optionalData == null) getOptionalData();

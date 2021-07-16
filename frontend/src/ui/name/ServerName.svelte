@@ -28,11 +28,7 @@
 		{address}
 	</span>
 {:else}
-	<span
-		class="nameTag"
-		style="color:{server.color};"
-		tabindex="0"
-		on:click={click}>
+	<span class="nameTag" style="color:{server.color};" tabindex="0" on:click={click}>
 		{server.name}
 	</span>
 {/if}

@@ -26,8 +26,7 @@
 		const allPerms = new Set(permissionList.map(([perm, _desc]) => perm));
 		for (const perm of permissions) {
 			const newPerm = allPermissions[perm.permissionId];
-			if (isDefault(newPerm))
-				removed.push(perm.permissionId);
+			if (isDefault(newPerm)) removed.push(perm.permissionId);
 			else if (!isEqual(newPerm, perm))
 				added.push({ permissionId: perm.permissionId, ...newPerm });
 			allPerms.delete(perm.permissionId);
@@ -35,24 +34,21 @@
 
 		for (const perm of allPerms) {
 			const newPerm = allPermissions[perm];
-			if (!isDefault(newPerm))
-				added.push({ permissionId: perm, ...newPerm });
+			if (!isDefault(newPerm)) added.push({ permissionId: perm, ...newPerm });
 		}
 		return { added, removed };
 	}
 
 	function isDefault(d: PermissionData): boolean {
 		for (const [k, v] of Object.entries(defaultPerm)) {
-			if ((d as any)[k] !== v)
-				return false;
+			if ((d as any)[k] !== v) return false;
 		}
 		return true;
 	}
 
 	function isEqual(a: PermissionData, b: PermissionData): boolean {
 		for (const k of Object.keys(defaultPerm)) {
-			if ((a as any)[k] !== (b as any)[k])
-				return false;
+			if ((a as any)[k] !== (b as any)[k]) return false;
 		}
 		return true;
 	}
@@ -76,8 +72,18 @@
 		allPermissions[perm] = { ...defaultPerm };
 	}
 
-	function showWithFilter(filter: string, perm: Permission, name: string, description: string | undefined): boolean {
-		return filter === "" || perm.toString().includes(filter) || name.includes(filter) || (description?.includes(filter) ?? false);
+	function showWithFilter(
+		filter: string,
+		perm: Permission,
+		name: string,
+		description: string | undefined
+	): boolean {
+		return (
+			filter === "" ||
+			perm.toString().includes(filter) ||
+			name.includes(filter) ||
+			(description?.includes(filter) ?? false)
+		);
 	}
 
 	// TODO Add headers for permission groups
@@ -95,7 +101,7 @@
 				</p>
 			</th>
 			<th>Value</th>
-			<th></th>
+			<th />
 		</tr>
 	</thead>
 	<tbody>
@@ -103,9 +109,7 @@
 			{#if showWithFilter(filter, perm, data.name, data.description)}
 				<tr>
 					<td>
-						<label
-							for={"perm" + perm}
-							title="{data.name} ({perm})">
+						<label for={"perm" + perm} title="{data.name} ({perm})">
 							<HighlightString {filter} content={data.description ?? data.name} />
 						</label>
 					</td>

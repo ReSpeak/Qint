@@ -367,9 +367,12 @@ export class YoutubeVideoControl implements IVideoControl {
 			cw.postMessage(JSON.stringify({ ...this.getCmdObj("listening") }), host);
 		}
 	}
-	private getCmdObj(
-		cmd: string = "command"
-	): { channel: "widget"; event: string; args: []; id: number } {
+	private getCmdObj(cmd: string = "command"): {
+		channel: "widget";
+		event: string;
+		args: [];
+		id: number;
+	} {
 		return {
 			channel: "widget",
 			event: cmd,
