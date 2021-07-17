@@ -2,7 +2,7 @@
 	import Icon from "../ui/icon/Icon.svelte";
 	import { DisplayPanel } from "../panel/panel";
 	import { SERVER_ICON } from "../util";
-	import { app, NodeSelection } from "../app";
+	import { app, NodeSelections } from "../app";
 	import ConnectionSettings from "./ConnectionSettings.svelte";
 	import { ConnectData } from "../connect/uiConnect";
 	import Searchbar from "./Searchbar.svelte";
@@ -18,10 +18,8 @@
 
 	const selectedNode = app.selectedNode;
 	$: selectedNodeChanged($selectedNode);
-	function selectedNodeChanged(node: NodeSelection | undefined) {
-		if (node !== undefined) {
-			displayPanel = DisplayPanel.Main;
-		}
+	function selectedNodeChanged(node: NodeSelections) {
+		if (node.selections.length !== 0) displayPanel = DisplayPanel.Main;
 	}
 </script>
 

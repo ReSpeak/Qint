@@ -26,7 +26,7 @@
 
 	const chat = app.chat;
 	const selected = app.selectedNode;
-	$: sel = $selected;
+	$: sel = $selected.getSingleSelection();
 	const ui = app.transientSettings.ui;
 	const showSidebar = app.showSidebar;
 	const displayPanel = app.displayPanel;

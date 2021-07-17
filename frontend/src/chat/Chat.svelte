@@ -27,7 +27,8 @@
 
 	export let chat: Chat;
 
-	const selected = app.selectedNode;
+	const selections = app.selectedNode;
+	$: selected = $selections.getSingleSelection();
 	const chatStore = app.transientSettings.chat;
 
 	const developMode = app.transientSettings.ui._developMode;
@@ -48,7 +49,7 @@
 	let connection: Connection | undefined;
 	let ownClient: Writable<Client | undefined>;
 	$: {
-		connection = $selected?.connection;
+		connection = selected?.connection;
 		ownClient = connection?.book.ownClient ?? writable(undefined);
 	}
 
@@ -71,9 +72,9 @@
 	// second one from working correctly.
 	// E.g. unreadCountChanged -> async update stared -> chatChanged -> (does nothing)
 	$: {
-		chatData = $selected?.node.chat;
-		if (sel !== $selected) {
-			sel = $selected;
+		chatData = selected?.node.chat;
+		if (sel !== selected) {
+			sel = selected;
 			chatChanged();
 		} else if (chatData !== undefined && $chatData) {
 			unreadCountChanged();
@@ -81,7 +82,7 @@
 	}
 
 	function chatChanged() {
-		const sel = $selected;
+		const sel = selected;
 		if (!NodeSelection.equals(sel, oldSelection)) {
 			if (oldSelection !== undefined) chatStore.save(text, oldSelection);
 
@@ -103,7 +104,7 @@
 	}
 
 	function chatBoxRecheck() {
-		const sel = $selected;
+		const sel = selected;
 		if (sel === undefined) {
 			canChatHere = false;
 			return;
@@ -130,7 +131,7 @@
 		try {
 			if (isSending) return;
 			isSending = true;
-			const sel = $selected;
+			const sel = selected;
 			if (sel === undefined) return;
 			const textData = messageInput.getStructuredView();
 			if (textData.length === 0) return;
@@ -272,7 +273,7 @@
 
 	onMount(() => {
 		chatChanged();
-		if ($selected !== undefined) chatList?.sourceChanged(ListFetchDir.New, ListFetchDir.After);
+		if (selected !== undefined) chatList?.sourceChanged(ListFetchDir.New, ListFetchDir.After);
 		window.addEventListener("focus", markRead);
 	});
 
@@ -293,7 +294,7 @@
 				<div class="message-body">Failed to fetch messages</div>
 			</article>
 		</div>
-	{:else if $selected !== undefined && sel !== undefined}
+	{:else if selected !== undefined && sel !== undefined}
 		<LazyList
 			on:viewchanged={viewchanged}
 			bind:this={chatList}

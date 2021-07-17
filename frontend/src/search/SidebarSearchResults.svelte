@@ -81,11 +81,7 @@
 			</article>
 		</div>
 	{:else if filter.length >= 2}
-		<LazyList
-			bind:this={searchList}
-			fetchElements={fetchElements}
-			suggestJumpStart={true}
-			let:item>
+		<LazyList bind:this={searchList} {fetchElements} suggestJumpStart={true} let:item>
 			<div slot="loading" class="searchFiller">
 				<span>Loading ...</span>
 				<Icon name="orbit mdi-spin" />

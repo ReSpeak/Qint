@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { get } from "svelte/store";
 	import type { Readable } from "svelte/store";
 	import TsIcon from "../ui/icon/TsIcon.svelte";
 	import ServerGroupIcon from "../ui/icon/ServerGroupIcon.svelte";
@@ -99,8 +100,17 @@
 		return [resEntry[0], resEntry[1], resDescription];
 	}
 
-	function setChat() {
-		app.select(connection, client);
+	function setChat(ev: MouseEvent) {
+		if (ev.ctrlKey) {
+			app.updateSelections((sels) => {
+				if (client.isSelected) return sels.filter((sel) => sel.node !== client);
+				else return [...sels, new NodeSelection(connection!, client)];
+			});
+		} else if (ev.shiftKey) {
+			// TODO
+		} else {
+			app.select(connection, client);
+		}
 	}
 
 	function applyFilter(filter: string, client: Client) {
@@ -137,7 +147,11 @@
 		log(hoverOpt, dropTarget);
 		if (dropTarget !== undefined) {
 			log("Would drop to", dropTarget.dataset.key);
-			connection.moveClient(client.id, dropTarget.dataset.key!);
+			// Move all selected clients
+			for (const sel of get(app.selectedNode).selections) {
+				if (sel.node instanceof Client && sel.connection === connection)
+					connection.moveClient(sel.node.id, dropTarget.dataset.key!);
+			}
 		}
 	}
 

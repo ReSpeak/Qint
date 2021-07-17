@@ -149,7 +149,7 @@
 
 		:global(.limitChatSize) {
 			//max-height: min(50vh, 30em);
-			max-height: min(30em);
+			max-height: 30em;
 		}
 	}
 

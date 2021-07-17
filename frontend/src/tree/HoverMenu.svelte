@@ -3,7 +3,7 @@
 	import HoverMenuChannel from "./HoverMenuChannel.svelte";
 	import HoverMenuServer from "./HoverMenuServer.svelte";
 	import Icon from "../ui/icon/Icon.svelte";
-	import { app, NodeSelection } from "../app";
+	import { app, NodeSelection, NodeSelections } from "../app";
 	import { Channel, Client, Server } from "../book";
 	import { DescriptionMode } from "../transientSettings";
 	import HoverContainer from "./HoverContainer.svelte";
@@ -17,7 +17,7 @@
 	let infoActive: boolean;
 	let filesActive: boolean;
 	$: {
-		if (NodeSelection.equals($curSelected, selected)) {
+		if ($curSelected.includesSel(selected)) {
 			if (selected.node instanceof Client) {
 				infoActive = $descriptionMode !== DescriptionMode.None;
 			} else {
@@ -38,7 +38,7 @@
 			$descriptionMode = DescriptionMode.None;
 		} else {
 			$descriptionMode = mode;
-			app.selectNode(selected);
+			app.selectNode(new NodeSelections([selected]));
 		}
 		app.transientSettings.save();
 	}

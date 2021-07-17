@@ -38,7 +38,16 @@
 		if (!$state.connected) {
 			showConnect(get(connection.connectOptions).clone());
 		} else if (ev.button === MouseButton.Main) {
-			app.setDescriptionMode(new NodeSelection(connection, server), DescriptionMode.Info);
+			if (ev.ctrlKey) {
+				app.updateSelections((sels) => {
+					if (server.isSelected) return sels.filter((sel) => sel.node !== server);
+					else return [...sels, new NodeSelection(connection!, server)];
+				});
+			} else if (ev.shiftKey) {
+				// TODO
+			} else {
+				app.setDescriptionMode(new NodeSelection(connection, server), DescriptionMode.Info);
+			}
 		} else if (ev.button === MouseButton.Auxiliary) {
 			ev.preventDefault();
 			app.setDescriptionMode(new NodeSelection(connection, server), DescriptionMode.Files);
@@ -61,7 +70,7 @@
 	<div bind:this={div} class="button stickyLine" class:selectedServerChat tabindex="0">
 		<TsIcon type="server" source={$server} {connection} />
 		<div class="serverName">
-			<ServerName server={$server} {connection} />
+			<ServerName server={$server} {connection} handleClicks={false} />
 		</div>
 		<div class="buttons">
 			{#if !$state.connected}

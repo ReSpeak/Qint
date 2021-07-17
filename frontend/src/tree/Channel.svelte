@@ -141,7 +141,19 @@
 	function setChat(ev: MouseEvent) {
 		if (connection === undefined) return;
 		if (ev.button === MouseButton.Main) {
-			app.setDescriptionMode(new NodeSelection(connection, channel), DescriptionMode.Info);
+			if (ev.ctrlKey) {
+				app.updateSelections((sels) => {
+					if (channel.isSelected) return sels.filter((sel) => sel.node !== channel);
+					else return [...sels, new NodeSelection(connection!, channel)];
+				});
+			} else if (ev.shiftKey) {
+				// TODO
+			} else {
+				app.setDescriptionMode(
+					new NodeSelection(connection, channel),
+					DescriptionMode.Info
+				);
+			}
 		} else if (ev.button === MouseButton.Auxiliary) {
 			app.setDescriptionMode(new NodeSelection(connection, channel), DescriptionMode.Files);
 		}

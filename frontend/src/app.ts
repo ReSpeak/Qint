@@ -25,7 +25,7 @@ export class App {
 	public get hasConnected(): boolean {
 		return get(this.connections).some((s) => get(s.state).connected);
 	}
-	public readonly selectedNode: Writable<NodeSelection | undefined> = writable(undefined);
+	public readonly selectedNode: Writable<NodeSelections> = writable(new NodeSelections());
 	public readonly showSidebar = writable(false);
 	public readonly displayPanel = writable(DisplayPanel.Connect);
 	public readonly modalVisible = writable(false);
@@ -46,13 +46,11 @@ export class App {
 		});
 		// TODO unsubscribe somewhere
 		this.selectedNode.subscribe((s) => {
-			if (s !== undefined && s.connection !== undefined) {
-				const name =
-					s.connection.book.server.name ?? get(s.connection.connectOptions).address;
+			const con = s.getConnection();
+			if (con !== undefined) {
+				const name = con.book.server.name ?? get(con.connectOptions).address;
 				backend.setTitle(name + " – Qint");
-				getIconPath(s.connection, s.connection.book.server).then((iconPath) =>
-					backend.setIcon(iconPath)
-				);
+				getIconPath(con, con.book.server).then((iconPath) => backend.setIcon(iconPath));
 			} else {
 				backend.setTitle("Qint");
 				backend.setIcon(undefined);
@@ -61,30 +59,33 @@ export class App {
 	}
 
 	public select(con: Connection, node: ITreeNode): void {
-		this.selectNode(new NodeSelection(con, node));
+		this.selectNode(new NodeSelections([new NodeSelection(con, node)]));
 	}
 
 	public deselect(): void {
-		this.selectNode(undefined);
+		this.selectNode(new NodeSelections());
 	}
 
-	public selectNode(nodeSel?: NodeSelection): void {
+	public selectNode(nodeSel: NodeSelections): void {
 		const checkOldNode = get(this.selectedNode);
-		if (NodeSelection.equals(checkOldNode, nodeSel)) return;
-		console.log("Switching to", nodeSel?.uniqueStr);
+		if (NodeSelections.equals(checkOldNode, nodeSel)) return;
+		console.log(
+			"Switching to",
+			nodeSel.selections?.map((s) => s.uniqueStr)
+		);
 		this.selectedNode.update((oldNode) => {
-			if (oldNode !== undefined) {
-				oldNode.node.update({ isSelected: false });
-			}
-			if (nodeSel !== undefined) {
-				nodeSel.node.update({ isSelected: true });
-			}
+			for (const sel of oldNode.selections) sel.node.update({ isSelected: false });
+			for (const sel of nodeSel.selections) sel.node.update({ isSelected: true });
 			return nodeSel;
 		});
 	}
 
+	public updateSelections(f: (sels: NodeSelection[]) => NodeSelection[]) {
+		this.selectNode(new NodeSelections(f(get(this.selectedNode).selections)));
+	}
+
 	public setDescriptionMode(selected: NodeSelection, mode: DescriptionMode): void {
-		app.selectNode(selected);
+		app.selectNode(new NodeSelections([selected]));
 		this.transientSettings.ui._descriptionMode.set(mode);
 		app.transientSettings.save();
 	}
@@ -144,6 +145,42 @@ export class NodeSelection {
 		if (first === undefined || second === undefined) return false;
 		if (first.connection !== second.connection) return false;
 		return first.node.equals(second.node);
+	}
+}
+
+export class NodeSelections {
+	constructor(public selections: NodeSelection[] = []) {}
+
+	public includes(con: Connection | undefined, node: ITreeNode): boolean {
+		const str = `${node.qlType},${con?.book.server.uidStr},${node.qlId}`;
+		return this.selections.some((s) => s.uniqueStr === str);
+	}
+
+	public includesSel(sel: NodeSelection): boolean {
+		const str = sel.uniqueStr;
+		return this.selections.some((s) => s.uniqueStr === str);
+	}
+
+	public getSingleSelection(): NodeSelection | undefined {
+		if (this.selections.length === 1) return this.selections[0];
+		return undefined;
+	}
+
+	/// Returns a connection if all nodes use the same or undefined if ambiguous
+	public getConnection(): Connection | undefined {
+		let con = undefined;
+		for (const sel of this.selections) {
+			if (con === undefined) con = sel.connection;
+			else if (sel.connection !== undefined && con !== sel.connection) return undefined;
+		}
+		return con;
+	}
+
+	public static equals(first: NodeSelections, second: NodeSelections): boolean {
+		if (first === second) return true;
+		if (first === undefined || second === undefined) return false;
+		if (first.selections.length !== second.selections.length) return false;
+		return first.selections.every((s) => second.includesSel(s));
 	}
 }
 

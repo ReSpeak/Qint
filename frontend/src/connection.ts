@@ -174,7 +174,7 @@ export class Connection implements IConnection {
 			}
 		}
 		// Reset chat if the selected node is from this connection.
-		app.selectedNode.update((n) => (n?.connection === this ? undefined : n));
+		app.updateSelections((sels) => sels.filter((sel) => sel.connection !== this));
 		this.rejectReturnCodes();
 	}
 
@@ -442,12 +442,14 @@ export class Connection implements IConnection {
 									return;
 								}
 								// Reset chat if the selected node is from this client.
-								app.selectedNode.update((n) =>
-									n?.connection === this &&
-									n.node instanceof Client &&
-									n.node.id === id
-										? undefined
-										: n
+								app.updateSelections((sels) =>
+									sels.filter((sel) => {
+										return !(
+											sel.connection === this &&
+											sel.node instanceof Client &&
+											sel.node.id === id
+										);
+									})
 								);
 								const client = this.book.getClient(id);
 								if (client !== undefined && client.uid !== null) {
@@ -506,13 +508,15 @@ export class Connection implements IConnection {
 									// Update selected node
 									const curTarget = get(app.selectedNode);
 									if (
-										curTarget === undefined ||
-										curTarget.node.qlType === "CHANNEL"
-									)
+										curTarget.selections.some(
+											(sel) => sel.node.qlType === "CHANNEL"
+										)
+									) {
 										app.select(
 											this,
 											this.book.getChannel(prop.Client.channel!)!
 										);
+									}
 								}
 
 								const muteOrAwayChanged =

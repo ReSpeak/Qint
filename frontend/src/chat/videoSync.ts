@@ -45,7 +45,7 @@ export class SyncState {
 			return [PluginTargetMode.Client, node.id];
 		} else if (
 			node instanceof Channel &&
-			NodeSelection.equals(get(app.selectedNode), this.nodeSel)
+			NodeSelection.equals(get(app.selectedNode).getSingleSelection(), this.nodeSel)
 		) {
 			return [PluginTargetMode.CurrentChannel, "0"];
 		} else if (node instanceof Server) {

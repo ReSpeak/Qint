@@ -7,6 +7,7 @@
 
 	export let connection: Connection | undefined = undefined;
 	export let server: ServerBase;
+	export let handleClicks = true;
 
 	const state = connection?.state;
 	const address =
@@ -17,9 +18,8 @@
 			: undefined;
 
 	function click() {
-		if (server instanceof Server && connection !== undefined) {
+		if (handleClicks && server instanceof Server && connection !== undefined)
 			app.select(connection, server);
-		}
 	}
 </script>
 

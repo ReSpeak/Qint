@@ -4,24 +4,29 @@
 	import DescriptionChannel from "./DescriptionChannel.svelte";
 	import DescriptionServer from "./DescriptionServer.svelte";
 	import DescriptionOfflineServer from "./DescriptionOfflineServer.svelte";
-	import { NodeSelection } from "../app";
+	import DescriptionMultiSelection from "./DescriptionMultiSelection.svelte";
+	import { NodeSelections } from "../app";
 	import { Channel, Client, GraphQlClient, GraphQlServer, Server } from "../book";
 
-	export let selected: NodeSelection | undefined;
+	export let selected: NodeSelections;
+
+	$: selection = selected.getSingleSelection();
 </script>
 
-{#if selected !== undefined}
-	{#if selected.node instanceof Client && selected.connection !== undefined}
-		<DescriptionClient connection={selected.connection} client={selected.node} />
-	{:else if selected.node instanceof GraphQlClient}
-		<DescriptionOfflineClient client={selected.node} />
-	{:else if selected.node instanceof Channel && selected.connection !== undefined}
-		<DescriptionChannel connection={selected.connection} channel={selected.node} />
-	{:else if selected.node instanceof Server && selected.connection !== undefined}
-		<DescriptionServer connection={selected.connection} server={selected.node} />
-	{:else if selected.node instanceof GraphQlServer}
-		<DescriptionOfflineServer server={selected.node} />
+{#if selection !== undefined}
+	{#if selection.node instanceof Client && selection.connection !== undefined}
+		<DescriptionClient connection={selection.connection} client={selection.node} />
+	{:else if selection.node instanceof GraphQlClient}
+		<DescriptionOfflineClient client={selection.node} />
+	{:else if selection.node instanceof Channel && selection.connection !== undefined}
+		<DescriptionChannel connection={selection.connection} channel={selection.node} />
+	{:else if selection.node instanceof Server && selection.connection !== undefined}
+		<DescriptionServer connection={selection.connection} server={selection.node} />
+	{:else if selection.node instanceof GraphQlServer}
+		<DescriptionOfflineServer server={selection.node} />
 	{/if}
+{:else if selected.selections.length !== 0}
+	<DescriptionMultiSelection {selected} />
 {/if}
 
 <style lang="scss">

@@ -3,7 +3,7 @@ import type { Moment } from "moment";
 import { GraphQlClient, ChatData } from "../book";
 import { datetimeDeserialize, getDataColor, assert, Lazy } from "../util";
 import { ListFetchDir, FetchResult } from "../ui/container/uiLazyList";
-import { NodeSelection } from "../app";
+import { NodeSelection, NodeSelections } from "../app";
 import { backend } from "../backend/backend";
 import { StructuredData } from "../ui/specialized/uiChatInput";
 import { ChannelId, Uid } from "../ts";
@@ -19,7 +19,7 @@ export class Chat {
 		canLoadAfterEnd: false,
 	};
 
-	public constructor(private readonly selectedChat: Readable<NodeSelection | undefined>) {}
+	public constructor(private readonly selectedChat: Readable<NodeSelections | undefined>) {}
 
 	private static groupMessages(
 		messages: Message[],
@@ -54,11 +54,17 @@ export class Chat {
 		}
 	}
 
+	private getSelected(): NodeSelection | undefined {
+		const selections = get(this.selectedChat);
+		if (selections === undefined || selections.selections.length !== 1) return undefined;
+		return selections.selections[0];
+	}
+
 	public async getMessages(
 		idFrom: Message | undefined,
 		dir: ListFetchDir
 	): Promise<FetchResult<Message>> {
-		const selected = get(this.selectedChat);
+		const selected = this.getSelected();
 		if (selected === undefined) return Chat.EmptyFetch;
 		const publicKey = selected.connection?.book.server.publicKey;
 		if (publicKey === undefined) {
@@ -169,7 +175,7 @@ export class Chat {
 	}
 
 	public sendMessage(message: string): void {
-		const selected = get(this.selectedChat);
+		const selected = this.getSelected();
 		if (selected === undefined) return;
 		selected.connection?.sendMessage({
 			SendMessage: {
@@ -180,7 +186,7 @@ export class Chat {
 	}
 
 	public async setLastRead(messageId: string, lastRead: Moment): Promise<void> {
-		const selected = get(this.selectedChat);
+		const selected = this.getSelected();
 		if (selected === undefined) return;
 		const publicKey = selected.connection?.book.server.publicKey;
 		if (publicKey === undefined) {
@@ -203,7 +209,7 @@ export class Chat {
 	}
 
 	public async getSendHistory(from: Uid, id: number): Promise<string | undefined> {
-		const selected = get(this.selectedChat);
+		const selected = this.getSelected();
 		if (selected === undefined) return undefined;
 		const publicKey = selected.connection?.book.server.publicKey;
 		if (publicKey === undefined) {

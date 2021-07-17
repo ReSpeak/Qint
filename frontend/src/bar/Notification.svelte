@@ -36,7 +36,7 @@
 	<span class="date" title={notification.date.format(LONG_DATETIME)}>
 		{notification.date.format("HH:mm")}
 	</span>
-	<ServerName server={connection.book.server} {connection} />
+	<ServerName server={connection.book.server} />
 </h6>
 <div class="content">
 	{#each notification.pieces as piece, i}
