@@ -5,10 +5,19 @@
 	export let src: string;
 	export let visible: boolean;
 	let div: HTMLElement;
+	let img: HTMLImageElement;
+	let stetch = false;
 
 	$: app.modalVisible.set(visible);
 
-	onMount(() => div.focus());
+	function updateStrech() {
+		stetch = img.naturalWidth === 0 && img.naturalHeight === 0;
+	}
+
+	onMount(() => {
+		updateStrech();
+		div.focus();
+	});
 	onDestroy(() => app.modalVisible.set(false));
 </script>
 
@@ -26,7 +35,9 @@
 	tabindex="0">
 	<div class="modal-background" />
 	<!-- svelte-ignore a11y-missing-attribute -->
-	<div class="custom-content"><img {src} /></div>
+	<div class="custom-content" class:stetch>
+		<img bind:this={img} on:load={() => updateStrech()} {src} />
+	</div>
 	<button class="modal-close is-large" aria-label="close" />
 </div>
 
@@ -36,12 +47,19 @@
 		max-width: 100%;
 	}
 
+	$max: calc(100% - 2em);
+
 	.custom-content {
 		position: relative;
-		max-width: calc(100% - 2em);
-		max-height: calc(100% - 2em);
+		max-width: $max;
+		max-height: $max;
 		display: flex;
 		justify-content: center;
+	}
+
+	.stetch {
+		min-width: $max;
+		min-height: $max;
 	}
 
 	.modal {
