@@ -19,7 +19,7 @@ export class Chat {
 		canLoadAfterEnd: false,
 	};
 
-	public constructor(private readonly selectedChat: Readable<NodeSelections | undefined>) {}
+	public constructor(private readonly selectedChat: Readable<NodeSelections>) {}
 
 	private static groupMessages(
 		messages: Message[],
@@ -55,9 +55,7 @@ export class Chat {
 	}
 
 	private getSelected(): NodeSelection | undefined {
-		const selections = get(this.selectedChat);
-		if (selections === undefined || selections.selections.length !== 1) return undefined;
-		return selections.selections[0];
+		return get(this.selectedChat).getSingleSelection();
 	}
 
 	public async getMessages(

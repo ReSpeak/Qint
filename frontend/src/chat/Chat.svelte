@@ -16,7 +16,7 @@
 	import { Channel, Client, Server } from "../book";
 	import { get, writable } from "svelte/store";
 	import type { Readable, Writable } from "svelte/store";
-	import { assert, SERVER_ICON } from "../util";
+	import { assert, on, SERVER_ICON } from "../util";
 	import type { ChatData } from "../bookBase";
 	import type { ChannelId } from "../ts";
 	import { pathJoin } from "../panel/fileUtil";
@@ -79,6 +79,13 @@
 		} else if (chatData !== undefined && $chatData) {
 			unreadCountChanged();
 		}
+	}
+
+	$: on(chatList, chatListChanged());
+
+	function chatListChanged() {
+		// chatList got mounted
+		chatList?.sourceChanged(ListFetchDir.New, ListFetchDir.After);
 	}
 
 	function chatChanged() {

@@ -141,14 +141,14 @@ export class Book {
 		channel.update(obj as any);
 		// Update node in channel tree
 		if (channel.parent !== oldParent || "order" in obj) {
-			let parent = this.getChannel(oldParent);
+			let parent = oldParent === "0" ? this.server : this.getChannel(oldParent);
 			if (parent !== undefined) {
 				parent.channels.update((pch) => {
 					pch.remove_item(channel);
 					return pch;
 				});
 			}
-			parent = this.getChannel(channel.parent);
+			parent = channel.parent === "0" ? this.server : this.getChannel(channel.parent);
 			if (parent !== undefined) {
 				parent.channels.update((pch) => Book.addChannelSorted(pch, channel));
 			}
