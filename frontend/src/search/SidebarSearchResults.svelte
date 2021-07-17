@@ -3,16 +3,16 @@
 	import { ListFetchDir } from "../ui/container/uiLazyList";
 	import type { FetchResult } from "../ui/container/uiLazyList";
 	import Icon from "../ui/icon/Icon.svelte";
-	import UiMessageSearchResult from "./MessageSearchResult.svelte";
-	import { EmptyMessageFetch, search } from "./uiSearch";
-	import type { MessageSearchResult, OtherSearchResult } from "./uiSearch";
+	import UiOtherSearchResult from "./OtherSearchResult.svelte";
+	import { EmptyOtherFetch, search } from "./uiSearch";
+	import type { OtherSearchResult } from "./uiSearch";
 	import debug from "debug";
 	import { on } from "../util";
 	const log = debug("SEARCH");
 
 	export let filter: string;
 
-	let searchList: LazyList<MessageSearchResult> | undefined;
+	let searchList: LazyList<OtherSearchResult> | undefined;
 	let searchError: unknown | undefined;
 
 	$: {
@@ -32,10 +32,10 @@
 		searchError = undefined;
 	}
 
-	async function fetchMessageElements(
-		idFrom: MessageSearchResult | undefined,
+	async function fetchElements(
+		idFrom: OtherSearchResult | undefined,
 		dir: ListFetchDir
-	): Promise<FetchResult<MessageSearchResult>> {
+	): Promise<FetchResult<OtherSearchResult>> {
 		searchError = undefined;
 		try {
 			let res;
@@ -44,27 +44,27 @@
 			if (dir === ListFetchDir.Before && idFrom) {
 				const start = Math.max(0, idFrom.id - 50);
 				canLoadBeforeStart = start !== 0;
-				res = await search(filter, true, start);
-				res.messages = res.messages.slice(0, idFrom.id - start);
+				res = await search(filter, false, start);
+				res.others = res.others.slice(0, idFrom.id - start);
 			} else {
 				if (idFrom !== undefined) canLoadBeforeStart = idFrom.id !== 0;
-				res = await search(filter, true, idFrom !== undefined ? idFrom.id + 1 : undefined);
-				if (res.messages.length < 50) canLoadAfterEnd = false;
+				res = await search(filter, false, idFrom !== undefined ? idFrom.id + 1 : undefined);
+				if (res.others.length < 50) canLoadAfterEnd = false;
 			}
-			if (res.messages.length === 0) {
+			if (res.others.length === 0) {
 				canLoadBeforeStart = false;
 				canLoadAfterEnd = false;
 			}
-			log("loading message search", idFrom, dir, "gives", res.messages);
+			log("loading other search", idFrom, dir, "gives", res.others);
 			return {
-				items: res.messages,
+				items: res.others,
 				canLoadAfterEnd,
 				canLoadBeforeStart,
 			};
 		} catch (err) {
-			console.error("Failed to load message search results", err);
+			console.error("Failed to load other search results", err);
 			searchError = err;
-			return EmptyMessageFetch;
+			return EmptyOtherFetch;
 		}
 	}
 </script>
@@ -83,7 +83,7 @@
 	{:else if filter.length >= 2}
 		<LazyList
 			bind:this={searchList}
-			fetchElements={fetchMessageElements}
+			fetchElements={fetchElements}
 			suggestJumpStart={true}
 			let:item>
 			<div slot="loading" class="searchFiller">
@@ -91,7 +91,7 @@
 				<Icon name="orbit mdi-spin" />
 			</div>
 			<div slot="empty" class="searchFiller">No results ¯\_(ツ)_/¯</div>
-			<UiMessageSearchResult content={item} />
+			<UiOtherSearchResult content={item} />
 		</LazyList>
 	{:else}
 		<div class="searchFiller" />

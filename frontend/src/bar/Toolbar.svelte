@@ -40,6 +40,15 @@
 	</div>
 	<div class="spacer" />
 	<div class="centerButtons toolbuttons">
+		{#if filter !== ""}
+			<button
+				class="toolbutton"
+				class:active={displayPanel === DisplayPanel.Search}
+				on:click={() => (displayPanel = DisplayPanel.Search)}
+				title="Chat">
+				<Icon name="magnify" />
+			</button>
+		{/if}
 		<button
 			class="toolbutton"
 			class:active={displayPanel === DisplayPanel.Main}

@@ -3,6 +3,7 @@
 	import Server from "../tree/ServerWrap.svelte";
 	import StickyList from "../ui/container/StickyList.svelte";
 	import StickySlot from "../ui/container/StickySlot.svelte";
+	import SidebarSearchResults from "../search/SidebarSearchResults.svelte";
 	import NotificationList from "./NotificationList.svelte";
 	import { Connection } from "../connection";
 	import { ConnectData } from "../connect/uiConnect";
@@ -20,6 +21,11 @@
 		{#each $connections as connection (connection.backend.id)}
 			<Server {connection} {filter} {showConnect} />
 		{/each}
+
+		{#if filter !== ""}
+			<StickySlot>Search results</StickySlot>
+			<SidebarSearchResults {filter} />
+		{/if}
 
 		<StickySlot>Notifications</StickySlot>
 		<NotificationList {notifications} />

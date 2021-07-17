@@ -11,7 +11,7 @@
 </script>
 
 <div class="searchResult">
-	<div class="result-icon chat-left-col">
+	<div class="result-icon">
 		{#if "Channel" in content}
 			<TsIcon
 				type="channel"
@@ -27,25 +27,14 @@
 				connection={new OfflineConnection(content.Server.server.publicKeyStr)} />
 		{/if}
 	</div>
-	<div class="resultName has-text-weight-bold">
+	<div class="resultName">
 		{#if "Channel" in content}
-			{content.Channel.channel.name}
+			{@html content.Channel.highlightedName} on
+			<ServerName server={content.Channel.server} />
 		{:else if "Client" in content}
 			<ClientName client={content.Client.client} />
 		{:else}
 			<ServerName server={content.Server.server} />
-		{/if}
-	</div>
-	<div class="chat-left-col" />
-	<div class="resultBody">
-		{#if "Channel" in content}
-			<TsIcon
-				type="server"
-				source={content.Channel.server}
-				connection={new OfflineConnection(content.Channel.server.publicKeyStr)} />
-			<ServerName server={content.Channel.server} />
-			<span class="serverAddress">({content.Channel.server.address})</span>
-		{:else if "Server" in content}
 			{@html content.Server.highlightedAddress}
 		{/if}
 	</div>
@@ -53,23 +42,13 @@
 
 <style lang="scss">
 	@import "../style/global_mixin";
-	@import "../chat/chat_style";
-
-	.searchResult :global(.chat-left-col) {
-		@include chat-left-col;
-		width: 40px;
-	}
 
 	.searchResult {
 		display: grid;
 		grid-template-columns: min-content minmax(0, 1fr);
 		line-height: 1.1em;
-		grid-gap: 0.3em;
+		grid-gap: 0.1em;
 		padding: 0.3em;
-
-		&:hover {
-			background-color: $highlight-weak;
-		}
 	}
 
 	.resultName {
