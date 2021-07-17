@@ -835,26 +835,6 @@ impl SearchResult {
 	}
 }
 
-/// A helper function that robustly aligns a range to char boundaries.
-/*fn highlight_to_byte_range(range: Range<usize>, text: &str) -> Range<usize> {
-	if range.start > text.len() {
-		range.start = text.len();
-	}
-	if range.end > text.len() {
-		range.end = text.len();
-	}
-
-	// Round down to char boundaries
-	while !text.is_char_boundary(range.start) {
-		range.start -= 1;
-	}
-	while !text.is_char_boundary(range.end) {
-		range.end -= 1;
-	}
-
-	range
-}*/
-
 #[juniper::graphql_object(Context = QintState)]
 impl SearchResult {
 	async fn attribute(&self, state: &QintState, attribute: String) -> GResult<Option<String>> {
@@ -876,9 +856,15 @@ impl SearchResult {
 			_ => None,
 		};
 		if let Some(gen) = snippet_generator {
-			//let highlights = gen.snippet(&attr).highlighted().iter(|r| highlight_to_byte_range(r.clone(), attr)).collect::<Vec<_>>();
+			// We want to highlight in the original message, so search the highlighted parts there.
 			let snippet = gen.snippet(&attr);
-			Ok(Some(markdown_highlighted(snippet.fragments(), snippet.highlighted())))
+			let s = snippet.fragments();
+			let highlights = snippet.highlighted().iter().filter_map(|r| {
+				attr.find(&s[r.clone()]).map(|start| {
+					start..(start + (r.end - r.start))
+				})
+			}).collect::<Vec<_>>();
+			Ok(Some(markdown_highlighted(&attr, &highlights)))
 		} else {
 			Ok(Some(markdown_highlighted(&attr, &[])))
 		}
