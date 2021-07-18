@@ -17,7 +17,7 @@
 	let infoActive: boolean;
 	let filesActive: boolean;
 	$: {
-		if ($curSelected.includesSel(selected)) {
+		if ($curSelected.includes(selected)) {
 			if (selected.node instanceof Client) {
 				infoActive = $descriptionMode !== DescriptionMode.None;
 			} else {

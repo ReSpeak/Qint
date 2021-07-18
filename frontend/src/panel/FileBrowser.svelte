@@ -28,11 +28,11 @@
 		None,
 		CreatingNewFolder,
 		DraggingFilesForUpload,
-		DeletingFiles,
 		EditingFile,
 	}
 
 	let currentState = WorkState.None;
+	let isConfirmingDelete = false;
 	let path: string[] = [];
 	let fileBrowserHasFocus = false;
 	let fileTable: Table<FileTreeNode>;
@@ -161,12 +161,14 @@
 			});
 		}
 		currentState = WorkState.None;
+		isConfirmingDelete = false;
 		refreshCurrentFolder(false); // TODO apply in chage instead
 	}
 
 	function selectionChanged(evt: CustomEvent<{ selected: FileTreeNode[] }>) {
 		fileSelection = evt.detail.selected;
 		currentState = WorkState.None;
+		isConfirmingDelete = false;
 	}
 
 	/// Sort first by type and then by f
@@ -258,6 +260,7 @@
 
 	function dragDrop(e: DragEvent) {
 		currentState = WorkState.None;
+		isConfirmingDelete = false;
 		e.preventDefault();
 
 		const files = e.dataTransfer?.files;
@@ -273,6 +276,7 @@
 		if (this !== e.target) return;
 		fileTable.clearSelection();
 		currentState = WorkState.None;
+		isConfirmingDelete = false;
 	}
 
 	function onHotkey(e: KeyboardEvent) {
@@ -282,11 +286,13 @@
 		if (e.key === "F2" && fileSelection.length === 1) {
 			e.preventDefault();
 			currentState = WorkState.EditingFile;
+			isConfirmingDelete = false;
 		}
 		if (e.key === "Delete") {
 			e.preventDefault();
-			if (currentState !== WorkState.DeletingFiles && fileSelection.length > 0) {
-				currentState = WorkState.DeletingFiles;
+			if (!isConfirmingDelete && fileSelection.length > 0) {
+				isConfirmingDelete = true;
+				currentState = WorkState.None;
 			} else {
 				deleteFiles();
 			}
@@ -393,7 +399,7 @@
 			on:click={clickEditFile}>
 			<Icon name="pen" />
 		</button>
-		<DeleteConfirmButton disabled={fileSelection.length === 0} on:delete={deleteFiles} />
+		<DeleteConfirmButton disabled={fileSelection.length === 0} bind:isConfirming={isConfirmingDelete} on:delete={deleteFiles} />
 	</div>
 
 	<nav class="breadcrumb" aria-label="path">

@@ -3,23 +3,22 @@
 	import Icon from "../icon/Icon.svelte";
 
 	export let disabled = false;
+	export let isConfirming = false;
 
 	const dispatch = createEventDispatcher<{
 		delete: undefined;
 	}>();
 
-	let isDeleting = false;
-
 	function deleteConfirmed() {
-		isDeleting = false;
+		isConfirming = false;
 		dispatch("delete");
 	}
 </script>
 
 <div class="field has-addons">
-	{#if isDeleting}
+	{#if isConfirming}
 		<p class="control">
-			<button class="button" on:click={() => (isDeleting = false)}>
+			<button class="button" on:click={() => (isConfirming = false)}>
 				<Icon name="close" />
 			</button>
 		</p>
@@ -33,7 +32,7 @@
 			<button
 				{disabled}
 				class="button is-danger is-outlined"
-				on:click={() => (isDeleting = true)}>
+				on:click={() => (isConfirming = true)}>
 				<Icon name="delete" />
 			</button>
 		</p>

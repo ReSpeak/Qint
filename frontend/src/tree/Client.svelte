@@ -102,12 +102,9 @@
 
 	function setChat(ev: MouseEvent) {
 		if (ev.ctrlKey) {
-			app.updateSelections((sels) => {
-				if (client.isSelected) return sels.filter((sel) => sel.node !== client);
-				else return [...sels, new NodeSelection(connection!, client)];
-			});
+			app.toggleSelection(new NodeSelection(connection, client));
 		} else if (ev.shiftKey) {
-			// TODO
+			app.expandSelection(new NodeSelection(connection, client));
 		} else {
 			app.select(connection, client);
 		}

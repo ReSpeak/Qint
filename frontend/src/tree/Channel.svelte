@@ -142,12 +142,9 @@
 		if (connection === undefined) return;
 		if (ev.button === MouseButton.Main) {
 			if (ev.ctrlKey) {
-				app.updateSelections((sels) => {
-					if (channel.isSelected) return sels.filter((sel) => sel.node !== channel);
-					else return [...sels, new NodeSelection(connection!, channel)];
-				});
+				app.toggleSelection(new NodeSelection(connection, channel));
 			} else if (ev.shiftKey) {
-				// TODO
+				app.expandSelection(new NodeSelection(connection, channel));
 			} else {
 				app.setDescriptionMode(
 					new NodeSelection(connection, channel),

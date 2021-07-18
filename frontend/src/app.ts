@@ -74,14 +74,98 @@ export class App {
 			nodeSel.selections?.map((s) => s.uniqueStr)
 		);
 		this.selectedNode.update((oldNode) => {
-			for (const sel of oldNode.selections) sel.node.update({ isSelected: false });
-			for (const sel of nodeSel.selections) sel.node.update({ isSelected: true });
+			for (const sel of oldNode.selections) {
+				if (!nodeSel.includes(sel))
+					sel.node.update({ isSelected: false });
+			}
+			for (const sel of nodeSel.selections) {
+				if (!sel.node.isSelected)
+					sel.node.update({ isSelected: true });
+			}
 			return nodeSel;
 		});
 	}
 
 	public updateSelections(f: (sels: NodeSelection[]) => NodeSelection[]) {
 		this.selectNode(new NodeSelections(f(get(this.selectedNode).selections)));
+	}
+
+	public toggleSelection(sel: NodeSelection) {
+		this.selectedNode.update((n) => {
+			sel.node.update({ isSelected: !sel.node.isSelected });
+			if (!sel.node.isSelected)
+				n.selections = n.selections.filter((s) => sel.node !== s.node);
+			else
+				n.selections.push(sel);
+			return n;
+		});
+	}
+
+	public expandSelection(sel: NodeSelection) {
+		const oldNode = get(this.selectedNode);
+		if (oldNode.selections.length === 0) {
+			this.toggleSelection(sel);
+			return;
+		}
+		const lastSel = oldNode.selections[oldNode.selections.length - 1];
+		if (NodeSelection.equals(lastSel, sel)) return;
+		let cons: Connection[] = [];
+		if (lastSel.connection === sel.connection) {
+			cons = [sel.connection];
+		} else {
+			let isSelecting = false;
+			for (const c of get(this.connections)) {
+				if (c === sel.connection || c === lastSel.connection) {
+					if (!isSelecting) {
+						isSelecting = true;
+					} else {
+						cons.push(c);
+						break;
+					}
+				}
+				if (isSelecting)
+					cons.push(c);
+			}
+		}
+
+		// Select everything in cons that is between the two selection boundaries
+		let isSelecting = false;
+		const newSelections: NodeSelection[] = [];
+		const handleNode = (node: NodeSelection) => {
+			if (NodeSelection.equals(lastSel, node) || NodeSelection.equals(sel, node)) {
+				if (!isSelecting) {
+					isSelecting = true;
+				} else {
+					// End of selection
+					if (!oldNode.includes(node))
+						newSelections.push(node);
+					return true;
+				}
+			}
+			if (isSelecting && !oldNode.includes(node))
+				newSelections.push(node);
+			return false;
+		};
+		selectionLoop:
+		for (const con of cons) {
+			if (!get(con.state).connected) continue;
+			if (handleNode(new NodeSelection(con, con.book.server)))
+				break selectionLoop;
+			let stack = [...get(con.book.server.channels)].reverse();
+			while (stack.length > 0) {
+				const channel = stack[stack.length - 1];
+				stack.pop();
+				if (handleNode(new NodeSelection(con, channel)))
+					break selectionLoop;
+				for (const client of get(channel.clients)) {
+					if (handleNode(new NodeSelection(con, client)))
+						break selectionLoop;
+				}
+				stack = [...stack, ...[...get(channel.channels)].reverse()];
+			}
+		}
+
+		this.updateSelections((sels) => [...sels, ...newSelections]);
 	}
 
 	public setDescriptionMode(selected: NodeSelection, mode: DescriptionMode): void {
@@ -151,14 +235,8 @@ export class NodeSelection {
 export class NodeSelections {
 	constructor(public selections: NodeSelection[] = []) {}
 
-	public includes(con: Connection | undefined, node: ITreeNode): boolean {
-		const str = `${node.qlType},${con?.book.server.uidStr},${node.qlId}`;
-		return this.selections.some((s) => s.uniqueStr === str);
-	}
-
-	public includesSel(sel: NodeSelection): boolean {
-		const str = sel.uniqueStr;
-		return this.selections.some((s) => s.uniqueStr === str);
+	public includes(sel: NodeSelection): boolean {
+		return this.selections.some((s) => NodeSelection.equals(s, sel));
 	}
 
 	public getSingleSelection(): NodeSelection | undefined {
@@ -180,7 +258,7 @@ export class NodeSelections {
 		if (first === second) return true;
 		if (first === undefined || second === undefined) return false;
 		if (first.selections.length !== second.selections.length) return false;
-		return first.selections.every((s) => second.includesSel(s));
+		return first.selections.every((s) => second.includes(s));
 	}
 }
 

@@ -23,12 +23,12 @@
 	const enum WorkState {
 		None,
 		DraggingFilesForUpload,
-		DeletingFiles,
 	}
 
 	type SelectableFileTreeNode = FileTreeNode & { selected?: boolean };
 
 	let currentState = WorkState.None;
+	let isConfirmingDelete = false;
 	let fileBrowserHasFocus = false;
 	let displayFiles: SelectableFileTreeNode[] = [];
 	let fileSelection: SelectableFileTreeNode[] = [];
@@ -129,6 +129,7 @@
 			});
 		}
 		currentState = WorkState.None;
+		isConfirmingDelete = false;
 		refreshFiles(false); // TODO apply in chage instead
 	}
 
@@ -172,6 +173,7 @@
 
 	function dragDrop(e: DragEvent) {
 		currentState = WorkState.None;
+		isConfirmingDelete = false;
 		e.preventDefault();
 
 		const files = e.dataTransfer?.files;
@@ -190,6 +192,7 @@
 		displayFiles = displayFiles;
 		fileSelection = [];
 		currentState = WorkState.None;
+		isConfirmingDelete = false;
 	}
 
 	function onFileClick(file: SelectableFileTreeNode, i: number) {
@@ -213,6 +216,7 @@
 			showBigVisible = true;
 		}
 		currentState = WorkState.None;
+		isConfirmingDelete = false;
 	}
 
 	function onFileDblClick(file: SelectableFileTreeNode) {
@@ -228,8 +232,9 @@
 
 		if (e.key === "Delete") {
 			e.preventDefault();
-			if (currentState !== WorkState.DeletingFiles && fileSelection.length > 0) {
-				currentState = WorkState.DeletingFiles;
+			if (!isConfirmingDelete && fileSelection.length > 0) {
+				isConfirmingDelete = true;
+				currentState = WorkState.None;
 			} else {
 				deleteFiles();
 			}
@@ -274,7 +279,7 @@
 			</button>
 		{/if}
 		{#if canDelete}
-			<DeleteConfirmButton disabled={fileSelection.length === 0} on:delete={deleteFiles} />
+			<DeleteConfirmButton disabled={fileSelection.length === 0} bind:isConfirming={isConfirmingDelete} on:delete={deleteFiles} />
 		{/if}
 	</div>
 

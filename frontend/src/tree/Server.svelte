@@ -39,12 +39,9 @@
 			showConnect(get(connection.connectOptions).clone());
 		} else if (ev.button === MouseButton.Main) {
 			if (ev.ctrlKey) {
-				app.updateSelections((sels) => {
-					if (server.isSelected) return sels.filter((sel) => sel.node !== server);
-					else return [...sels, new NodeSelection(connection!, server)];
-				});
+				app.toggleSelection(new NodeSelection(connection, server));
 			} else if (ev.shiftKey) {
-				// TODO
+				app.expandSelection(new NodeSelection(connection, server));
 			} else {
 				app.setDescriptionMode(new NodeSelection(connection, server), DescriptionMode.Info);
 			}
