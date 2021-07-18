@@ -25,13 +25,11 @@
 		DraggingFilesForUpload,
 	}
 
-	type SelectableFileTreeNode = FileTreeNode & { selected?: boolean };
-
 	let currentState = WorkState.None;
 	let isConfirmingDelete = false;
 	let fileBrowserHasFocus = false;
-	let displayFiles: SelectableFileTreeNode[] = [];
-	let fileSelection: SelectableFileTreeNode[] = [];
+	let displayFiles: FileTreeNode[] = [];
+	let fileSelection: FileTreeNode[] = [];
 	let fileIo: FileIO;
 	let invalidateCache = true;
 	let showBig: FileTreeNode | undefined = undefined;
@@ -63,35 +61,27 @@
 		if (!forSelection) return;
 		if (selection === undefined) {
 			if (fileSelection.length !== 0) {
-				for (const f of fileSelection) f.selected = false;
-				displayFiles = displayFiles;
 				fileSelection = [];
 			}
 		} else {
-			for (const f of fileSelection) {
-				if (f.name !== selection) {
-					f.selected = false;
-					displayFiles = displayFiles;
-				}
-			}
-			if (fileSelection.length !== 1) {
-				const file = displayFiles.find((f) => f.name === selection);
-				if (file === undefined) {
-					selection = undefined;
-				} else {
-					fileSelection = [file];
-					file.selected = true;
-					displayFiles = displayFiles;
-				}
+			const file = displayFiles.find((f) => f.name === selection);
+			if (file === undefined) {
+				selection = undefined;
+			} else {
+				fileSelection = [file];
 			}
 		}
 	}
 
-	function getPath(filename: string): string {
+	async function getPath(filename: string): Promise<string> {
 		// This only works for icons and avatars.
 		// Note especially, that we need to list icons in the icons/ subfolder,
 		// however we can only download them from the root folder.
-		return `${connection.backend.serverFileSrc}/file/0/${filename}?cache=true`;
+		return await connection.fileProvider({
+			channel: "0",
+			path: `/${filename}`,
+			cache: true,
+		});
 	}
 
 	async function refreshFiles(useCache: boolean) {
@@ -188,28 +178,23 @@
 
 	function clickBackground(this: HTMLElement, e: MouseEvent) {
 		if (this !== e.target) return;
-		for (const f of fileSelection) f.selected = false;
-		displayFiles = displayFiles;
 		fileSelection = [];
 		currentState = WorkState.None;
 		isConfirmingDelete = false;
 	}
 
-	function onFileClick(file: SelectableFileTreeNode, i: number) {
+	function onFileClick(file: FileTreeNode, i: number) {
 		if (canDelete || forSelection) {
 			if (fileSelection.includes(file)) {
 				fileSelection.remove_item(file);
-				displayFiles[i].selected = false;
 				selection = undefined;
 			} else {
-				if (forSelection) {
-					for (const f of fileSelection) f.selected = false;
+				if (forSelection)
 					fileSelection = [];
-				}
 				fileSelection.push(file);
 				selection = file.name;
-				displayFiles[i].selected = true;
 			}
+			// Trigger update
 			fileSelection = fileSelection;
 		} else if (canShowBig) {
 			showBig = file;
@@ -219,7 +204,7 @@
 		isConfirmingDelete = false;
 	}
 
-	function onFileDblClick(file: SelectableFileTreeNode) {
+	function onFileDblClick(file: FileTreeNode) {
 		if (canDelete && canShowBig) {
 			showBig = file;
 			showBigVisible = true;
@@ -243,7 +228,9 @@
 </script>
 
 {#if showBig !== undefined}
-	<ImageModal src={getPath(showBig.name)} bind:visible={showBigVisible} />
+	{#await getPath(showBig.name) then path}
+		<ImageModal src={path} bind:visible={showBigVisible} />
+	{/await}
 {/if}
 <div
 	on:dragenter={dragEnter}
@@ -291,14 +278,16 @@
 				{#if file.isFile}
 					<span
 						class="image"
-						class:selected={file.selected ?? false}
+						class:selected={fileSelection.includes(file)}
 						on:click={() => onFileClick(file, i)}
 						on:dblclick={() => onFileDblClick(file)}>
-						<img
-							src={getPath(file.name)}
-							alt={file.name}
-							title={file.name}
-							style="max-width: {maxSize}; max-height: {maxSize};" />
+						{#await getPath(file.name) then path}
+							<img
+								src={path}
+								alt={file.name}
+								title={file.name}
+								style="max-width: {maxSize}; max-height: {maxSize};" />
+						{/await}
 					</span>
 				{/if}
 			{/each}

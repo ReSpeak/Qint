@@ -82,7 +82,7 @@ export function schemeToLink(con: IConnection, scheme: Ts3Scheme): IConFileReque
 		} else {
 			throw new Error("Not supported scheme");
 		}
-		return { con, channel, path, cache: false };
+		return { con, channel, path, cache: true };
 	}
 	return null;
 }
