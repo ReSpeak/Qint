@@ -140,14 +140,30 @@
 	function dragDrop(ev: CustomEvent<DragData>) {
 		ev.detail.dragNode.classList.remove("dragStyle");
 		const hoverOpt: HTMLElement[] = [...ev.detail.customData.querySelectorAll(":hover")];
-		const dropTarget = hoverOpt.reverse().find((x) => x.dataset.type === "channel");
+		const dropTarget = hoverOpt.reverse().find((x) => x.dataset.type === "channel" || x.dataset.type === "client");
 		log(hoverOpt, dropTarget);
 		if (dropTarget !== undefined) {
 			log("Would drop to", dropTarget.dataset.key);
-			// Move all selected clients
-			for (const sel of get(app.selectedNode).selections) {
-				if (sel.node instanceof Client && sel.connection === connection)
-					connection.moveClient(sel.node.id, dropTarget.dataset.key!);
+			let channelId;
+			if (dropTarget.dataset.type === "channel") {
+				channelId = dropTarget.dataset.key!;
+			} else {
+				channelId = connection.book.getClient(dropTarget.dataset.key!)?.channel;
+				if (channelId === undefined) {
+					log("Channel of client", dropTarget.dataset.key, "not found");
+					return;
+				}
+			}
+
+			// If this client is in the current selection, move all selected clients
+			if (client.isSelected) {
+				for (const sel of get(app.selectedNode).selections) {
+					if (sel.node instanceof Client && sel.connection === connection)
+						connection.moveClient(sel.node.id, channelId);
+				}
+			} else {
+				// Just move this client
+				connection.moveClient(client.id, channelId);
 			}
 		}
 	}

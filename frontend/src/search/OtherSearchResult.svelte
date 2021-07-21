@@ -54,10 +54,4 @@
 	.resultName {
 		align-self: center;
 	}
-
-	.resultBody {
-		display: flex;
-		align-items: center;
-		gap: 0.5em;
-	}
 </style>

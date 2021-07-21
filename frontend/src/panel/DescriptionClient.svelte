@@ -259,22 +259,12 @@
 		}
 	}
 
-	async function kickFromChannel() {
+	async function kick(reason: Reason) {
 		// TODO Handle result
 		await connection.sendChange({
 			ClientKick: {
 				id: client.id,
-				reason: Reason.KickChannel,
-			},
-		});
-	}
-
-	async function kickFromServer() {
-		// TODO Handle result
-		await connection.sendChange({
-			ClientKick: {
-				id: client.id,
-				reason: Reason.KickServer,
+				reason,
 			},
 		});
 	}
@@ -709,11 +699,11 @@
 					<Icon name="hand-pointing-right" />
 					<span>Poke</span>
 				</button>
-				<button class="button is-small is-warning" on:click={kickFromChannel}>
+				<button class="button is-small is-warning" on:click={() => kick(Reason.KickChannel)}>
 					<Icon name="shoe-formal" />
 					<span>Kick Channel</span>
 				</button>
-				<button class="button is-small is-danger" on:click={kickFromServer}>
+				<button class="button is-small is-danger" on:click={() => kick(Reason.KickServer)}>
 					<Icon name="shoe-formal" />
 					<span>Kick Server</span>
 				</button>

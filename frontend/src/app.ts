@@ -10,6 +10,8 @@ import { ConnectData } from "./connect/uiConnect";
 import { DisplayPanel } from "./panel/panel";
 import { getIconPath } from "./ui/icon/tsIcons";
 import { TsNotification } from "./notifications";
+import debug from "debug";
+const log = debug("APP");
 
 export class App {
 	public readonly connections: Writable<Connection[]> = writable([]);
@@ -86,11 +88,24 @@ export class App {
 		});
 	}
 
-	public updateSelections(f: (sels: NodeSelection[]) => NodeSelection[]) {
+	public updateSelections(f: (sels: NodeSelection[]) => NodeSelection[]): void {
 		this.selectNode(new NodeSelections(f(get(this.selectedNode).selections)));
 	}
 
-	public toggleSelection(sel: NodeSelection) {
+	private hasSameTypeAsCurrentSelection(node: ITreeNode): boolean {
+		const sels = get(this.selectedNode).selections;
+		if (sels.length === 0)
+			return true;
+		return sels[0].node.qlType === node.qlType;
+	}
+
+	public toggleSelection(sel: NodeSelection): void {
+		if (!sel.node.isSelected && !this.hasSameTypeAsCurrentSelection(sel.node)) {
+			log("Replacing selection because a different type of node is already selected");
+			this.updateSelections((_) => [sel]);
+			return;
+		}
+
 		this.selectedNode.update((n) => {
 			sel.node.update({ isSelected: !sel.node.isSelected });
 			if (!sel.node.isSelected)
@@ -101,7 +116,7 @@ export class App {
 		});
 	}
 
-	public expandSelection(sel: NodeSelection) {
+	public expandSelection(sel: NodeSelection): void {
 		const oldNode = get(this.selectedNode);
 		if (oldNode.selections.length === 0) {
 			this.toggleSelection(sel);
@@ -129,6 +144,8 @@ export class App {
 		}
 
 		// Select everything in cons that is between the two selection boundaries
+		// and has the same type as already selected parts.
+		const selectedType = lastSel.node.qlType;
 		let isSelecting = false;
 		const newSelections: NodeSelection[] = [];
 		const handleNode = (node: NodeSelection) => {
@@ -137,12 +154,12 @@ export class App {
 					isSelecting = true;
 				} else {
 					// End of selection
-					if (!oldNode.includes(node))
+					if (!oldNode.includes(node) && node.node.qlType === selectedType)
 						newSelections.push(node);
 					return true;
 				}
 			}
-			if (isSelecting && !oldNode.includes(node))
+			if (isSelecting && !oldNode.includes(node) && node.node.qlType === selectedType)
 				newSelections.push(node);
 			return false;
 		};

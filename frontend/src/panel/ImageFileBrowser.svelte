@@ -183,7 +183,7 @@
 		isConfirmingDelete = false;
 	}
 
-	function onFileClick(file: FileTreeNode, i: number) {
+	function onFileClick(file: FileTreeNode) {
 		if (canDelete || forSelection) {
 			if (fileSelection.includes(file)) {
 				fileSelection.remove_item(file);
@@ -274,12 +274,12 @@
 		<div class="noFiles">Empty</div>
 	{:else}
 		<div class="imageList">
-			{#each displayFiles as file, i (file.name)}
+			{#each displayFiles as file (file.name)}
 				{#if file.isFile}
 					<span
 						class="image"
 						class:selected={fileSelection.includes(file)}
-						on:click={() => onFileClick(file, i)}
+						on:click={() => onFileClick(file)}
 						on:dblclick={() => onFileDblClick(file)}>
 						{#await getPath(file.name) then path}
 							<img

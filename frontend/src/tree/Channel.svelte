@@ -21,6 +21,8 @@
 	import { DescriptionMode } from "../transientSettings";
 	import HoverContainer from "./HoverContainer.svelte";
 	import ChangeResult from "../ui/specialized/ChangeResult.svelte";
+	import debug from "debug";
+	const log = debug("UICHANNEL");
 
 	if (render_updates) afterUpdate(() => flash(div));
 
@@ -170,12 +172,25 @@
 		const hoverOpt: HTMLElement[] = [
 			...ev.detail.customData.querySelectorAll(":hover"),
 		].reverse();
-		const dropTarget = hoverOpt.find((x) => x.dataset.type === "channel");
+		const dropTarget = hoverOpt.find((x) => x.dataset.type === "channel" || x.dataset.type === "client");
 		if (dropTarget !== undefined && connection !== undefined) {
 			const rect = dropTarget.getBoundingClientRect();
 			const clickY = ev.detail.mouseDrop.clientY - rect.top;
-			const clickPerc = clickY / (rect.bottom - rect.top);
-			const target = connection.book.getChannel(dropTarget.dataset.key!)!;
+			let clickPerc = clickY / (rect.bottom - rect.top);
+			let target: Channel | undefined;
+			if (dropTarget.dataset.type === "channel") {
+				target = connection.book.getChannel(dropTarget.dataset.key!);
+			} else {
+				const client = connection.book.getClient(dropTarget.dataset.key!);
+				if (client !== undefined)
+					target = connection.book.getChannel(client.channel);
+				clickPerc = 0.5;
+			}
+			if (target === undefined) {
+				log("Target channel for drag'n'drop not found");
+				return;
+			}
+
 			// < 0.25      : Dropped in the upper quarter
 			// 0.25 - 0.75 : Dropped in the middle half
 			// > 0.75      : Dropped in the lower quarter

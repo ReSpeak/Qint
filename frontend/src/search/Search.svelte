@@ -5,7 +5,7 @@
 	import Icon from "../ui/icon/Icon.svelte";
 	import UiMessageSearchResult from "./MessageSearchResult.svelte";
 	import { EmptyMessageFetch, search } from "./uiSearch";
-	import type { MessageSearchResult, OtherSearchResult } from "./uiSearch";
+	import type { MessageSearchResult } from "./uiSearch";
 	import debug from "debug";
 	import { on } from "../util";
 	const log = debug("SEARCH");

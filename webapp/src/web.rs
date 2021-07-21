@@ -1006,7 +1006,6 @@ fn check_authentication(token: &str, req: &actix_web::dev::ServiceRequest) -> Op
 
 // 		async fn recv(&mut self) -> Result<MessageP2F> {
 // 			match self.socket.next().await {
-// 				Some(Ok(ws::Frame::Binary(msg))) => Ok(rmp_serde::from_read_ref(msg.as_ref())?),
 // 				Some(Ok(ws::Frame::Text(msg))) => {
 // 					Ok(serde_json::from_str(std::str::from_utf8(&msg)?)?)
 // 				}

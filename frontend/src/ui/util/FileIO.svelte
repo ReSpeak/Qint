@@ -12,7 +12,7 @@
 		uploadRequest: FileList;
 	}>();
 
-	export async function askDownload(req: IConFileRequest, fileName?: string | null) {
+	export async function askDownload(req: IConFileRequest, fileName?: string | null): Promise<void> {
 		if (!useDownload) {
 			useDownload = true;
 			await tick();
@@ -36,7 +36,7 @@
 		downloader.src = link;
 	}
 
-	export async function askUpload() {
+	export async function askUpload(): Promise<void> {
 		if (!useUpload) {
 			useUpload = true;
 			await tick();

@@ -4,6 +4,9 @@
 	import ServerName from "../ui/name/ServerName.svelte";
 	import { Channel, Client, Server } from "../book";
 	import ClientName from "../ui/name/ClientName.svelte";
+	import Icon from "../ui/icon/Icon.svelte";
+	import { Reason } from "../book_events";
+	import type { ClientId } from "../ts";
 
 	export let selected: NodeSelections;
 
@@ -11,6 +14,7 @@
 	let clientCount = 0;
 	let serverCount = 0;
 	let connectionCount = 0;
+	let allClientsMuted = true;
 	let connection: Connection | undefined;
 
 	$: update(selected);
@@ -20,13 +24,19 @@
 		clientCount = 0;
 		serverCount = 0;
 		connectionCount = 0;
+		allClientsMuted = true;
 		const cons = new Set();
 		for (const sel of selected.selections) {
 			if (sel.node.qlType === "SERVER") {
 				serverCount++;
 			} else {
-				if (sel.node.qlType === "CHANNEL") channelCount++;
-				else if (sel.node.qlType === "CLIENT" || sel.node.qlType === "POKE") clientCount++;
+				if (sel.node.qlType === "CHANNEL") {
+					channelCount++;
+				} else if (sel.node.qlType === "CLIENT" || sel.node.qlType === "POKE") {
+					clientCount++;
+					const client = sel.node as Client;
+					client.loadVolume().then(() => allClientsMuted &&= client.volume === 0);
+				}
 
 				if (!cons.has(sel.connection)) {
 					cons.add(sel.connection);
@@ -35,6 +45,52 @@
 			}
 		}
 		connection = selected.getConnection();
+	}
+
+	async function kickClients(reason: Reason) {
+		// TODO Handle result
+		for (const sel of selected.selections) {
+			if (sel.node.qlType === "CLIENT") {
+				await sel.connection.sendChange({
+					ClientKick: {
+						id: (sel.node as Client).id,
+						reason,
+					},
+				});
+			}
+		}
+	}
+
+	async function muteClients() {
+		// TODO Handle result
+		for (const sel of selected.selections) {
+			if (sel.node.qlType === "CLIENT") {
+				const client = sel.node as Client;
+				client.updateVolume(sel.connection, allClientsMuted ? (client.prevVolume ?? 1) : 0);
+			}
+		}
+		update(selected);
+	}
+
+	async function whisperClients() {
+		const ids: ClientId[] = [];
+		for (const sel of selected.selections) {
+			if (sel.node.qlType === "CLIENT")
+				ids.push((sel.node as Client).id);
+		}
+		// TODO
+	}
+
+	async function whisperChannels() {
+		// TODO
+	}
+
+	async function disconnectServers() {
+		for (const sel of selected.selections) {
+			if (sel.node.qlType === "SERVER") {
+				sel.connection.disconnect();
+			}
+		}
 	}
 </script>
 
@@ -84,7 +140,54 @@
 	{/each}
 </ul>
 
-<!-- TODO Action buttons -->
+{#if clientCount > 0}
+	<div class="descGroup">
+		<p class="buttons">
+			<button class="button is-small is-warning" on:click={() => kickClients(Reason.KickChannel)}>
+				<Icon name="shoe-formal" />
+				<span>Kick Channel</span>
+			</button>
+			<button class="button is-small is-danger" on:click={() => kickClients(Reason.KickServer)}>
+				<Icon name="shoe-formal" />
+				<span>Kick Server</span>
+			</button>
+			<button class="button is-small is-danger">
+				<Icon name="cancel" />
+				<span>Ban</span>
+			</button>
+			<button class="button is-small is-info" on:click={whisperClients}>
+				<Icon name="microphone" />
+				<span>Whisper to selected clients</span>
+			</button>
+			<button class="button is-small is-info" on:click={muteClients}>
+				<Icon name={allClientsMuted ? "microphone-off" : "microphone"} />
+				<span>{#if allClientsMuted}Unmute{:else}Mute{/if}</span>
+			</button>
+		</p>
+	</div>
+{/if}
+
+{#if channelCount > 0}
+	<div class="descGroup">
+		<p class="buttons">
+			<button class="button is-small is-info" on:click={whisperChannels}>
+				<Icon name="microphone" />
+				<span>Whisper to selected channels</span>
+			</button>
+		</p>
+	</div>
+{/if}
+
+{#if serverCount > 0}
+	<div class="descGroup">
+		<p class="buttons">
+			<button class="button is-small is-warning" on:click={disconnectServers}>
+				<Icon name="shoe-formal" />
+				<span>Disconnect</span>
+			</button>
+		</p>
+	</div>
+{/if}
 
 <style lang="scss">
 </style>

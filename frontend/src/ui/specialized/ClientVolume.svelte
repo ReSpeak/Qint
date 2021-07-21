@@ -4,29 +4,30 @@
 	import { Client } from "../../book";
 	import Slider from "../html/Slider.svelte";
 	import Icon from "../icon/Icon.svelte";
-	import { dbToFactor, debounced, MIN_VOLUME_DB } from "../../util";
+	import { dbToFactor, debounced, factorToDb, MIN_VOLUME_DB } from "../../util";
 
 	export let connection: Connection;
 	export let client: Client;
 	const minVolume = MIN_VOLUME_DB;
 	const maxVolume = -MIN_VOLUME_DB;
-	const clientVolume = client.volume;
+	let clientVolume = factorToDb(client.volume);
 
 	async function loadVolume() {
 		await client.loadVolume();
+		clientVolume = factorToDb(client.volume);
 	}
 
 	function toggleVolume() {
-		if ($clientVolume === minVolume) {
-			$clientVolume = 0;
+		if (clientVolume === minVolume) {
+			clientVolume = client.prevVolume !== undefined ? factorToDb(client.prevVolume) : 0;
 		} else {
-			$clientVolume = minVolume;
+			clientVolume = minVolume;
 		}
 		updateVolume();
 	}
 
 	const updateVolume = debounced(() => {
-		client.updateVolume(connection, dbToFactor($clientVolume));
+		client.updateVolume(connection, dbToFactor(clientVolume));
 	}, 100);
 
 	onMount(() => {
@@ -36,7 +37,7 @@
 
 <div class="volumeControl">
 	<button class="volume button" on:click={toggleVolume}>
-		{#if $clientVolume === minVolume}
+		{#if clientVolume === minVolume}
 			<Icon name="volume-off" />
 		{:else}
 			<Icon name="volume-high" />
@@ -46,7 +47,7 @@
 		min={minVolume}
 		max={maxVolume}
 		step={1}
-		bind:value={$clientVolume}
+		bind:value={clientVolume}
 		display={(n) => `${n} dB`}
 		tooltip={true}
 		on:input={updateVolume} />
