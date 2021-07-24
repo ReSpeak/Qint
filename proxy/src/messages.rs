@@ -1,15 +1,16 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 
-#[cfg(test)]
-use proxy_codegen::book_events::serialize_some_u64;
 use proxy_codegen::book_events::{
-	deserialize_id, deserialize_some_u64, serialize_id, JsEvent, JsInMessage, JsM2B,
+	deserialize_id, deserialize_set_id, deserialize_some_u64, serialize_id, JsEvent, JsInMessage,
+	JsM2B,
 };
+#[cfg(test)]
+use proxy_codegen::book_events::{serialize_set_id, serialize_some_u64};
 use serde::{Deserialize, Serialize};
 use tsclientlib::{
-	ClientId, CommandError, DisconnectOptions, Error as TsclError, MessageTarget, Permission,
-	TsError, Version,
+	ChannelId, ClientId, CommandError, DisconnectOptions, Error as TsclError, MessageTarget,
+	Permission, TsError, Version,
 };
 
 use super::connection::Error as WsError;
@@ -39,6 +40,8 @@ pub enum MessageF2P {
 		client: Vec<u8>,
 		volume: f32,
 	},
+	/// Start or stop whispering to the specified targets.
+	SetWhispering(Option<WhisperData>),
 	/// Change something in the book.
 	Change {
 		change: JsM2B,
@@ -113,6 +116,16 @@ pub enum JsMessageTarget {
 		#[serde(default, deserialize_with = "deserialize_id", serialize_with = "serialize_id")]
 		ClientId,
 	),
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[cfg_attr(test, derive(Serialize))]
+#[serde(deny_unknown_fields)]
+pub struct WhisperData {
+	#[serde(default, deserialize_with = "deserialize_set_id", serialize_with = "serialize_set_id")]
+	pub clients: HashSet<ClientId>,
+	#[serde(default, deserialize_with = "deserialize_set_id", serialize_with = "serialize_set_id")]
+	pub channels: HashSet<ChannelId>,
 }
 
 #[derive(Clone, Debug, Deserialize, Default)]

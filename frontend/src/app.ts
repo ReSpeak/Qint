@@ -77,12 +77,13 @@ export class App {
 		);
 		this.selectedNode.update((oldNode) => {
 			for (const sel of oldNode.selections) {
-				if (!nodeSel.includes(sel))
+				if (!nodeSel.includes(sel)) {
 					sel.node.update({ isSelected: false });
+					sel.connection.stopWhispering();
+				}
 			}
 			for (const sel of nodeSel.selections) {
-				if (!sel.node.isSelected)
-					sel.node.update({ isSelected: true });
+				if (!sel.node.isSelected) sel.node.update({ isSelected: true });
 			}
 			return nodeSel;
 		});
@@ -94,8 +95,7 @@ export class App {
 
 	private hasSameTypeAsCurrentSelection(node: ITreeNode): boolean {
 		const sels = get(this.selectedNode).selections;
-		if (sels.length === 0)
-			return true;
+		if (sels.length === 0) return true;
 		return sels[0].node.qlType === node.qlType;
 	}
 
@@ -106,13 +106,9 @@ export class App {
 			return;
 		}
 
-		this.selectedNode.update((n) => {
-			sel.node.update({ isSelected: !sel.node.isSelected });
-			if (!sel.node.isSelected)
-				n.selections = n.selections.filter((s) => sel.node !== s.node);
-			else
-				n.selections.push(sel);
-			return n;
+		this.updateSelections((sels) => {
+			if (sel.node.isSelected) return sels.filter((s) => sel.node !== s.node);
+			else return [...sels, sel];
 		});
 	}
 
@@ -138,8 +134,7 @@ export class App {
 						break;
 					}
 				}
-				if (isSelecting)
-					cons.push(c);
+				if (isSelecting) cons.push(c);
 			}
 		}
 
@@ -163,20 +158,16 @@ export class App {
 				newSelections.push(node);
 			return false;
 		};
-		selectionLoop:
-		for (const con of cons) {
+		selectionLoop: for (const con of cons) {
 			if (!get(con.state).connected) continue;
-			if (handleNode(new NodeSelection(con, con.book.server)))
-				break selectionLoop;
+			if (handleNode(new NodeSelection(con, con.book.server))) break selectionLoop;
 			let stack = [...get(con.book.server.channels)].reverse();
 			while (stack.length > 0) {
 				const channel = stack[stack.length - 1];
 				stack.pop();
-				if (handleNode(new NodeSelection(con, channel)))
-					break selectionLoop;
+				if (handleNode(new NodeSelection(con, channel))) break selectionLoop;
 				for (const client of get(channel.clients)) {
-					if (handleNode(new NodeSelection(con, client)))
-						break selectionLoop;
+					if (handleNode(new NodeSelection(con, client))) break selectionLoop;
 				}
 				stack = [...stack, ...[...get(channel.channels)].reverse()];
 			}

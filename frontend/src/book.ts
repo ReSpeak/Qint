@@ -599,8 +599,7 @@ export class Client extends book_events.ClientGen implements ITreeNode, Readable
 
 	public updateVolume(connection: Connection, volume: number): void {
 		assert(this.uid !== null, "Cannot update volume if the client has no uid");
-		if (volume === 0)
-			this.prevVolume = this.volume;
+		if (volume === 0) this.prevVolume = this.volume;
 		this.update({ volume } as any);
 		connection.sendMessage({
 			SetClientVolume: {
@@ -619,8 +618,7 @@ export class Client extends book_events.ClientGen implements ITreeNode, Readable
 				client: this.uid,
 			}
 		);
-		if (res.data)
-			this.volume = res.data.client.volume;
+		if (res.data) this.volume = res.data.client.volume;
 	}
 }
 

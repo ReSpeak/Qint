@@ -6,7 +6,7 @@
 	import ClientName from "../ui/name/ClientName.svelte";
 	import Icon from "../ui/icon/Icon.svelte";
 	import { Reason } from "../book_events";
-	import type { ClientId } from "../ts";
+	import type { ChannelId, ClientId } from "../ts";
 
 	export let selected: NodeSelections;
 
@@ -15,6 +15,8 @@
 	let serverCount = 0;
 	let connectionCount = 0;
 	let allClientsMuted = true;
+	let isClientWhispering = false;
+	let isChannelWhispering = false;
 	let connection: Connection | undefined;
 
 	$: update(selected);
@@ -25,6 +27,8 @@
 		serverCount = 0;
 		connectionCount = 0;
 		allClientsMuted = true;
+		isClientWhispering = false;
+		isChannelWhispering = false;
 		const cons = new Set();
 		for (const sel of selected.selections) {
 			if (sel.node.qlType === "SERVER") {
@@ -32,10 +36,12 @@
 			} else {
 				if (sel.node.qlType === "CHANNEL") {
 					channelCount++;
+					isChannelWhispering ||= sel.connection.isWhispering;
 				} else if (sel.node.qlType === "CLIENT" || sel.node.qlType === "POKE") {
 					clientCount++;
 					const client = sel.node as Client;
-					client.loadVolume().then(() => allClientsMuted &&= client.volume === 0);
+					client.loadVolume().then(() => (allClientsMuted &&= client.volume === 0));
+					isClientWhispering ||= sel.connection.isWhispering;
 				}
 
 				if (!cons.has(sel.connection)) {
@@ -66,23 +72,50 @@
 		for (const sel of selected.selections) {
 			if (sel.node.qlType === "CLIENT") {
 				const client = sel.node as Client;
-				client.updateVolume(sel.connection, allClientsMuted ? (client.prevVolume ?? 1) : 0);
+				client.updateVolume(sel.connection, allClientsMuted ? client.prevVolume ?? 1 : 0);
 			}
 		}
 		update(selected);
 	}
 
 	async function whisperClients() {
-		const ids: ClientId[] = [];
-		for (const sel of selected.selections) {
-			if (sel.node.qlType === "CLIENT")
-				ids.push((sel.node as Client).id);
+		if (isClientWhispering) {
+			for (const sel of selected.selections) {
+				if (sel.node.qlType === "CLIENT" && sel.connection.isWhispering)
+					sel.connection.stopWhispering();
+			}
+		} else {
+			const targets: Map<Connection, ClientId[]> = new Map();
+			for (const sel of selected.selections) {
+				if (sel.node.qlType === "CLIENT") {
+					if (!targets.has(sel.connection)) targets.set(sel.connection, []);
+					targets.get(sel.connection)!.push((sel.node as Client).id);
+				}
+			}
+
+			for (const [con, ids] of targets) con.startWhispering(ids, []);
 		}
-		// TODO
+		update(selected);
 	}
 
 	async function whisperChannels() {
-		// TODO
+		if (isChannelWhispering) {
+			for (const sel of selected.selections) {
+				if (sel.node.qlType === "CHANNEL" && sel.connection.isWhispering)
+					sel.connection.stopWhispering();
+			}
+		} else {
+			const targets: Map<Connection, ChannelId[]> = new Map();
+			for (const sel of selected.selections) {
+				if (sel.node.qlType === "CHANNEL") {
+					if (!targets.has(sel.connection)) targets.set(sel.connection, []);
+					targets.get(sel.connection)!.push((sel.node as Channel).id);
+				}
+			}
+
+			for (const [con, ids] of targets) con.startWhispering([], ids);
+		}
+		update(selected);
 	}
 
 	async function disconnectServers() {
@@ -143,25 +176,37 @@
 {#if clientCount > 0}
 	<div class="descGroup">
 		<p class="buttons">
-			<button class="button is-small is-warning" on:click={() => kickClients(Reason.KickChannel)}>
+			<button class="button is-small is-info" on:click={whisperClients}>
+				<Icon name="microphone" />
+				<span class:is-loading={isClientWhispering} />
+				<span>
+					{#if !isClientWhispering}
+						Whisper to selected clients
+					{:else}
+						Stop whispering
+					{/if}
+				</span>
+			</button>
+			<button class="button is-small is-info" on:click={muteClients}>
+				<Icon name={allClientsMuted ? "microphone-off" : "microphone"} />
+				<span
+					>{#if allClientsMuted}Unmute{:else}Mute{/if}</span>
+			</button>
+			<button
+				class="button is-small is-warning"
+				on:click={() => kickClients(Reason.KickChannel)}>
 				<Icon name="shoe-formal" />
 				<span>Kick Channel</span>
 			</button>
-			<button class="button is-small is-danger" on:click={() => kickClients(Reason.KickServer)}>
+			<button
+				class="button is-small is-danger"
+				on:click={() => kickClients(Reason.KickServer)}>
 				<Icon name="shoe-formal" />
 				<span>Kick Server</span>
 			</button>
 			<button class="button is-small is-danger">
 				<Icon name="cancel" />
 				<span>Ban</span>
-			</button>
-			<button class="button is-small is-info" on:click={whisperClients}>
-				<Icon name="microphone" />
-				<span>Whisper to selected clients</span>
-			</button>
-			<button class="button is-small is-info" on:click={muteClients}>
-				<Icon name={allClientsMuted ? "microphone-off" : "microphone"} />
-				<span>{#if allClientsMuted}Unmute{:else}Mute{/if}</span>
 			</button>
 		</p>
 	</div>
@@ -172,7 +217,14 @@
 		<p class="buttons">
 			<button class="button is-small is-info" on:click={whisperChannels}>
 				<Icon name="microphone" />
-				<span>Whisper to selected channels</span>
+				<span class:is-loading={isChannelWhispering} />
+				<span>
+					{#if !isChannelWhispering}
+						Whisper to selected channels
+					{:else}
+						Stop whispering
+					{/if}
+				</span>
 			</button>
 		</p>
 	</div>
@@ -190,4 +242,8 @@
 {/if}
 
 <style lang="scss">
+	span.is-loading {
+		@include loader;
+		margin-right: 0.5em;
+	}
 </style>

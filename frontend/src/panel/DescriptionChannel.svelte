@@ -39,6 +39,7 @@
 	$: clientCount = $clients.length;
 	$: serverRaw = connection.book.server;
 	$: server = $serverRaw;
+	$: isWhispering = connection.isWhispering;
 	let formatMaxClients: string | number = 0;
 	$: {
 		// TODO: calculate inheritance?
@@ -221,6 +222,12 @@
 				},
 			});
 		}
+	}
+
+	function whisper() {
+		if (connection.isWhispering) connection.stopWhispering();
+		else connection.startWhispering([], [channel.id]);
+		isWhispering = connection.isWhispering;
 	}
 
 	const channelTypeOpt = [
@@ -496,6 +503,22 @@
 		<StickySlot>Permissions</StickySlot>
 		<ChannelPermissions bind:this={uiPermissions} {connection} {channel} />
 	{/if}
+	<StickySlot>Actions</StickySlot>
+	<div class="descGroup">
+		<p class="buttons">
+			<button class="button is-small is-info" on:click={whisper}>
+				<Icon name="microphone" />
+				<span class:is-loading={isWhispering} />
+				<span>
+					{#if !isWhispering}
+						Whisper
+					{:else}
+						Stop whispering
+					{/if}
+				</span>
+			</button>
+		</p>
+	</div>
 </StickyList>
 
 <style lang="scss">
@@ -513,5 +536,10 @@
 
 	.iconChooser {
 		background-color: mix($box-background-color, $text, 95%);
+	}
+
+	span.is-loading {
+		@include loader;
+		margin-right: 0.5em;
 	}
 </style>

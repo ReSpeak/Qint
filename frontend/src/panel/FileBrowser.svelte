@@ -399,7 +399,10 @@
 			on:click={clickEditFile}>
 			<Icon name="pen" />
 		</button>
-		<DeleteConfirmButton disabled={fileSelection.length === 0} bind:isConfirming={isConfirmingDelete} on:delete={deleteFiles} />
+		<DeleteConfirmButton
+			disabled={fileSelection.length === 0}
+			bind:isConfirming={isConfirmingDelete}
+			on:delete={deleteFiles} />
 	</div>
 
 	<nav class="breadcrumb" aria-label="path">

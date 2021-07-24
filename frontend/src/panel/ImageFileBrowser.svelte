@@ -189,8 +189,7 @@
 				fileSelection.remove_item(file);
 				selection = undefined;
 			} else {
-				if (forSelection)
-					fileSelection = [];
+				if (forSelection) fileSelection = [];
 				fileSelection.push(file);
 				selection = file.name;
 			}
@@ -266,7 +265,10 @@
 			</button>
 		{/if}
 		{#if canDelete}
-			<DeleteConfirmButton disabled={fileSelection.length === 0} bind:isConfirming={isConfirmingDelete} on:delete={deleteFiles} />
+			<DeleteConfirmButton
+				disabled={fileSelection.length === 0}
+				bind:isConfirming={isConfirmingDelete}
+				on:delete={deleteFiles} />
 		{/if}
 	</div>
 

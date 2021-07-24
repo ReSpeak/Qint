@@ -21,11 +21,11 @@ use tsclientlib::{
 	Error as TsclError, FileDownloadResult, FileUploadResult, FiletransferHandle, InMessage,
 	MessageTarget, UidBuf,
 };
-use tsproto_packets::packets::{AudioData, OutCommand, OutPacket};
+use tsproto_packets::packets::{AudioData, CodecType, OutAudio, OutCommand, OutPacket};
 use tsproto_types::crypto::EccKeyPubP256;
 
 use crate::db::{ChannelListMsg, ChatId, ChatType, SetClientVolumeMsg};
-use crate::messages::{self, MessageF2P, MessageP2F, ResultDetails, ResultStruct};
+use crate::messages::{self, MessageF2P, MessageP2F, ResultDetails, ResultStruct, WhisperData};
 use crate::{audio, db, with_log, ConnectionId, FrontBridge, QintState};
 
 /// A websocket connection
@@ -43,6 +43,7 @@ pub struct QintConnection {
 	self_talking: bool,
 	own_loudness: VecDeque<f64>,
 	talkers: Vec<(ClientId, bool)>,
+	whisper_list: Option<WhisperData>,
 }
 
 /// Polls the connection for events.
@@ -56,6 +57,7 @@ pub struct SetSelfTalkingMsg(pub bool);
 pub struct TalkersChangedMsg(pub Vec<(ClientId, bool)>);
 pub struct LoudnessesMsg(pub HashMap<ClientId, f64>);
 pub struct SendPacketMsg(pub OutPacket);
+pub struct SendAudioMsg(pub CodecType, pub Vec<u8>);
 pub struct CaptureLoudnessMsg(pub f64);
 pub struct DisconnectMsg;
 pub struct SetChannelListMsgMsg(pub ChannelListMsg);
@@ -130,6 +132,9 @@ impl Message for LoudnessesMsg {
 impl Message for SendPacketMsg {
 	type Result = Result<()>;
 }
+impl Message for SendAudioMsg {
+	type Result = Result<()>;
+}
 impl Message for CaptureLoudnessMsg {
 	type Result = ();
 }
@@ -169,6 +174,7 @@ impl QintConnection {
 			self_talking: false,
 			own_loudness: Default::default(),
 			talkers: Default::default(),
+			whisper_list: Default::default(),
 		}
 	}
 
@@ -700,6 +706,9 @@ impl QintConnection {
 					},
 				));
 			}
+			MessageF2P::SetWhispering(data) => {
+				self.whisper_list = data;
+			}
 			MessageF2P::SendMessage { target, message, return_code } => {
 				self.send_chat_message(target.into(), message, return_code.as_deref());
 			}
@@ -1205,6 +1214,33 @@ impl Handler<SendPacketMsg> for QintConnection {
 		&mut self, SendPacketMsg(packet): SendPacketMsg, _: &mut Self::Context,
 	) -> Self::Result {
 		if let Some(con) = &mut self.connection {
+			con.send_audio(packet)?;
+			Ok(())
+		} else {
+			bail!("Connection does not exist")
+		}
+	}
+}
+
+impl Handler<SendAudioMsg> for QintConnection {
+	type Result = Result<()>;
+	fn handle(
+		&mut self, SendAudioMsg(codec, data): SendAudioMsg, _: &mut Self::Context,
+	) -> Self::Result {
+		if let Some(con) = &mut self.connection {
+			let packet = if let Some(whisper) = &self.whisper_list {
+				let channels = whisper.channels.iter().map(|i| i.0).collect();
+				let clients = whisper.clients.iter().map(|i| i.0).collect();
+				OutAudio::new(&AudioData::C2SWhisper {
+					id: 0,
+					channels,
+					clients,
+					codec,
+					data: &data,
+				})
+			} else {
+				OutAudio::new(&AudioData::C2S { id: 0, codec, data: &data })
+			};
 			con.send_audio(packet)?;
 			Ok(())
 		} else {

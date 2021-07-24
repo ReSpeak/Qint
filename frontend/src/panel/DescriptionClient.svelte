@@ -57,6 +57,7 @@
 
 	const serverGroups = connection.book.serverGroups;
 	let avatarPath: string | undefined;
+	$: isWhispering = connection.isWhispering;
 	$: getClientAvatarPath(connection, $client).then((path) => (avatarPath = path));
 	$: ownClient = client.id === connection.book.ownClientId;
 	$: {
@@ -479,6 +480,12 @@
 		timer = window.setInterval(updateClientInfo, statsOpen ? 1000 : 10000);
 	}
 
+	function whisper() {
+		if (connection.isWhispering) connection.stopWhispering();
+		else connection.startWhispering([client.id], []);
+		isWhispering = connection.isWhispering;
+	}
+
 	onMount(() => {
 		updateClientInfo();
 		// onDestroy handler
@@ -699,7 +706,20 @@
 					<Icon name="hand-pointing-right" />
 					<span>Poke</span>
 				</button>
-				<button class="button is-small is-warning" on:click={() => kick(Reason.KickChannel)}>
+				<button class="button is-small is-info" on:click={whisper}>
+					<Icon name="microphone" />
+					<span class:is-loading={isWhispering} />
+					<span>
+						{#if !isWhispering}
+							Whisper
+						{:else}
+							Stop whispering
+						{/if}
+					</span>
+				</button>
+				<button
+					class="button is-small is-warning"
+					on:click={() => kick(Reason.KickChannel)}>
 					<Icon name="shoe-formal" />
 					<span>Kick Channel</span>
 				</button>
@@ -851,5 +871,10 @@
 
 	.pokeInput {
 		width: 100%;
+	}
+
+	span.is-loading {
+		@include loader;
+		margin-right: 0.5em;
 	}
 </style>

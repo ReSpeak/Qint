@@ -1,6 +1,6 @@
 // tslint:disable: interface-name
 
-import { ClientId, Uid } from "../ts";
+import { ChannelId, ClientId, Uid } from "../ts";
 import {
 	InMessage,
 	OChange,
@@ -20,6 +20,7 @@ export type OutMsg =
 	| OMsgSendMessage
 	| OMsgSendCommand
 	| OMsgSetClientVolume
+	| OMsgSetWhispering
 	| OMsgChange;
 
 export interface OMsgConnect {
@@ -72,6 +73,13 @@ interface OMsgSetClientVolume {
 		client: number[];
 		volume: number;
 	};
+}
+
+interface OMsgSetWhispering {
+	SetWhispering: {
+		channels: ChannelId[];
+		clients: ClientId[];
+	} | null;
 }
 
 interface OMsgChange {

@@ -140,7 +140,9 @@
 	function dragDrop(ev: CustomEvent<DragData>) {
 		ev.detail.dragNode.classList.remove("dragStyle");
 		const hoverOpt: HTMLElement[] = [...ev.detail.customData.querySelectorAll(":hover")];
-		const dropTarget = hoverOpt.reverse().find((x) => x.dataset.type === "channel" || x.dataset.type === "client");
+		const dropTarget = hoverOpt
+			.reverse()
+			.find((x) => x.dataset.type === "channel" || x.dataset.type === "client");
 		log(hoverOpt, dropTarget);
 		if (dropTarget !== undefined) {
 			log("Would drop to", dropTarget.dataset.key);

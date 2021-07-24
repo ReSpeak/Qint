@@ -51,6 +51,10 @@ export class Connection implements IConnection {
 	public get state(): Readable<ConnectionState> {
 		return this._state;
 	}
+	private _isWhispering = false;
+	public get isWhispering(): boolean {
+		return this._isWhispering;
+	}
 
 	public readonly book: Book = new Book();
 	public readonly channelPermCache: Writable<IMsgChannelPermListPart[]> = writable([]);
@@ -258,6 +262,23 @@ export class Connection implements IConnection {
 		const client = this.book.getClient(clientId);
 		if (client !== undefined) {
 			client.chat.set(new ChatData(moment(), 0));
+		}
+	}
+
+	public startWhispering(clients: ClientId[], channels: ChannelId[]): void {
+		this.sendMessage({
+			SetWhispering: {
+				channels,
+				clients,
+			},
+		});
+		this._isWhispering = true;
+	}
+
+	public stopWhispering(): void {
+		if (this._isWhispering) {
+			this.sendMessage({ SetWhispering: null });
+			this._isWhispering = false;
 		}
 	}
 

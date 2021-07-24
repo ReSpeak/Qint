@@ -172,7 +172,9 @@
 		const hoverOpt: HTMLElement[] = [
 			...ev.detail.customData.querySelectorAll(":hover"),
 		].reverse();
-		const dropTarget = hoverOpt.find((x) => x.dataset.type === "channel" || x.dataset.type === "client");
+		const dropTarget = hoverOpt.find(
+			(x) => x.dataset.type === "channel" || x.dataset.type === "client"
+		);
 		if (dropTarget !== undefined && connection !== undefined) {
 			const rect = dropTarget.getBoundingClientRect();
 			const clickY = ev.detail.mouseDrop.clientY - rect.top;
@@ -182,8 +184,7 @@
 				target = connection.book.getChannel(dropTarget.dataset.key!);
 			} else {
 				const client = connection.book.getClient(dropTarget.dataset.key!);
-				if (client !== undefined)
-					target = connection.book.getChannel(client.channel);
+				if (client !== undefined) target = connection.book.getChannel(client.channel);
 				clickPerc = 0.5;
 			}
 			if (target === undefined) {

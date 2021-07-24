@@ -246,4 +246,20 @@ pub fn serialize_some_set_id<S: Serializer, T: Eq + Hash + Id>(
 		.serialize(serializer)
 }
 
+pub fn deserialize_set_id<'de, D: Deserializer<'de>, T: Eq + Hash + Id>(
+	deserializer: D,
+) -> Result<HashSet<T>, D::Error> {
+	let s: HashSet<String> = Deserialize::deserialize(deserializer)?;
+	Ok(s.into_iter()
+		.map(|s| T::parse_id(&s))
+		.collect::<Result<HashSet<T>>>()
+		.map_err(SerdeError::custom)?)
+}
+
+pub fn serialize_set_id<S: Serializer, T: Eq + Hash + Id>(
+	i: &HashSet<T>, serializer: S,
+) -> Result<S::Ok, S::Error> {
+	i.iter().map(|i| i.to_string_id()).collect::<HashSet<String>>().serialize(serializer)
+}
+
 include!(concat!(env!("OUT_DIR"), "/book_events.rs"));
