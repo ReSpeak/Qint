@@ -3930,12 +3930,10 @@ name = "qint-proxy"
 version = "0.1.0"
 dependencies = [
  "actix",
- "actix-codec",
  "actix-rt",
  "actix-service",
  "anyhow",
  "audiopus",
- "awc",
  "base64",
  "bytes",
  "chacha20poly1305",
@@ -3979,7 +3977,6 @@ dependencies = [
  "slog-stdlog",
  "slog-term",
  "tantivy",
- "tempfile",
  "thiserror",
  "time 0.2.27",
  "tokio",
@@ -6208,12 +6205,14 @@ name = "webapp"
 version = "0.1.0"
 dependencies = [
  "actix",
+ "actix-codec",
  "actix-cors",
  "actix-files",
  "actix-rt",
  "actix-web",
  "actix-web-actors",
  "anyhow",
+ "awc",
  "base64",
  "futures",
  "juniper",
@@ -6233,6 +6232,7 @@ dependencies = [
  "slog-stdlog",
  "slog-term",
  "structopt",
+ "tempfile",
  "tokio",
  "tokio-util",
  "tsclientlib",

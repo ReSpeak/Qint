@@ -736,388 +736,396 @@ fn check_authentication(token: &str, req: &actix_web::dev::ServiceRequest) -> Op
 	}
 }
 
-// / Tests need a running TeamSpeak server on localhost. The default channel has to be channel 1,
-// / this is used to access messages.
-// #[cfg(test)]
-// mod tests {
-// 	use anyhow::format_err;
-// 	use awc::ws;
-// 	use rand::Rng;
+/// Tests need a running TeamSpeak server on localhost. The default channel has to be channel 1,
+/// this is used to access messages.
+#[cfg(test)]
+mod tests {
+	use std::future::Future;
+	use std::sync::Mutex;
+	use std::time::Duration;
 
-// 	use juniper::http::GraphQLRequest;
-// 	use slog::{o, Drain};
-// 	use tsclientlib::ClientId;
+	use anyhow::{format_err, Result};
+	use awc::ws;
+	use futures::{SinkExt, StreamExt};
+	use juniper::http::GraphQLRequest;
+	use qint_proxy::messages::{ConnectOptions, JsMessageTarget, MessageF2P, MessageP2F};
+	use qint_proxy::QintState;
+	use rand::Rng;
+	use serde::Deserialize;
+	use slog::{o, Drain, Logger};
+	use tokio::time;
+	use tsclientlib::ClientId;
+	use uuid::Uuid;
 
-// 	use super::*;
-// 	use messages::{ConnectOptions, JsMessageTarget, MessageF2P, MessageP2F};
+	use crate::web::WebApp;
+	use crate::Args;
 
-// 	struct TestProxy {
-// 		logger: Logger,
-// 		port: u16,
-// 	}
+	struct TestProxy {
+		logger: Logger,
+		port: u16,
+	}
 
-// 	struct Connection {
-// 		socket: actix_codec::Framed<awc::BoxedSocket, ws::Codec>,
-// 	}
+	struct Connection {
+		socket: actix_codec::Framed<awc::BoxedSocket, ws::Codec>,
+	}
 
-// 	#[derive(Deserialize)]
-// 	struct GraphQLResponse<T> {
-// 		data: T,
-// 	}
+	#[derive(Deserialize)]
+	struct GraphQLResponse<T> {
+		data: T,
+	}
 
-// 	#[derive(Deserialize)]
-// 	struct ClientServerKey {
-// 		/// Public key of the server.
-// 		server: Vec<u8>,
-// 		/// Uid of the own identity.
-// 		client: Vec<u8>,
-// 	}
+	#[derive(Deserialize)]
+	struct ClientServerKey {
+		/// Public key of the server.
+		server: Vec<u8>,
+		/// Uid of the own identity.
+		client: Vec<u8>,
+	}
 
-// 	impl TestProxy {
-// 		fn new(logger: Logger) -> Self {
-// 			let mut rng = rand::thread_rng();
-// 			Self { logger, port: rng.gen_range(1025..=65535) }
-// 		}
+	impl TestProxy {
+		fn new(logger: Logger) -> Self {
+			let mut rng = rand::thread_rng();
+			Self { logger, port: rng.gen_range(1025..=65535) }
+		}
 
-// 		async fn create_connection(&self) -> Result<Connection> {
-// 			let client = awc::Client::default();
-// 			let id = Uuid::new_v4();
-// 			let url = format!("ws://127.0.0.1:{}/con/{}/ws?format=Json", self.port, id);
-// 			info!(self.logger, "Connecting to proxy"; "url" => &url);
-// 			let (_resp, socket) = client
-// 				.ws(url)
-// 				.connect()
-// 				.await
-// 				.map_err(|e| format_err!("Websocket client error: {:?}", e))?;
-// 			Ok(Connection { socket })
-// 		}
+		async fn create_connection(&self) -> Result<Connection> {
+			let client = awc::Client::default();
+			let id = Uuid::new_v4();
+			let url = format!("ws://127.0.0.1:{}/con/{}/ws?format=Json", self.port, id);
+			info!(self.logger, "Connecting to proxy"; "url" => &url);
+			let (_resp, socket) = client
+				.ws(url)
+				.connect()
+				.await
+				.map_err(|e| format_err!("Websocket client error: {:?}", e))?;
+			Ok(Connection { socket })
+		}
 
-// 		async fn graphql<T>(&self, request: &GraphQLRequest) -> Result<T>
-// 		where
-// 			for<'a> T: Deserialize<'a>,
-// 		{
-// 			let client = awc::Client::default();
-// 			let url = format!("http://127.0.0.1:{}/db", self.port);
-// 			debug!(self.logger, "GraphQL request"; "body" => serde_json::to_string(&request).unwrap());
-// 			let mut resp = client
-// 				.post(url)
-// 				.send_json(request)
-// 				.await
-// 				.map_err(|_| format_err!("GraphQL failed"))?;
-// 			if !resp.status().is_success() {
-// 				let body = resp
-// 					.body()
-// 					.await
-// 					.map_err(|e| format_err!("Failed to receive body: {:?}", e))?;
-// 				bail!("GraphQL request failed: {}", String::from_utf8_lossy(body.as_ref()));
-// 			}
-// 			let resp: GraphQLResponse<T> =
-// 				resp.json().await.map_err(|e| format_err!("Failed to decode json: {:?}", e))?;
-// 			Ok(resp.data)
-// 		}
+		async fn graphql<T>(&self, request: &GraphQLRequest) -> Result<T>
+		where for<'a> T: Deserialize<'a> {
+			let client = awc::Client::default();
+			let url = format!("http://127.0.0.1:{}/db", self.port);
+			debug!(self.logger, "GraphQL request"; "body" => serde_json::to_string(&request).unwrap());
+			let mut resp = client
+				.post(url)
+				.send_json(request)
+				.await
+				.map_err(|_| format_err!("GraphQL failed"))?;
+			if !resp.status().is_success() {
+				let body = resp
+					.body()
+					.await
+					.map_err(|e| format_err!("Failed to receive body: {:?}", e))?;
+				bail!("GraphQL request failed: {}", String::from_utf8_lossy(body.as_ref()));
+			}
+			let resp: GraphQLResponse<T> =
+				resp.json().await.map_err(|e| format_err!("Failed to decode json: {:?}", e))?;
+			Ok(resp.data)
+		}
 
-// 		async fn get_client_server_key(&self) -> Result<ClientServerKey> {
-// 			#[derive(Deserialize)]
-// 			#[serde(rename_all = "camelCase")]
-// 			struct Server {
-// 				public_key: Vec<u8>,
-// 			}
-// 			#[derive(Deserialize)]
-// 			struct Client {
-// 				uid: Vec<u8>,
-// 			}
-// 			#[derive(Deserialize)]
-// 			struct Identity {
-// 				client: Client,
-// 			}
-// 			#[derive(Deserialize)]
-// 			struct Bookmark {
-// 				server: Server,
-// 				identity: Identity,
-// 			}
-// 			#[derive(Deserialize)]
-// 			#[serde(rename_all = "camelCase")]
-// 			struct Query {
-// 				most_recent_bookmark: Bookmark,
-// 			}
+		async fn get_client_server_key(&self) -> Result<ClientServerKey> {
+			#[derive(Deserialize)]
+			#[serde(rename_all = "camelCase")]
+			struct Server {
+				public_key: Vec<u8>,
+			}
+			#[derive(Deserialize)]
+			struct Client {
+				uid: Vec<u8>,
+			}
+			#[derive(Deserialize)]
+			struct Identity {
+				client: Client,
+			}
+			#[derive(Deserialize)]
+			struct Bookmark {
+				server: Server,
+				identity: Identity,
+			}
+			#[derive(Deserialize)]
+			#[serde(rename_all = "camelCase")]
+			struct Query {
+				most_recent_bookmark: Bookmark,
+			}
 
-// 			let resp: Query = self
-// 				.graphql(&GraphQLRequest::new(
-// 					"{
-// 					mostRecentBookmark {
-// 						server {
-// 							publicKey
-// 						}
-// 						identity {
-// 							client {
-// 								uid
-// 							}
-// 						}
-// 					}
-// 				}"
-// 					.into(),
-// 					None,
-// 					None,
-// 				))
-// 				.await?;
-// 			Ok(ClientServerKey {
-// 				client: resp.most_recent_bookmark.identity.client.uid,
-// 				server: resp.most_recent_bookmark.server.public_key,
-// 			})
-// 		}
+			let resp: Query = self
+				.graphql(&GraphQLRequest::new(
+					"{
+					mostRecentBookmark {
+						server {
+							publicKey
+						}
+						identity {
+							client {
+								uid
+							}
+						}
+					}
+				}"
+					.into(),
+					None,
+					None,
+				))
+				.await?;
+			Ok(ClientServerKey {
+				client: resp.most_recent_bookmark.identity.client.uid,
+				server: resp.most_recent_bookmark.server.public_key,
+			})
+		}
 
-// 		/// Returns uid and name of the client and messages.
-// 		async fn get_messages(
-// 			&self, server: &[u8], type_s: &str, id: &str,
-// 		) -> Result<Vec<(Vec<u8>, String, String)>> {
-// 			#![allow(non_snake_case)]
+		/// Returns uid and name of the client and messages.
+		async fn get_messages(
+			&self, server: &[u8], type_s: &str, id: &str,
+		) -> Result<Vec<(Vec<u8>, String, String)>> {
+			#![allow(non_snake_case)]
 
-// 			#[derive(Deserialize)]
-// 			struct Client {
-// 				uid: Vec<u8>,
-// 				name: String,
-// 			}
-// 			#[derive(Deserialize)]
-// 			struct Invoker {
-// 				client: Client,
-// 			}
-// 			#[derive(Deserialize)]
-// 			struct Message {
-// 				invoker: Invoker,
-// 				content: String,
-// 			}
-// 			#[derive(Deserialize)]
-// 			struct Chat {
-// 				messages: Vec<Message>,
-// 			}
-// 			#[derive(Deserialize)]
-// 			struct Query {
-// 				chat: Chat,
-// 			}
+			#[derive(Deserialize)]
+			struct Client {
+				uid: Vec<u8>,
+				name: String,
+			}
+			#[derive(Deserialize)]
+			struct Invoker {
+				client: Client,
+			}
+			#[derive(Deserialize)]
+			struct Message {
+				invoker: Invoker,
+				content: String,
+			}
+			#[derive(Deserialize)]
+			struct Chat {
+				messages: Vec<Message>,
+			}
+			#[derive(Deserialize)]
+			struct Query {
+				chat: Chat,
+			}
 
-// 			let vars = vec![("typ", type_s), ("id", id)];
-// 			let vars = juniper::InputValue::Object({
-// 				let mut vars: Vec<_> = vars
-// 					.into_iter()
-// 					.map(|(k, v)| {
-// 						(
-// 							juniper::parser::Spanning::unlocated(k.to_string()),
-// 							juniper::parser::Spanning::unlocated(juniper::InputValue::scalar(v)),
-// 						)
-// 					})
-// 					.collect();
-// 				vars.push((
-// 					juniper::parser::Spanning::unlocated("server".to_string()),
-// 					juniper::parser::Spanning::unlocated(juniper::InputValue::list(
-// 						server.iter().map(|b| juniper::InputValue::scalar(*b as i32)).collect(),
-// 					)),
-// 				));
-// 				vars
-// 			});
-// 			let resp: Query = self
-// 				.graphql(&GraphQLRequest::new(
-// 					"query ($typ: GMessageTarget!, $server: [Int!]!, $id: ID!) {
-// 					chat(typ: $typ, server: $server, id: $id) {
-// 						messages {
-// 							invoker {
-// 								client {
-// 									uid
-// 									name
-// 								}
-// 							}
-// 							content
-// 						}
-// 					}
-// 				}"
-// 					.into(),
-// 					None,
-// 					Some(vars),
-// 				))
-// 				.await?;
-// 			Ok(resp
-// 				.chat
-// 				.messages
-// 				.into_iter()
-// 				.map(|m| (m.invoker.client.uid, m.invoker.client.name, m.content))
-// 				.collect())
-// 		}
+			let vars = vec![("typ", type_s), ("id", id)];
+			let vars = juniper::InputValue::Object({
+				let mut vars: Vec<_> = vars
+					.into_iter()
+					.map(|(k, v)| {
+						(
+							juniper::parser::Spanning::unlocated(k.to_string()),
+							juniper::parser::Spanning::unlocated(juniper::InputValue::scalar(v)),
+						)
+					})
+					.collect();
+				vars.push((
+					juniper::parser::Spanning::unlocated("server".to_string()),
+					juniper::parser::Spanning::unlocated(juniper::InputValue::list(
+						server.iter().map(|b| juniper::InputValue::scalar(*b as i32)).collect(),
+					)),
+				));
+				vars
+			});
+			let resp: Query = self
+				.graphql(&GraphQLRequest::new(
+					"query ($typ: GMessageTarget!, $server: [Int!]!, $id: ID!) {
+					chat(typ: $typ, server: $server, id: $id) {
+						messages {
+							invoker {
+								client {
+									uid
+									name
+								}
+							}
+							content
+						}
+					}
+				}"
+					.into(),
+					None,
+					Some(vars),
+				))
+				.await?;
+			Ok(resp
+				.chat
+				.messages
+				.into_iter()
+				.map(|m| (m.invoker.client.uid, m.invoker.client.name, m.content))
+				.collect())
+		}
 
-// 		fn run(&self) -> impl Future<Output = Result<()>> {
-// 			let logger = self.logger.clone();
-// 			let port = self.port;
-// 			async move {
-// 				let dir = tempfile::Builder::new().prefix("qint-proxy").tempdir()?;
-// 				info!(logger, "Using config directory"; "dir" => dir.path().display());
-// 				let args = Args {
-// 					listen_address: Some(format!("127.0.0.1:{}", port).parse().unwrap()),
-// 					default_identity: None,
-// 					config_path: Some(dir.path().join("config")),
-// 					cache_path: Some(dir.path().join("cache")),
-// 					plugin_path: None,
-// 					no_audio: true,
-// 					no_search: false,
-// 					no_link_cache: false,
-// 					verbosity: 1,
-// 				};
-// 				let app = App::new(logger, args);
-// 				app.serve().await?;
-// 				dir.close()?;
-// 				Ok(())
-// 			}
-// 		}
+		fn run(&self) -> impl Future<Output = Result<()>> {
+			let logger = self.logger.clone();
+			let port = self.port;
+			async move {
+				let dir = tempfile::Builder::new().prefix("qint-proxy").tempdir()?;
+				info!(logger, "Using config directory"; "dir" => dir.path().display());
+				let args = Args {
+					listen_address: Some(format!("127.0.0.1:{}", port).parse().unwrap()),
+					default_identity: None,
+					config_path: Some(dir.path().join("config")),
+					cache_path: Some(dir.path().join("cache")),
+					plugin_path: None,
+					no_audio: true,
+					no_search: false,
+					no_link_cache: false,
+					no_open: true,
+					verbosity: 1,
+				};
+				let app = WebApp::new(QintState::new(logger, args.into())?);
+				app.serve().await?;
+				dir.close()?;
+				Ok(())
+			}
+		}
 
-// 		fn run_log_errors(&self) -> impl Future<Output = ()> {
-// 			let fut = self.run();
-// 			let logger = self.logger.clone();
-// 			async move {
-// 				if let Err(e) = fut.await {
-// 					error!(logger, "Proxy encountered an error"; "error" => %e);
-// 				}
-// 			}
-// 		}
-// 	}
+		fn run_log_errors(&self) -> impl Future<Output = ()> {
+			let fut = self.run();
+			let logger = self.logger.clone();
+			async move {
+				if let Err(e) = fut.await {
+					error!(logger, "Proxy encountered an error"; "error" => %e);
+				}
+			}
+		}
+	}
 
-// 	impl Connection {
-// 		async fn connect(&mut self) -> Result<ClientId> {
-// 			self.send(&MessageF2P::Connect(ConnectOptions {
-// 				address: "localhost".to_string(),
-// 				name: "Test".to_string(),
-// 				..Default::default()
-// 			}))
-// 			.await?;
-// 			loop {
-// 				let msg = self.recv().await?;
-// 				if let MessageP2F::Connected { own_client, .. } = msg {
-// 					return Ok(ClientId(own_client.parse().unwrap()));
-// 				} else if let MessageP2F::Error(e) = msg {
-// 					bail!("Got proxy error: {}", e);
-// 				}
-// 			}
-// 		}
+	impl Connection {
+		async fn connect(&mut self) -> Result<ClientId> {
+			self.send(&MessageF2P::Connect(ConnectOptions {
+				address: "localhost".to_string(),
+				name: "Test".to_string(),
+				..Default::default()
+			}))
+			.await?;
+			loop {
+				let msg = self.recv().await?;
+				if let MessageP2F::Connected { own_client, .. } = msg {
+					return Ok(ClientId(own_client.parse().unwrap()));
+				} else if let MessageP2F::Error(e) = msg {
+					bail!("Got proxy error: {}", e);
+				}
+			}
+		}
 
-// 		async fn send(&mut self, msg: &MessageF2P) -> Result<()> {
-// 			println!("Sending message to proxy: {}", serde_json::to_string(msg).unwrap());
-// 			self.socket
-// 				.send(ws::Message::Text(serde_json::to_string(msg)?.into()))
-// 				.await
-// 				.map_err(|e| format_err!("Websocket client protocol error: {:?}", e))?;
-// 			Ok(())
-// 		}
+		async fn send(&mut self, msg: &MessageF2P) -> Result<()> {
+			println!("Sending message to proxy: {}", serde_json::to_string(msg).unwrap());
+			self.socket
+				.send(ws::Message::Text(serde_json::to_string(msg)?.into()))
+				.await
+				.map_err(|e| format_err!("Websocket client protocol error: {:?}", e))?;
+			Ok(())
+		}
 
-// 		async fn recv(&mut self) -> Result<MessageP2F> {
-// 			match self.socket.next().await {
-// 				Some(Ok(ws::Frame::Text(msg))) => {
-// 					Ok(serde_json::from_str(std::str::from_utf8(&msg)?)?)
-// 				}
-// 				f => bail!("Websocket client received unexpected packet: {:?}", f),
-// 			}
-// 		}
-// 	}
+		async fn recv(&mut self) -> Result<MessageP2F> {
+			match self.socket.next().await {
+				Some(Ok(ws::Frame::Text(msg))) => {
+					Ok(serde_json::from_str(std::str::from_utf8(&msg)?)?)
+				}
+				f => bail!("Websocket client received unexpected packet: {:?}", f),
+			}
+		}
+	}
 
-// 	fn create_logger() -> Logger {
-// 		let decorator = slog_term::PlainDecorator::new(slog_term::TestStdoutWriter);
-// 		let drain = Mutex::new(slog_term::FullFormat::new(decorator).build()).fuse();
+	fn create_logger() -> Logger {
+		let decorator = slog_term::PlainDecorator::new(slog_term::TestStdoutWriter);
+		let drain = Mutex::new(slog_term::FullFormat::new(decorator).build()).fuse();
 
-// 		slog::Logger::root(drain, o!())
-// 	}
+		slog::Logger::root(drain, o!())
+	}
 
-// 	/// Check that connecting to a server adds this server to the recent connections and updates
-// 	/// it when reconnecting.
-// 	#[actix_rt::test]
-// 	async fn test_save_server() -> Result<()> {
-// 		let proxy = TestProxy::new(create_logger());
-// 		actix::spawn(proxy.run_log_errors());
-// 		// Wait for server to come up
-// 		time::sleep(Duration::from_millis(100)).await;
-// 		let mut con = proxy.create_connection().await?;
-// 		con.connect().await?;
-// 		// Wait for saving the connection in the database
-// 		time::sleep(Duration::from_millis(100)).await;
-// 		drop(con);
+	/// Check that connecting to a server adds this server to the recent connections and updates
+	/// it when reconnecting.
+	#[actix_rt::test]
+	async fn test_save_server() -> Result<()> {
+		let proxy = TestProxy::new(create_logger());
+		actix::spawn(proxy.run_log_errors());
+		// Wait for server to come up
+		time::sleep(Duration::from_millis(100)).await;
+		let mut con = proxy.create_connection().await?;
+		con.connect().await?;
+		// Wait for saving the connection in the database
+		time::sleep(Duration::from_millis(100)).await;
+		drop(con);
 
-// 		#[derive(Deserialize)]
-// 		#[serde(rename_all = "camelCase")]
-// 		struct ServerServer {
-// 			#[allow(dead_code)]
-// 			public_key: Vec<u8>,
-// 		}
-// 		#[derive(Deserialize)]
-// 		struct ServerBookmark {
-// 			#[allow(dead_code)]
-// 			server: ServerServer,
-// 		}
-// 		#[derive(Deserialize)]
-// 		struct ServerResponse {
-// 			bookmarks: Vec<ServerBookmark>,
-// 		}
+		#[derive(Deserialize)]
+		#[serde(rename_all = "camelCase")]
+		struct ServerServer {
+			#[allow(dead_code)]
+			public_key: Vec<u8>,
+		}
+		#[derive(Deserialize)]
+		struct ServerBookmark {
+			#[allow(dead_code)]
+			server: ServerServer,
+		}
+		#[derive(Deserialize)]
+		struct ServerResponse {
+			bookmarks: Vec<ServerBookmark>,
+		}
 
-// 		// Check for the server in the database
-// 		let response: ServerResponse = proxy
-// 			.graphql(&GraphQLRequest::new(
-// 				"{
-// 				bookmarks {
-// 					server {
-// 						publicKey
-// 					}
-// 				}
-// 			}"
-// 				.into(),
-// 				None,
-// 				None,
-// 			))
-// 			.await?;
-// 		assert_eq!(response.bookmarks.len(), 1, "Recent connection not saved in the database");
-// 		Ok(())
-// 	}
+		// Check for the server in the database
+		let response: ServerResponse = proxy
+			.graphql(&GraphQLRequest::new(
+				"{
+				bookmarks {
+					server {
+						publicKey
+					}
+				}
+			}"
+				.into(),
+				None,
+				None,
+			))
+			.await?;
+		assert_eq!(response.bookmarks.len(), 1, "Recent connection not saved in the database");
+		Ok(())
+	}
 
-// 	/// Check that getting or sending a message from a client saves the other client and the
-// 	/// message.
-// 	#[actix_rt::test]
-// 	async fn test_save_client() -> Result<()> {
-// 		let logger = create_logger();
-// 		let proxy0 = TestProxy::new(logger.clone());
-// 		actix::spawn(proxy0.run_log_errors());
-// 		let proxy1 = TestProxy::new(logger);
-// 		actix::spawn(proxy1.run_log_errors());
-// 		// Wait for server to come up
-// 		time::sleep(Duration::from_millis(100)).await;
-// 		let mut con0 = proxy0.create_connection().await?;
-// 		con0.connect().await?;
-// 		let mut con1 = proxy1.create_connection().await?;
-// 		let con1_id = con1.connect().await?;
+	/// Check that getting or sending a message from a client saves the other client and the
+	/// message.
+	#[actix_rt::test]
+	async fn test_save_client() -> Result<()> {
+		let logger = create_logger();
+		let proxy0 = TestProxy::new(logger.clone());
+		actix::spawn(proxy0.run_log_errors());
+		let proxy1 = TestProxy::new(logger);
+		actix::spawn(proxy1.run_log_errors());
+		// Wait for server to come up
+		time::sleep(Duration::from_millis(100)).await;
+		let mut con0 = proxy0.create_connection().await?;
+		con0.connect().await?;
+		let mut con1 = proxy1.create_connection().await?;
+		let con1_id = con1.connect().await?;
 
-// 		// con0 sends a message to con1
-// 		let msg = "Hello 1";
-// 		con0.send(&MessageF2P::SendMessage {
-// 			target: JsMessageTarget::Client(con1_id),
-// 			message: msg.to_string(),
-// 			return_code: None,
-// 		})
-// 		.await?;
+		// con0 sends a message to con1
+		let msg = "Hello 1";
+		con0.send(&MessageF2P::SendMessage {
+			target: JsMessageTarget::Client(con1_id),
+			message: msg.to_string(),
+			return_code: None,
+		})
+		.await?;
 
-// 		// Wait for saving the message in the database
-// 		time::sleep(Duration::from_millis(100)).await;
-// 		drop(con0);
-// 		drop(con1);
+		// Wait for saving the message in the database
+		time::sleep(Duration::from_millis(100)).await;
+		drop(con0);
+		drop(con1);
 
-// 		let key0 = proxy0.get_client_server_key().await?;
-// 		let key1 = proxy1.get_client_server_key().await?;
+		let key0 = proxy0.get_client_server_key().await?;
+		let key1 = proxy1.get_client_server_key().await?;
 
-// 		// Check for the message in the database of con0
-// 		let msgs =
-// 			proxy0.get_messages(&key0.server, "CLIENT", &base64::encode(&key1.client)).await?;
-// 		assert_eq!(msgs.len(), 1, "Message not saved in the database");
-// 		assert_eq!(msgs[0].0, key0.client, "Sender uid is wrong");
-// 		assert_eq!(msgs[0].2, msg, "Message is wrong");
-// 		assert!(msgs[0].1.starts_with("Test"), "Client name has to start with 'Test'");
+		// Check for the message in the database of con0
+		let msgs =
+			proxy0.get_messages(&key0.server, "CLIENT", &base64::encode(&key1.client)).await?;
+		assert_eq!(msgs.len(), 1, "Message not saved in the database");
+		assert_eq!(msgs[0].0, key0.client, "Sender uid is wrong");
+		assert_eq!(msgs[0].2, msg, "Message is wrong");
+		assert!(msgs[0].1.starts_with("Test"), "Client name has to start with 'Test'");
 
-// 		// Check for the message in the database of con1
-// 		let msgs =
-// 			proxy1.get_messages(&key0.server, "CLIENT", &base64::encode(&key0.client)).await?;
-// 		assert_eq!(msgs.len(), 1, "Message not saved in the database");
-// 		assert_eq!(msgs[0].0, key0.client, "Sender uid is wrong");
-// 		assert_eq!(msgs[0].2, msg, "Message is wrong");
-// 		assert!(msgs[0].1.starts_with("Test"), "Client name has to start with 'Test'");
-// 		Ok(())
-// 	}
-// }
+		// Check for the message in the database of con1
+		let msgs =
+			proxy1.get_messages(&key0.server, "CLIENT", &base64::encode(&key0.client)).await?;
+		assert_eq!(msgs.len(), 1, "Message not saved in the database");
+		assert_eq!(msgs[0].0, key0.client, "Sender uid is wrong");
+		assert_eq!(msgs[0].2, msg, "Message is wrong");
+		assert!(msgs[0].1.starts_with("Test"), "Client name has to start with 'Test'");
+		Ok(())
+	}
+}

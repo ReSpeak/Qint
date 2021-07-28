@@ -1,5 +1,5 @@
 # Qint
-Qint allows you to speak with other people over the internet.
+Qint is an open-source TeamSpeak client that allows you to speak with other people over the internet.
 
 ## Screenshots
 ![main ui](https://share.splamy.de/20/02/firefox_2020-02-02_19-06-04.png)
@@ -8,8 +8,8 @@ Qint allows you to speak with other people over the internet.
 - [Rust](https://rust-lang.org), preferred installation method is [rustup](https://rustup.rs)
 - [yarn](https://yarnpkg.com)
 - [SDL2](https://www.libsdl.org), Windows installation guide is [below](#windows)
-- [OpenSSL](https://www.openssl.org) 1.1, on linux only
-- [libopus](https://opus-codec.org), on linux only
+- [OpenSSL](https://www.openssl.org) 1.1, on Linux only
+- [libopus](https://opus-codec.org), on Linux only
 
 ### Windows
 Run `./install_sdl.ps1`  
@@ -46,10 +46,13 @@ cargo build --release
 
 To activate logging for audio, use e.g. `RUST_LOG=debug,qint_proxy::audio::audio_to_ts=trace`.
 
-By default, the proxy searches for the frontend in `../frontend/build`, where the frontend gets built by default. For packaging, it is useful to load the frontend for another directory, which can be set during compilation: `env FRONTEND_PATH=./frontend/ cargo build`
+By default, the proxy searches for the frontend in `../frontend/build`, where the frontend gets
+built by default. For packaging, it is useful to load the frontend for another directory, which can
+be set during compilation: `env FRONTEND_PATH=./frontend/ cargo build`
 
 ### Build the frontend
-The backend needs to be built first because it autogenerates part of the frontend code.
+Make sure to build the backend once before building the frontend, because the backend build
+autogenerates the `book_events.ts` file of the frontend.
 
 ```bash
 cd Qint/frontend
@@ -88,7 +91,7 @@ localStorage.debug = "*"
 
 ### Configure Shortcuts
 
-On windows in `%appdata%\ReSpeak\config.toml`:
+On Windows in `%appdata%\ReSpeak\config.toml`:
 ```toml
 [[shortcuts.actions]]
 keycode = "F13"
@@ -104,7 +107,7 @@ action = { Away = "False" }
 ```
 
 On Linux/X11, shortcuts are currently not implemented.
-For Linux/wayland, configure your compositor to make http requests, e.g. by using curl:
+For Linux/Wayland, configure your compositor to make http requests, e.g. using curl:
 ```bash
 curl -H "Content-Type: application/json" -X POST -d '{"InputMute":"Toggle"}' http://localhost:4422/shortcut
 curl -H "Content-Type: application/json" -X POST -d '{"Away":"True"}' http://localhost:4422/shortcut

@@ -2,11 +2,9 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 
 use proxy_codegen::book_events::{
-	deserialize_id, deserialize_set_id, deserialize_some_u64, serialize_id, JsEvent, JsInMessage,
-	JsM2B,
+	deserialize_id, deserialize_set_id, deserialize_some_u64, serialize_id, serialize_set_id,
+	serialize_some_u64, JsEvent, JsInMessage, JsM2B,
 };
-#[cfg(test)]
-use proxy_codegen::book_events::{serialize_set_id, serialize_some_u64};
 use serde::{Deserialize, Serialize};
 use tsclientlib::{
 	ChannelId, ClientId, CommandError, DisconnectOptions, Error as TsclError, MessageTarget,
@@ -16,8 +14,7 @@ use tsclientlib::{
 use super::connection::Error as WsError;
 
 /// A message sent over a websocket connection from the frontend to the proxy.
-#[derive(Clone, Debug, Deserialize)]
-#[cfg_attr(test, derive(Serialize))]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub enum MessageF2P {
 	Connect(ConnectOptions),
@@ -51,8 +48,7 @@ pub enum MessageF2P {
 }
 
 /// A message sent over a websocket connection from the proxy to the frontend.
-#[derive(Debug, Serialize)]
-#[cfg_attr(test, derive(Deserialize))]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub enum MessageP2F {
 	/// The connection failed. The websocket connection should be closed
@@ -80,8 +76,7 @@ pub enum MessageP2F {
 }
 
 // Has to be an extra struct for flatten to work
-#[derive(Debug, Serialize)]
-#[cfg_attr(test, derive(Deserialize))]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ResultStruct {
 	pub return_code: String,
@@ -91,8 +86,7 @@ pub struct ResultStruct {
 
 /// Usually, either `ts_result` (and optionally `missing_permission`) or `description` is set.
 /// If all are `None`, the result is success.
-#[derive(Debug, Default, Serialize)]
-#[cfg_attr(test, derive(Deserialize))]
+#[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResultDetails {
 	#[serde(default, skip_serializing_if = "Option::is_none")]
@@ -118,8 +112,7 @@ pub enum JsMessageTarget {
 	),
 }
 
-#[derive(Clone, Debug, Deserialize)]
-#[cfg_attr(test, derive(Serialize))]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct WhisperData {
 	#[serde(default, deserialize_with = "deserialize_set_id", serialize_with = "serialize_set_id")]
@@ -128,8 +121,7 @@ pub struct WhisperData {
 	pub channels: HashSet<ChannelId>,
 }
 
-#[derive(Clone, Debug, Deserialize, Default)]
-#[cfg_attr(test, derive(Serialize))]
+#[derive(Clone, Debug, Deserialize, Default, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ConnectOptions {
 	/// Id of the bookmark
