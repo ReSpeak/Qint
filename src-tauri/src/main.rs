@@ -176,6 +176,7 @@ fn main() {
 			cmd::identity_list,
 			cmd::identity_update,
 			cmd::identity_delete,
+			cmd::get_mutestate,
 		])
 		.run(tauri::generate_context!())
 		.map_err(|e| format_err!("tauri error: {}", e))

@@ -16,6 +16,7 @@ import {
 import { urlToWebSocket } from "./backendUtil";
 import { RustAnalyzeResult } from "src/chat/previewAnalyzer";
 import { ApiIdentity } from "src/panel/settings/identity";
+import { MuteStates } from "src/connect/uiConnect";
 
 export class BrowserBackend implements IBackend {
 	public name = "Browser";
@@ -97,11 +98,11 @@ export class BrowserBackend implements IBackend {
 	}
 
 	public async identity_import(data: string): Promise<void> {
-		const req = await this.fetch("/ident/import", {
+		const response = await this.fetch("/ident/import", {
 			method: "POST",
 			body: data,
 		});
-		await req.text();
+		await response.text();
 	}
 
 	public async identity_list(find: FindIdentity): Promise<ApiIdentity[]> {
@@ -113,17 +114,21 @@ export class BrowserBackend implements IBackend {
 	}
 
 	public async identity_update(id: string, update: UpdateIdentityOptions): Promise<void> {
-		const req = await this.fetch(`/ident/${id}?name=${update.name}`, {
+		const response = await this.fetch(`/ident/${id}?name=${update.name}`, {
 			method: "PUT",
 		});
-		await req.text();
+		await response.text();
 	}
 
 	public async identity_delete(id: string): Promise<void> {
-		const req = await this.fetch(`/ident/${id}`, {
+		const response = await this.fetch(`/ident/${id}`, {
 			method: "DELETE",
 		});
-		await req.text();
+		await response.text();
+	}
+	
+	public async get_mutestate(): Promise<MuteStates> {
+		return await (await this.fetch("/mutestate")).json();
 	}
 }
 

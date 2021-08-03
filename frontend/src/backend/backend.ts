@@ -1,6 +1,7 @@
-import { RustAnalyzeResult } from "src/chat/previewAnalyzer";
-import { ApiIdentity } from "src/panel/settings/identity";
-import { Uid } from "src/ts";
+import { RustAnalyzeResult } from "../chat/previewAnalyzer";
+import { MuteStates } from "../connect/uiConnect";
+import { ApiIdentity } from "../panel/settings/identity";
+import { Uid } from "../ts";
 import { IConnection } from "../connection";
 import { IS_TAURI } from "../util";
 import { BrowserBackend } from "./browser";
@@ -37,6 +38,7 @@ export interface IBackend {
 	identity_list(find: FindIdentity): Promise<ApiIdentity[]>;
 	identity_update(id: string, update: UpdateIdentityOptions): Promise<void>;
 	identity_delete(id: string): Promise<void>;
+	get_mutestate(): Promise<MuteStates>;
 }
 
 export interface IBackendConnection {

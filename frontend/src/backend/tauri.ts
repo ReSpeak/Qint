@@ -17,8 +17,9 @@ import { listen } from "@tauri-apps/api/event";
 import { urlToWebSocket } from "./backendUtil";
 import debug from "debug";
 import { invoke } from "@tauri-apps/api/tauri";
-import { RustAnalyzeResult } from "src/chat/previewAnalyzer";
-import { ApiIdentity } from "src/panel/settings/identity";
+import { RustAnalyzeResult } from "../chat/previewAnalyzer";
+import { ApiIdentity } from "../panel/settings/identity";
+import { MuteStates } from "../connect/uiConnect";
 const log = debug("TAURI");
 
 type TauriMsg<T> = { Msg: T } | "Close";
@@ -190,6 +191,11 @@ export class TauriBackend extends ImageTracking implements IBackend {
 
 	public async identity_delete(id: string): Promise<void> {
 		await invoke("identity_delete", { id });
+	}
+
+		
+	public async get_mutestate(): Promise<MuteStates> {
+		return await invoke<MuteStates>("get_mutestate");
 	}
 }
 

@@ -7,6 +7,7 @@ use futures::{Stream, StreamExt};
 use juniper::http::GraphQLRequest;
 use proxy_codegen::book_events::deserialize_id;
 use proxy_codegen::book_events::deserialize_u64;
+use qint_proxy::MuteStates;
 use qint_proxy::{
 	db::{
 		models::UpdateIdentity, DeleteIdentityMsg, FindIdentity, GenrateNewIdentityMsg,
@@ -351,4 +352,9 @@ pub async fn identity_update(
 #[command]
 pub async fn identity_delete(state: State<'_, QState>, id: StringId) -> Result<(), String> {
 	unwrap_send!(state.database, DeleteIdentityMsg(FindIdentity::ById(id.0)))
+}
+
+#[command]
+pub async fn get_mutestate(state: State<'_, QState>) -> Result<MuteStates, ()> {
+	Ok(state.get_mute_state().await)
 }

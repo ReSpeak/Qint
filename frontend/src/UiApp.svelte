@@ -74,7 +74,7 @@
 
 	async function updateGlobalMuteState() {
 		try {
-			const state: MuteStates = await (await backend.fetch("/mutestate")).json();
+			const state = await backend.get_mutestate();
 			connectData.inputMuted = state.input;
 			connectData.outputMuted = state.output;
 			connectData.away = state.away ? "" : undefined;
