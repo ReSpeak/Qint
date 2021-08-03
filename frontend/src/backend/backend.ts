@@ -7,6 +7,7 @@ import { IS_TAURI } from "../util";
 import { BrowserBackend } from "./browser";
 import { TauriBackend } from "./tauri";
 import { InMsg, OutMsg } from "./ws";
+import { HotkeyAction } from "../transientSettings";
 
 export const backend: IBackend = IS_TAURI ? new TauriBackend() : new BrowserBackend();
 
@@ -39,6 +40,7 @@ export interface IBackend {
 	identity_update(id: string, update: UpdateIdentityOptions): Promise<void>;
 	identity_delete(id: string): Promise<void>;
 	get_mutestate(): Promise<MuteStates>;
+	run_hotkey(action: HotkeyAction): Promise<void>;
 }
 
 export interface IBackendConnection {

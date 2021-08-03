@@ -14,9 +14,10 @@ import {
 	UpdateIdentityOptions,
 } from "./backend";
 import { urlToWebSocket } from "./backendUtil";
-import { RustAnalyzeResult } from "src/chat/previewAnalyzer";
-import { ApiIdentity } from "src/panel/settings/identity";
-import { MuteStates } from "src/connect/uiConnect";
+import { RustAnalyzeResult } from "../chat/previewAnalyzer";
+import { ApiIdentity } from "../panel/settings/identity";
+import { MuteStates } from "../connect/uiConnect";
+import { HotkeyAction } from "../transientSettings";
 
 export class BrowserBackend implements IBackend {
 	public name = "Browser";
@@ -129,6 +130,15 @@ export class BrowserBackend implements IBackend {
 	
 	public async get_mutestate(): Promise<MuteStates> {
 		return await (await this.fetch("/mutestate")).json();
+	}
+
+	public async run_hotkey(action: HotkeyAction): Promise<void> {
+		const response = await this.fetch("/hotkey", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(action),
+		});
+		await response.text();
 	}
 }
 

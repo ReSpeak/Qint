@@ -358,3 +358,9 @@ pub async fn identity_delete(state: State<'_, QState>, id: StringId) -> Result<(
 pub async fn get_mutestate(state: State<'_, QState>) -> Result<MuteStates, ()> {
 	Ok(state.get_mute_state().await)
 }
+
+#[command]
+pub async fn run_hotkey(state: State<'_, QState>, action: qint_proxy::hotkey::Action) -> Result<(), ()> {
+	action.run(&state).await;
+	Ok(())
+}

@@ -13,7 +13,6 @@
 	import GlobalCss from "./GlobalCss.svelte";
 	import GlobalScss from "./GlobalScss.svelte";
 	import { ConnectData, MuteState } from "./connect/uiConnect";
-	import type { MuteStates } from "./connect/uiConnect";
 	import { DescriptionMode } from "./transientSettings";
 	import { Channel, Server } from "./book";
 	import { backend } from "./backend/backend";

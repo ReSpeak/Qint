@@ -57,25 +57,13 @@
 		if (connection === undefined) {
 			// Send as shortcut
 			if (change.inputMuted !== undefined) {
-				await backend.fetch("/hotkey", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ InputMute: null }),
-				});
+				await backend.run_hotkey({ InputMute: null });
 			}
 			if (change.outputMuted !== undefined) {
-				await backend.fetch("/hotkey", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ OutputMute: null }),
-				});
+				await backend.run_hotkey({ OutputMute: null });
 			}
 			if (change.away !== undefined) {
-				await backend.fetch("/hotkey", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ Away: null }),
-				});
+				await backend.run_hotkey({ Away: null });
 			}
 		}
 		app.updateMuteState();

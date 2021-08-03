@@ -20,6 +20,7 @@ import { invoke } from "@tauri-apps/api/tauri";
 import { RustAnalyzeResult } from "../chat/previewAnalyzer";
 import { ApiIdentity } from "../panel/settings/identity";
 import { MuteStates } from "../connect/uiConnect";
+import { HotkeyAction } from "../transientSettings";
 const log = debug("TAURI");
 
 type TauriMsg<T> = { Msg: T } | "Close";
@@ -193,9 +194,12 @@ export class TauriBackend extends ImageTracking implements IBackend {
 		await invoke("identity_delete", { id });
 	}
 
-		
 	public async get_mutestate(): Promise<MuteStates> {
 		return await invoke<MuteStates>("get_mutestate");
+	}
+
+	public async run_hotkey(action: HotkeyAction): Promise<void> {
+		await invoke("run_hotkey", { action });
 	}
 }
 
