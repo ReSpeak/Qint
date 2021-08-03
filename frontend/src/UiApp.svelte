@@ -120,7 +120,7 @@
 		{filter}
 		visible={$showSidebar}
 		{showConnect} />
-	<div class="panel">
+	<div class="displayPanel">
 		{#if $displayPanel === DisplayPanel.Main}
 			<Chat {chat} />
 			{#if $descriptionMode !== DescriptionMode.None}
@@ -172,13 +172,13 @@
 			grid-row: 2;
 			grid-column: 1;
 		}
-		> .panel {
+		> .displayPanel {
 			grid-row: 2;
 			grid-column: 2;
 		}
 	}
 
-	.panel {
+	.displayPanel {
 		display: flex;
 		flex-direction: row;
 		overflow: hidden;

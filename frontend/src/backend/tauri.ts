@@ -3,6 +3,7 @@ import { BASE_ADDRESS, createUuidV4 } from "../util";
 import {
 	closedFn,
 	errorFn,
+	IAudioDeviceList,
 	IBackend,
 	IBackendConnection,
 	ICacheFileRequest,
@@ -162,6 +163,10 @@ export class TauriBackend extends ImageTracking implements IBackend {
 	
 	public async peek_link(link: string): Promise<RustAnalyzeResult> {
 		return await invoke<RustAnalyzeResult>("peek_link", { link });
+	}
+
+	public async get_audio_device_list() : Promise<IAudioDeviceList> {
+		return await invoke<IAudioDeviceList>("get_audio_device_list");
 	}
 }
 

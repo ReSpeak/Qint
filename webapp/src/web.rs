@@ -160,7 +160,9 @@ impl WebApp {
 		settings.listen_address
 	}
 
-	pub fn get_token(&self) -> &str { &self.token }
+	pub fn get_token(&self) -> &str {
+		&self.token
+	}
 }
 
 #[get("/con/{id}/ws")]
@@ -230,18 +232,7 @@ async fn audio_reset(state: web::Data<Arc<QintState>>) -> impl Responder {
 
 #[get("/audio/device_list")]
 async fn audio_device_list(state: web::Data<Arc<QintState>>) -> impl Responder {
-	if let Some(ad) = &state.audio_data {
-		let captures =
-			ad.a2ts.send(qint_proxy::audio::GetAudioDevices()).await.unwrap_or(Vec::new());
-		let playbacks =
-			ad.ts2a.send(qint_proxy::audio::GetAudioDevices()).await.unwrap_or(Vec::new());
-		HttpResponse::Ok().json(&serde_json::json!({
-			"capture": captures,
-			"playback": playbacks,
-		}))
-	} else {
-		HttpResponse::Ok().json(&serde_json::json!({ "capture": [], "playback": [] }))
-	}
+	HttpResponse::Ok().json(&qint_proxy::shared::audio_device_list(&**state).await)
 }
 
 fn list_plugins_intern(state: &QintState) -> Vec<String> {
@@ -310,7 +301,9 @@ struct GetFileOptions {
 	cache: bool,
 }
 
-fn result_details_gone() -> ResultDetails { ResultDetails::from_desc("gone".into()) }
+fn result_details_gone() -> ResultDetails {
+	ResultDetails::from_desc("gone".into())
+}
 
 #[get("/con/{id}/file/{channel}/{path:.*}")]
 async fn download_file(
@@ -634,10 +627,10 @@ async fn put_ident(
 	let query = query_opt.into_inner();
 	match state
 		.database
-		.send(UpdateIdentityMsg(FindIdentity::ById(path.into_inner()), UpdateIdentity {
-			name: query.name,
-			..Default::default()
-		}))
+		.send(UpdateIdentityMsg(
+			FindIdentity::ById(path.into_inner()),
+			UpdateIdentity { name: query.name, ..Default::default() },
+		))
 		.await
 	{
 		Ok(Ok(())) => HttpResponse::Ok().finish(),

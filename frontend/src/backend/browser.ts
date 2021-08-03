@@ -3,6 +3,7 @@ import { BASE_ADDRESS, createUuidV4 } from "../util";
 import {
 	closedFn,
 	errorFn,
+	IAudioDeviceList,
 	IBackend,
 	IBackendConnection,
 	ICacheFileRequest,
@@ -34,12 +35,12 @@ export class BrowserBackend implements IBackend {
 		query: string,
 		variables?: Record<string, unknown>
 	): Promise<{ data: T }> {
-		const val = await this.fetch(`/db`, {
+		const response = await this.fetch(`/db`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ query, variables }),
 		});
-		return await val.json();
+		return await response.json();
 	}
 
 	public setTitle(name: string): void {
@@ -53,8 +54,8 @@ export class BrowserBackend implements IBackend {
 	}
 
 	public async get_settings(): Promise<Record<string, unknown>> {
-		const resp = await this.fetch("/settings");
-		return await resp.json();
+		const response = await this.fetch("/settings");
+		return await response.json();
 	}
 
 	public async set_settings(diff: Record<string, unknown>): Promise<void> {
@@ -76,8 +77,13 @@ export class BrowserBackend implements IBackend {
 	}
 
 	public async peek_link(link: string): Promise<RustAnalyzeResult> {
-		const result = await this.fetch(`/peek_link/${encodeURIComponent(link)}`);
-		return await result.json();
+		const response = await this.fetch(`/peek_link/${encodeURIComponent(link)}`);
+		return await response.json();
+	}
+
+	public async get_audio_device_list() : Promise<IAudioDeviceList> {
+		const response = await this.fetch("/audio/device_list");
+		return await response.json();
 	}
 }
 

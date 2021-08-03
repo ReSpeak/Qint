@@ -10,6 +10,7 @@ use qint_proxy::{
 	filecache::guess_content_type,
 	link_previewer::AnalyzeResult,
 	messages::{MessageF2P, MessageP2F},
+	shared::AudioDeviceList,
 	AppToFrontendBridge, ConnectionId, QintState, Settings, SettingsUpdate,
 };
 use serde::{Deserialize, Serialize};
@@ -282,4 +283,9 @@ pub async fn upload_file(
 #[command]
 pub async fn peek_link(state: State<'_, QState>, link: String) -> Result<AnalyzeResult, ()> {
 	Ok(state.link_previewer.analyze_link(&link).await)
+}
+
+#[command]
+pub async fn get_audio_device_list(state: State<'_, QState>) -> Result<AudioDeviceList, ()> {
+	Ok(qint_proxy::shared::audio_device_list(&**state).await)
 }

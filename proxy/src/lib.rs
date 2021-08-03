@@ -32,6 +32,7 @@ pub mod link_previewer;
 pub mod messages;
 pub mod search;
 pub mod secret;
+pub mod shared;
 
 use connection::QintConnection;
 use filecache::FileCache;

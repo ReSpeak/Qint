@@ -170,6 +170,7 @@ fn main() {
 			cmd::download_file,
 			cmd::upload_file,
 			cmd::peek_link,
+			cmd::get_audio_device_list,
 		])
 		.run(tauri::generate_context!())
 		.map_err(|e| format_err!("tauri error: {}", e))

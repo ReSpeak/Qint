@@ -5,6 +5,8 @@ import { BrowserBackend } from "./browser";
 import { TauriBackend } from "./tauri";
 import { InMsg, OutMsg } from "./ws";
 
+export const backend: IBackend = IS_TAURI ? new TauriBackend() : new BrowserBackend();
+
 export type errorFn = (err: string) => void;
 export type msgFn = (msg: InMsg) => void;
 export type closedFn = () => void;
@@ -27,6 +29,7 @@ export interface IBackend {
 	set_settings(diff: Record<string, unknown>): Promise<void>;
 	fetch_cache_image(img: ICacheFileRequest): Promise<string>;
 	peek_link(link: string): Promise<RustAnalyzeResult>;
+	get_audio_device_list() : Promise<IAudioDeviceList>;
 }
 
 export interface IBackendConnection {
@@ -63,4 +66,7 @@ export const enum ImageProvider {
 	Cache,
 }
 
-export const backend: IBackend = IS_TAURI ? new TauriBackend() : new BrowserBackend();
+export interface IAudioDeviceList {
+	capture: string[];
+	playback: string[];
+}

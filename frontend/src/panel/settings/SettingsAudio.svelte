@@ -77,10 +77,7 @@
 	}
 
 	async function fetchAvailableDevices() {
-		const req = await backend.fetch("/audio/device_list", {
-			method: "GET",
-		});
-		const list = (await req.json()) as { capture: string[]; playback: string[] };
+		const list = await backend.get_audio_device_list();
 		captureDevices = [null, ...list.capture];
 		playbackDevices = [null, ...list.playback];
 	}
