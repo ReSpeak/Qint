@@ -140,8 +140,8 @@ fn main() {
 		.system_tray(
 			SystemTray::new().with_menu(
 				SystemTrayMenu::new()
-					.add_item(CustomMenuItem::new("toggle".into(), "Toggle"))
-					.add_item(CustomMenuItem::new("new".into(), "New window")),
+					.add_item(CustomMenuItem::new("toggle", "Toggle"))
+					.add_item(CustomMenuItem::new("new", "New window")),
 			),
 		)
 		.on_system_tray_event(|app, event| match event {
@@ -169,6 +169,7 @@ fn main() {
 			cmd::get_cache_file,
 			cmd::download_file,
 			cmd::upload_file,
+			cmd::peek_link,
 		])
 		.run(tauri::generate_context!())
 		.map_err(|e| format_err!("tauri error: {}", e))

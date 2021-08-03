@@ -14,6 +14,7 @@ import { listen } from "@tauri-apps/api/event";
 import { urlToWebSocket } from "./backendUtil";
 import debug from "debug";
 import { invoke } from "@tauri-apps/api/tauri";
+import { RustAnalyzeResult } from "src/chat/previewAnalyzer";
 const log = debug("TAURI");
 
 type TauriMsg<T> = { Msg: T } | "Close";
@@ -157,6 +158,10 @@ export class TauriBackend extends ImageTracking implements IBackend {
 
 	public async fetch_cache_image(req: ICacheFileRequest): Promise<string> {
 		return await this.fetchImgInternal("get_cache_file", req, req.server);
+	}
+	
+	public async peek_link(link: string): Promise<RustAnalyzeResult> {
+		return await invoke<RustAnalyzeResult>("peek_link", { link });
 	}
 }
 

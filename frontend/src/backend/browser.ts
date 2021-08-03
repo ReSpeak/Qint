@@ -11,6 +11,7 @@ import {
 	msgFn,
 } from "./backend";
 import { urlToWebSocket } from "./backendUtil";
+import { RustAnalyzeResult } from "src/chat/previewAnalyzer";
 
 export class BrowserBackend implements IBackend {
 	public name = "Browser";
@@ -72,6 +73,11 @@ export class BrowserBackend implements IBackend {
 			hasQ = true;
 		}
 		return Promise.resolve(str);
+	}
+
+	public async peek_link(link: string): Promise<RustAnalyzeResult> {
+		const result = await this.fetch(`/peek_link/${encodeURIComponent(link)}`);
+		return await result.json();
 	}
 }
 

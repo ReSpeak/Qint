@@ -40,22 +40,22 @@ export async function analyzeLink(link: string): Promise<AnalyzeResult> {
 	}
 }
 
-function rustResultToAnalyzeResult(data: any): AnalyzeResult {
+function rustResultToAnalyzeResult(data: RustAnalyzeResult): AnalyzeResult {
 	if (data === "Unknown") {
 		return Unknown;
-	} else if (data.Site) {
+	} else if ("Site" in data) {
 		return {
 			kind: "site",
 			title: data.Site.title,
 			imageSrc: data.Site.image_src,
-			description: data.Site.description,
+			description: data.Site.description ?? "",
 		};
-	} else if (data.Image) {
+	} else if ("Image" in data) {
 		return {
 			kind: "image",
 			imageSrc: data.Image,
 		};
-	} else if (data.Video) {
+	} else if ("Video" in data) {
 		return {
 			kind: "video",
 			videoSrc: data.Video,
@@ -65,8 +65,7 @@ function rustResultToAnalyzeResult(data: any): AnalyzeResult {
 }
 
 async function analyzeLinkInBackend(link: string): Promise<AnalyzeResult> {
-	const result = await backend.fetch(`/peek_link/${encodeURIComponent(link)}`);
-	const data = await result.json();
+	const data = await backend.peek_link(link);
 	return rustResultToAnalyzeResult(data);
 }
 
@@ -76,6 +75,13 @@ const Unknown: UnknwonResult = {
 
 type AnalyzeResult = ImageResult | SiteResult | VideoResult | UnknwonResult;
 export type EmbedTypes = "youtube";
+
+	
+export type RustAnalyzeResult = 
+	"Unknown"
+	| { Image: string }
+	| { Video: string }
+	| { Site: { title: string, image_src: string, description: string | null } }
 
 interface UnknwonResult {
 	kind: undefined;

@@ -1,3 +1,4 @@
+import { RustAnalyzeResult } from "src/chat/previewAnalyzer";
 import { IConnection } from "../connection";
 import { IS_TAURI } from "../util";
 import { BrowserBackend } from "./browser";
@@ -25,6 +26,7 @@ export interface IBackend {
 	get_settings(): Promise<Record<string, unknown>>;
 	set_settings(diff: Record<string, unknown>): Promise<void>;
 	fetch_cache_image(img: ICacheFileRequest): Promise<string>;
+	peek_link(link: string): Promise<RustAnalyzeResult>;
 }
 
 export interface IBackendConnection {

@@ -7,7 +7,7 @@ edition = "2018"
 build = "src/build.rs"
 
 [build-dependencies]
-tauri-build = { version = "1.0.0-beta.2" }
+tauri-build = { version = "1.0.0-beta.3" }
 
 [features]
 custom-protocol = [ "tauri/custom-protocol" ]
@@ -31,7 +31,7 @@ slog-scope = "4"
 slog-stdlog = "4"
 slog-term = "2"
 structopt = { version = "0.3", default-features = false }
-tauri = { version = "1.0.0-beta.4", features = ["api-all", "system-tray", "menu"] }
+tauri = { version = "1.0.0-beta.5", features = ["api-all", "system-tray", "menu"] }
 tsclientlib = { path = "../../tsclientlib/tsclientlib", features = [ "unstable" ] }
 tsproto-types = { path = "../../tsclientlib/utils/tsproto-types" }
 tokio = "1"

@@ -44,32 +44,37 @@ impl LinkPreviewer {
 	}
 
 	pub async fn decode_and_analyze_link(&self, link: &str) -> AnalyzeResult {
+		if let Ok(link) = percent_decode_str(link).decode_utf8() {
+			self.analyze_link(&link).await
+		} else {
+			AnalyzeResult::Unknown
+		}
+	}
+
+	pub async fn analyze_link(&self, link: &str) -> AnalyzeResult {
 		if let Some(cached_value) = self.cache.as_ref().and_then(|c| c.get(link).ok().flatten()) {
 			let slice: &[u8] = cached_value.as_ref();
 			if let Ok(result) = rmp_serde::from_read_ref(slice) {
 				return result;
 			}
 		}
-		if let Ok(url) = percent_decode_str(link).decode_utf8() {
-			let result = Self::analyze_link(url.as_ref()).await.unwrap_or(AnalyzeResult::Unknown);
 
-			if let Ok(cache_arr) = rmp_serde::to_vec(&result) {
-				if let Some(cache) = &self.cache {
-					if let Err(e) = cache.insert(link.as_bytes(), cache_arr.as_slice()) {
-						warn!(self.logger, "Failed to insert into link cache"; "url" => link,
-							"error" => %e);
-					} else if let Err(e) = cache.flush_async().await {
-						warn!(self.logger, "Failed to flush link cache"; "error" => %e);
-					}
+		let result = Self::analyze_link_internal(link.as_ref()).await.unwrap_or(AnalyzeResult::Unknown);
+
+		if let Ok(cache_arr) = rmp_serde::to_vec(&result) {
+			if let Some(cache) = &self.cache {
+				if let Err(e) = cache.insert(link.as_bytes(), cache_arr.as_slice()) {
+					warn!(self.logger, "Failed to insert into link cache"; "url" => link,
+						"error" => %e);
+				} else if let Err(e) = cache.flush_async().await {
+					warn!(self.logger, "Failed to flush link cache"; "error" => %e);
 				}
 			}
-			result
-		} else {
-			AnalyzeResult::Unknown
 		}
+		result
 	}
 
-	async fn analyze_link(link: &str) -> Result<AnalyzeResult> {
+	async fn analyze_link_internal(link: &str) -> Result<AnalyzeResult> {
 		// Include 'Bot' in the user agent to be able to load Twitter previews
 		// (https://mau.dev/maunium/synapse)
 		let client = reqwest::Client::builder().user_agent("Bot").build()?;

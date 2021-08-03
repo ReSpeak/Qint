@@ -8,6 +8,7 @@ use juniper::http::GraphQLRequest;
 use proxy_codegen::book_events::deserialize_id;
 use qint_proxy::{
 	filecache::guess_content_type,
+	link_previewer::AnalyzeResult,
 	messages::{MessageF2P, MessageP2F},
 	AppToFrontendBridge, ConnectionId, QintState, Settings, SettingsUpdate,
 };
@@ -24,7 +25,8 @@ use crate::core::{CreateWs, DispatchWsMsg, QintCore};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum TauriMsg<T>
-where T: Debug
+where
+	T: Debug,
 {
 	Close,
 	Msg(T),
@@ -33,7 +35,8 @@ where T: Debug
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TauriWs<T>
-where T: Debug
+where
+	T: Debug,
 {
 	connection: Uuid,
 	msg: TauriMsg<T>,
@@ -92,7 +95,11 @@ pub async fn pass_ws_msg(
 #[command]
 pub async fn db(state: State<'_, QState>, request: GraphQLRequest) -> Result<String, ()> {
 	let res = request.execute(&state.graphql_schema, &*state).await;
-	if res.is_ok() { Ok(serde_json::to_string(&res).unwrap()) } else { Err(()) }
+	if res.is_ok() {
+		Ok(serde_json::to_string(&res).unwrap())
+	} else {
+		Err(())
+	}
 }
 
 #[command]
@@ -270,4 +277,9 @@ pub async fn upload_file(
 	state: State<'_, QState>, server_file: FileRequest, local_path: String,
 ) -> Result<(), ()> {
 	Ok(()) // TODO
+}
+
+#[command]
+pub async fn peek_link(state: State<'_, QState>, link: String) -> Result<AnalyzeResult, ()> {
+	Ok(state.link_previewer.analyze_link(&link).await)
 }
