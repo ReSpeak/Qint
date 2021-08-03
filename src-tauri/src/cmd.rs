@@ -310,7 +310,7 @@ pub async fn peek_link(state: State<'_, QState>, link: String) -> Result<Analyze
 
 #[command]
 pub async fn get_audio_device_list(state: State<'_, QState>) -> Result<AudioDeviceList, ()> {
-	Ok(qint_proxy::shared::audio_device_list(&state).await)
+	Ok(state.audio_device_list().await)
 }
 
 #[derive(Deserialize)]
@@ -360,7 +360,31 @@ pub async fn get_mutestate(state: State<'_, QState>) -> Result<MuteStates, ()> {
 }
 
 #[command]
-pub async fn run_hotkey(state: State<'_, QState>, action: qint_proxy::hotkey::Action) -> Result<(), ()> {
+pub async fn run_hotkey(
+	state: State<'_, QState>, action: qint_proxy::hotkey::Action,
+) -> Result<(), ()> {
 	action.run(&state).await;
 	Ok(())
+}
+
+#[command]
+pub fn plugin_list(state: State<'_, QState>) -> Vec<String> {
+	state.plugin_list()
+}
+
+#[command]
+pub fn plugin_get(state: State<'_, QState>, name: String) -> Result<String, String> {
+	state.plugin_get(&name).map_err(|err| err.to_string())
+}
+
+#[command]
+pub fn plugin_save(
+	state: State<'_, QState>, name: String, content: String,
+) -> Result<(), String> {
+	state.plugin_save(&name, &content).map_err(|err| err.to_string())
+}
+
+#[command]
+pub fn plugin_delete(state: State<'_, QState>, name: String) -> Result<(), String> {
+	state.plugin_delete(&name).map_err(|err| err.to_string())
 }

@@ -21,6 +21,7 @@ import { RustAnalyzeResult } from "../chat/previewAnalyzer";
 import { ApiIdentity } from "../panel/settings/identity";
 import { MuteStates } from "../connect/uiConnect";
 import { HotkeyAction } from "../transientSettings";
+import { IPlugin } from "../plugins";
 const log = debug("TAURI");
 
 type TauriMsg<T> = { Msg: T } | "Close";
@@ -200,6 +201,28 @@ export class TauriBackend extends ImageTracking implements IBackend {
 
 	public async run_hotkey(action: HotkeyAction): Promise<void> {
 		await invoke("run_hotkey", { action });
+	}
+
+
+	public async plugin_list(): Promise<string[]> {
+		return await invoke<string[]>("plugin_list");
+	}
+
+	public async plugin_get(name: string): Promise<string> {
+		return await invoke<string>("plugin_get", { name });
+	}
+
+	public async plugin_save(name: string, content: string): Promise<void> {
+		await invoke("plugin_save", { name, content });
+	}
+
+	public async plugin_delete(name: string): Promise<void> {
+		await invoke("plugin_delete", { name });
+	}
+
+	public async plugin_load(name: string): Promise<IPlugin> {
+		const content = await this.plugin_get(name);
+		return await eval(content);
 	}
 }
 

@@ -8,6 +8,7 @@ import { BrowserBackend } from "./browser";
 import { TauriBackend } from "./tauri";
 import { InMsg, OutMsg } from "./ws";
 import { HotkeyAction } from "../transientSettings";
+import { IPlugin } from "../plugins";
 
 export const backend: IBackend = IS_TAURI ? new TauriBackend() : new BrowserBackend();
 
@@ -41,6 +42,11 @@ export interface IBackend {
 	identity_delete(id: string): Promise<void>;
 	get_mutestate(): Promise<MuteStates>;
 	run_hotkey(action: HotkeyAction): Promise<void>;
+	plugin_list(): Promise<string[]>;
+	plugin_get(name: string): Promise<string>;
+	plugin_save(name: string, content: string): Promise<void>;
+	plugin_delete(name: string): Promise<void>;
+	plugin_load(name: string): Promise<IPlugin>;
 }
 
 export interface IBackendConnection {

@@ -5,6 +5,7 @@ extern crate diesel_migrations;
 
 use std::collections::HashMap;
 use std::fs;
+use std::io;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
@@ -12,12 +13,14 @@ use std::sync::{Arc, Mutex, RwLock};
 use actix::prelude::*;
 use actix::{Actor, Addr};
 use anyhow::{bail, format_err, Result};
+use audio::GetAudioDevices;
 use futures::prelude::*;
 use futures::stream::FuturesUnordered;
 use messages::MessageP2F;
 use serde::de::IntoDeserializer;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use shared::AudioDeviceList;
 use slog::{debug, error, info, warn, Logger};
 use tokio::runtime::Handle;
 use uuid::Uuid;
@@ -185,7 +188,9 @@ pub struct MuteStates {
 	pub away: bool,
 }
 
-fn default_listen_address() -> SocketAddr { "127.0.0.1:4422".parse().unwrap() }
+fn default_listen_address() -> SocketAddr {
+	"127.0.0.1:4422".parse().unwrap()
+}
 
 fn default_cache_path() -> PathBuf {
 	let proj_dirs = match directories_next::ProjectDirs::from("", DIR_ORGANIZATION, DIR_PROJECT) {
@@ -342,6 +347,16 @@ impl QintState {
 		fut.filter_map(|f| future::ready(f))
 	}
 
+	pub async fn audio_device_list(&self) -> AudioDeviceList {
+		if let Some(ad) = &self.audio_data {
+			let capture = ad.a2ts.send(GetAudioDevices()).await.unwrap_or(Vec::new());
+			let playback = ad.ts2a.send(GetAudioDevices()).await.unwrap_or(Vec::new());
+			AudioDeviceList { capture, playback }
+		} else {
+			AudioDeviceList::default()
+		}
+	}
+
 	pub async fn get_mute_state(&self) -> MuteStates {
 		struct OptionMuteStates {
 			// Input state for servers, where we can talk (not away and output not muted)
@@ -419,6 +434,40 @@ impl QintState {
 			.unwrap_or_else(|| self.settings.read().unwrap().get_default_mute_states());
 		res
 	}
+
+	pub fn plugin_list(&self) -> Vec<String> {
+		let path = &self.launch_config.read().unwrap().plugin_path;
+		let mut res = Vec::new();
+		let dir = match path.read_dir() {
+			Ok(r) => r,
+			Err(e) => {
+				warn!(self.logger, "Failed to list plugins"; "dir" => ?path, "error" => %e);
+				return Vec::new();
+			}
+		};
+		for p in dir {
+			if let Some(p) = p.ok().and_then(|p| p.file_name().into_string().ok()) {
+				res.push(p);
+			}
+		}
+		res
+	}
+
+	// TODO: consider checking name for '.' and '/' for security?
+	pub fn plugin_get(&self, name: &str) -> io::Result<String> {
+		let path = self.launch_config.read().unwrap().plugin_path.join(name);
+		fs::read_to_string(path)
+	}
+
+	pub fn plugin_save(&self, name: &str, content: &str) -> io::Result<()> {
+		let path = self.launch_config.read().unwrap().plugin_path.join(name);
+		fs::write(path, content)
+	}
+
+	pub fn plugin_delete(&self, name: &str) -> io::Result<()> {
+		let path = &self.launch_config.read().unwrap().plugin_path.join(name);
+		fs::remove_file(path)
+	}
 }
 
 impl Default for LaunchConfig {
@@ -461,7 +510,9 @@ impl Settings {
 		Ok(())
 	}
 
-	pub fn merge(&mut self, v: &Value) { merge_json(&mut self.0, v); }
+	pub fn merge(&mut self, v: &Value) {
+		merge_json(&mut self.0, v);
+	}
 
 	fn get_global_volume(&self) -> Option<f32> {
 		Some(self.0.as_object()?.get("audio")?.as_object()?.get("globalVolume")?.as_f64()? as f32)

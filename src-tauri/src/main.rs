@@ -178,6 +178,10 @@ fn main() {
 			cmd::identity_delete,
 			cmd::get_mutestate,
 			cmd::run_hotkey,
+			cmd::plugin_list,
+			cmd::plugin_get,
+			cmd::plugin_save,
+			cmd::plugin_delete,
 		])
 		.run(tauri::generate_context!())
 		.map_err(|e| format_err!("tauri error: {}", e))

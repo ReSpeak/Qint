@@ -233,36 +233,18 @@ async fn audio_reset(state: web::Data<Arc<QintState>>) -> impl Responder {
 
 #[get("/audio/device_list")]
 async fn audio_device_list(state: web::Data<Arc<QintState>>) -> impl Responder {
-	HttpResponse::Ok().json(&qint_proxy::shared::audio_device_list(&state).await)
-}
-
-fn list_plugins_intern(state: &QintState) -> Vec<String> {
-	let path = &state.launch_config.read().unwrap().plugin_path;
-	let mut res = Vec::new();
-	let dir = match path.read_dir() {
-		Ok(r) => r,
-		Err(e) => {
-			warn!(state.logger, "Failed to list plugins"; "dir" => ?path, "error" => %e);
-			return Vec::new();
-		}
-	};
-	for p in dir {
-		if let Some(p) = p.ok().and_then(|p| p.file_name().into_string().ok()) {
-			res.push(p);
-		}
-	}
-	res
+	HttpResponse::Ok().json(state.audio_device_list().await)
 }
 
 #[get("/plugins")]
 async fn list_plugins(state: web::Data<Arc<QintState>>) -> impl Responder {
-	web::Json(list_plugins_intern(&state))
+	web::Json(state.plugin_list())
 }
 
 #[get("/plugins/{name}")]
 async fn get_plugin(state: web::Data<Arc<QintState>>, name: web::Path<String>) -> impl Responder {
-	let path = state.launch_config.read().unwrap().plugin_path.join(&*name);
-	fs::read_to_string(path)
+	state
+		.plugin_get(&name)
 		.with_header((http::header::CONTENT_TYPE, "application/javascript; charset=utf-8"))
 }
 
@@ -271,8 +253,7 @@ async fn put_plugin(
 	state: web::Data<Arc<QintState>>, name: web::Path<String>, body: web::Bytes,
 ) -> impl Responder {
 	if let Ok(s) = std::str::from_utf8(body.as_ref()) {
-		let path = state.launch_config.read().unwrap().plugin_path.join(&*name);
-		if let Err(e) = fs::write(path, s) {
+		if let Err(e) = state.plugin_save(&name, s) {
 			HttpResponse::InternalServerError().body(e.to_string())
 		} else {
 			HttpResponse::Ok().finish()
@@ -286,8 +267,7 @@ async fn put_plugin(
 async fn delete_plugin(
 	state: web::Data<Arc<QintState>>, name: web::Path<String>,
 ) -> impl Responder {
-	let path = state.launch_config.read().unwrap().plugin_path.join(&*name);
-	if let Err(e) = fs::remove_file(path) {
+	if let Err(e) = state.plugin_delete(&name) {
 		HttpResponse::InternalServerError().body(e.to_string())
 	} else {
 		HttpResponse::Ok().finish()

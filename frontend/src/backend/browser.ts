@@ -18,6 +18,7 @@ import { RustAnalyzeResult } from "../chat/previewAnalyzer";
 import { ApiIdentity } from "../panel/settings/identity";
 import { MuteStates } from "../connect/uiConnect";
 import { HotkeyAction } from "../transientSettings";
+import { importFunc, IPlugin } from "../plugins";
 
 export class BrowserBackend implements IBackend {
 	public name = "Browser";
@@ -99,11 +100,10 @@ export class BrowserBackend implements IBackend {
 	}
 
 	public async identity_import(data: string): Promise<void> {
-		const response = await this.fetch("/ident/import", {
+		await this.fetch("/ident/import", {
 			method: "POST",
 			body: data,
 		});
-		await response.text();
 	}
 
 	public async identity_list(find: FindIdentity): Promise<ApiIdentity[]> {
@@ -115,17 +115,15 @@ export class BrowserBackend implements IBackend {
 	}
 
 	public async identity_update(id: string, update: UpdateIdentityOptions): Promise<void> {
-		const response = await this.fetch(`/ident/${id}?name=${update.name}`, {
+		await this.fetch(`/ident/${id}?name=${update.name}`, {
 			method: "PUT",
 		});
-		await response.text();
 	}
 
 	public async identity_delete(id: string): Promise<void> {
-		const response = await this.fetch(`/ident/${id}`, {
+		await this.fetch(`/ident/${id}`, {
 			method: "DELETE",
 		});
-		await response.text();
 	}
 	
 	public async get_mutestate(): Promise<MuteStates> {
@@ -133,12 +131,38 @@ export class BrowserBackend implements IBackend {
 	}
 
 	public async run_hotkey(action: HotkeyAction): Promise<void> {
-		const response = await this.fetch("/hotkey", {
+		await this.fetch("/hotkey", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify(action),
 		});
-		await response.text();
+	}
+
+	public async plugin_list(): Promise<string[]> {
+		const response = await this.fetch("/plugins");
+		return await response.json();
+	}
+
+	public async plugin_get(name: string): Promise<string> {
+		const response = await this.fetch(`/plugins/${name}`);
+		return await response.text();
+	}
+
+	public async plugin_save(name: string, content: string): Promise<void> {
+		await this.fetch(`/plugins/${name}`, {
+			method: "PUT",
+			body: content,
+		});
+	}
+
+	public async plugin_delete(name: string): Promise<void> {
+		await this.fetch(`/plugins/${name}`, {
+			method: "DELETE",
+		});
+	}
+
+	public plugin_load(name: string): Promise<IPlugin> {
+		return importFunc(name);
 	}
 }
 

@@ -23,8 +23,7 @@
 
 	async function loadPlugins() {
 		try {
-			const req = await backend.fetch("/plugins");
-			plugins = await req.json();
+			plugins = await backend.plugin_list();
 			for (const p of plugins) newPlugins.remove_item(p);
 			if (
 				selectedPlugin !== undefined &&
@@ -48,8 +47,7 @@
 				isLoading = false;
 			} else {
 				isLoading = true;
-				const req = await backend.fetch(`/plugins/${sel}`);
-				const text = await req.text();
+				const text = await backend.plugin_get(sel);
 				if (selectedPlugin === sel) {
 					isLoading = false;
 					editArea = text;
@@ -88,10 +86,7 @@
 	}
 
 	async function updatePlugin(name: string, content: string) {
-		await backend.fetch(`/plugins/${name}`, {
-			method: "PUT",
-			body: content,
-		});
+		await backend.plugin_save(name, content);
 		await loadPlugins();
 	}
 
@@ -128,9 +123,7 @@
 			delete editingPlugins[selectedPlugin];
 			editingPlugins = editingPlugins;
 			if (plugins.includes(selectedPlugin)) {
-				await backend.fetch(`/plugins/${selectedPlugin}`, {
-					method: "DELETE",
-				});
+				await backend.plugin_delete(selectedPlugin);
 				await loadPlugins();
 			} else {
 				newPlugins.remove_item(selectedPlugin);

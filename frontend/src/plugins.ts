@@ -3,9 +3,9 @@ import { importModule } from "@uupaa/dynamic-import-polyfill";
 import { backend } from "./backend/backend";
 import { Connection } from "./connection";
 import { InMsg } from "./backend/ws";
-import { NotificationHandler, TsNotification } from "./notificationss";
+import { NotificationHandler, TsNotification } from "./notifications";
 
-const importFunc = genImportFunc();
+export const importFunc = genImportFunc();
 
 export interface IPlugin {
 	handleEvent?: (con: Connection, evt: InMsg) => any;
@@ -25,14 +25,14 @@ export async function loadPlugins(): Promise<IPlugin[]> {
 	const plugins: IPlugin[] = [];
 	let list: string[];
 	try {
-		list = await (await backend.fetch(`/plugins`)).json();
+		list = await backend.plugin_list();
 	} catch (err) {
 		console.log("Failed to load plugins list", err);
 		return plugins;
 	}
 	for (let i = 0; i < list.length; i++) {
 		try {
-			const mod = await importFunc(list[i]);
+			const mod = await backend.plugin_load(list[i]);
 			plugins.push(mod);
 		} catch (err) {
 			console.error(`Failed to load plugin ${list[i]}`);
