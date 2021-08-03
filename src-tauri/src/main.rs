@@ -171,6 +171,11 @@ fn main() {
 			cmd::upload_file,
 			cmd::peek_link,
 			cmd::get_audio_device_list,
+			cmd::identity_create,
+			cmd::identity_import,
+			cmd::identity_list,
+			cmd::identity_update,
+			cmd::identity_delete,
 		])
 		.run(tauri::generate_context!())
 		.map_err(|e| format_err!("tauri error: {}", e))

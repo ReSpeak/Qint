@@ -10,6 +10,8 @@ use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use futures::prelude::*;
+use proxy_codegen::book_events::deserialize_u64;
+use serde::Deserialize;
 use slog::{error, info, trace, warn, Logger};
 use tsclientlib::data::Client;
 use tsclientlib::data::Connection as TsData;
@@ -64,9 +66,11 @@ pub struct AddIdentityMsg {
 	pub phonetic_nickname: Option<String>,
 }
 pub struct GetIdentitiesMsg(pub FindIdentity);
+
+#[derive(Deserialize)]
 pub enum FindIdentity {
 	All,
-	ById(u64),
+	ById(#[serde(deserialize_with = "deserialize_u64")] u64),
 	ByUid(Vec<u8>),
 	ByName(String),
 }
@@ -1209,14 +1213,17 @@ impl<'a> EventHandler<'a> {
 			Some(client) => self.handle_add_client(client, true),
 			None => {
 				if let Some(uid) = &invoker.uid {
-					self.handle_add_client_internal(true, ClientData {
-						name: invoker.name.clone(),
-						uid: uid.clone(),
-						icon: None,
-						avatar: None,
-						phonetic_name: None,
-						description: None,
-					})
+					self.handle_add_client_internal(
+						true,
+						ClientData {
+							name: invoker.name.clone(),
+							uid: uid.clone(),
+							icon: None,
+							avatar: None,
+							phonetic_name: None,
+							description: None,
+						},
+					)
 				} else {
 					Ok(())
 				}
@@ -1233,22 +1240,25 @@ impl<'a> EventHandler<'a> {
 		let icon = if client.icon.0 == 0 { None } else { Some(client.icon.0 as i32) };
 		let avatar =
 			if client.avatar_hash.is_empty() { None } else { Some(client.avatar_hash.clone()) };
-		self.handle_add_client_internal(create, ClientData {
-			name: client.name.clone(),
-			uid: client_uid,
-			icon,
-			avatar,
-			phonetic_name: if client.phonetic_name != "" {
-				Some(client.phonetic_name.clone())
-			} else {
-				None
+		self.handle_add_client_internal(
+			create,
+			ClientData {
+				name: client.name.clone(),
+				uid: client_uid,
+				icon,
+				avatar,
+				phonetic_name: if client.phonetic_name != "" {
+					Some(client.phonetic_name.clone())
+				} else {
+					None
+				},
+				description: if client.description != "" {
+					Some(client.description.clone())
+				} else {
+					None
+				},
 			},
-			description: if client.description != "" {
-				Some(client.description.clone())
-			} else {
-				None
-			},
-		})
+		)
 	}
 
 	fn handle_add_client_internal(&self, create: bool, client: ClientData) -> Result<()> {

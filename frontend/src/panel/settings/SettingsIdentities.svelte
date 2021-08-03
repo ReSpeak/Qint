@@ -30,10 +30,7 @@
 
 	async function clickNewIdentity() {
 		try {
-			const req = await backend.fetch("/ident/new", {
-				method: "POST",
-			});
-			const newIdentity = await req.json();
+			const newIdentity = await backend.identity_create();
 			await loadIdentities();
 
 			const newIndex = identities.findIndex((ident) => ident.id === newIdentity.id);
@@ -51,12 +48,7 @@
 
 	async function importIdentityFromString(data: string) {
 		try {
-			// import is special...
-			const req = await backend.fetch("/ident/im" + "port", {
-				method: "POST",
-				body: data,
-			});
-			await req.text();
+			await backend.identity_import(data);
 			await loadIdentities();
 		} catch (ex) {
 			// TODO: change to debug and show on ui
@@ -67,10 +59,7 @@
 	async function updateIdentity() {
 		if (editIdentity === undefined) return;
 		try {
-			const req = await backend.fetch(`/ident/${editIdentity.id}?name=${editIdentity.name}`, {
-				method: "PUT",
-			});
-			await req.text();
+			await backend.identity_update(editIdentity.id, { name: editIdentity.name });
 			await loadIdentities();
 		} catch (ex) {
 			// TODO: change to debug and show on ui
@@ -81,10 +70,7 @@
 	async function deleteIdentity() {
 		if (editIdentity === undefined) return;
 		try {
-			const req = await backend.fetch(`/ident/${editIdentity.id}`, {
-				method: "DELETE",
-			});
-			await req.text();
+			await backend.identity_delete(editIdentity.id);
 			await loadIdentities();
 			editIdentity = undefined;
 		} catch (ex) {

@@ -1,4 +1,6 @@
 import { RustAnalyzeResult } from "src/chat/previewAnalyzer";
+import { ApiIdentity } from "src/panel/settings/identity";
+import { Uid } from "src/ts";
 import { IConnection } from "../connection";
 import { IS_TAURI } from "../util";
 import { BrowserBackend } from "./browser";
@@ -29,7 +31,12 @@ export interface IBackend {
 	set_settings(diff: Record<string, unknown>): Promise<void>;
 	fetch_cache_image(img: ICacheFileRequest): Promise<string>;
 	peek_link(link: string): Promise<RustAnalyzeResult>;
-	get_audio_device_list() : Promise<IAudioDeviceList>;
+	get_audio_device_list(): Promise<IAudioDeviceList>;
+	identity_create(): Promise<ApiIdentity>;
+	identity_import(data: string): Promise<void>;
+	identity_list(find: FindIdentity): Promise<ApiIdentity[]>;
+	identity_update(id: string, update: UpdateIdentityOptions): Promise<void>;
+	identity_delete(id: string): Promise<void>;
 }
 
 export interface IBackendConnection {
@@ -69,4 +76,14 @@ export const enum ImageProvider {
 export interface IAudioDeviceList {
 	capture: string[];
 	playback: string[];
+}
+
+export type FindIdentity =
+	"All"
+	| { ById: number }
+	| { ByUid: Uid }
+	| { ByName: string };
+
+export interface UpdateIdentityOptions {
+	name?: string;
 }

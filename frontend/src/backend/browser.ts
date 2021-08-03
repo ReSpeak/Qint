@@ -3,6 +3,7 @@ import { BASE_ADDRESS, createUuidV4 } from "../util";
 import {
 	closedFn,
 	errorFn,
+	FindIdentity,
 	IAudioDeviceList,
 	IBackend,
 	IBackendConnection,
@@ -10,9 +11,11 @@ import {
 	IFetchLike,
 	IFileRequest,
 	msgFn,
+	UpdateIdentityOptions,
 } from "./backend";
 import { urlToWebSocket } from "./backendUtil";
 import { RustAnalyzeResult } from "src/chat/previewAnalyzer";
+import { ApiIdentity } from "src/panel/settings/identity";
 
 export class BrowserBackend implements IBackend {
 	public name = "Browser";
@@ -81,9 +84,46 @@ export class BrowserBackend implements IBackend {
 		return await response.json();
 	}
 
-	public async get_audio_device_list() : Promise<IAudioDeviceList> {
+	public async get_audio_device_list(): Promise<IAudioDeviceList> {
 		const response = await this.fetch("/audio/device_list");
 		return await response.json();
+	}
+
+	public async identity_create(): Promise<ApiIdentity> {
+		const response = await this.fetch("/ident/new", {
+			method: "POST",
+		});
+		return await response.json();
+	}
+
+	public async identity_import(data: string): Promise<void> {
+		const req = await this.fetch("/ident/import", {
+			method: "POST",
+			body: data,
+		});
+		await req.text();
+	}
+
+	public async identity_list(find: FindIdentity): Promise<ApiIdentity[]> {
+		if (find == "All") {
+			const response = await this.fetch("/ident/all");
+			return (await response.json()) as ApiIdentity[];
+		}
+		throw Error("Not implemented");
+	}
+
+	public async identity_update(id: string, update: UpdateIdentityOptions): Promise<void> {
+		const req = await this.fetch(`/ident/${id}?name=${update.name}`, {
+			method: "PUT",
+		});
+		await req.text();
+	}
+
+	public async identity_delete(id: string): Promise<void> {
+		const req = await this.fetch(`/ident/${id}`, {
+			method: "DELETE",
+		});
+		await req.text();
 	}
 }
 

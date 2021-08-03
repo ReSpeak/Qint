@@ -1,6 +1,6 @@
 /// Functionality which usually doesn't belong directly to the proxy
 /// but is shared between the web and tauri backend.
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{audio::GetAudioDevices, QintState};
 
@@ -18,4 +18,9 @@ pub async fn audio_device_list(state: &QintState) -> AudioDeviceList {
 	} else {
 		AudioDeviceList::default()
 	}
+}
+
+#[derive(Deserialize)]
+pub struct UpdateIdentityOptions {
+	pub name: Option<String>,
 }

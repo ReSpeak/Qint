@@ -17,6 +17,7 @@ use http::{header::CACHE_CONTROL, header::ETAG, HeaderValue};
 use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
 use qint_proxy::filecache::guess_content_type;
+use qint_proxy::shared::UpdateIdentityOptions;
 use tsproto_types::crypto::EccKeyPubP256;
 
 use rand::Rng;
@@ -232,7 +233,7 @@ async fn audio_reset(state: web::Data<Arc<QintState>>) -> impl Responder {
 
 #[get("/audio/device_list")]
 async fn audio_device_list(state: web::Data<Arc<QintState>>) -> impl Responder {
-	HttpResponse::Ok().json(&qint_proxy::shared::audio_device_list(&**state).await)
+	HttpResponse::Ok().json(&qint_proxy::shared::audio_device_list(&state).await)
 }
 
 fn list_plugins_intern(state: &QintState) -> Vec<String> {
@@ -255,7 +256,7 @@ fn list_plugins_intern(state: &QintState) -> Vec<String> {
 
 #[get("/plugins")]
 async fn list_plugins(state: web::Data<Arc<QintState>>) -> impl Responder {
-	web::Json(list_plugins_intern(&**state))
+	web::Json(list_plugins_intern(&state))
 }
 
 #[get("/plugins/{name}")]
@@ -615,11 +616,6 @@ async fn get_single_ident_by(state: web::Data<Arc<QintState>>, by: FindIdentity)
 	}
 }
 
-#[derive(Deserialize)]
-struct UpdateIdentityOptions {
-	name: Option<String>,
-}
-
 #[put("/ident/{id}")]
 async fn put_ident(
 	state: web::Data<Arc<QintState>>, path: web::Path<u64>, query_opt: Query<UpdateIdentityOptions>,
@@ -795,7 +791,9 @@ mod tests {
 		}
 
 		async fn graphql<T>(&self, request: &GraphQLRequest) -> Result<T>
-		where for<'a> T: Deserialize<'a> {
+		where
+			for<'a> T: Deserialize<'a>,
+		{
 			let client = awc::Client::default();
 			let url = format!("http://127.0.0.1:{}/db", self.port);
 			debug!(self.logger, "GraphQL request"; "body" => serde_json::to_string(&request).unwrap());

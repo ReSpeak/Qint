@@ -3,6 +3,7 @@ import { BASE_ADDRESS, createUuidV4 } from "../util";
 import {
 	closedFn,
 	errorFn,
+	FindIdentity,
 	IAudioDeviceList,
 	IBackend,
 	IBackendConnection,
@@ -10,12 +11,14 @@ import {
 	IFetchLike,
 	IFileRequest,
 	msgFn,
+	UpdateIdentityOptions,
 } from "./backend";
 import { listen } from "@tauri-apps/api/event";
 import { urlToWebSocket } from "./backendUtil";
 import debug from "debug";
 import { invoke } from "@tauri-apps/api/tauri";
 import { RustAnalyzeResult } from "src/chat/previewAnalyzer";
+import { ApiIdentity } from "src/panel/settings/identity";
 const log = debug("TAURI");
 
 type TauriMsg<T> = { Msg: T } | "Close";
@@ -33,7 +36,7 @@ interface OutListPluginsRequest {
 }
 
 class FetchLike implements IFetchLike {
-	constructor(private obj: any) {}
+	constructor(private obj: any) { }
 	public async json(): Promise<any> {
 		return this.obj;
 	}
@@ -160,13 +163,33 @@ export class TauriBackend extends ImageTracking implements IBackend {
 	public async fetch_cache_image(req: ICacheFileRequest): Promise<string> {
 		return await this.fetchImgInternal("get_cache_file", req, req.server);
 	}
-	
+
 	public async peek_link(link: string): Promise<RustAnalyzeResult> {
 		return await invoke<RustAnalyzeResult>("peek_link", { link });
 	}
 
-	public async get_audio_device_list() : Promise<IAudioDeviceList> {
+	public async get_audio_device_list(): Promise<IAudioDeviceList> {
 		return await invoke<IAudioDeviceList>("get_audio_device_list");
+	}
+
+	public async identity_create(): Promise<ApiIdentity> {
+		return await invoke<ApiIdentity>("identity_create");
+	}
+
+	public async identity_import(data: string): Promise<void> {
+		await invoke("identity_import", { data });
+	}
+
+	public async identity_list(find: FindIdentity): Promise<ApiIdentity[]> {
+		return await invoke<ApiIdentity[]>("identity_list", { find });
+	}
+
+	public async identity_update(id: string, update: UpdateIdentityOptions): Promise<void> {
+		await invoke("identity_update", { id, update });
+	}
+
+	public async identity_delete(id: string): Promise<void> {
+		await invoke("identity_delete", { id });
 	}
 }
 

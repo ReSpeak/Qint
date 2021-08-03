@@ -6,11 +6,17 @@ use bytes::{Bytes, BytesMut};
 use futures::{Stream, StreamExt};
 use juniper::http::GraphQLRequest;
 use proxy_codegen::book_events::deserialize_id;
+use proxy_codegen::book_events::deserialize_u64;
 use qint_proxy::{
+	db::{
+		models::UpdateIdentity, DeleteIdentityMsg, FindIdentity, GenrateNewIdentityMsg,
+		GetIdentitiesMsg, UpdateIdentityMsg,
+	},
 	filecache::guess_content_type,
+	identities::{import_ts_identities_from_string, ApiIdentity},
 	link_previewer::AnalyzeResult,
 	messages::{MessageF2P, MessageP2F},
-	shared::AudioDeviceList,
+	shared::{AudioDeviceList, UpdateIdentityOptions},
 	AppToFrontendBridge, ConnectionId, QintState, Settings, SettingsUpdate,
 };
 use serde::{Deserialize, Serialize};
@@ -23,6 +29,22 @@ use tsproto_types::{crypto::EccKeyPubP256, ChannelId};
 use uuid::Uuid;
 
 use crate::core::{CreateWs, DispatchWsMsg, QintCore};
+
+macro_rules! unwrap_send {
+	($act:expr, $msg:expr) => {{
+		match $act.send($msg).await {
+			Ok(Ok(v)) => Ok(v),
+			Ok(Err(err)) => Err(err.to_string()),
+			Err(_) => Err(concat!(
+				"Mailbox error sending '",
+				stringify!($msg),
+				"' to ",
+				stringify!($act),
+			)
+			.into()),
+		}
+	}};
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum TauriMsg<T>
@@ -287,5 +309,46 @@ pub async fn peek_link(state: State<'_, QState>, link: String) -> Result<Analyze
 
 #[command]
 pub async fn get_audio_device_list(state: State<'_, QState>) -> Result<AudioDeviceList, ()> {
-	Ok(qint_proxy::shared::audio_device_list(&**state).await)
+	Ok(qint_proxy::shared::audio_device_list(&state).await)
+}
+
+#[derive(Deserialize)]
+pub struct StringId(#[serde(deserialize_with = "deserialize_u64")] pub u64);
+
+#[command]
+pub async fn identity_create(state: State<'_, QState>) -> Result<ApiIdentity, String> {
+	unwrap_send!(state.database, GenrateNewIdentityMsg())
+}
+
+#[command]
+pub async fn identity_import(state: State<'_, QState>, data: String) -> Result<(), String> {
+	match import_ts_identities_from_string(&state, &data).await {
+		Ok(_) => Ok(()),
+		Err(e) => Err(e.to_string()),
+	}
+}
+
+#[command]
+pub async fn identity_list(
+	state: State<'_, QState>, find: FindIdentity,
+) -> Result<Vec<ApiIdentity>, String> {
+	unwrap_send!(state.database, GetIdentitiesMsg(find))
+}
+
+#[command]
+pub async fn identity_update(
+	state: State<'_, QState>, id: StringId, update: UpdateIdentityOptions,
+) -> Result<(), String> {
+	unwrap_send!(
+		state.database,
+		UpdateIdentityMsg(
+			FindIdentity::ById(id.0),
+			UpdateIdentity { name: update.name, ..Default::default() },
+		)
+	)
+}
+
+#[command]
+pub async fn identity_delete(state: State<'_, QState>, id: StringId) -> Result<(), String> {
+	unwrap_send!(state.database, DeleteIdentityMsg(FindIdentity::ById(id.0)))
 }
