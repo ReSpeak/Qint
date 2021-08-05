@@ -24,6 +24,7 @@ use shared::AudioDeviceList;
 use slog::{debug, error, info, warn, Logger};
 use tokio::runtime::Handle;
 use uuid::Uuid;
+use thiserror::Error;
 
 pub mod audio;
 pub mod connection;
@@ -112,8 +113,15 @@ pub struct Args {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Settings(Value);
 
+#[derive(Debug, Error)]
+pub enum SettingsUpdateError {
+	#[error("Failed to apply changed to the settings object: {0}")]
+	ModifyFailed(#[source] anyhow::Error),
+	#[error("Internal error occourd when applying changes: {0}")]
+	InternalError(#[source] anyhow::Error),
+}
 #[derive(Debug, Default)]
-pub struct SettingsUpdate {
+pub struct SettingsChanged {
 	pub hotkeys_changed: bool,
 }
 
@@ -213,9 +221,9 @@ pub trait AppToFrontendBridge {
 pub type FrontBridge = Box<dyn AppToFrontendBridge + Send>;
 
 impl QintState {
-	pub fn modify_settings<T: FnOnce(&mut Settings) -> Result<SettingsUpdate>>(
+	pub fn modify_settings<T: FnOnce(&mut Settings) -> Result<SettingsChanged>>(
 		state: &Arc<Self>, f: T,
-	) -> (Result<SettingsUpdate>, Result<()>) {
+	) -> Result<(), SettingsUpdateError> {
 		let mut settings = state.settings.write().unwrap();
 		let old_loudness_threshold = settings.get_loudness_threshold();
 		let old_global_volume = settings.get_global_volume();
@@ -226,11 +234,12 @@ impl QintState {
 			warn!(state.logger, "Failed to reload settings"; "error" => %e);
 		}
 
-		let r = f(&mut *settings);
-		let res = settings.save(&state.launch_config.read().unwrap().config_path);
-		if let Err(e) = &res {
-			error!(state.logger, "Failed to save settings"; "error" => %e);
-		}
+		let changes = match f(&mut *settings) {
+			Ok(changes) => changes,
+			Err(err) => return Err(SettingsUpdateError::ModifyFailed(err)),
+		};
+
+		let save_result = settings.save(&state.launch_config.read().unwrap().config_path);
 
 		// Apply audio changes
 		if let Some(ad) = &state.audio_data {
@@ -271,16 +280,33 @@ impl QintState {
 			}
 		}
 
-		if let Ok(changes) = &r {
-			if changes.hotkeys_changed {
-				if let Ok(hotkeys) = settings.get_hotkeys_config() {
-					if let Err(e) = state.hotkeys.apply_config(state, hotkeys) {
-						error!(state.logger, "Failed to apply new hotkeys"; "error" => %e);
-					}
+		if changes.hotkeys_changed {
+			if let Ok(hotkeys) = settings.get_hotkeys_config() {
+				if let Err(e) = state.hotkeys.apply_config(state, hotkeys) {
+					error!(state.logger, "Failed to apply new hotkeys"; "error" => %e);
 				}
 			}
 		}
-		(r, res)
+
+		if let Err(e) = save_result {
+			error!(state.logger, "Failed to save settings"; "error" => %e);
+			Err(SettingsUpdateError::InternalError(e))
+		} else {
+			Ok(())
+		}
+	}
+
+	pub fn set_settings_diff(state: &Arc<Self>, diff: &Value) -> Result<(), SettingsUpdateError> {
+		QintState::modify_settings(state, |values| {
+			let hotkeys_changed;
+			if let Value::Object(o) = &diff {
+				hotkeys_changed = o.contains_key(Settings::KEY_HOTKEYS);
+				values.merge(&diff);
+			} else {
+				bail!("body must be an object");
+			}
+			Ok(SettingsChanged { hotkeys_changed })
+		})
 	}
 
 	/// Run a function for every connected connection and send a packet.

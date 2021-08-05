@@ -1,4 +1,3 @@
-use std::fs;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -11,7 +10,7 @@ use actix_web::web::{Data, Query};
 use actix_web::*;
 
 use actix_web_actors::ws;
-use anyhow::{bail, Result};
+use anyhow::Result;
 use futures::prelude::*;
 use http::{header::CACHE_CONTROL, header::ETAG, HeaderValue};
 use juniper::http::graphiql::graphiql_source;
@@ -37,7 +36,7 @@ use qint_proxy::db::{
 };
 use qint_proxy::identities::import_ts_identities_from_string;
 use qint_proxy::messages::ResultDetails;
-use qint_proxy::{ConnectionId, QintState, Settings, SettingsUpdate};
+use qint_proxy::{ConnectionId, QintState, SettingsUpdateError};
 
 use crate::loudness_ws::LoudnessService;
 use crate::markdown_ws::MarkdownService;
@@ -534,23 +533,12 @@ async fn get_setting(state: web::Data<Arc<QintState>>) -> impl Responder {
 
 #[put("/settings")]
 async fn set_setting(state: web::Data<Arc<QintState>>, body: web::Json<Value>) -> impl Responder {
-	let (r, res) = QintState::modify_settings(&state.into_inner(), |values| {
-		let hotkeys_changed;
-		if let Value::Object(o) = &body.0 {
-			hotkeys_changed = o.contains_key(Settings::KEY_HOTKEYS);
-			values.merge(&body.0);
-		} else {
-			bail!("body must be an object");
+	match QintState::set_settings_diff(&state.into_inner(), &body.0) {
+		Err(SettingsUpdateError::ModifyFailed(e)) => HttpResponse::BadRequest().body(e.to_string()),
+		Err(SettingsUpdateError::InternalError(e)) => {
+			HttpResponse::InternalServerError().body(e.to_string())
 		}
-		Ok(SettingsUpdate { hotkeys_changed })
-	});
-
-	if let Err(e) = r {
-		HttpResponse::BadRequest().body(e.to_string())
-	} else if let Err(e) = res {
-		HttpResponse::InternalServerError().body(e.to_string())
-	} else {
-		HttpResponse::Ok().finish()
+		Ok(_) => HttpResponse::Ok().finish(),
 	}
 }
 

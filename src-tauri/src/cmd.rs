@@ -1,13 +1,13 @@
 use std::{fmt::Debug, sync::Arc};
 
 use actix::Addr;
-use anyhow::bail;
 use bytes::{Bytes, BytesMut};
 use futures::{Stream, StreamExt};
 use juniper::http::GraphQLRequest;
 use proxy_codegen::book_events::deserialize_id;
 use proxy_codegen::book_events::deserialize_u64;
 use qint_proxy::MuteStates;
+use qint_proxy::SettingsUpdateError;
 use qint_proxy::{
 	db::{
 		models::UpdateIdentity, DeleteIdentityMsg, FindIdentity, GenrateNewIdentityMsg,
@@ -18,7 +18,7 @@ use qint_proxy::{
 	link_previewer::AnalyzeResult,
 	messages::{MessageF2P, MessageP2F},
 	shared::{AudioDeviceList, UpdateIdentityOptions},
-	AppToFrontendBridge, ConnectionId, QintState, Settings, SettingsUpdate,
+	AppToFrontendBridge, ConnectionId, QintState,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -127,23 +127,10 @@ pub fn get_settings(state: State<'_, QState>) -> Value {
 
 #[command]
 pub fn set_settings(state: State<'_, QState>, diff: Value) -> Result<(), String> {
-	let (r, res) = QintState::modify_settings(&state.inner(), |values| {
-		let hotkeys_changed;
-		if let Value::Object(o) = &diff {
-			hotkeys_changed = o.contains_key(Settings::KEY_HOTKEYS);
-			values.merge(&diff);
-		} else {
-			bail!("body must be an object");
-		}
-		Ok(SettingsUpdate { hotkeys_changed })
-	});
-
-	if let Err(e) = r {
-		Err(format!("Malformed diff: {}", e))
-	} else if let Err(e) = res {
-		Err(format!("Internal error: {}", e))
-	} else {
-		Ok(())
+	match QintState::set_settings_diff(&state, &diff) {
+		Err(SettingsUpdateError::ModifyFailed(e)) => Err(e.to_string()),
+		Err(SettingsUpdateError::InternalError(e)) => Err(format!("Internal error: {}", e)),
+		Ok(_) => Ok(()),
 	}
 }
 

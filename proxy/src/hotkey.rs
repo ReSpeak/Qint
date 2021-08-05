@@ -98,7 +98,7 @@ impl Action {
 				let states = get_input_mute_states(state).await;
 				if states.is_empty() {
 					// No connections, toggle default
-					if let (Err(e), _) = QintState::modify_settings(state, |settings| {
+					if let Err(e) = QintState::modify_settings(state, |settings| {
 						let mut state = settings.get_default_mute_states();
 						if state.input != MuteState::None {
 							state.input = MuteState::None;
@@ -150,7 +150,7 @@ impl Action {
 				let states = get_output_mute_states(state).await;
 				if states.is_empty() {
 					// No connections, toggle default
-					if let (Err(e), _) = QintState::modify_settings(state, |settings| {
+					if let Err(e) = QintState::modify_settings(state, |settings| {
 						let mut state = settings.get_default_mute_states();
 						if state.output != MuteState::None {
 							state.output = MuteState::None;
@@ -192,7 +192,7 @@ impl Action {
 				let states = get_away_states(state).await;
 				if states.is_empty() {
 					// No connections, toggle default
-					if let (Err(e), _) = QintState::modify_settings(state, |settings| {
+					if let Err(e) = QintState::modify_settings(state, |settings| {
 						let mut state = settings.get_default_mute_states();
 						state.away = !state.away;
 						settings.set_default_mute_states(state);
