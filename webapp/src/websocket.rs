@@ -129,5 +129,7 @@ impl Handler<SetConnectionMsg> for Ws {
 
 impl Handler<CloseMsg> for Ws {
 	type Result = ();
-	fn handle(&mut self, _: CloseMsg, ctx: &mut Self::Context) -> Self::Result { ctx.close(None); }
+	fn handle(&mut self, _: CloseMsg, ctx: &mut Self::Context) -> Self::Result {
+		ctx.close(None);
+	}
 }

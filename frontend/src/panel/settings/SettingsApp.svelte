@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { IS_TAURI } from "../../util";
 	import { app } from "../../app";
 	import TabSlot from "../../ui/container/TabSlot.svelte";
 	import KeyValue from "../../ui/util/KeyValue.svelte";
@@ -40,7 +41,7 @@
 			<button class="button is-warning" on:click={enableBrowserNotifications}
 				>Enable browser notifications</button>
 		</KeyValue>
-	{:else if browserNotificationPermission === "denied"}
+	{:else if !IS_TAURI && browserNotificationPermission === "denied"}
 		<article class="message is-warning">
 			<div class="message-header">
 				<p>Notifications</p>

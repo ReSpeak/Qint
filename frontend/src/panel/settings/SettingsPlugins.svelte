@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { BASE_ADDRESS } from "../../util";
 	import { backend } from "../../backend/backend";
 	import TabSlot from "../../ui/container/TabSlot.svelte";
 	import Icon from "../../ui/icon/Icon.svelte";
@@ -135,6 +134,21 @@
 			console.log("Failed to update: ", ex);
 		}
 	}
+
+	async function exportPlugin(name: string | undefined) {
+		if (!name) return;
+		const content = await backend.plugin_get(name);
+		const blob = new Blob([content], { type: "application/octet-stream" });
+		const url = URL.createObjectURL(blob);
+		try {
+			const a = document.createElement("a");
+			a.download = name;
+			a.href = url;
+			a.click();
+		} finally {
+			URL.revokeObjectURL(url);
+		}
+	}
 </script>
 
 <!-- svelte-ignore a11y-missing-attribute -->
@@ -179,7 +193,7 @@
 
 		<form class="pluginOption" on:submit|preventDefault={savePlugin}>
 			{#if selectedPlugin !== undefined}
-				<p class="buttons is-right">
+				<div class="buttons is-right">
 					<button type="button" class="button is-danger" on:click={deletePlugin}>
 						<Icon name="delete" />
 						<span>Delete</span>
@@ -187,14 +201,10 @@
 
 					<span style="flex:1;" />
 
-					<a
-						class="button is-info"
-						download={selectedPlugin}
-						target="_blank"
-						href="{BASE_ADDRESS}/plugins/{selectedPlugin}">
+					<button class="button is-info" on:click={() => exportPlugin(selectedPlugin)}>
 						<Icon name="file-export-outline" />
 						<span>Download</span>
-					</a>
+					</button>
 
 					<button
 						type="submit"
@@ -204,7 +214,7 @@
 						<Icon name="content-save" />
 						<span>Save</span>
 					</button>
-				</p>
+				</div>
 
 				<div class="is-horizontal field">
 					<input type="text" bind:value={selectedPluginName} class="input" />

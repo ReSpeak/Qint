@@ -6,12 +6,14 @@ import { app } from "./app";
 import { ConnectData } from "./connect/uiConnect";
 import debug from "debug";
 import { backend } from "./backend/backend";
+import { IS_TAURI } from "./util";
 
 if (localStorage.getItem("debug") === null) debug.enable("error:*");
 
 (window as any).qint = app; // DEBUG
 (window as any).get = get; // DEBUG
 (window as any).debug = debug; // DEBUG
+(window as any).backend = backend; // DEBUG
 (window as any).debugset = (s: string) => {
 	debug.enable(s);
 	localStorage.setItem("debug", s);
@@ -23,13 +25,17 @@ app.transientSettings.synth.init();
 window.onbeforeunload = function (e: any) {
 	app.transientSettings.flush();
 
-	// For debugging purposes (?)
-	app.transientSettings.synth.trySpeak("Goodbye");
-	if (app.hasConnected && app.transientSettings.app.askBeforeClosing) {
-		if (e) {
-			e.returnValue = true;
+	if (IS_TAURI) {
+		backend.close();
+	} else {
+		// For debugging purposes (?)
+		app.transientSettings.synth.trySpeak("Goodbye");
+		if (app.hasConnected && app.transientSettings.app.askBeforeClosing) {
+			if (e) {
+				e.returnValue = true;
+			}
+			return true;
 		}
-		return true;
 	}
 	return;
 };

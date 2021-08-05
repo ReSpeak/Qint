@@ -21,6 +21,8 @@
 			await tick();
 		}
 		const src = await req.con.fileProvider(req); // TODO not for tauri
+		if (src === undefined)
+			return;
 		let link = src;
 		if (fileName === undefined || fileName !== null) {
 			let dlName: string;

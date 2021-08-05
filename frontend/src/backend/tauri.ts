@@ -1,5 +1,5 @@
 import { InMsg, OutMsg } from "./ws";
-import { BASE_ADDRESS, createUuidV4 } from "../util";
+import { createUuidV4 } from "../util";
 import {
 	closedFn,
 	errorFn,
@@ -14,23 +14,21 @@ import {
 	UpdateIdentityOptions,
 } from "./backend";
 import { listen } from "@tauri-apps/api/event";
-import { urlToWebSocket } from "./backendUtil";
 import debug from "debug";
 import { invoke } from "@tauri-apps/api/tauri";
 import { RustAnalyzeResult } from "../chat/previewAnalyzer";
 import { ApiIdentity } from "../panel/settings/identity";
 import { MuteStates } from "../connect/uiConnect";
 import { HotkeyAction } from "../transientSettings";
-import { IPlugin } from "../plugins";
+import { importFunc, IPlugin } from "../plugins";
 const log = debug("TAURI");
 
-type TauriMsg<T> = { Msg: T } | "Close";
-type TauriWs<T> = {
-	connection: string;
-	msg: TauriMsg<T>;
-};
-type TauriMsgP2F = TauriWs<InMsg>;
-type TauriMsgF2P = TauriWs<OutMsg>;
+type TauriP2FWs = { con: string; msg: InMsg; };
+type TauriP2FClose = string;
+type TauriF2PCreate = { con: string; };
+type TauriF2PWs = { con: string; msg: OutMsg; };
+type TauriF2PClose = { con: string; };
+
 
 type OutHttpRequest = OutListPluginsRequest;
 
@@ -38,103 +36,96 @@ interface OutListPluginsRequest {
 	ListPlugins: unknown;
 }
 
-class FetchLike implements IFetchLike {
-	constructor(private obj: any) { }
-	public async json(): Promise<any> {
-		return this.obj;
-	}
-	public async text(): Promise<string> {
-		return JSON.stringify(this.obj);
-	}
-}
 
 class ImageTracking {
-	private trackedImages: Map<string, string | Promise<string>> = new Map();
+	private trackedImages: Map<string, string | undefined | Promise<string | undefined>> = new Map();
 
-	protected async fetchImgInternal(ep: string, req: IFileRequest, con: string) {
+	protected async fetchImgInternal(ep: string, req: IFileRequest, con: string): Promise<string | undefined> {
 		const key = reqAsKey(req);
-		let url = this.trackedImages.get(key);
-		if (url === undefined) {
-			const task = (async () => {
-				const response = await invoke<GetFileResponse>(ep, {
-					req: {
-						con,
-						channel: req.channel,
-						path: req.path,
-						hash: req.hash,
-						cache: req.cache,
-					},
-				});
-				const buffer = new Uint8Array(response.data);
-				const blob = new Blob([buffer], {
-					type: response.mime,
-				});
-				url = URL.createObjectURL(blob);
-				return url;
-			})();
-			this.trackedImages.set(key, task);
-			url = await task;
-			this.trackedImages.set(key, url);
-			return url;
+		if (this.trackedImages.has(key)) {
+			return await this.trackedImages.get(key);
 		} else {
-			return await url;
+			const task = this.fetchImgTask(ep, req, con);
+			this.trackedImages.set(key, task);
+			const resolvedUrl = await task;
+			this.trackedImages.set(key, resolvedUrl);
+			return resolvedUrl;
+		}
+	}
+
+	private async fetchImgTask(ep: string, req: IFileRequest, con: string): Promise<string | undefined> {
+		try {
+			const response = await invoke<GetFileResponse>(ep, {
+				req: {
+					con,
+					channel: req.channel,
+					path: req.path,
+					hash: req.hash,
+					cache: req.cache,
+				},
+			});
+			const buffer = new Uint8Array(response.data);
+			const blob = new Blob([buffer], {
+				type: response.mime,
+			});
+			return URL.createObjectURL(blob);
+		} catch (err) {
+			return undefined;
 		}
 	}
 
 	protected releaseImages() {
-		this.trackedImages.forEach(async (v) => URL.revokeObjectURL(await v));
+		this.trackedImages.forEach((v) => {
+			if (typeof v === "string")
+				URL.revokeObjectURL(v);
+		});
 		this.trackedImages.clear();
 	}
 }
 
 export class TauriBackend extends ImageTracking implements IBackend {
 	public name = "Tauri";
-	public cacheFileSrc: string;
-	public readonly wsBaseAddress: string = urlToWebSocket(BASE_ADDRESS);
+	public cacheFileSrc: string = undefined!; // TODO: TAURI
+	public readonly wsBaseAddress: string = undefined!; // TODO: TAURI
 
 	private connections: Map<string, TauriBackendConnection> = new Map();
 
 	constructor() {
 		super();
 		log("Using tauri backend");
-		this.cacheFileSrc = `${BASE_ADDRESS}/filecache`;
 
-		listen<TauriMsgP2F>("ws", (ev) => {
+		listen<TauriP2FWs>("ws", (ev) => {
 			log("QintConnection: %o", ev);
 			const msg = ev.payload;
-			const con = this.connections.get(msg.connection);
+			const con = this.connections.get(msg.con);
 			if (con !== undefined) {
-				if (msg.msg === "Close") {
-					con.onClose?.();
-					this.connections.delete(msg.connection);
-				} else con.onMsg?.(msg.msg.Msg);
+				con.onMsg?.(msg.msg);
+			}
+		});
+
+		listen<TauriP2FClose>("ws_close", (ev) => {
+			log("Closing event: %o", ev);
+			const conId = ev.payload;
+			const con = this.connections.get(conId);
+			if (con !== undefined) {
+				con.onClose?.();
+				this.connections.delete(conId);
 			}
 		});
 	}
 
-	createNewConnection(): IBackendConnection {
+	public createNewConnection(): IBackendConnection {
 		const con = new TauriBackendConnection();
 		this.connections.set(con.id, con);
 		return con;
 	}
 
-	private async listPlugins(): Promise<string[]> {
-		//return (await promisified<{ PluginList: string[] }>({ ListPlugins: {} })).PluginList;
-		return []; // ?TAURI
+	public close(): void {
+		this.connections.forEach(con => con.close());
 	}
 
-	private async getPlugin(name: string): Promise<string> {
-		//return (await promisified<{ Plugin: string }>({ GetPlugin: name })).Plugin;
-		return ""; // ?TAURI
-	}
-
-	public async fetch(cmd: string, data: RequestInit): Promise<IFetchLike> {
-		if (cmd === "/plugins") {
-			return new FetchLike(this.listPlugins());
-		} else if (cmd.startsWith("/plugins/")) {
-			return new FetchLike(this.getPlugin(cmd.slice("/plugins/".length)));
-		}
-		return fetch(`${BASE_ADDRESS}${cmd}`, data);
+	public async fetch(_cmd: string, _data: RequestInit): Promise<IFetchLike> {
+		throw new Error("Not implemented");
 	}
 
 	public async graphql<T = any>(
@@ -163,7 +154,7 @@ export class TauriBackend extends ImageTracking implements IBackend {
 		await invoke("set_settings", { diff });
 	}
 
-	public async fetch_cache_image(req: ICacheFileRequest): Promise<string> {
+	public async fetch_cache_image(req: ICacheFileRequest): Promise<string | undefined> {
 		return await this.fetchImgInternal("get_cache_file", req, req.server);
 	}
 
@@ -222,58 +213,62 @@ export class TauriBackend extends ImageTracking implements IBackend {
 
 	public async plugin_load(name: string): Promise<IPlugin> {
 		const content = await this.plugin_get(name);
-		return await eval(content);
+		// https://stackoverflow.com/a/67359410/2444047
+		const dataUri = URL.createObjectURL(new Blob([content], { type: 'text/javascript' }));
+		try {
+			return await importFunc(dataUri);
+		} finally {
+			URL.revokeObjectURL(dataUri);
+		}
 	}
 }
 
 export class TauriBackendConnection extends ImageTracking implements IBackendConnection {
-	public serverFileSrc: string;
-	public id: string;
+	public serverFileSrc: string = undefined!; // TODO: TAURI
+	public readonly id: string;
 	onMsg?: msgFn;
+	onError?: errorFn;
 	onClose?: closedFn;
 
 	constructor() {
 		super();
-		this.serverFileSrc = "";
 		this.id = createUuidV4();
 	}
 
 	public async connect(onMsg: msgFn, onError: errorFn, onClose: closedFn): Promise<void> {
 		this.onMsg = onMsg;
+		this.onError = onError;
 		this.onClose = onClose;
 
-		await invoke("create_ws", { uuid: this.id });
-		log("create_ws %j", this.id);
-
-		this.serverFileSrc = `${BASE_ADDRESS}/con/${this.id}`;
+		log("Creating message channel with %s", this.id);
+		try {
+			await invoke<TauriF2PCreate>("create_ws", { con: this.id });
+		} catch (err: unknown) {
+			this.onError?.(JSON.stringify(err));
+		}
 	}
 
 	public async send(data: OutMsg): Promise<void> {
-		const i: TauriMsgF2P = {
-			connection: this.id,
-			msg: { Msg: data },
-		};
-		await invoke("pass_ws_msg", i);
-		log("pass_ws_msg %j", i);
+		await invoke<TauriF2PWs>("pass_ws_msg", { con: this.id, msg: data });
 	}
 
 	public async close(): Promise<void> {
-		const i: TauriMsgF2P = {
-			connection: this.id,
-			msg: "Close",
-		};
-		log("closing %j", i);
+		const id = this.id;
+		log("closing %s", id);
 		this.releaseImages();
-		await invoke("pass_ws_msg", i);
-		this.id = createUuidV4();
-		log("closed %j", i);
+		try {
+			await invoke<TauriF2PClose>("close_ws", { con: id });
+			log("closed %s", id);
+		} catch (err) {
+			log("Failed to close connection %s: %s", id, err);
+		}
 	}
 
-	public async fetch(cmd: string, data: RequestInit): Promise<IFetchLike> {
-		return fetch(`${this.serverFileSrc}${cmd}`, data);
+	public async fetch(_cmd: string, _data: RequestInit): Promise<IFetchLike> {
+		throw new Error("Not implemented");
 	}
 
-	public async fetch_image(req: IFileRequest): Promise<string> {
+	public async fetch_image(req: IFileRequest): Promise<string | undefined> {
 		return await this.fetchImgInternal("get_file", req, this.id);
 	}
 }

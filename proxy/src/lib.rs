@@ -206,6 +206,8 @@ impl juniper::Context for QintState {}
 
 pub trait AppToFrontendBridge {
 	fn send(&self, msg: &MessageP2F);
+	/// Called when the proxy has closed the ts3 connection so that the
+	/// frontend manager can clean up the messaging channel.
 	fn close(&self);
 }
 pub type FrontBridge = Box<dyn AppToFrontendBridge + Send>;

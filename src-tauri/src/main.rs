@@ -161,6 +161,7 @@ fn main() {
 		})
 		.invoke_handler(tauri::generate_handler![
 			cmd::create_ws,
+			cmd::close_ws,
 			cmd::pass_ws_msg,
 			cmd::db,
 			cmd::get_settings,

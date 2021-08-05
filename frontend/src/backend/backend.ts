@@ -22,6 +22,7 @@ export interface IBackend {
 	/** The url address prefix for websockets */
 	readonly wsBaseAddress: string;
 	createNewConnection(): IBackendConnection;
+	close(): void;
 	fetch(cmd: string, data?: RequestInit): Promise<IFetchLike>;
 	setTitle(name: string): void;
 	setIcon(url: string | undefined): void;
@@ -32,7 +33,7 @@ export interface IBackend {
 
 	get_settings(): Promise<Record<string, unknown>>;
 	set_settings(diff: Record<string, unknown>): Promise<void>;
-	fetch_cache_image(img: ICacheFileRequest): Promise<string>;
+	fetch_cache_image(img: ICacheFileRequest): Promise<string | undefined>;
 	peek_link(link: string): Promise<RustAnalyzeResult>;
 	get_audio_device_list(): Promise<IAudioDeviceList>;
 	identity_create(): Promise<ApiIdentity>;
@@ -56,7 +57,7 @@ export interface IBackendConnection {
 	connect(onMsg: msgFn, onError: errorFn, onClose: closedFn): Promise<void>;
 	close(): void;
 	fetch(cmd: string, data?: RequestInit): Promise<IFetchLike>;
-	fetch_image(img: IFileRequest): Promise<string>;
+	fetch_image(img: IFileRequest): Promise<string | undefined>;
 }
 
 export interface IFetchLike {

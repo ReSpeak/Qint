@@ -29,7 +29,7 @@ use tsclientlib::Error as TsError;
 use tsproto_types::{crypto::EccKeyPubP256, ChannelId};
 use uuid::Uuid;
 
-use crate::core::{CreateWs, DispatchWsMsg, QintCore};
+use crate::core::{CloseWs, CreateWs, DispatchWsMsg, Error, QintCore};
 
 macro_rules! unwrap_send {
 	($act:expr, $msg:expr) => {{
@@ -48,22 +48,13 @@ macro_rules! unwrap_send {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum TauriMsg<T>
-where
-	T: Debug,
-{
-	Close,
-	Msg(T),
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TauriWs<T>
 where
 	T: Debug,
 {
-	connection: Uuid,
-	msg: TauriMsg<T>,
+	con: Uuid,
+	msg: T,
 }
 
 struct WindowBridge {
@@ -73,47 +64,49 @@ struct WindowBridge {
 }
 
 type QState = Arc<QintState>;
+type QCore = Addr<QintCore>;
 
 impl AppToFrontendBridge for WindowBridge {
 	fn send(&self, msg: &MessageP2F) {
 		debug!(self.logger, "Sending to frontend"; "msg" => ?msg);
-		let res =
-			self.window.emit("ws", TauriWs { connection: self.id.0, msg: TauriMsg::Msg(msg) });
+		let res = self.window.emit("ws", TauriWs { con: self.id.0, msg });
 		if let Err(e) = res {
 			warn!(self.logger, "Failed sending to frontend"; "error" => %e);
 		}
 	}
 
 	fn close(&self) {
-		// (TODO: Check that there is) nothing to do here for now ?
+		let res = self.window.emit("ws_close", self.id.0);
+		if let Err(e) = res {
+			warn!(self.logger, "Failed sending to frontend"; "error" => %e);
+		}
 	}
 }
 
 #[command]
 pub async fn create_ws(
-	logger: State<'_, Logger>, qc_act: State<'_, Addr<QintCore>>, window: Window, uuid: Uuid,
-) -> Result<String, ()> {
-	let id = ConnectionId(uuid);
-	let state = qc_act.inner();
+	logger: State<'_, Logger>, core: State<'_, QCore>, window: Window, con: Uuid,
+) -> Result<(), Error> {
+	let id = ConnectionId(con);
 	info!(logger.inner().clone(), "Creating tauri connection"; "id" => ?id);
 
 	let sender = Box::new(WindowBridge { logger: logger.inner().clone(), window, id: id.clone() });
-	state.send(CreateWs { id, sender }).await.unwrap();
-
-	Ok("OK".into())
+	core.send(CreateWs { id, sender }).await.unwrap()
 }
 
 #[command]
-pub async fn pass_ws_msg(
-	qc_act: State<'_, Addr<QintCore>>, connection: Uuid, msg: TauriMsg<MessageF2P>,
-) -> Result<(), ()> {
-	let id = ConnectionId(connection);
-	let state = qc_act.inner();
-	match msg {
-		TauriMsg::Close => {}
-		TauriMsg::Msg(msg) => state.send(DispatchWsMsg { id, msg }).await.unwrap(),
-	}
-	Ok(())
+pub async fn close_ws(
+	logger: State<'_, Logger>, core: State<'_, QCore>, con: Uuid,
+) -> Result<(), Error> {
+	let id = ConnectionId(con);
+	info!(logger.inner().clone(), "Closing tauri connection"; "id" => ?id);
+	core.send(CloseWs { id }).await.unwrap()
+}
+
+#[command]
+pub async fn pass_ws_msg(core: State<'_, QCore>, con: Uuid, msg: MessageF2P) -> Result<(), Error> {
+	let id = ConnectionId(con);
+	core.send(DispatchWsMsg { id, msg }).await.unwrap()
 }
 
 #[command]
@@ -378,9 +371,7 @@ pub fn plugin_get(state: State<'_, QState>, name: String) -> Result<String, Stri
 }
 
 #[command]
-pub fn plugin_save(
-	state: State<'_, QState>, name: String, content: String,
-) -> Result<(), String> {
+pub fn plugin_save(state: State<'_, QState>, name: String, content: String) -> Result<(), String> {
 	state.plugin_save(&name, &content).map_err(|err| err.to_string())
 }
 

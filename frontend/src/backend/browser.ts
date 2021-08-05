@@ -1,5 +1,5 @@
 import { InMsg, OutMsg } from "./ws";
-import { BASE_ADDRESS, createUuidV4 } from "../util";
+import { createUuidV4 } from "../util";
 import {
 	closedFn,
 	errorFn,
@@ -20,6 +20,9 @@ import { MuteStates } from "../connect/uiConnect";
 import { HotkeyAction } from "../transientSettings";
 import { importFunc, IPlugin } from "../plugins";
 
+const IS_SNOWPACK = (import.meta as any).hot;
+const BASE_ADDRESS = IS_SNOWPACK ? "http://localhost:4422" : "";
+
 export class BrowserBackend implements IBackend {
 	public name = "Browser";
 	public readonly cacheFileSrc: string;
@@ -29,8 +32,12 @@ export class BrowserBackend implements IBackend {
 		this.cacheFileSrc = `${BASE_ADDRESS}/filecache`;
 	}
 
-	createNewConnection(): IBackendConnection {
+	public createNewConnection(): IBackendConnection {
 		return new BrowserBackendConnection(this);
+	}
+
+	public close(): void {
+		// Nothing to do here for browser backed since websockets get killed.
 	}
 
 	public fetch(cmd: string, data?: RequestInit): Promise<IFetchLike> {
@@ -125,7 +132,7 @@ export class BrowserBackend implements IBackend {
 			method: "DELETE",
 		});
 	}
-	
+
 	public async get_mutestate(): Promise<MuteStates> {
 		return await (await this.fetch("/mutestate")).json();
 	}
@@ -162,13 +169,13 @@ export class BrowserBackend implements IBackend {
 	}
 
 	public plugin_load(name: string): Promise<IPlugin> {
-		return importFunc(name);
+		return importFunc(`${BASE_ADDRESS}/plugins/${name}`);
 	}
 }
 
 export class BrowserBackendConnection implements IBackendConnection {
 	public serverFileSrc: string;
-	public id: string;
+	public readonly id: string;
 	private socket?: WebSocket;
 
 	constructor(private parent: BrowserBackend) {

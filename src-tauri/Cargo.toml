@@ -32,10 +32,11 @@ slog-stdlog = "4"
 slog-term = "2"
 structopt = { version = "0.3", default-features = false }
 tauri = { version = "1.0.0-beta.5", features = ["api-all", "system-tray", "menu"] }
-tsclientlib = { path = "../../tsclientlib/tsclientlib", features = [ "unstable" ] }
-tsproto-types = { path = "../../tsclientlib/utils/tsproto-types" }
+thiserror = "1"
 tokio = "1"
 tokio-util = { version = "0.6", features = [ "io" ] }
+tsclientlib = { path = "../../tsclientlib/tsclientlib", features = [ "unstable" ] }
+tsproto-types = { path = "../../tsclientlib/utils/tsproto-types" }
 uuid = { version = "0.8", features = [ "serde" ] }
 
 [dependencies.log]

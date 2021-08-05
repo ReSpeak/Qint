@@ -81,7 +81,7 @@
 			channel: "0",
 			path: `/${filename}`,
 			cache: true,
-		});
+		}) ?? "";
 	}
 
 	async function refreshFiles(useCache: boolean) {

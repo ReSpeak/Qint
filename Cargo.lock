@@ -3917,6 +3917,7 @@ dependencies = [
  "structopt",
  "tauri",
  "tauri-build",
+ "thiserror",
  "tokio",
  "tokio-util",
  "tsclientlib",

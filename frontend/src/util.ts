@@ -17,8 +17,6 @@ export const BOOKMARK_OFF = "star-outline";
 export const EDIT_ICON = "pencil-outline";
 export const CLEAR_ICON = "broom";
 
-export const IS_SNOWPACK = (import.meta as any).hot;
-export const BASE_ADDRESS = IS_SNOWPACK ? "http://localhost:4422" : "";
 // the rpc field gets injected by the tauri runtime so it's a good indicator if
 // we are running withing the tauri app.
 export const IS_TAURI = "__TAURI__" in window;

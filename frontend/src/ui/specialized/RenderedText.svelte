@@ -97,7 +97,7 @@
 					req.con
 						.fileProvider(req)
 						.then((proxyFileSrc) => {
-							if (proxyFileSrc === null) {
+							if (proxyFileSrc === undefined) {
 								img.parentElement?.removeChild(img);
 							} else {
 								img.src = proxyFileSrc;

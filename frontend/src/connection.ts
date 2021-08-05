@@ -40,7 +40,7 @@ const ConnectionClosedResult: ResultDetails = {
 export type ChangePromise = Promise<ResultDetails | undefined>;
 
 export interface IConnection {
-	fileProvider(req: IFileRequest): Promise<string>;
+	fileProvider(req: IFileRequest): Promise<string | undefined>;
 }
 
 export class Connection implements IConnection {
@@ -132,7 +132,7 @@ export class Connection implements IConnection {
 		});
 	}
 
-	public fileProvider(req: IFileRequest): Promise<string> {
+	public fileProvider(req: IFileRequest): Promise<string | undefined> {
 		return this.backend.fetch_image(req);
 	}
 
@@ -639,7 +639,7 @@ export class Connection implements IConnection {
 export class OfflineConnection implements IConnection {
 	constructor(public server: string) {}
 
-	public fileProvider(req: IFileRequest): Promise<string> {
+	public fileProvider(req: IFileRequest): Promise<string | undefined> {
 		return backend.fetch_cache_image({ server: this.server, ...req });
 	}
 }
@@ -653,7 +653,7 @@ export class DDConnection implements IConnection {
 		if (server) this.offlineConnection = new OfflineConnection(server);
 	}
 
-	public fileProvider(req: IFileRequest): Promise<string> {
+	public fileProvider(req: IFileRequest): Promise<string | undefined> {
 		if (this.connection) return this.connection.fileProvider(req);
 		else if (this.offlineConnection) return this.offlineConnection.fileProvider(req);
 		throw new Error("Missing connection data");
