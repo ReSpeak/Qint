@@ -12,5 +12,9 @@ declare namespace svelte.JSX {
 	}
 }
 
+declare module '*.svelte' {
+	export { SvelteComponentDev as default } from 'svelte/internal';
+}
+
 declare const BUILD_ENV: string;
 declare const BUILD_DAT: string;
