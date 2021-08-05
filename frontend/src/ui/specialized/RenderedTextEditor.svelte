@@ -4,6 +4,7 @@
 	import Icon from "../icon/Icon.svelte";
 	import { debounced } from "../../util";
 	import { backend } from "../../backend/backend";
+	import type { IMarkdownTransform } from "../../backend/backend";
 	import { onMount } from "svelte";
 	import type { Connection } from "../../connection";
 
@@ -18,13 +19,13 @@
 
 	let view: View = View.Edit;
 	let rendered: string = "";
-	let mdRenderSocket: WebSocket | undefined;
+	let mdRenderSocket: IMarkdownTransform | undefined;
 	$: renderRequest(raw);
 
 	const renderRequest = debounced(
 		(text: string) => {
 			try {
-				mdRenderSocket?.send(text);
+				mdRenderSocket?.write(text).then((r) => (rendered = r));
 			} catch (e) {
 				console.error("Failed to render text", e);
 			}
@@ -36,14 +37,7 @@
 	);
 
 	onMount(() => {
-		mdRenderSocket = new WebSocket(`${backend.wsBaseAddress}/render_md_service`);
-		mdRenderSocket.onmessage = (ev) => {
-			rendered = ev.data as string;
-		};
-		mdRenderSocket.onclose = () => {
-			mdRenderSocket = undefined;
-		};
-
+		mdRenderSocket = backend.get_markdown_transformer();
 		return () => {
 			mdRenderSocket?.close();
 			mdRenderSocket = undefined;

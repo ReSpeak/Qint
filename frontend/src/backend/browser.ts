@@ -1,5 +1,5 @@
 import { InMsg, OutMsg } from "./ws";
-import { createUuidV4 } from "../util";
+import { createUuidV4, PromiseParts } from "../util";
 import {
 	closedFn,
 	errorFn,
@@ -10,6 +10,7 @@ import {
 	ICacheFileRequest,
 	IFetchLike,
 	IFileRequest,
+	IMarkdownTransform,
 	msgFn,
 	UpdateIdentityOptions,
 } from "./backend";
@@ -171,6 +172,11 @@ export class BrowserBackend implements IBackend {
 	public plugin_load(name: string): Promise<IPlugin> {
 		return importFunc(`${BASE_ADDRESS}/plugins/${name}`);
 	}
+
+	public get_markdown_transformer(): IMarkdownTransform {
+		return new BrowserMarkdownTransform(`${this.wsBaseAddress}/render_md_service`);
+	}
+
 }
 
 export class BrowserBackendConnection implements IBackendConnection {
@@ -225,5 +231,50 @@ export class BrowserBackendConnection implements IBackendConnection {
 			hasQ = true;
 		}
 		return Promise.resolve(str);
+	}
+}
+
+class BrowserMarkdownTransform implements IMarkdownTransform {
+	private mdRenderSocket: WebSocket | undefined;
+	private promise: PromiseParts<string> & { p: Promise<string> } | undefined;
+
+	constructor(url: string) {
+		this.mdRenderSocket = new WebSocket(url);
+		this.mdRenderSocket.onclose = () => {
+			if (this.promise !== undefined) {
+				const p = this.promise;
+				this.promise = undefined;
+				p.reject();
+			}
+			this.mdRenderSocket = undefined;
+		};
+		this.mdRenderSocket.onmessage = (ev) => {
+			if (this.promise !== undefined) {
+				const p = this.promise;
+				this.promise = undefined;
+				p.resolve(ev.data as string);
+			}
+		};
+	}
+
+	public write(md: string): Promise<string> {
+		if (this.mdRenderSocket !== undefined) {
+			if (this.promise === undefined) {
+				let promisePart: PromiseParts<string> = undefined!;
+				const p = new Promise<string>((resolve, reject) => {
+					promisePart = { resolve, reject };
+				});
+				this.promise = { ...promisePart, p };
+				this.mdRenderSocket.send(md);
+			}
+			return this.promise.p;
+		} else {
+			return Promise.reject();
+		}
+	}
+
+	public close() {
+		this.mdRenderSocket?.close();
+		this.mdRenderSocket = undefined;
 	}
 }

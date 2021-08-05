@@ -48,6 +48,7 @@ export interface IBackend {
 	plugin_save(name: string, content: string): Promise<void>;
 	plugin_delete(name: string): Promise<void>;
 	plugin_load(name: string): Promise<IPlugin>;
+	get_markdown_transformer(): IMarkdownTransform;
 }
 
 export interface IBackendConnection {
@@ -97,4 +98,9 @@ export type FindIdentity =
 
 export interface UpdateIdentityOptions {
 	name?: string;
+}
+
+export interface IMarkdownTransform {
+	write(md: string): Promise<string>;
+	close(): void;
 }

@@ -183,6 +183,7 @@ fn main() {
 			cmd::plugin_get,
 			cmd::plugin_save,
 			cmd::plugin_delete,
+			cmd::markdown,
 		])
 		.run(tauri::generate_context!())
 		.map_err(|e| format_err!("tauri error: {}", e))

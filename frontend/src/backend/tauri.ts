@@ -10,6 +10,7 @@ import {
 	ICacheFileRequest,
 	IFetchLike,
 	IFileRequest,
+	IMarkdownTransform,
 	msgFn,
 	UpdateIdentityOptions,
 } from "./backend";
@@ -221,6 +222,10 @@ export class TauriBackend extends ImageTracking implements IBackend {
 			URL.revokeObjectURL(dataUri);
 		}
 	}
+
+	public get_markdown_transformer(): IMarkdownTransform {
+		return TauriMarkdownTransform.Instance;
+	}
 }
 
 export class TauriBackendConnection extends ImageTracking implements IBackendConnection {
@@ -279,4 +284,10 @@ function reqAsKey(req: IFileRequest | ICacheFileRequest): string {
 interface GetFileResponse {
 	data: ArrayLike<number>;
 	mime: string | undefined;
+}
+
+class TauriMarkdownTransform implements IMarkdownTransform {
+	public static Instance: IMarkdownTransform = new TauriMarkdownTransform();
+	public write(md: string) { return invoke<string>("markdown", { md }); }
+	public close() { }
 }

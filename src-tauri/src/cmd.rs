@@ -366,3 +366,8 @@ pub fn plugin_save(state: State<'_, QState>, name: String, content: String) -> R
 pub fn plugin_delete(state: State<'_, QState>, name: String) -> Result<(), String> {
 	state.plugin_delete(&name).map_err(|err| err.to_string())
 }
+
+#[command]
+pub fn markdown(md: String) -> String {
+	proxy_codegen::markdown::markdown(&md)
+}

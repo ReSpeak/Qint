@@ -199,7 +199,7 @@ export class BinarySearchResult {
 		public found: boolean,
 		// Index of found element or index where element can be inserted to maintain order
 		public index: number
-	) {}
+	) { }
 }
 
 /** The comparator function should implement an order consistent with the sort order of the underlying slice,
@@ -265,7 +265,7 @@ export function binarySearchByKey<T, E>(
 export class Lazy<T> {
 	private value: T | undefined;
 
-	constructor(private generator: () => T) {}
+	constructor(private generator: () => T) { }
 
 	public get(): T {
 		if (this.generator !== undefined) {
@@ -506,7 +506,7 @@ export function deep_equals(a: any, b: any): boolean {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
-export function on(..._: any[]): void {}
+export function on(..._: any[]): void { }
 
 export function oneshot<T>(
 	store: Readable<T>,
@@ -656,3 +656,8 @@ export function nodeIsText(node: Node): node is Text {
 export function nodeIsElement(node: Node): node is Element {
 	return node.nodeType === Node.ELEMENT_NODE;
 }
+
+export type PromiseParts<TResolve = void, TReject = void> = {
+	resolve: (res: TResolve) => void;
+	reject: (rej: TReject) => void;
+};

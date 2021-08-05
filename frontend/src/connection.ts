@@ -1,7 +1,7 @@
 import { ResultDetails, OutMsg, InMsg } from "./backend/ws";
 import { get, writable, Writable, Readable } from "svelte/store";
 import { Book, Channel, ChatData, Client } from "./book";
-import { oneshot, fnBroadcast, LOUDNESS_MIN, Lazy } from "./util";
+import { oneshot, fnBroadcast, LOUDNESS_MIN, Lazy, PromiseParts } from "./util";
 import { handleMessage } from "./notifications";
 import { backend, IBackendConnection, IFileRequest } from "./backend/backend";
 import { app } from "./app";
@@ -28,10 +28,7 @@ const log = debug("CON"),
 const log_evt = log.extend("EVT"),
 	log_msg = log.extend("MSG");
 
-type ResultPromise = {
-	resolve: (res: ResultDetails | undefined) => void;
-	reject: () => void;
-};
+type ResultPromise = PromiseParts<ResultDetails | undefined>;
 
 const ConnectionClosedResult: ResultDetails = {
 	tsResult: TsError.ConnectionLost,
@@ -637,7 +634,7 @@ export class Connection implements IConnection {
 }
 
 export class OfflineConnection implements IConnection {
-	constructor(public server: string) {}
+	constructor(public server: string) { }
 
 	public fileProvider(req: IFileRequest): Promise<string | undefined> {
 		return backend.fetch_cache_image({ server: this.server, ...req });
@@ -729,8 +726,7 @@ export class ConnectionState {
 
 	private throwTransition(newState: ConnectionStateEnum): never {
 		throw Error(
-			`Cannot transition this connection from '${ConnectionStateEnum[this.rawState]}' to ${
-				ConnectionStateEnum[newState]
+			`Cannot transition this connection from '${ConnectionStateEnum[this.rawState]}' to ${ConnectionStateEnum[newState]
 			}`
 		);
 	}
