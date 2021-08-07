@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -38,11 +38,13 @@ pub struct PlayPacketMsg {
 	data: Option<Vec<u8>>,
 	is_end: bool,
 	loudness: Option<f64>,
+	vad: Option<f32>,
 }
 pub struct SetLoudnessThresholdMsg(pub f64);
+pub struct SetVadThresholdMsg(pub f32);
 
 /// Threshold for voice activation detection.
-const VAD_THRESHOLD: f32 = 0.3;
+const DEFAULT_VAD_THRESHOLD: f32 = 0.3;
 /// The default minimum loudness for voice activation detection.
 const DEFAULT_LOUDNESS_THRESHOLD: f64 = -50.0;
 
@@ -60,11 +62,18 @@ pub struct AudioToTs {
 	spawn_send: mpsc::Sender<PlayPacketMsg>,
 	connections: HashSet<Addr<QintConnection>>,
 	loudness_cons: HashMap<usize, LoudnessListener>,
+	/// When enabled will send all loudness packets regardles of their activation
+	/// values.
+	loudness_listening: Arc<AtomicBool>,
 	loudness_id_cnt: usize,
 	/// The loudness threshold in LUFS (Loudness Unit Full Scale).
 	///
 	/// This is actually a `f64`, there is no `AtomicF64` though.
 	loudness_threshold: Arc<AtomicU64>,
+	/// The voice activation detection threshold [0.0 ≤ vad ≤ 1.0].
+	///
+	/// This is actually a `f32`, there is no `AtomicF32` though.
+	vad_threshold: Arc<AtomicU32>,
 	/// Packet loss in percent, 0-100.
 	packet_loss: Arc<AtomicU8>,
 
@@ -79,8 +88,10 @@ struct SdlCallback {
 	encoder: Option<Encoder>,
 	denoise: Box<DenoiseState<'static>>,
 	denoise_buffer: [f32; DenoiseState::FRAME_SIZE],
+	vad_threshold: Arc<AtomicU32>,
 	loudness: Option<EbuR128>,
 	loudness_threshold: Arc<AtomicU64>,
+	loudness_listening: Arc<AtomicBool>,
 	packet_loss: Arc<AtomicU8>,
 	opus_output: [u8; MAX_OPUS_FRAME_SIZE],
 	/// The last captured buffer if we are not talking.
@@ -89,6 +100,7 @@ struct SdlCallback {
 	/// ensures a smoother start.
 	/// Empty if we are currently sending.
 	last_buffer: Vec<f32>,
+	last_buffer_is_upscaled: bool,
 	/// If we are actually talking and sending audio.
 	///
 	/// This is `TALKING_TIME + 1` if voice activation triggers and greater 0 if
@@ -136,6 +148,9 @@ impl Message for PlayPacketMsg {
 impl Message for SetLoudnessThresholdMsg {
 	type Result = ();
 }
+impl Message for SetVadThresholdMsg {
+	type Result = ();
+}
 
 impl Handler<AddListenerMsg> for AudioToTs {
 	type Result = ();
@@ -178,6 +193,7 @@ impl Handler<AddLoudnessListenerMsg> for AudioToTs {
 		self.loudness_id_cnt += 1;
 		let id = self.loudness_id_cnt;
 		self.loudness_cons.insert(id, msg.0);
+		self.loudness_listening.store(true, Ordering::Relaxed);
 		self.update_device_state();
 		id
 	}
@@ -187,6 +203,7 @@ impl Handler<RemoveLoudnessListenerMsg> for AudioToTs {
 	type Result = bool;
 	fn handle(&mut self, msg: RemoveLoudnessListenerMsg, _: &mut Self::Context) -> Self::Result {
 		let r = self.loudness_cons.remove(&msg.0);
+		self.loudness_listening.store(self.loudness_cons.len() > 0, Ordering::Relaxed);
 		self.update_device_state();
 		r.is_some()
 	}
@@ -204,8 +221,10 @@ impl Handler<PlayPacketMsg> for AudioToTs {
 	fn handle(&mut self, packet: PlayPacketMsg, _: &mut Self::Context) -> Self::Result {
 		// Write into packet sink
 		let logger = self.logger.clone();
+		let loudness = packet.loudness;
+		let vad = packet.vad.unwrap_or(0f32);
+
 		if let (Some(data), Some(codec)) = (packet.data, packet.codec) {
-			let loudness = packet.loudness;
 			self.connections.retain(|con| {
 				if !con.connected() {
 					false
@@ -218,7 +237,7 @@ impl Handler<PlayPacketMsg> for AudioToTs {
 
 					if let Some(loudness) = loudness {
 						actix::spawn(with_log!(
-							con.send(CaptureLoudnessMsg(loudness)),
+							con.send(CaptureLoudnessMsg(loudness, vad)),
 							logger.clone(),
 							"Failed to send loudness"
 						));
@@ -234,15 +253,16 @@ impl Handler<PlayPacketMsg> for AudioToTs {
 			}
 		}
 
-		if let Some(loudness) = packet.loudness {
-			self.loudness_cons.retain(|_id, con| {
+		if let Some(loudness) = loudness {
+			self.loudness_cons.retain(|_, con| {
 				if !con.connected() {
 					false
 				} else {
-					con.send(CaptureLoudnessMsg(loudness));
+					con.send(CaptureLoudnessMsg(loudness, vad));
 					true
 				}
 			});
+			self.loudness_listening.store(self.loudness_cons.len() > 0, Ordering::Relaxed);
 		}
 
 		self.update_device_state();
@@ -255,6 +275,15 @@ impl Handler<SetLoudnessThresholdMsg> for AudioToTs {
 		&mut self, SetLoudnessThresholdMsg(thres): SetLoudnessThresholdMsg, _: &mut Self::Context,
 	) -> Self::Result {
 		self.loudness_threshold.store(thres.to_bits(), Ordering::Relaxed);
+	}
+}
+
+impl Handler<SetVadThresholdMsg> for AudioToTs {
+	type Result = ();
+	fn handle(
+		&mut self, SetVadThresholdMsg(thres): SetVadThresholdMsg, _: &mut Self::Context,
+	) -> Self::Result {
+		self.vad_threshold.store(thres.to_bits(), Ordering::Relaxed);
 	}
 }
 
@@ -306,6 +335,8 @@ impl AudioToTs {
 			loudness_cons: Default::default(),
 			loudness_id_cnt: 0,
 			loudness_threshold: Arc::new(AtomicU64::new(DEFAULT_LOUDNESS_THRESHOLD.to_bits())),
+			vad_threshold: Arc::new(AtomicU32::new(DEFAULT_VAD_THRESHOLD.to_bits())),
+			loudness_listening: Arc::new(AtomicBool::new(false)),
 			packet_loss: Arc::new(AtomicU8::new(0)),
 
 			device: None,
@@ -339,7 +370,9 @@ impl AudioToTs {
 					self.logger.clone(),
 					channels,
 					spawn_send,
+					self.vad_threshold.clone(),
 					self.loudness_threshold.clone(),
+					self.loudness_listening.clone(),
 					self.packet_loss.clone(),
 				)
 			})
@@ -380,7 +413,8 @@ impl AudioToTs {
 impl SdlCallback {
 	fn new(
 		logger: Logger, channels: audiopus::Channels, spawn_send: mpsc::Sender<PlayPacketMsg>,
-		loudness_threshold: Arc<AtomicU64>, packet_loss: Arc<AtomicU8>,
+		vad_threshold: Arc<AtomicU32>, loudness_threshold: Arc<AtomicU64>,
+		loudness_listening: Arc<AtomicBool>, packet_loss: Arc<AtomicU8>,
 	) -> Self {
 		let loudness = match EbuR128::new(1, super::SAMPLE_RATE as u32, ebur128::Mode::M) {
 			Ok(r) => Some(r),
@@ -395,11 +429,14 @@ impl SdlCallback {
 			encoder: None,
 			denoise: DenoiseState::new(),
 			denoise_buffer: [0.0; DenoiseState::FRAME_SIZE],
+			vad_threshold,
 			loudness,
 			loudness_threshold,
+			loudness_listening,
 			packet_loss,
 			opus_output: [0; MAX_OPUS_FRAME_SIZE],
 			last_buffer: Default::default(),
+			last_buffer_is_upscaled: false,
 			is_talking: 0,
 			spawn_send,
 		}
@@ -443,18 +480,23 @@ impl AudioCallback for SdlCallback {
 	type Channel = f32;
 	fn callback(&mut self, buffer: &mut [Self::Channel]) {
 		let did_talk = self.is_talking != 0;
-		let mut should_talk;
+		let is_loudness_listening = self.loudness_listening.load(Ordering::Relaxed);
 		let mut loudness = None;
-		let mut packet_end = None;
+		let mut loudness_triggered = true;
+		let mut vad = None;
+		let vad_triggered;
+		let mut is_upscaled = false;
+
 		// Denoise
 		if buffer.len() % DenoiseState::FRAME_SIZE != 0 {
 			warn!(self.logger, "Size not fitting for denoising");
-			should_talk = true;
+			vad_triggered = true;
 		} else {
 			// Scale to the expected range
 			for d in &mut *buffer {
 				*d *= i16::max_value() as f32;
 			}
+			is_upscaled = true;
 
 			let mut vad_probe = 0.0;
 			for i in buffer.chunks_mut(DenoiseState::FRAME_SIZE) {
@@ -462,38 +504,32 @@ impl AudioCallback for SdlCallback {
 				i.copy_from_slice(&self.denoise_buffer);
 			}
 			vad_probe /= (buffer.len() / DenoiseState::FRAME_SIZE) as f32;
-
 			trace!(self.logger, "Vad probe"; "value" => vad_probe);
+			vad = Some(vad_probe);
+			vad_triggered = vad_probe >= f32::from_bits(self.vad_threshold.load(Ordering::Relaxed));
+		}
 
-			should_talk = vad_probe >= VAD_THRESHOLD;
-			if should_talk || self.is_talking > 1 {
+		if vad_triggered || self.is_talking > 1 || is_loudness_listening {
+			if is_upscaled {
 				for d in &mut *buffer {
 					*d /= i16::max_value() as f32;
 				}
+				is_upscaled = false;
 			}
-		}
 
-		if should_talk {
 			// Additionally measure loudness, it has to be over the threshold
 			if let Some(lufs) = self.measure_loudness(buffer) {
 				loudness = Some(lufs);
-				if lufs < f64::from_bits(self.loudness_threshold.load(Ordering::Relaxed)) {
-					should_talk = false;
-				}
+				loudness_triggered =
+					lufs >= f64::from_bits(self.loudness_threshold.load(Ordering::Relaxed));
 			}
 		}
 
+		let should_talk = vad_triggered && loudness_triggered;
 		if should_talk {
 			self.is_talking = TALKING_TIME + 1;
-		}
-
-		if !should_talk {
+		} else {
 			self.is_talking = self.is_talking.saturating_sub(1);
-
-			if self.is_talking != 0 {
-				// Measure loudness so the frontend can display it
-				loudness = self.measure_loudness(buffer);
-			}
 		}
 
 		let codec = if self.channels == audiopus::Channels::Mono {
@@ -501,6 +537,7 @@ impl AudioCallback for SdlCallback {
 		} else {
 			CodecType::OpusMusic
 		};
+
 		if self.is_talking == 0 {
 			if did_talk {
 				// Send empty packet to signal end
@@ -510,12 +547,14 @@ impl AudioCallback for SdlCallback {
 					data: Some(Vec::new()),
 					is_end: true,
 					loudness: Some(LOUDNESS_END_MAGIC),
+					vad,
 				});
-			} else if loudness.is_some() {
-				self.send_audio(PlayPacketMsg { loudness, ..Default::default() });
+			} else if is_loudness_listening && (loudness.is_some() || vad.is_some()) {
+				self.send_audio(PlayPacketMsg { loudness, vad, ..Default::default() });
 			}
 			self.last_buffer.resize(buffer.len(), 0.0);
 			self.last_buffer.copy_from_slice(buffer);
+			self.last_buffer_is_upscaled = is_upscaled;
 			self.encoder = None;
 			return;
 		}
@@ -545,8 +584,10 @@ impl AudioCallback for SdlCallback {
 			// Send cached last buffer if there was one
 			if !self.last_buffer.is_empty() {
 				trace!(self.logger, "Start to talk: Sending cached last buffer");
-				for d in &mut self.last_buffer {
-					*d /= i16::max_value() as f32;
+				if self.last_buffer_is_upscaled {
+					for d in &mut self.last_buffer {
+						*d /= i16::max_value() as f32;
+					}
 				}
 				match encoder.encode_float(&self.last_buffer, &mut self.opus_output[..]) {
 					Err(e) => {
@@ -557,7 +598,8 @@ impl AudioCallback for SdlCallback {
 							codec: Some(codec),
 							data: Some(self.opus_output[..len].to_vec()),
 							is_end: false,
-							loudness,
+							loudness: None,
+							vad: None,
 						});
 					}
 				}
@@ -565,22 +607,28 @@ impl AudioCallback for SdlCallback {
 			}
 		}
 
-		match self.encoder.as_ref().unwrap().encode_float(buffer, &mut self.opus_output[..]) {
-			Err(e) => {
-				warn!(self.logger, "Failed to encode opus"; "error" => %e);
-			}
-			Ok(len) => {
-				trace!(self.logger, "Sending packet");
-				packet_end = Some(self.opus_output[..len].to_vec());
-			}
-		}
+		assert!(!is_upscaled);
+		let packet =
+			match self.encoder.as_ref().unwrap().encode_float(buffer, &mut self.opus_output[..]) {
+				Err(e) => {
+					warn!(self.logger, "Failed to encode opus"; "error" => %e);
+					None
+				}
+				Ok(len) => {
+					trace!(self.logger, "Sending packet");
+					Some(self.opus_output[..len].to_vec())
+				}
+			};
 
-		if packet_end.is_some() || loudness.is_some() {
+		// TODO: consider not sending the packed at all if we coudn't encode the audio data
+		// otherwise this could result in confusing visuals showing playback but not seding anything
+		if packet.is_some() || loudness.is_some() || vad.is_some() {
 			self.send_audio(PlayPacketMsg {
 				codec: Some(codec),
-				data: packet_end,
+				data: packet,
 				is_end: false,
 				loudness,
+				vad,
 			});
 		}
 	}

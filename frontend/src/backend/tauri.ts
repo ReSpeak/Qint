@@ -1,5 +1,5 @@
 import { InMsg, OutMsg } from "./ws";
-import { createUuidV4 } from "../util";
+import { createUuidV4, fnBroadcast } from "../util";
 import {
 	closedFn,
 	errorFn,
@@ -11,6 +11,9 @@ import {
 	IFetchLike,
 	IFileRequest,
 	IMarkdownTransform,
+	LoudnessData,
+	LoudnessEvent,
+	LoudnessUnsubscribe,
 	msgFn,
 	UpdateIdentityOptions,
 } from "./backend";
@@ -88,6 +91,7 @@ export class TauriBackend extends ImageTracking implements IBackend {
 	public name = "Tauri";
 	public cacheFileSrc: string = undefined!; // TODO: TAURI
 	public readonly wsBaseAddress: string = undefined!; // TODO: TAURI
+	private readonly loudnessListener = fnBroadcast<[LoudnessData]>();
 
 	private connections: Map<string, TauriBackendConnection> = new Map();
 
@@ -112,6 +116,11 @@ export class TauriBackend extends ImageTracking implements IBackend {
 				con.onClose?.();
 				this.connections.delete(conId);
 			}
+		});
+
+		listen<LoudnessData>("loudness", (ev) => {
+			const data = ev.payload;
+			this.loudnessListener.call(data);
 		});
 	}
 
@@ -225,6 +234,17 @@ export class TauriBackend extends ImageTracking implements IBackend {
 
 	public get_markdown_transformer(): IMarkdownTransform {
 		return TauriMarkdownTransform.Instance;
+	}
+
+	public get_loudness_listener(callback: LoudnessEvent): LoudnessUnsubscribe {
+		invoke("set_loudness_callback", { enabled: true });
+		const unsub = this.loudnessListener.subscribe(callback);
+		return () => {
+			unsub();
+			if (this.loudnessListener.isEmpty()) {
+				invoke("set_loudness_callback", { enabled: false });
+			}
+		};
 	}
 }
 

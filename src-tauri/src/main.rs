@@ -4,6 +4,7 @@
 #[macro_use]
 extern crate qint_proxy;
 
+mod audio;
 mod cmd;
 mod core;
 
@@ -22,6 +23,7 @@ use tauri::SystemTrayMenu;
 use tauri::{CustomMenuItem, Manager};
 use tokio::runtime::Runtime;
 
+use crate::audio::LoudnessShare;
 use crate::core::QintCore;
 
 #[derive(Clone, Debug, StructOpt)]
@@ -127,6 +129,7 @@ fn main() {
 	tauri::Builder::default()
 		.manage(addr)
 		.manage(app.state)
+		.manage(LoudnessShare::new())
 		.manage(logger)
 		.on_page_load(|window, _| {
 			if let Err(e) = window.set_title("Qint") {
@@ -184,6 +187,7 @@ fn main() {
 			cmd::plugin_save,
 			cmd::plugin_delete,
 			cmd::markdown,
+			cmd::set_loudness_callback,
 		])
 		.run(tauri::generate_context!())
 		.map_err(|e| format_err!("tauri error: {}", e))

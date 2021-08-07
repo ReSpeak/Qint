@@ -22,9 +22,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use shared::AudioDeviceList;
 use slog::{debug, error, info, warn, Logger};
+use thiserror::Error;
 use tokio::runtime::Handle;
 use uuid::Uuid;
-use thiserror::Error;
 
 pub mod audio;
 pub mod connection;
@@ -226,6 +226,7 @@ impl QintState {
 	) -> Result<(), SettingsUpdateError> {
 		let mut settings = state.settings.write().unwrap();
 		let old_loudness_threshold = settings.get_loudness_threshold();
+		let old_vad_threshold = settings.get_vad_threshold();
 		let old_global_volume = settings.get_global_volume();
 		let (old_capture, old_playback) = settings.get_preferred_audio_device();
 
@@ -249,6 +250,16 @@ impl QintState {
 						ad.a2ts.send(audio::audio_to_ts::SetLoudnessThresholdMsg(v)),
 						state.logger.clone(),
 						"Failed to apply loudness threshold"
+					));
+				}
+			}
+
+			if let Some(v) = settings.get_vad_threshold() {
+				if Some(v) != old_vad_threshold {
+					state.handle.spawn(with_log!(
+						ad.a2ts.send(audio::audio_to_ts::SetVadThresholdMsg(v)),
+						state.logger.clone(),
+						"Failed to apply vad threshold"
 					));
 				}
 			}
@@ -550,6 +561,10 @@ impl Settings {
 		self.0.as_object()?.get("audio")?.as_object()?.get("loudnessThreshold")?.as_f64()
 	}
 
+	fn get_vad_threshold(&self) -> Option<f32> {
+		Some(self.0.as_object()?.get("audio")?.as_object()?.get("vadThreshold")?.as_f64()? as f32)
+	}
+
 	fn get_hotkeys_config(&self) -> Result<hotkey::HotkeyConfig> {
 		Ok(hotkey::HotkeyConfig::deserialize(
 			self.0
@@ -774,18 +789,24 @@ impl QintState {
 		};
 		let hotkeys = hotkey::Hotkeys::new()?;
 
-		if let Some(threshold) = settings.get_loudness_threshold() {
-			if let Some(ad) = &audio_data {
+		if let Some(ad) = &audio_data {
+			if let Some(threshold) = settings.get_loudness_threshold() {
 				handle.spawn(with_log!(
 					ad.a2ts.send(audio::audio_to_ts::SetLoudnessThresholdMsg(threshold)),
 					logger.clone(),
 					"Failed to apply loudness threshold"
 				));
 			}
-		}
 
-		if let Some(volume) = settings.get_global_volume() {
-			if let Some(ad) = &audio_data {
+			if let Some(threshold) = settings.get_vad_threshold() {
+				handle.spawn(with_log!(
+					ad.a2ts.send(audio::audio_to_ts::SetVadThresholdMsg(threshold)),
+					logger.clone(),
+					"Failed to apply loudness threshold"
+				));
+			}
+
+			if let Some(volume) = settings.get_global_volume() {
 				handle.spawn(with_log!(
 					ad.ts2a.send(audio::ts_to_audio::SetGlobalVolumeMsg(volume)),
 					logger.clone(),

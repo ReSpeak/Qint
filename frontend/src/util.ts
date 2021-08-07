@@ -28,7 +28,10 @@ export const NARROW_NO_BREAK_SPACE = String.fromCharCode(0x202f);
 export const youtubeUrlRegex =
 	/^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube\.com|youtu.be))(\/(?:[\w-]+\?v=|embed\/|v\/)?)([\w-]+)(\S+)?$/;
 
+export const VAD_MIN = 0;
+export const VAD_MAX = 1;
 export const LOUDNESS_MIN = -45;
+export const LOUDNESS_MIN_SETTINGS = -100;
 export const LOUDNESS_MAX = 0;
 export const LOUDNESS_END_MAGIC = -1000;
 export const LOUDNESS_HISTORY = 100;
@@ -599,9 +602,14 @@ export function fnBroadcast<T extends unknown[] = []>() {
 		return () => callList.remove_item(func);
 	}
 
+	function isEmpty(): boolean {
+		return callList.length === 0;
+	}
+
 	call.call = call;
 	call.clear = clear;
 	call.subscribe = subscribe;
+	call.isEmpty = isEmpty;
 	return call;
 }
 

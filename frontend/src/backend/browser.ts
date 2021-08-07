@@ -11,10 +11,11 @@ import {
 	IFetchLike,
 	IFileRequest,
 	IMarkdownTransform,
+	LoudnessEvent,
+	LoudnessUnsubscribe,
 	msgFn,
 	UpdateIdentityOptions,
 } from "./backend";
-import { urlToWebSocket } from "./backendUtil";
 import { RustAnalyzeResult } from "../chat/previewAnalyzer";
 import { ApiIdentity } from "../panel/settings/identity";
 import { MuteStates } from "../connect/uiConnect";
@@ -177,6 +178,17 @@ export class BrowserBackend implements IBackend {
 		return new BrowserMarkdownTransform(`${this.wsBaseAddress}/render_md_service`);
 	}
 
+	public get_loudness_listener(callback: LoudnessEvent): LoudnessUnsubscribe {
+		const loudnessSocket = new WebSocket(`${this.wsBaseAddress}/loudness`);
+		loudnessSocket.binaryType = "arraybuffer";
+		loudnessSocket.onmessage = (ev) => {
+			const data = new DataView(ev.data);
+			const loudness = data.getFloat64(0);
+			const vad = data.getFloat32(8);
+			callback([loudness, vad]);
+		};
+		return () => { loudnessSocket.close(); }
+	}
 }
 
 export class BrowserBackendConnection implements IBackendConnection {
@@ -232,6 +244,13 @@ export class BrowserBackendConnection implements IBackendConnection {
 		}
 		return Promise.resolve(str);
 	}
+}
+
+function urlToWebSocket(url: string): string {
+	let path = url;
+	if (!path.startsWith("http")) path = window.location.origin;
+	if (!path.startsWith("http")) throw Error("Failed to get websocket path");
+	return "ws" + path.substring(4);
 }
 
 class BrowserMarkdownTransform implements IMarkdownTransform {

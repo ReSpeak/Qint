@@ -36,21 +36,26 @@
 			bind:checked={$developMode}
 			on:change={syncSettings} />
 	</KeyValue>
-	{#if browserNotificationPermission === "default"}
-		<KeyValue label="">
-			<button class="button is-warning" on:click={enableBrowserNotifications}
-				>Enable browser notifications</button>
-		</KeyValue>
-	{:else if !IS_TAURI && browserNotificationPermission === "denied"}
-		<article class="message is-warning">
-			<div class="message-header">
-				<p>Notifications</p>
-				<button class="delete" aria-label="delete" on:click={updateNotificationSetting} />
-			</div>
-			<div class="message-body">
-				Your browser blocked notifications for this page. If you want to use them, enable
-				notifications in your browser settings and close this message.
-			</div>
-		</article>
+	{#if !IS_TAURI}
+		{#if browserNotificationPermission === "default"}
+			<KeyValue label="">
+				<button class="button is-warning" on:click={enableBrowserNotifications}
+					>Enable browser notifications</button>
+			</KeyValue>
+		{:else if browserNotificationPermission === "denied"}
+			<article class="message is-warning">
+				<div class="message-header">
+					<p>Notifications</p>
+					<button
+						class="delete"
+						aria-label="delete"
+						on:click={updateNotificationSetting} />
+				</div>
+				<div class="message-body">
+					Your browser blocked notifications for this page. If you want to use them,
+					enable notifications in your browser settings and close this message.
+				</div>
+			</article>
+		{/if}
 	{/if}
 </TabSlot>

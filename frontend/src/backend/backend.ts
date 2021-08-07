@@ -49,6 +49,7 @@ export interface IBackend {
 	plugin_delete(name: string): Promise<void>;
 	plugin_load(name: string): Promise<IPlugin>;
 	get_markdown_transformer(): IMarkdownTransform;
+	get_loudness_listener(callback: LoudnessEvent): LoudnessUnsubscribe;
 }
 
 export interface IBackendConnection {
@@ -104,3 +105,7 @@ export interface IMarkdownTransform {
 	write(md: string): Promise<string>;
 	close(): void;
 }
+
+export type LoudnessData = [loudness: number, vad: number];
+export type LoudnessEvent = (ev: LoudnessData) => void;
+export type LoudnessUnsubscribe = () => void;

@@ -216,6 +216,7 @@ export class TransientSettingsApp {
 export class TransientSettingsAudio {
 	public globalVolume: number = 1.0;
 	public loudnessThreshold: number | undefined = undefined;
+	public vadThreshold: number | undefined = undefined;
 	public capture: string | null = null;
 	public playback: string | null = null;
 }

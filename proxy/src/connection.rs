@@ -58,7 +58,7 @@ pub struct TalkersChangedMsg(pub Vec<(ClientId, bool)>);
 pub struct LoudnessesMsg(pub HashMap<ClientId, f64>);
 pub struct SendPacketMsg(pub OutPacket);
 pub struct SendAudioMsg(pub CodecType, pub Vec<u8>);
-pub struct CaptureLoudnessMsg(pub f64);
+pub struct CaptureLoudnessMsg(pub f64, pub f32); // (Loudness, Vad)
 pub struct DisconnectMsg;
 pub struct SetChannelListMsgMsg(pub ChannelListMsg);
 pub struct RunOnConMsg<R: 'static, F: FnOnce(&mut QintConnection) -> R>(pub F);
@@ -1192,7 +1192,7 @@ impl Handler<LoudnessesMsg> for QintConnection {
 impl Handler<CaptureLoudnessMsg> for QintConnection {
 	type Result = ();
 	fn handle(
-		&mut self, CaptureLoudnessMsg(loudness): CaptureLoudnessMsg, _: &mut Self::Context,
+		&mut self, CaptureLoudnessMsg(loudness, _vad): CaptureLoudnessMsg, _: &mut Self::Context,
 	) -> Self::Result {
 		// If nobody else is talking, sent it as a packet.
 		if self.talkers.is_empty() {

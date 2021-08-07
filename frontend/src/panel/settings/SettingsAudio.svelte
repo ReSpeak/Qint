@@ -2,15 +2,18 @@
 	import { onDestroy } from "svelte";
 	import { app } from "../../app";
 	import { backend } from "../../backend/backend";
+	import type { LoudnessUnsubscribe } from "../../backend/backend";
 	import {
 		dbToFactor,
 		factorToDb,
 		LOUDNESS_END_MAGIC,
 		LOUDNESS_MAX,
-		LOUDNESS_MIN,
+		LOUDNESS_MIN_SETTINGS,
 		MIN_VOLUME_DB,
 		NARROW_NO_BREAK_SPACE,
 		on,
+		VAD_MAX,
+		VAD_MIN,
 	} from "../../util";
 	import TabSlot from "../../ui/container/TabSlot.svelte";
 	import KeyValue from "../../ui/util/KeyValue.svelte";
@@ -20,21 +23,26 @@
 
 	let selected: boolean;
 	const audioSett = app.transientSettings.audio;
+	const developMode = app.transientSettings.ui._developMode;
 
 	const minGlobalVolume = MIN_VOLUME_DB;
 	const maxGlobalVolume = -MIN_VOLUME_DB;
+	const minVadThreshold = 0;
+	const maxVadThreshold = 1;
+	const defaultVadThreshold = 0.3;
 	const minLoudnessThreshold = -100;
-	const maxLoudnessThreshold = 100;
+	const maxLoudnessThreshold = 0;
 
 	let globalVolume = factorToDb(audioSett.globalVolume);
 	let loudnessThreshold = audioSett.loudnessThreshold ?? minLoudnessThreshold;
+	let vadThreshold = audioSett.vadThreshold ?? defaultVadThreshold;
 	let loudnessDiagram: VoiceGraph;
+	let vadDiagram: VoiceGraph;
 	let renderRequested: boolean = false;
 
-	let loudnessSocket: WebSocket | undefined;
-	let loudness: number | undefined;
+	let loudnessUnsub: LoudnessUnsubscribe | undefined;
 	const LOUDNESS_WIDTH = 1000;
-	const LOUDNESS_HEIGHT = 300;
+	const LOUDNESS_HEIGHT = 200;
 	const LOUDNESS_COUNT = 500;
 
 	type DeviceList = [null, ...string[]];
@@ -43,9 +51,6 @@
 	let selectedCaptureDevice: string | null = audioSett.capture;
 	let selectedPlaybackDevice: string | null = audioSett.playback;
 
-	function syncSettings() {
-		app.transientSettings.save();
-	}
 	function syncSettingsImmediately() {
 		app.transientSettings.save();
 		app.transientSettings.flush();
@@ -54,7 +59,12 @@
 	function updateLoudness() {
 		audioSett.loudnessThreshold =
 			loudnessThreshold === minLoudnessThreshold ? undefined : loudnessThreshold;
-		syncSettings();
+		syncSettingsImmediately();
+	}
+
+	function updateVad() {
+		audioSett.vadThreshold = vadThreshold;
+		syncSettingsImmediately();
 	}
 
 	function updateGlobalVolume() {
@@ -70,8 +80,9 @@
 
 	function renderLoudnessGraphs(timestamp: number) {
 		renderRequested = false;
-		const hasRequest = loudnessDiagram?.redraw(timestamp) ?? false;
-		if (hasRequest) {
+		let loudnessHasRequest = loudnessDiagram?.redraw(timestamp) ?? false;
+		let vadHasRequest = vadDiagram?.redraw(timestamp) ?? false;
+		if (loudnessHasRequest || vadHasRequest) {
 			requestRenderLoudnessGraphs();
 		}
 	}
@@ -91,20 +102,15 @@
 	$: on(selected, changeSelected());
 
 	function changeSelected() {
-		if (selected && loudnessSocket === undefined) {
-			loudnessSocket = new WebSocket(`${backend.wsBaseAddress}/loudness`);
-			loudnessSocket.binaryType = "arraybuffer";
-			loudnessSocket.onmessage = (ev) => {
-				const now = performance.now();
-				loudness = new DataView(ev.data).getFloat64(0);
+		if (selected && loudnessUnsub === undefined) {
+			loudnessUnsub = backend.get_loudness_listener(([loudness, vad]) => {
 				if (loudness !== LOUDNESS_END_MAGIC) {
+					const now = performance.now();
 					loudnessDiagram?.addValue(loudness, now);
+					vadDiagram?.addValue(vad, now);
 					requestRenderLoudnessGraphs();
 				}
-			};
-			loudnessSocket.onclose = () => {
-				loudnessSocket = undefined;
-			};
+			});
 		} else {
 			closeSocket();
 		}
@@ -113,8 +119,8 @@
 	}
 
 	function closeSocket() {
-		loudnessSocket?.close();
-		loudnessSocket = undefined;
+		loudnessUnsub?.();
+		loudnessUnsub = undefined;
 	}
 
 	fetchAvailableDevices();
@@ -153,35 +159,100 @@
 		</div>
 	</KeyValue>
 	<KeyValue label="Loudness">
-		<VoiceGraph
-			bind:this={loudnessDiagram}
-			width={LOUDNESS_WIDTH}
-			height={LOUDNESS_HEIGHT}
-			min={LOUDNESS_MIN}
-			max={LOUDNESS_MAX}
-			count={LOUDNESS_COUNT}
-			lines={[
-				[-14, `Standard normalized volume (-14${NARROW_NO_BREAK_SPACE}dB)`, "#555555"],
-				[loudnessThreshold, "Your talking threshold", "#aa3333"],
-			]} />
-	</KeyValue>
-	<KeyValue label="Volume Capture Trigger">
-		<div class="volumeControl">
-			<Slider
-				min={minLoudnessThreshold}
-				max={maxLoudnessThreshold}
-				step={1}
-				bind:value={loudnessThreshold}
-				display={(n) => `${n} LUFS`}
-				tooltip={true}
-				on:input={updateLoudness} />
+		<div class="field is-horizontal">
+			<div class="field rotatedSideControl">
+				<div class="volumeControl">
+					<Slider
+						min={minLoudnessThreshold}
+						max={maxLoudnessThreshold}
+						step={1}
+						bind:value={loudnessThreshold}
+						display={(n) => `${n}${NARROW_NO_BREAK_SPACE}LUFS`}
+						tooltip={true}
+						on:input={updateLoudness} />
+				</div>
+			</div>
+			<div class="field" style="flex:1;">
+				<VoiceGraph
+					bind:this={loudnessDiagram}
+					width={LOUDNESS_WIDTH}
+					height={LOUDNESS_HEIGHT}
+					min={LOUDNESS_MIN_SETTINGS}
+					max={LOUDNESS_MAX}
+					count={LOUDNESS_COUNT}
+					lines={[
+						[
+							-14,
+							`Standard normalized volume (-14${NARROW_NO_BREAK_SPACE}dB)`,
+							"#555555",
+						],
+						[loudnessThreshold, "Your talking threshold", "#aa3333"],
+					]} />
+			</div>
 		</div>
 	</KeyValue>
+	{#if $developMode}
+		<KeyValue label="Voice Activation Detection">
+			<div class="field is-horizontal">
+				<div class="field rotatedSideControl">
+					<div class="volumeControl">
+						<Slider
+							min={minVadThreshold}
+							max={maxVadThreshold}
+							step={0.01}
+							bind:value={vadThreshold}
+							display={(n) => `${Math.floor(n * 100)}${NARROW_NO_BREAK_SPACE}%`}
+							tooltip={true}
+							on:input={updateVad} />
+					</div>
+				</div>
+				<div class="field" style="flex:1;">
+					<VoiceGraph
+						bind:this={vadDiagram}
+						width={LOUDNESS_WIDTH}
+						height={LOUDNESS_HEIGHT}
+						min={VAD_MIN}
+						max={VAD_MAX}
+						count={LOUDNESS_COUNT}
+						lines={[
+							[0.3, "Suggested VAD", "#555555"],
+							[vadThreshold, "Your vad threshold", "#aa3333"],
+						]}
+						gradient={[
+							[0.0, "#025189"],
+							[0.7, "#81C6EB"],
+							[1, "#20FF20"],
+						]} />
+				</div>
+			</div>
+		</KeyValue>
+	{/if}
 </TabSlot>
 
 <style lang="scss">
 	.volumeControl {
 		display: flex;
 		align-items: center;
+	}
+
+	.rotatedSideControl {
+		position: relative;
+
+		> .volumeControl {
+			position: absolute;
+			$heigth: 200px;
+			$heigth2: math.div($heigth, 2);
+			width: $heigth;
+			transform: translate(-50%, -50%) translate(0, $heigth2) rotate(270deg);
+
+			> :global(.bslider) {
+				flex: 1;
+				margin: 0;
+			}
+		}
+	}
+
+	.field > :global(canvas) {
+		border: 1px solid gray;
 	}
 </style>

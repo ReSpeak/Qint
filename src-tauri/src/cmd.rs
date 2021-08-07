@@ -29,6 +29,7 @@ use tsclientlib::Error as TsError;
 use tsproto_types::{crypto::EccKeyPubP256, ChannelId};
 use uuid::Uuid;
 
+use crate::audio::LoudnessShare;
 use crate::core::{CloseWs, CreateWs, DispatchWsMsg, Error, QintCore};
 
 macro_rules! unwrap_send {
@@ -363,11 +364,23 @@ pub fn plugin_save(state: State<'_, QState>, name: String, content: String) -> R
 }
 
 #[command]
-pub fn plugin_delete(state: State<'_, QState>, name: String) -> Result<(), String> {
+pub fn plugin_delete(state: State<QState>, name: String) -> Result<(), String> {
 	state.plugin_delete(&name).map_err(|err| err.to_string())
 }
 
 #[command]
 pub fn markdown(md: String) -> String {
 	proxy_codegen::markdown::markdown(&md)
+}
+
+#[command]
+pub async fn set_loudness_callback(
+	state: State<'_, QState>, listener: State<'_, LoudnessShare>, window: Window, enabled: bool,
+) -> Result<(), ()> {
+	if enabled {
+		listener.enable(&state, window).await;
+	} else {
+		listener.disable()
+	}
+	Ok(())
 }

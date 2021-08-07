@@ -5,16 +5,21 @@
 	export let min = 0;
 	export let max: number;
 	export let count: number;
-	export let fillStyle: string | CanvasGradient | CanvasPattern | undefined = undefined;
 	// [height, description, color]
 	export let lines: [number, string, string | CanvasGradient | CanvasPattern][] = [];
 
 	export let width: number | undefined = undefined;
 	export let height: number | undefined = undefined;
 	export let style: string | undefined = undefined;
+	export let gradient: [number, string][] = [
+		[0, "#00bbbb"],
+		[0.5, "#bb00bb"],
+		[1, "#bb0000"],
+	];
 
 	let canvas: HTMLCanvasElement;
 	let ctx: CanvasRenderingContext2D | null = null;
+	let fillStyle: string | CanvasGradient | CanvasPattern | undefined = undefined;
 
 	const framelength = LOUDNESS_UPDATE_MS;
 	let historySize = count;
@@ -31,6 +36,11 @@
 	let bufferCount: number = 0;
 	let lengthWithData: number = 0;
 	let needRender: boolean = false;
+
+	$: {
+		on(gradient);
+		fillStyle = undefined;
+	}
 
 	$: on(min, max, count, build(), redrawNow());
 
@@ -126,11 +136,11 @@
 			if (fillStyle !== undefined) {
 				ctx.fillStyle = fillStyle;
 			} else {
-				const gradient = ctx.createLinearGradient(0, realHeight, 0, 0);
-				gradient.addColorStop(0, "#00bbbb");
-				gradient.addColorStop(0.5, "#bb00bb");
-				gradient.addColorStop(1, "#bb0000");
-				ctx.fillStyle = gradient;
+				fillStyle = ctx.createLinearGradient(0, realHeight, 0, 0);
+				for (const [p, col] of gradient) {
+					fillStyle.addColorStop(p, col);
+				}
+				ctx.fillStyle = fillStyle;
 			}
 			ctx.fill();
 		}

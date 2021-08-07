@@ -76,7 +76,8 @@
 
 	.tabBody {
 		padding-top: 1.5em;
-		overflow: hidden;
+		overflow-x: hidden;
+		overflow-y: scroll;
 	}
 
 	a:hover {
