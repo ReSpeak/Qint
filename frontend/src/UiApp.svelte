@@ -19,6 +19,8 @@
 	import { onMount } from "svelte";
 	import { derived, writable } from "svelte/store";
 	import type { Readable, Writable } from "svelte/store";
+	import TitleBar from "./bar/TitleBar.svelte";
+	import { IS_TAURI } from "./util";
 
 	const connections = app.connections;
 	let filter: string = "";
@@ -107,6 +109,12 @@
 </script>
 
 <div class="appContainer" style="grid-template-columns: {columnStyle}">
+	{#if IS_TAURI}
+		<TitleBar />
+	{:else}
+		<div style="height: 0.5em;" />
+	{/if}
+
 	<Toolbar
 		bind:showSidebar={$showSidebar}
 		bind:displayPanel={$displayPanel}
@@ -150,7 +158,7 @@
 <style lang="scss">
 	.appContainer {
 		display: grid;
-		grid-template-rows: max-content 1fr;
+		grid-template-rows: min-content max-content 1fr;
 
 		position: absolute;
 		top: 0;
@@ -159,20 +167,20 @@
 		left: 0;
 		height: 100%;
 
-		> :global(.toolbar) {
+		> :global(#titlebar) {
 			grid-row: 1;
 			grid-column: 1 / span 2;
 		}
-		> :global(.searchbar) {
-			grid-row: 1;
-			grid-column: 1;
+		> :global(.toolbar) {
+			grid-row: 2;
+			grid-column: 1 / span 2;
 		}
 		> :global(.sidebar) {
-			grid-row: 2;
+			grid-row: 3;
 			grid-column: 1;
 		}
 		> .displayPanel {
-			grid-row: 2;
+			grid-row: 3;
 			grid-column: 2;
 		}
 	}

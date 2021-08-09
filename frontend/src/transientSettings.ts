@@ -211,6 +211,8 @@ export class TransientSettingsChat {
 
 export class TransientSettingsApp {
 	public askBeforeClosing: boolean = true;
+	public minimizeToTray: boolean = false;
+	public closeToTray: boolean = false;
 }
 
 export class TransientSettingsAudio {

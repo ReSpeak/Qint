@@ -29,6 +29,20 @@
 			bind:checked={app.transientSettings.app.askBeforeClosing}
 			on:change={syncSettings} />
 	</KeyValue>
+	<KeyValue label="Minimize to Tray">
+		<input
+			type="checkbox"
+			class="checkbox-switch is-info"
+			bind:checked={app.transientSettings.app.minimizeToTray}
+			on:change={syncSettings} />
+	</KeyValue>
+	<KeyValue label="Close to Tray">
+		<input
+			type="checkbox"
+			class="checkbox-switch is-info"
+			bind:checked={app.transientSettings.app.closeToTray}
+			on:change={syncSettings} />
+	</KeyValue>
 	<KeyValue label="Developer Mode">
 		<input
 			type="checkbox"

@@ -1,11 +1,12 @@
 <script lang="ts">
 	import Icon from "../ui/icon/Icon.svelte";
 	import { DisplayPanel } from "../panel/panel";
-	import { SERVER_ICON } from "../util";
+	import { IS_TAURI, SERVER_ICON } from "../util";
 	import { app, NodeSelections } from "../app";
 	import ConnectionSettings from "./ConnectionSettings.svelte";
 	import { ConnectData } from "../connect/uiConnect";
 	import Searchbar from "./Searchbar.svelte";
+	import { appWindow } from "@tauri-apps/api/window";
 
 	export let displayPanel: DisplayPanel;
 	export let showSidebar: boolean;
@@ -20,6 +21,12 @@
 	$: selectedNodeChanged($selectedNode);
 	function selectedNodeChanged(node: NodeSelections) {
 		if (node.selections.length !== 0) displayPanel = DisplayPanel.Main;
+	}
+
+	async function startDragWindow() {
+		if (IS_TAURI) {
+			await appWindow.startDragging();
+		}
 	}
 </script>
 
@@ -36,7 +43,7 @@
 			<Searchbar bind:filter visible={true} />
 		</div>
 	</div>
-	<div class="spacer" />
+	<div class="spacer" on:mousedown={startDragWindow} />
 	<div class="centerButtons toolbuttons">
 		{#if filter !== ""}
 			<button
@@ -69,7 +76,7 @@
 			<Icon name={SERVER_ICON} />
 		</button>
 	</div>
-	<div class="spacer" />
+	<div class="spacer" on:mousedown={startDragWindow} />
 	<div class="rightButtons">
 		<ConnectionSettings bind:connectData />
 	</div>
@@ -79,6 +86,7 @@
 	.toolbar {
 		background-color: $box-background-color;
 		padding: 0.5em;
+		padding-top: 0;
 		display: flex;
 	}
 

@@ -20,6 +20,7 @@ use structopt::StructOpt;
 use tauri::SystemTray;
 use tauri::SystemTrayEvent;
 use tauri::SystemTrayMenu;
+use tauri::WindowEvent;
 use tauri::{CustomMenuItem, Manager};
 use tokio::runtime::Runtime;
 
@@ -141,25 +142,30 @@ fn main() {
 			});
 		})
 		.system_tray(
-			SystemTray::new().with_menu(
-				SystemTrayMenu::new()
-					.add_item(CustomMenuItem::new("toggle", "Toggle"))
-					.add_item(CustomMenuItem::new("new", "New window")),
-			),
+			SystemTray::new()
+				.with_menu(SystemTrayMenu::new().add_item(CustomMenuItem::new("exit", "Exit"))),
 		)
 		.on_system_tray_event(|app, event| match event {
-			SystemTrayEvent::LeftClick { position: _, size: _, .. } => {}
+			SystemTrayEvent::LeftClick { position: _, size: _, .. } => {
+				let window = app.get_window("main").unwrap();
+				window.set_skip_taskbar(false).unwrap();
+				window.unminimize().unwrap();
+				window.show().unwrap();
+				window.set_focus().unwrap();
+			}
 			SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
-				"toggle" => {
-					let window = app.get_window("main").unwrap();
-					window.hide().unwrap();
-				}
-				"show" => {
-					let window = app.get_window("main").unwrap();
-					window.show().unwrap();
+				"exit" => {
+					std::process::exit(0);
 				}
 				_ => {}
 			},
+			_ => {}
+		})
+		.on_window_event(move |ev| match ev.event() {
+			WindowEvent::CloseRequested => {
+				println!("Close requested");
+			}
+			WindowEvent::Resized(_) => {}
 			_ => {}
 		})
 		.invoke_handler(tauri::generate_handler![
