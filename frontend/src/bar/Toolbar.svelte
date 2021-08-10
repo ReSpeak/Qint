@@ -7,11 +7,16 @@
 	import { ConnectData } from "../connect/uiConnect";
 	import Searchbar from "./Searchbar.svelte";
 	import { appWindow } from "@tauri-apps/api/window";
+	import { TitleBarStyle } from "../transientSettings";
+	import TitleButtons from "./TitleButtons.svelte";
 
 	export let displayPanel: DisplayPanel;
 	export let showSidebar: boolean;
 	export let connectData: ConnectData;
 	export let filter: string; // from the search
+
+	let appSettings = app.transientSettings.app;
+	let titleBarStyle = appSettings._titleBarStyle;
 
 	function toggleSidebar(show: boolean) {
 		showSidebar = show;
@@ -23,75 +28,115 @@
 		if (node.selections.length !== 0) displayPanel = DisplayPanel.Main;
 	}
 
-	async function startDragWindow() {
+	function startDragWindow(this: HTMLElement, ev: MouseEvent) {
 		if (IS_TAURI) {
-			await appWindow.startDragging();
+			if ((ev.target as HTMLElement)?.dataset?.titledrag) {
+				appWindow.startDragging();
+			}
+		}
+	}
+
+	let supportedStyle: TitleBarStyle;
+	$: {
+		if (IS_TAURI) {
+			supportedStyle = $titleBarStyle;
+		} else {
+			supportedStyle = TitleBarStyle.Native;
+		}
+
+		if (supportedStyle === TitleBarStyle.Native) {
+			appWindow.setDecorations(true);
+		} else {
+			appWindow.setDecorations(false);
 		}
 	}
 </script>
 
-<div class="toolbar">
+{#if supportedStyle === TitleBarStyle.Normal}
+	<div class="titlebar" on:mousedown={startDragWindow}>
+		<div class="flex1" data-titledrag="1" />
+		<TitleButtons />
+	</div>
+{/if}
+
+<div
+	class="toolbar"
+	class:normalStyle={supportedStyle === TitleBarStyle.Normal}
+	class:tinyStyle={supportedStyle === TitleBarStyle.Tiny}
+	class:bigDesign={supportedStyle !== TitleBarStyle.Tiny}
+	class:smallDesign={supportedStyle === TitleBarStyle.Tiny}
+	on:mousedown={startDragWindow}>
 	<div class="leftButtons">
-		<button
-			class="toolbutton"
+		<div
+			class="hybridTitleButton"
 			class:active={showSidebar}
 			on:click={() => toggleSidebar(!showSidebar)}
 			title="Channel tree">
 			<Icon name="file-tree" />
-		</button>
-		<div class="searchbar">
-			<Searchbar bind:filter visible={true} />
 		</div>
+		<div class="dragSpace" data-titledrag="1" />
+		<Searchbar bind:filter visible={true} />
 	</div>
-	<div class="spacer" on:mousedown={startDragWindow} />
-	<div class="centerButtons toolbuttons">
+	<div class="flex1" data-titledrag="1" />
+	<div class="centerButtons hybridTitleButtons">
 		{#if filter !== ""}
-			<button
-				class="toolbutton"
+			<div
+				class="hybridTitleButton"
 				class:active={displayPanel === DisplayPanel.Search}
 				on:click={() => (displayPanel = DisplayPanel.Search)}
 				title="Chat">
 				<Icon name="magnify" />
-			</button>
+			</div>
 		{/if}
-		<button
-			class="toolbutton"
+		<div
+			class="hybridTitleButton"
 			class:active={displayPanel === DisplayPanel.Main}
 			on:click={() => (displayPanel = DisplayPanel.Main)}
 			title="Chat">
 			<Icon name="chat-outline" />
-		</button>
-		<button
-			class="toolbutton"
+		</div>
+		<div
+			class="hybridTitleButton"
 			class:active={displayPanel === DisplayPanel.Settings}
 			on:click={() => (displayPanel = DisplayPanel.Settings)}
 			title="Settings">
 			<Icon name="cog" />
-		</button>
-		<button
-			class="toolbutton"
+		</div>
+		<div
+			class="hybridTitleButton"
 			class:active={displayPanel === DisplayPanel.Connect}
 			on:click={() => (displayPanel = DisplayPanel.Connect)}
 			title="Connect to a new server">
 			<Icon name={SERVER_ICON} />
-		</button>
+		</div>
 	</div>
-	<div class="spacer" on:mousedown={startDragWindow} />
+	<div class="flex1" data-titledrag="1" />
 	<div class="rightButtons">
 		<ConnectionSettings bind:connectData />
 	</div>
+
+	{#if supportedStyle === TitleBarStyle.Compact || supportedStyle === TitleBarStyle.Tiny}
+		<div class="flex1" data-titledrag="1" />
+		<TitleButtons />
+	{/if}
 </div>
 
 <style lang="scss">
+	@import "../style/global_mixin";
+
 	.toolbar {
 		background-color: $box-background-color;
 		padding: 0.5em;
-		padding-top: 0;
 		display: flex;
-	}
 
-	.spacer {
-		flex: 1;
+		&.normalStyle {
+			padding-top: 0;
+		}
+
+		&.tinyStyle {
+			padding: 0;
+			height: 2em;
+		}
 	}
 
 	.centerButtons,
@@ -100,7 +145,14 @@
 		display: inline-flex;
 	}
 
-	.searchbar {
-		padding-left: 1em;
+	.dragSpace {
+		width: 2em;
+	}
+
+	.titlebar {
+		height: 1.5em;
+		display: flex;
+
+		background-color: $box-background-color;
 	}
 </style>

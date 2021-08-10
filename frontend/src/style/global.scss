@@ -46,7 +46,7 @@ hr {
 	color: $text-strong !important;
 }
 
-.toolbuttons {
+.toolbuttons, .bigDesign .hybridTitleButtons {
 	align-items: center;
 	display: flex;
 	flex-wrap: wrap;
@@ -57,7 +57,7 @@ hr {
 	}
 }
 
-.toolbutton {
+.toolbutton, .bigDesign .hybridTitleButton {
 	@extend %unselectable;
 	-moz-appearance: none;
 	-webkit-appearance: none;
@@ -87,6 +87,24 @@ hr {
 	&.is-small {
 		height: 1.5em;
 		width: 1.5em;
+	}
+}
+
+.titleButtons, .smallDesign .hybridTitleButtons {
+	display: flex;
+}
+
+.titleButton, .smallDesign .hybridTitleButton {
+	padding: 0 0.5em;
+	display: flex;
+	align-items: center;
+
+	&.active {
+		background-color: #888888;
+	}
+
+	&:hover {
+		background-color: $highlight-weak;
 	}
 }
 

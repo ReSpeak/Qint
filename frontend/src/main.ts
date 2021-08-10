@@ -23,11 +23,9 @@ console.log(`Using ${backend.name} backend`);
 app.transientSettings.synth.init();
 
 window.onbeforeunload = function (e: any) {
-	app.transientSettings.flush();
+	app.close();
 
-	if (IS_TAURI) {
-		backend.close();
-	} else {
+	if (!IS_TAURI) {
 		// For debugging purposes (?)
 		app.transientSettings.synth.trySpeak("Goodbye");
 		if (app.hasConnected && app.transientSettings.app.askBeforeClosing) {

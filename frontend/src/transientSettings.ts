@@ -154,17 +154,19 @@ export class TransientSettingsSynth {
 
 // TODO move into own app.ui management
 export class TransientSettingsUi {
-	private get descriptionMode() {
-		return get(this._descriptionMode);
-	}
-	private set descriptionMode(val: DescriptionMode) {
-		this._descriptionMode.set(val);
-	}
-	private get developMode() {
-		return get(this._developMode);
-	}
-	private set developMode(val: boolean) {
-		this._developMode.set(val);
+	constructor() {
+		Object.defineProperties(this, {
+			descriptionMode: {
+				get: function (): DescriptionMode { return get(this._descriptionMode); },
+				set: function (val: DescriptionMode) { this._descriptionMode.set(val); },
+				enumerable: true
+			},
+			developMode: {
+				get: function (): boolean { return get(this._developMode); },
+				set: function (val: boolean) { this._developMode.set(val); },
+				enumerable: true
+			},
+		});
 	}
 	public readonly _descriptionMode = writable(DescriptionMode.None);
 	public readonly _developMode = writable(false);
@@ -181,8 +183,6 @@ export class TransientSettingsUi {
 		return res;
 	}
 }
-Object.defineProperty(TransientSettingsUi.prototype, "descriptionMode", { enumerable: true });
-Object.defineProperty(TransientSettingsUi.prototype, "developMode", { enumerable: true });
 
 export class TransientSettingsChat {
 	private _parent: TransientSettings;
@@ -210,9 +210,27 @@ export class TransientSettingsChat {
 }
 
 export class TransientSettingsApp {
+	constructor() {
+		Object.defineProperties(this, {
+			titleBarStyle: {
+				get: function (): TitleBarStyle { return get(this._titleBarStyle); },
+				set: function (val: TitleBarStyle) { this._titleBarStyle.set(val); },
+				enumerable: true
+			}
+		});
+	}
+
 	public askBeforeClosing: boolean = true;
 	public minimizeToTray: boolean = false;
 	public closeToTray: boolean = false;
+	public readonly _titleBarStyle = writable(TitleBarStyle.Normal);
+}
+
+export const enum TitleBarStyle {
+	Native,
+	Normal,
+	Compact,
+	Tiny,
 }
 
 export class TransientSettingsAudio {

@@ -94,36 +94,30 @@ export function clickToSelectAll(element: HTMLElement): void {
 	element.onclick = clickFn;
 }
 
-// See https://jsperf.com/node-uuid-performance/64 about how to generate a uuid fast
 export function createUuidV4(): string {
-	const d2h: string[] = [],
-		vals = new Array(16);
-	for (let i = 0; i < 256; ++i) d2h.push((0x100 + i).toString(16).substring(1));
-
-	for (let i = 0; i < 16; ++i) vals[i] = (Math.random() * 256) | 0;
-	vals[6] = (vals[6] & 0x0f) | 0x40;
-	vals[8] = (vals[8] & 0x3f) | 0x80;
+	function rnd_hex() { return (0x100 + ((Math.random() * 256) | 0)).toString(16).substring(1); }
+	function to_hex(i: number) { return (0x100 + i).toString(16).substring(1); }
 	return (
-		d2h[vals[0]] +
-		d2h[vals[1]] +
-		d2h[vals[2]] +
-		d2h[vals[3]] +
+		rnd_hex() +
+		rnd_hex() +
+		rnd_hex() +
+		rnd_hex() +
 		"-" +
-		d2h[vals[4]] +
-		d2h[vals[5]] +
+		rnd_hex() +
+		rnd_hex() +
 		"-" +
-		d2h[vals[6]] +
-		d2h[vals[7]] +
+		to_hex((((Math.random() * 256) | 0) & 0x0f) | 0x40) +
+		rnd_hex() +
 		"-" +
-		d2h[vals[8]] +
-		d2h[vals[9]] +
+		to_hex((((Math.random() * 256) | 0) & 0x3f) | 0x80) +
+		rnd_hex() +
 		"-" +
-		d2h[vals[10]] +
-		d2h[vals[11]] +
-		d2h[vals[12]] +
-		d2h[vals[13]] +
-		d2h[vals[14]] +
-		d2h[vals[15]]
+		rnd_hex() +
+		rnd_hex() +
+		rnd_hex() +
+		rnd_hex() +
+		rnd_hex() +
+		rnd_hex()
 	);
 }
 
@@ -401,10 +395,11 @@ export function emojiEncode(data: number[]): EmojiData[] {
 // Java hashCode implementation for string.
 // We don't need the Java version, we just need any hash and this one is short to implement.
 export function javaHash(s: string): number {
-	return s.split("").reduce((a, b) => {
-		a = a * 31 + b.charCodeAt(0);
-		return a & a; // Truncate to 32 bit
-	}, 0);
+	let a = 0 | 0;
+	for (let i = 0; i < s.length; i++) {
+		a = (a * 31 + s.charCodeAt(i)) | 0; // Truncate to 32 bit
+	}
+	return a;
 }
 
 export function datetimeDeserialize(rustDate: OffsetDateTime): Moment {
@@ -491,7 +486,6 @@ export function deep_diff(from: any, to: any): any | undefined {
 	if (!hasChanges) return undefined;
 	return res;
 }
-(window as any).deep_diff = deep_diff;
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function deep_equals(a: any, b: any): boolean {
@@ -614,7 +608,7 @@ export function fnBroadcast<T extends unknown[] = []>() {
 }
 
 export function enumValues(e: Record<string, unknown>): (string | number)[] {
-	return Object.keys(e) as any;
+	return Object.keys(e);
 }
 
 const SiName: readonly string[] = ["", "k", "M", "G", "T", "P", "E", "Z", "Y"];

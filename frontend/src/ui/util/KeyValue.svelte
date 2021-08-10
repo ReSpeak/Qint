@@ -8,13 +8,14 @@
 	export let narrow: boolean = false;
 	export let title: string = "";
 	export let labelStyle: string = "";
+	export let autoLabel: boolean = true;
 
 	const ctx = (getContext("component_id") as any) ?? "";
 	const labelId: string = label.replace(/\s/g, "-") + ctx;
 	let slot: HTMLElement | undefined;
 
 	onMount(() => {
-		if (slot && labelId) {
+		if (slot && labelId && autoLabel) {
 			const inputField = slot.querySelector("input");
 			if (inputField) {
 				inputField.id = labelId;

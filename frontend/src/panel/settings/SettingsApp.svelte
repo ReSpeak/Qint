@@ -3,9 +3,12 @@
 	import { app } from "../../app";
 	import TabSlot from "../../ui/container/TabSlot.svelte";
 	import KeyValue from "../../ui/util/KeyValue.svelte";
+	import { TitleBarStyle } from "../../transientSettings";
 
 	let browserNotificationPermission = Notification.permission;
 	const developMode = app.transientSettings.ui._developMode;
+	const appSettings = app.transientSettings.app;
+	const titleBarStyle = appSettings._titleBarStyle;
 
 	function syncSettings() {
 		app.transientSettings.save();
@@ -26,21 +29,21 @@
 		<input
 			type="checkbox"
 			class="checkbox-switch is-info"
-			bind:checked={app.transientSettings.app.askBeforeClosing}
+			bind:checked={appSettings.askBeforeClosing}
 			on:change={syncSettings} />
 	</KeyValue>
 	<KeyValue label="Minimize to Tray">
 		<input
 			type="checkbox"
 			class="checkbox-switch is-info"
-			bind:checked={app.transientSettings.app.minimizeToTray}
+			bind:checked={appSettings.minimizeToTray}
 			on:change={syncSettings} />
 	</KeyValue>
 	<KeyValue label="Close to Tray">
 		<input
 			type="checkbox"
 			class="checkbox-switch is-info"
-			bind:checked={app.transientSettings.app.closeToTray}
+			bind:checked={appSettings.closeToTray}
 			on:change={syncSettings} />
 	</KeyValue>
 	<KeyValue label="Developer Mode">
@@ -49,6 +52,51 @@
 			class="checkbox-switch is-info"
 			bind:checked={$developMode}
 			on:change={syncSettings} />
+	</KeyValue>
+	<KeyValue label="Window Design" autoLabel={false}>
+		<div>
+			<input
+				type="radio"
+				id="tb1"
+				name="titleBarStyle"
+				bind:group={$titleBarStyle}
+				value={TitleBarStyle.Native}
+				on:change={syncSettings} />
+			<label for="tb1">Native</label>
+		</div>
+
+		<div>
+			<input
+				type="radio"
+				id="tb2"
+				name="titleBarStyle"
+				bind:group={$titleBarStyle}
+				value={TitleBarStyle.Normal}
+				on:change={syncSettings} />
+			<label for="tb2">Normal</label>
+		</div>
+
+		<div>
+			<input
+				type="radio"
+				id="tb3"
+				name="titleBarStyle"
+				bind:group={$titleBarStyle}
+				value={TitleBarStyle.Compact}
+				on:change={syncSettings} />
+			<label for="tb3">Compact</label>
+		</div>
+
+		<div>
+			<input
+				type="radio"
+				id="tb4"
+				name="titleBarStyle"
+				bind:group={$titleBarStyle}
+				value={TitleBarStyle.Tiny}
+				on:change={syncSettings} />
+			<label for="tb4">Tiny</label>
+		</div>
 	</KeyValue>
 	{#if !IS_TAURI}
 		{#if browserNotificationPermission === "default"}

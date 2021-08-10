@@ -70,26 +70,26 @@
 	}
 </script>
 
-<div class="toolbuttons">
-	<button
-		class="toolbutton"
+<div class="hybridTitleButtons">
+	<div
+		class="hybridTitleButton"
 		class:active={inputMuted}
 		on:click={() => changeOwnClient({ inputMuted: !inputMuted })}
 		title="Mute microphone">
 		<Icon name={inputMuted ? "microphone-off" : "microphone"} />
-	</button>
-	<button
-		class="toolbutton"
+	</div>
+	<div
+		class="hybridTitleButton"
 		class:active={outputMuted}
 		on:click={() => changeOwnClient({ outputMuted: !outputMuted })}
 		title="Mute output">
 		<Icon name={outputMuted ? "volume-off" : "volume-high"} />
-	</button>
-	<button
-		class="toolbutton"
+	</div>
+	<div
+		class="hybridTitleButton"
 		class:active={isAway}
 		on:click={() => changeOwnClient({ away: isAway ? null : "" })}
 		title="Toggle away">
 		<Icon name={isAway ? "sleep" : "sleep-off"} />
-	</button>
+	</div>
 </div>
