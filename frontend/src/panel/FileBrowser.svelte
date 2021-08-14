@@ -12,12 +12,11 @@
 		IDragOptions,
 		TableSortFn,
 	} from "../ui/html/uiTable";
-	import FileIO from "../ui/util/FileIO.svelte";
 	import { FolderState } from "../fileTreeCache";
 	import type { FileTreeNode } from "../fileTreeCache";
 	import { extensionToIcon, formatBytes, pathJoin, pathSplit } from "./fileUtil";
 	import { assert, focus, on } from "../util";
-	import type { IConFileRequest } from "../backend/backend";
+	import type { IFileRequest } from "../backend/backend";
 	import DeleteConfirmButton from "../ui/util/DeleteConfirmButton.svelte";
 
 	export let connection: Connection;
@@ -38,7 +37,6 @@
 	let fileTable: Table<FileTreeNode>;
 	let displayChannel: FileTreeNode | null;
 	let displayChildren: FileTreeNode[];
-	let fileIo: FileIO;
 	let invalidateCache = true;
 	let fileSelection: FileTreeNode[] = [];
 	let createNewFolderName = "";
@@ -108,13 +106,13 @@
 		if (dblclick) {
 			if (row.isFile) {
 				const filePath = pathJoin(...path, row.name);
-				const req: IConFileRequest = {
-					con: connection,
+				const req: IFileRequest = {
 					channel: channelId,
 					path: filePath,
 					cache: false,
+					suggested_name: row.name,
 				};
-				fileIo.askDownload(req, row.name);
+				connection.backend.ask_download(req);
 			} else {
 				pushFolder(row.name);
 			}
@@ -231,17 +229,14 @@
 			Array.from(document.querySelectorAll("[data-type='folder']:not(.selected)")),
 	};
 
-	const currentUploadTask: any = undefined; // TODO
-	function uploadFiles(...files: File[]) {
-		connection.filetransferManager.uploadFiles(
-			...files.map((file) => {
-				return {
-					data: file,
-					channelId,
-					path: pathJoin(...path, file.name),
-				};
-			})
-		);
+	const is_uploading: boolean = false; // TODO
+
+	async function askUpload() {
+		try {
+			await connection.backend.ask_upload({ Files: [channelId, pathJoin(...path)] });
+		} catch {
+			return;
+		}
 	}
 
 	function dragEnter(e: DragEvent) {
@@ -265,11 +260,7 @@
 
 		const files = e.dataTransfer?.files;
 		if (!files) return;
-		uploadFiles(...files);
-	}
-
-	function uploadSelected(files: CustomEvent<FileList>) {
-		uploadFiles(...files.detail);
+		//uploadFiles(...files); // TAURI TODO FIX
 	}
 
 	function clickBackground(this: HTMLElement, e: MouseEvent) {
@@ -380,10 +371,10 @@
 		</button>
 		<button
 			title="Upload files"
-			on:click={() => fileIo.askUpload()}
-			class:is-info={currentUploadTask !== undefined}
+			on:click={() => askUpload()}
+			class:is-info={is_uploading}
 			class="button">
-			<Icon name={currentUploadTask === undefined ? "upload" : "orbit mdi-spin"} />
+			<Icon name={is_uploading ? "orbit mdi-spin" : "upload"} />
 		</button>
 		<button
 			class="button"
@@ -496,7 +487,6 @@
 			<th class="noFiles" colspan="4">No files</th>
 		</tr>
 	</Table>
-	<FileIO bind:this={fileIo} on:uploadRequest={uploadSelected} />
 </div>
 
 <style lang="scss">

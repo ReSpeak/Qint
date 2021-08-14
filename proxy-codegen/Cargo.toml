@@ -9,10 +9,10 @@ build = "build/build.rs"
 anyhow = "1"
 fancy-regex = "0.6"
 lazy_static = "1"
-nom = "6"
+nom = "7.0.0-alpha2"
 pulldown-cmark = "0.8"
 serde = { version = "1", features = [ "derive" ] }
-time = "0.2"
+time = "0.3"
 tsclientlib = { path = "../../tsclientlib/tsclientlib", features = [ "unstable" ] }
 tsproto = { path = "../../tsclientlib/tsproto" }
 tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }

@@ -7,10 +7,11 @@ extern crate qint_proxy;
 mod audio;
 mod cmd;
 mod core;
+mod filetransfer;
 
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::thread;
-use std::time::Duration;
 
 use actix::prelude::*;
 use anyhow::format_err;
@@ -104,23 +105,22 @@ fn main() {
 	// Parse command line options
 	let args = Args::from_args();
 
-	let mut runtime = Runtime::new().unwrap();
-
-	let (addr, app) = {
+	let (app_addr, app_arc) = {
 		let (sender, receiver) = std::sync::mpsc::channel();
 
 		let logger2 = logger.clone();
 		thread::spawn(move || {
+			let mut runtime = Runtime::new().unwrap();
 			let local = tokio::task::LocalSet::new();
+			let handle = runtime.handle().clone();
 			local.block_on(&mut runtime, async move {
-				let app = QintState::new(logger2, args.into()).unwrap();
-				let core = QintCore { state: app };
+				let state = QintState::new(logger2, args.into()).unwrap();
+				let app = QintCore::new(handle, state);
+				let app_arc = Arc::new(app.clone());
 
-				sender.send((core.clone().start(), core)).unwrap();
+				sender.send((app.start(), app_arc.clone())).unwrap();
 
-				loop {
-					tokio::time::sleep(Duration::from_secs(1)).await;
-				}
+				app_arc.run().await;
 			});
 		});
 
@@ -128,8 +128,9 @@ fn main() {
 	};
 
 	tauri::Builder::default()
-		.manage(addr)
-		.manage(app.state)
+		.manage(app_addr)
+		.manage(app_arc.state.clone())
+		.manage(app_arc)
 		.manage(LoudnessShare::new())
 		.manage(logger)
 		.on_page_load(|window, _| {
@@ -155,7 +156,7 @@ fn main() {
 			}
 			SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
 				"exit" => {
-					std::process::exit(0);
+					app.exit(0);
 				}
 				_ => {}
 			},
@@ -175,8 +176,11 @@ fn main() {
 			cmd::db,
 			cmd::get_settings,
 			cmd::set_settings,
-			cmd::get_file,
-			cmd::get_cache_file,
+			cmd::filetransfer_list,
+			cmd::download_bytes,
+			cmd::download_bytes_from_cache,
+			cmd::upload_bytes,
+			cmd::read_file,
 			cmd::download_file,
 			cmd::upload_file,
 			cmd::peek_link,
@@ -194,6 +198,7 @@ fn main() {
 			cmd::plugin_delete,
 			cmd::markdown,
 			cmd::set_loudness_callback,
+			cmd::teest,
 		])
 		.run(tauri::generate_context!())
 		.map_err(|e| format_err!("tauri error: {}", e))

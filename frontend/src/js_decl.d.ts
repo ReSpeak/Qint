@@ -18,3 +18,4 @@ declare module '*.svelte' {
 
 declare const BUILD_ENV: string;
 declare const BUILD_DAT: string;
+declare const DEBUG_UTIL: boolean;

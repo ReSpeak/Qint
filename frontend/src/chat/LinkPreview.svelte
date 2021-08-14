@@ -5,11 +5,11 @@
 	import ImageModal from "./ImageModal.svelte";
 	import { analyzeLink } from "./previewAnalyzer";
 	import { autoError } from "../util";
-	import type { NodeSelection } from "../app";
+	import type { IConnection } from "../connection";
 
 	export let link: string;
 	export let textContent: string;
-	export let nodeSel: NodeSelection | undefined;
+	export let connection: IConnection;
 
 	let showBig = false;
 
@@ -31,7 +31,7 @@
 			<ImageModal src={result.imageSrc} bind:visible={showBig} />
 		{/if}
 	{:else if result.kind === "video"}
-		<VideoPreview videoSrc={result.videoSrc} embed={result.embed} {nodeSel} />
+		<VideoPreview videoSrc={result.videoSrc} embed={result.embed} {connection} />
 	{:else if result.kind === "site"}
 		<a href={link} target="_blank" class="box padTop">
 			<div>

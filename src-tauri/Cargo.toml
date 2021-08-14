@@ -7,7 +7,7 @@ edition = "2018"
 build = "src/build.rs"
 
 [build-dependencies]
-tauri-build = { version = "1.0.0-beta.3" }
+tauri-build = { version = "1.0.0-beta.4" }
 
 [features]
 custom-protocol = [ "tauri/custom-protocol" ]
@@ -25,19 +25,19 @@ proxy-codegen = { path = "../proxy-codegen" }
 qint-proxy = { path = "../proxy" }
 serde = { version = "1.0", features = [ "derive" ] }
 serde_json = "1.0"
+sha2 = "0.9"
 slog-async = "2"
 slog-envlogger = "2"
 slog-scope = "4"
 slog-stdlog = "4"
 slog-term = "2"
 structopt = { version = "0.3", default-features = false }
-tauri = { version = "1.0.0-beta.5", features = ["api-all", "system-tray", "menu"] }
+tauri = { version = "1.0.0-beta.7", features = ["window-all", "dialog-all", "http-all", "notification-all", "system-tray"] }
 thiserror = "1"
 tokio = "1"
 tokio-util = { version = "0.6", features = [ "io" ] }
 tsclientlib = { path = "../../tsclientlib/tsclientlib", features = [ "unstable" ] }
 tsproto-types = { path = "../../tsclientlib/utils/tsproto-types" }
-uuid = { version = "0.8", features = [ "serde" ] }
 
 [dependencies.log]
 version = "0.4"

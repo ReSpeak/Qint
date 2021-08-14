@@ -333,7 +333,7 @@ export function base64Decode(s: string): number[] {
 	return res;
 }
 
-export function base64Encode(data: number[]): string {
+export function base64Encode(data: ArrayLike<number>): string {
 	let res = "";
 	for (let i = 0; i < data.length; i++) res += String.fromCharCode(data[i]);
 	return btoa(res);
@@ -343,7 +343,7 @@ export function urlBase64Decode(s: string): number[] {
 	return base64Decode(s.replace("-", "+").replace("_", "/"));
 }
 
-export function urlBase64Encode(data: number[]): string {
+export function urlBase64Encode(data: ArrayLike<number>): string {
 	return base64Encode(data).replace("+", "-").replace("/", "_").replace(/=+$/, "");
 }
 
@@ -353,7 +353,7 @@ export function hexDecode(s: string): number[] {
 	return res;
 }
 
-export function hexEncode(data: number[]): string {
+export function hexEncode(data: ArrayLike<number>): string {
 	let res = "";
 	for (let i = 0; i < data.length; i++) res += data[i].toString(16).padStart(2, "0");
 	return res;
@@ -367,7 +367,7 @@ export function tsHexDecode(s: string): number[] {
 	return res;
 }
 
-export function tsHexEncode(data: number[]): string {
+export function tsHexEncode(data: ArrayLike<number>): string {
 	const a0 = "a".charCodeAt(0);
 	let res = "";
 	for (let i = 0; i < data.length; i++) {
@@ -381,7 +381,7 @@ export function tsHexEncode(data: number[]): string {
 // Emoji encoding from Matrix: https://matrix.org/docs/spec/client_server/latest#sas-method-emoji
 // Declarations from here: https://github.com/matrix-org/matrix-doc/blob/master/data-definitions/sas-emoji.json
 
-export function emojiEncode(data: number[]): EmojiData[] {
+export function emojiEncode(data: ArrayLike<number>): EmojiData[] {
 	const BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 	const b64 = base64Encode(data);
 	const res = [];

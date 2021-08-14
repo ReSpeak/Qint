@@ -1,6 +1,7 @@
-import { InMsg, OutMsg } from "./ws";
+import { InMsg, OutMsg, ResultDetails } from "./ws";
 import { createUuidV4, fnBroadcast } from "../util";
 import {
+	AskReadResult,
 	closedFn,
 	errorFn,
 	FindIdentity,
@@ -8,14 +9,15 @@ import {
 	IBackend,
 	IBackendConnection,
 	ICacheFileRequest,
-	IFetchLike,
 	IFileRequest,
 	IMarkdownTransform,
 	LoudnessData,
 	LoudnessEvent,
 	LoudnessUnsubscribe,
 	msgFn,
+	TransferResult,
 	UpdateIdentityOptions,
+	UploadFeature,
 } from "./backend";
 import { listen } from "@tauri-apps/api/event";
 import debug from "debug";
@@ -25,7 +27,12 @@ import { ApiIdentity } from "../panel/settings/identity";
 import { MuteStates } from "../connect/uiConnect";
 import { HotkeyAction } from "../transientSettings";
 import { importFunc, IPlugin } from "../plugins";
+import { ReturnCodeTracker } from "./returnCodeTracker";
 const log = debug("TAURI");
+
+if (DEBUG_UTIL) {
+	(window as any).invoke = invoke;
+}
 
 type TauriP2FWs = { con: string; msg: InMsg; };
 type TauriP2FClose = string;
@@ -44,7 +51,7 @@ interface OutListPluginsRequest {
 class ImageTracking {
 	private trackedImages: Map<string, string | undefined | Promise<string | undefined>> = new Map();
 
-	protected async fetchImgInternal(ep: string, req: IFileRequest, con: string): Promise<string | undefined> {
+	public async fetchImgInternal(ep: string, req: IFileRequest, con: string): Promise<string | undefined> {
 		const key = reqAsKey(req);
 		if (this.trackedImages.has(key)) {
 			return await this.trackedImages.get(key);
@@ -65,20 +72,22 @@ class ImageTracking {
 					channel: req.channel,
 					path: req.path,
 					hash: req.hash,
-					cache: req.cache,
+					existing: FileExistsAction.Error
 				},
+				cache: req.cache,
 			});
 			const buffer = new Uint8Array(response.data);
 			const blob = new Blob([buffer], {
 				type: response.mime,
 			});
 			return URL.createObjectURL(blob);
-		} catch (err) {
+		} catch (err: any) {
+			log("Failed to fetch image: %j", err);
 			return undefined;
 		}
 	}
 
-	protected releaseImages() {
+	public releaseImages() {
 		this.trackedImages.forEach((v) => {
 			if (typeof v === "string")
 				URL.revokeObjectURL(v);
@@ -87,16 +96,14 @@ class ImageTracking {
 	}
 }
 
-export class TauriBackend extends ImageTracking implements IBackend {
+export class TauriBackend implements IBackend {
 	public name = "Tauri";
-	public cacheFileSrc: string = undefined!; // TODO: TAURI
-	public readonly wsBaseAddress: string = undefined!; // TODO: TAURI
+	private readonly imageTracker = new ImageTracking();
 	private readonly loudnessListener = fnBroadcast<[LoudnessData]>();
 
 	private connections: Map<string, TauriBackendConnection> = new Map();
 
 	constructor() {
-		super();
 		log("Using tauri backend");
 
 		listen<TauriP2FWs>("ws", (ev) => {
@@ -124,18 +131,14 @@ export class TauriBackend extends ImageTracking implements IBackend {
 		});
 	}
 
-	public createNewConnection(): IBackendConnection {
-		const con = new TauriBackendConnection();
+	public createNewConnection(returnCodes: ReturnCodeTracker): IBackendConnection {
+		const con = new TauriBackendConnection(returnCodes);
 		this.connections.set(con.id, con);
 		return con;
 	}
 
 	public close(): void {
 		this.connections.forEach(con => con.close());
-	}
-
-	public async fetch(_cmd: string, _data: RequestInit): Promise<IFetchLike> {
-		throw new Error("Not implemented");
 	}
 
 	public async graphql<T = any>(
@@ -165,7 +168,16 @@ export class TauriBackend extends ImageTracking implements IBackend {
 	}
 
 	public async fetch_cache_image(req: ICacheFileRequest): Promise<string | undefined> {
-		return await this.fetchImgInternal("get_cache_file", req, req.server);
+		return await this.imageTracker.fetchImgInternal("download_bytes_from_cache", req, req.server);
+	}
+
+	public async ask_read_file(): Promise<AskReadResult | undefined> {
+		try {
+			const [name, content] = await invoke<[string, string]>("read_file");
+			return { name, content };
+		} catch {
+			return undefined;
+		}
 	}
 
 	public async peek_link(link: string): Promise<RustAnalyzeResult> {
@@ -248,15 +260,18 @@ export class TauriBackend extends ImageTracking implements IBackend {
 	}
 }
 
-export class TauriBackendConnection extends ImageTracking implements IBackendConnection {
-	public serverFileSrc: string = undefined!; // TODO: TAURI
+declare let __TAURI_INVOKE_KEY__: number;
+
+export class TauriBackendConnection implements IBackendConnection {
 	public readonly id: string;
+	private readonly imageTracker = new ImageTracking();
 	onMsg?: msgFn;
 	onError?: errorFn;
 	onClose?: closedFn;
 
-	constructor() {
-		super();
+	constructor(
+		private returnCodes: ReturnCodeTracker,
+	) {
 		this.id = createUuidV4();
 	}
 
@@ -273,37 +288,99 @@ export class TauriBackendConnection extends ImageTracking implements IBackendCon
 		}
 	}
 
-	public async send(data: OutMsg): Promise<void> {
-		await invoke<TauriF2PWs>("pass_ws_msg", { con: this.id, msg: data });
+	public send(data: OutMsg): void {
+		window.rpc.notify("pass_ws_msg", {
+			__invokeKey: __TAURI_INVOKE_KEY__,
+			callback: "",
+			error: "",
+			con: this.id,
+			msg: data,
+		});
 	}
 
 	public async close(): Promise<void> {
 		const id = this.id;
 		log("closing %s", id);
-		this.releaseImages();
+		this.imageTracker.releaseImages();
 		try {
 			await invoke<TauriF2PClose>("close_ws", { con: id });
 			log("closed %s", id);
 		} catch (err) {
-			log("Failed to close connection %s: %s", id, err);
+			log("Failed to close connection %s: %j", id, err);
 		}
 	}
 
-	public async fetch(_cmd: string, _data: RequestInit): Promise<IFetchLike> {
-		throw new Error("Not implemented");
+	public async fetch_image(req: IFileRequest): Promise<string | undefined> {
+		console.log("Fetching", req);
+		return await this.imageTracker.fetchImgInternal("download_bytes", req, this.id);
 	}
 
-	public async fetch_image(req: IFileRequest): Promise<string | undefined> {
-		return await this.fetchImgInternal("get_file", req, this.id);
+	// Filetransfer
+
+	public async upload_bytes(req: IFileRequest, data: Blob): Promise<TransferResult> {
+		try {
+			new Blob()
+			await invoke<void>("upload_bytes", {
+				req: {
+					con: this.id,
+					...req,
+					existing: FileExistsAction.Overwrite
+				},
+				data: Array.from(new Uint8Array(await data.arrayBuffer()))
+			});
+			return { uploadPromise: Promise.resolve() };
+		} catch (err: any) {
+			log("upload_bytes error: %j", err);
+			throw err as ResultDetails;
+		}
+	}
+
+	public async ask_download(req: IFileRequest): Promise<TransferResult> {
+		try {
+			await invoke<void>("download_file", {
+				req: {
+					con: this.id,
+					...req,
+					existing: FileExistsAction.Error
+				}
+			});
+			return { uploadPromise: Promise.resolve() };
+		} catch (err: any) {
+			log("ask_download error: %j", err);
+			throw err as ResultDetails;
+		}
+	}
+
+	public async ask_upload(feature: UploadFeature): Promise<TransferResult> {
+		try {
+			const featureData = await invoke<string | null>("upload_file", {
+				feature,
+				req: {
+					con: this.id,
+					channel_password: "", // TODO,
+					existing: FileExistsAction.Error,
+				}
+			}) ?? undefined;
+			return { uploadPromise: Promise.resolve(), featureData };
+		} catch (err: any) {
+			log("ask_upload error: %j", err);
+			throw err as ResultDetails;
+		}
 	}
 }
 
 function reqAsKey(req: IFileRequest | ICacheFileRequest): string {
-	return `${req.channel}/${req.path}`;
+	return `${req.hash}:${req.channel}/${req.path}`;
 }
 interface GetFileResponse {
 	data: ArrayLike<number>;
 	mime: string | undefined;
+}
+
+enum FileExistsAction {
+	Error = "Error",
+	Overwrite = "Overwrite",
+	Resume = "Resume",
 }
 
 class TauriMarkdownTransform implements IMarkdownTransform {

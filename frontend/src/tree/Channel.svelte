@@ -10,7 +10,7 @@
 	import type { ITreeNode } from "../book";
 	import UiClient from "./ClientWrap.svelte";
 	import UiChannel from "./ChannelWrap.svelte";
-	import { Connection, DDConnection } from "../connection";
+	import type { IConnection } from "../connection";
 	import { draggable, DragData, MouseButton } from "../ui/util/draggable";
 	import { findParent, assert, flash, focus, render_updates } from "../util";
 	import { SpacerType } from "./tree";
@@ -26,8 +26,7 @@
 
 	if (render_updates) afterUpdate(() => flash(div));
 
-	export let connection: Connection | undefined = undefined;
-	export let server: string | undefined = undefined;
+	export let connection: IConnection;
 	export let filter: string;
 	export let filterShow: boolean = true;
 	export let filterStartFromRoot: boolean;
@@ -61,7 +60,7 @@
 	let div: HTMLElement;
 
 	function updateOwnClient(_children: ITreeNode[]) {
-		if (connection === undefined) return false;
+		if (!connection.is_online()) return false;
 		const client = get(connection.book.ownClient);
 		if (client === undefined) return false;
 		return client.channel === channel.id;
@@ -108,7 +107,7 @@
 	}
 
 	async function switchChannel(ev?: MouseEvent) {
-		if (connection === undefined) return;
+		if (!connection.is_online()) return;
 		if (ev !== undefined && ev.button !== MouseButton.Main) return;
 		const res = await connection.switchChannel(channel, askPassword);
 		if (res !== undefined) {
@@ -141,7 +140,7 @@
 	}
 
 	function setChat(ev: MouseEvent) {
-		if (connection === undefined) return;
+		if (!connection.is_online()) return;
 		if (ev.button === MouseButton.Main) {
 			if (ev.ctrlKey) {
 				app.toggleSelection(new NodeSelection(connection, channel));
@@ -169,6 +168,7 @@
 
 	function dragDrop(ev: CustomEvent<DragData>) {
 		ev.detail.dragNode.classList.remove("dragStyle");
+		if (!connection.is_online()) return;
 		const hoverOpt: HTMLElement[] = [
 			...ev.detail.customData.querySelectorAll(":hover"),
 		].reverse();
@@ -269,7 +269,7 @@
 				<TsIcon
 					type="channel"
 					source={$channel}
-					connection={new DDConnection(connection, server)} />
+					connection={connection} />
 			</button>
 			<span
 				class:spacerC={spacerType === SpacerType.CSpacer ||
@@ -336,12 +336,12 @@
 					<ChangeResult result={error} />
 				</HoverContainer>
 			</div>
-		{:else if connection !== undefined && $hovered}
+		{:else if connection.is_online() && $hovered}
 			<HoverMenu {div} selected={new NodeSelection(connection, channel)} />
 		{/if}
 	</div>
 	<ul class="menu-list">
-		{#if connection !== undefined}
+		{#if connection.is_online()}
 			{#each $clients as client (client.id)}
 				<UiClient
 					{connection}
@@ -354,7 +354,6 @@
 		{#each $channels as c (c.id)}
 			<UiChannel
 				{connection}
-				{server}
 				filter={childrenFilter}
 				{filterStartFromRoot}
 				channel={c}

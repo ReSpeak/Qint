@@ -11,10 +11,15 @@ use qint_proxy::FrontBridge;
 use qint_proxy::QintState;
 use slog::error;
 use thiserror::Error;
+use tokio::runtime::Handle;
+
+use crate::filetransfer::FiletransferManager;
 
 #[derive(Clone)]
 pub struct QintCore {
+	pub handle: Handle,
 	pub state: Arc<QintState>,
+	pub filetransfer: Arc<FiletransferManager>,
 }
 impl Actor for QintCore {
 	type Context = Context<Self>;
@@ -58,7 +63,7 @@ impl Handler<CreateWs> for QintCore {
 		let CreateWs { id, sender } = msg;
 
 		let mut cons = self.state.connections.lock().unwrap();
-		if cons.contains_key(&id) || id.0.is_nil() {
+		if cons.contains_key(&id) || !id.is_valid() {
 			error!(self.state.logger, "Connection already in use. Duplicate create call?"; "error" => ?id);
 			return Err(Error::ConnectionInUse);
 		}
@@ -71,9 +76,8 @@ impl Handler<CreateWs> for QintCore {
 	}
 }
 
-impl Handler<CloseWs> for QintCore {
-	type Result = Result<(), Error>;
-	fn handle(&mut self, msg: CloseWs, _: &mut Self::Context) -> Self::Result {
+impl QintCore {
+	pub fn close_ws(&self, msg: CloseWs) -> Result<(), Error> {
 		let CloseWs { id } = msg;
 
 		let con = {
@@ -86,18 +90,15 @@ impl Handler<CloseWs> for QintCore {
 			}
 		};
 
-		actix::spawn(with_log!(
+		self.handle.spawn(with_log!(
 			con.send(qint_proxy::connection::DisconnectMsg),
 			self.state.logger.clone(),
 			"Failed to send disconnect to connection"
 		));
 		Ok(())
 	}
-}
 
-impl Handler<DispatchWsMsg> for QintCore {
-	type Result = Result<(), Error>;
-	fn handle(&mut self, msg: DispatchWsMsg, _: &mut Self::Context) -> Self::Result {
+	pub fn ws_msg(&self, msg: DispatchWsMsg) -> Result<(), Error> {
 		let DispatchWsMsg { id, msg } = msg;
 
 		let con = {
@@ -110,11 +111,19 @@ impl Handler<DispatchWsMsg> for QintCore {
 			}
 		};
 
-		actix::spawn(with_log!(
+		self.handle.spawn(with_log!(
 			con.send(MessageF2PWrapper(msg)),
 			self.state.logger.clone(),
 			"Failed to forward Message to Proxy"
 		));
 		Ok(())
+	}
+
+	pub fn new(handle: Handle, state: Arc<QintState>) -> Self {
+		Self { handle, state, filetransfer: Arc::new(FiletransferManager::new()) }
+	}
+
+	pub async fn run(&self) {
+		self.filetransfer.transfer_loop().await;
 	}
 }

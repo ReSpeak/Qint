@@ -1,7 +1,7 @@
 import { ResultDetails, OutMsg, InMsg } from "./backend/ws";
 import { get, writable, Writable, Readable } from "svelte/store";
 import { Book, Channel, ChatData, Client } from "./book";
-import { oneshot, fnBroadcast, LOUDNESS_MIN, Lazy, PromiseParts } from "./util";
+import { oneshot, fnBroadcast, LOUDNESS_MIN, Lazy } from "./util";
 import { handleMessage } from "./notifications";
 import { backend, IBackendConnection, IFileRequest } from "./backend/backend";
 import { app } from "./app";
@@ -10,7 +10,6 @@ import {
 	OChange,
 	Reason,
 	IMsgPluginCommandPart,
-	TsError,
 	IMsgServerLogPart,
 	IMsgPermListPart,
 	IMsgChannelPermListPart,
@@ -18,9 +17,9 @@ import {
 import moment from "moment";
 import { ChannelId, ClientId, Permission, PermissionDescription } from "./ts";
 import { FileTreeCache } from "./fileTreeCache";
-import { FiletransferManager } from "./panel/filetransferManager";
 import debug from "debug";
 import VoiceGraph from "./ui/specialized/VoiceGraph.svelte";
+import { ChangePromise, ReturnCodeTracker } from "./backend/returnCodeTracker";
 const log_raw_in = debug("RAW:IN");
 const log_raw_out = debug("RAW:OUT");
 const log = debug("CON"),
@@ -28,22 +27,15 @@ const log = debug("CON"),
 const log_evt = log.extend("EVT"),
 	log_msg = log.extend("MSG");
 
-type ResultPromise = PromiseParts<ResultDetails | undefined>;
-
-const ConnectionClosedResult: ResultDetails = {
-	tsResult: TsError.ConnectionLost,
-};
-
-export type ChangePromise = Promise<ResultDetails | undefined>;
 
 export interface IConnection {
+	is_online(): this is Connection;
 	fileProvider(req: IFileRequest): Promise<string | undefined>;
 }
 
 export class Connection implements IConnection {
 	private readonly _state = writable(new ConnectionState());
-	private curReturnCode = 0;
-	private returnCodes = new Map<string, ResultPromise>();
+	private returnCodes = new ReturnCodeTracker();
 	private permListResult: IMsgPermListPart[] | undefined;
 	public get state(): Readable<ConnectionState> {
 		return this._state;
@@ -56,7 +48,6 @@ export class Connection implements IConnection {
 	public readonly book: Book = new Book();
 	public readonly channelPermCache: Writable<IMsgChannelPermListPart[]> = writable([]);
 	public readonly fileTreeCache: Writable<FileTreeCache> = writable(new FileTreeCache());
-	public readonly filetransferManager: FiletransferManager = new FiletransferManager(this);
 	public backend: IBackendConnection;
 
 	public readonly loudness: Writable<number> = writable(0);
@@ -70,7 +61,7 @@ export class Connection implements IConnection {
 
 	constructor(connectOptions: ConnectData) {
 		this.connectOptions = writable(connectOptions);
-		this.backend = backend.createNewConnection();
+		this.backend = backend.createNewConnection(this.returnCodes);
 		this._state.update((s) => s.setConnecting());
 		this.backend
 			.connect(
@@ -86,7 +77,7 @@ export class Connection implements IConnection {
 			)
 			.then(() => {
 				const connectMsg = connectOptions.toConnectMsg();
-				const [returnCode, promise] = this.generateReturnCode();
+				const [returnCode, promise] = this.returnCodes.getNew();
 				connectMsg.Connect.returnCode = returnCode;
 				this.backend.send(connectMsg);
 				oneshot(
@@ -129,9 +120,7 @@ export class Connection implements IConnection {
 		});
 	}
 
-	public fileProvider(req: IFileRequest): Promise<string | undefined> {
-		return this.backend.fetch_image(req);
-	}
+	is_online(): boolean { return true; }
 
 	public getState(): Readonly<ConnectionState> {
 		return get(this.state);
@@ -176,14 +165,7 @@ export class Connection implements IConnection {
 		}
 		// Reset chat if the selected node is from this connection.
 		app.updateSelections((sels) => sels.filter((sel) => sel.connection !== this));
-		this.rejectReturnCodes();
-	}
-
-	private rejectReturnCodes(): void {
-		for (const value of this.returnCodes.values()) {
-			value.resolve(ConnectionClosedResult);
-		}
-		this.returnCodes.clear();
+		this.returnCodes.rejectAll();
 	}
 
 	public sendMessage(data: OutMsg): void {
@@ -192,7 +174,7 @@ export class Connection implements IConnection {
 	}
 
 	public sendChange(change: OChange): ChangePromise {
-		const [returnCode, promise] = this.generateReturnCode();
+		const [returnCode, promise] = this.returnCodes.getNew();
 		this.sendMessage({
 			Change: {
 				change,
@@ -202,16 +184,6 @@ export class Connection implements IConnection {
 		return promise;
 	}
 
-	public generateReturnCode(): [string, ChangePromise] {
-		const returnCode = "frontend:" + this.curReturnCode;
-		this.curReturnCode = (this.curReturnCode + 1) % 65536;
-		return [
-			returnCode,
-			new Promise((resolve, reject) => {
-				this.returnCodes.set(returnCode, { resolve, reject });
-			}),
-		];
-	}
 
 	public disconnect(reason?: Reason, message?: string): void {
 		this.sendMessage({ Disconnect: { reason, message } });
@@ -412,7 +384,7 @@ export class Connection implements IConnection {
 		} else if ("DisconnectedTemporarily" in msg) {
 			this._state.update((s) => s.setConnecting());
 			this.book.reset();
-			this.rejectReturnCodes();
+			this.returnCodes.rejectAll();
 		} else if ("Events" in msg) {
 			for (const tsevt of msg.Events) {
 				try {
@@ -618,22 +590,22 @@ export class Connection implements IConnection {
 		} else if ("Loudnesses" in msg) {
 			this.applyLoudnesses(msg.Loudnesses);
 		} else if ("Result" in msg) {
-			const ret = this.returnCodes.get(msg.Result.returnCode);
-			if (ret !== undefined) {
-				if (
-					(msg.Result.tsResult === undefined && msg.Result.description === undefined) ||
-					msg.Result.tsResult === TsError.Ok
-				)
-					ret.resolve(undefined);
-				else ret.resolve(msg.Result);
-			}
+			this.returnCodes.resolve(msg.Result.returnCode, msg.Result);
 		} else {
 			error("Unknown message", msg);
 		}
 	}
+
+	// Filetrasfer
+
+	public fileProvider(req: IFileRequest): Promise<string | undefined> {
+		return this.backend.fetch_image(req);
+	}
 }
 
 export class OfflineConnection implements IConnection {
+	is_online(): boolean { return false; }
+
 	constructor(public server: string) { }
 
 	public fileProvider(req: IFileRequest): Promise<string | undefined> {
@@ -641,19 +613,14 @@ export class OfflineConnection implements IConnection {
 	}
 }
 
-// Dynamic dispatch
-// Just for transitioning to a better architecture
-export class DDConnection implements IConnection {
-	private offlineConnection: OfflineConnection | undefined;
-	constructor(public connection: Connection | undefined, server: string | undefined) {
-		if (!connection && !server) throw new Error("Missing connection data");
-		if (server) this.offlineConnection = new OfflineConnection(server);
-	}
+export class NullConnection implements IConnection {
+	public static readonly Instance: IConnection = new NullConnection();
+	is_online(): boolean { return false; }
 
-	public fileProvider(req: IFileRequest): Promise<string | undefined> {
-		if (this.connection) return this.connection.fileProvider(req);
-		else if (this.offlineConnection) return this.offlineConnection.fileProvider(req);
-		throw new Error("Missing connection data");
+	private constructor() { }
+
+	public fileProvider(_req: IFileRequest): Promise<undefined> {
+		return Promise.resolve(undefined);
 	}
 }
 

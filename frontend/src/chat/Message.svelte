@@ -6,15 +6,13 @@
 	import Icon from "../ui/icon/Icon.svelte";
 	import LinkPreview from "./LinkPreview.svelte";
 	import RenderedText from "../ui/specialized/RenderedText.svelte";
-	import type { NodeSelection } from "../app";
 	import type { LinksMap } from "../ui/specialized/uiRenderedText";
-	import { DDConnection } from "../connection";
+	import type { IConnection } from "../connection";
 
 	export let unread: boolean = false;
 	export let message: Message;
 	export let messageHighlightedContent: string | undefined = undefined;
-	export let nodeSel: NodeSelection | undefined = undefined;
-	export let server: string | undefined = undefined;
+	export let connection: IConnection;
 	export let timeFormat: string = "HH:mm";
 
 	let viewRaw = false;
@@ -29,8 +27,6 @@
 				{message.date.format(timeFormat)}
 			</span>
 		</div>
-		<!-- msg.status === MessageStatus::Sending -->
-		<!-- msg.status === MessageStatus::Error -->
 		<div
 			class="messageBody"
 			class:messageSending={message.status === MessageStatus.Sending}
@@ -39,11 +35,11 @@
 			class:viewRaw>
 			<div class="messageRendered">
 				<RenderedText
-					connection={new DDConnection(nodeSel?.connection, server)}
+					{connection}
 					text={messageHighlightedContent || message.rendered}
 					bind:links />
 				{#each linksArr as { link, title } (link)}
-					<LinkPreview {link} textContent={title} {nodeSel} />
+					<LinkPreview {link} textContent={title} {connection} />
 				{/each}
 			</div>
 			<div class="messageRaw">

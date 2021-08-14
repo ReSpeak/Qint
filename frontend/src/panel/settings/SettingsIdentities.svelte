@@ -5,11 +5,9 @@
 	import KeyValue from "../../ui/util/KeyValue.svelte";
 	import Icon from "../../ui/icon/Icon.svelte";
 	import EmojiString from "../../ui/specialized/EmojiString.svelte";
-	import FileIO from "../../ui/util/FileIO.svelte";
 	import { loadIdentities as liArr } from "./identity";
 	import type { ApiIdentity } from "./identity";
 
-	let fileIo: FileIO;
 	let identities: ApiIdentity[] = [];
 	let selectedIndex: number = -1;
 	let selectedIdentity: ApiIdentity | undefined;
@@ -41,9 +39,10 @@
 		}
 	}
 
-	async function clickImportIdentity(files: CustomEvent<FileList>) {
-		const content = await files.detail[0].text();
-		await importIdentityFromString(content);
+	async function clickImportIdentity() {
+		const file = await backend.ask_read_file();
+		if (file === undefined) return;
+		await importIdentityFromString(file.content);
 	}
 
 	async function importIdentityFromString(data: string) {
@@ -91,7 +90,7 @@
 				New
 			</a>
 
-			<a class="panel-block is-active" on:click={() => fileIo.askUpload()}>
+			<a class="panel-block is-active" on:click={() => clickImportIdentity()}>
 				<Icon name="file-upload-outline" />
 				Import
 			</a>
@@ -199,8 +198,6 @@
 			{/if}
 		</form>
 	</div>
-
-	<FileIO bind:this={fileIo} on:uploadRequest={clickImportIdentity} />
 </TabSlot>
 
 <style lang="scss">

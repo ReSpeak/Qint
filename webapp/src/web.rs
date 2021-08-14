@@ -27,9 +27,8 @@ use tokio::time::{self, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
 use tsclientlib::ChannelId;
 use tsclientlib::Error as TsError;
-use uuid::Uuid;
 
-use qint_proxy::connection::QintConnection;
+use qint_proxy::connection::{DownloadFileContext, QintConnection, UploadFileContext};
 use qint_proxy::db::{
 	models::UpdateIdentity, DeleteIdentityMsg, FindIdentity, GenrateNewIdentityMsg,
 	GetIdentitiesMsg, UpdateIdentityMsg,
@@ -167,13 +166,13 @@ impl WebApp {
 
 #[get("/con/{id}/ws")]
 async fn create_ws(
-	state: web::Data<Arc<QintState>>, uuid: web::Path<Uuid>, req: HttpRequest, stream: web::Payload,
+	state: web::Data<Arc<QintState>>, id: web::Path<ConnectionId>, req: HttpRequest,
+	stream: web::Payload,
 ) -> impl Responder {
-	let id = ConnectionId(*uuid);
-
+	let id = id.into_inner();
 	// Check that the id does not exist
 	let mut cons = state.connections.lock().unwrap();
-	if cons.contains_key(&id) || uuid.is_nil() {
+	if cons.contains_key(&id) || !id.is_valid() {
 		return Either::Left(
 			HttpResponse::PreconditionFailed()
 				.body("Connection id is already occupied".to_string()),
@@ -282,98 +281,103 @@ struct GetFileOptions {
 }
 
 fn result_details_gone() -> ResultDetails {
-	ResultDetails::from_desc("gone".into())
+	"gone".into()
 }
 
 #[get("/con/{id}/file/{channel}/{path:.*}")]
 async fn download_file(
-	state: web::Data<Arc<QintState>>, path: web::Path<(Uuid, u64, String)>,
+	state: web::Data<Arc<QintState>>, path: web::Path<(ConnectionId, u64, String)>,
 	query_opt: Query<GetFileOptions>,
 ) -> impl Responder {
-	let cons = state.connections.lock().unwrap();
 	let (id, channel, path) = path.into_inner();
 	let path = format!("/{}", path);
 	let channel = ChannelId(channel);
 	let GetFileOptions { dl, return_code, cache } = query_opt.into_inner();
-	if let Some(con) = cons.get(&ConnectionId(id)).cloned() {
-		drop(cons);
 
-		// Lookup in cache
-		let server = match con.send(qint_proxy::connection::GetPublicKeyMsg).await {
-			Ok(Ok(r)) => r,
-			Ok(Err(e)) => {
-				error!(state.logger, "Failed to get server public key"; "error" => %e);
-				return HttpResponse::Gone().json(result_details_gone());
-			}
-			Err(_) => {
-				return HttpResponse::Gone().json(result_details_gone());
-			}
-		};
-
-		let build_response = |len: u64, mime: Option<&str>| {
-			let mut response = HttpResponse::Ok();
-			response.no_chunking(len);
-			if let Some(mime) = mime {
-				response.content_type(mime);
-			}
-			if let Some(filename) = dl.as_ref() {
-				response.insert_header((
-					"Content-Disposition",
-					format!("attachment; filename=\"{}\"", filename),
-				));
-			}
-			response
-		};
-
-		if let Some((len, stream)) = state.file_cache.get_cached_file(&server, channel, &path).await
-		{
-			let (stream, mime) = guess_content_type(stream).await;
-			let mut response = build_response(len, mime);
-			return response.streaming(stream);
+	let con = match state.get_connection(&id) {
+		Some(con) => con,
+		_ => {
+			return HttpResponse::Gone().json(result_details_gone());
 		}
+	};
 
-		debug!(state.logger, "Downloading file"; "channel" => channel.0, "path" => &path);
-		let (len, file_stream, server) = match con
-			.send(qint_proxy::connection::DownloadFile { channel, path: path.clone(), return_code })
-			.await
-		{
-			Err(_) => {
-				return HttpResponse::Gone().json(result_details_gone());
-			}
-			Ok(Err(qint_proxy::connection::Error::TsError(TsError::CommandError(err)))) => {
-				debug!(state.logger, "File download error"; "error" => %err, "path" => &path);
-				return match err.error {
-					tsclientlib::TsError::FileInvalidPath => {
-						HttpResponse::NotFound().json(Into::<ResultDetails>::into(err))
-					}
-					tsclientlib::TsError::PermissionsClientInsufficient => {
-						HttpResponse::Forbidden().json(Into::<ResultDetails>::into(err))
-					}
-					_ => HttpResponse::BadRequest().json(Into::<ResultDetails>::into(err)),
-				};
-			}
-			Ok(Err(e)) => {
-				error!(state.logger, "File download failed"; "error" => %e, "path" => &path);
-				return HttpResponse::InternalServerError()
-					.json(ResultDetails::from_desc(format!("Failed to download file: {}", e)));
-			}
-			Ok(Ok(r)) => r,
-		};
+	// Lookup in cache
+	let server = match con.send(qint_proxy::connection::GetPublicKeyMsg).await {
+		Ok(Ok(r)) => r,
+		Ok(Err(e)) => {
+			error!(state.logger, "Failed to get server public key"; "error" => %e);
+			return HttpResponse::Gone().json(result_details_gone());
+		}
+		Err(_) => {
+			return HttpResponse::Gone().json(result_details_gone());
+		}
+	};
 
-		let stream =
-			FramedRead::new(file_stream, BytesCodec::new()).map(|r| r.map(web::BytesMut::freeze));
+	let build_response = |len: u64, mime: Option<&str>| {
+		let mut response = HttpResponse::Ok();
+		response.no_chunking(len);
+		if let Some(mime) = mime {
+			response.content_type(mime);
+		}
+		if let Some(filename) = dl.as_ref() {
+			response.insert_header((
+				"Content-Disposition",
+				format!("attachment; filename=\"{}\"", filename),
+			));
+		}
+		response
+	};
+
+	if let Some((len, stream)) = state.file_cache.get_cached_file(&server, channel, &path).await {
 		let (stream, mime) = guess_content_type(stream).await;
 		let mut response = build_response(len, mime);
+		return response.streaming(stream);
+	}
 
-		// Cache for offline usage if smaller than 5 MiB
-		if cache && len < 5 * 1024 * 1024 {
-			let stream = state.file_cache.cache_file(&server, channel, &path, stream).await;
-			response.streaming(stream)
-		} else {
-			response.streaming(stream)
+	debug!(state.logger, "Downloading file"; "channel" => channel.0, "path" => &path);
+	let DownloadFileContext { size, stream } = match con
+		.send(qint_proxy::connection::DownloadFile {
+			channel,
+			path: path.clone(),
+			return_code,
+			channel_password: None,
+			resume: false,
+		})
+		.await
+	{
+		Err(_) => {
+			return HttpResponse::Gone().json(result_details_gone());
 		}
+		Ok(Err(qint_proxy::connection::Error::TsError(TsError::CommandError(err)))) => {
+			debug!(state.logger, "File download error"; "error" => %err, "path" => &path);
+			return match err.error {
+				tsclientlib::TsError::FileInvalidPath => {
+					HttpResponse::NotFound().json(Into::<ResultDetails>::into(err))
+				}
+				tsclientlib::TsError::PermissionsClientInsufficient => {
+					HttpResponse::Forbidden().json(Into::<ResultDetails>::into(err))
+				}
+				_ => HttpResponse::BadRequest().json(Into::<ResultDetails>::into(err)),
+			};
+		}
+		Ok(Err(e)) => {
+			error!(state.logger, "File download failed"; "error" => %e, "path" => &path);
+			return HttpResponse::InternalServerError()
+				.json(ResultDetails::from_desc(format!("Failed to download file: {}", e)));
+		}
+		Ok(Ok(r)) => r,
+	};
+
+	let stream = FramedRead::new(stream, BytesCodec::new()).map(|r| r.map(web::BytesMut::freeze));
+	let (stream, mime) = guess_content_type(stream).await;
+	let mut response = build_response(size, mime);
+
+	// Cache for offline usage if smaller than 5 MiB
+	if cache && size < 5 * 1024 * 1024 {
+		let stream = state.file_cache.cache_file(&server, channel, &path, stream).await;
+		response.streaming(stream)
 	} else {
-		HttpResponse::Gone().json(result_details_gone())
+		response.streaming(stream)
 	}
 }
 
@@ -384,81 +388,83 @@ struct PutFileOptions {
 
 #[put("/con/{id}/file/{channel}/{path:.*}")]
 async fn upload_file(
-	state: web::Data<Arc<QintState>>, path: web::Path<(Uuid, u64, String)>, req: web::HttpRequest,
-	body: web::Payload, query_opt: Query<PutFileOptions>,
+	state: web::Data<Arc<QintState>>, path: web::Path<(ConnectionId, u64, String)>,
+	req: web::HttpRequest, body: web::Payload, query_opt: Query<PutFileOptions>,
 ) -> impl Responder {
 	let (id, channel, path) = path.into_inner();
+	let path = format!("/{}", path);
 	let channel = ChannelId(channel);
-	let cons = state.connections.lock().unwrap();
-	if let Some(con) = cons.get(&ConnectionId(id)).cloned() {
-		drop(cons);
 
-		debug!(state.logger, "Uploading file"; "channel" => channel.0, "path" => &path);
-		let size = if let Some(r) = req.headers().get(http::header::CONTENT_LENGTH) {
-			match r.to_str() {
-				Err(e) => {
-					warn!(state.logger, "Invalid content length header"; "error" => %e);
-					return HttpResponse::BadRequest().body("Invalid content length header");
-				}
-				Ok(s) => match s.parse() {
-					Err(e) => {
-						warn!(state.logger, "Invalid content length header value"; "error" => %e);
-						return HttpResponse::BadRequest()
-							.body("Invalid content length header - not a number");
-					}
-					Ok(r) => r,
-				},
-			}
-		} else {
-			return HttpResponse::BadRequest().body("Content length header is missing");
-		};
-		let mut file_stream = match con
-			.send(qint_proxy::connection::UploadFile {
-				channel,
-				path: path.clone(),
-				channel_password: None,
-				size,
-				overwrite: true,
-				resume: false,
-				return_code: query_opt.return_code.clone(),
-			})
-			.await
-		{
-			Err(_) => {
-				return HttpResponse::Gone().json(result_details_gone());
-			}
-			Ok(Err(qint_proxy::connection::Error::TsError(TsError::CommandError(err)))) => {
-				debug!(state.logger, "File upload error"; "error" => %err, "path" => &path);
-				return match err.error {
-					tsclientlib::TsError::FileInvalidPath => {
-						HttpResponse::NotFound().json(Into::<ResultDetails>::into(err))
-					}
-					tsclientlib::TsError::PermissionsClientInsufficient => {
-						HttpResponse::Forbidden().json(Into::<ResultDetails>::into(err))
-					}
-					_ => HttpResponse::BadRequest().json(Into::<ResultDetails>::into(err)),
-				};
-			}
-			Ok(Err(e)) => {
-				error!(state.logger, "File upload failed"; "error" => %e, "path" => &path);
-				return HttpResponse::InternalServerError()
-					.json(ResultDetails::from_desc(format!("Failed to upload file: {}", e)));
-			}
-			Ok(Ok(r)) => r,
-		};
-		// Upload
-		let mut body_reader = tokio_util::io::StreamReader::new(body.map_err(|e| {
-			std::io::Error::new(std::io::ErrorKind::Other, format!("Payload error {}", e))
-		}));
-		if let Err(e) = tokio::io::copy(&mut body_reader, &mut file_stream).await {
-			warn!(state.logger, "File upload aborted"; "error" => %e);
-			return HttpResponse::BadGateway()
-				.json(ResultDetails::from_desc(format!("Upload failed: {}", e)));
+	let con = match state.get_connection(&id) {
+		Some(con) => con,
+		_ => {
+			return HttpResponse::Gone().json(result_details_gone());
 		}
-		HttpResponse::Ok().json(ResultDetails::ok())
+	};
+
+	debug!(state.logger, "Uploading file"; "channel" => channel.0, "path" => &path);
+	let size = if let Some(r) = req.headers().get(http::header::CONTENT_LENGTH) {
+		match r.to_str() {
+			Err(e) => {
+				warn!(state.logger, "Invalid content length header"; "error" => %e);
+				return HttpResponse::BadRequest().body("Invalid content length header");
+			}
+			Ok(s) => match s.parse() {
+				Err(e) => {
+					warn!(state.logger, "Invalid content length header value"; "error" => %e);
+					return HttpResponse::BadRequest()
+						.body("Invalid content length header - not a number");
+				}
+				Ok(r) => r,
+			},
+		}
 	} else {
-		HttpResponse::Gone().json(result_details_gone())
+		return HttpResponse::BadRequest().body("Content length header is missing");
+	};
+	let UploadFileContext { mut stream } = match con
+		.send(qint_proxy::connection::UploadFile {
+			channel,
+			path: path.clone(),
+			channel_password: None,
+			size,
+			overwrite: true,
+			resume: false,
+			return_code: query_opt.return_code.clone(),
+		})
+		.await
+	{
+		Err(_) => {
+			return HttpResponse::Gone().json(result_details_gone());
+		}
+		Ok(Err(qint_proxy::connection::Error::TsError(TsError::CommandError(err)))) => {
+			debug!(state.logger, "File upload error"; "error" => %err, "path" => &path);
+			return match err.error {
+				tsclientlib::TsError::FileInvalidPath => {
+					HttpResponse::NotFound().json(Into::<ResultDetails>::into(err))
+				}
+				tsclientlib::TsError::PermissionsClientInsufficient => {
+					HttpResponse::Forbidden().json(Into::<ResultDetails>::into(err))
+				}
+				_ => HttpResponse::BadRequest().json(Into::<ResultDetails>::into(err)),
+			};
+		}
+		Ok(Err(e)) => {
+			error!(state.logger, "File upload failed"; "error" => %e, "path" => &path);
+			return HttpResponse::InternalServerError()
+				.json(ResultDetails::from_desc(format!("Failed to upload file: {}", e)));
+		}
+		Ok(Ok(r)) => r,
+	};
+	// Upload
+	let mut body_reader = tokio_util::io::StreamReader::new(body.map_err(|e| {
+		std::io::Error::new(std::io::ErrorKind::Other, format!("Payload error {}", e))
+	}));
+	if let Err(e) = tokio::io::copy(&mut body_reader, &mut stream).await {
+		warn!(state.logger, "File upload aborted"; "error" => %e);
+		return HttpResponse::BadGateway()
+			.json(ResultDetails::from_desc(format!("Upload failed: {}", e)));
 	}
+	HttpResponse::Ok().json(ResultDetails::ok())
 }
 
 /// Get a cached file by server id, channel and path.
@@ -467,6 +473,7 @@ async fn download_cache_file(
 	state: web::Data<Arc<QintState>>, path: web::Path<(String, u64, String)>,
 ) -> impl Responder {
 	let (id, channel, path) = path.into_inner();
+	let path = format!("/{}", path);
 	let server = match base64::decode_config(&id, base64::URL_SAFE_NO_PAD)
 		.map_err(|e| e.into())
 		.and_then(|id| EccKeyPubP256::from_short(&id))

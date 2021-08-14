@@ -3,14 +3,15 @@
 	import { HTML5VideoControl, SyncState, YoutubeVideoControl } from "./videoSync";
 	import type { IVideoControl } from "./videoSync";
 	import { onDestroy, tick } from "svelte";
-	import type { NodeSelection } from "../app";
+	import { NodeSelection } from "../app";
 	import { assert, youtubeUrlRegex } from "../util";
 	import type { EmbedTypes } from "./previewAnalyzer";
 	import debug from "debug";
+	import type { IConnection } from "../connection";
 	const log = debug("VIDEO");
 
 	export let videoSrc: string;
-	export let nodeSel: NodeSelection | undefined;
+	export let connection: IConnection;
 	export let embed: EmbedTypes | undefined;
 
 	let preview_only = true;
@@ -19,6 +20,7 @@
 	let videoControl: IVideoControl | undefined | null;
 	let vSync: SyncState | undefined;
 	let additionalData: string;
+	let nodeSel: NodeSelection | undefined = undefined;
 
 	let detectedType: "youtube" | "media";
 	let video_key: string;
@@ -74,7 +76,7 @@
 	}
 
 	async function toggleVSync() {
-		if (nodeSel === undefined) return;
+		if (!connection.is_online()) return;
 		if (preview_only) {
 			preview_only = false;
 			await tick();
@@ -83,6 +85,8 @@
 		if (vSync === undefined) {
 			const _videoControl = getVideoControl();
 			if (_videoControl === null) return;
+			// TODO fix
+			nodeSel = new NodeSelection(connection, null as any);
 			log("key:%s %o %o", video_key, nodeSel, videoControl);
 			vSync = new SyncState(nodeSel, video_key, _videoControl);
 		}

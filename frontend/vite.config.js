@@ -8,6 +8,7 @@ export default defineConfig(({ command, mode }) => {
 		define: {
 			BUILD_ENV: production ? '"production"' : '"development"',
 			BUILD_DAT: `"${process.env.npm_package_name} - ${process.env.npm_package_version}"`,
+			DEBUG_UTIL: "true",
 		},
 		plugins: [svelte()],
 		json: {

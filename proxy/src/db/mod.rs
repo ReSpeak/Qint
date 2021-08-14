@@ -1086,7 +1086,7 @@ impl DbHandler {
 				if let Err(e) = self.file_cache.delete_file(
 					server,
 					ChannelId(0),
-					&format!("avatar_{}", client.uid.as_avatar()),
+					&format!("/avatar_{}", client.uid.as_avatar()),
 				) {
 					warn!(self.logger, "Failed to delete cached file"; "error" => %e);
 				}
@@ -1351,7 +1351,7 @@ impl<'a> EventHandler<'a> {
 		if let Err(e) = self.state.file_cache.delete_file(
 			&server_id,
 			ChannelId(0),
-			&format!("avatar_{}", client_uid.as_avatar()),
+			&format!("/avatar_{}", client_uid.as_avatar()),
 		) {
 			warn!(self.logger, "Failed to delete cached file"; "error" => %e);
 		}

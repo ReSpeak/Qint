@@ -88,7 +88,7 @@ pub fn deserialize_date_time<'de, D: Deserializer<'de>>(
 	deserializer: D,
 ) -> Result<OffsetDateTime, D::Error> {
 	let (ts, offset) = Deserialize::deserialize(deserializer)?;
-	Ok(OffsetDateTime::from_unix_timestamp(ts).to_offset(offset))
+	Ok(OffsetDateTime::from_unix_timestamp(ts).map_err(serde::de::Error::custom)?.to_offset(offset))
 }
 
 pub fn serialize_date_time<S: Serializer>(
@@ -101,7 +101,7 @@ pub fn deserialize_some_date_time<'de, D: Deserializer<'de>>(
 	deserializer: D,
 ) -> Result<Option<OffsetDateTime>, D::Error> {
 	let (ts, offset) = Deserialize::deserialize(deserializer)?;
-	Ok(Some(OffsetDateTime::from_unix_timestamp(ts).to_offset(offset)))
+	Ok(Some(OffsetDateTime::from_unix_timestamp(ts).map_err(serde::de::Error::custom)?.to_offset(offset)))
 }
 
 pub fn serialize_some_date_time<S: Serializer>(

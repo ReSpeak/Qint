@@ -10,14 +10,17 @@ import { IS_TAURI } from "./util";
 
 if (localStorage.getItem("debug") === null) debug.enable("error:*");
 
-(window as any).qint = app; // DEBUG
-(window as any).get = get; // DEBUG
-(window as any).debug = debug; // DEBUG
-(window as any).backend = backend; // DEBUG
-(window as any).debugset = (s: string) => {
-	debug.enable(s);
-	localStorage.setItem("debug", s);
-};
+if (DEBUG_UTIL) {
+	(window as any).qint = app; // DEBUG
+	(window as any).get = get; // DEBUG
+	(window as any).debug = debug; // DEBUG
+	(window as any).backend = backend; // DEBUG
+	(window as any).debugset = (s: string) => {
+		debug.enable(s);
+		localStorage.setItem("debug", s);
+	};
+}
+
 console.log("BUILD", BUILD_ENV, BUILD_DAT);
 console.log(`Using ${backend.name} backend`);
 app.transientSettings.synth.init();

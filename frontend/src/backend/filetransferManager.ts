@@ -1,14 +1,14 @@
-import { Connection } from "../connection";
-import { pathJoin } from "./fileUtil";
+import { pathJoin } from "../panel/fileUtil";
 import { ChannelId } from "../ts";
 import { Writable, writable } from "svelte/store";
+import { BrowserBackendConnection } from "./browser";
 
 export class FiletransferManager {
 	private uploadQueue: UploadFile[] = [];
 	private currentUploadTask: Promise<void> | undefined;
 	public uploadState: Writable<number> = writable(0);
 
-	constructor(private connection: Connection) {}
+	constructor(private backend: BrowserBackendConnection) { }
 
 	public uploadFiles(...files: UploadFile[]): void {
 		if (files.length === 0) return;
@@ -19,13 +19,21 @@ export class FiletransferManager {
 		}
 	}
 
+	public async uploadSingleFile(file: UploadFile): Promise<void> {
+		let link = `/file${pathJoin(file.channelId, file.path)}`;
+		if (file.returnCode) {
+			link += "?return_code=" + file.returnCode;
+		}
+		await this.backend.fetch(link, {
+			method: "PUT",
+			body: file.data,
+		});
+	}
+
 	private async uploadTaskFn(): Promise<void> {
 		while (this.uploadQueue.length !== 0) {
 			const file = this.uploadQueue.shift()!;
-			await this.connection.backend.fetch(`/file${pathJoin(file.channelId, file.path)}`, {
-				method: "PUT",
-				body: file.data,
-			});
+			await this.uploadSingleFile(file);
 			this.uploadState.set(this.uploadQueue.length);
 		}
 		this.currentUploadTask = undefined;
@@ -36,5 +44,5 @@ export interface UploadFile {
 	data: BodyInit;
 	channelId: ChannelId;
 	path: string;
-	task?: Promise<void>;
+	returnCode?: string;
 }

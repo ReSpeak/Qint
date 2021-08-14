@@ -1,6 +1,5 @@
 <script lang="ts">
 	import ImageModal from "../../chat/ImageModal.svelte";
-	import FileIO from "../util/FileIO.svelte";
 	import katex from "katex";
 	import { hljsHighlight } from "../util/hljs";
 	import { onMount } from "svelte";
@@ -16,8 +15,6 @@
 	let showBig = false;
 	let showBigSrc = "";
 	let rendered: HTMLElement;
-	let hasDownload = false;
-	let fileIo: FileIO;
 	$: renderedObj = render(text);
 
 	function render(html: string) {
@@ -55,13 +52,14 @@
 
 			const scheme = parseTsScheme(href);
 			if (scheme?.scheme === "ts3file") {
-				hasDownload = true;
 				a.classList.add("file_download");
 				a.onclick = function (e) {
 					e.preventDefault();
-					const proxyFileSrc = schemeToLink(connection, scheme);
-					if (proxyFileSrc !== null) {
-						fileIo.askDownload(proxyFileSrc, scheme.attrs.filename);
+					if (connection.is_online()) {
+						const proxyFileSrc = schemeToLink(scheme);
+						if (proxyFileSrc !== null) {
+							connection.backend.ask_download(proxyFileSrc);
+						}
 					}
 				};
 				a.insertAdjacentHTML(
@@ -80,7 +78,7 @@
 
 		// process ts3file links
 		for (const img of obj.querySelectorAll("img")) {
-			const src = img.src;
+			const src = img.dataset.qintimg;
 			if (!src) continue;
 
 			img.classList.add("limitChatSize", "previewImg", "padTop");
@@ -88,25 +86,29 @@
 				showBigSrc = img.src;
 				showBig = true;
 			};
-			img.dataset.qintimg = src;
 
 			const scheme = parseTsScheme(src);
 			if (scheme !== null) {
-				const req = schemeToLink(connection, scheme);
+				const req = schemeToLink(scheme);
 				if (req !== null) {
-					req.con
+					connection
 						.fileProvider(req)
 						.then((proxyFileSrc) => {
+							console.log("RENder req res", proxyFileSrc);
 							if (proxyFileSrc === undefined) {
-								img.parentElement?.removeChild(img);
+								img.remove();
+								console.warn("Removing invalid image", img);
 							} else {
 								img.src = proxyFileSrc;
 							}
 						})
 						.catch((err) => {
+							img.remove();
 							console.warn("Failed to load", err, req);
 						});
 				}
+			} else {
+				img.src = src;
 			}
 		}
 
@@ -130,9 +132,6 @@
 <div class="textRendered content" bind:this={rendered} />
 {#if showBig}
 	<ImageModal src={showBigSrc} bind:visible={showBig} />
-{/if}
-{#if hasDownload}
-	<FileIO bind:this={fileIo} />
 {/if}
 
 <style lang="scss">

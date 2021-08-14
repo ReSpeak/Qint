@@ -1,6 +1,7 @@
-import { InMsg, OutMsg } from "./ws";
-import { createUuidV4, PromiseParts } from "../util";
+import { InMsg, OutMsg, ResultDetails } from "./ws";
+import { createUuidV4, hasProperty, hexEncode, javaHash, PromiseParts } from "../util";
 import {
+	AskReadResult,
 	closedFn,
 	errorFn,
 	FindIdentity,
@@ -8,19 +9,25 @@ import {
 	IBackend,
 	IBackendConnection,
 	ICacheFileRequest,
-	IFetchLike,
 	IFileRequest,
 	IMarkdownTransform,
 	LoudnessEvent,
 	LoudnessUnsubscribe,
 	msgFn,
+	TransferResult,
 	UpdateIdentityOptions,
+	UploadFeature,
 } from "./backend";
 import { RustAnalyzeResult } from "../chat/previewAnalyzer";
 import { ApiIdentity } from "../panel/settings/identity";
 import { MuteStates } from "../connect/uiConnect";
 import { HotkeyAction } from "../transientSettings";
 import { importFunc, IPlugin } from "../plugins";
+import FileIO from "../ui/util/FileIO.svelte";
+import { guessName } from "../ui/specialized/uiRenderedText";
+import { FiletransferManager, UploadFile } from "./filetransferManager";
+import { pathJoin } from "../panel/fileUtil";
+import { ReturnCodeTracker } from "./returnCodeTracker";
 
 const IS_SNOWPACK = (import.meta as any).hot;
 const BASE_ADDRESS = IS_SNOWPACK ? "http://localhost:4422" : "";
@@ -28,21 +35,24 @@ const BASE_ADDRESS = IS_SNOWPACK ? "http://localhost:4422" : "";
 export class BrowserBackend implements IBackend {
 	public name = "Browser";
 	public readonly cacheFileSrc: string;
+
+	/** The url address prefix for websockets */
 	public readonly wsBaseAddress: string = urlToWebSocket(BASE_ADDRESS);
+	public fileIo!: FileIO;
 
 	constructor() {
 		this.cacheFileSrc = `${BASE_ADDRESS}/filecache`;
 	}
 
-	public createNewConnection(): IBackendConnection {
-		return new BrowserBackendConnection(this);
+	public createNewConnection(returnCodes: ReturnCodeTracker): IBackendConnection {
+		return new BrowserBackendConnection(this, returnCodes);
 	}
 
 	public close(): void {
 		// Nothing to do here for browser backed since websockets get killed.
 	}
 
-	public fetch(cmd: string, data?: RequestInit): Promise<IFetchLike> {
+	private fetch(cmd: string, data?: RequestInit): Promise<Response> {
 		return fetch(`${BASE_ADDRESS}${cmd}`, data);
 	}
 
@@ -89,6 +99,16 @@ export class BrowserBackend implements IBackend {
 			hasQ = true;
 		}
 		return Promise.resolve(str);
+	}
+
+	public async ask_read_file(): Promise<AskReadResult | undefined> {
+		let files: FileList;
+		try {
+			files = await this.fileIo.askUpload(false);
+		} catch { return undefined; }
+		if (files.length === 0) return undefined;
+		const file0 = files[0];
+		return { content: await file0.text(), name: file0.name };
 	}
 
 	public async peek_link(link: string): Promise<RustAnalyzeResult> {
@@ -195,8 +215,11 @@ export class BrowserBackendConnection implements IBackendConnection {
 	public serverFileSrc: string;
 	public readonly id: string;
 	private socket?: WebSocket;
-
-	constructor(private parent: BrowserBackend) {
+	private readonly filetransferManager: FiletransferManager = new FiletransferManager(this);
+	constructor(
+		private parent: BrowserBackend,
+		private returnCodes: ReturnCodeTracker,
+	) {
 		this.serverFileSrc = "";
 		this.id = createUuidV4();
 	}
@@ -227,7 +250,7 @@ export class BrowserBackendConnection implements IBackendConnection {
 		this.socket = undefined;
 	}
 
-	public fetch(cmd: string, data: RequestInit): Promise<IFetchLike> {
+	public fetch(cmd: string, data: RequestInit): Promise<Response> {
 		return fetch(`${this.serverFileSrc}${cmd}`, data);
 	}
 
@@ -243,6 +266,113 @@ export class BrowserBackendConnection implements IBackendConnection {
 			hasQ = true;
 		}
 		return Promise.resolve(str);
+	}
+
+	public async upload_bytes(req: IFileRequest, data: Blob): Promise<TransferResult> {
+		const [returnCode, request] = this.returnCodes.getNew();
+		const uploadPromise = this.fetch(
+			`/file/${req.channel}${req.path}?return_code=${returnCode}`,
+			{
+				method: "PUT",
+				body: data,
+			}
+		);
+		const details = await request;
+		if (details) throw details;
+		return { uploadPromise };
+	}
+
+	public async ask_download(req: IFileRequest): Promise<TransferResult> {
+		const src = await this.fetch_image(req);
+		const finalName = req.suggested_name ?? guessName(src) ?? "file";
+		// TODO add return code ?
+		this.parent.fileIo.askDownload(`${src}?dl=${encodeURIComponent(finalName)}`);
+		return { uploadPromise: Promise.resolve() };
+	}
+
+	private static readonly NoFilesSelected: ResultDetails = { description: "No files selected" };
+
+	public async ask_upload(target: UploadFeature): Promise<TransferResult> {
+		let files: FileList;
+		const is_files = hasProperty(target, "Files");
+		const multiple = is_files;
+		try {
+			files = await this.parent.fileIo.askUpload(multiple);
+		} catch { throw BrowserBackendConnection.NoFilesSelected; }
+
+		if (!files || files.length == 0)
+			throw BrowserBackendConnection.NoFilesSelected;
+
+		if (target === "Avatar") {
+			const [returnCode, request] = this.returnCodes.getNew();
+			try {
+				const [hash, data] = await this.upload_feature_avatar(files[0]);
+				const uploadFile: UploadFile = {
+					data,
+					channelId: "0",
+					path: "/avatar",
+					returnCode,
+				};
+				const uploadPromise = this.filetransferManager.uploadSingleFile(uploadFile);
+				console.log("before await");
+				const details = await request;
+				console.log("after await");
+				if (details) throw details;
+				return { uploadPromise, featureData: hash };
+			} finally {
+				this.returnCodes.reject(returnCode);
+			}
+		} else if (target === "Icon") {
+			const [returnCode, request] = this.returnCodes.getNew();
+			try {
+				const file0 = files[0];
+				const uploadFile = {
+					data: file0,
+					channelId: "0",
+					path: this.upload_feature_icon(file0),
+					returnCode
+				};
+				const uploadPromise = this.filetransferManager.uploadSingleFile(uploadFile);
+				const details = await request;
+				if (details) throw details;
+				return { uploadPromise };
+			} finally {
+				this.returnCodes.reject(returnCode);
+			}
+		} else {
+			const [channelId, path] = target.Files;
+			this.filetransferManager.uploadFiles(...[...files].map((file) => {
+				return {
+					data: file,
+					channelId,
+					path: pathJoin(path, file.name),
+				};
+			}));
+			return { uploadPromise: Promise.resolve() }; // TODO
+		}
+	}
+
+	// TODO Consider piping the array of existing values to this funtion
+	// TODO Consider actually hasing the icon file
+	private upload_feature_icon(file: File) {
+		// eslint-disable-next-line prefer-const
+		let number = javaHash(file.name);
+		// while (displayFiles.find((node) => node.name === name) !== undefined) {
+		// 	number++;
+		// 	number &= number; // Truncate to u32
+		// }
+		const name = "/icon_" + number;
+		return name;
+	}
+
+	private async upload_feature_avatar(file: File): Promise<[string, BodyInit]> {
+		// Use SHA-256 hash and fall back to file size if not available
+		if (crypto.subtle) {
+			const buffer = await file.arrayBuffer();
+			const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+			return [hexEncode(new Uint8Array(hashBuffer)), buffer];
+		}
+		return [file.size.toString(), file];
 	}
 }
 

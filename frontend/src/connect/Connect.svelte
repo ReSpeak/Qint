@@ -13,6 +13,7 @@
 	import { loadIdentities } from "../panel/settings/identity";
 	import type { ApiIdentity } from "../panel/settings/identity";
 	import DropDown from "../ui/html/DropDown.svelte";
+	import { NullConnection, OfflineConnection } from "../connection";
 
 	export let data: ConnectData;
 	let addressInput: HTMLInputElement;
@@ -34,6 +35,7 @@
 
 	let editing: Bookmark | undefined;
 
+	$: connection = !!server ? new OfflineConnection(server) : NullConnection.Instance;
 	$: on(data, dataChanged());
 
 	async function dataChanged() {
@@ -359,7 +361,7 @@
 				<ul class="menu-list">
 					{#each channels as channel (channel.id)}
 						<UiChannel
-							{server}
+							{connection}
 							filter={channelPart}
 							filterStartFromRoot={true}
 							{channel} />
