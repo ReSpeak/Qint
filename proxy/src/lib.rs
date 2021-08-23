@@ -492,13 +492,23 @@ impl QintState {
 		res
 	}
 
+	pub fn create_plugin_dir(&self) -> io::Result<()> {
+		let cfg = self.launch_config.read().unwrap();
+		if !cfg.plugin_path.exists() {
+			fs::create_dir_all(&cfg.plugin_path)?;
+		}
+		Ok(())
+	}
+
 	// TODO: consider checking name for '.' and '/' for security?
 	pub fn plugin_get(&self, name: &str) -> io::Result<String> {
+		self.create_plugin_dir()?;
 		let path = self.launch_config.read().unwrap().plugin_path.join(name);
 		fs::read_to_string(path)
 	}
 
 	pub fn plugin_save(&self, name: &str, content: &str) -> io::Result<()> {
+		self.create_plugin_dir()?;
 		let path = self.launch_config.read().unwrap().plugin_path.join(name);
 		fs::write(path, content)
 	}

@@ -1,8 +1,10 @@
 <script lang="ts">
+
 	import { backend } from "../../backend/backend";
 	import TabSlot from "../../ui/container/TabSlot.svelte";
 	import Icon from "../../ui/icon/Icon.svelte";
 	import FileIO from "../../ui/util/FileIO.svelte";
+	import { loadCssPlugin, removeCssPlugin } from "../../plugins";
 
 	let fileIo: FileIO;
 	// Plugin names
@@ -97,12 +99,19 @@
 		)
 			return;
 		try {
+			const isCss = selectedPluginName.endsWith(".css");
 			const sel = selectedPlugin;
 			if (selectedPluginName === selectedPlugin) {
 				// Name unchanged
 				await updatePlugin(selectedPlugin, editArea);
+				if (isCss) {
+					loadCssPlugin(selectedPlugin, editArea);
+				}
 			} else {
 				await updatePlugin(selectedPluginName, editArea);
+				if (isCss) {
+					loadCssPlugin(selectedPluginName, editArea);
+				}
 				deletePlugin();
 				selectedPlugin = selectedPluginName;
 			}
@@ -119,6 +128,9 @@
 	async function deletePlugin() {
 		if (selectedPlugin === undefined) return;
 		try {
+			if (selectedPlugin.endsWith(".css")) {
+				removeCssPlugin(selectedPlugin);
+			}
 			delete editingPlugins[selectedPlugin];
 			editingPlugins = editingPlugins;
 			if (plugins.includes(selectedPlugin)) {
