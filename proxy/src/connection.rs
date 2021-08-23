@@ -66,16 +66,26 @@ pub struct RunOnConMsg<R: 'static, F: FnOnce(&mut QintConnection) -> R>(pub F);
 pub struct DownloadFile {
 	pub channel: ChannelId,
 	pub path: String,
+	pub channel_password: Option<String>,
+	pub resume: bool,
 	pub return_code: Option<String>,
+}
+pub struct DownloadFileContext {
+	pub size: u64,
+	pub stream: TcpStream,
+}
+
+pub struct UploadFileContext {
+	pub stream: TcpStream,
 }
 
 pub struct UploadFile {
 	pub channel: ChannelId,
 	pub path: String,
 	pub channel_password: Option<String>,
-	pub size: u64,
-	pub overwrite: bool,
 	pub resume: bool,
+	pub overwrite: bool,
+	pub size: u64,
 	pub return_code: Option<String>,
 }
 
@@ -145,11 +155,11 @@ impl Message for SetChannelListMsgMsg {
 	type Result = ();
 }
 impl Message for DownloadFile {
-	/// The size of the file, the stream and the server key.
-	type Result = Result<(u64, TcpStream, EccKeyPubP256), Error>;
+	/// The size of the file and the stream.
+	type Result = Result<DownloadFileContext, Error>;
 }
 impl Message for UploadFile {
-	type Result = Result<TcpStream, Error>;
+	type Result = Result<UploadFileContext, Error>;
 }
 impl<R: 'static, F: FnOnce(&mut QintConnection) -> R> Message for RunOnConMsg<R, F> {
 	type Result = R;
@@ -204,7 +214,9 @@ impl QintConnection {
 	}
 
 	fn send_to_ts2a<T: Message<Result = Result<()>> + Send + 'static>(&self, msg: T)
-	where audio::ts_to_audio::TsToAudio: Handler<T> {
+	where
+		audio::ts_to_audio::TsToAudio: Handler<T>,
+	{
 		if let Some(ad) = &self.state.audio_data {
 			let logger = self.logger.clone();
 			actix::spawn(ad.ts2a.send(msg).map(move |r| match r {
@@ -220,7 +232,9 @@ impl QintConnection {
 	}
 
 	fn send_to_a2ts<T: Message<Result = ()> + Send + 'static>(&self, msg: T)
-	where audio::audio_to_ts::AudioToTs: Handler<T> {
+	where
+		audio::audio_to_ts::AudioToTs: Handler<T>,
+	{
 		if let Some(ad) = &self.state.audio_data {
 			actix::spawn(with_log!(
 				ad.a2ts.send(msg),
@@ -231,7 +245,9 @@ impl QintConnection {
 	}
 
 	fn send_to_a2ts_r<R: Send + 'static, T: Message<Result = R> + Send + 'static>(&self, msg: T)
-	where audio::audio_to_ts::AudioToTs: Handler<T> {
+	where
+		audio::audio_to_ts::AudioToTs: Handler<T>,
+	{
 		if let Some(ad) = &self.state.audio_data {
 			actix::spawn(with_log!(
 				ad.a2ts.send(msg),
@@ -746,7 +762,11 @@ impl QintConnection {
 										.unwrap()
 										.iter()
 										.filter_map(|(id, addr)| {
-											if *id != self.id { Some(addr.clone()) } else { None }
+											if *id != self.id {
+												Some(addr.clone())
+											} else {
+												None
+											}
 										})
 										.collect::<Vec<_>>();
 									let state = self.state.clone();
@@ -798,7 +818,11 @@ impl QintConnection {
 										.unwrap()
 										.iter()
 										.filter_map(|(id, addr)| {
-											if *id != self.id { Some(addr.clone()) } else { None }
+											if *id != self.id {
+												Some(addr.clone())
+											} else {
+												None
+											}
 										})
 										.collect::<Vec<_>>();
 									let state = self.state.clone();
@@ -845,7 +869,9 @@ impl QintConnection {
 		}
 	}
 
-	fn send_message(&self, msg: &MessageP2F) { self.sender.send(msg) }
+	fn send_message(&self, msg: &MessageP2F) {
+		self.sender.send(msg)
+	}
 
 	fn send_error(&self, return_code: Option<&str>, error: String) {
 		if let Some(code) = return_code {
@@ -997,56 +1023,52 @@ impl QintConnection {
 }
 
 impl Handler<DownloadFile> for QintConnection {
-	type Result = ActorResponse<Self, Result<(u64, TcpStream, EccKeyPubP256), Error>>;
+	type Result = ActorResponse<Self, Result<DownloadFileContext, Error>>;
 	fn handle(&mut self, msg: DownloadFile, _: &mut Self::Context) -> Self::Result {
-		if let Some(con) = &mut self.connection {
-			let public_key = match con.get_server_key() {
-				Ok(k) => k,
-				Err(e) => {
-					return ActorResponse::r#async(wrap_future(futures::future::err(
-						Error::NoUid(e),
-					)));
-				}
-			};
+		let con = match &mut self.connection {
+			Some(con) => con,
+			_ => {
+				return ActorResponse::r#async(wrap_future(futures::future::err(
+					Error::NoConnection,
+				)))
+			}
+		};
 
-			let handle = match con.download_file(msg.channel, &msg.path, None, None) {
-				Ok(r) => r,
-				Err(e) => {
-					return ActorResponse::r#async(wrap_future(futures::future::err(e.into())));
-				}
-			};
+		let handle = match con.download_file(msg.channel, &msg.path, None, None) {
+			Ok(r) => r,
+			Err(e) => {
+				return ActorResponse::r#async(wrap_future(futures::future::err(e.into())));
+			}
+		};
 
-			let (send, recv) = oneshot::channel();
-			self.file_downloads.insert(handle, send);
-			ActorResponse::r#async(wrap_future(recv).map(|r, this: &mut Self, _| {
-				let result = match r {
-					Ok(Ok(r)) => Ok((r.size, r.stream, public_key)),
-					Ok(Err(e)) => Err(e.into()),
-					Err(e) => Err(e.into()),
-				};
-				if let Some(return_code) = msg.return_code {
-					this.send_message(&MessageP2F::Result(ResultStruct {
-						return_code,
-						details: (&result).try_into().unwrap_or_else(|e| {
-							ResultDetails::from_desc(format!("Download failed, {}", e))
-						}),
-					}));
-				}
-				result
-			}))
-		} else {
-			ActorResponse::r#async(wrap_future(futures::future::err(Error::NoConnection)))
-		}
+		let (send, recv) = oneshot::channel();
+		self.file_downloads.insert(handle, send);
+		ActorResponse::r#async(wrap_future(recv).map(|r, this: &mut Self, _| {
+			let result = match r {
+				Ok(Ok(r)) => Ok(DownloadFileContext { size: r.size, stream: r.stream }),
+				Ok(Err(e)) => Err(e.into()),
+				Err(e) => Err(e.into()),
+			};
+			if let Some(return_code) = msg.return_code {
+				this.send_message(&MessageP2F::Result(ResultStruct {
+					return_code,
+					details: (&result).try_into().unwrap_or_else(|e| {
+						ResultDetails::from_desc(format!("Download failed, {}", e))
+					}),
+				}));
+			}
+			result
+		}))
 	}
 }
 
 impl Handler<UploadFile> for QintConnection {
-	type Result = ActorResponse<Self, Result<TcpStream, Error>>;
+	type Result = ActorResponse<Self, Result<UploadFileContext, Error>>;
 	fn handle(&mut self, msg: UploadFile, _: &mut Self::Context) -> Self::Result {
 		if let Some(con) = &mut self.connection {
 			let handle = match con.upload_file(
 				msg.channel,
-				&format!("/{}", msg.path),
+				&msg.path,
 				msg.channel_password.as_deref(),
 				msg.size,
 				msg.overwrite,
@@ -1061,7 +1083,7 @@ impl Handler<UploadFile> for QintConnection {
 			self.file_uploads.insert(handle, send);
 			ActorResponse::r#async(wrap_future(recv).map(|r, this: &mut Self, _| {
 				let result = match r {
-					Ok(Ok(r)) => Ok(r.stream),
+					Ok(Ok(r)) => Ok(UploadFileContext { stream: r.stream }),
 					Ok(Err(e)) => Err(e.into()),
 					Err(e) => Err(e.into()),
 				};

@@ -191,9 +191,14 @@ impl Into<MessageTarget> for JsMessageTarget {
 }
 
 impl ResultDetails {
-	pub fn ok() -> Self { Self { ts_result: Some(TsError::Ok), ..Default::default() } }
+	pub fn ok() -> Self {
+		Self { ts_result: Some(TsError::Ok), ..Default::default() }
+	}
 	pub fn from_desc(error: String) -> Self {
 		Self { description: Some(error), ..Default::default() }
+	}
+	pub fn from_str(error: &str) -> Self {
+		Self::from_desc(error.to_string())
 	}
 }
 
@@ -213,7 +218,9 @@ impl<'a, T> TryFrom<&'a Result<T, WsError>> for ResultDetails {
 }
 
 impl From<CommandError> for ResultDetails {
-	fn from(err: CommandError) -> Self { (&err).into() }
+	fn from(err: CommandError) -> Self {
+		(&err).into()
+	}
 }
 
 impl From<&CommandError> for ResultDetails {
@@ -228,6 +235,22 @@ impl From<&CommandError> for ResultDetails {
 
 impl<T> From<Result<T, CommandError>> for ResultDetails {
 	fn from(err: Result<T, CommandError>) -> Self {
-		if let Err(err) = err { err.into() } else { Self::ok() }
+		if let Err(err) = err {
+			err.into()
+		} else {
+			Self::ok()
+		}
+	}
+}
+
+impl From<String> for ResultDetails {
+	fn from(err: String) -> Self {
+		Self::from_desc(err)
+	}
+}
+
+impl From<&str> for ResultDetails {
+	fn from(err: &str) -> Self {
+		Self::from_str(err)
 	}
 }

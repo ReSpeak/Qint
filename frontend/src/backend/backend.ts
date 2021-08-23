@@ -2,13 +2,13 @@ import { RustAnalyzeResult } from "../chat/previewAnalyzer";
 import { MuteStates } from "../connect/uiConnect";
 import { ApiIdentity } from "../panel/settings/identity";
 import { Uid } from "../ts";
-import { IConnection } from "../connection";
 import { IS_TAURI } from "../util";
 import { BrowserBackend } from "./browser";
 import { TauriBackend } from "./tauri";
 import { InMsg, OutMsg } from "./ws";
 import { HotkeyAction } from "../transientSettings";
 import { IPlugin } from "../plugins";
+import { ReturnCodeTracker } from "./returnCodeTracker";
 
 export const backend: IBackend = IS_TAURI ? new TauriBackend() : new BrowserBackend();
 
@@ -18,12 +18,8 @@ export type closedFn = () => void;
 
 export interface IBackend {
 	readonly name: string;
-	readonly cacheFileSrc: string;
-	/** The url address prefix for websockets */
-	readonly wsBaseAddress: string;
-	createNewConnection(): IBackendConnection;
+	createNewConnection(returnCodes: ReturnCodeTracker): IBackendConnection;
 	close(): void;
-	fetch(cmd: string, data?: RequestInit): Promise<IFetchLike>;
 	setTitle(name: string): void;
 	setIcon(url: string | undefined): void;
 
@@ -34,6 +30,7 @@ export interface IBackend {
 	get_settings(): Promise<Record<string, unknown>>;
 	set_settings(diff: Record<string, unknown>): Promise<void>;
 	fetch_cache_image(img: ICacheFileRequest): Promise<string | undefined>;
+	ask_read_file(): Promise<AskReadResult | undefined>;
 	peek_link(link: string): Promise<RustAnalyzeResult>;
 	get_audio_device_list(): Promise<IAudioDeviceList>;
 	identity_create(): Promise<ApiIdentity>;
@@ -54,17 +51,32 @@ export interface IBackend {
 
 export interface IBackendConnection {
 	readonly id: string;
-	readonly serverFileSrc: string;
 	send(data: OutMsg): void;
 	connect(onMsg: msgFn, onError: errorFn, onClose: closedFn): Promise<void>;
 	close(): void;
-	fetch(cmd: string, data?: RequestInit): Promise<IFetchLike>;
-	fetch_image(img: IFileRequest): Promise<string | undefined>;
-}
 
-export interface IFetchLike {
-	json(): Promise<any>;
-	text(): Promise<string>;
+	fetch_image(img: IFileRequest): Promise<string | undefined>;
+
+	/**
+	 * @throws {ResultDetails} On ts error
+	*/
+	upload_bytes(req: IFileRequest, data: Blob): Promise<TransferResult>;
+
+	/**
+	 * Does *not* allow multiple uploads (for now).
+	 * @throws {ResultDetails} On ts error
+	*/
+	ask_download(req: IFileRequest): Promise<TransferResult>;
+
+	/**
+	 * Multiple uploads for:
+	 * - ❌ Upload Avatar
+	 * - ❌ Upload Icon
+	 * - ✅ Upload to folder
+	 * 	- Returns: {string}
+	 * @throws {ResultDetails} On ts error
+	*/
+	ask_upload(target: UploadFeature): Promise<TransferResult>;
 }
 
 export interface IFileRequest {
@@ -72,13 +84,26 @@ export interface IFileRequest {
 	path: string;
 	hash?: string;
 	cache: boolean;
+	suggested_name?: string;
 }
 
-export interface IConFileRequest extends IFileRequest {
-	con: IConnection;
-}
 export interface ICacheFileRequest extends IFileRequest {
 	server: string;
+}
+
+export type UploadFeature =
+	{ Files: [channel: string, path: string] }
+	| "Avatar"
+	| "Icon";
+
+export interface AskReadResult {
+	name: string;
+	content: string;
+}
+
+export interface TransferResult {
+	uploadPromise: Promise<any>;
+	featureData?: string;
 }
 
 export const enum ImageProvider {

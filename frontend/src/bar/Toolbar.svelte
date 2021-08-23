@@ -40,14 +40,13 @@
 	$: {
 		if (IS_TAURI) {
 			supportedStyle = $titleBarStyle;
+			if (supportedStyle === TitleBarStyle.Native) {
+				appWindow.setDecorations(true);
+			} else {
+				appWindow.setDecorations(false);
+			}
 		} else {
 			supportedStyle = TitleBarStyle.Native;
-		}
-
-		if (supportedStyle === TitleBarStyle.Native) {
-			appWindow.setDecorations(true);
-		} else {
-			appWindow.setDecorations(false);
 		}
 	}
 </script>

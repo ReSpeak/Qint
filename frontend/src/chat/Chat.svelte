@@ -22,6 +22,7 @@
 	import { pathJoin } from "../panel/fileUtil";
 	import { TsError } from "../book_events";
 	import debug from "debug";
+	import type { ResultDetails } from "../backend/ws";
 	const log = debug("CHAT"),
 		error = debug("error:CHAT");
 
@@ -181,17 +182,17 @@
 	): Promise<string | undefined> {
 		if (mdData.files.length === 0) return undefined;
 
-		function tryUpload(file: MdFile) {
-			const [returnCode, promise] = connection.generateReturnCode();
-			const uploadDonePromise = connection.backend.fetch(
-				`/file${pathJoin(channelId, file.path, file.name)}?return_code=${returnCode}`,
-				{
-					method: "PUT",
-					body: file.blob,
-				}
-			);
-			return promise;
-			//return (await request.json()) as ResultDetails;
+		async function tryUpload(file: MdFile) {
+			try {
+				await connection.backend.upload_bytes({
+					cache: false,
+					channel: channelId,
+					path: pathJoin(file.path, file.name),
+				}, file.blob);
+				return undefined;
+			} catch (err: any) {
+				return err as ResultDetails;
+			}
 		}
 
 		async function createFolder(file: MdFile) {
@@ -340,7 +341,7 @@
 			<UiMessage
 				message={item}
 				unread={chatData !== undefined && item.date > $chatData.lastRead}
-				nodeSel={sel} />
+				connection={sel.connection} />
 		</LazyList>
 		<form class="chat-form" class:hidden={!canChatHere} on:submit|preventDefault={sendMessage}>
 			{#if sendError !== undefined}

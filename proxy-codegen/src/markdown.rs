@@ -17,6 +17,8 @@ use pulldown_cmark::{Alignment, CodeBlockKind, Event, LinkType, Options, Parser,
 
 use super::{escape_html_attribute, escape_html_body};
 
+const QINT_IMG: &'static str = "data-qintimg";
+
 #[derive(Debug, Clone)]
 enum VNode {
 	VText(String),
@@ -505,7 +507,7 @@ impl RenderMd {
 			}
 			Tag::Image(_, src, title) => {
 				let mut el = VTag::new("img");
-				el.add_attribute("src", &src);
+				el.add_attribute(QINT_IMG, &src);
 				if !title.as_ref().is_empty() {
 					el.add_attribute("title", &title);
 				}
@@ -675,7 +677,7 @@ impl RenderBb {
 						} else if stack_tag == BBTag::Img {
 							let src = vtag.get_inner_text();
 							if !src.is_empty() {
-								vtag.add_attribute("src", &src);
+								vtag.add_attribute(QINT_IMG, &src);
 								vtag.children.clear();
 							}
 						}

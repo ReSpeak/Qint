@@ -17,7 +17,7 @@ anyhow = "1"
 base64 = "0.13"
 futures = "0.3"
 juniper = "0.15"
-open = "1"
+open = "2"
 proxy-codegen = { path = "../proxy-codegen" }
 qint-proxy = { path = "../proxy" }
 rand = "0.8"

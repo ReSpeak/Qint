@@ -45,19 +45,24 @@
 			"active": false
 		},
 		"allowlist": {
-			"all": true
+			"window": {
+				"all": true
+			},
+			"http": {
+				"all": true
+			},
+			"notification": {
+				"all": true
+			},
+			"dialog": {
+				"all": true
+			}
 		},
 		"windows": [
-			{
-				"title": "Qint",
-				"width": 800,
-				"height": 600,
-				"resizable": true,
-				"fullscreen": false
-			}
+
 		],
 		"security": {
-			"csp": "default-src blob: data: filesystem: ws: http: https: 'unsafe-eval' 'unsafe-inline'"
+			"csp": "default-src blob: data: filesystem: ws: http: https: tauri: 'unsafe-eval' 'unsafe-inline'"
 		},
 		"systemTray": {
 			"iconPath": "../assets/icon.ico"

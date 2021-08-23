@@ -40,11 +40,16 @@ struct FileWriter<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin> {
 }
 
 impl FileCache {
-	pub fn new(logger: Logger, cache_path: PathBuf) -> Self { Self { logger, cache_path } }
+	pub fn new(logger: Logger, cache_path: PathBuf) -> Self {
+		Self { logger, cache_path }
+	}
 
-	fn path_encode(data: &[u8]) -> String { base64::encode_config(data, base64::URL_SAFE_NO_PAD) }
+	fn path_encode(data: &[u8]) -> String {
+		base64::encode_config(data, base64::URL_SAFE_NO_PAD)
+	}
 
 	fn get_path(&self, server: &EccKeyPubP256, channel: ChannelId, path: &str) -> PathBuf {
+		assert!(path.starts_with("/"), "Invalid path: {}", path);
 		let mut p = self.cache_path.clone();
 		p.push(Self::path_encode(&server.get_uid_no_base64()));
 		p.push(channel.0.to_string());
@@ -62,8 +67,7 @@ impl FileCache {
 			return file.left_stream();
 		}
 
-		debug!(self.logger, "Caching file"; "channel" => channel.0, "path" => %path,
-			"localpath" => ?filepath);
+		debug!(self.logger, "Caching file"; "channel" => channel.0, "path" => %path, "localpath" => ?filepath);
 		match fs::File::create(&filepath).await {
 			Ok(r) => FileWriter::new(file, r, filepath).right_stream(),
 			Err(e) => {
@@ -79,11 +83,13 @@ impl FileCache {
 	pub fn delete_file(
 		&self, server: &EccKeyPubP256, channel: ChannelId, path: &str,
 	) -> Result<bool> {
-		let path = self.get_path(server, channel, path);
-		if !path.exists() {
+		let filepath = self.get_path(server, channel, path);
+
+		debug!(self.logger, "Deleting cached file"; "channel" => channel.0, "path" => %path, "localpath" => ?filepath);
+		if !filepath.exists() {
 			return Ok(false);
 		}
-		Ok(std::fs::remove_file(path).map(|()| true)?)
+		Ok(std::fs::remove_file(filepath).map(|()| true)?)
 	}
 
 	/// Returns length and stream if the file is cached.
@@ -94,7 +100,7 @@ impl FileCache {
 		let meta = match fs::metadata(&filepath).await {
 			Ok(r) => r,
 			Err(e) => {
-				debug!(self.logger, "File not in cache"; " filepath" => ?filepath, "error" => %e);
+				debug!(self.logger, "File not in cache"; "path" => %path,"localpath" => ?filepath, "error" => %e);
 				return None;
 			}
 		};

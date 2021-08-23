@@ -65,8 +65,8 @@ macro_rules! with_log {
 	}};
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct ConnectionId(pub Uuid);
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+pub struct ConnectionId(Uuid);
 
 #[derive(Clone, Debug)]
 pub struct Args {
@@ -221,6 +221,11 @@ pub trait AppToFrontendBridge {
 pub type FrontBridge = Box<dyn AppToFrontendBridge + Send>;
 
 impl QintState {
+	pub fn get_connection(&self, con: &ConnectionId) -> Option<Addr<QintConnection>> {
+		let cons = self.connections.lock().unwrap();
+		cons.get(con).cloned()
+	}
+
 	pub fn modify_settings<T: FnOnce(&mut Settings) -> Result<SettingsChanged>>(
 		state: &Arc<Self>, f: T,
 	) -> Result<(), SettingsUpdateError> {
@@ -651,6 +656,12 @@ impl MuteState {
 		} else {
 			Self::Disabled
 		}
+	}
+}
+
+impl ConnectionId {
+	pub fn is_valid(&self) -> bool {
+		!self.0.is_nil()
 	}
 }
 

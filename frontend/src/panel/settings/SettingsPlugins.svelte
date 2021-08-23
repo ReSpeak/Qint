@@ -6,7 +6,6 @@
 	import FileIO from "../../ui/util/FileIO.svelte";
 	import { loadCssPlugin, removeCssPlugin } from "../../plugins";
 
-	let fileIo: FileIO;
 	// Plugin names
 	let plugins: string[] = [];
 	// Created but not yet saved plugins
@@ -75,11 +74,11 @@
 		selectedPlugin = name;
 	}
 
-	async function clickImportPlugin(files: CustomEvent<FileList>) {
+	async function clickImportPlugin() {
 		try {
-			const file0 = files.detail[0];
-			const content = await file0.text();
-			await updatePlugin(file0.name, content);
+			const file = await backend.ask_read_file();
+			if (file === undefined) return;
+			await updatePlugin(file.name, file.content);
 		} catch (ex) {
 			// TODO: change to debug and show on ui
 			console.log("Failed to import: ", ex);
@@ -174,7 +173,7 @@
 				New
 			</a>
 
-			<a class="panel-block is-active" on:click={() => fileIo.askUpload()}>
+			<a class="panel-block is-active" on:click={() => clickImportPlugin()}>
 				<Icon name="file-upload-outline" />
 				Import
 			</a>
@@ -243,8 +242,6 @@
 			{/if}
 		</form>
 	</div>
-
-	<FileIO bind:this={fileIo} on:uploadRequest={clickImportPlugin} />
 </TabSlot>
 
 <style lang="scss">

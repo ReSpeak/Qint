@@ -4,9 +4,8 @@
 	import { FileTreeFolder, FolderState } from "../fileTreeCache";
 	import type { FileTreeNode } from "../fileTreeCache";
 	import { pathJoin } from "./fileUtil";
-	import { base64Encode, javaHash, on, tsHexDecode } from "../util";
+	import { base64Encode, on, tsHexDecode } from "../util";
 	import ImageModal from "../chat/ImageModal.svelte";
-	import FileIO from "../ui/util/FileIO.svelte";
 	import DeleteConfirmButton from "../ui/util/DeleteConfirmButton.svelte";
 
 	export let connection: Connection;
@@ -30,7 +29,6 @@
 	let fileBrowserHasFocus = false;
 	let displayFiles: FileTreeNode[] = [];
 	let fileSelection: FileTreeNode[] = [];
-	let fileIo: FileIO;
 	let invalidateCache = true;
 	let showBig: FileTreeNode | undefined = undefined;
 	let showBigVisible = false;
@@ -77,11 +75,13 @@
 		// This only works for icons and avatars.
 		// Note especially, that we need to list icons in the icons/ subfolder,
 		// however we can only download them from the root folder.
-		return await connection.fileProvider({
-			channel: "0",
-			path: `/${filename}`,
-			cache: true,
-		}) ?? "";
+		return (
+			(await connection.fileProvider({
+				channel: "0",
+				path: `/${filename}`,
+				cache: true,
+			})) ?? ""
+		);
 	}
 
 	async function refreshFiles(useCache: boolean) {
@@ -123,26 +123,16 @@
 		refreshFiles(false); // TODO apply in chage instead
 	}
 
-	const currentUploadTask: any = undefined; // TODO
-	function uploadFiles(...files: File[]) {
-		connection.filetransferManager.uploadFiles(
-			...files.map((file) => {
-				// Add number to name if filename already exist
-				// TODO Has to be an u32
-				let number = javaHash(file.name);
-				let name = "icon_" + number;
-				while (displayFiles.find((node) => node.name === name) !== undefined) {
-					number++;
-					number &= number; // Truncate to u32
-					name = "icon_" + number;
-				}
-				return {
-					data: file,
-					channelId: "0",
-					path: name,
-				};
-			})
-		);
+	const is_uploading: boolean = false; // TODO
+
+	async function uploadFiles() {
+		if (!canUpload) return;
+		try {
+			await connection.backend.ask_upload("Icon");
+		} catch(err) {
+			console.log(err);
+			return;
+		}
 		refreshFiles(false); // TODO apply in chage instead
 	}
 
@@ -168,12 +158,7 @@
 
 		const files = e.dataTransfer?.files;
 		if (!files) return;
-		uploadFiles(...files);
-	}
-
-	function uploadSelected(files: CustomEvent<FileList>) {
-		if (!canUpload) return;
-		uploadFiles(...files.detail);
+		//uploadFiles(...files); // TODO TAURI FIX
 	}
 
 	function clickBackground(this: HTMLElement, e: MouseEvent) {
@@ -258,10 +243,10 @@
 		{#if canUpload}
 			<button
 				title="Upload files"
-				on:click={() => fileIo.askUpload()}
-				class:is-info={currentUploadTask !== undefined}
+				on:click={() => uploadFiles()}
+				class:is-info={is_uploading}
 				class="button">
-				<Icon name={currentUploadTask === undefined ? "upload" : "orbit mdi-spin"} />
+				<Icon name={is_uploading ? "orbit mdi-spin" : "upload"} />
 			</button>
 		{/if}
 		{#if canDelete}
@@ -294,10 +279,6 @@
 				{/if}
 			{/each}
 		</div>
-	{/if}
-
-	{#if canUpload}
-		<FileIO bind:this={fileIo} on:uploadRequest={uploadSelected} />
 	{/if}
 </div>
 

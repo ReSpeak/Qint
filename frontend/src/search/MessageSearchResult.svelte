@@ -33,7 +33,7 @@
 	<Message
 		timeFormat="YYYY-MM-DD HH:mm"
 		message={content.message}
-		server={content.server}
+		connection={new OfflineConnection(content.server)}
 		messageHighlightedContent={content.highlightedContent === null
 			? undefined
 			: content.highlightedContent} />

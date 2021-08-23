@@ -49,6 +49,9 @@ export function extensionToIcon(file: string): string {
 		case "p7s":
 		case "pem":
 		case "pfx":
+		case "pkcs7":
+		case "pkcs8":
+		case "pkcs12":
 			return "file-certificate-outline";
 		case "gpg":
 		case "kbdx":

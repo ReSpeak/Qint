@@ -2,7 +2,6 @@
 	import ImageModal from "../chat/ImageModal.svelte";
 	import { get } from "svelte/store";
 	import { Connection } from "../connection";
-	import type { ChangePromise } from "../connection";
 	import type { ServerGroupId } from "../ts";
 	import moment from "moment";
 	import type { Duration, Moment } from "moment";
@@ -21,7 +20,6 @@
 	import {
 		formatDuration,
 		formatSi,
-		hexEncode,
 		iconPathToId,
 		LONG_DATETIME,
 		NARROW_NO_BREAK_SPACE,
@@ -37,6 +35,8 @@
 	import { app } from "../app";
 	import type { ChartConfiguration } from "chart.js";
 	import "chartjs-adapter-moment";
+	import type { ChangePromise } from "../backend/returnCodeTracker";
+	import type { ResultDetails } from "../backend/ws";
 
 	export let connection: Connection;
 	export let client: Client;
@@ -51,18 +51,17 @@
 	let chart: Chart | null = null;
 	let editing = false;
 	let editIcon = false;
-	let dummyUploader: HTMLInputElement;
 	let timer: number | undefined;
 	let showBigAvatar = false;
 
 	const serverGroups = connection.book.serverGroups;
 	let avatarPath: string | undefined;
 	$: isWhispering = connection.isWhispering;
-	$: getClientAvatarPath(connection, $client).then((path) => (avatarPath = path));
 	$: ownClient = client.id === connection.book.ownClientId;
 	$: {
 		if ($client.optionalData == null) getOptionalData();
 		if ($client.connectionData == null) getConnectionData();
+		updateAvatar();
 	}
 	$: on(client, onClientChanged());
 
@@ -224,6 +223,7 @@
 	}
 
 	function onClientChanged() {
+		avatarPath = undefined;
 		editing = false;
 		chartConfig.data.datasets.forEach((dataset) => {
 			dataset.data = [];
@@ -272,15 +272,7 @@
 
 	async function updateClientInfo() {
 		chartRefresh();
-		await connection
-			.sendChange({
-				ClientConnectionInfoRequest: {
-					id: client.id,
-				},
-			})
-			.catch((reason) => {
-				console.error("Client info update failed: ", reason);
-			});
+		await getConnectionData();
 	}
 
 	async function getOptionalData() {
@@ -305,6 +297,15 @@
 			.catch((reason) => {
 				console.error("ClientConnectionInfoRequest failed: ", reason);
 			});
+	}
+
+	async function updateAvatar() {
+		console.log("Reset avatar");
+		const oldClient = $client;
+		const path = await getClientAvatarPath(connection, $client);
+		if (oldClient !== $client) return;
+		console.log("Settings avatar", path);
+		avatarPath = path;
 	}
 
 	async function onPokeClick() {
@@ -361,27 +362,23 @@
 		else return moment.duration(duration.asSeconds(), "seconds").humanize();
 	}
 
-	async function uploadSelectedAvatar() {
-		const files = dummyUploader.files;
-		if (files && files.length > 0) {
-			const file = files[0];
-			dummyUploader.value = null!;
-			await connection.backend.fetch("/file/0/avatar", {
-				method: "PUT",
-				body: file,
-			});
-			let hash = file.size.toString();
-			// Use SHA-256 hash and fall back to file size if not available
-			if (crypto.subtle) {
-				const hashBuffer = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
-				hash = hexEncode(Array.from(new Uint8Array(hashBuffer)));
-			}
-			changeRequest = connection.sendChange({
-				ConnectionClientUpdate: {
-					avatarHash: hash,
-				},
-			});
+	async function uploadAvatar() {
+		let hash: string;
+		try {
+			const result = await connection.backend.ask_upload("Avatar");
+			if (!result.featureData) throw "Internal error; ask should have returned hash";
+			hash = result.featureData;
+		} catch (err: any) {
+			console.log("Upload error:", err as ResultDetails);
+			changeRequest = Promise.resolve(err as ResultDetails);
+			return;
 		}
+		console.log("settings hash", hash);
+		changeRequest = connection.sendChange({
+			ConnectionClientUpdate: {
+				avatarHash: hash,
+			},
+		});
 	}
 
 	function deleteAvatar() {
@@ -477,7 +474,7 @@
 	function updateTimer() {
 		if (timer !== undefined) clearInterval(timer);
 		// Throttle when stats are not open, we still need to update last active and online time
-		timer = window.setInterval(updateClientInfo, statsOpen ? 1000 : 10000);
+		//timer = window.setInterval(updateClientInfo, statsOpen ? 1000 : 10000);
 	}
 
 	function whisper() {
@@ -527,7 +524,7 @@
 	<div class="descGroup" class:editing>
 		{#await changeRequest then changeResult}
 			{#if changeResult !== undefined}
-				<div class="notification is-danger">
+				<div class="notification is-danger stickyInfo">
 					<button
 						class="toolbutton is-small"
 						style="float: right;"
@@ -647,15 +644,8 @@
 				<div>Avatar:</div>
 				<div>
 					{#if ownClient}
-						<input
-							title="Dummy Uploader"
-							style="display: none;"
-							bind:this={dummyUploader}
-							on:change={uploadSelectedAvatar}
-							type="file" />
-						<button
-							class="button is-small is-info"
-							on:click={() => dummyUploader.click()}>Upload</button>
+						<button class="button is-small is-info" on:click={() => uploadAvatar()}
+							>Upload</button>
 					{/if}
 					{#if avatarPath}
 						<button class="button is-small is-danger" on:click={deleteAvatar}>
@@ -876,5 +866,11 @@
 	span.is-loading {
 		@include loader;
 		margin-right: 0.5em;
+	}
+
+	.stickyInfo {
+		position: sticky;
+		z-index: 1;
+		top: 50px;
 	}
 </style>

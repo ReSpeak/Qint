@@ -1,11 +1,17 @@
+use std::convert::TryInto;
+use std::fmt::Write;
+use std::path::PathBuf;
 use std::{fmt::Debug, sync::Arc};
 
 use actix::Addr;
+use actix::MailboxError;
 use bytes::{Bytes, BytesMut};
 use futures::{Stream, StreamExt};
 use juniper::http::GraphQLRequest;
 use proxy_codegen::book_events::deserialize_id;
 use proxy_codegen::book_events::deserialize_u64;
+use qint_proxy::connection::{DownloadFileContext, UploadFile};
+use qint_proxy::messages::ResultDetails;
 use qint_proxy::MuteStates;
 use qint_proxy::SettingsUpdateError;
 use qint_proxy::{
@@ -22,12 +28,15 @@ use qint_proxy::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use slog::{debug, info, warn, Logger};
+use tauri::api::dialog::FileDialogBuilder;
 use tauri::{command, State, Window};
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
 use tsclientlib::Error as TsError;
 use tsproto_types::{crypto::EccKeyPubP256, ChannelId};
-use uuid::Uuid;
 
 use crate::audio::LoudnessShare;
 use crate::core::{CloseWs, CreateWs, DispatchWsMsg, Error, QintCore};
@@ -54,7 +63,7 @@ pub struct TauriWs<T>
 where
 	T: Debug,
 {
-	con: Uuid,
+	con: ConnectionId,
 	msg: T,
 }
 
@@ -65,49 +74,137 @@ struct WindowBridge {
 }
 
 type QState = Arc<QintState>;
-type QCore = Addr<QintCore>;
+type QCore = Arc<QintCore>;
+type QCoreAddr = Addr<QintCore>;
 
 impl AppToFrontendBridge for WindowBridge {
 	fn send(&self, msg: &MessageP2F) {
 		debug!(self.logger, "Sending to frontend"; "msg" => ?msg);
-		let res = self.window.emit("ws", TauriWs { con: self.id.0, msg });
+		let res = self.window.emit("ws", TauriWs { con: self.id, msg });
 		if let Err(e) = res {
 			warn!(self.logger, "Failed sending to frontend"; "error" => %e);
 		}
 	}
 
 	fn close(&self) {
-		let res = self.window.emit("ws_close", self.id.0);
+		let res = self.window.emit("ws_close", self.id);
 		if let Err(e) = res {
 			warn!(self.logger, "Failed sending to frontend"; "error" => %e);
 		}
 	}
 }
 
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FileRequest {
+	con: ConnectionId,
+	#[serde(deserialize_with = "deserialize_id")]
+	channel: ChannelId,
+	path: String,
+	#[serde(default)]
+	channel_password: Option<String>,
+	existing: FileExistsAction,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileCacheRequest {
+	con: String,
+	#[serde(deserialize_with = "deserialize_id")]
+	channel: ChannelId,
+	path: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FileMetaRequest {
+	con: ConnectionId,
+	#[serde(default)]
+	channel_password: Option<String>,
+	existing: FileExistsAction,
+}
+
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+enum FileExistsAction {
+	Error,
+	Overwrite,
+	Resume,
+}
+impl FileExistsAction {
+	fn overwrite(&self) -> bool {
+		*self == FileExistsAction::Overwrite
+	}
+	fn resume(&self) -> bool {
+		*self == FileExistsAction::Resume
+	}
+}
+
+#[derive(Debug, Serialize)]
+pub struct FileTransferStatus {
+	con: ConnectionId,
+	transfer_handle: u16,
+	file_size: usize,
+	/// Wording is 'progress' and not 'transferred' since files can be resumed.
+	/// This is so that this value is transparent whether a file is transferred
+	/// from start or resumed.
+	progress_size: usize,
+	file_name: String,
+	/// in Bytes/s
+	transfer_speed: usize,
+}
+
+#[derive(Debug, Serialize)]
+pub struct FileResponse {
+	pub data: Vec<u8>,
+	pub mime: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct StringId(#[serde(deserialize_with = "deserialize_u64")] pub u64);
+
+trait FileDialogBuilderExt {
+	fn set_parent_ext(self, window: &Window) -> Self;
+}
+impl FileDialogBuilderExt for FileDialogBuilder {
+	#[cfg(any(windows, target_os = "macos"))]
+	fn set_parent_ext(self, window: &Window) -> Self {
+		if let Ok(handle) = &tauri::api::dialog::window_parent(&window) {
+			self.set_parent(handle)
+		} else {
+			self
+		}
+	}
+	#[cfg(not(any(windows, target_os = "macos")))]
+	fn set_parent_ext(self, _window: &Window) -> Self {
+		self
+	}
+}
+
+// === CMDS ===
+
 #[command]
 pub async fn create_ws(
-	logger: State<'_, Logger>, core: State<'_, QCore>, window: Window, con: Uuid,
+	logger: State<'_, Logger>, core: State<'_, QCoreAddr>, window: Window, con: ConnectionId,
 ) -> Result<(), Error> {
-	let id = ConnectionId(con);
-	info!(logger.inner().clone(), "Creating tauri connection"; "id" => ?id);
+	info!(logger.inner().clone(), "Creating tauri connection"; "id" => ?con);
 
-	let sender = Box::new(WindowBridge { logger: logger.inner().clone(), window, id: id.clone() });
-	core.send(CreateWs { id, sender }).await.unwrap()
+	let sender = Box::new(WindowBridge { logger: logger.inner().clone(), window, id: con.clone() });
+	core.send(CreateWs { id: con, sender }).await.unwrap()
 }
 
 #[command]
-pub async fn close_ws(
-	logger: State<'_, Logger>, core: State<'_, QCore>, con: Uuid,
+pub fn close_ws(
+	logger: State<'_, Logger>, core: State<'_, QCore>, con: ConnectionId,
 ) -> Result<(), Error> {
-	let id = ConnectionId(con);
-	info!(logger.inner().clone(), "Closing tauri connection"; "id" => ?id);
-	core.send(CloseWs { id }).await.unwrap()
+	info!(logger.inner().clone(), "Closing tauri connection"; "id" => ?con);
+	core.close_ws(CloseWs { id: con })
 }
 
 #[command]
-pub async fn pass_ws_msg(core: State<'_, QCore>, con: Uuid, msg: MessageF2P) -> Result<(), Error> {
-	let id = ConnectionId(con);
-	core.send(DispatchWsMsg { id, msg }).await.unwrap()
+pub fn pass_ws_msg(
+	core: State<'_, QCore>, con: ConnectionId, msg: MessageF2P,
+) -> Result<(), Error> {
+	core.ws_msg(DispatchWsMsg { id: con, msg })
 }
 
 #[command]
@@ -135,32 +232,6 @@ pub fn set_settings(state: State<'_, QState>, diff: Value) -> Result<(), String>
 	}
 }
 
-#[derive(Debug, Deserialize)]
-pub struct FileRequest {
-	con: Uuid,
-	#[serde(deserialize_with = "deserialize_id")]
-	channel: ChannelId,
-	path: String,
-	hash: Option<String>,
-	cache: Option<bool>,
-	return_code: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct FileCacheRequest {
-	con: String,
-	#[serde(deserialize_with = "deserialize_id")]
-	channel: ChannelId,
-	path: String,
-	hash: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct FileResponse {
-	pub data: Vec<u8>,
-	pub mime: Option<String>,
-}
-
 async fn collect_to_bytes<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin + 'static>(
 	mut stream: S,
 ) -> Vec<u8> {
@@ -171,85 +242,83 @@ async fn collect_to_bytes<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpi
 	vec
 }
 
-#[command]
-pub async fn get_file(state: State<'_, QState>, req: FileRequest) -> Result<FileResponse, String> {
-	let state = state.inner();
-	let FileRequest { con, channel, path, return_code, cache, .. } = req;
-	let cache = cache.unwrap_or(false);
-
-	let conn;
-	{
-		let cons = state.connections.lock().unwrap();
-		conn = cons.get(&ConnectionId(con)).cloned();
-	}
-
-	if let Some(con) = conn {
-		// Lookup in cache
-		let server = match con.send(qint_proxy::connection::GetPublicKeyMsg).await {
-			Ok(Ok(r)) => r,
-			Ok(Err(e)) => {
-				error!(state.logger, "Failed to get server public key"; "error" => %e);
-				return Err("Failed to get server public key".into());
-			}
-			Err(_) => {
-				return Err("Mailbox error: GetPublicKeyMsg".into());
-			}
-		};
-
-		if let Some((_, stream)) = state.file_cache.get_cached_file(&server, channel, &path).await {
-			let (stream, mime) = guess_content_type(stream).await;
-			let data = collect_to_bytes(stream).await;
-			return Ok(FileResponse { data, mime: mime.map(|s| s.to_string()) });
+fn format_tx_err<T>(
+	res: Result<Result<T, qint_proxy::connection::Error>, MailboxError>, logger: &Logger,
+) -> Result<T, ResultDetails> {
+	match res {
+		Err(_) => Err("Mailbox error".into()),
+		Ok(Err(qint_proxy::connection::Error::TsError(TsError::CommandError(err)))) => {
+			debug!(logger, "Common Teamspeak error"; "error" => %err);
+			Err(err.into())
 		}
-
-		debug!(state.logger, "Downloading file"; "channel" => channel.0, "path" => &path);
-		let (len, file_stream, server) = match con
-			.send(qint_proxy::connection::DownloadFile { channel, path: path.clone(), return_code })
-			.await
-		{
-			Err(_) => {
-				return Err("Mailbox error: DownloadFile".into());
-			}
-			Ok(Err(qint_proxy::connection::Error::TsError(TsError::CommandError(err)))) => {
-				debug!(state.logger, "File download error"; "error" => %err, "path" => &path);
-				return match err.error {
-					tsclientlib::TsError::FileInvalidPath => Err("Invalid file".into()),
-					tsclientlib::TsError::PermissionsClientInsufficient => {
-						Err("Missing perm".into())
-					}
-					err => Err(format!("other err: {0}", err)),
-				};
-			}
-			Ok(Err(e)) => {
-				error!(state.logger, "File download failed"; "error" => %e, "path" => &path);
-				return Err(format!("download err: {0}", e));
-			}
-			Ok(Ok(r)) => r,
-		};
-
-		let stream =
-			FramedRead::new(file_stream, BytesCodec::new()).map(|r| r.map(BytesMut::freeze));
-		let (stream, mime) = guess_content_type(stream).await;
-
-		// Cache for offline usage if smaller than 5 MiB
-		let data = if cache && len < 5 * 1024 * 1024 {
-			let stream = state.file_cache.cache_file(&server, channel, &path, stream).await;
-			collect_to_bytes(stream).await
-		} else {
-			collect_to_bytes(stream).await
-		};
-		return Ok(FileResponse { data, mime: mime.map(|s| s.to_string()) });
-	} else {
-		return Err("Connection not found".into());
+		Ok(Err(err)) => {
+			error!(logger, "Unknown Teamspeak error"; "error" => %err);
+			Err(format!("Unknown transfer err: {}", err).into())
+		}
+		Ok(Ok(r)) => Ok(r),
 	}
 }
 
 #[command]
-pub async fn get_cache_file(
+pub async fn download_bytes(
+	state: State<'_, QState>, req: FileRequest, cache: bool,
+) -> Result<FileResponse, ResultDetails> {
+	let state = state.inner();
+	// move 'cache' into parameter from FileReq
+	let FileRequest { con, channel, path, existing, channel_password } = req;
+
+	let con_addr = state.get_connection(&con).ok_or("Connection not found".to_string())?;
+
+	// Lookup in cache
+	let server = match con_addr.send(qint_proxy::connection::GetPublicKeyMsg).await {
+		Ok(Ok(r)) => r,
+		Ok(Err(e)) => {
+			error!(state.logger, "Failed to get server public key"; "error" => %e);
+			return Err("Failed to get server public key".into());
+		}
+		Err(_) => {
+			return Err("Mailbox error: GetPublicKeyMsg".into());
+		}
+	};
+
+	if let Some((_, stream)) = state.file_cache.get_cached_file(&server, channel, &path).await {
+		let (stream, mime) = guess_content_type(stream).await;
+		let data = collect_to_bytes(stream).await;
+		return Ok(FileResponse { data, mime: mime.map(|s| s.to_string()) });
+	}
+
+	let DownloadFileContext { size, stream } = format_tx_err(
+		con_addr
+			.send(qint_proxy::connection::DownloadFile {
+				channel,
+				path: path.clone(),
+				channel_password,
+				return_code: None,
+				resume: existing.resume(),
+			})
+			.await,
+		&state.logger,
+	)?;
+
+	let stream = FramedRead::new(stream, BytesCodec::new()).map(|r| r.map(BytesMut::freeze));
+	let (stream, mime) = guess_content_type(stream).await;
+
+	// Cache for offline usage if smaller than 5 MiB
+	let data = if cache && size < 5 * 1024 * 1024 {
+		let stream = state.file_cache.cache_file(&server, channel, &path, stream).await;
+		collect_to_bytes(stream).await
+	} else {
+		collect_to_bytes(stream).await
+	};
+	return Ok(FileResponse { data, mime: mime.map(|s| s.to_string()) });
+}
+
+#[command]
+pub async fn download_bytes_from_cache(
 	state: State<'_, QState>, req: FileCacheRequest,
 ) -> Result<FileResponse, String> {
 	let state = state.inner();
-	let FileCacheRequest { con, channel, path, .. } = req;
+	let FileCacheRequest { con, channel, path } = req;
 
 	let server = match base64::decode_config(&con, base64::URL_SAFE_NO_PAD)
 		.map_err(|e| e.into())
@@ -271,17 +340,259 @@ pub async fn get_cache_file(
 }
 
 #[command]
+pub async fn upload_bytes(
+	core: State<'_, QCore>, state: State<'_, QState>, req: FileRequest, data: Vec<u8>,
+) -> Result<(), ResultDetails> {
+	let FileRequest { con, channel, path, channel_password, existing } = req;
+	// TODO try fetch pw from database
+
+	let prepare =
+		core.filetransfer.prepare_upload_from_bytes(data).map_err(|err| err.to_string())?;
+	let size = prepare.get_size();
+
+	let con_addr = state.get_connection(&con).ok_or("Connection not found".to_string())?;
+
+	debug!(state.logger, "Uploading file"; "channel" => channel.0, "path" => &path);
+	let ctx = format_tx_err(
+		con_addr
+			.send(qint_proxy::connection::UploadFile {
+				channel,
+				path,
+				channel_password,
+				return_code: None,
+				overwrite: existing.overwrite(),
+				resume: false,
+				size,
+			})
+			.await,
+		&state.logger,
+	)?;
+
+	core.filetransfer.add_upload(ctx, prepare);
+	Ok(())
+}
+
+#[command]
+pub async fn read_file(window: Window) -> Result<(String, String), String> {
+	let path_buf = tauri::async_runtime::spawn(async move {
+		let (tx, rx) = std::sync::mpsc::channel::<Option<PathBuf>>();
+		FileDialogBuilder::default()
+			.set_parent_ext(&window)
+			.add_filter("JavaScript File", &["js"])
+			.pick_file(move |p| {
+				let _ = tx.send(p);
+			});
+		rx.recv().unwrap_or(None)
+	})
+	.await
+	.unwrap();
+	if let Some(path_buf) = path_buf {
+		let content = tauri::api::file::read_string(&path_buf).map_err(|err| err.to_string())?;
+		let file = if let Some(file) = path_buf.file_name() {
+			file.to_string_lossy()
+		} else {
+			path_buf.to_string_lossy()
+		};
+		return Ok((file.to_string(), content));
+	} else {
+		Err("No file selected".to_string())
+	}
+	//std::fs::read_to_string(filename).map_err(|err| err.to_string())
+}
+
+#[command]
+pub async fn filetransfer_list() -> Result<Vec<FileTransferStatus>, ()> {
+	// state
+	// 	.aggregate(|con, _| FileTransferStatus {
+	// 		con: con.id,
+	// 		file_name: "file.txt".into(),
+	// 		file_size: 1024,
+	// 		progress_size: 420,
+	// 		transfer_handle: 13,
+	// 		transfer_speed: 2,
+	// 	})
+	// 	.collect()
+	// 	.await
+	Ok(Vec::new())
+}
+
+#[command]
 pub async fn download_file(
-	state: State<'_, QState>, server_file: FileRequest, local_path: String,
-) -> Result<(), ()> {
+	core: State<'_, QCore>, state: State<'_, QState>, window: Window, req: FileRequest,
+) -> Result<(), ResultDetails> {
+	let FileRequest { con, channel, existing, path, channel_password } = req;
+	// TODO try fetch pw from database
+
+	let con_addr = state.get_connection(&con).ok_or("Connection not found".to_string())?;
+
+	let suggest_file =
+		if let Some(i) = path.rfind('/') { &path[(i + 1)..] } else { &path }.to_string();
+
+	let path_buf = tauri::async_runtime::spawn(async move {
+		let (tx, rx) = std::sync::mpsc::channel::<Option<PathBuf>>();
+		FileDialogBuilder::default()
+			.set_parent_ext(&window)
+			.set_file_name(&suggest_file)
+			.save_file(move |p| {
+				let _ = tx.send(p);
+			});
+		rx.recv().unwrap_or(None)
+	})
+	.await
+	.unwrap();
+
+	let local_file = path_buf.ok_or("No file selected".to_string())?;
+
+	let prepare =
+		core.filetransfer.prepare_download(&local_file).await.map_err(|err| err.to_string())?;
+
+	let ctx = format_tx_err(
+		con_addr
+			.send(qint_proxy::connection::DownloadFile {
+				channel,
+				path: path.clone(),
+				channel_password,
+				return_code: None,
+				resume: existing.resume(),
+			})
+			.await,
+		&state.logger,
+	)?;
+
+	core.filetransfer.add_download(ctx, prepare);
 	Ok(()) // TODO
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+pub enum UploadFeature {
+	Files(#[serde(deserialize_with = "deserialize_id")] ChannelId, String),
+	Avatar,
+	Icon,
+}
+
+async fn ask_for_files(multiple: bool, window: Window) -> Result<Vec<PathBuf>, String> {
+	let picked = tauri::async_runtime::spawn(async move {
+		let (tx, rx) = std::sync::mpsc::channel::<Vec<PathBuf>>();
+		let builder = FileDialogBuilder::default().set_parent_ext(&window);
+		if multiple {
+			builder.pick_files(move |p| {
+				let picked = if let Some(vec) = p { vec } else { Vec::new() };
+				let _ = tx.send(picked);
+			});
+		} else {
+			builder.pick_file(move |p| {
+				let picked = if let Some(p) = p { vec![p] } else { Vec::new() };
+				let _ = tx.send(picked);
+			});
+		}
+		rx.recv().unwrap_or(Vec::new())
+	})
+	.await
+	.unwrap();
+	if picked.len() == 0 {
+		return Err("No file selected".to_string());
+	} else {
+		return Ok(picked);
+	}
 }
 
 #[command]
 pub async fn upload_file(
-	state: State<'_, QState>, server_file: FileRequest, local_path: String,
-) -> Result<(), ()> {
-	Ok(()) // TODO
+	core: State<'_, QCore>, state: State<'_, QState>, window: Window, req: FileMetaRequest,
+	feature: UploadFeature,
+) -> Result<Option<String>, ResultDetails> {
+	let FileMetaRequest { con, existing, channel_password, .. } = req;
+	// TODO try fetch pw from database
+
+	let con_addr = state.get_connection(&con).ok_or("Connection not found".to_string())?;
+
+	match feature {
+		UploadFeature::Files(channel, mut path) => {
+			let local_file = ask_for_files(false, window).await?.into_iter().next().unwrap();
+			let filename = local_file
+				.file_name()
+				.map(|p| p.to_string_lossy().to_string())
+				.ok_or("No file name ??!?".to_string())?;
+
+			let prepare = core
+				.filetransfer
+				.prepare_upload(&local_file)
+				.await
+				.map_err(|err| err.to_string())?;
+			let size = prepare.get_size();
+
+			if !path.ends_with('/') {
+				path.push('/');
+			}
+			path.push_str(&filename);
+
+			debug!(state.logger, "Uploading"; "local_file" => ?local_file, "path" => &path);
+			let ctx = format_tx_err(
+				con_addr
+					.send(UploadFile {
+						channel,
+						path,
+						channel_password,
+						return_code: None,
+						overwrite: existing.overwrite(),
+						resume: existing.resume(),
+						size,
+					})
+					.await,
+				&state.logger,
+			)?;
+
+			core.filetransfer.add_upload(ctx, prepare);
+			Ok(None)
+		}
+		UploadFeature::Avatar | UploadFeature::Icon => {
+			let local_file = ask_for_files(false, window).await?.into_iter().next().unwrap();
+			let mut file = File::open(local_file).await.map_err(|err| err.to_string())?;
+			let meta = file.metadata().await.map_err(|err| err.to_string())?;
+			let size = meta.len();
+			let mut buf = Vec::with_capacity(size as usize);
+			file.read_to_end(&mut buf).await.map_err(|err| err.to_string())?;
+
+			let hash_bytes = Sha256::digest(&buf);
+			let hash_bytes = hash_bytes.as_slice();
+
+			let path = if feature == UploadFeature::Avatar {
+				"/avatar".to_string()
+			} else {
+				format!("/icon_{}", u32::from_le_bytes(hash_bytes[0..4].try_into().unwrap()))
+			};
+
+			debug!(state.logger, "Uploading"; "feature" => ?feature, "path" => &path);
+			let ctx = format_tx_err(
+				con_addr
+					.send(UploadFile {
+						channel: ChannelId(0),
+						path,
+						channel_password,
+						return_code: None,
+						overwrite: true,
+						resume: false,
+						size,
+					})
+					.await,
+				&state.logger,
+			)?;
+
+			let prepare =
+				core.filetransfer.prepare_upload_from_bytes(buf).map_err(|err| err.to_string())?;
+			core.filetransfer.add_upload(ctx, prepare);
+
+			if feature == UploadFeature::Avatar {
+				let mut hash = String::with_capacity(64);
+				for byte in hash_bytes {
+					let _ = write!(hash, "{:02X}", byte);
+				}
+				Ok(Some(hash))
+			} else {
+				Ok(None)
+			}
+		}
+	}
 }
 
 #[command]
@@ -293,9 +604,6 @@ pub async fn peek_link(state: State<'_, QState>, link: String) -> Result<Analyze
 pub async fn get_audio_device_list(state: State<'_, QState>) -> Result<AudioDeviceList, ()> {
 	Ok(state.audio_device_list().await)
 }
-
-#[derive(Deserialize)]
-pub struct StringId(#[serde(deserialize_with = "deserialize_u64")] pub u64);
 
 #[command]
 pub async fn identity_create(state: State<'_, QState>) -> Result<ApiIdentity, String> {
@@ -383,4 +691,9 @@ pub async fn set_loudness_callback(
 		listener.disable()
 	}
 	Ok(())
+}
+
+#[command]
+pub fn teest(_data: Vec<u8>) {
+	println!("yay testing");
 }

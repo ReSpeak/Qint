@@ -1,5 +1,4 @@
-import { IConFileRequest } from "../../backend/backend";
-import { IConnection } from "../../connection";
+import { IFileRequest } from "../../backend/backend";
 import { pathJoin } from "../../panel/fileUtil";
 
 export type LinksMap = Map<
@@ -14,15 +13,15 @@ const ts3Scheme = /^(ts3file|ts3image):\/\/([^?]*)(\?(.*))?$/i;
 
 type Ts3Scheme =
 	| {
-			scheme: "ts3file";
-			server: string;
-			attrs: Partial<Ts3FileAtt>;
-	  }
+		scheme: "ts3file";
+		server: string;
+		attrs: Partial<Ts3FileAtt>;
+	}
 	| {
-			scheme: "ts3image";
-			file: string;
-			attrs: Partial<Ts3ImageAtt>;
-	  };
+		scheme: "ts3image";
+		file: string;
+		attrs: Partial<Ts3ImageAtt>;
+	};
 type Ts3FileAtt = {
 	port: string;
 	serverUID: string;
@@ -69,20 +68,33 @@ export function parseTsScheme(url: string): Ts3Scheme | null {
 	return null;
 }
 
-export function schemeToLink(con: IConnection, scheme: Ts3Scheme): IConFileRequest | null {
+export function schemeToLink(scheme: Ts3Scheme): IFileRequest | null {
 	if (scheme.attrs.path) {
 		let path: string;
 		let channel: string;
+		let suggested_name: string | undefined;
 		if (scheme.scheme === "ts3file") {
 			channel = scheme.attrs.channel!;
 			path = pathJoin(scheme.attrs.path, scheme.attrs.filename ?? "");
+			suggested_name = scheme.attrs.filename;
 		} else if (scheme.scheme === "ts3image") {
 			channel = scheme.attrs.channel!;
 			path = pathJoin(scheme.attrs.path, scheme.file);
+			suggested_name = guessName(path);
 		} else {
 			throw new Error("Not supported scheme");
 		}
-		return { con, channel, path, cache: true };
+		return { channel, path, cache: true, suggested_name };
 	}
 	return null;
+}
+
+export function guessName(src: string | undefined | null): string | undefined {
+	if (!src) return undefined;
+	const lastSlash = src.lastIndexOf("/");
+	if (lastSlash >= 0) {
+		return src.substring(lastSlash + 1);
+	} else {
+		return src;
+	}
 }

@@ -1,4 +1,4 @@
-$version = "2.0.14"
+$version = "2.0.16"
 $zipDownloadPath = "./target/sdl.zip"
 # Reuse rust build dir
 New-Item -Path "./target" -ItemType "directory" -Force | Out-Null

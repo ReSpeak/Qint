@@ -19,6 +19,9 @@
 	import { onMount } from "svelte";
 	import { derived, writable } from "svelte/store";
 	import type { Readable, Writable } from "svelte/store";
+	import FileIO from "./ui/util/FileIO.svelte";
+	import { IS_TAURI } from "./util";
+	import { BrowserBackend } from "./backend/browser";
 
 	const connections = app.connections;
 	let filter: string = "";
@@ -33,6 +36,7 @@
 	const descriptionMode = ui._descriptionMode;
 	let columnStyle = "";
 	let connectData = new ConnectData("", "");
+	let fileIo: FileIO;
 
 	$: {
 		columnStyle = "";
@@ -100,6 +104,9 @@
 	}
 
 	onMount(() => {
+		if (backend instanceof BrowserBackend) {
+			backend.fileIo = fileIo;
+		}
 		updateGlobalMuteState();
 		const unsub = app.updateMuteState.subscribe(updateGlobalMuteState);
 		return unsub;
@@ -146,6 +153,9 @@
 </div>
 <GlobalCss />
 <GlobalScss />
+{#if !IS_TAURI}
+	<FileIO bind:this={fileIo} />
+{/if}
 
 <style lang="scss">
 	.appContainer {
