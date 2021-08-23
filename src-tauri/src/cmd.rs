@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use slog::{debug, info, warn, Logger};
-use tauri::api::dialog::{window_parent, FileDialogBuilder};
+use tauri::api::dialog::FileDialogBuilder;
 use tauri::{command, State, Window};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
@@ -161,6 +161,24 @@ pub struct FileResponse {
 
 #[derive(Deserialize)]
 pub struct StringId(#[serde(deserialize_with = "deserialize_u64")] pub u64);
+
+trait FileDialogBuilderExt {
+	fn set_parent_ext(self, window: &Window) -> Self;
+}
+impl FileDialogBuilderExt for FileDialogBuilder {
+	#[cfg(any(windows, target_os = "macos"))]
+	fn set_parent_ext(self, window: &Window) -> Self {
+		if let Ok(handle) = &tauri::api::dialog::window_parent(&window) {
+			self.set_parent(handle)
+		} else {
+			self
+		}
+	}
+	#[cfg(not(any(windows, target_os = "macos")))]
+	fn set_parent_ext(self, _window: &Window) -> Self {
+		self
+	}
+}
 
 // === CMDS ===
 
@@ -358,8 +376,8 @@ pub async fn upload_bytes(
 pub async fn read_file(window: Window) -> Result<(String, String), String> {
 	let path_buf = tauri::async_runtime::spawn(async move {
 		let (tx, rx) = std::sync::mpsc::channel::<Option<PathBuf>>();
-		tauri::api::dialog::FileDialogBuilder::default()
-			.set_parent(&window_parent(&window).map_err(|err| err.to_string()).unwrap())
+		FileDialogBuilder::default()
+			.set_parent_ext(&window)
 			.add_filter("JavaScript File", &["js"])
 			.pick_file(move |p| {
 				let _ = tx.send(p);
@@ -412,8 +430,8 @@ pub async fn download_file(
 
 	let path_buf = tauri::async_runtime::spawn(async move {
 		let (tx, rx) = std::sync::mpsc::channel::<Option<PathBuf>>();
-		tauri::api::dialog::FileDialogBuilder::default()
-			.set_parent(&window_parent(&window).map_err(|err| err.to_string()).unwrap())
+		FileDialogBuilder::default()
+			.set_parent_ext(&window)
 			.set_file_name(&suggest_file)
 			.save_file(move |p| {
 				let _ = tx.send(p);
@@ -455,8 +473,7 @@ pub enum UploadFeature {
 async fn ask_for_files(multiple: bool, window: Window) -> Result<Vec<PathBuf>, String> {
 	let picked = tauri::async_runtime::spawn(async move {
 		let (tx, rx) = std::sync::mpsc::channel::<Vec<PathBuf>>();
-		let builder = FileDialogBuilder::default()
-			.set_parent(&window_parent(&window).map_err(|err| err.to_string()).unwrap());
+		let builder = FileDialogBuilder::default().set_parent_ext(&window);
 		if multiple {
 			builder.pick_files(move |p| {
 				let picked = if let Some(vec) = p { vec } else { Vec::new() };
@@ -677,6 +694,6 @@ pub async fn set_loudness_callback(
 }
 
 #[command]
-pub fn teest(data: Vec<u8>) {
+pub fn teest(_data: Vec<u8>) {
 	println!("yay testing");
 }

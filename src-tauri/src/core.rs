@@ -101,15 +101,10 @@ impl QintCore {
 	pub fn ws_msg(&self, msg: DispatchWsMsg) -> Result<(), Error> {
 		let DispatchWsMsg { id, msg } = msg;
 
-		let con = {
-			match self.state.connections.lock().unwrap().get(&id) {
-				Some(con) => con.clone(),
-				None => {
-					error!(self.state.logger, "No con for msg found"; "error" => ?id);
-					return Err(Error::NoConnection);
-				}
-			}
-		};
+		let con = self.state.get_connection(&id).ok_or_else(|| {
+			error!(self.state.logger, "No con for msg found"; "error" => ?id);
+			Error::NoConnection
+		})?;
 
 		self.handle.spawn(with_log!(
 			con.send(MessageF2PWrapper(msg)),

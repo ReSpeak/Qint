@@ -22,6 +22,7 @@ use tauri::SystemTray;
 use tauri::SystemTrayEvent;
 use tauri::SystemTrayMenu;
 use tauri::WindowEvent;
+use tauri::WindowUrl;
 use tauri::{CustomMenuItem, Manager};
 use tokio::runtime::Runtime;
 
@@ -133,6 +134,11 @@ fn main() {
 		.manage(app_arc)
 		.manage(LoudnessShare::new())
 		.manage(logger)
+		.create_window(
+			"main",
+			WindowUrl::App("index.html".into()),
+			|window_builder, webview_attributes| (window_builder, webview_attributes),
+		)
 		.on_page_load(|window, _| {
 			if let Err(e) = window.set_title("Qint") {
 				println!("Failed to set title: {}", e);

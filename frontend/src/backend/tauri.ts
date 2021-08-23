@@ -129,6 +129,16 @@ export class TauriBackend implements IBackend {
 			const data = ev.payload;
 			this.loudnessListener.call(data);
 		});
+
+		listen<string[]>("tauri://file-drop", (data) => {
+			console.log("tauri://file-drop", data);
+		});
+		listen<string[]>("tauri://file-drop-hover", (data) => {
+			console.log("tauri://file-drop-hover", data);
+		});
+		listen<string[]>("tauri://file-drop-cancelled", (data) => {
+			console.log("tauri://file-drop-cancelled", data);
+		});
 	}
 
 	public createNewConnection(returnCodes: ReturnCodeTracker): IBackendConnection {

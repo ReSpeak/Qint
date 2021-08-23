@@ -12,16 +12,17 @@
 		IDragOptions,
 		TableSortFn,
 	} from "../ui/html/uiTable";
-	import { FolderState } from "../fileTreeCache";
+	import { FileTreeCache, FolderState } from "../fileTreeCache";
 	import type { FileTreeNode } from "../fileTreeCache";
 	import { extensionToIcon, formatBytes, pathJoin, pathSplit } from "./fileUtil";
 	import { assert, focus, on } from "../util";
 	import type { IFileRequest } from "../backend/backend";
 	import DeleteConfirmButton from "../ui/util/DeleteConfirmButton.svelte";
+	import type { Writable } from "svelte/store";
+	import { Channel } from "../book";
 
 	export let connection: Connection;
 	export let channelId: ChannelId;
-	$: fileTreeCache = connection.fileTreeCache;
 
 	const enum WorkState {
 		None,
@@ -30,44 +31,50 @@
 		EditingFile,
 	}
 
+	let fileTreeCache: Writable<FileTreeCache>;
+	let channelRaw: Channel | undefined = undefined;
+	let channel: Channel | undefined = undefined;
 	let currentState = WorkState.None;
 	let isConfirmingDelete = false;
 	let path: string[] = [];
 	let fileBrowserHasFocus = false;
 	let fileTable: Table<FileTreeNode>;
 	let displayChannel: FileTreeNode | null;
-	let displayChildren: FileTreeNode[];
+	let displayChildren: FileTreeNode[] = [];
 	let invalidateCache = true;
 	let fileSelection: FileTreeNode[] = [];
 	let createNewFolderName = "";
 
-	$: channelRaw = connection.book.channels.get(channelId)!;
-	$: channel = channelRaw !== undefined ? $channelRaw : undefined;
-	$: on(channelId, channelChanged());
 	$: {
-		on(path);
-		const cachePath = getCachePath();
-		if (channel !== undefined) channel.lastFilePath = path;
-		displayChannel = $fileTreeCache.get(cachePath, true);
-		const childrenIter = displayChannel?.children?.values();
-		displayChildren = childrenIter !== undefined ? Array.from(childrenIter) : [];
+		fileTreeCache = connection.fileTreeCache;
+		refreshDisplayList();
 	}
-	$: on(channelId, path, refreshCurrentFolder(true));
-
-	function channelChanged() {
-		path = channel?.lastFilePath ?? [];
+	$: {
+		on(channelId);
 		invalidateCache = true;
+		channelRaw = connection.book.channels.get(channelId)!;
+		channel = channelRaw !== undefined ? $channelRaw : undefined;
+		setDisplayPath(channel?.lastFilePath ?? []);
 	}
+	$: on($fileTreeCache, refreshCurrentFolder(true));
 
 	function getCachePath(): string[] {
 		return [channelId, ...path];
 	}
 
+	async function setDisplayPath(p: string[]) {
+		path = p;
+		if (channel !== undefined) channel.lastFilePath = path;
+		await refreshCurrentFolder(true);
+	}
+
 	async function refreshCurrentFolder(useCache: boolean) {
 		const cachePath = getCachePath();
+
 		if (useCache && !invalidateCache) {
 			const cachedFolder = $fileTreeCache.get(cachePath, true);
 			if (cachedFolder !== null && cachedFolder.contentLoaded !== FolderState.Dummy) {
+				refreshDisplayList();
 				return;
 			}
 		}
@@ -75,12 +82,18 @@
 		$fileTreeCache.clear(cachePath);
 		const getPath = "/" + path.join("/");
 		if (channel !== undefined) {
+			let reqPath = {
+				id: channelId,
+				password: "", // TODO
+				path: getPath,
+			};
+			// - TODO handle empty result error explicitely instead of implicitely
+			// (currently the `fileTreeCache.clear` at the to ensures that in case
+			// of an empty folder nothing gets shown)
+			// - TODO handle error show when missing permission instead of 
+			// "No files"
 			await connection.sendChange({
-				ChannelFileListRequest: {
-					id: channelId,
-					password: "", // TODO
-					path: getPath,
-				},
+				ChannelFileListRequest: reqPath,
 			});
 		} else {
 			await connection.sendChange({
@@ -89,16 +102,24 @@
 				},
 			});
 		}
+		refreshDisplayList();
+	}
+
+	function refreshDisplayList() {
+		const cachePath = getCachePath();
+		displayChannel = $fileTreeCache.get(cachePath, true);
+		const childrenIter = displayChannel?.children?.values();
+		displayChildren = childrenIter !== undefined ? Array.from(childrenIter) : [];
 	}
 
 	function goUp(toLevel?: number) {
 		if (path.length === 0) return;
-		path = path.slice(0, toLevel ?? path.length - 1);
+		setDisplayPath(path.slice(0, toLevel ?? path.length - 1));
 	}
 
 	function pushFolder(name: string) {
 		path.push(name);
-		path = path;
+		setDisplayPath(path);
 	}
 
 	function onClickRow(evt: ClickRowEvent<FileTreeNode>) {
@@ -129,38 +150,37 @@
 		createNewFolderName = "";
 	}
 
-	function createNewFolder() {
+	async function createNewFolder() {
+		currentState = WorkState.None;
 		const createPath = pathJoin(...path, createNewFolderName);
-		connection.sendMessage({
-			Change: {
-				change: {
-					ChannelCreateDirectory: {
-						id: channelId,
-						password: "", // TODO
-						path: createPath,
-					},
-				},
+		await connection.sendChange({
+			ChannelCreateDirectory: {
+				id: channelId,
+				password: "", // TODO
+				path: createPath,
 			},
 		});
-		currentState = WorkState.None;
-		refreshCurrentFolder(false); // TODO apply in chage instead
+		refreshCurrentFolder(false);
 	}
 
-	function deleteFiles() {
+	async function deleteFiles() {
+		currentState = WorkState.None;
+		isConfirmingDelete = false;
 		// TODO as one packet
+		let promises = [];
 		for (const toDelete of fileSelection) {
 			const deletePath = pathJoin(...path, toDelete.name);
-			connection.sendChange({
+			const promise = connection.sendChange({
 				ChannelDeleteFile: {
 					id: channelId,
 					password: "", // TODO
 					path: deletePath,
 				},
 			});
+			promises.push(promise);
 		}
-		currentState = WorkState.None;
-		isConfirmingDelete = false;
-		refreshCurrentFolder(false); // TODO apply in chage instead
+		await Promise.allSettled(promises);
+		refreshCurrentFolder(false);
 	}
 
 	function selectionChanged(evt: CustomEvent<{ selected: FileTreeNode[] }>) {
@@ -237,6 +257,7 @@
 		} catch {
 			return;
 		}
+		refreshCurrentFolder(false);
 	}
 
 	function dragEnter(e: DragEvent) {
@@ -320,25 +341,20 @@
 
 			if (fromChannel === toChannel && fromPath === toPath) continue;
 
-			connection.sendMessage({
-				Change: {
-					change: {
-						ChannelRenameFile: {
-							id: fromChannel,
-							password: "", // TODO
-							fromPath,
-							toPath,
-							toChannel,
-							toChannelPassword, // TODO
-						},
-					},
+			connection.sendChange({
+				ChannelRenameFile: {
+					id: fromChannel,
+					password: "", // TODO
+					fromPath,
+					toPath,
+					toChannel,
+					toChannelPassword, // TODO
 				},
 			});
 		}
 
 		$fileTreeCache.clear(pathSplit(channelId, targetPath));
-		invalidateCache = true;
-		path = path;
+		refreshCurrentFolder(false);
 	}
 </script>
 
