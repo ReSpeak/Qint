@@ -35,6 +35,7 @@
 		display: flex;
 		align-items: center;
 		//flex-wrap: nowrap;
+		margin-bottom: 0.5em;
 
 		> :global(:first-child) {
 			margin-right: 1em;
@@ -68,7 +69,7 @@
 		padding: 1em;
 		white-space: nowrap;
 
-		&.editing > :global(*:not(:last-child)) {
+		:global(&.editing) > :global(*:not(:last-child)) {
 			margin-bottom: 0.5em;
 		}
 	}
