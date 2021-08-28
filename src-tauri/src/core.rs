@@ -114,11 +114,15 @@ impl QintCore {
 		Ok(())
 	}
 
+	pub fn notify_transfer_status() {
+		// ...
+	}
+
 	pub fn new(handle: Handle, state: Arc<QintState>) -> Self {
 		Self { handle, state, filetransfer: Arc::new(FiletransferManager::new()) }
 	}
 
-	pub async fn run(&self) {
-		self.filetransfer.transfer_loop().await;
+	pub async fn run(self_addr: Addr<QintCore>, self_arc: Arc<QintCore>) {
+		self_arc.filetransfer.transfer_loop().await;
 	}
 }

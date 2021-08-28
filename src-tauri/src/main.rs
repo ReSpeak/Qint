@@ -118,10 +118,11 @@ fn main() {
 				let state = QintState::new(logger2, args.into()).unwrap();
 				let app = QintCore::new(handle, state);
 				let app_arc = Arc::new(app.clone());
+				let app_addr = app.start();
 
-				sender.send((app.start(), app_arc.clone())).unwrap();
+				sender.send((app_addr.clone(), app_arc.clone())).unwrap();
 
-				app_arc.run().await;
+				QintCore::run(app_addr, app_arc).await;
 			});
 		});
 

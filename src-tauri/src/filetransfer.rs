@@ -4,11 +4,13 @@ use futures::stream::StreamExt;
 use qint_proxy::connection::{DownloadFileContext, UploadFileContext};
 use std::io;
 use std::io::{ErrorKind, SeekFrom};
+use std::ops::Range;
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
 use std::task::{Context, Poll};
+use std::time::Instant;
 use tokio::fs::File;
 use tokio::io::{AsyncRead, AsyncWrite, Interest, ReadBuf};
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
@@ -32,10 +34,13 @@ struct TransferContext {
 	id: TransferId,
 	done: bool,
 	kind: TxDirection,
-	remote_stream: TcpStream,
-	file_size: u64,
-	local_position: u64,
+	src_stream: Pin<Box<dyn AsyncRead>>,
+	dst_stream: Pin<Box<dyn AsyncWrite>>,
+	transfer_target: u64,
+	transfer_position: u64,
 	buffer: Box<[u8]>,
+	buffer_size: Range<usize>,
+	//last_measurement: Option<Instant, u64> // measure timestamp, transfer_position
 }
 
 pub struct UploadPrepare {
@@ -55,9 +60,10 @@ enum TxTickStatus {
 	Waiting,
 }
 
+#[derive(Debug, PartialEq, Eq)]
 enum TxDirection {
-	Download(Pin<Box<dyn AsyncWrite>>),
-	Upload(Pin<Box<dyn AsyncRead>>),
+	Download,
+	Upload,
 }
 
 impl UploadPrepare {
@@ -102,8 +108,8 @@ impl FiletransferManager {
 		};
 
 		// TODO RESUMING !!!
-		// let new_pos = local_stream.seek(SeekFrom::Start(local_position)).await.unwrap();
-		// if local_position != new_pos {
+		// let new_pos = local_stream.seek(SeekFrom::Start(transfer_position)).await.unwrap();
+		// if transfer_position != new_pos {
 		// 	bail!("Failed to seek");
 		// }
 
@@ -175,29 +181,25 @@ impl FiletransferManager {
 				DownloadFileContext { stream, size },
 				DownloadPrepare { id, file },
 			) => {
-				list.push(TransferContext {
+				list.push(TransferContext::new(
 					id,
-					done: false,
-					kind: TxDirection::Download(file),
-					remote_stream: stream,
-					file_size: size,
-					local_position: 0,
-					buffer: Box::new([0u8; 1 << 16]),
-				});
+					TxDirection::Download,
+					Box::pin(stream),
+					file,
+					size,
+				));
 			}
 			TransferAction::Upload(
 				UploadFileContext { stream },
 				UploadPrepare { id, file, size },
 			) => {
-				list.push(TransferContext {
+				list.push(TransferContext::new(
 					id,
-					done: false,
-					kind: TxDirection::Upload(file),
-					remote_stream: stream,
-					file_size: size,
-					local_position: 0,
-					buffer: Box::new([0u8; 1 << 16]),
-				});
+					TxDirection::Upload,
+					file,
+					Box::pin(stream),
+					size,
+				));
 			}
 		}
 	}
@@ -223,50 +225,53 @@ impl FiletransferManager {
 }
 
 impl TransferContext {
+	pub fn new(
+		id: TransferId, kind: TxDirection, src_stream: Pin<Box<dyn AsyncRead>>,
+		dst_stream: Pin<Box<dyn AsyncWrite>>, transfer_target: u64,
+	) -> Self {
+		Self {
+			id,
+			done: false,
+			kind,
+			src_stream,
+			dst_stream,
+			transfer_target,
+			transfer_position: 0,
+			buffer: Box::new([0u8; 1 << 16]),
+			buffer_size: 0..0,
+		}
+	}
+
 	pub async fn transfer_tick(&mut self) -> Result<TxTickStatus, Error> {
-		match &mut self.kind {
-			TxDirection::Download(local_stream) => {
-				let ready = self.remote_stream.ready(Interest::READABLE).await?;
-
-				if !ready.is_readable() {
-					return Ok(TxTickStatus::Waiting);
+		if self.buffer_size.len() == 0 {
+			match self.src_stream.read(&mut self.buffer).await {
+				Ok(n) => {
+					self.buffer_size = 0..n;
 				}
-
-				match self.remote_stream.try_read(&mut self.buffer) {
-					Ok(n) => {
-						local_stream.write_all(&self.buffer[..n]).await?;
-						self.local_position += n as u64;
-						if self.local_position == self.file_size {
-							Ok(TxTickStatus::Finished)
-						} else {
-							Ok(TxTickStatus::Progress)
-						}
-					}
-					Err(ref e) if e.kind() == ErrorKind::WouldBlock => Ok(TxTickStatus::Waiting),
-					Err(e) => Err(e.into()),
+				Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
+					return Ok(TxTickStatus::Waiting)
 				}
+				Err(e) => return Err(e.into()),
 			}
-			TxDirection::Upload(local_stream) => {
-				let ready = self.remote_stream.ready(Interest::WRITABLE).await?;
+		}
 
-				if !ready.is_writable() {
-					return Ok(TxTickStatus::Waiting);
-				}
+		if self.buffer_size.len() > 0 {
+			match self.dst_stream.write(&self.buffer[self.buffer_size.clone()]).await {
+				Ok(written) => {
+					self.buffer_size = (self.buffer_size.start + written)..self.buffer_size.end;
+					self.transfer_position += written as u64;
 
-				match local_stream.read(&mut self.buffer).await {
-					Ok(n) => {
-						self.remote_stream.write_all(&self.buffer[..n]).await?;
-						self.local_position += n as u64;
-						if self.local_position == self.file_size {
-							Ok(TxTickStatus::Finished)
-						} else {
-							Ok(TxTickStatus::Progress)
-						}
+					if self.transfer_position == self.transfer_target {
+						Ok(TxTickStatus::Finished)
+					} else {
+						Ok(TxTickStatus::Progress)
 					}
-					Err(ref e) if e.kind() == ErrorKind::WouldBlock => Ok(TxTickStatus::Waiting),
-					Err(e) => Err(e.into()),
 				}
+				Err(ref e) if e.kind() == ErrorKind::WouldBlock => Ok(TxTickStatus::Waiting),
+				Err(e) => Err(e.into()),
 			}
+		} else {
+			Ok(TxTickStatus::Waiting)
 		}
 	}
 }
