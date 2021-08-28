@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
-use crate::QintState;
 use actix::Addr;
 use futures::{future, StreamExt};
 use serde::{Deserialize, Serialize};
 use slog::error;
 use tsclientlib::prelude::*;
 
-use crate::{connection, MuteState};
-use connection::QintConnection;
+use crate::QintState;
+use crate::MuteState;
+use crate::connection::QintConnection;
 
 pub use imp::{Hotkeys, KeyCode};
 
@@ -458,6 +458,9 @@ mod imp {
 
 	use anyhow::Result;
 	use serde::{Deserialize, Serialize};
+	use slog::{debug, warn};
+	use tokio::io::{AsyncBufReadExt, BufReader};
+	use tokio::net::UnixListener;
 
 	use super::HotkeyConfig;
 	use crate::QintState;
@@ -473,6 +476,56 @@ mod imp {
 	impl Hotkeys {
 		pub fn new() -> Result<Self> { Ok(Self {}) }
 
-		pub fn apply_config(&self, _: &Arc<QintState>, _: HotkeyConfig) -> Result<()> { Ok(()) }
+		pub fn apply_config(&self, state: &Arc<QintState>, _: HotkeyConfig) -> Result<()> {
+			let state = Arc::clone(state);
+			// Listen on unix socket to support shortcuts on wayland
+			tokio::spawn(async move {
+				let path = state.settings.read().unwrap().get_hotkey_socket_path()
+					.unwrap_or(crate::DEFAULT_HOTKEY_SOCKET_PATH).to_string();
+				let listener = match UnixListener::bind(&path) {
+					Ok(r) => r,
+					Err(e) => {
+						warn!(state.logger, "Failed to open hotkey unix socket"; "error" => %e);
+						return;
+					}
+				};
+
+				loop {
+					match listener.accept().await {
+						Ok((stream, _)) => {
+							debug!(state.logger, "Accepted hotkey unix socket connection");
+							let state = state.clone();
+							tokio::spawn(async move {
+								let mut reader = BufReader::new(stream);
+								let mut buf = String::new();
+								loop {
+									if let Err(e) = reader.read_line(&mut buf).await {
+										debug!(state.logger, "Failed to read from hotkey unix socket \
+											connection"; "error" => %e);
+										return;
+									}
+									// Parse as action
+									let action: super::Action = match serde_json::from_str(&buf) {
+										Ok(r) => r,
+										Err(e) => {
+											warn!(state.logger, "Failed to parse from hotkey unix socket \
+												connection"; "error" => %e);
+											return;
+										}
+									};
+									action.run(&state).await;
+									buf.clear();
+								}
+							});
+						}
+						Err(e) => {
+							warn!(state.logger, "Failed to accept hotkey unix socket connection"; "error" => %e);
+						}
+					}
+				}
+			});
+
+			Ok(())
+		}
 	}
 }
