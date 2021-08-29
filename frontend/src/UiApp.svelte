@@ -79,7 +79,8 @@
 	}
 
 	function modeChanged(mode: DescriptionMode) {
-		editing = mode === DescriptionMode.Edit;
+		if (editing !== (mode === DescriptionMode.Edit))
+			editing = mode === DescriptionMode.Edit;
 	}
 
 	function showConnect(data: ConnectData) {

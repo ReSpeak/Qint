@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { ChangePromise } from "../connection";
 	import type { GraphQlServer } from "../book";
+	import type { ChangePromise } from "../backend/returnCodeTracker";
 	import Icon from "../ui/icon/Icon.svelte";
 	import ServerName from "../ui/name/ServerName.svelte";
 	import StickyList from "../ui/container/StickyList.svelte";

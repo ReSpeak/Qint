@@ -19,12 +19,14 @@
 	});
 </script>
 
-<div bind:this={div} tabindex="0" on:focusout={onBlur} class="hover menu" style="left: {x}px; top: {y}px;">
+<div bind:this={div} tabindex="0" on:focusout={onBlur} class="context menu" style="left: {x}px; top: {y}px;">
 	<slot />
 </div>
 
 <style lang="scss">
-	.hover {
+	@import "../style/global_mixin";
+
+	.context {
 		position: fixed;
 		z-index: 350;
 		border: solid 1px $border;
@@ -36,20 +38,14 @@
 		gap: 0.5em;
 	}
 
-	.hover .corner {
-		position: absolute;
-		transform: rotate(45deg);
-		left: -0.3em;
-		top: 1.8em;
-		width: 0.5em;
-		height: 0.5em;
-		border-left: solid 1px $border;
-		border-bottom: solid 1px $border;
-		background: $background;
+	.context :global(button) {
+		background: none;
+		border: none;
+		color: $text;
+		text-align: start;
 	}
 
-	.closeButton {
-		font-size: 0.5em;
-		float: right;
+	.context :global(button:hover) {
+		background-color: $highlight-weak;
 	}
 </style>

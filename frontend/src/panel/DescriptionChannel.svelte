@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Connection } from "../connection";
-	import type { ChangePromise } from "../connection";
+	import type { ChangePromise } from "../backend/returnCodeTracker";
 	import TsIcon from "../ui/icon/TsIcon.svelte";
 	import Icon from "../ui/icon/Icon.svelte";
 	import StickyList from "../ui/container/StickyList.svelte";
@@ -46,11 +46,6 @@
 		if (channel.maxClients === "Inherited" || channel.maxClients === "Unlimited")
 			formatMaxClients = channel.maxClients;
 		else formatMaxClients = channel.maxClients?.Limited ?? "unknown";
-	}
-
-	$: on(channel, onChannelChanged());
-	function onChannelChanged() {
-		editing = false;
 	}
 
 	// THIS IS NOT A FULL CHANNEL OBJECT

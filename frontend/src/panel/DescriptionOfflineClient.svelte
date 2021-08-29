@@ -10,7 +10,7 @@
 	import ChangeResult from "../ui/specialized/ChangeResult.svelte";
 	import EmojiString from "../ui/specialized/EmojiString.svelte";
 	import { app } from "../app";
-	import type { ChangePromise } from "../connection";
+	import type { ChangePromise } from "../backend/returnCodeTracker";
 
 	export let client: GraphQlClient;
 	export let editing = false;
@@ -23,7 +23,6 @@
 	$: curOnline = client.uid === null ? [] : $clientsByUid.get(client.uidStr) ?? [];
 
 	function onClientChanged() {
-		editing = false;
 		console.log("Client", client);
 	}
 

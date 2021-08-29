@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Connection } from "../connection";
-	import type { ChangePromise } from "../connection";
+	import type { ChangePromise } from "../backend/returnCodeTracker";
 	import type { Server } from "../book";
 	import moment from "moment";
 	import {

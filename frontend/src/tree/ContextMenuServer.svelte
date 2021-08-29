@@ -20,6 +20,6 @@
 
 <style lang="scss">
 	.spacer {
-		width: 0.5em;
+		width: 1em;
 	}
 </style>

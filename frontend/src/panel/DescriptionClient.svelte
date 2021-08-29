@@ -224,7 +224,6 @@
 
 	function onClientChanged() {
 		avatarPath = undefined;
-		editing = false;
 		chartConfig.data.datasets.forEach((dataset) => {
 			dataset.data = [];
 			for (let i = CHART_ENTRY_COUNT; i > 0; i--) {
