@@ -3,7 +3,7 @@
 	import { DisplayPanel } from "../panel/panel";
 	import { IS_TAURI, SERVER_ICON } from "../util";
 	import { app, NodeSelections } from "../app";
-	import ConnectionSettings from "./ConnectionSettings.svelte";
+	import MuteButtons from "./MuteButtons.svelte";
 	import { ConnectData } from "../connect/uiConnect";
 	import Searchbar from "./Searchbar.svelte";
 	import { appWindow } from "@tauri-apps/api/window";
@@ -85,7 +85,7 @@
 			</div>
 		</div>
 		<div class="flex1" data-titledrag="1" />
-		<ConnectionSettings bind:connectData />
+		<MuteButtons bind:connectData />
 	</div>
 	<div class="flex1" data-titledrag="1" />
 	<div class="inlineButtons">
