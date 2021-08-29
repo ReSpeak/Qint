@@ -8,6 +8,7 @@ const log = debug("TRANSIENT");
 export const enum DescriptionMode {
 	None = "None",
 	Info = "Info",
+	Edit = "Edit",
 	Files = "Files",
 }
 

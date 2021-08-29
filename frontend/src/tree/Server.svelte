@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { Writable } from "svelte/store";
 	import StickySlot from "../ui/container/StickySlot.svelte";
 	import ServerName from "../ui/name/ServerName.svelte";
 	import TsIcon from "../ui/icon/TsIcon.svelte";
@@ -8,11 +7,11 @@
 	import { Connection } from "../connection";
 	import { ConnectData } from "../connect/uiConnect";
 	import { flash, render_updates } from "../util";
-	import { afterUpdate, onMount } from "svelte";
+	import { afterUpdate } from "svelte";
 	import { get } from "svelte/store";
 	import { app, NodeSelection } from "../app";
-	import HoverMenu from "./HoverMenu.svelte";
-	import { DelayedHover } from "./delayedHover";
+	import ContextMenuServer from "./ContextMenuServer.svelte";
+	import ContextMenuContainer from "./ContextMenuContainer.svelte";
 	import ChangeResult from "../ui/specialized/ChangeResult.svelte";
 	import { DescriptionMode } from "../transientSettings";
 	import { MouseButton } from "../ui/util/draggable";
@@ -24,9 +23,9 @@
 	export let filter: string;
 	export let showConnect: (data: ConnectData) => void;
 
-	let hover: DelayedHover;
-	let hovered: Writable<boolean>;
-	let hoverComp: HTMLElement;
+	let contextMenuVisible = false;
+	let contextMenuX = 0;
+	let contextMenuY = 0;
 	const state = connection.state;
 	const server = connection.book.server;
 	const channels = server.channels;
@@ -55,16 +54,25 @@
 		connection.close();
 	}
 
-	onMount(() => {
-		hover = new DelayedHover(div, [div, hoverComp]);
-		hovered = hover.hovered;
-
-		return () => hover.unregister();
-	});
+	function showContextMenu(e: MouseEvent) {
+		if (!contextMenuVisible) {
+			e.preventDefault();
+			contextMenuVisible = true;
+			contextMenuX = e.pageX;
+			contextMenuY = e.pageY;
+		} else {
+			contextMenuVisible = false;
+		}
+	}
 </script>
 
+{#if contextMenuVisible}
+	<ContextMenuContainer on:close={() => contextMenuVisible = false} x={contextMenuX} y={contextMenuY}>
+		<ContextMenuServer {connection} {server} />
+	</ContextMenuContainer>
+{/if}
 <StickySlot styled={false} on:click={click} on:auxclick={click}>
-	<div bind:this={div} class="button stickyLine" class:selectedServerChat tabindex="0">
+	<div bind:this={div} class="button stickyLine" class:selectedServerChat tabindex="0" on:contextmenu={showContextMenu}>
 		<TsIcon type="server" source={$server} {connection} />
 		<div class="serverName">
 			<ServerName server={$server} {connection} handleClicks={false} />
@@ -84,11 +92,6 @@
 		</span>
 	</div>
 </StickySlot>
-<div bind:this={hoverComp}>
-	{#if $hovered}
-		<HoverMenu {div} selected={new NodeSelection(connection, server)} />
-	{/if}
-</div>
 
 {#if !$state.connected}
 	<div class="statusField">

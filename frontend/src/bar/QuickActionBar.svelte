@@ -1,15 +1,16 @@
 <script lang="ts">
-	import Icon from "../ui/icon/Icon.svelte";
+	import QuickActionButtons from "./QuickActionButtons.svelte";
+	import { app } from "../app";
+
+	const selections = app.selectedNode;
+	$: selected = $selections.getSingleSelection();
 	
 </script>
 
 <div class="actionBar inlineButtons">
-	<div class="inlineButton">
-		<Icon name="information-outline" />
-	</div>
-	<div class="inlineButton">
-		<Icon name="folder" />
-	</div>
+	{#if selected !== undefined}
+		<QuickActionButtons {selected} />
+	{/if}
 </div>
 
 <style lang="scss">

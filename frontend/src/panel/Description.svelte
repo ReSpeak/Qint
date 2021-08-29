@@ -9,21 +9,22 @@
 	import { Channel, Client, GraphQlClient, GraphQlServer, Server } from "../book";
 
 	export let selected: NodeSelections;
+	export let editing: boolean;
 
 	$: selection = selected.getSingleSelection();
 </script>
 
 {#if selection !== undefined}
 	{#if selection.node instanceof Client && selection.connection !== undefined}
-		<DescriptionClient connection={selection.connection} client={selection.node} />
+		<DescriptionClient connection={selection.connection} client={selection.node} bind:editing={editing} />
 	{:else if selection.node instanceof GraphQlClient}
-		<DescriptionOfflineClient client={selection.node} />
+		<DescriptionOfflineClient client={selection.node} bind:editing={editing} />
 	{:else if selection.node instanceof Channel && selection.connection !== undefined}
-		<DescriptionChannel connection={selection.connection} channel={selection.node} />
+		<DescriptionChannel connection={selection.connection} channel={selection.node} bind:editing={editing} />
 	{:else if selection.node instanceof Server && selection.connection !== undefined}
-		<DescriptionServer connection={selection.connection} server={selection.node} />
+		<DescriptionServer connection={selection.connection} server={selection.node} bind:editing={editing} />
 	{:else if selection.node instanceof GraphQlServer}
-		<DescriptionOfflineServer server={selection.node} />
+		<DescriptionOfflineServer server={selection.node} bind:editing={editing} />
 	{/if}
 {:else if selected.selections.length !== 0}
 	<DescriptionMultiSelection {selected} />

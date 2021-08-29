@@ -13,9 +13,9 @@
 	import type { ChangePromise } from "../connection";
 
 	export let client: GraphQlClient;
+	export let editing = false;
 
 	const developMode = app.transientSettings.ui._developMode;
-	let editing = false;
 	let changeRequest: ChangePromise | undefined;
 	$: on(client, onClientChanged());
 

@@ -39,9 +39,9 @@
 
 	export let connection: Connection;
 	export let server: Server;
+	export let editing = false;
 
 	const developMode = app.transientSettings.ui._developMode;
-	let editing = false;
 	let editIcon = false;
 	let logOpen = false;
 	$: create_date = $server.created !== undefined ? $server.created : moment.unix(0);

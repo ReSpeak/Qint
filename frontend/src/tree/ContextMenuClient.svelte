@@ -1,36 +1,41 @@
 <script lang="ts">
 	import Icon from "../ui/icon/Icon.svelte";
 	import { Connection } from "../connection";
-	import ClientName from "../ui/name/ClientName.svelte";
 	import ClientVolume from "../ui/specialized/ClientVolume.svelte";
-	import { app } from "../app";
+	import { app, NodeSelection } from "../app";
 	import { Client } from "../book";
+	import QuickActionButtons from "../bar/QuickActionButtons.svelte";
+	import { Reason } from "../book_events";
 
 	export let connection: Connection;
 	export let client: Client;
+
+	const developMode = app.transientSettings.ui._developMode;
+
 	let pokeMessage: string = "";
 	let pokeInput: HTMLElement | undefined;
-	const developMode = app.transientSettings.ui._developMode;
 
 	function onPokeSend() {
 		connection.pokeClient(client.id, pokeMessage);
 		pokeMessage = "";
 	}
 
+	async function kick(reason: Reason) {
+		// TODO Handle result
+		await connection.sendChange({
+			ClientKick: {
+				id: client.id,
+				reason,
+			},
+		});
+	}
+
 	$: ownClient = client.id === connection.book.ownClientId;
 </script>
 
-<div class="name">
-	<ClientName client={$client} />
-	{#if $client.awayMessage !== null && $client.awayMessage.length !== 0}
-		({$client.awayMessage})
-	{/if}
+<div class="inlineButtons">
+	<QuickActionButtons selected={new NodeSelection(connection, client)} />
 </div>
-{#if $client.description.length > 0}
-	<div class="description">
-		{$client.description}
-	</div>
-{/if}
 {#if !ownClient}
 	<ClientVolume client={$client} {connection} />
 {/if}
@@ -47,6 +52,9 @@
 			bind:value={pokeMessage} />
 	</form>
 {/if}
+<button on:click={() => kick(Reason.KickChannel)}><Icon name="shoe-formal" />Kick from channel</button>
+<button on:click={() => kick(Reason.KickServer)}><Icon name="shoe-formal" />Kick from server</button>
+<button><Icon name="cancel" />Ban</button>
 
 <style lang="scss">
 	.poke-input {

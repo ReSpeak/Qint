@@ -38,6 +38,10 @@
 	let columnStyle = "";
 	let connectData = new ConnectData("", "");
 	let fileIo: FileIO;
+	let editing = false;
+
+	$: editingChanged(editing);
+	$: modeChanged($descriptionMode);
 
 	$: {
 		columnStyle = "";
@@ -63,6 +67,20 @@
 	}
 
 	$: location.hash = $connectStringDerived;
+
+	function editingChanged(editing: boolean) {
+		if (editing) {
+			if ($descriptionMode === DescriptionMode.Info)
+				$descriptionMode = DescriptionMode.Edit;
+		} else {
+			if ($descriptionMode === DescriptionMode.Edit)
+				$descriptionMode = DescriptionMode.Info;
+		}
+	}
+
+	function modeChanged(mode: DescriptionMode) {
+		editing = mode === DescriptionMode.Edit;
+	}
 
 	function showConnect(data: ConnectData) {
 		connectData = data;
@@ -139,7 +157,7 @@
 							<ServerFileBrowser connection={sel.connection} />
 						{/if}
 					{:else}
-						<Description selected={$selected} />
+						<Description selected={$selected} bind:editing={editing} />
 					{/if}
 				</div>
 			{/if}

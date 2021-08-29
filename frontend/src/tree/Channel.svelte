@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { afterUpdate, onMount } from "svelte";
-	import type { Writable } from "svelte/store";
+	import { afterUpdate } from "svelte";
 	import { get } from "svelte/store";
 	import Icon from "../ui/icon/Icon.svelte";
 	import TsIcon from "../ui/icon/TsIcon.svelte";
@@ -16,11 +15,11 @@
 	import { SpacerType } from "./tree";
 	import { app, NodeSelection } from "../app";
 	import { ChannelType, TsError } from "../book_events";
-	import HoverMenu from "./HoverMenu.svelte";
-	import { DelayedHover } from "./delayedHover";
 	import { DescriptionMode } from "../transientSettings";
 	import HoverContainer from "./HoverContainer.svelte";
 	import ChangeResult from "../ui/specialized/ChangeResult.svelte";
+	import ContextMenuChannel from "./ContextMenuChannel.svelte";
+	import ContextMenuContainer from "./ContextMenuContainer.svelte";
 	import debug from "debug";
 	const log = debug("UICHANNEL");
 
@@ -36,8 +35,9 @@
 	let showId = false;
 	let thisFilter = "";
 	let childrenFilter = "";
-	let hover: DelayedHover;
-	let hovered: Writable<boolean>;
+	let contextMenuVisible = false;
+	let contextMenuX = 0;
+	let contextMenuY = 0;
 	let askPassword: string | undefined;
 	let error: ResultDetails | undefined;
 
@@ -123,13 +123,11 @@
 		error = undefined;
 		switchChannel();
 		askPassword = undefined;
-		hovered.set(false);
 	}
 
 	function closeAskPassword() {
 		error = undefined;
 		askPassword = undefined;
-		hovered.set(false);
 	}
 
 	function preventScrollClick(ev: MouseEvent): any {
@@ -241,16 +239,25 @@
 		return data;
 	}
 
-	onMount(() => {
-		hover = new DelayedHover(div, [div]);
-		hovered = hover.hovered;
-
-		return () => hover.unregister();
-	});
+	function showContextMenu(e: MouseEvent) {
+		if (!contextMenuVisible) {
+			e.preventDefault();
+			contextMenuVisible = true;
+			contextMenuX = e.pageX;
+			contextMenuY = e.pageY;
+		} else {
+			contextMenuVisible = false;
+		}
+	}
 </script>
 
 <li class="container" class:hidden={!filterShow} class:collapsed>
-	<div bind:this={div} tabindex="0" class="hoverDummy">
+	<div bind:this={div} tabindex="0" on:contextmenu={showContextMenu}>
+		{#if contextMenuVisible}
+			<ContextMenuContainer on:close={() => contextMenuVisible = false} x={contextMenuX} y={contextMenuY}>
+				<ContextMenuChannel {connection} {channel} />
+			</ContextMenuContainer>
+		{/if}
 		<div
 			class="innerContainer"
 			class:ownClient
@@ -329,15 +336,10 @@
 				<HoverContainer
 					{div}
 					closeButton={true}
-					on:close={() => {
-						error = undefined;
-						hovered.set(false);
-					}}>
+					on:close={() => error = undefined}>
 					<ChangeResult result={error} />
 				</HoverContainer>
 			</div>
-		{:else if connection.is_online() && $hovered}
-			<HoverMenu {div} selected={new NodeSelection(connection, channel)} />
 		{/if}
 	</div>
 	<ul class="menu-list">

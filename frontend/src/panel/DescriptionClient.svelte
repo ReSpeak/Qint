@@ -40,6 +40,7 @@
 
 	export let connection: Connection;
 	export let client: Client;
+	export let editing = false;
 
 	const CHART_ENTRY_COUNT = 61;
 
@@ -49,7 +50,6 @@
 	let pokeMessage: string = "";
 	const developMode = app.transientSettings.ui._developMode;
 	let chart: Chart | null = null;
-	let editing = false;
 	let editIcon = false;
 	let timer: number | undefined;
 	let showBigAvatar = false;

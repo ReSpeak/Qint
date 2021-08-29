@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { get } from "svelte/store";
-	import type { Readable } from "svelte/store";
 	import TsIcon from "../ui/icon/TsIcon.svelte";
 	import ServerGroupIcon from "../ui/icon/ServerGroupIcon.svelte";
 	import HighlightString from "../ui/specialized/HighlightString.svelte";
@@ -21,8 +20,8 @@
 	import { afterUpdate, onMount } from "svelte";
 	import { app, NodeSelection } from "../app";
 	import type { ServerGroupId } from "../ts";
-	import HoverMenu from "./HoverMenu.svelte";
-	import { DelayedHover } from "./delayedHover";
+	import ContextMenuClient from "./ContextMenuClient.svelte";
+	import ContextMenuContainer from "./ContextMenuContainer.svelte";
 	import debug from "debug";
 	const log = debug("UICLIENT");
 
@@ -34,10 +33,11 @@
 	export let filterShow: boolean = true;
 	// Channel where this client is in
 	export let channel: Channel | undefined = undefined;
-	let hover: DelayedHover;
-	let hovered: Readable<boolean>;
 	let showId = false;
 	let thisFilter = "";
+	let contextMenuVisible = false;
+	let contextMenuX = 0;
+	let contextMenuY = 0;
 	const serverGroups = connection.book.serverGroups;
 
 	$: isSelected = $client.isSelected;
@@ -170,22 +170,33 @@
 		}
 	}
 
-	onMount(() => {
-		hover = new DelayedHover(div, [div]);
-		hovered = hover.hovered;
+	function showContextMenu(e: MouseEvent) {
+		if (!contextMenuVisible) {
+			e.preventDefault();
+			contextMenuVisible = true;
+			contextMenuX = e.pageX;
+			contextMenuY = e.pageY;
+		} else {
+			contextMenuVisible = false;
+		}
+	}
 
+	onMount(() => {
 		connection.loudnesses.set(client.id, loudnessDiagram);
 
 		return () => {
-			hover.unregister();
-
 			connection.loudnesses.delete(client.id);
 		};
 	});
 </script>
 
-<li class="container" class:hidden={!filterShow}>
-	<div bind:this={div} tabindex="0" class="hoverDummy">
+<li class="container" class:hidden={!filterShow} on:contextmenu={showContextMenu}>
+	{#if contextMenuVisible}
+		<ContextMenuContainer on:close={() => contextMenuVisible = false} x={contextMenuX} y={contextMenuY}>
+			<ContextMenuClient {connection} {client} />
+		</ContextMenuContainer>
+	{/if}
+	<div bind:this={div} tabindex="0">
 		<div
 			class:ownClient
 			class:isSelected
@@ -243,9 +254,6 @@
 				{/if}
 			</span>
 		</div>
-		{#if $hovered}
-			<HoverMenu {div} selected={new NodeSelection(connection, client)} />
-		{/if}
 	</div>
 </li>
 

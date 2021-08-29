@@ -11,9 +11,9 @@
 	import { app } from "../app";
 
 	export let server: GraphQlServer;
+	export let editing = false;
 
 	const developMode = app.transientSettings.ui._developMode;
-	let editing = false;
 	let changeRequest: ChangePromise | undefined;
 
 	function clickEditMode() {

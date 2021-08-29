@@ -31,8 +31,8 @@
 
 	export let connection: Connection;
 	export let channel: Channel;
+	export let editing = false;
 
-	let editing = false;
 	let editIcon = false;
 
 	$: clients = channel.clients;
