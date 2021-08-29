@@ -107,6 +107,10 @@ hr {
 	&:hover {
 		background-color: $highlight-weak;
 	}
+
+	.icon {
+		margin: auto;
+	}
 }
 
 .buttons:not(:last-child) {

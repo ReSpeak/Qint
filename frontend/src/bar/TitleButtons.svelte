@@ -46,14 +46,14 @@
 	updateWindowState();
 </script>
 
-<div class="titleButtons">
-	<div class="titleButton minimize" on:click={minimize}>
+<div class="inlineButtons">
+	<div class="inlineButton minimize" on:click={minimize}>
 		<Icon name="minus" />
 	</div>
-	<div class="titleButton maximize" on:click={maximize}>
+	<div class="inlineButton maximize" on:click={maximize}>
 		<Icon name={isMaximized ? "vector-arrange-above" : "crop-square"} />
 	</div>
-	<div class="titleButton close" on:click={close}>
+	<div class="inlineButton close" on:click={close}>
 		<Icon name="close" />
 	</div>
 </div>

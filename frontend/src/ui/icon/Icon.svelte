@@ -24,8 +24,4 @@
 	.mdi-dummy::before {
 		content: "";
 	}
-
-	.icon {
-		margin: auto;
-	}
 </style>
