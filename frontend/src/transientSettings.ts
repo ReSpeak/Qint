@@ -229,8 +229,6 @@ export class TransientSettingsApp {
 export const enum TitleBarStyle {
 	Native,
 	Normal,
-	Compact,
-	Tiny,
 }
 
 export class TransientSettingsAudio {

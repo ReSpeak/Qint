@@ -75,28 +75,6 @@
 				on:change={syncSettings} />
 			<label for="tb2">Normal</label>
 		</div>
-
-		<div>
-			<input
-				type="radio"
-				id="tb3"
-				name="titleBarStyle"
-				bind:group={$titleBarStyle}
-				value={TitleBarStyle.Compact}
-				on:change={syncSettings} />
-			<label for="tb3">Compact</label>
-		</div>
-
-		<div>
-			<input
-				type="radio"
-				id="tb4"
-				name="titleBarStyle"
-				bind:group={$titleBarStyle}
-				value={TitleBarStyle.Tiny}
-				on:change={syncSettings} />
-			<label for="tb4">Tiny</label>
-		</div>
 	</KeyValue>
 	{#if !IS_TAURI}
 		{#if browserNotificationPermission === "default"}

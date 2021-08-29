@@ -9,6 +9,7 @@
 	import { appWindow } from "@tauri-apps/api/window";
 	import { TitleBarStyle } from "../transientSettings";
 	import TitleButtons from "./TitleButtons.svelte";
+	import { get } from "svelte/store";
 
 	export let displayPanel: DisplayPanel;
 	export let showSidebar: boolean;
@@ -20,6 +21,18 @@
 
 	function toggleSidebar(show: boolean) {
 		showSidebar = show;
+	}
+
+	function togglePanel(panel: DisplayPanel) {
+		if (displayPanel !== panel) {
+			displayPanel = panel;
+		} else {
+			if (get(app.connections).length === 0) {
+				displayPanel = DisplayPanel.Connect;
+			} else {
+				displayPanel = DisplayPanel.Main;
+			}
+		}
 	}
 
 	const selectedNode = app.selectedNode;
@@ -36,86 +49,58 @@
 		}
 	}
 
-	let supportedStyle: TitleBarStyle;
 	$: {
 		if (IS_TAURI) {
-			supportedStyle = $titleBarStyle;
-			if (supportedStyle === TitleBarStyle.Native) {
+			if ($titleBarStyle === TitleBarStyle.Native) {
 				appWindow.setDecorations(true);
 			} else {
 				appWindow.setDecorations(false);
 			}
-		} else {
-			supportedStyle = TitleBarStyle.Native;
 		}
 	}
 </script>
 
-{#if supportedStyle === TitleBarStyle.Normal}
-	<div class="titlebar" on:mousedown={startDragWindow}>
-		<div class="flex1" data-titledrag="1" />
-		<TitleButtons />
-	</div>
-{/if}
-
 <div
 	class="toolbar"
-	class:normalStyle={supportedStyle === TitleBarStyle.Normal}
-	class:tinyStyle={supportedStyle === TitleBarStyle.Tiny}
-	class:bigDesign={supportedStyle !== TitleBarStyle.Tiny}
-	class:smallDesign={supportedStyle === TitleBarStyle.Tiny}
+	class:normalStyle={false}
+	class:tinyStyle={true}
+	class:bigDesign={false}
+	class:smallDesign={true}
 	on:mousedown={startDragWindow}>
-	<div class="leftButtons">
-		<div
-			class="hybridTitleButton"
-			class:active={showSidebar}
-			on:click={() => toggleSidebar(!showSidebar)}
-			title="Channel tree">
-			<Icon name="file-tree" />
+	<div class="leftBlock">
+		<div class="inlineButtons">
+			<div
+				class="inlineButton"
+				class:active={showSidebar}
+				on:click={() => toggleSidebar(!showSidebar)}
+				title="Channel tree">
+				<Icon name="file-tree" />
+			</div>
+			<div
+				class="inlineButton"
+				class:active={displayPanel === DisplayPanel.Connect}
+				on:click={() => togglePanel(DisplayPanel.Connect)}
+				title="Connect to a new server">
+				<Icon name="plus" />
+			</div>
 		</div>
-		<div class="dragSpace" data-titledrag="1" />
-		<Searchbar bind:filter visible={true} />
+		<div class="flex1" data-titledrag="1" />
+		<ConnectionSettings bind:connectData />
 	</div>
 	<div class="flex1" data-titledrag="1" />
-	<div class="centerButtons hybridTitleButtons">
-		{#if filter !== ""}
-			<div
-				class="hybridTitleButton"
-				class:active={displayPanel === DisplayPanel.Search}
-				on:click={() => (displayPanel = DisplayPanel.Search)}
-				title="Chat">
-				<Icon name="magnify" />
-			</div>
-		{/if}
+	<div class="inlineButtons">
+		<Searchbar bind:filter visible={true} />
+		<div class="dragSpace" data-titledrag="1" />
 		<div
-			class="hybridTitleButton"
-			class:active={displayPanel === DisplayPanel.Main}
-			on:click={() => (displayPanel = DisplayPanel.Main)}
-			title="Chat">
-			<Icon name="chat-outline" />
-		</div>
-		<div
-			class="hybridTitleButton"
+			class="inlineButton"
 			class:active={displayPanel === DisplayPanel.Settings}
-			on:click={() => (displayPanel = DisplayPanel.Settings)}
+			on:click={() => togglePanel(DisplayPanel.Settings)}
 			title="Settings">
 			<Icon name="cog" />
 		</div>
-		<div
-			class="hybridTitleButton"
-			class:active={displayPanel === DisplayPanel.Connect}
-			on:click={() => (displayPanel = DisplayPanel.Connect)}
-			title="Connect to a new server">
-			<Icon name={SERVER_ICON} />
-		</div>
-	</div>
-	<div class="flex1" data-titledrag="1" />
-	<div class="rightButtons">
-		<ConnectionSettings bind:connectData />
 	</div>
 
-	{#if supportedStyle === TitleBarStyle.Compact || supportedStyle === TitleBarStyle.Tiny}
-		<div class="flex1" data-titledrag="1" />
+	{#if IS_TAURI && $titleBarStyle !== TitleBarStyle.Native}
 		<TitleButtons />
 	{/if}
 </div>
@@ -136,22 +121,19 @@
 			padding: 0;
 			height: 2em;
 		}
+
+		//box-sizing: content-box;
+		//border-bottom: 1px cyan solid;
+		box-shadow: 0 0 5px black;
+		z-index: 5;
 	}
 
-	.centerButtons,
-	.leftButtons,
-	.rightButtons {
-		display: inline-flex;
+	.leftBlock {
+		display: flex;
+		width: var(--channel-tree-width);
 	}
 
 	.dragSpace {
 		width: 2em;
-	}
-
-	.titlebar {
-		height: 1.5em;
-		display: flex;
-
-		background-color: $box-background-color;
 	}
 </style>

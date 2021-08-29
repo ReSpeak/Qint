@@ -22,6 +22,7 @@
 	import FileIO from "./ui/util/FileIO.svelte";
 	import { IS_TAURI } from "./util";
 	import { BrowserBackend } from "./backend/browser";
+	import QuickActionBar from "./bar/QuickActionBar.svelte";
 
 	const connections = app.connections;
 	let filter: string = "";
@@ -142,6 +143,7 @@
 					{/if}
 				</div>
 			{/if}
+			<QuickActionBar />
 		{:else if $displayPanel === DisplayPanel.Settings}
 			<Settings />
 		{:else if $displayPanel === DisplayPanel.Connect}
@@ -160,7 +162,7 @@
 <style lang="scss">
 	.appContainer {
 		display: grid;
-		grid-template-rows: min-content max-content 1fr;
+		grid-template-rows: max-content 1fr;
 
 		position: absolute;
 		top: 0;
@@ -169,20 +171,16 @@
 		left: 0;
 		height: 100%;
 
-		> :global(.titlebar) {
+		> :global(.toolbar) {
 			grid-row: 1;
 			grid-column: 1 / span 2;
 		}
-		> :global(.toolbar) {
-			grid-row: 2;
-			grid-column: 1 / span 2;
-		}
 		> :global(.sidebar) {
-			grid-row: 3;
+			grid-row: 2;
 			grid-column: 1;
 		}
 		> .displayPanel {
-			grid-row: 3;
+			grid-row: 2;
 			grid-column: 2;
 		}
 	}

@@ -46,7 +46,7 @@ hr {
 	color: $text-strong !important;
 }
 
-.toolbuttons, .bigDesign .hybridTitleButtons {
+.toolbuttons {
 	align-items: center;
 	display: flex;
 	flex-wrap: wrap;
@@ -57,7 +57,7 @@ hr {
 	}
 }
 
-.toolbutton, .bigDesign .hybridTitleButton {
+.toolbutton {
 	@extend %unselectable;
 	-moz-appearance: none;
 	-webkit-appearance: none;
@@ -90,14 +90,15 @@ hr {
 	}
 }
 
-.titleButtons, .smallDesign .hybridTitleButtons {
-	display: flex;
+.inlineButtons {
+	display: inline-flex;
 }
 
-.titleButton, .smallDesign .hybridTitleButton {
-	padding: 0 0.5em;
+.inlineButton {
 	display: flex;
 	align-items: center;
+	width: 2em;
+	height: 2em;
 
 	&.active {
 		background-color: #888888;

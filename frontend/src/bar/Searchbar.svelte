@@ -17,7 +17,6 @@
 <style lang="scss">
 	.searchbar {
 		background-color: $box-background-color;
-		box-shadow: 3px 0 3px #0005;
 	}
 
 	.searchbar,

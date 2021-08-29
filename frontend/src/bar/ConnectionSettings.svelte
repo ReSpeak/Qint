@@ -70,23 +70,23 @@
 	}
 </script>
 
-<div class="hybridTitleButtons">
+<div class="inlineButtons">
 	<div
-		class="hybridTitleButton"
+		class="inlineButton"
 		class:active={inputMuted}
 		on:click={() => changeOwnClient({ inputMuted: !inputMuted })}
 		title="Mute microphone">
 		<Icon name={inputMuted ? "microphone-off" : "microphone"} />
 	</div>
 	<div
-		class="hybridTitleButton"
+		class="inlineButton"
 		class:active={outputMuted}
 		on:click={() => changeOwnClient({ outputMuted: !outputMuted })}
 		title="Mute output">
 		<Icon name={outputMuted ? "volume-off" : "volume-high"} />
 	</div>
 	<div
-		class="hybridTitleButton"
+		class="inlineButton"
 		class:active={isAway}
 		on:click={() => changeOwnClient({ away: isAway ? null : "" })}
 		title="Toggle away">
