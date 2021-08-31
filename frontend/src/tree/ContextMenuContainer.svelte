@@ -1,17 +1,12 @@
 <script lang="ts">
-	import { createEventDispatcher, onMount } from "svelte";
+	import { onMount } from "svelte";
+	import { clearMenu, mX, mY } from "../contextMenu";
 
-	export let x: number;
-	export let y: number;
-
-	const dispatch = createEventDispatcher<{ close: undefined }>();
 	let div: HTMLDivElement;
 
-	function onBlur(e: FocusEvent) {
-		// TODO Only works sometimes
-		if (!(e.relatedTarget instanceof Node) || !div.contains(e.relatedTarget)) {
-			setTimeout(() => dispatch("close"));
-		}
+	function onClick(ev: MouseEvent) {
+		ev.stopPropagation();
+		if ((ev.target as HTMLElement).closest('button, .inlineButton') !== null) clearMenu();
 	}
 
 	onMount(() => {
@@ -19,7 +14,12 @@
 	});
 </script>
 
-<div bind:this={div} tabindex="0" on:focusout={onBlur} class="context menu" style="left: {x}px; top: {y}px;">
+<div
+	bind:this={div}
+	on:click={onClick}
+	tabindex="0"
+	class="context menu"
+	style="left: {mX}px; top: {mY}px;">
 	<slot />
 </div>
 
@@ -30,9 +30,7 @@
 		position: fixed;
 		z-index: 350;
 		border: solid 1px $border;
-		border-radius: 0.5em;
 		background: $background;
-		padding: 0.5em;
 		display: flex;
 		flex-direction: column;
 		gap: 0.5em;

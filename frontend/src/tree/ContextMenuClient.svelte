@@ -52,8 +52,10 @@
 			bind:value={pokeMessage} />
 	</form>
 {/if}
-<button on:click={() => kick(Reason.KickChannel)}><Icon name="shoe-formal" />Kick from channel</button>
-<button on:click={() => kick(Reason.KickServer)}><Icon name="shoe-formal" />Kick from server</button>
+<button on:click={() => kick(Reason.KickChannel)}
+	><Icon name="shoe-formal" />Kick from channel</button>
+<button on:click={() => kick(Reason.KickServer)}
+	><Icon name="shoe-formal" />Kick from server</button>
 <button><Icon name="cancel" />Ban</button>
 
 <style lang="scss">

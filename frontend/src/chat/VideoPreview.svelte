@@ -76,7 +76,7 @@
 	}
 
 	async function toggleVSync() {
-		if (!connection.is_online()) return;
+		if (!connection.isOnline()) return;
 		if (preview_only) {
 			preview_only = false;
 			await tick();

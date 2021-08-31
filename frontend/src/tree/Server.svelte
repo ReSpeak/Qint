@@ -15,6 +15,7 @@
 	import ChangeResult from "../ui/specialized/ChangeResult.svelte";
 	import { DescriptionMode } from "../transientSettings";
 	import { MouseButton } from "../ui/util/draggable";
+	import { showContextMenu } from "../contextMenu";
 
 	let div: HTMLElement;
 	if (render_updates) afterUpdate(() => flash(div));
@@ -24,8 +25,6 @@
 	export let showConnect: (data: ConnectData) => void;
 
 	let contextMenuVisible = false;
-	let contextMenuX = 0;
-	let contextMenuY = 0;
 	const state = connection.state;
 	const server = connection.book.server;
 	const channels = server.channels;
@@ -54,25 +53,26 @@
 		connection.close();
 	}
 
-	function showContextMenu(e: MouseEvent) {
+	function onContextMenu(e: MouseEvent) {
 		if (!contextMenuVisible) {
-			e.preventDefault();
+			showContextMenu(e, () => (contextMenuVisible = false));
 			contextMenuVisible = true;
-			contextMenuX = e.pageX;
-			contextMenuY = e.pageY;
-		} else {
-			contextMenuVisible = false;
 		}
 	}
 </script>
 
 {#if contextMenuVisible}
-	<ContextMenuContainer on:close={() => contextMenuVisible = false} x={contextMenuX} y={contextMenuY}>
-		<ContextMenuServer {connection} {server} />
+	<ContextMenuContainer>
+		<ContextMenuServer {connection} />
 	</ContextMenuContainer>
 {/if}
 <StickySlot styled={false} on:click={click} on:auxclick={click}>
-	<div bind:this={div} class="button stickyLine" class:selectedServerChat tabindex="0" on:contextmenu={showContextMenu}>
+	<div
+		bind:this={div}
+		class="button stickyLine"
+		class:selectedServerChat
+		tabindex="0"
+		on:contextmenu={onContextMenu}>
 		<TsIcon type="server" source={$server} {connection} />
 		<div class="serverName">
 			<ServerName server={$server} {connection} handleClicks={false} />

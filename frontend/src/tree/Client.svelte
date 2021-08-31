@@ -23,6 +23,7 @@
 	import ContextMenuClient from "./ContextMenuClient.svelte";
 	import ContextMenuContainer from "./ContextMenuContainer.svelte";
 	import debug from "debug";
+	import { showContextMenu } from "../contextMenu";
 	const log = debug("UICLIENT");
 
 	if (render_updates) afterUpdate(() => flash(div));
@@ -36,8 +37,6 @@
 	let showId = false;
 	let thisFilter = "";
 	let contextMenuVisible = false;
-	let contextMenuX = 0;
-	let contextMenuY = 0;
 	const serverGroups = connection.book.serverGroups;
 
 	$: isSelected = $client.isSelected;
@@ -170,14 +169,10 @@
 		}
 	}
 
-	function showContextMenu(e: MouseEvent) {
+	function onContextMenu(e: MouseEvent) {
 		if (!contextMenuVisible) {
-			e.preventDefault();
+			showContextMenu(e, () => (contextMenuVisible = false));
 			contextMenuVisible = true;
-			contextMenuX = e.pageX;
-			contextMenuY = e.pageY;
-		} else {
-			contextMenuVisible = false;
 		}
 	}
 
@@ -190,9 +185,9 @@
 	});
 </script>
 
-<li class="container" class:hidden={!filterShow} on:contextmenu={showContextMenu}>
+<li class="container" class:hidden={!filterShow} on:contextmenu={onContextMenu}>
 	{#if contextMenuVisible}
-		<ContextMenuContainer on:close={() => contextMenuVisible = false} x={contextMenuX} y={contextMenuY}>
+		<ContextMenuContainer>
 			<ContextMenuClient {connection} {client} />
 		</ContextMenuContainer>
 	{/if}

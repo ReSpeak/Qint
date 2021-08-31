@@ -3,7 +3,7 @@
 	import { app, NodeSelection, NodeSelections } from "../app";
 	import { DescriptionMode } from "../transientSettings";
 	import { Client } from "../book";
-	
+
 	export let selected: NodeSelection;
 
 	const curSelected = app.selectedNode;

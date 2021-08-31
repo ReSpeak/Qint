@@ -21,6 +21,7 @@
 	import ContextMenuChannel from "./ContextMenuChannel.svelte";
 	import ContextMenuContainer from "./ContextMenuContainer.svelte";
 	import debug from "debug";
+	import { showContextMenu } from "../contextMenu";
 	const log = debug("UICHANNEL");
 
 	if (render_updates) afterUpdate(() => flash(div));
@@ -36,8 +37,6 @@
 	let thisFilter = "";
 	let childrenFilter = "";
 	let contextMenuVisible = false;
-	let contextMenuX = 0;
-	let contextMenuY = 0;
 	let askPassword: string | undefined;
 	let error: ResultDetails | undefined;
 
@@ -60,7 +59,7 @@
 	let div: HTMLElement;
 
 	function updateOwnClient(_children: ITreeNode[]) {
-		if (!connection.is_online()) return false;
+		if (!connection.isOnline()) return false;
 		const client = get(connection.book.ownClient);
 		if (client === undefined) return false;
 		return client.channel === channel.id;
@@ -107,7 +106,7 @@
 	}
 
 	async function switchChannel(ev?: MouseEvent) {
-		if (!connection.is_online()) return;
+		if (!connection.isOnline()) return;
 		if (ev !== undefined && ev.button !== MouseButton.Main) return;
 		const res = await connection.switchChannel(channel, askPassword);
 		if (res !== undefined) {
@@ -138,7 +137,7 @@
 	}
 
 	function setChat(ev: MouseEvent) {
-		if (!connection.is_online()) return;
+		if (!connection.isOnline()) return;
 		if (ev.button === MouseButton.Main) {
 			if (ev.ctrlKey) {
 				app.toggleSelection(new NodeSelection(connection, channel));
@@ -166,7 +165,7 @@
 
 	function dragDrop(ev: CustomEvent<DragData>) {
 		ev.detail.dragNode.classList.remove("dragStyle");
-		if (!connection.is_online()) return;
+		if (!connection.isOnline()) return;
 		const hoverOpt: HTMLElement[] = [
 			...ev.detail.customData.querySelectorAll(":hover"),
 		].reverse();
@@ -239,22 +238,18 @@
 		return data;
 	}
 
-	function showContextMenu(e: MouseEvent) {
+	function onContextMenu(e: MouseEvent) {
 		if (!contextMenuVisible) {
-			e.preventDefault();
+			showContextMenu(e, () => contextMenuVisible = false);
 			contextMenuVisible = true;
-			contextMenuX = e.pageX;
-			contextMenuY = e.pageY;
-		} else {
-			contextMenuVisible = false;
 		}
 	}
 </script>
 
 <li class="container" class:hidden={!filterShow} class:collapsed>
-	<div bind:this={div} tabindex="0" on:contextmenu={showContextMenu}>
-		{#if contextMenuVisible}
-			<ContextMenuContainer on:close={() => contextMenuVisible = false} x={contextMenuX} y={contextMenuY}>
+	<div bind:this={div} tabindex="0" on:contextmenu={onContextMenu}>
+		{#if contextMenuVisible && connection.isOnline()}
+			<ContextMenuContainer>
 				<ContextMenuChannel {connection} {channel} />
 			</ContextMenuContainer>
 		{/if}
@@ -273,10 +268,7 @@
 				class:spacer={spacerType !== SpacerType.None}
 				on:click={() => (collapsed = !collapsed)}>
 				<Icon name="chevron-right{collapsed ? '' : ' mdi-rotate-90'}" />
-				<TsIcon
-					type="channel"
-					source={$channel}
-					connection={connection} />
+				<TsIcon type="channel" source={$channel} {connection} />
 			</button>
 			<span
 				class:spacerC={spacerType === SpacerType.CSpacer ||
@@ -333,17 +325,14 @@
 			</div>
 		{:else if error !== undefined}
 			<div class="errorHoverContainer">
-				<HoverContainer
-					{div}
-					closeButton={true}
-					on:close={() => error = undefined}>
+				<HoverContainer {div} closeButton={true} on:close={() => (error = undefined)}>
 					<ChangeResult result={error} />
 				</HoverContainer>
 			</div>
 		{/if}
 	</div>
 	<ul class="menu-list">
-		{#if connection.is_online()}
+		{#if connection.isOnline()}
 			{#each $clients as client (client.id)}
 				<UiClient
 					{connection}

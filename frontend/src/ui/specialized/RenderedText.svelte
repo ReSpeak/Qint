@@ -55,7 +55,7 @@
 				a.classList.add("file_download");
 				a.onclick = function (e) {
 					e.preventDefault();
-					if (connection.is_online()) {
+					if (connection.isOnline()) {
 						const proxyFileSrc = schemeToLink(scheme);
 						if (proxyFileSrc !== null) {
 							connection.backend.ask_download(proxyFileSrc);

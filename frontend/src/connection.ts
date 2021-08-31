@@ -29,7 +29,7 @@ const log_evt = log.extend("EVT"),
 
 
 export interface IConnection {
-	is_online(): this is Connection;
+	isOnline(): this is Connection;
 	fileProvider(req: IFileRequest): Promise<string | undefined>;
 }
 
@@ -120,7 +120,7 @@ export class Connection implements IConnection {
 		});
 	}
 
-	is_online(): boolean { return true; }
+	isOnline(): boolean { return true; }
 
 	public getState(): Readonly<ConnectionState> {
 		return get(this.state);
@@ -604,7 +604,7 @@ export class Connection implements IConnection {
 }
 
 export class OfflineConnection implements IConnection {
-	is_online(): boolean { return false; }
+	isOnline(): boolean { return false; }
 
 	constructor(public server: string) { }
 
@@ -615,7 +615,7 @@ export class OfflineConnection implements IConnection {
 
 export class NullConnection implements IConnection {
 	public static readonly Instance: IConnection = new NullConnection();
-	is_online(): boolean { return false; }
+	isOnline(): boolean { return false; }
 
 	private constructor() { }
 
