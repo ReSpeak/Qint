@@ -1,7 +1,6 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use actix::prelude::*;
 use actix_cors::Cors;
 use actix_files::Files;
 use actix_web::dev::{Service, ServiceResponse};
@@ -15,32 +14,20 @@ use futures::prelude::*;
 use http::{header::CACHE_CONTROL, header::ETAG, HeaderValue};
 use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
-use qint_proxy::filecache::guess_content_type;
-use qint_proxy::shared::UpdateIdentityOptions;
 use tsproto_types::crypto::EccKeyPubP256;
-
 use rand::Rng;
 use serde::Deserialize;
-use serde_json::Value;
 use slog::{debug, error, info, warn};
 use tokio::time::{self, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
 use tsclientlib::ChannelId;
 use tsclientlib::Error as TsError;
-
-use qint_proxy::connection::{DownloadFileContext, QintConnection, UploadFileContext};
-use qint_proxy::db::{
-	models::UpdateIdentity, DeleteIdentityMsg, FindIdentity, GenrateNewIdentityMsg,
-	GetIdentitiesMsg, UpdateIdentityMsg,
-};
-use qint_proxy::identities::import_ts_identities_from_string;
+use qint_proxy::filecache::guess_content_type;
+use qint_proxy::connection::{DownloadFileContext, UploadFileContext};
 use qint_proxy::messages::ResultDetails;
-use qint_proxy::{ConnectionId, QintState, SettingsUpdateError};
+use qint_proxy::{ConnectionId, QintState};
 
-use crate::loudness_ws::LoudnessService;
-use crate::main_websocket;
-use crate::markdown_ws::MarkdownService;
-use crate::websocket::{SetConnectionMsg, Ws, WsBridge};
+use crate::websocket::Ws;
 
 pub struct WebApp {
 	state: Arc<QintState>,
@@ -87,30 +74,10 @@ impl WebApp {
 				})
 				.app_data(Data::new(state))
 				.service(create_main_ws)
-				.service(create_ws)
-				.service(run_hotkey)
 				.service(audio_reset)
-				.service(audio_device_list)
-				.service(list_plugins)
-				.service(get_plugin)
-				.service(put_plugin)
-				.service(delete_plugin)
 				.service(download_file)
 				.service(upload_file)
 				.service(download_cache_file)
-				.service(get_setting)
-				.service(set_setting)
-				.service(get_link_preview)
-				.service(loudness_service)
-				.service(render_md_service)
-				.service(get_ident_all)
-				.service(get_ident_by_id)
-				.service(get_ident_by_name)
-				.service(put_ident)
-				.service(delete_ident)
-				.service(post_ident_import)
-				.service(post_ident_new)
-				.service(get_mute_state)
 				.service(db_graphql)
 				.service(graphiql)
 				.service(Files::new("", frontend_path).index_file("index.html"))
@@ -166,51 +133,11 @@ impl WebApp {
 	}
 }
 
-#[get("/con/{id}/ws")]
-async fn create_ws(
-	state: web::Data<Arc<QintState>>, id: web::Path<ConnectionId>, req: HttpRequest,
-	stream: web::Payload,
-) -> impl Responder {
-	let id = id.into_inner();
-	// Check that the id does not exist
-	let mut cons = state.connections.lock().unwrap();
-	if cons.contains_key(&id) || !id.is_valid() {
-		return Either::Left(
-			HttpResponse::PreconditionFailed()
-				.body("Connection id is already occupied".to_string()),
-		);
-	}
-
-	// Due to cyclic dependencies Ws will have to wait for it's connection actor
-	// to be injected delayed.
-	// Dependecy chain: QintConnection -> WsBridge -> Ws -> QintConnection
-	let webws = Ws::new(state.logger.clone(), None);
-	match ws::start_with_addr(webws, &req, stream) {
-		Err(e) => {
-			error!(state.logger, "Failed to create websocket actor"; "error" => %e);
-			Either::Left(HttpResponse::InternalServerError().body("Failed to start connection"))
-		}
-		Ok((addr, ws)) => {
-			let sender = WsBridge { logger: state.logger.clone(), ws: addr.clone() };
-			let qint_con =
-				QintConnection::new(state.logger.clone(), (**state).clone(), id, Box::new(sender));
-			let qint_con = qint_con.start();
-			actix::spawn(with_log!(
-				addr.send(SetConnectionMsg(qint_con.clone())),
-				state.logger.clone(),
-				"Failed to delayed inject con"
-			));
-			cons.insert(id, qint_con);
-			Either::Right(ws)
-		}
-	}
-}
-
 #[get("/ws")]
 async fn create_main_ws(
 	state: web::Data<Arc<QintState>>, req: HttpRequest, stream: web::Payload,
 ) -> impl Responder {
-	let webws = main_websocket::Ws::new((**state).clone());
+	let webws = Ws::new((**state).clone());
 	match ws::start(webws, &req, stream) {
 		Err(e) => {
 			error!(state.logger, "Failed to create websocket actor"; "error" => %e);
@@ -219,74 +146,6 @@ async fn create_main_ws(
 		Ok(ws) => {
 			Either::Right(ws)
 		}
-	}
-}
-
-#[post("/hotkey")]
-async fn run_hotkey(
-	state: web::Data<Arc<QintState>>, action: web::Json<qint_proxy::hotkey::Action>,
-) -> impl Responder {
-	action.run(&state).await;
-	HttpResponse::Ok()
-}
-
-#[post("/audio/reset")]
-async fn audio_reset(state: web::Data<Arc<QintState>>) -> impl Responder {
-	if let Some(ad) = &state.audio_data {
-		if ad.a2ts.send(qint_proxy::audio::ResetMsg).await.is_err() {
-			error!(state.logger, "Failed to reset audio pipeline");
-			HttpResponse::InternalServerError()
-		} else if ad.ts2a.send(qint_proxy::audio::ResetMsg).await.is_err() {
-			error!(state.logger, "Failed to reset audio pipeline");
-			HttpResponse::InternalServerError()
-		} else {
-			HttpResponse::Ok()
-		}
-	} else {
-		HttpResponse::Ok()
-	}
-}
-
-#[get("/audio/device_list")]
-async fn audio_device_list(state: web::Data<Arc<QintState>>) -> impl Responder {
-	HttpResponse::Ok().json(state.audio_device_list().await)
-}
-
-#[get("/plugins")]
-async fn list_plugins(state: web::Data<Arc<QintState>>) -> impl Responder {
-	web::Json(state.plugin_list())
-}
-
-#[get("/plugins/{name}")]
-async fn get_plugin(state: web::Data<Arc<QintState>>, name: web::Path<String>) -> impl Responder {
-	state
-		.plugin_get(&name)
-		.with_header((http::header::CONTENT_TYPE, "application/javascript; charset=utf-8"))
-}
-
-#[put("/plugins/{name}")]
-async fn put_plugin(
-	state: web::Data<Arc<QintState>>, name: web::Path<String>, body: web::Bytes,
-) -> impl Responder {
-	if let Ok(s) = std::str::from_utf8(body.as_ref()) {
-		if let Err(e) = state.plugin_save(&name, s) {
-			HttpResponse::InternalServerError().body(e.to_string())
-		} else {
-			HttpResponse::Ok().finish()
-		}
-	} else {
-		HttpResponse::BadRequest().body("Invalid text data")
-	}
-}
-
-#[delete("/plugins/{name}")]
-async fn delete_plugin(
-	state: web::Data<Arc<QintState>>, name: web::Path<String>,
-) -> impl Responder {
-	if let Err(e) = state.plugin_delete(&name) {
-		HttpResponse::InternalServerError().body(e.to_string())
-	} else {
-		HttpResponse::Ok().finish()
 	}
 }
 
@@ -515,152 +374,21 @@ async fn download_cache_file(
 	}
 }
 
-#[get("/peek_link/{url}")]
-async fn get_link_preview(
-	state: web::Data<Arc<QintState>>, url: web::Path<String>,
-) -> impl Responder {
-	HttpResponse::Ok().json(state.link_previewer.decode_and_analyze_link(&url).await)
-}
-
-#[get("/loudness")]
-async fn loudness_service(
-	state: web::Data<Arc<QintState>>, req: HttpRequest, stream: web::Payload,
-) -> impl Responder {
-	let ws = LoudnessService::new(Arc::clone(&state));
-	match ws::start_with_addr(ws, &req, stream) {
-		Err(e) => {
-			error!(state.logger, "Failed to create websocket actor"; "error" => %e);
-			Either::Left(HttpResponse::InternalServerError().body("Failed to start connection"))
-		}
-		Ok((_, ws)) => Either::Right(ws),
-	}
-}
-
-#[get("/render_md_service")]
-async fn render_md_service(
-	state: web::Data<Arc<QintState>>, req: HttpRequest, stream: web::Payload,
-) -> impl Responder {
-	let ws = MarkdownService::new();
-	match ws::start_with_addr(ws, &req, stream) {
-		Err(e) => {
-			error!(state.logger, "Failed to create websocket actor"; "error" => %e);
-			Either::Left(HttpResponse::InternalServerError().body("Failed to start connection"))
-		}
-		Ok((_, ws)) => Either::Right(ws),
-	}
-}
-
-#[get("/settings")]
-async fn get_setting(state: web::Data<Arc<QintState>>) -> impl Responder {
-	let values = state.settings.read().unwrap();
-	HttpResponse::Ok().json(serde_json::to_value(&*values).unwrap())
-}
-
-#[put("/settings")]
-async fn set_setting(state: web::Data<Arc<QintState>>, body: web::Json<Value>) -> impl Responder {
-	match QintState::set_settings_diff(&state.into_inner(), &body.0) {
-		Err(SettingsUpdateError::ModifyFailed(e)) => HttpResponse::BadRequest().body(e.to_string()),
-		Err(SettingsUpdateError::InternalError(e)) => {
-			HttpResponse::InternalServerError().body(e.to_string())
-		}
-		Ok(_) => HttpResponse::Ok().finish(),
-	}
-}
-
-// get /ident/all
-// get /ident/by_name/{name}
-// put /ident/{name}?nickname?phonetic_name
-// post /ident/import [Body:ini_file]
-
-#[get("/ident/all")]
-async fn get_ident_all(state: web::Data<Arc<QintState>>) -> impl Responder {
-	match state.database.send(GetIdentitiesMsg(FindIdentity::All)).await {
-		Ok(Ok(idents)) => HttpResponse::Ok().json(idents),
-		Ok(Err(err)) => HttpResponse::BadRequest().body(err.to_string()),
-		Err(_) => HttpResponse::Gone().finish(),
-	}
-}
-
-#[get("/ident/by_id/{id}")]
-async fn get_ident_by_id(state: web::Data<Arc<QintState>>, path: web::Path<u64>) -> impl Responder {
-	let id = path.into_inner();
-	get_single_ident_by(state, FindIdentity::ById(id)).await
-}
-
-#[get("/ident/by_name/{name}")]
-async fn get_ident_by_name(
-	state: web::Data<Arc<QintState>>, path: web::Path<String>,
-) -> impl Responder {
-	let name = path.into_inner();
-	get_single_ident_by(state, FindIdentity::ByName(name)).await
-}
-
-async fn get_single_ident_by(state: web::Data<Arc<QintState>>, by: FindIdentity) -> impl Responder {
-	match state.database.send(GetIdentitiesMsg(by)).await {
-		Ok(Ok(idents)) => {
-			if let Some(ident) = idents.first() {
-				HttpResponse::Ok().json(ident)
-			} else {
-				HttpResponse::NotFound().finish()
-			}
-		}
-		Ok(Err(err)) => HttpResponse::BadRequest().body(err.to_string()),
-		Err(_) => HttpResponse::Gone().finish(),
-	}
-}
-
-#[put("/ident/{id}")]
-async fn put_ident(
-	state: web::Data<Arc<QintState>>, path: web::Path<u64>, query_opt: Query<UpdateIdentityOptions>,
-) -> impl Responder {
-	let query = query_opt.into_inner();
-	match state
-		.database
-		.send(UpdateIdentityMsg(
-			FindIdentity::ById(path.into_inner()),
-			UpdateIdentity { name: query.name, ..Default::default() },
-		))
-		.await
-	{
-		Ok(Ok(())) => HttpResponse::Ok().finish(),
-		Ok(Err(err)) => HttpResponse::BadRequest().body(err.to_string()),
-		Err(_) => HttpResponse::Gone().finish(),
-	}
-}
-
-#[delete("/ident/{id}")]
-async fn delete_ident(state: web::Data<Arc<QintState>>, path: web::Path<u64>) -> impl Responder {
-	match state.database.send(DeleteIdentityMsg(FindIdentity::ById(path.into_inner()))).await {
-		Ok(Ok(_)) => HttpResponse::Ok().finish(),
-		Ok(Err(err)) => HttpResponse::BadRequest().body(err.to_string()),
-		Err(_) => HttpResponse::Gone().finish(),
-	}
-}
-
-#[post("/ident/import")]
-async fn post_ident_import(state: web::Data<Arc<QintState>>, body: web::Bytes) -> impl Responder {
-	if let Ok(import_str) = std::str::from_utf8(body.as_ref()) {
-		match import_ts_identities_from_string(&state, import_str).await {
-			Ok(_) => HttpResponse::Ok().finish(),
-			Err(e) => HttpResponse::BadRequest().body(e.to_string()),
+#[post("/audio/reset")]
+async fn audio_reset(state: web::Data<Arc<QintState>>) -> impl Responder {
+	if let Some(ad) = &state.audio_data {
+		if ad.a2ts.send(qint_proxy::audio::ResetMsg).await.is_err() {
+			error!(state.logger, "Failed to reset audio pipeline");
+			HttpResponse::InternalServerError()
+		} else if ad.ts2a.send(qint_proxy::audio::ResetMsg).await.is_err() {
+			error!(state.logger, "Failed to reset audio pipeline");
+			HttpResponse::InternalServerError()
+		} else {
+			HttpResponse::Ok()
 		}
 	} else {
-		HttpResponse::BadRequest().body("Invalid text data")
+		HttpResponse::Ok()
 	}
-}
-
-#[post("/ident/new")]
-async fn post_ident_new(state: web::Data<Arc<QintState>>) -> impl Responder {
-	match state.database.send(GenrateNewIdentityMsg()).await {
-		Ok(Ok(ident)) => HttpResponse::Ok().json(ident),
-		Ok(Err(err)) => HttpResponse::BadRequest().body(err.to_string()),
-		Err(_) => HttpResponse::Gone().finish(),
-	}
-}
-
-#[get("/mutestate")]
-async fn get_mute_state(state: web::Data<Arc<QintState>>) -> impl Responder {
-	HttpResponse::Ok().json(state.get_mute_state().await)
 }
 
 #[get("/graphiql")]

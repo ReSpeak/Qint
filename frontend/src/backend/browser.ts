@@ -1,39 +1,149 @@
-import { InMsg, OutMsg, ResultDetails } from "./ws";
-import { createUuidV4, hasProperty, hexEncode, javaHash, PromiseParts } from "../util";
+import { ResultDetails } from "./ws";
+import { assert, hasProperty, hexEncode, javaHash, PromiseParts } from "../util";
 import {
 	AskReadResult,
-	closedFn,
-	errorFn,
-	FindIdentity,
-	IAudioDeviceList,
 	IBackend,
 	IBackendConnection,
 	ICacheFileRequest,
 	IFileRequest,
-	IMarkdownTransform,
-	LoudnessEvent,
-	LoudnessUnsubscribe,
-	msgFn,
 	TransferResult,
-	UpdateIdentityOptions,
 	UploadFeature,
 } from "./backend";
-import { RustAnalyzeResult } from "../chat/previewAnalyzer";
-import { ApiIdentity } from "../panel/settings/identity";
-import { MuteStates } from "../connect/uiConnect";
-import { HotkeyAction } from "../transientSettings";
-import { importFunc, IPlugin } from "../plugins";
-import FileIO from "../ui/util/FileIO.svelte";
+import { IInvokeConnection, InvokeArgs, InvokeBackend, InvokeBackendConnection } from "./invokeConnection";
 import { guessName } from "../ui/specialized/uiRenderedText";
 import { FiletransferManager, UploadFile } from "./filetransferManager";
 import { pathJoin } from "../panel/fileUtil";
+import debug from "debug";
 import { ReturnCodeTracker } from "./returnCodeTracker";
+import FileIO from "../ui/util/FileIO.svelte";
+const log = debug("BROWSER-WS");
 
 const IS_SNOWPACK = (import.meta as any).hot;
 const BASE_ADDRESS = IS_SNOWPACK ? "http://localhost:4422" : "";
 
-export class BrowserBackend implements IBackend {
-	public name = "Browser";
+type WsP2FMsg = { cmd: string; returnCode?: string; con?: string; msg?: any; };
+
+function urlToWebSocket(url: string): string {
+	let path = url;
+	if (!path.startsWith("http")) path = window.location.origin;
+	if (!path.startsWith("http")) throw Error("Failed to get websocket path");
+	return "ws" + path.substring(4);
+}
+
+class BrowserInvokeConnection implements IInvokeConnection {
+	public name: string = "browser-ws";
+	backend!: BrowserBackend;
+
+	/** The url address prefix for websockets */
+	private readonly wsBaseAddress: string = urlToWebSocket(BASE_ADDRESS);
+
+	private socket?: WebSocket;
+	private connecting?: Promise<void>;
+	private curReturnCode = 0;
+	private returnCodes = new Map<string, PromiseParts<any>>();
+
+	constructor() {}
+
+	private connect(): Promise<void> {
+		log("Connecting");
+		this.socket?.close();
+		this.socket = new WebSocket(`${this.wsBaseAddress}/ws`);
+		this.socket.onerror = (error) => console.error("browser-ws error", String(error));
+		this.socket.onmessage = (evt) => {
+			const msg = JSON.parse(evt.data) as WsP2FMsg;
+			switch (msg.cmd) {
+				case "loudness":
+					this.backend.loudnessListener.call(msg.msg);
+					break;
+				case "ws_close": {
+					log("Closing event: %o", msg);
+					const conId = msg.con!;
+					const con = this.backend.connections.get(conId);
+					if (con !== undefined) {
+						con.onClose?.();
+						this.backend.connections.delete(conId);
+					}
+					break;
+				}
+				case "ws": {
+					log("QintConnection: %o", msg);
+					const con = this.backend.connections.get(msg.con!);
+					if (con !== undefined) {
+						con.onMsg?.(msg.msg);
+					}
+					break;
+				}
+				case "resp": {
+					const ret = this.returnCodes.get(msg.returnCode!);
+					if (ret !== undefined) {
+						this.returnCodes.delete(msg.returnCode!);
+						ret.resolve(msg.msg);
+					}
+					break;
+				}
+				case "resp_err": {
+					const ret = this.returnCodes.get(msg.returnCode!);
+					if (ret !== undefined) {
+						this.returnCodes.delete(msg.returnCode!);
+						ret.reject(msg.msg);
+					}
+					break;
+				}
+			}
+		};
+		let rejectFun: (reason?: any) => void;
+		this.connecting = new Promise((resolve, reject) => {
+			rejectFun = reject;
+			this.socket!.onopen = () => {
+				log("Connected");
+				this.connecting = undefined;
+				resolve();
+			};
+		});
+		this.socket.onclose = () => {
+			log("Closing");
+			this.socket = undefined;
+
+			// Reject all promises
+			rejectFun("Websocket closed");
+			for (const ret of this.returnCodes.values()) {
+				ret.reject();
+			}
+			this.returnCodes.clear();
+
+			// Close all connections
+			for (const con of this.backend.connections.values()) {
+				con.onClose?.();
+			}
+			this.backend.connections.clear();
+		};
+		return this.connecting;
+	}
+
+	public async invoke<T = void>(cmd: string, args?: InvokeArgs): Promise<T> {
+		log("invoke " + cmd);
+		if (this.socket === undefined) await this.connect();
+		if (this.connecting !== undefined) await this.connecting;
+
+		if (this.socket !== undefined) {
+			const returnCode = this.curReturnCode.toString();
+			log(`sending ${cmd} return code ${returnCode}`);
+			this.curReturnCode = (this.curReturnCode + 1) % 65536;
+			this.socket.send(JSON.stringify({ cmd, returnCode, args: args ?? {} }));
+			return new Promise((resolve, reject) => {
+				this.returnCodes.set(returnCode, { resolve, reject });
+			});
+		} else {
+			return new Promise((_resolve, reject) => reject("Failed to connect websocket"));
+		}
+	}
+
+	public createNewConnection(returnCodes: ReturnCodeTracker): IBackendConnection & InvokeBackendConnection {
+		return new BrowserBackendConnection(this.backend, returnCodes);
+	}
+}
+
+export class BrowserBackend extends InvokeBackend<BrowserInvokeConnection> implements IBackend {
 	public readonly cacheFileSrc: string;
 
 	/** The url address prefix for websockets */
@@ -41,57 +151,14 @@ export class BrowserBackend implements IBackend {
 	public fileIo!: FileIO;
 
 	constructor() {
+		super(new BrowserInvokeConnection());
+		this.inner.backend = this;
+		log("Using browser-ws backend");
 		this.cacheFileSrc = `${BASE_ADDRESS}/filecache`;
 	}
 
-	public createNewConnection(returnCodes: ReturnCodeTracker): IBackendConnection {
-		return new BrowserBackendConnection(this, returnCodes);
-	}
-
-	public close(): void {
-		// Nothing to do here for browser backed since websockets get killed.
-	}
-
-	private fetch(cmd: string, data?: RequestInit): Promise<Response> {
-		return fetch(`${BASE_ADDRESS}${cmd}`, data);
-	}
-
-	public async graphql<T = any>(
-		query: string,
-		variables?: Record<string, unknown>
-	): Promise<{ data: T }> {
-		const response = await this.fetch(`/db`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ query, variables }),
-		});
-		return await response.json();
-	}
-
-	public setTitle(name: string): void {
-		document.title = name;
-	}
-
-	public setIcon(url: string | undefined): void {
-		const icon = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
-		if (icon !== null) icon.href = url ?? "icon.png";
-		else console.log("Tried to set icon but did not find icon element");
-	}
-
-	public async get_settings(): Promise<Record<string, unknown>> {
-		const response = await this.fetch("/settings");
-		return await response.json();
-	}
-
-	public async set_settings(diff: Record<string, unknown>): Promise<void> {
-		await this.fetch(`/settings`, {
-			method: "PUT",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(diff),
-		});
-	}
-
 	public fetch_cache_image(req: ICacheFileRequest): Promise<string> {
+		assert(!req.server.includes("/"), "Server must be url-safe base64");
 		let str = `${this.cacheFileSrc}/${req.server}/${req.channel}${req.path}`;
 		let hasQ = false;
 		if (req.hash) {
@@ -110,144 +177,18 @@ export class BrowserBackend implements IBackend {
 		const file0 = files[0];
 		return { content: await file0.text(), name: file0.name };
 	}
-
-	public async peek_link(link: string): Promise<RustAnalyzeResult> {
-		const response = await this.fetch(`/peek_link/${encodeURIComponent(link)}`);
-		return await response.json();
-	}
-
-	public async get_audio_device_list(): Promise<IAudioDeviceList> {
-		const response = await this.fetch("/audio/device_list");
-		return await response.json();
-	}
-
-	public async identity_create(): Promise<ApiIdentity> {
-		const response = await this.fetch("/ident/new", {
-			method: "POST",
-		});
-		return await response.json();
-	}
-
-	public async identity_import(data: string): Promise<void> {
-		await this.fetch("/ident/import", {
-			method: "POST",
-			body: data,
-		});
-	}
-
-	public async identity_list(find: FindIdentity): Promise<ApiIdentity[]> {
-		if (find == "All") {
-			const response = await this.fetch("/ident/all");
-			return (await response.json()) as ApiIdentity[];
-		}
-		throw Error("Not implemented");
-	}
-
-	public async identity_update(id: string, update: UpdateIdentityOptions): Promise<void> {
-		await this.fetch(`/ident/${id}?name=${update.name}`, {
-			method: "PUT",
-		});
-	}
-
-	public async identity_delete(id: string): Promise<void> {
-		await this.fetch(`/ident/${id}`, {
-			method: "DELETE",
-		});
-	}
-
-	public async get_mutestate(): Promise<MuteStates> {
-		return await (await this.fetch("/mutestate")).json();
-	}
-
-	public async run_hotkey(action: HotkeyAction): Promise<void> {
-		await this.fetch("/hotkey", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(action),
-		});
-	}
-
-	public async plugin_list(): Promise<string[]> {
-		const response = await this.fetch("/plugins");
-		return await response.json();
-	}
-
-	public async plugin_get(name: string): Promise<string> {
-		const response = await this.fetch(`/plugins/${name}`);
-		return await response.text();
-	}
-
-	public async plugin_save(name: string, content: string): Promise<void> {
-		await this.fetch(`/plugins/${name}`, {
-			method: "PUT",
-			body: content,
-		});
-	}
-
-	public async plugin_delete(name: string): Promise<void> {
-		await this.fetch(`/plugins/${name}`, {
-			method: "DELETE",
-		});
-	}
-
-	public plugin_load(name: string): Promise<IPlugin> {
-		return importFunc(`${BASE_ADDRESS}/plugins/${name}`);
-	}
-
-	public get_markdown_transformer(): IMarkdownTransform {
-		return new BrowserMarkdownTransform(`${this.wsBaseAddress}/render_md_service`);
-	}
-
-	public get_loudness_listener(callback: LoudnessEvent): LoudnessUnsubscribe {
-		const loudnessSocket = new WebSocket(`${this.wsBaseAddress}/loudness`);
-		loudnessSocket.binaryType = "arraybuffer";
-		loudnessSocket.onmessage = (ev) => {
-			const data = new DataView(ev.data);
-			const loudness = data.getFloat64(0);
-			const vad = data.getFloat32(8);
-			callback([loudness, vad]);
-		};
-		return () => { loudnessSocket.close(); }
-	}
 }
 
-export class BrowserBackendConnection implements IBackendConnection {
+export class BrowserBackendConnection extends InvokeBackendConnection implements IBackendConnection {
 	public serverFileSrc: string;
-	public readonly id: string;
-	private socket?: WebSocket;
 	private readonly filetransferManager: FiletransferManager = new FiletransferManager(this);
+
 	constructor(
-		private parent: BrowserBackend,
+		private browserBackend: BrowserBackend,
 		private returnCodes: ReturnCodeTracker,
 	) {
-		this.serverFileSrc = "";
-		this.id = createUuidV4();
-	}
-
-	public send(data: OutMsg): void {
-		if (this.socket) this.socket.send(JSON.stringify(data));
-	}
-
-	public connect(onMsg: msgFn, onError: errorFn, onClose: closedFn): Promise<void> {
-		this.close();
-
+		super(browserBackend.inner);
 		this.serverFileSrc = `${BASE_ADDRESS}/con/${this.id}`;
-		this.socket = new WebSocket(`${this.parent.wsBaseAddress}/con/${this.id}/ws`);
-		this.socket.onerror = (error) => onError(String(error));
-		this.socket.onclose = onClose;
-		this.socket.onmessage = (evt) => {
-			onMsg(JSON.parse(evt.data) as InMsg);
-		};
-		return new Promise((resolve) => {
-			this.socket!.onopen = () => {
-				resolve();
-			};
-		});
-	}
-
-	public close(): void {
-		if (this.socket) this.socket.close();
-		this.socket = undefined;
 	}
 
 	public fetch(cmd: string, data: RequestInit): Promise<Response> {
@@ -268,6 +209,8 @@ export class BrowserBackendConnection implements IBackendConnection {
 		return Promise.resolve(str);
 	}
 
+	// Filetransfer
+
 	public async upload_bytes(req: IFileRequest, data: Blob): Promise<TransferResult> {
 		const [returnCode, request] = this.returnCodes.getNew();
 		const uploadPromise = this.fetch(
@@ -286,7 +229,7 @@ export class BrowserBackendConnection implements IBackendConnection {
 		const src = await this.fetch_image(req);
 		const finalName = req.suggested_name ?? guessName(src) ?? "file";
 		// TODO add return code ?
-		this.parent.fileIo.askDownload(`${src}?dl=${encodeURIComponent(finalName)}`);
+		this.browserBackend.fileIo.askDownload(`${src}?dl=${encodeURIComponent(finalName)}`);
 		return { uploadPromise: Promise.resolve() };
 	}
 
@@ -297,7 +240,7 @@ export class BrowserBackendConnection implements IBackendConnection {
 		const is_files = hasProperty(target, "Files");
 		const multiple = is_files;
 		try {
-			files = await this.parent.fileIo.askUpload(multiple);
+			files = await this.browserBackend.fileIo.askUpload(multiple);
 		} catch { throw BrowserBackendConnection.NoFilesSelected; }
 
 		if (!files || files.length == 0)
@@ -371,57 +314,5 @@ export class BrowserBackendConnection implements IBackendConnection {
 			return [hexEncode(new Uint8Array(hashBuffer)), buffer];
 		}
 		return [file.size.toString(), file];
-	}
-}
-
-function urlToWebSocket(url: string): string {
-	let path = url;
-	if (!path.startsWith("http")) path = window.location.origin;
-	if (!path.startsWith("http")) throw Error("Failed to get websocket path");
-	return "ws" + path.substring(4);
-}
-
-class BrowserMarkdownTransform implements IMarkdownTransform {
-	private mdRenderSocket: WebSocket | undefined;
-	private promise: PromiseParts<string> & { p: Promise<string> } | undefined;
-
-	constructor(url: string) {
-		this.mdRenderSocket = new WebSocket(url);
-		this.mdRenderSocket.onclose = () => {
-			if (this.promise !== undefined) {
-				const p = this.promise;
-				this.promise = undefined;
-				p.reject();
-			}
-			this.mdRenderSocket = undefined;
-		};
-		this.mdRenderSocket.onmessage = (ev) => {
-			if (this.promise !== undefined) {
-				const p = this.promise;
-				this.promise = undefined;
-				p.resolve(ev.data as string);
-			}
-		};
-	}
-
-	public write(md: string): Promise<string> {
-		if (this.mdRenderSocket !== undefined) {
-			if (this.promise === undefined) {
-				let promisePart: PromiseParts<string> = undefined!;
-				const p = new Promise<string>((resolve, reject) => {
-					promisePart = { resolve, reject };
-				});
-				this.promise = { ...promisePart, p };
-				this.mdRenderSocket.send(md);
-			}
-			return this.promise.p;
-		} else {
-			return Promise.reject();
-		}
-	}
-
-	public close() {
-		this.mdRenderSocket?.close();
-		this.mdRenderSocket = undefined;
 	}
 }

@@ -4,7 +4,7 @@ import { ApiIdentity } from "../panel/settings/identity";
 import { Uid } from "../ts";
 import { IS_TAURI } from "../util";
 //import { BrowserBackend } from "./browser";
-import { BrowserBackend } from "./browser2";
+import { BrowserBackend } from "./browser";
 import { TauriBackend } from "./tauri";
 import { InMsg, OutMsg } from "./ws";
 import { HotkeyAction } from "../transientSettings";
