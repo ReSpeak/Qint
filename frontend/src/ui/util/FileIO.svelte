@@ -6,7 +6,7 @@
 
 	let callback: PromiseParts<FileList> | undefined;
 
-	export async function askDownload(url: string): void {
+	export async function askDownload(url: string): Promise<void> {
 		downloader.src = url;
 	}
 

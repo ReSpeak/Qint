@@ -26,8 +26,6 @@ console.log(`Using ${backend.name} backend`);
 app.transientSettings.synth.init();
 
 window.onbeforeunload = function (e: any) {
-	app.close();
-
 	if (!IS_TAURI) {
 		// For debugging purposes (?)
 		app.transientSettings.synth.trySpeak("Goodbye");
@@ -38,6 +36,8 @@ window.onbeforeunload = function (e: any) {
 			return true;
 		}
 	}
+
+	app.close();
 	return;
 };
 

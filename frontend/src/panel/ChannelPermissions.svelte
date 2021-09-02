@@ -7,7 +7,7 @@
 	import PermissionList from "../ui/specialized/PermissionList.svelte";
 	import type { PermissionDiff } from "../ui/specialized/uiPermissionList";
 	import type { Permission, PermissionDescription } from "../ts";
-	import { ChangePromise } from "../backend/returnCodeTracker";
+	import type { ChangePromise } from "../backend/returnCodeTracker";
 
 	export let connection: Connection;
 	export let channel: Channel;

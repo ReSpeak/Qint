@@ -129,7 +129,7 @@ class BrowserInvokeConnection implements IInvokeConnection {
 			const returnCode = this.curReturnCode.toString();
 			log(`sending ${cmd} return code ${returnCode}`);
 			this.curReturnCode = (this.curReturnCode + 1) % 65536;
-			this.socket.send(JSON.stringify({ cmd, returnCode, args }));
+			this.socket.send(JSON.stringify({ cmd, returnCode, args: args ?? {} }));
 			return new Promise((resolve, reject) => {
 				this.returnCodes.set(returnCode, { resolve, reject });
 			});
