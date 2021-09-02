@@ -128,7 +128,6 @@ export class Connection implements IConnection {
 
 	public close(): void {
 		this.backend.close();
-		this._state.update((s) => s.setDisconnected());
 
 		app.clientsByUid.update((clients) => {
 			for (const c of this.book.clients.values()) {
@@ -155,6 +154,7 @@ export class Connection implements IConnection {
 	}
 
 	private onClose(): void {
+		this._state.update((s) => s.setDisconnected());
 		// Plugins
 		for (const plugin of app.plugins) {
 			try {

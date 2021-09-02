@@ -199,6 +199,7 @@ pub fn markdown(raw: &str) -> String { RenderMd::new().markdown(raw, &[]).to_str
 
 /// Marks highlighted text ranges with `.filterHighlight`.
 pub fn markdown_highlighted(raw: &str, highlights: &[Range<usize>]) -> String {
+	assert!(highlights.windows(2).all(|w| w[0].start <= w[1].start), "highlights need to be sorted");
 	RenderMd::new().markdown(raw, highlights).to_string()
 }
 

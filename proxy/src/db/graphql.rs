@@ -859,13 +859,14 @@ impl SearchResult {
 			// We want to highlight in the original message, so search the highlighted parts there.
 			let snippet = gen.snippet(&attr);
 			let s = snippet.fragments();
-			let highlights = snippet
+			let mut highlights = snippet
 				.highlighted()
 				.iter()
 				.filter_map(|r| {
 					attr.find(&s[r.clone()]).map(|start| start..(start + (r.end - r.start)))
 				})
 				.collect::<Vec<_>>();
+			highlights.sort_by_key(|r| r.start);
 			Ok(Some(markdown_highlighted(&attr, &highlights)))
 		} else {
 			Ok(Some(markdown_highlighted(&attr, &[])))

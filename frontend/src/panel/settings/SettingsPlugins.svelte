@@ -1,9 +1,7 @@
 <script lang="ts">
-
 	import { backend } from "../../backend/backend";
 	import TabSlot from "../../ui/container/TabSlot.svelte";
 	import Icon from "../../ui/icon/Icon.svelte";
-	import FileIO from "../../ui/util/FileIO.svelte";
 	import { loadCssPlugin, removeCssPlugin } from "../../plugins";
 
 	// Plugin names

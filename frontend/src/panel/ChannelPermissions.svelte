@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { Connection } from "../connection";
-	import type { ChangePromise } from "../connection";
 	import type { Channel } from "../book";
 	import { on } from "../util";
 	import Icon from "../ui/icon/Icon.svelte";
@@ -8,6 +7,7 @@
 	import PermissionList from "../ui/specialized/PermissionList.svelte";
 	import type { PermissionDiff } from "../ui/specialized/uiPermissionList";
 	import type { Permission, PermissionDescription } from "../ts";
+	import { ChangePromise } from "../backend/returnCodeTracker";
 
 	export let connection: Connection;
 	export let channel: Channel;

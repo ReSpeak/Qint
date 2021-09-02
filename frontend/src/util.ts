@@ -179,12 +179,12 @@ export function hasProperty(obj: unknown, propName: string): boolean {
 
 export function escapeHtml(s: string): string {
 	return s
-		.replace("&", "&amp;")
-		.replace("<", "&lt;")
-		.replace(">", "&gt;")
-		.replace('"', "&quot;")
-		.replace("'", "&#x27;")
-		.replace("/", "&#x2F;");
+		.replaceAll("&", "&amp;")
+		.replaceAll("<", "&lt;")
+		.replaceAll(">", "&gt;")
+		.replaceAll('"', "&quot;")
+		.replaceAll("'", "&#x27;")
+		.replaceAll("/", "&#x2F;");
 }
 
 export function ignoreCaseRegex(search: string): RegExp {
@@ -340,11 +340,12 @@ export function base64Encode(data: ArrayLike<number>): string {
 }
 
 export function urlBase64Decode(s: string): number[] {
-	return base64Decode(s.replace("-", "+").replace("_", "/"));
+	return base64Decode(s.replaceAll("-", "+").replaceAll("_", "/"));
 }
 
 export function urlBase64Encode(data: ArrayLike<number>): string {
-	return base64Encode(data).replace("+", "-").replace("/", "_").replace(/=+$/, "");
+	const r = base64Encode(data).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+	return r;
 }
 
 export function hexDecode(s: string): number[] {

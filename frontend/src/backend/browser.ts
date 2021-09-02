@@ -314,9 +314,7 @@ export class BrowserBackendConnection implements IBackendConnection {
 					returnCode,
 				};
 				const uploadPromise = this.filetransferManager.uploadSingleFile(uploadFile);
-				console.log("before await");
 				const details = await request;
-				console.log("after await");
 				if (details) throw details;
 				return { uploadPromise, featureData: hash };
 			} finally {

@@ -1,14 +1,15 @@
 import { pathJoin } from "../panel/fileUtil";
 import { ChannelId } from "../ts";
 import { Writable, writable } from "svelte/store";
-import { BrowserBackendConnection } from "./browser";
+
+type IBackendConnection = { fetch: (cmd: string, data: RequestInit) => Promise<Response>; }
 
 export class FiletransferManager {
 	private uploadQueue: UploadFile[] = [];
 	private currentUploadTask: Promise<void> | undefined;
 	public uploadState: Writable<number> = writable(0);
 
-	constructor(private backend: BrowserBackendConnection) { }
+	constructor(private backend: IBackendConnection) { }
 
 	public uploadFiles(...files: UploadFile[]): void {
 		if (files.length === 0) return;

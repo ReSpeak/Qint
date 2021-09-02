@@ -11,6 +11,7 @@ use structopt::StructOpt;
 use web::WebApp;
 
 mod loudness_ws;
+mod main_websocket;
 mod markdown_ws;
 mod web;
 mod websocket;

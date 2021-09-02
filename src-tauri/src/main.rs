@@ -205,7 +205,6 @@ fn main() {
 			cmd::plugin_delete,
 			cmd::markdown,
 			cmd::set_loudness_callback,
-			cmd::teest,
 		])
 		.run(tauri::generate_context!())
 		.map_err(|e| format_err!("tauri error: {}", e))

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Icon from "../ui/icon/Icon.svelte";
 	import { DisplayPanel } from "../panel/panel";
-	import { IS_TAURI, SERVER_ICON } from "../util";
+	import { IS_TAURI } from "../util";
 	import { app, NodeSelections } from "../app";
 	import MuteButtons from "./MuteButtons.svelte";
 	import { ConnectData } from "../connect/uiConnect";
@@ -16,8 +16,8 @@
 	export let connectData: ConnectData;
 	export let filter: string; // from the search
 
-	let appSettings = app.transientSettings.app;
-	let titleBarStyle = appSettings._titleBarStyle;
+	const appSettings = app.transientSettings.app;
+	const titleBarStyle = appSettings._titleBarStyle;
 
 	function toggleSidebar(show: boolean) {
 		showSidebar = show;

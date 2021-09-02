@@ -6092,6 +6092,7 @@ dependencies = [
  "slog-term",
  "structopt",
  "tempfile",
+ "thiserror",
  "tokio",
  "tokio-util",
  "tsclientlib",

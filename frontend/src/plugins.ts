@@ -27,7 +27,7 @@ function getCssPlugin(fileName: string): HTMLStyleElement | null {
 	return document.getElementById(`css-${fileName}`) as HTMLStyleElement;
 }
 
-export function loadCssPlugin(fileName: string, body: string) {
+export function loadCssPlugin(fileName: string, body: string): void {
 	let element = getCssPlugin(fileName);
 	if (element == null) {
 		element = document.createElement("style");
@@ -37,9 +37,9 @@ export function loadCssPlugin(fileName: string, body: string) {
 	element.innerHTML = body;
 }
 
-export function removeCssPlugin(fileName: string) {
+export function removeCssPlugin(fileName: string): void {
 	log("removing %s", fileName);
-	let element = getCssPlugin(fileName);
+	const element = getCssPlugin(fileName);
 	if (element != null) {
 		element.remove();
 	}

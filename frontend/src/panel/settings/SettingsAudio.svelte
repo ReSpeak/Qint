@@ -80,8 +80,8 @@
 
 	function renderLoudnessGraphs(timestamp: number) {
 		renderRequested = false;
-		let loudnessHasRequest = loudnessDiagram?.redraw(timestamp) ?? false;
-		let vadHasRequest = vadDiagram?.redraw(timestamp) ?? false;
+		const loudnessHasRequest = loudnessDiagram?.redraw(timestamp) ?? false;
+		const vadHasRequest = vadDiagram?.redraw(timestamp) ?? false;
 		if (loudnessHasRequest || vadHasRequest) {
 			requestRenderLoudnessGraphs();
 		}

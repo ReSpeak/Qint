@@ -38,6 +38,7 @@ use qint_proxy::messages::ResultDetails;
 use qint_proxy::{ConnectionId, QintState, SettingsUpdateError};
 
 use crate::loudness_ws::LoudnessService;
+use crate::main_websocket;
 use crate::markdown_ws::MarkdownService;
 use crate::websocket::{SetConnectionMsg, Ws, WsBridge};
 
@@ -85,6 +86,7 @@ impl WebApp {
 					future::Either::Right(srv.call(req))
 				})
 				.app_data(Data::new(state))
+				.service(create_main_ws)
 				.service(create_ws)
 				.service(run_hotkey)
 				.service(audio_reset)
@@ -199,6 +201,22 @@ async fn create_ws(
 				"Failed to delayed inject con"
 			));
 			cons.insert(id, qint_con);
+			Either::Right(ws)
+		}
+	}
+}
+
+#[get("/ws")]
+async fn create_main_ws(
+	state: web::Data<Arc<QintState>>, req: HttpRequest, stream: web::Payload,
+) -> impl Responder {
+	let webws = main_websocket::Ws::new((**state).clone());
+	match ws::start(webws, &req, stream) {
+		Err(e) => {
+			error!(state.logger, "Failed to create websocket actor"; "error" => %e);
+			Either::Left(HttpResponse::InternalServerError().body("Failed to start connection"))
+		}
+		Ok(ws) => {
 			Either::Right(ws)
 		}
 	}

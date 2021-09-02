@@ -35,7 +35,7 @@
 
 	let editing: Bookmark | undefined;
 
-	$: connection = !!server ? new OfflineConnection(server) : NullConnection.Instance;
+	$: connection = server ? new OfflineConnection(server) : NullConnection.Instance;
 	$: on(data, dataChanged());
 
 	async function dataChanged() {

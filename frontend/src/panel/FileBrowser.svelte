@@ -82,7 +82,7 @@
 		$fileTreeCache.clear(cachePath);
 		const getPath = "/" + path.join("/");
 		if (channel !== undefined) {
-			let reqPath = {
+			const reqPath = {
 				id: channelId,
 				password: "", // TODO
 				path: getPath,
@@ -90,7 +90,7 @@
 			// - TODO handle empty result error explicitely instead of implicitely
 			// (currently the `fileTreeCache.clear` at the to ensures that in case
 			// of an empty folder nothing gets shown)
-			// - TODO handle error show when missing permission instead of 
+			// - TODO handle error show when missing permission instead of
 			// "No files"
 			await connection.sendChange({
 				ChannelFileListRequest: reqPath,
@@ -167,7 +167,7 @@
 		currentState = WorkState.None;
 		isConfirmingDelete = false;
 		// TODO as one packet
-		let promises = [];
+		const promises = [];
 		for (const toDelete of fileSelection) {
 			const deletePath = pathJoin(...path, toDelete.name);
 			const promise = connection.sendChange({

@@ -208,10 +208,10 @@ pub fn pass_ws_msg(
 }
 
 #[command]
-pub async fn db(state: State<'_, QState>, request: GraphQLRequest) -> Result<String, ()> {
+pub async fn db(state: State<'_, QState>, request: GraphQLRequest) -> Result<serde_json::Value, ()> {
 	let res = request.execute(&state.graphql_schema, &*state).await;
 	if res.is_ok() {
-		Ok(serde_json::to_string(&res).unwrap())
+		Ok(serde_json::to_value(&res).unwrap())
 	} else {
 		Err(())
 	}
@@ -691,9 +691,4 @@ pub async fn set_loudness_callback(
 		listener.disable()
 	}
 	Ok(())
-}
-
-#[command]
-pub fn teest(_data: Vec<u8>) {
-	println!("yay testing");
 }
