@@ -60,13 +60,13 @@ export interface IBackendConnection {
 
 	/**
 	 * @throws {ResultDetails} On ts error
-	*/
+	 */
 	upload_bytes(req: IFileRequest, data: Blob): Promise<TransferResult>;
 
 	/**
 	 * Does *not* allow multiple uploads (for now).
 	 * @throws {ResultDetails} On ts error
-	*/
+	 */
 	ask_download(req: IFileRequest): Promise<TransferResult>;
 
 	/**
@@ -76,7 +76,7 @@ export interface IBackendConnection {
 	 * - ✅ Upload to folder
 	 * 	- Returns: {string}
 	 * @throws {ResultDetails} On ts error
-	*/
+	 */
 	ask_upload(target: UploadFeature): Promise<TransferResult>;
 }
 
@@ -92,10 +92,7 @@ export interface ICacheFileRequest extends IFileRequest {
 	server: string;
 }
 
-export type UploadFeature =
-	{ Files: [channel: string, path: string] }
-	| "Avatar"
-	| "Icon";
+export type UploadFeature = { Files: [channel: string, path: string] } | "Avatar" | "Icon";
 
 export interface AskReadResult {
 	name: string;
@@ -117,11 +114,7 @@ export interface IAudioDeviceList {
 	playback: string[];
 }
 
-export type FindIdentity =
-	"All"
-	| { ById: number }
-	| { ByUid: Uid }
-	| { ByName: string };
+export type FindIdentity = "All" | { ById: number } | { ByUid: Uid } | { ByName: string };
 
 export interface UpdateIdentityOptions {
 	name?: string;

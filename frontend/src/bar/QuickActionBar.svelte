@@ -4,7 +4,6 @@
 
 	const selections = app.selectedNode;
 	$: selected = $selections.getSingleSelection();
-	
 </script>
 
 <div class="actionBar inlineButtons">

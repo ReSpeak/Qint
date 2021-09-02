@@ -14,7 +14,10 @@ use futures::prelude::*;
 use http::{header::CACHE_CONTROL, header::ETAG, HeaderValue};
 use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
-use tsproto_types::crypto::EccKeyPubP256;
+use qint_proxy::connection::{DownloadFileContext, UploadFileContext};
+use qint_proxy::filecache::guess_content_type;
+use qint_proxy::messages::ResultDetails;
+use qint_proxy::{ConnectionId, QintState};
 use rand::Rng;
 use serde::Deserialize;
 use slog::{debug, error, info, warn};
@@ -22,10 +25,7 @@ use tokio::time::{self, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
 use tsclientlib::ChannelId;
 use tsclientlib::Error as TsError;
-use qint_proxy::filecache::guess_content_type;
-use qint_proxy::connection::{DownloadFileContext, UploadFileContext};
-use qint_proxy::messages::ResultDetails;
-use qint_proxy::{ConnectionId, QintState};
+use tsproto_types::crypto::EccKeyPubP256;
 
 use crate::websocket::Ws;
 
@@ -128,9 +128,7 @@ impl WebApp {
 		settings.listen_address
 	}
 
-	pub fn get_token(&self) -> &str {
-		&self.token
-	}
+	pub fn get_token(&self) -> &str { &self.token }
 }
 
 #[get("/ws")]
@@ -143,9 +141,7 @@ async fn create_main_ws(
 			error!(state.logger, "Failed to create websocket actor"; "error" => %e);
 			Either::Left(HttpResponse::InternalServerError().body("Failed to start connection"))
 		}
-		Ok(ws) => {
-			Either::Right(ws)
-		}
+		Ok(ws) => Either::Right(ws),
 	}
 }
 
@@ -157,9 +153,7 @@ struct GetFileOptions {
 	cache: bool,
 }
 
-fn result_details_gone() -> ResultDetails {
-	"gone".into()
-}
+fn result_details_gone() -> ResultDetails { "gone".into() }
 
 #[get("/con/{id}/file/{channel}/{path:.*}")]
 async fn download_file(
@@ -512,9 +506,7 @@ mod tests {
 		}
 
 		async fn graphql<T>(&self, request: &GraphQLRequest) -> Result<T>
-		where
-			for<'a> T: Deserialize<'a>,
-		{
+		where for<'a> T: Deserialize<'a> {
 			let client = awc::Client::default();
 			let url = format!("http://127.0.0.1:{}/db", self.port);
 			debug!(self.logger, "GraphQL request"; "body" => serde_json::to_string(&request).unwrap());

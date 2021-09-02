@@ -129,7 +129,7 @@
 		if (!canUpload) return;
 		try {
 			await connection.backend.ask_upload("Icon");
-		} catch(err) {
+		} catch (err) {
 			console.log(err);
 			return;
 		}

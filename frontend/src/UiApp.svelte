@@ -70,17 +70,14 @@
 
 	function editingChanged(editing: boolean) {
 		if (editing) {
-			if ($descriptionMode === DescriptionMode.Info)
-				$descriptionMode = DescriptionMode.Edit;
+			if ($descriptionMode === DescriptionMode.Info) $descriptionMode = DescriptionMode.Edit;
 		} else {
-			if ($descriptionMode === DescriptionMode.Edit)
-				$descriptionMode = DescriptionMode.Info;
+			if ($descriptionMode === DescriptionMode.Edit) $descriptionMode = DescriptionMode.Info;
 		}
 	}
 
 	function modeChanged(mode: DescriptionMode) {
-		if (editing !== (mode === DescriptionMode.Edit))
-			editing = mode === DescriptionMode.Edit;
+		if (editing !== (mode === DescriptionMode.Edit)) editing = mode === DescriptionMode.Edit;
 	}
 
 	function showConnect(data: ConnectData) {
@@ -158,7 +155,7 @@
 							<ServerFileBrowser connection={sel.connection} />
 						{/if}
 					{:else}
-						<Description selected={$selected} bind:editing={editing} />
+						<Description selected={$selected} bind:editing />
 					{/if}
 				</div>
 			{/if}

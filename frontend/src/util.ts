@@ -95,8 +95,12 @@ export function clickToSelectAll(element: HTMLElement): void {
 }
 
 export function createUuidV4(): string {
-	function rnd_hex() { return (0x100 + ((Math.random() * 256) | 0)).toString(16).substring(1); }
-	function to_hex(i: number) { return (0x100 + i).toString(16).substring(1); }
+	function rnd_hex() {
+		return (0x100 + ((Math.random() * 256) | 0)).toString(16).substring(1);
+	}
+	function to_hex(i: number) {
+		return (0x100 + i).toString(16).substring(1);
+	}
 	return (
 		rnd_hex() +
 		rnd_hex() +
@@ -196,7 +200,7 @@ export class BinarySearchResult {
 		public found: boolean,
 		// Index of found element or index where element can be inserted to maintain order
 		public index: number
-	) { }
+	) {}
 }
 
 /** The comparator function should implement an order consistent with the sort order of the underlying slice,
@@ -262,7 +266,7 @@ export function binarySearchByKey<T, E>(
 export class Lazy<T> {
 	private value: T | undefined;
 
-	constructor(private generator: () => T) { }
+	constructor(private generator: () => T) {}
 
 	public get(): T {
 		if (this.generator !== undefined) {
@@ -504,7 +508,7 @@ export function deep_equals(a: any, b: any): boolean {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
-export function on(..._: any[]): void { }
+export function on(..._: any[]): void {}
 
 export function oneshot<T>(
 	store: Readable<T>,

@@ -67,9 +67,7 @@ enum TxDirection {
 }
 
 impl UploadPrepare {
-	pub fn get_size(&self) -> u64 {
-		self.size
-	}
+	pub fn get_size(&self) -> u64 { self.size }
 }
 
 type FiletransferList = Vec<TransferContext>;
@@ -249,7 +247,7 @@ impl TransferContext {
 					self.buffer_size = 0..n;
 				}
 				Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
-					return Ok(TxTickStatus::Waiting)
+					return Ok(TxTickStatus::Waiting);
 				}
 				Err(e) => return Err(e.into()),
 			}

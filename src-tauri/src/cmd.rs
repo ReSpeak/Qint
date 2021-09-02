@@ -60,8 +60,7 @@ macro_rules! unwrap_send {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TauriWs<T>
-where
-	T: Debug,
+where T: Debug
 {
 	con: ConnectionId,
 	msg: T,
@@ -131,12 +130,8 @@ enum FileExistsAction {
 	Resume,
 }
 impl FileExistsAction {
-	fn overwrite(&self) -> bool {
-		*self == FileExistsAction::Overwrite
-	}
-	fn resume(&self) -> bool {
-		*self == FileExistsAction::Resume
-	}
+	fn overwrite(&self) -> bool { *self == FileExistsAction::Overwrite }
+	fn resume(&self) -> bool { *self == FileExistsAction::Resume }
 }
 
 #[derive(Debug, Serialize)]
@@ -175,9 +170,7 @@ impl FileDialogBuilderExt for FileDialogBuilder {
 		}
 	}
 	#[cfg(not(any(windows, target_os = "macos")))]
-	fn set_parent_ext(self, _window: &Window) -> Self {
-		self
-	}
+	fn set_parent_ext(self, _window: &Window) -> Self { self }
 }
 
 // === CMDS ===
@@ -208,13 +201,11 @@ pub fn pass_ws_msg(
 }
 
 #[command]
-pub async fn db(state: State<'_, QState>, request: GraphQLRequest) -> Result<serde_json::Value, ()> {
+pub async fn db(
+	state: State<'_, QState>, request: GraphQLRequest,
+) -> Result<serde_json::Value, ()> {
 	let res = request.execute(&state.graphql_schema, &*state).await;
-	if res.is_ok() {
-		Ok(serde_json::to_value(&res).unwrap())
-	} else {
-		Err(())
-	}
+	if res.is_ok() { Ok(serde_json::to_value(&res).unwrap()) } else { Err(()) }
 }
 
 #[command]
@@ -631,10 +622,10 @@ pub async fn identity_update(
 ) -> Result<(), String> {
 	unwrap_send!(
 		state.database,
-		UpdateIdentityMsg(
-			FindIdentity::ById(id.0),
-			UpdateIdentity { name: update.name, ..Default::default() },
-		)
+		UpdateIdentityMsg(FindIdentity::ById(id.0), UpdateIdentity {
+			name: update.name,
+			..Default::default()
+		},)
 	)
 }
 
@@ -657,9 +648,7 @@ pub async fn run_hotkey(
 }
 
 #[command]
-pub fn plugin_list(state: State<'_, QState>) -> Vec<String> {
-	state.plugin_list()
-}
+pub fn plugin_list(state: State<'_, QState>) -> Vec<String> { state.plugin_list() }
 
 #[command]
 pub fn plugin_get(state: State<'_, QState>, name: String) -> Result<String, String> {
@@ -677,9 +666,7 @@ pub fn plugin_delete(state: State<QState>, name: String) -> Result<(), String> {
 }
 
 #[command]
-pub fn markdown(md: String) -> String {
-	proxy_codegen::markdown::markdown(&md)
-}
+pub fn markdown(md: String) -> String { proxy_codegen::markdown::markdown(&md) }
 
 #[command]
 pub async fn set_loudness_callback(

@@ -1213,17 +1213,14 @@ impl<'a> EventHandler<'a> {
 			Some(client) => self.handle_add_client(client, true),
 			None => {
 				if let Some(uid) = &invoker.uid {
-					self.handle_add_client_internal(
-						true,
-						ClientData {
-							name: invoker.name.clone(),
-							uid: uid.clone(),
-							icon: None,
-							avatar: None,
-							phonetic_name: None,
-							description: None,
-						},
-					)
+					self.handle_add_client_internal(true, ClientData {
+						name: invoker.name.clone(),
+						uid: uid.clone(),
+						icon: None,
+						avatar: None,
+						phonetic_name: None,
+						description: None,
+					})
 				} else {
 					Ok(())
 				}
@@ -1240,25 +1237,22 @@ impl<'a> EventHandler<'a> {
 		let icon = if client.icon.0 == 0 { None } else { Some(client.icon.0 as i32) };
 		let avatar =
 			if client.avatar_hash.is_empty() { None } else { Some(client.avatar_hash.clone()) };
-		self.handle_add_client_internal(
-			create,
-			ClientData {
-				name: client.name.clone(),
-				uid: client_uid,
-				icon,
-				avatar,
-				phonetic_name: if client.phonetic_name != "" {
-					Some(client.phonetic_name.clone())
-				} else {
-					None
-				},
-				description: if client.description != "" {
-					Some(client.description.clone())
-				} else {
-					None
-				},
+		self.handle_add_client_internal(create, ClientData {
+			name: client.name.clone(),
+			uid: client_uid,
+			icon,
+			avatar,
+			phonetic_name: if client.phonetic_name != "" {
+				Some(client.phonetic_name.clone())
+			} else {
+				None
 			},
-		)
+			description: if client.description != "" {
+				Some(client.description.clone())
+			} else {
+				None
+			},
+		})
 	}
 
 	fn handle_add_client_internal(&self, create: bool, client: ClientData) -> Result<()> {

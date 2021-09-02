@@ -8,8 +8,10 @@ use juniper::http::GraphQLRequest;
 use proxy_codegen::book_events::deserialize_u64;
 use qint_proxy::{
 	connection::{DisconnectMsg, MessageF2PWrapper, QintConnection},
-	db::{DeleteIdentityMsg, FindIdentity, GenrateNewIdentityMsg, GetIdentitiesMsg, UpdateIdentityMsg},
 	db::models::UpdateIdentity,
+	db::{
+		DeleteIdentityMsg, FindIdentity, GenrateNewIdentityMsg, GetIdentitiesMsg, UpdateIdentityMsg,
+	},
 	hotkey::Action,
 	identities::import_ts_identities_from_string,
 	messages::{MessageF2P, MessageP2F},
@@ -57,7 +59,9 @@ impl AppToFrontendBridge for WsBridge {
 		}
 
 		actix::spawn(with_log!(
-			self.ws.send(SendToFrontendMsg(serde_json::to_string(&WsMsg { cmd: "ws", con: self.id.clone(), msg }).unwrap())),
+			self.ws.send(SendToFrontendMsg(
+				serde_json::to_string(&WsMsg { cmd: "ws", con: self.id.clone(), msg }).unwrap()
+			)),
 			self.logger.clone(),
 			"Failed to forward msg to frontend"
 		));
@@ -71,7 +75,9 @@ impl AppToFrontendBridge for WsBridge {
 		}
 
 		actix::spawn(with_log!(
-			self.ws.send(SendToFrontendMsg(serde_json::to_string(&WsMsg { cmd: "ws_close", con: self.id.clone() }).unwrap())),
+			self.ws.send(SendToFrontendMsg(
+				serde_json::to_string(&WsMsg { cmd: "ws_close", con: self.id.clone() }).unwrap()
+			)),
 			self.logger.clone(),
 			"Failed to send close msg to websocket"
 		));
@@ -93,12 +99,14 @@ macro_rules! unwrap_send {
 		match $act.send($msg).await {
 			Ok(Ok(v)) => return Ok(serde_json::to_value(&v).unwrap()),
 			Ok(Err(err)) => return Err(err.into()),
-			Err(_) => return Err(format_err!(concat!(
-				"Mailbox error sending '",
-				stringify!($msg),
-				"' to ",
-				stringify!($act),
-			))),
+			Err(_) => {
+				return Err(format_err!(concat!(
+					"Mailbox error sending '",
+					stringify!($msg),
+					"' to ",
+					stringify!($act),
+				)));
+			}
 		}
 	}};
 }
@@ -132,21 +140,25 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 				}
 
 				let return_code = msg.return_code;
-				ctx.spawn(actix::fut::wrap_future::<_, Self>(Self::handle_msg(self.state.clone(), msg.cmd, msg.args, ctx.address())).map(move |res, _, ctx| {
-					let resp = match res {
-						Ok(r) => WsMsg {
-							cmd: "resp",
-							return_code: &return_code,
-							msg: r,
-						},
-						Err(e) => WsMsg {
-							cmd: "resp_err",
-							return_code: &return_code,
-							msg: serde_json::Value::String(e.to_string()),
-						},
-					};
-					ctx.text(serde_json::to_string(&resp).unwrap());
-				}));
+				ctx.spawn(
+					actix::fut::wrap_future::<_, Self>(Self::handle_msg(
+						self.state.clone(),
+						msg.cmd,
+						msg.args,
+						ctx.address(),
+					))
+					.map(move |res, _, ctx| {
+						let resp = match res {
+							Ok(r) => WsMsg { cmd: "resp", return_code: &return_code, msg: r },
+							Err(e) => WsMsg {
+								cmd: "resp_err",
+								return_code: &return_code,
+								msg: serde_json::Value::String(e.to_string()),
+							},
+						};
+						ctx.text(serde_json::to_string(&resp).unwrap());
+					}),
+				);
 			}
 			Ok(ws::Message::Binary(_)) => {
 				error!(self.state.logger, "binary protocol not supported");
@@ -177,11 +189,11 @@ impl Handler<SendToFrontendMsg> for Ws {
 }
 
 impl Ws {
-	pub fn new(state: Arc<QintState>) -> Self {
-		Self { state }
-	}
+	pub fn new(state: Arc<QintState>) -> Self { Self { state } }
 
-	async fn handle_msg(state: Arc<QintState>, cmd: String, args: serde_json::Value, addr: Addr<Self>) -> Result<serde_json::Value> {
+	async fn handle_msg(
+		state: Arc<QintState>, cmd: String, args: serde_json::Value, addr: Addr<Self>,
+	) -> Result<serde_json::Value> {
 		#[derive(Deserialize)]
 		struct ConArgs {
 			con: ConnectionId,
@@ -192,7 +204,8 @@ impl Ws {
 				let args: ConArgs = serde_json::from_value(args)?;
 				let id = args.con;
 
-				let sender = Box::new(WsBridge { logger: state.logger.clone(), ws: addr, id: id.clone() });
+				let sender =
+					Box::new(WsBridge { logger: state.logger.clone(), ws: addr, id: id.clone() });
 				let mut cons = state.connections.lock().unwrap();
 				if cons.contains_key(&id) || !id.is_valid() {
 					error!(state.logger, "Connection already in use. Duplicate create call?"; "error" => ?id);
@@ -276,7 +289,10 @@ impl Ws {
 				}
 				let args: Args = serde_json::from_value(args)?;
 
-				return Ok(serde_json::to_value(&state.link_previewer.analyze_link(&args.link).await).unwrap());
+				return Ok(serde_json::to_value(
+					&state.link_previewer.analyze_link(&args.link).await,
+				)
+				.unwrap());
 			}
 			"get_audio_device_list" => {
 				return Ok(serde_json::to_value(&state.audio_device_list().await).unwrap());
@@ -313,10 +329,10 @@ impl Ws {
 
 				unwrap_send!(
 					state.database,
-					UpdateIdentityMsg(
-						FindIdentity::ById(args.id.0),
-						UpdateIdentity { name: args.update.name, ..Default::default() },
-					)
+					UpdateIdentityMsg(FindIdentity::ById(args.id.0), UpdateIdentity {
+						name: args.update.name,
+						..Default::default()
+					},)
 				)
 			}
 			"identity_delete" => {
@@ -360,7 +376,9 @@ impl Ws {
 				}
 				let args: Args = serde_json::from_value(args)?;
 
-				return Ok(serde_json::to_value(&state.plugin_save(&args.name, &args.content)?).unwrap());
+				return Ok(
+					serde_json::to_value(&state.plugin_save(&args.name, &args.content)?).unwrap()
+				);
 			}
 			"plugin_delete" => {
 				#[derive(Deserialize)]

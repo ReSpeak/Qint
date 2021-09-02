@@ -59,7 +59,8 @@ impl LinkPreviewer {
 			}
 		}
 
-		let result = Self::analyze_link_internal(link.as_ref()).await.unwrap_or(AnalyzeResult::Unknown);
+		let result =
+			Self::analyze_link_internal(link.as_ref()).await.unwrap_or(AnalyzeResult::Unknown);
 
 		if let Ok(cache_arr) = rmp_serde::to_vec(&result) {
 			if let Some(cache) = &self.cache {

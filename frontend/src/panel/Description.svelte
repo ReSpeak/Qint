@@ -16,15 +16,18 @@
 
 {#if selection !== undefined}
 	{#if selection.node instanceof Client && selection.connection !== undefined}
-		<DescriptionClient connection={selection.connection} client={selection.node} bind:editing={editing} />
+		<DescriptionClient connection={selection.connection} client={selection.node} bind:editing />
 	{:else if selection.node instanceof GraphQlClient}
-		<DescriptionOfflineClient client={selection.node} bind:editing={editing} />
+		<DescriptionOfflineClient client={selection.node} bind:editing />
 	{:else if selection.node instanceof Channel && selection.connection !== undefined}
-		<DescriptionChannel connection={selection.connection} channel={selection.node} bind:editing={editing} />
+		<DescriptionChannel
+			connection={selection.connection}
+			channel={selection.node}
+			bind:editing />
 	{:else if selection.node instanceof Server && selection.connection !== undefined}
-		<DescriptionServer connection={selection.connection} server={selection.node} bind:editing={editing} />
+		<DescriptionServer connection={selection.connection} server={selection.node} bind:editing />
 	{:else if selection.node instanceof GraphQlServer}
-		<DescriptionOfflineServer server={selection.node} bind:editing={editing} />
+		<DescriptionOfflineServer server={selection.node} bind:editing />
 	{/if}
 {:else if selected.selections.length !== 0}
 	<DescriptionMultiSelection {selected} />

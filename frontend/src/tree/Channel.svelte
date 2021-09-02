@@ -240,7 +240,7 @@
 
 	function onContextMenu(e: MouseEvent) {
 		if (!contextMenuVisible) {
-			showContextMenu(e, () => contextMenuVisible = false);
+			showContextMenu(e, () => (contextMenuVisible = false));
 			contextMenuVisible = true;
 		}
 	}

@@ -76,12 +76,11 @@ const Unknown: UnknwonResult = {
 type AnalyzeResult = ImageResult | SiteResult | VideoResult | UnknwonResult;
 export type EmbedTypes = "youtube";
 
-	
-export type RustAnalyzeResult = 
-	"Unknown"
+export type RustAnalyzeResult =
+	| "Unknown"
 	| { Image: string }
 	| { Video: string }
-	| { Site: { title: string, image_src: string, description: string | null } }
+	| { Site: { title: string; image_src: string; description: string | null } };
 
 interface UnknwonResult {
 	kind: undefined;

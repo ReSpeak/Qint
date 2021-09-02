@@ -6,7 +6,7 @@
 
 	function onClick(ev: MouseEvent) {
 		ev.stopPropagation();
-		if ((ev.target as HTMLElement).closest('button, .inlineButton') !== null) clearMenu();
+		if ((ev.target as HTMLElement).closest("button, .inlineButton") !== null) clearMenu();
 	}
 
 	onMount(() => {

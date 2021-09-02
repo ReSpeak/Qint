@@ -16,9 +16,7 @@ pub struct LoudnessShare {
 }
 
 impl LoudnessShare {
-	pub fn new() -> Self {
-		Self { current_listener: Mutex::new(None) }
-	}
+	pub fn new() -> Self { Self { current_listener: Mutex::new(None) } }
 
 	pub async fn enable(&self, state: &QintState, window: Window) {
 		let callback = {
@@ -65,7 +63,5 @@ impl LoudnessTrait for LoudnessCallback {
 		}
 	}
 
-	fn connected(&self) -> bool {
-		self.listening.load(Ordering::Relaxed)
-	}
+	fn connected(&self) -> bool { self.listening.load(Ordering::Relaxed) }
 }

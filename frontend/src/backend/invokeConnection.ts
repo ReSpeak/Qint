@@ -24,13 +24,15 @@ import { OutMsg } from "./ws";
 const log = debug("INVOKE-CON");
 
 export interface InvokeArgs {
-	[key: string]: unknown
+	[key: string]: unknown;
 }
 
 export interface IInvokeConnection {
 	readonly name: string;
 	invoke<T = void>(cmd: string, args?: InvokeArgs): Promise<T>;
-	createNewConnection(returnCodes: ReturnCodeTracker): IBackendConnection & InvokeBackendConnection;
+	createNewConnection(
+		returnCodes: ReturnCodeTracker
+	): IBackendConnection & InvokeBackendConnection;
 }
 
 export class InvokeBackend<T extends IInvokeConnection> {
@@ -51,7 +53,7 @@ export class InvokeBackend<T extends IInvokeConnection> {
 	}
 
 	public close(): void {
-		this.connections.forEach(con => con.close());
+		this.connections.forEach((con) => con.close());
 	}
 
 	public async graphql<T = any>(
@@ -115,7 +117,6 @@ export class InvokeBackend<T extends IInvokeConnection> {
 		await this.inner.invoke("run_hotkey", { action });
 	}
 
-
 	public async plugin_list(): Promise<string[]> {
 		return await this.inner.invoke<string[]>("plugin_list");
 	}
@@ -135,7 +136,7 @@ export class InvokeBackend<T extends IInvokeConnection> {
 	public async plugin_load(name: string): Promise<IPlugin> {
 		const content = await this.plugin_get(name);
 		// https://stackoverflow.com/a/67359410/2444047
-		const dataUri = URL.createObjectURL(new Blob([content], { type: 'text/javascript' }));
+		const dataUri = URL.createObjectURL(new Blob([content], { type: "text/javascript" }));
 		try {
 			return await importFunc(dataUri);
 		} finally {
@@ -204,6 +205,8 @@ export class InvokeBackendConnection {
 
 class InvokeMarkdownTransform implements IMarkdownTransform {
 	constructor(private backend: IInvokeConnection) {}
-	public write(md: string) { return this.backend.invoke<string>("markdown", { md }); }
-	public close() { }
+	public write(md: string) {
+		return this.backend.invoke<string>("markdown", { md });
+	}
+	public close() {}
 }

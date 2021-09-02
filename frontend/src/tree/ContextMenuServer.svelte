@@ -12,7 +12,7 @@
 
 <div class="inlineButtons">
 	<QuickActionButtons selected={new NodeSelection(connection, server)} />
-	<div class="spacer"></div>
+	<div class="spacer" />
 	<MuteButtons {connection} />
 </div>
 <button on:click={() => connection.disconnect()}><Icon name="exit-to-app" />Disconnect</button>

@@ -6,9 +6,9 @@ use serde::{Deserialize, Serialize};
 use slog::error;
 use tsclientlib::prelude::*;
 
-use crate::QintState;
-use crate::MuteState;
 use crate::connection::QintConnection;
+use crate::MuteState;
+use crate::QintState;
 
 pub use imp::{Hotkeys, KeyCode};
 
@@ -480,8 +480,13 @@ mod imp {
 			let state = Arc::clone(state);
 			// Listen on unix socket to support shortcuts on wayland
 			tokio::spawn(async move {
-				let path = state.settings.read().unwrap().get_hotkey_socket_path()
-					.unwrap_or(crate::DEFAULT_HOTKEY_SOCKET_PATH).to_string();
+				let path = state
+					.settings
+					.read()
+					.unwrap()
+					.get_hotkey_socket_path()
+					.unwrap_or(crate::DEFAULT_HOTKEY_SOCKET_PATH)
+					.to_string();
 				let listener = match UnixListener::bind(&path) {
 					Ok(r) => r,
 					Err(e) => {

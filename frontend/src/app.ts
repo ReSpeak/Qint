@@ -222,16 +222,16 @@ export class App {
 			for (const con of get(this.connections)) {
 				con.close();
 			}
-		} catch { }
+		} catch {}
 
 		try {
 			backend.close();
-		} catch { }
+		} catch {}
 	}
 }
 
 export class NodeSelection {
-	constructor(public readonly connection: Connection, public readonly node: ITreeNode) { }
+	constructor(public readonly connection: Connection, public readonly node: ITreeNode) {}
 
 	public get uniqueStr(): string {
 		return `${this.node.qlType},${this.connection?.book.server.uidStr},${this.node.qlId}`;
@@ -249,7 +249,7 @@ export class NodeSelection {
 }
 
 export class NodeSelections {
-	constructor(public selections: NodeSelection[] = []) { }
+	constructor(public selections: NodeSelection[] = []) {}
 
 	public includes(sel: NodeSelection): boolean {
 		return this.selections.some((s) => NodeSelection.equals(s, sel));

@@ -9,7 +9,12 @@ import {
 	TransferResult,
 	UploadFeature,
 } from "./backend";
-import { IInvokeConnection, InvokeArgs, InvokeBackend, InvokeBackendConnection } from "./invokeConnection";
+import {
+	IInvokeConnection,
+	InvokeArgs,
+	InvokeBackend,
+	InvokeBackendConnection,
+} from "./invokeConnection";
 import { guessName } from "../ui/specialized/uiRenderedText";
 import { FiletransferManager, UploadFile } from "./filetransferManager";
 import { pathJoin } from "../panel/fileUtil";
@@ -21,7 +26,7 @@ const log = debug("BROWSER-WS");
 const IS_SNOWPACK = (import.meta as any).hot;
 const BASE_ADDRESS = IS_SNOWPACK ? "http://localhost:4422" : "";
 
-type WsP2FMsg = { cmd: string; returnCode?: string; con?: string; msg?: any; };
+type WsP2FMsg = { cmd: string; returnCode?: string; con?: string; msg?: any };
 
 function urlToWebSocket(url: string): string {
 	let path = url;
@@ -138,7 +143,9 @@ class BrowserInvokeConnection implements IInvokeConnection {
 		}
 	}
 
-	public createNewConnection(returnCodes: ReturnCodeTracker): IBackendConnection & InvokeBackendConnection {
+	public createNewConnection(
+		returnCodes: ReturnCodeTracker
+	): IBackendConnection & InvokeBackendConnection {
 		return new BrowserBackendConnection(this.backend, returnCodes);
 	}
 }
@@ -172,21 +179,23 @@ export class BrowserBackend extends InvokeBackend<BrowserInvokeConnection> imple
 		let files: FileList;
 		try {
 			files = await this.fileIo.askUpload(false);
-		} catch { return undefined; }
+		} catch {
+			return undefined;
+		}
 		if (files.length === 0) return undefined;
 		const file0 = files[0];
 		return { content: await file0.text(), name: file0.name };
 	}
 }
 
-export class BrowserBackendConnection extends InvokeBackendConnection implements IBackendConnection {
+export class BrowserBackendConnection
+	extends InvokeBackendConnection
+	implements IBackendConnection
+{
 	public serverFileSrc: string;
 	private readonly filetransferManager: FiletransferManager = new FiletransferManager(this);
 
-	constructor(
-		private browserBackend: BrowserBackend,
-		private returnCodes: ReturnCodeTracker,
-	) {
+	constructor(private browserBackend: BrowserBackend, private returnCodes: ReturnCodeTracker) {
 		super(browserBackend.inner);
 		this.serverFileSrc = `${BASE_ADDRESS}/con/${this.id}`;
 	}
@@ -241,10 +250,11 @@ export class BrowserBackendConnection extends InvokeBackendConnection implements
 		const multiple = is_files;
 		try {
 			files = await this.browserBackend.fileIo.askUpload(multiple);
-		} catch { throw BrowserBackendConnection.NoFilesSelected; }
-
-		if (!files || files.length == 0)
+		} catch {
 			throw BrowserBackendConnection.NoFilesSelected;
+		}
+
+		if (!files || files.length == 0) throw BrowserBackendConnection.NoFilesSelected;
 
 		if (target === "Avatar") {
 			const [returnCode, request] = this.returnCodes.getNew();
@@ -271,7 +281,7 @@ export class BrowserBackendConnection extends InvokeBackendConnection implements
 					data: file0,
 					channelId: "0",
 					path: this.upload_feature_icon(file0),
-					returnCode
+					returnCode,
 				};
 				const uploadPromise = this.filetransferManager.uploadSingleFile(uploadFile);
 				const details = await request;
@@ -282,13 +292,15 @@ export class BrowserBackendConnection extends InvokeBackendConnection implements
 			}
 		} else {
 			const [channelId, path] = target.Files;
-			this.filetransferManager.uploadFiles(...[...files].map((file) => {
-				return {
-					data: file,
-					channelId,
-					path: pathJoin(path, file.name),
-				};
-			}));
+			this.filetransferManager.uploadFiles(
+				...[...files].map((file) => {
+					return {
+						data: file,
+						channelId,
+						path: pathJoin(path, file.name),
+					};
+				})
+			);
 			return { uploadPromise: Promise.resolve() }; // TODO
 		}
 	}

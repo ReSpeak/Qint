@@ -10,8 +10,8 @@ use slog::{debug, error, o, Drain};
 use structopt::StructOpt;
 use web::WebApp;
 
-mod websocket;
 mod web;
+mod websocket;
 
 #[derive(Clone, Debug, StructOpt)]
 #[structopt(author, about)]

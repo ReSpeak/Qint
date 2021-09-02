@@ -214,9 +214,7 @@ impl QintConnection {
 	}
 
 	fn send_to_ts2a<T: Message<Result = Result<()>> + Send + 'static>(&self, msg: T)
-	where
-		audio::ts_to_audio::TsToAudio: Handler<T>,
-	{
+	where audio::ts_to_audio::TsToAudio: Handler<T> {
 		if let Some(ad) = &self.state.audio_data {
 			let logger = self.logger.clone();
 			actix::spawn(ad.ts2a.send(msg).map(move |r| match r {
@@ -232,9 +230,7 @@ impl QintConnection {
 	}
 
 	fn send_to_a2ts<T: Message<Result = ()> + Send + 'static>(&self, msg: T)
-	where
-		audio::audio_to_ts::AudioToTs: Handler<T>,
-	{
+	where audio::audio_to_ts::AudioToTs: Handler<T> {
 		if let Some(ad) = &self.state.audio_data {
 			actix::spawn(with_log!(
 				ad.a2ts.send(msg),
@@ -245,9 +241,7 @@ impl QintConnection {
 	}
 
 	fn send_to_a2ts_r<R: Send + 'static, T: Message<Result = R> + Send + 'static>(&self, msg: T)
-	where
-		audio::audio_to_ts::AudioToTs: Handler<T>,
-	{
+	where audio::audio_to_ts::AudioToTs: Handler<T> {
 		if let Some(ad) = &self.state.audio_data {
 			actix::spawn(with_log!(
 				ad.a2ts.send(msg),
@@ -762,11 +756,7 @@ impl QintConnection {
 										.unwrap()
 										.iter()
 										.filter_map(|(id, addr)| {
-											if *id != self.id {
-												Some(addr.clone())
-											} else {
-												None
-											}
+											if *id != self.id { Some(addr.clone()) } else { None }
 										})
 										.collect::<Vec<_>>();
 									let state = self.state.clone();
@@ -818,11 +808,7 @@ impl QintConnection {
 										.unwrap()
 										.iter()
 										.filter_map(|(id, addr)| {
-											if *id != self.id {
-												Some(addr.clone())
-											} else {
-												None
-											}
+											if *id != self.id { Some(addr.clone()) } else { None }
 										})
 										.collect::<Vec<_>>();
 									let state = self.state.clone();
@@ -869,9 +855,7 @@ impl QintConnection {
 		}
 	}
 
-	fn send_message(&self, msg: &MessageP2F) {
-		self.sender.send(msg)
-	}
+	fn send_message(&self, msg: &MessageP2F) { self.sender.send(msg) }
 
 	fn send_error(&self, return_code: Option<&str>, error: String) {
 		if let Some(code) = return_code {
@@ -1030,7 +1014,7 @@ impl Handler<DownloadFile> for QintConnection {
 			_ => {
 				return ActorResponse::r#async(wrap_future(futures::future::err(
 					Error::NoConnection,
-				)))
+				)));
 			}
 		};
 

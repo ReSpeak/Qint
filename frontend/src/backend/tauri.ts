@@ -13,20 +13,30 @@ import { listen } from "@tauri-apps/api/event";
 import debug from "debug";
 import { invoke } from "@tauri-apps/api/tauri";
 import { ReturnCodeTracker } from "./returnCodeTracker";
-import { IInvokeConnection, InvokeArgs, InvokeBackend, InvokeBackendConnection } from "./invokeConnection";
+import {
+	IInvokeConnection,
+	InvokeArgs,
+	InvokeBackend,
+	InvokeBackendConnection,
+} from "./invokeConnection";
 const log = debug("TAURI");
 
 if (DEBUG_UTIL) {
 	(window as any).invoke = invoke;
 }
 
-type TauriP2FWs = { con: string; msg: InMsg; };
+type TauriP2FWs = { con: string; msg: InMsg };
 type TauriP2FClose = string;
 
 class ImageTracking {
-	private trackedImages: Map<string, string | undefined | Promise<string | undefined>> = new Map();
+	private trackedImages: Map<string, string | undefined | Promise<string | undefined>> =
+		new Map();
 
-	public async fetchImgInternal(ep: string, req: IFileRequest, con: string): Promise<string | undefined> {
+	public async fetchImgInternal(
+		ep: string,
+		req: IFileRequest,
+		con: string
+	): Promise<string | undefined> {
 		const key = reqAsKey(req);
 		if (this.trackedImages.has(key)) {
 			return await this.trackedImages.get(key);
@@ -39,7 +49,11 @@ class ImageTracking {
 		}
 	}
 
-	private async fetchImgTask(ep: string, req: IFileRequest, con: string): Promise<string | undefined> {
+	private async fetchImgTask(
+		ep: string,
+		req: IFileRequest,
+		con: string
+	): Promise<string | undefined> {
 		try {
 			const response = await invoke<GetFileResponse>(ep, {
 				req: {
@@ -47,7 +61,7 @@ class ImageTracking {
 					channel: req.channel,
 					path: req.path,
 					hash: req.hash,
-					existing: FileExistsAction.Error
+					existing: FileExistsAction.Error,
 				},
 				cache: req.cache,
 			});
@@ -64,8 +78,7 @@ class ImageTracking {
 
 	public releaseImages() {
 		this.trackedImages.forEach((v) => {
-			if (typeof v === "string")
-				URL.revokeObjectURL(v);
+			if (typeof v === "string") URL.revokeObjectURL(v);
 		});
 		this.trackedImages.clear();
 	}
@@ -81,7 +94,9 @@ class TauriInvokeConnection implements IInvokeConnection {
 		return invoke<T>(cmd, args);
 	}
 
-	public createNewConnection(_returnCodes: ReturnCodeTracker): IBackendConnection & InvokeBackendConnection {
+	public createNewConnection(
+		_returnCodes: ReturnCodeTracker
+	): IBackendConnection & InvokeBackendConnection {
 		return new TauriBackendConnection(this.backend);
 	}
 }
@@ -130,7 +145,11 @@ export class TauriBackend extends InvokeBackend<TauriInvokeConnection> implement
 	}
 
 	public async fetch_cache_image(req: ICacheFileRequest): Promise<string | undefined> {
-		return await this.imageTracker.fetchImgInternal("download_bytes_from_cache", req, req.server);
+		return await this.imageTracker.fetchImgInternal(
+			"download_bytes_from_cache",
+			req,
+			req.server
+		);
 	}
 
 	public async ask_read_file(): Promise<AskReadResult | undefined> {
@@ -146,9 +165,7 @@ export class TauriBackend extends InvokeBackend<TauriInvokeConnection> implement
 export class TauriBackendConnection extends InvokeBackendConnection implements IBackendConnection {
 	private readonly imageTracker = new ImageTracking();
 
-	constructor(
-		tauriBackend: TauriBackend,
-	) {
+	constructor(tauriBackend: TauriBackend) {
 		super(tauriBackend.inner);
 	}
 
@@ -161,14 +178,14 @@ export class TauriBackendConnection extends InvokeBackendConnection implements I
 
 	public async upload_bytes(req: IFileRequest, data: Blob): Promise<TransferResult> {
 		try {
-			new Blob()
+			new Blob();
 			await invoke<void>("upload_bytes", {
 				req: {
 					con: this.id,
 					...req,
-					existing: FileExistsAction.Overwrite
+					existing: FileExistsAction.Overwrite,
 				},
-				data: Array.from(new Uint8Array(await data.arrayBuffer()))
+				data: Array.from(new Uint8Array(await data.arrayBuffer())),
 			});
 			return { uploadPromise: Promise.resolve() };
 		} catch (err: any) {
@@ -183,8 +200,8 @@ export class TauriBackendConnection extends InvokeBackendConnection implements I
 				req: {
 					con: this.id,
 					...req,
-					existing: FileExistsAction.Error
-				}
+					existing: FileExistsAction.Error,
+				},
 			});
 			return { uploadPromise: Promise.resolve() };
 		} catch (err: any) {
@@ -195,14 +212,15 @@ export class TauriBackendConnection extends InvokeBackendConnection implements I
 
 	public async ask_upload(feature: UploadFeature): Promise<TransferResult> {
 		try {
-			const featureData = await invoke<string | null>("upload_file", {
-				feature,
-				req: {
-					con: this.id,
-					channel_password: "", // TODO,
-					existing: FileExistsAction.Error,
-				}
-			}) ?? undefined;
+			const featureData =
+				(await invoke<string | null>("upload_file", {
+					feature,
+					req: {
+						con: this.id,
+						channel_password: "", // TODO,
+						existing: FileExistsAction.Error,
+					},
+				})) ?? undefined;
 			return { uploadPromise: Promise.resolve(), featureData };
 		} catch (err: any) {
 			log("ask_upload error: %j", err);

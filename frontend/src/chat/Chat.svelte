@@ -184,11 +184,14 @@
 
 		async function tryUpload(file: MdFile) {
 			try {
-				await connection.backend.upload_bytes({
-					cache: false,
-					channel: channelId,
-					path: pathJoin(file.path, file.name),
-				}, file.blob);
+				await connection.backend.upload_bytes(
+					{
+						cache: false,
+						channel: channelId,
+						path: pathJoin(file.path, file.name),
+					},
+					file.blob
+				);
 				return undefined;
 			} catch (err: any) {
 				return err as ResultDetails;

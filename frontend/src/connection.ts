@@ -27,7 +27,6 @@ const log = debug("CON"),
 const log_evt = log.extend("EVT"),
 	log_msg = log.extend("MSG");
 
-
 export interface IConnection {
 	isOnline(): this is Connection;
 	fileProvider(req: IFileRequest): Promise<string | undefined>;
@@ -120,7 +119,9 @@ export class Connection implements IConnection {
 		});
 	}
 
-	isOnline(): boolean { return true; }
+	isOnline(): boolean {
+		return true;
+	}
 
 	public getState(): Readonly<ConnectionState> {
 		return get(this.state);
@@ -183,7 +184,6 @@ export class Connection implements IConnection {
 		});
 		return promise;
 	}
-
 
 	public disconnect(reason?: Reason, message?: string): void {
 		this.sendMessage({ Disconnect: { reason, message } });
@@ -604,9 +604,11 @@ export class Connection implements IConnection {
 }
 
 export class OfflineConnection implements IConnection {
-	isOnline(): boolean { return false; }
+	isOnline(): boolean {
+		return false;
+	}
 
-	constructor(public server: string) { }
+	constructor(public server: string) {}
 
 	public fileProvider(req: IFileRequest): Promise<string | undefined> {
 		return backend.fetch_cache_image({ server: this.server, ...req });
@@ -615,9 +617,11 @@ export class OfflineConnection implements IConnection {
 
 export class NullConnection implements IConnection {
 	public static readonly Instance: IConnection = new NullConnection();
-	isOnline(): boolean { return false; }
+	isOnline(): boolean {
+		return false;
+	}
 
-	private constructor() { }
+	private constructor() {}
 
 	public fileProvider(_req: IFileRequest): Promise<undefined> {
 		return Promise.resolve(undefined);
@@ -693,7 +697,8 @@ export class ConnectionState {
 
 	private throwTransition(newState: ConnectionStateEnum): never {
 		throw Error(
-			`Cannot transition this connection from '${ConnectionStateEnum[this.rawState]}' to ${ConnectionStateEnum[newState]
+			`Cannot transition this connection from '${ConnectionStateEnum[this.rawState]}' to ${
+				ConnectionStateEnum[newState]
 			}`
 		);
 	}
