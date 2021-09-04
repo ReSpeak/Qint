@@ -108,7 +108,7 @@
 		</div>
 	</div>
 {:else}
-	<div class="menu channel-list">
+	<div class="menu channel-list" data-type="connection" data-key={connection.backend.id}>
 		<ul class="menu-list">
 			{#each $channels as channel (channel.id)}
 				<UiChannel {connection} {filter} {filterStartFromRoot} {channel} />

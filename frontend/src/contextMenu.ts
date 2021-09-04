@@ -20,7 +20,6 @@ export function showContextMenu(ev: MouseEvent, close: CloseFn): void {
 
 export function clearMenu(): void {
 	if (currentMenu !== null) {
-		console.log("clearing, click");
 		currentMenu();
 		currentMenu = null;
 

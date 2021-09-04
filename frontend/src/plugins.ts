@@ -68,7 +68,7 @@ export async function loadPlugins(): Promise<IPlugin[]> {
 				error("Failed to load plugin %s: Unknown file type.", list[i]);
 			}
 		} catch (err) {
-			error("Failed to load plugin %s: $j", list[i], err);
+			error("Failed to load plugin %s: %j", list[i], err);
 		}
 	}
 	return plugins;
