@@ -1,4 +1,5 @@
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 use actix::prelude::*;
 use actix_web_actors::ws;
@@ -49,6 +50,35 @@ pub enum Error {
 #[derive(Deserialize)]
 pub struct StringId(#[serde(deserialize_with = "deserialize_u64")] pub u64);
 
+pub struct SendToFrontendMsg(pub String);
+
+pub struct Ws {
+	state: Arc<QintState>,
+	/// All connections managed by this websocket
+	connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>,
+}
+
+impl Message for SendToFrontendMsg {
+	type Result = ();
+}
+
+macro_rules! unwrap_send {
+	($act:expr, $msg:expr) => {{
+		match $act.send($msg).await {
+			Ok(Ok(v)) => return Ok(serde_json::to_value(&v).unwrap()),
+			Ok(Err(err)) => return Err(err.into()),
+			Err(_) => {
+				return Err(format_err!(concat!(
+					"Mailbox error sending '",
+					stringify!($msg),
+					"' to ",
+					stringify!($act),
+				)));
+			}
+		}
+	}};
+}
+
 impl AppToFrontendBridge for WsBridge {
 	fn send(&self, msg: &MessageP2F) {
 		#[derive(Serialize)]
@@ -84,35 +114,11 @@ impl AppToFrontendBridge for WsBridge {
 	}
 }
 
-pub struct SendToFrontendMsg(pub String);
-
-pub struct Ws {
-	state: Arc<QintState>,
-}
-
-impl Message for SendToFrontendMsg {
-	type Result = ();
-}
-
-macro_rules! unwrap_send {
-	($act:expr, $msg:expr) => {{
-		match $act.send($msg).await {
-			Ok(Ok(v)) => return Ok(serde_json::to_value(&v).unwrap()),
-			Ok(Err(err)) => return Err(err.into()),
-			Err(_) => {
-				return Err(format_err!(concat!(
-					"Mailbox error sending '",
-					stringify!($msg),
-					"' to ",
-					stringify!($act),
-				)));
-			}
-		}
-	}};
-}
-
 impl Actor for Ws {
 	type Context = ws::WebsocketContext<Self>;
+	fn stopped(&mut self, _: &mut Self::Context) {
+		self.close();
+	}
 }
 
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
@@ -143,6 +149,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 				ctx.spawn(
 					actix::fut::wrap_future::<_, Self>(Self::handle_msg(
 						self.state.clone(),
+						self.connections.clone(),
 						msg.cmd,
 						msg.args,
 						ctx.address(),
@@ -164,17 +171,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 				error!(self.state.logger, "binary protocol not supported");
 			}
 			Ok(ws::Message::Close(_)) => {
-				debug!(self.state.logger, "Websocket closed");
-
-				// Close all connections
-				let mut cons = self.state.connections.lock().unwrap();
-				for con in cons.drain() {
-					actix::spawn(with_log!(
-						con.1.send(DisconnectMsg),
-						self.state.logger.clone(),
-						"Failed to send disconnect msg to QintConnection"
-					));
-				}
+				self.close();
 			}
 			_ => {}
 		}
@@ -189,10 +186,24 @@ impl Handler<SendToFrontendMsg> for Ws {
 }
 
 impl Ws {
-	pub fn new(state: Arc<QintState>) -> Self { Self { state } }
+	pub fn new(state: Arc<QintState>) -> Self { Self { state, connections: Default::default() } }
+
+	fn close(&self) {
+		debug!(self.state.logger, "Websocket closed");
+
+		// Close all connections for this websocket
+		let mut own_cons = self.connections.lock().unwrap();
+		for con in own_cons.drain() {
+			actix::spawn(with_log!(
+				con.1.send(DisconnectMsg),
+				self.state.logger.clone(),
+				"Failed to send disconnect msg to QintConnection"
+			));
+		}
+	}
 
 	async fn handle_msg(
-		state: Arc<QintState>, cmd: String, args: serde_json::Value, addr: Addr<Self>,
+		state: Arc<QintState>, connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>, cmd: String, args: serde_json::Value, addr: Addr<Self>,
 	) -> Result<serde_json::Value> {
 		#[derive(Deserialize)]
 		struct ConArgs {
@@ -204,17 +215,18 @@ impl Ws {
 				let args: ConArgs = serde_json::from_value(args)?;
 				let id = args.con;
 
-				let sender =
-					Box::new(WsBridge { logger: state.logger.clone(), ws: addr, id: id.clone() });
 				let mut cons = state.connections.lock().unwrap();
 				if cons.contains_key(&id) || !id.is_valid() {
 					error!(state.logger, "Connection already in use. Duplicate create call?"; "error" => ?id);
 					return Err(Error::ConnectionInUse.into());
 				}
 
+				let sender =
+					Box::new(WsBridge { logger: state.logger.clone(), ws: addr, id: id.clone() });
 				let ws =
 					QintConnection::new(state.logger.clone(), state.clone(), id.clone(), sender);
 				let addr = ws.start();
+				connections.lock().unwrap().insert(id.clone(), addr.clone());
 				cons.insert(id, addr);
 			}
 			"close_ws" => {
@@ -236,6 +248,7 @@ impl Ws {
 					state.logger.clone(),
 					"Failed to send disconnect to connection"
 				));
+				connections.lock().unwrap().remove(&id);
 			}
 			"pass_ws_msg" => {
 				#[derive(Deserialize)]
