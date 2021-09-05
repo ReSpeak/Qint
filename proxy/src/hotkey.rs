@@ -487,6 +487,28 @@ mod imp {
 					.get_hotkey_socket_path()
 					.unwrap_or(crate::DEFAULT_HOTKEY_SOCKET_PATH)
 					.to_string();
+
+				if path.exists() {
+					// Try to connect to see if the socket is alive
+					use std::os::unix::net::UnixStream;
+					if let Err(e) = UnixStream::connect(&path) {
+						debug!(state.logger, "Failed to connect to existing unix socket, removing";
+							"error" => %e);
+						if let Err(e) = std::fs::remove_file(&path) {
+							warn!(state.logger, "Failed to remove existing unix socket";
+								"error" => %e);
+							return;
+						}
+					} else {
+						warn!(
+							state.logger,
+							"Failed to open hotkey unix socket, another process is already \
+							 listening"
+						);
+						return;
+					}
+				}
+
 				let listener = match UnixListener::bind(&path) {
 					Ok(r) => r,
 					Err(e) => {

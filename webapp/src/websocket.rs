@@ -116,9 +116,7 @@ impl AppToFrontendBridge for WsBridge {
 
 impl Actor for Ws {
 	type Context = ws::WebsocketContext<Self>;
-	fn stopped(&mut self, _: &mut Self::Context) {
-		self.close();
-	}
+	fn stopped(&mut self, _: &mut Self::Context) { self.close(); }
 }
 
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
@@ -203,7 +201,9 @@ impl Ws {
 	}
 
 	async fn handle_msg(
-		state: Arc<QintState>, connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>, cmd: String, args: serde_json::Value, addr: Addr<Self>,
+		state: Arc<QintState>,
+		connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>, cmd: String,
+		args: serde_json::Value, addr: Addr<Self>,
 	) -> Result<serde_json::Value> {
 		#[derive(Deserialize)]
 		struct ConArgs {

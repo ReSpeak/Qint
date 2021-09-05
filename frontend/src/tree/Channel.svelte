@@ -250,7 +250,7 @@
 	<div bind:this={div} tabindex="0" on:contextmenu={onContextMenu}>
 		{#if contextMenuVisible && connection.isOnline()}
 			<ContextMenuContainer>
-				<ContextMenuChannel {connection} {channel} />
+				<ContextMenuChannel {connection} {channel} on:switchChannel={() => switchChannel()} />
 			</ContextMenuContainer>
 		{/if}
 		<div
