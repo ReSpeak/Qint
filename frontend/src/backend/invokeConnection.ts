@@ -3,7 +3,7 @@ import { RustAnalyzeResult } from "../chat/previewAnalyzer";
 import { MuteStates } from "../connect/uiConnect";
 import { ApiIdentity } from "../panel/settings/identity";
 import { importFunc, IPlugin } from "../plugins";
-import { HotkeyAction } from "../transientSettings";
+import { HotkeyAction } from "../settings";
 import { createUuidV4, fnBroadcast } from "../util";
 import {
 	closedFn,

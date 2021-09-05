@@ -41,7 +41,7 @@
 	export let server: Server;
 	export let editing = false;
 
-	const developMode = app.transientSettings.ui._developMode;
+	const developMode = app.settings.ui._developMode;
 	let editIcon = false;
 	let logOpen = false;
 	$: create_date = $server.created !== undefined ? $server.created : moment.unix(0);

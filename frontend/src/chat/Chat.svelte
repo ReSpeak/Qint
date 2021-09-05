@@ -30,9 +30,9 @@
 
 	const selections = app.selectedNode;
 	$: selected = $selections.getSingleSelection();
-	const chatStore = app.transientSettings.chat;
+	const chatStore = app.settings.chat;
 
-	const developMode = app.transientSettings.ui._developMode;
+	const developMode = app.settings.ui._developMode;
 	let chatList: LazyList<Message> | undefined;
 	let messagesError: unknown | undefined;
 	let messageInput: ChatInput;

@@ -48,7 +48,7 @@
 	let pokeModalVisible = false;
 	let pokeInput: HTMLElement | undefined;
 	let pokeMessage: string = "";
-	const developMode = app.transientSettings.ui._developMode;
+	const developMode = app.settings.ui._developMode;
 	let chart: Chart | null = null;
 	let editIcon = false;
 	let timer: number | undefined;

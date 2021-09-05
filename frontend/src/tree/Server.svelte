@@ -13,7 +13,7 @@
 	import ContextMenuServer from "./ContextMenuServer.svelte";
 	import ContextMenuContainer from "./ContextMenuContainer.svelte";
 	import ChangeResult from "../ui/specialized/ChangeResult.svelte";
-	import { DescriptionMode } from "../transientSettings";
+	import { DescriptionMode } from "../settings";
 	import { MouseButton } from "../ui/util/draggable";
 	import { showContextMenu } from "../contextMenu";
 

@@ -15,7 +15,7 @@
 	import { SpacerType } from "./tree";
 	import { app, NodeSelection } from "../app";
 	import { ChannelType, TsError } from "../book_events";
-	import { DescriptionMode } from "../transientSettings";
+	import { DescriptionMode } from "../settings";
 	import HoverContainer from "./HoverContainer.svelte";
 	import ChangeResult from "../ui/specialized/ChangeResult.svelte";
 	import ContextMenuChannel from "./ContextMenuChannel.svelte";

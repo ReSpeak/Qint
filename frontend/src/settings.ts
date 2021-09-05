@@ -3,7 +3,7 @@ import { debounced, deep_diff, deep_merge } from "./util";
 import { backend } from "./backend/backend";
 import { NodeSelection } from "./app";
 import debug from "debug";
-const log = debug("TRANSIENT");
+const log = debug("SETTINGS");
 
 export const enum DescriptionMode {
 	None = "None",
@@ -12,17 +12,17 @@ export const enum DescriptionMode {
 	Files = "Files",
 }
 
-export class TransientSettings {
+export class Settings {
 	private _syncDebounced = debounced(() => this.saveAsync(), 5000);
 	/// Value from last save
 	private _lastSave: any;
-	public synth = new TransientSettingsSynth();
-	public ui = new TransientSettingsUi();
-	public chat = new TransientSettingsChat(this);
-	public app = new TransientSettingsApp();
-	public audio = new TransientSettingsAudio();
-	public hotkeys = new TransientSettingsHotkeys();
-	public notifications = new TransientSettingsNotifications();
+	public synth = new SettingsSynth();
+	public ui = new SettingsUi();
+	public chat = new SettingsChat(this);
+	public app = new SettingsApp();
+	public audio = new SettingsAudio();
+	public hotkeys = new SettingsHotkeys();
+	public notifications = new SettingsNotifications();
 
 	constructor() {
 		// Initialize with default values
@@ -39,7 +39,7 @@ export class TransientSettings {
 			this._lastSave = data;
 			deep_merge(this, data);
 		} catch (e) {
-			console.error("Failed to load transient settings", e);
+			console.error("Failed to load settings", e);
 		}
 	}
 
@@ -63,12 +63,12 @@ export class TransientSettings {
 		try {
 			await backend.set_settings(diff);
 		} catch (e) {
-			console.error("Failed to save transient settings", e);
+			console.error("Failed to save settings", e);
 		}
 	}
 }
 
-export class TransientSettingsSynth {
+export class SettingsSynth {
 	public voiceId?: string;
 	public volume: number = 1;
 	public speed: number = 1;
@@ -154,7 +154,7 @@ export class TransientSettingsSynth {
 }
 
 // TODO move into own app.ui management
-export class TransientSettingsUi {
+export class SettingsUi {
 	constructor() {
 		Object.defineProperties(this, {
 			descriptionMode: {
@@ -193,10 +193,10 @@ export class TransientSettingsUi {
 	}
 }
 
-export class TransientSettingsChat {
-	private _parent: TransientSettings;
+export class SettingsChat {
+	private _parent: Settings;
 
-	constructor(parent: TransientSettings) {
+	constructor(parent: Settings) {
 		this._parent = parent;
 	}
 
@@ -218,7 +218,7 @@ export class TransientSettingsChat {
 	}
 }
 
-export class TransientSettingsApp {
+export class SettingsApp {
 	constructor() {
 		Object.defineProperties(this, {
 			titleBarStyle: {
@@ -244,7 +244,7 @@ export const enum TitleBarStyle {
 	Normal,
 }
 
-export class TransientSettingsAudio {
+export class SettingsAudio {
 	public globalVolume: number = 1.0;
 	public loudnessThreshold: number | undefined = undefined;
 	public vadThreshold: number | undefined = undefined;
@@ -268,7 +268,7 @@ export interface Hotkey {
 	_meta?: boolean;
 }
 
-export class TransientSettingsHotkeys {
+export class SettingsHotkeys {
 	public actions: Hotkey[] = [];
 }
 
@@ -290,7 +290,7 @@ export type RelevantNotificationSetting = NotificationSetting & {
 	onlyRelevant: boolean;
 };
 
-export class TransientSettingsNotifications {
+export class SettingsNotifications {
 	public poke: NotificationSetting = { tts: true, notification: true };
 	public message: NotificationSetting = { tts: true, notification: true };
 	/// Channel or server edited

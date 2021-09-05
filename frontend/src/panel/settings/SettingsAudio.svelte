@@ -22,8 +22,8 @@
 	import VoiceGraph from "../../ui/specialized/VoiceGraph.svelte";
 
 	let selected: boolean;
-	const audioSett = app.transientSettings.audio;
-	const developMode = app.transientSettings.ui._developMode;
+	const audioSett = app.settings.audio;
+	const developMode = app.settings.ui._developMode;
 
 	const minGlobalVolume = MIN_VOLUME_DB;
 	const maxGlobalVolume = -MIN_VOLUME_DB;
@@ -52,8 +52,8 @@
 	let selectedPlaybackDevice: string | null = audioSett.playback;
 
 	function syncSettingsImmediately() {
-		app.transientSettings.save();
-		app.transientSettings.flush();
+		app.settings.save();
+		app.settings.flush();
 	}
 
 	function updateLoudness() {

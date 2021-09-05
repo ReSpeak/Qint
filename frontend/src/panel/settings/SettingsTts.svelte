@@ -5,12 +5,12 @@
 	import DropDown from "../../ui/html/DropDown.svelte";
 	import Slider from "../../ui/html/Slider.svelte";
 
-	const synthSett = app.transientSettings.synth;
+	const synthSett = app.settings.synth;
 	const voices = synthSett._voices;
 	let previewText!: HTMLInputElement;
 
 	function syncSettings() {
-		app.transientSettings.save();
+		app.settings.save();
 	}
 
 	function previewVoice() {

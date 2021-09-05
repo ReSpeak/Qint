@@ -11,7 +11,7 @@
 	import TabList from "../ui/container/TabList.svelte";
 	import Icon from "../ui/icon/Icon.svelte";
 
-	const developMode = app.transientSettings.ui._developMode;
+	const developMode = app.settings.ui._developMode;
 </script>
 
 <div class="settings">

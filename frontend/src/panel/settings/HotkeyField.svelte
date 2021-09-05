@@ -8,7 +8,7 @@
 		translateJsKeyToWindows,
 		isHotkeyComplete,
 	} from "./hotkey";
-	import type { Hotkey } from "../../transientSettings";
+	import type { Hotkey } from "../../settings";
 	import DropDown from "../../ui/html/DropDown.svelte";
 	import Icon from "../../ui/icon/Icon.svelte";
 	import KeyValue from "../../ui/util/KeyValue.svelte";

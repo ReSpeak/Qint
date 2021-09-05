@@ -1,13 +1,13 @@
 <script lang="ts">
 	import Icon from "../ui/icon/Icon.svelte";
 	import { app, NodeSelection, NodeSelections } from "../app";
-	import { DescriptionMode } from "../transientSettings";
+	import { DescriptionMode } from "../settings";
 	import { Client } from "../book";
 
 	export let selected: NodeSelection;
 
 	const curSelected = app.selectedNode;
-	const descriptionMode = app.transientSettings.ui._descriptionMode;
+	const descriptionMode = app.settings.ui._descriptionMode;
 
 	let infoActive: boolean;
 	let editActive: boolean;
@@ -35,7 +35,7 @@
 			$descriptionMode = mode;
 			app.selectNode(new NodeSelections([selected]));
 		}
-		app.transientSettings.save();
+		app.settings.save();
 	}
 </script>
 

@@ -2,7 +2,7 @@ import { Writable, writable, get } from "svelte/store";
 import { Chat } from "./chat/uiChat";
 import { Client, ITreeNode } from "./book";
 import { Connection } from "./connection";
-import { TransientSettings, DescriptionMode } from "./transientSettings";
+import { Settings, DescriptionMode } from "./settings";
 import { loadPlugins, IPlugin } from "./plugins";
 import { backend } from "./backend/backend";
 import { fnBroadcast, oneshot } from "./util";
@@ -33,18 +33,18 @@ export class App {
 	public readonly modalVisible = writable(false);
 
 	public readonly chat: Chat = new Chat(this.selectedNode);
-	public readonly transientSettings: TransientSettings = new TransientSettings();
+	public readonly settings: Settings = new Settings();
 	// List of displayed notifications. Sorted by descending time, the latest comes first.
 	public readonly nofifications: Writable<[number, Connection, TsNotification][]> = writable([]);
 	private notificationId = 0;
 	public plugins: IPlugin[] = [];
-	public transientSettingsLoaded = fnBroadcast();
+	public settingsLoaded = fnBroadcast();
 	public updateMuteState = fnBroadcast();
 
 	constructor() {
 		loadPlugins().then((x) => (this.plugins = x));
-		this.transientSettings.loadAsync().then(() => {
-			this.transientSettingsLoaded();
+		this.settings.loadAsync().then(() => {
+			this.settingsLoaded();
 		});
 		// TODO unsubscribe somewhere
 		this.selectedNode.subscribe((s) => {
@@ -178,8 +178,8 @@ export class App {
 
 	public setDescriptionMode(selected: NodeSelection, mode: DescriptionMode): void {
 		app.selectNode(new NodeSelections([selected]));
-		this.transientSettings.ui._descriptionMode.set(mode);
-		app.transientSettings.save();
+		this.settings.ui._descriptionMode.set(mode);
+		app.settings.save();
 	}
 
 	public showMainPanel() {
@@ -223,7 +223,7 @@ export class App {
 	}
 
 	public close(): void {
-		this.transientSettings.flush();
+		this.settings.flush();
 
 		try {
 			for (const con of get(this.connections)) {

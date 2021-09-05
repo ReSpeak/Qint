@@ -7,7 +7,7 @@
 	import { ConnectData } from "../connect/uiConnect";
 	import Searchbar from "./Searchbar.svelte";
 	import { appWindow } from "@tauri-apps/api/window";
-	import { TitleBarStyle } from "../transientSettings";
+	import { TitleBarStyle } from "../settings";
 	import TitleButtons from "./TitleButtons.svelte";
 	import { get } from "svelte/store";
 
@@ -16,7 +16,7 @@
 	export let connectData: ConnectData;
 	export let filter: string; // from the search
 
-	const appSettings = app.transientSettings.app;
+	const appSettings = app.settings.app;
 	const titleBarStyle = appSettings._titleBarStyle;
 
 	function toggleSidebar(show: boolean) {

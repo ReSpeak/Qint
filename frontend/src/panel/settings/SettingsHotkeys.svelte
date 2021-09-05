@@ -6,11 +6,11 @@
 	import Icon from "../../ui/icon/Icon.svelte";
 	import { isHotkeyComplete } from "./hotkey";
 
-	let localHotkeys = [...app.transientSettings.hotkeys.actions];
+	let localHotkeys = [...app.settings.hotkeys.actions];
 	function syncHotkeys() {
-		app.transientSettings.hotkeys.actions = localHotkeys.filter(isHotkeyComplete);
-		app.transientSettings.save();
-		app.transientSettings.flush();
+		app.settings.hotkeys.actions = localHotkeys.filter(isHotkeyComplete);
+		app.settings.save();
+		app.settings.flush();
 	}
 
 	function deleteHotkey(index: number) {

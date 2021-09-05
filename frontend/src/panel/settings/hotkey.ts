@@ -1,4 +1,4 @@
-import { Hotkey, HotkeyAction, HotkeySubject } from "../../transientSettings";
+import { Hotkey, HotkeyAction, HotkeySubject } from "../../settings";
 
 export const hotkeySubjects: ReadonlyMap<HotkeySubject | null, string> = new Map([
 	[null, ""],

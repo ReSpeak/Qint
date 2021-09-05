@@ -7,7 +7,7 @@ import { IS_TAURI } from "../util";
 import { BrowserBackend } from "./browser";
 import { TauriBackend } from "./tauri";
 import { InMsg, OutMsg } from "./ws";
-import { HotkeyAction } from "../transientSettings";
+import { HotkeyAction } from "../settings";
 import { IPlugin } from "../plugins";
 import { ReturnCodeTracker } from "./returnCodeTracker";
 

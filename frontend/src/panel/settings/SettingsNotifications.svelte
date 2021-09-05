@@ -2,7 +2,7 @@
 	import { app } from "../../app";
 	import TabSlot from "../../ui/container/TabSlot.svelte";
 
-	const settings = app.transientSettings.notifications;
+	const settings = app.settings.notifications;
 
 	const notificationCategories = [
 		{ name: "Poke/Mention", attr: settings.poke },
@@ -18,7 +18,7 @@
 	];
 
 	function syncSettings() {
-		app.transientSettings.save();
+		app.settings.save();
 	}
 </script>
 

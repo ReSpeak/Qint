@@ -23,13 +23,13 @@ if (DEBUG_UTIL) {
 
 console.log("BUILD", BUILD_ENV, BUILD_DAT);
 console.log(`Using ${backend.name} backend`);
-app.transientSettings.synth.init();
+app.settings.synth.init();
 
 window.onbeforeunload = function (e: any) {
 	if (!IS_TAURI) {
 		// For debugging purposes (?)
-		app.transientSettings.synth.trySpeak("Goodbye");
-		if (app.hasConnected && app.transientSettings.app.askBeforeClosing) {
+		app.settings.synth.trySpeak("Goodbye");
+		if (app.hasConnected && app.settings.app.askBeforeClosing) {
 			if (e) {
 				e.returnValue = true;
 			}

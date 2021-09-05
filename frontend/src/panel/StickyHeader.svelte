@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Icon from "../ui/icon/Icon.svelte";
 	import { app } from "../app";
-	import { DescriptionMode } from "../transientSettings";
+	import { DescriptionMode } from "../settings";
 
 	export let title: string;
 </script>
@@ -14,7 +14,7 @@
 		<button
 			class="toolbutton is-small compact active"
 			on:click|stopPropagation={() =>
-				app.transientSettings.ui._descriptionMode.set(DescriptionMode.None)}>
+				app.settings.ui._descriptionMode.set(DescriptionMode.None)}>
 			<Icon name="close" />
 		</button>
 	</div>

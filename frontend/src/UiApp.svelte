@@ -13,7 +13,7 @@
 	import GlobalCss from "./GlobalCss.svelte";
 	import GlobalScss from "./GlobalScss.svelte";
 	import { ConnectData, MuteState } from "./connect/uiConnect";
-	import { DescriptionMode } from "./transientSettings";
+	import { DescriptionMode } from "./settings";
 	import { Channel, Server } from "./book";
 	import { backend } from "./backend/backend";
 	import { onMount } from "svelte";
@@ -30,7 +30,7 @@
 	const chat = app.chat;
 	const selected = app.selectedNode;
 	$: sel = $selected.getSingleSelection();
-	const ui = app.transientSettings.ui;
+	const ui = app.settings.ui;
 	const showSidebar = app.showSidebar;
 	const displayPanel = app.displayPanel;
 
@@ -99,8 +99,8 @@
 			connectData.outputMuted = state.output;
 			connectData.away = state.away ? "" : undefined;
 
-			// Save in transientsettings
-			const ui = app.transientSettings.ui;
+			// Save in settings
+			const ui = app.settings.ui;
 			let changed = false;
 			if (ui.defaultInputMuted !== (connectData.inputMuted !== MuteState.None)) {
 				ui.defaultInputMuted = connectData.inputMuted !== MuteState.None;
@@ -114,7 +114,7 @@
 				ui.defaultAway = state.away;
 				changed = true;
 			}
-			if (changed) app.transientSettings.save();
+			if (changed) app.settings.save();
 		} catch (e) {
 			console.log("Failed to get mute state", e);
 		}

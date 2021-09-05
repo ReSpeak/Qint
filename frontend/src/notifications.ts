@@ -9,7 +9,7 @@ import { ClientId } from "./ts";
 import { InMessage, Reason } from "./book_events";
 import { getClientIconPath, getIconPath, IconSourceLike } from "./ui/icon/tsIcons";
 import debug from "debug";
-import { NotificationCategory } from "./transientSettings";
+import { NotificationCategory } from "./settings";
 import { Moment } from "moment";
 import moment from "moment";
 const error = debug("error:NTFY");
@@ -926,7 +926,7 @@ async function defaultNotificationHandler(
 		options?: NotificationOptions;
 	}
 ) {
-	const settings = app.transientSettings.notifications.getSetting(category);
+	const settings = app.settings.notifications.getSetting(category);
 	if (!isRelevant && "onlyRelevant" in settings && settings.onlyRelevant) return;
 	if (settings.tts) {
 		// Check for custom tts handlers
@@ -939,7 +939,7 @@ async function defaultNotificationHandler(
 			}
 		}
 
-		if (!handled) app.transientSettings.synth.trySpeak(tts.toString(con, true));
+		if (!handled) app.settings.synth.trySpeak(tts.toString(con, true));
 	}
 	if (settings.notification && Notification.permission === "granted") {
 		//  By default, set server name as title, tts as content and server as icon

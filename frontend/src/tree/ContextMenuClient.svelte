@@ -10,7 +10,7 @@
 	export let connection: Connection;
 	export let client: Client;
 
-	const developMode = app.transientSettings.ui._developMode;
+	const developMode = app.settings.ui._developMode;
 
 	let pokeMessage: string = "";
 	let pokeInput: HTMLElement | undefined;

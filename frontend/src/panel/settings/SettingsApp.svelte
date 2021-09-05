@@ -3,15 +3,15 @@
 	import { app } from "../../app";
 	import TabSlot from "../../ui/container/TabSlot.svelte";
 	import KeyValue from "../../ui/util/KeyValue.svelte";
-	import { TitleBarStyle } from "../../transientSettings";
+	import { TitleBarStyle } from "../../settings";
 
 	let browserNotificationPermission = Notification.permission;
-	const developMode = app.transientSettings.ui._developMode;
-	const appSettings = app.transientSettings.app;
+	const developMode = app.settings.ui._developMode;
+	const appSettings = app.settings.app;
 	const titleBarStyle = appSettings._titleBarStyle;
 
 	function syncSettings() {
-		app.transientSettings.save();
+		app.settings.save();
 	}
 
 	function updateNotificationSetting() {

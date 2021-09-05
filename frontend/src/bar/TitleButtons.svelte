@@ -4,7 +4,7 @@
 	import { appWindow } from "@tauri-apps/api/window";
 
 	let isMaximized = false;
-	const appSettings = app.transientSettings.app;
+	const appSettings = app.settings.app;
 
 	async function updateWindowState() {
 		isMaximized = await appWindow.isMaximized();

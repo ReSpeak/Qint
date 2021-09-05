@@ -13,7 +13,7 @@
 	export let server: GraphQlServer;
 	export let editing = false;
 
-	const developMode = app.transientSettings.ui._developMode;
+	const developMode = app.settings.ui._developMode;
 	let changeRequest: ChangePromise | undefined;
 
 	function clickEditMode() {
