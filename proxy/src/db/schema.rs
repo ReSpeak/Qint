@@ -10,8 +10,6 @@ table! {
 		last_used -> Nullable<Timestamp>,
 		timezone -> Integer,
 		server -> Nullable<Binary>,
-		password -> Nullable<Text>,
-		channel_password -> Nullable<Text>,
 	}
 }
 
@@ -32,6 +30,7 @@ table! {
 		name -> Text,
 		icon -> Nullable<Integer>,
 		deleted -> Bool,
+		password -> Nullable<Text>,
 	}
 }
 
@@ -122,6 +121,7 @@ table! {
 		name -> Text,
 		address -> Text,
 		icon -> Nullable<Integer>,
+		password -> Nullable<Text>,
 	}
 }
 

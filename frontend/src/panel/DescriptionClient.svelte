@@ -299,11 +299,9 @@
 	}
 
 	async function updateAvatar() {
-		console.log("Reset avatar");
 		const oldClient = $client;
 		const path = await getClientAvatarPath(connection, $client);
 		if (oldClient !== $client) return;
-		console.log("Settings avatar", path);
 		avatarPath = path;
 	}
 
