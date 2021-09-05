@@ -42,7 +42,7 @@ lazy_static! {
 		#We accept any number of slugs, given we have a char after the slash
 		(?P<path>\/
 			#If we have endings like ?=fds include the ending
-			(?:[\w\d\?\-=#:%@&.;+*/~()])*
+			(?:[\w\d\?\-=#:%@&.,;+*/~()])*
 			#The last char cannot be one of these symbols .,?!,-)]} exclude these
 			(?<![.,?!-)\]}]))?
 	").unwrap();
@@ -159,6 +159,14 @@ mod tests {
 	fn misc() {
 		matches("u www.abc.de:1/? c", &[((2, 15), "http://www.abc.de:1/")]);
 		matches("http://wWw.gOogle.de", &[((0, 20), "http://wWw.gOogle.de")]);
+		matches("https://www.openstreetmap.org/#map=14/38.7047/13.1909", &[(
+			(0, 53),
+			"https://www.openstreetmap.org/#map=14/38.7047/13.1909",
+		)]);
+		matches("https://www.google.de/maps/@38.708441,13.1891842,14z", &[(
+			(0, 52),
+			"https://www.google.de/maps/@38.708441,13.1891842,14z",
+		)]);
 		matches("a x.org f", &[((2, 7), "http://x.org")]);
 		matches("a b cde.de", &[((4, 10), "http://cde.de")]);
 		matches("127.0.0.1/u", &[((0, 11), "http://127.0.0.1/u")]);
