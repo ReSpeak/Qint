@@ -488,7 +488,7 @@ mod imp {
 					.unwrap_or(crate::DEFAULT_HOTKEY_SOCKET_PATH)
 					.to_string();
 
-				if path.exists() {
+				if std::path::Path::new(&path).exists() {
 					// Try to connect to see if the socket is alive
 					use std::os::unix::net::UnixStream;
 					if let Err(e) = UnixStream::connect(&path) {
