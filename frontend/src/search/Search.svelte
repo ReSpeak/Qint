@@ -8,6 +8,7 @@
 	import type { MessageSearchResult } from "./uiSearch";
 	import debug from "debug";
 	import { on } from "../util";
+	import { app } from "../app";
 	const log = debug("SEARCH");
 
 	export let filter: string;
@@ -70,6 +71,13 @@
 </script>
 
 <div class="searchResults">
+	<div class="toolbar">
+		<button
+			class="toolbutton is-small compact active"
+			on:click={() => app.showMainPanel()}>
+			<Icon name="close" />
+		</button>
+	</div>
 	{#if searchError}
 		<div>
 			<article class="message is-danger">
@@ -100,6 +108,11 @@
 
 <style lang="scss">
 	@import "../style/global_mixin";
+
+	.toolbutton {
+		float: right;
+		margin: 0.5em;
+	}
 
 	.searchResults {
 		overflow: hidden;

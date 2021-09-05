@@ -10,7 +10,6 @@
 	import SettingsDeveloper from "./settings/SettingsDeveloper.svelte";
 	import TabList from "../ui/container/TabList.svelte";
 	import Icon from "../ui/icon/Icon.svelte";
-	import { DisplayPanel } from "../panel/panel";
 
 	const developMode = app.transientSettings.ui._developMode;
 </script>
@@ -18,7 +17,7 @@
 <div class="settings">
 	<button
 		class="toolbutton is-small compact active"
-		on:click={() => app.displayPanel.set(DisplayPanel.Main)}>
+		on:click={() => app.showMainPanel()}>
 		<Icon name="close" />
 	</button>
 	<TabList _style="height:100%;">

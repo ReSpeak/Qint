@@ -182,6 +182,13 @@ export class App {
 		app.transientSettings.save();
 	}
 
+	public showMainPanel() {
+		if (get(this.connections).length === 0)
+			this.displayPanel.set(DisplayPanel.Connect);
+		else
+			this.displayPanel.set(DisplayPanel.Main)
+	}
+
 	public addNotification(n: [Connection, TsNotification]): void {
 		this.nofifications.update((ns) => {
 			if (ns.length > 50) ns.pop();
