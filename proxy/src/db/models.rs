@@ -52,6 +52,7 @@ pub struct Server {
 	/// Last used address
 	pub address: String,
 	pub icon: Option<i32>,
+	pub password: Option<String>,
 }
 
 #[derive(Insertable)]
@@ -61,6 +62,7 @@ pub struct ServerInsert<'a> {
 	pub name: &'a str,
 	pub address: &'a str,
 	pub icon: Option<i32>,
+	pub password: Option<&'a str>,
 }
 
 #[derive(Queryable)]
@@ -72,6 +74,7 @@ pub struct Channel {
 	pub name: String,
 	pub icon: Option<i32>,
 	pub deleted: bool,
+	pub password: Option<String>,
 }
 
 #[derive(Insertable)]
@@ -84,6 +87,7 @@ pub struct ChannelInsert<'a> {
 	pub name: &'a str,
 	pub icon: Option<i32>,
 	pub deleted: bool,
+	pub password: Option<&'a str>,
 }
 
 #[derive(Debug, Insertable)]
@@ -98,8 +102,6 @@ pub struct BookmarkInsert<'a> {
 	/// Time of last successful connection
 	pub last_used: Option<NaiveDateTime>,
 	pub timezone: i32,
-	pub password: Option<&'a str>,
-	pub channel_password: Option<&'a str>,
 	/// Reference to the server if we already connected once
 	pub server: Option<&'a [u8]>,
 }
@@ -217,8 +219,6 @@ pub struct Bookmark {
 	pub last_used: Option<NaiveDateTime>,
 	pub timezone: i32,
 	pub server: Option<Vec<u8>>,
-	pub password: Option<String>,
-	pub channel_password: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Queryable, Serialize)]

@@ -24,7 +24,7 @@ use tsclientlib::{
 use tsproto_packets::packets::{AudioData, CodecType, OutAudio, OutCommand, OutPacket};
 use tsproto_types::crypto::EccKeyPubP256;
 
-use crate::db::{ChannelListMsg, ChatId, ChatType, SetClientVolumeMsg};
+use crate::db::{ChannelListMsg, ChannelListTask, ChatId, ChatType, SetClientVolumeMsg};
 use crate::messages::{self, MessageF2P, MessageP2F, ResultDetails, ResultStruct, WhisperData};
 use crate::{audio, db, with_log, ConnectionId, FrontBridge, QintState};
 
@@ -36,7 +36,7 @@ pub struct QintConnection {
 	sender: FrontBridge,
 	connection: Option<Connection>,
 	connect_options: Option<messages::ConnectOptions>,
-	channel_list_finished_msg: Option<ChannelListMsg>,
+	channel_list_finished_task: Option<ChannelListTask>,
 	file_downloads: HashMap<FiletransferHandle, oneshot::Sender<Result<FileDownloadResult, Error>>>,
 	file_uploads: HashMap<FiletransferHandle, oneshot::Sender<Result<FileUploadResult, Error>>>,
 
@@ -60,7 +60,7 @@ pub struct SendPacketMsg(pub OutPacket);
 pub struct SendAudioMsg(pub CodecType, pub Vec<u8>);
 pub struct CaptureLoudnessMsg(pub f64, pub f32); // (Loudness, Vad)
 pub struct DisconnectMsg;
-pub struct SetChannelListMsgMsg(pub ChannelListMsg);
+pub struct SetChannelListTaskMsg(pub ChannelListTask);
 pub struct RunOnConMsg<R: 'static, F: FnOnce(&mut QintConnection) -> R>(pub F);
 
 pub struct DownloadFile {
@@ -151,7 +151,7 @@ impl Message for CaptureLoudnessMsg {
 impl Message for DisconnectMsg {
 	type Result = ();
 }
-impl Message for SetChannelListMsgMsg {
+impl Message for SetChannelListTaskMsg {
 	type Result = ();
 }
 impl Message for DownloadFile {
@@ -177,7 +177,7 @@ impl QintConnection {
 			sender,
 			connection: None,
 			connect_options: None,
-			channel_list_finished_msg: None,
+			channel_list_finished_task: None,
 			file_downloads: Default::default(),
 			file_uploads: Default::default(),
 
@@ -357,22 +357,26 @@ impl QintConnection {
 			}
 			TsStreamItem::MessageEvent(msg) => {
 				if let InMessage::ChannelListFinished(_) = msg {
-					// Tell the database that all channels are now available
-					if let Some(msg) = self.channel_list_finished_msg.take() {
-						let logger = self.logger.clone();
-						actix::spawn(self.state.database.send(msg).map(move |r| match r {
-							Ok(Ok(())) => {}
-							Ok(Err(e)) => {
-								debug!(logger, "Failed to update bookmark"; "error" => %e);
-							}
-							Err(_) => {
-								warn!(logger, "Failed to send message to database");
-							}
-						}));
-					}
-
 					if let Some(con) = &mut self.connection {
 						if let Ok(data) = con.get_state() {
+							// Tell the database that all channels are now available
+							if let Some(task) = self.channel_list_finished_task.take() {
+								let logger = self.logger.clone();
+								let msg = ChannelListMsg {
+									current_channel: data.clients.get(&data.own_client).map(|c| c.channel),
+									task,
+								};
+								actix::spawn(self.state.database.send(msg).map(move |r| match r {
+									Ok(Ok(())) => {}
+									Ok(Err(e)) => {
+										debug!(logger, "Failed to update bookmark"; "error" => %e);
+									}
+									Err(_) => {
+										warn!(logger, "Failed to send message to database");
+									}
+								}));
+							}
+
 							if let Err(e) = db::DbHandler::handle_message(
 								&self.logger,
 								&self.state,
@@ -486,7 +490,6 @@ impl QintConnection {
 	}
 
 	fn set_audio_input_active(&mut self, ctx: &mut <Self as Actor>::Context, active: bool) {
-		// TODO Simplify to one message instead of two
 		if active {
 			self.send_to_a2ts(audio::audio_to_ts::AddListenerMsg(ctx.address()))
 		} else {
@@ -1262,10 +1265,10 @@ impl Handler<DisconnectMsg> for QintConnection {
 	}
 }
 
-impl Handler<SetChannelListMsgMsg> for QintConnection {
+impl Handler<SetChannelListTaskMsg> for QintConnection {
 	type Result = ();
-	fn handle(&mut self, msg: SetChannelListMsgMsg, _: &mut Self::Context) -> Self::Result {
-		self.channel_list_finished_msg = Some(msg.0);
+	fn handle(&mut self, msg: SetChannelListTaskMsg, _: &mut Self::Context) -> Self::Result {
+		self.channel_list_finished_task = Some(msg.0);
 	}
 }
 

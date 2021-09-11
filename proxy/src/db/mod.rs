@@ -98,11 +98,17 @@ pub struct ConnectedMsg {
 }
 
 /// After all channels are available.
-pub enum ChannelListMsg {
+pub enum ChannelListTask {
 	/// Create the bookmark with the right channel reference.
 	CreateBookmark(ConnectedMsg),
 	/// Set the channel reference of the bookmark.
-	UpdateChannel { bookmark: i64, server: Vec<u8>, channel: String },
+	UpdateChannel { bookmark: i64, server: Vec<u8>, channel: String, channel_password: Option<String> },
+}
+
+/// After all channels are available.
+pub struct ChannelListMsg {
+	pub current_channel: Option<ChannelId>,
+	pub task: ChannelListTask,
 }
 
 pub struct ClientData {
@@ -180,7 +186,7 @@ impl Message for WriteMessageMsg {
 	type Result = Result<()>;
 }
 impl Message for ConnectedMsg {
-	type Result = Result<Option<ChannelListMsg>>;
+	type Result = Result<Option<ChannelListTask>>;
 }
 impl Message for ChannelListMsg {
 	type Result = Result<()>;
@@ -646,31 +652,46 @@ impl Handler<WriteMessageMsg> for DbHandler {
 }
 
 impl Handler<ConnectedMsg> for DbHandler {
-	type Result = Result<Option<ChannelListMsg>>;
+	type Result = Result<Option<ChannelListTask>>;
 	/// Has to be called after the server was added in handle_connected.
 	///
 	/// Returns the id of a bookmark/recent connection if it should be updated later with the
 	/// correct channel reference.
 	fn handle(&mut self, msg: ConnectedMsg, _: &mut Self::Context) -> Self::Result {
-		use schema::{bookmarks, identities};
+		use schema::{bookmarks, identities, servers};
 		let server = msg.server_key.to_short();
 		let (utc_time, utc_to_local_offset) = EventHandler::get_now();
+
+		// Set server password
+		if diesel::update(servers::table.find(server.as_slice()))
+			.set(servers::password.eq(msg.password.as_deref()))
+			.execute(&self.con)? != 1 {
+			bail!("Failed to update password of server, not found");
+		}
 
 		if let Some(id) = msg.bookmark {
 			trace!(self.logger, "Connected: Update used bookmark"; "bookmark" => id);
 			// Update
-			if diesel::update(bookmarks::table.filter(bookmarks::id.eq(id)))
+			if diesel::update(bookmarks::table.find(id))
 				.set((
 					bookmarks::last_used.eq(Some(utc_time)),
 					bookmarks::timezone.eq(utc_to_local_offset),
-					// TODO Update server and channel password
 				))
 				.execute(&self.con)?
 				!= 1
 			{
 				bail!("Failed to update time of bookmark {}, not found", id);
 			}
-			Ok(None)
+			if let Some(channel) = msg.channel {
+				Ok(Some(ChannelListTask::UpdateChannel {
+					bookmark: id,
+					server,
+					channel,
+					channel_password: msg.channel_password,
+				}))
+			} else {
+				Ok(None)
+			}
 		} else {
 			// Find identity
 			let identity = match identities::table
@@ -724,7 +745,7 @@ impl Handler<ConnectedMsg> for DbHandler {
 							let mut msg = msg;
 							msg.identity = identity;
 							msg.bookmark = Some(id);
-							return Ok(Some(ChannelListMsg::CreateBookmark(msg)));
+							return Ok(Some(ChannelListTask::CreateBookmark(msg)));
 						} else {
 							trace!(
 								self.logger,
@@ -747,7 +768,7 @@ impl Handler<ConnectedMsg> for DbHandler {
 			if let Some(id) = bookmark_id {
 				// Update
 				trace!(self.logger, "Connected: Update existing bookmark"; "bookmark" => id);
-				if diesel::update(bookmarks::table.filter(bookmarks::id.eq(id)))
+				if diesel::update(bookmarks::table.find(id))
 					.set((
 						bookmarks::last_used.eq(Some(utc_time)),
 						bookmarks::timezone.eq(utc_to_local_offset),
@@ -756,7 +777,16 @@ impl Handler<ConnectedMsg> for DbHandler {
 				{
 					bail!("Failed to update time of bookmark {}, not found", id);
 				}
-				Ok(None)
+				if let Some(channel) = msg.channel {
+					Ok(Some(ChannelListTask::UpdateChannel {
+						bookmark: id,
+						server,
+						channel,
+						channel_password: msg.channel_password,
+					}))
+				} else {
+					Ok(None)
+				}
 			} else {
 				let bookmark = models::BookmarkInsert {
 					name: None,
@@ -767,8 +797,6 @@ impl Handler<ConnectedMsg> for DbHandler {
 					bookmark: false,
 					last_used: Some(utc_time),
 					timezone: utc_to_local_offset,
-					password: msg.password.as_deref(),
-					channel_password: msg.channel_password.as_deref(),
 					server: Some(server.as_slice()),
 				};
 				let id = self.con.transaction::<_, diesel::result::Error, _>(|| {
@@ -778,13 +806,15 @@ impl Handler<ConnectedMsg> for DbHandler {
 						.select(bookmarks::id)
 						.first::<i64>(&self.con)
 				})?;
+
 				trace!(self.logger, "Connected: Created new bookmark"; "bookmark" => id,
 					"channel_id" => ?channel_id, "channel" => ?msg.channel.as_ref());
 				if msg.channel.is_some() && channel_id.is_none() {
-					Ok(Some(ChannelListMsg::UpdateChannel {
+					Ok(Some(ChannelListTask::UpdateChannel {
 						bookmark: id,
-						server: server.as_slice().to_vec(),
+						server,
 						channel: msg.channel.unwrap(),
+						channel_password: msg.channel_password,
 					}))
 				} else {
 					Ok(None)
@@ -797,15 +827,20 @@ impl Handler<ConnectedMsg> for DbHandler {
 impl Handler<ChannelListMsg> for DbHandler {
 	type Result = Result<()>;
 	fn handle(&mut self, msg: ChannelListMsg, _: &mut Self::Context) -> Self::Result {
-		use schema::bookmarks;
+		use schema::{bookmarks, channels};
 
-		match msg {
-			ChannelListMsg::CreateBookmark(data) => {
+		let bookmark_server;
+		let bookmark_channel;
+		let bookmark_channel_password;
+		match msg.task {
+			ChannelListTask::CreateBookmark(data) => {
 				let server = data.server_key.to_short();
 				let (utc_time, utc_to_local_offset) = EventHandler::get_now();
+				bookmark_channel_password = data.channel_password;
 				if let Some(channel) = &data.channel {
 					match self.find_channel(server.as_slice(), channel) {
 						Ok(channel) => {
+							bookmark_channel = Some(channel);
 							// Create new bookmark with channel
 							trace!(self.logger, "ChannelList: Create new bookmark";
 								"channel" => channel);
@@ -818,8 +853,6 @@ impl Handler<ChannelListMsg> for DbHandler {
 								bookmark: false,
 								last_used: Some(utc_time),
 								timezone: utc_to_local_offset,
-								password: data.password.as_deref(),
-								channel_password: data.channel_password.as_deref(),
 								server: Some(server.as_slice()),
 							};
 							diesel::insert_into(bookmarks::table)
@@ -827,12 +860,13 @@ impl Handler<ChannelListMsg> for DbHandler {
 								.execute(&self.con)?;
 						}
 						Err(_) => {
+							bookmark_channel = None;
 							if let Some(id) = data.bookmark {
 								// Update existing bookmark without channel
 								trace!(self.logger, "ChannelList: Update bookmark without \
 									channel";
 									"bookmark" => id, "channel" => channel);
-								if diesel::update(bookmarks::table.filter(bookmarks::id.eq(id)))
+								if diesel::update(bookmarks::table.find(id))
 									.set((
 										bookmarks::last_used.eq(Some(utc_time)),
 										bookmarks::timezone.eq(utc_to_local_offset),
@@ -852,15 +886,37 @@ impl Handler<ChannelListMsg> for DbHandler {
 				} else {
 					bail!("Bookmarks that are created after channellistfinished need a channel");
 				}
+				bookmark_server = server;
 			}
-			ChannelListMsg::UpdateChannel { bookmark, server, channel } => {
+			ChannelListTask::UpdateChannel { bookmark, server, channel, channel_password } => {
 				let channel = self.find_channel(&server, &channel)?;
-				if diesel::update(bookmarks::table.filter(bookmarks::id.eq(bookmark)))
+				bookmark_server = server;
+				bookmark_channel = Some(channel);
+				bookmark_channel_password = channel_password;
+				if diesel::update(bookmarks::table.find(bookmark))
 					.set(bookmarks::channel.eq(channel))
 					.execute(&self.con)? != 1
 				{
 					bail!("Failed to update channel of bookmark {}, not found", bookmark);
 				}
+			}
+		}
+
+		if let Some(channel) = bookmark_channel {
+			if let Some(current_channel) = msg.current_channel {
+				// Update password only if it was correct
+				if current_channel.0 == channel as u64 {
+					if diesel::update(channels::table.filter(
+						channels::server.eq(&bookmark_server)
+							.and(channels::id.eq(channel))))
+						.set(channels::password.eq(bookmark_channel_password))
+						.execute(&self.con)? != 1
+					{
+						bail!("Failed to update channel password for bookmark, not found");
+					}
+				}
+			} else {
+				bail!("Failed to get channel of own client when updating bookmark");
 			}
 		}
 		Ok(())
@@ -965,7 +1021,7 @@ impl DbHandler {
 				Ok(Err(e)) => warn!(logger, "Failed to save connection in database"; "error" => %e),
 				Ok(Ok(Some(msg))) => {
 					actix::spawn(with_log!(
-						ws.send(crate::connection::SetChannelListMsgMsg(msg)),
+						ws.send(crate::connection::SetChannelListTaskMsg(msg)),
 						logger,
 						"Failed to set update bookmark message"
 					));
@@ -1156,6 +1212,7 @@ impl<'a> EventHandler<'a> {
 					name: &server_name,
 					address: &addr,
 					icon: icon_id,
+					password: None,
 				};
 				diesel::insert_into(schema::servers::table).values(&server).execute(&db.con)?;
 			}
@@ -1459,6 +1516,7 @@ impl<'a> EventHandler<'a> {
 					name: &ch_name,
 					icon: icon_id,
 					deleted: false,
+					password: None,
 				};
 				diesel::replace_into(schema::channels::table).values(&channel).execute(&db.con)?;
 			}
