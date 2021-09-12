@@ -14,12 +14,13 @@ use thiserror::Error;
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
 use tsclientlib::events::Event as TsEvent;
+use tsclientlib::messages::s2c::InCommandErrorPart;
 use tsclientlib::prelude::*;
 use tsclientlib::StreamItem as TsStreamItem;
 use tsclientlib::{
 	events, AudioEvent, ChannelId, ClientId, Connection, ConnectionStats, DisconnectOptions,
 	Error as TsclError, FileDownloadResult, FileUploadResult, FiletransferHandle, InMessage,
-	MessageTarget, UidBuf,
+	MessageTarget, TsError, UidBuf,
 };
 use tsproto_packets::packets::{AudioData, CodecType, OutAudio, OutCommand, OutPacket};
 use tsproto_types::crypto::EccKeyPubP256;
@@ -27,6 +28,10 @@ use tsproto_types::crypto::EccKeyPubP256;
 use crate::db::{ChannelListMsg, ChannelListTask, ChatId, ChatType, SetClientVolumeMsg};
 use crate::messages::{self, MessageF2P, MessageP2F, ResultDetails, ResultStruct, WhisperData};
 use crate::{audio, db, with_log, ConnectionId, FrontBridge, QintState};
+
+type ReturnCodeListener = Box<dyn FnOnce(&mut QintConnection, &InCommandErrorPart)>;
+
+const RETURN_CODE_PREFIX: &str = "proxy:";
 
 /// A websocket connection
 pub struct QintConnection {
@@ -39,6 +44,8 @@ pub struct QintConnection {
 	channel_list_finished_task: Option<ChannelListTask>,
 	file_downloads: HashMap<FiletransferHandle, oneshot::Sender<Result<FileDownloadResult, Error>>>,
 	file_uploads: HashMap<FiletransferHandle, oneshot::Sender<Result<FileUploadResult, Error>>>,
+	return_codes: HashMap<String, ReturnCodeListener>,
+	cur_return_code: u16,
 
 	self_talking: bool,
 	own_loudness: VecDeque<f64>,
@@ -180,6 +187,8 @@ impl QintConnection {
 			channel_list_finished_task: None,
 			file_downloads: Default::default(),
 			file_uploads: Default::default(),
+			return_codes: Default::default(),
+			cur_return_code: 0,
 
 			self_talking: false,
 			own_loudness: Default::default(),
@@ -363,7 +372,10 @@ impl QintConnection {
 							if let Some(task) = self.channel_list_finished_task.take() {
 								let logger = self.logger.clone();
 								let msg = ChannelListMsg {
-									current_channel: data.clients.get(&data.own_client).map(|c| c.channel),
+									current_channel: data
+										.clients
+										.get(&data.own_client)
+										.map(|c| c.channel),
 									task,
 								};
 								actix::spawn(self.state.database.send(msg).map(move |r| match r {
@@ -397,17 +409,24 @@ impl QintConnection {
 					}
 				}
 
+				// Convert errors by hand
 				if let InMessage::CommandError(error) = &msg {
 					for e in error.iter() {
 						if let Some(return_code) = &e.return_code {
-							self.send_message(&MessageP2F::Result(ResultStruct {
-								return_code: return_code.clone(),
-								details: ResultDetails {
-									ts_result: Some(e.id),
-									missing_permission: e.missing_permission_id,
-									description: None,
-								},
-							}));
+							if !return_code.starts_with(RETURN_CODE_PREFIX) {
+								self.send_message(&MessageP2F::Result(ResultStruct {
+									return_code: return_code.clone(),
+									details: ResultDetails {
+										ts_result: Some(e.id),
+										missing_permission: e.missing_permission_id,
+										description: None,
+									},
+								}));
+							}
+
+							if let Some(handler) = self.return_codes.remove(return_code) {
+								handler(self, e);
+							}
 						}
 					}
 				} else if let Some(m) = book_events::convert_message(&msg) {
@@ -572,6 +591,21 @@ impl QintConnection {
 		info.server_to_client_packetloss_total = Some(Some(stats.get_packetloss_s2c_total()));
 	}
 
+	fn reset_connection(&mut self) {
+		self.connection = None;
+		self.channel_list_finished_task = None;
+		self.file_downloads.clear();
+		self.file_uploads.clear();
+		self.return_codes.clear();
+		self.cur_return_code = 0;
+
+		self.self_talking = false;
+		self.own_loudness.clear();
+		self.talkers.clear();
+		self.whisper_list = None;
+		self.update_talkers();
+	}
+
 	fn disconnect(&mut self, ctx: &mut <Self as Actor>::Context) {
 		self.set_audio_input_active(ctx, false);
 		self.set_audio_output_active(ctx, false);
@@ -581,18 +615,57 @@ impl QintConnection {
 				debug!(self.logger, "Sending disconnect packet");
 				if let Err(e) = con.disconnect(DisconnectOptions::new()) {
 					warn!(self.logger, "Failed to disconnect properly"; "error" => %e);
-					self.connection = None;
+					self.reset_connection();
 				} else {
 					// Wait until disconnected
 					return;
 				}
 			} else {
-				self.connection = None;
+				self.reset_connection();
 			}
 		}
 		debug!(self.logger, "Disconnecting QintConnection");
 		self.sender.close();
 		ctx.stop();
+	}
+
+	/// Update channel password after successfully switching channels.
+	fn handle_channel_move_result(&mut self, channel: ChannelId, password: Option<String>) {
+		if let Some(state) = self.get_book() {
+			let server = state.server.public_key.to_short();
+			let logger = self.logger.clone();
+			actix::spawn(
+				self.state
+					.database
+					.send(db::RunOnDbMsg(move |db| {
+						use diesel::prelude::*;
+
+						use db::schema::channels;
+
+						diesel::update(channels::table.filter(
+							channels::server.eq(&server).and(channels::id.eq(channel.0 as i64)),
+						))
+						.set(channels::password.eq(password))
+						.execute(&db.con)
+					}))
+					.map(move |r| match r {
+						Ok(Ok(1)) => {}
+						Ok(Ok(_)) => {
+							error!(
+								logger,
+								"Failed to update channel password in database, channel not found"
+							);
+						}
+						Ok(Err(e)) => {
+							error!(logger, "Failed to update channel password in database"; "error" => %e);
+						}
+						Err(e) => {
+							error!(logger, "Failed to send channel password update to database";
+						"error" => %e);
+						}
+					}),
+			);
+		}
 	}
 
 	fn handle_ws_message(&mut self, msg: MessageF2P, ctx: &mut <Self as Actor>::Context) {
@@ -752,36 +825,17 @@ impl QintConnection {
 									}
 
 									// Change all other muted servers to disabled
-									let cons = self
-										.state
-										.connections
-										.lock()
-										.unwrap()
-										.iter()
-										.filter_map(|(id, addr)| {
-											if *id != self.id { Some(addr.clone()) } else { None }
-										})
-										.collect::<Vec<_>>();
-									let state = self.state.clone();
-									actix::spawn(async move {
-										state
-											.send_each_con(cons.into_iter(), |con| {
-												if let Some(client) =
-													con.clients.get(&con.own_client)
-												{
-													if client.input_muted
-														&& client.input_hardware_enabled
-													{
-														return Some(
-															con.client_update()
-																.set_input_muted(false)
-																.set_input_hardware_enabled(false),
-														);
-													}
-												}
-												None
-											})
-											.await
+									self.for_other_connections(|con| {
+										if let Some(client) = con.clients.get(&con.own_client) {
+											if client.input_muted && client.input_hardware_enabled {
+												return Some(
+													con.client_update()
+														.set_input_muted(false)
+														.set_input_hardware_enabled(false),
+												);
+											}
+										}
+										None
 									});
 								}
 							}
@@ -804,107 +858,141 @@ impl QintConnection {
 									}
 
 									// Change all other muted servers to disabled
-									let cons = self
-										.state
-										.connections
-										.lock()
-										.unwrap()
-										.iter()
-										.filter_map(|(id, addr)| {
-											if *id != self.id { Some(addr.clone()) } else { None }
-										})
-										.collect::<Vec<_>>();
-									let state = self.state.clone();
-									actix::spawn(async move {
-										state
-											.send_each_con(cons.into_iter(), |con| {
-												if let Some(client) =
-													con.clients.get(&con.own_client)
-												{
-													if client.output_muted
-														&& client.output_hardware_enabled
-													{
-														return Some(
-															con.client_update()
-																.set_output_muted(false)
-																.set_output_hardware_enabled(false),
-														);
-													}
-												}
-												None
-											})
-											.await
+									self.for_other_connections(|con| {
+										if let Some(client) = con.clients.get(&con.own_client) {
+											if client.output_muted && client.output_hardware_enabled
+											{
+												return Some(
+													con.client_update()
+														.set_output_muted(false)
+														.set_output_hardware_enabled(false),
+												);
+											}
+										}
+										None
 									});
 								}
 							}
 						}
 					} else if let JsM2B::ClientMove(move_change) = &mut change {
+						let channel = move_change.channel;
+						let password = move_change.password.clone();
 						// Add a password if we have one saved
 						if move_change.password.is_none() {
 							let server = state.server.public_key.to_short();
-							let channel = move_change.channel;
 							let logger = self.logger.clone();
-							ctx.spawn(wrap_future(self.state.database.send(db::RunOnDbMsg(move |db| {
-								use diesel::prelude::*;
+							ctx.spawn(
+								wrap_future(self.state.database.send(db::RunOnDbMsg(move |db| {
+									use diesel::prelude::*;
 
-								use db::schema::channels;
+									use db::schema::channels;
 
-								channels::table.filter(channels::server.eq(&server).and(channels::id.eq(channel.0 as i64)))
-									.select(channels::password)
-									.first::<Option<String>>(&db.con)
-							}))).map(move |r, actor: &mut Self, _| {
-								let pw = match r {
-									Ok(Ok(r)) => r,
-									Ok(Err(e)) => {
-										error!(logger, "Failed to query database for channel password";
+									channels::table
+										.filter(
+											channels::server
+												.eq(&server)
+												.and(channels::id.eq(channel.0 as i64)),
+										)
+										.select(channels::password)
+										.first::<Option<String>>(&db.con)
+								})))
+								.map(move |r, actor: &mut Self, _| {
+									let pw = match r {
+										Ok(Ok(r)) => r,
+										Ok(Err(e)) => {
+											error!(logger, "Failed to query database for channel password";
 											"error" => %e);
-										None
-									}
-									Err(_) => {
-										error!(logger, "Failed to query database for channel password");
-										None
-									}
-								};
-								if let JsM2B::ClientMove(change) = &mut change {
-									change.password = pw;
-								} else {
-									error!(logger, "Unexpected message, should be a client move");
-								}
-
-								if let Some(state) = actor.get_book() {
-									match change.to_packet(state) {
-										Ok(msg) => {
-											let _ = actor.send_ts_message(msg, return_code.as_deref());
+											None
 										}
-										Err(e) => {
-											actor.send_error(
-												return_code.as_deref(),
-												format!("Failed to create packet for change {:?}: {}", change, e),
+										Err(_) => {
+											error!(
+												logger,
+												"Failed to query database for channel password"
 											);
+											None
 										}
+									};
+									if let JsM2B::ClientMove(change) = &mut change {
+										change.password = pw;
+									} else {
+										error!(
+											logger,
+											"Unexpected message, should be a client move"
+										);
 									}
-								}
-							}));
+									let _ = actor.send_change_with_result(
+										change,
+										return_code,
+										Box::new(move |actor, res| {
+											if res.id == TsError::Ok {
+												actor.handle_channel_move_result(channel, password);
+											}
+										}),
+									);
+								}),
+							);
 							return;
 						}
+
+						let _ = self.send_change_with_result(
+							change,
+							return_code,
+							Box::new(move |actor, res| {
+								if res.id == TsError::Ok {
+									actor.handle_channel_move_result(channel, password);
+								}
+							}),
+						);
+						return;
 					}
 
-					match change.to_packet(state) {
-						Ok(msg) => {
-							let _ = self.send_ts_message(msg, return_code.as_deref());
-						}
-						Err(e) => {
-							self.send_error(
-								return_code.as_deref(),
-								format!("Failed to create packet for change {:?}: {}", change, e),
-							);
-						}
-					}
+					let _ = self.send_change(change, return_code);
 				} else {
 					self.send_error(return_code.as_deref(), format!("Failed to get state"));
 				}
 			}
 		}
+	}
+
+	fn send_change(&mut self, change: JsM2B, return_code: Option<String>) -> Result<()> {
+		if let Some(state) = self.get_book() {
+			match change.to_packet(state) {
+				Ok(msg) => self.send_ts_message(msg, return_code.as_deref()),
+				Err(e) => {
+					self.send_error(
+						return_code.as_deref(),
+						format!("Failed to create packet for change {:?}: {}", change, e),
+					);
+					bail!("Failed to create packet");
+				}
+			}
+		} else {
+			self.send_error(return_code.as_deref(), format!("Failed to get state"));
+			bail!("Failed to get state");
+		}
+	}
+
+	/// Send the message and execute the given function after the result is there.
+	///
+	/// If the `return_code` is `None`, a new one will be generated.
+	///
+	/// The `on_result` function will not be called if sending the message fails and this function
+	/// returns an error.
+	fn send_change_with_result(
+		&mut self, change: JsM2B, return_code: Option<String>, on_result: ReturnCodeListener,
+	) -> Result<()> {
+		let return_code = return_code.unwrap_or_else(|| {
+			let r = format!("{}{}", RETURN_CODE_PREFIX, self.cur_return_code);
+			self.cur_return_code = self.cur_return_code.wrapping_add(1);
+			r
+		});
+
+		let res = self.send_change(change, Some(return_code.clone()));
+		if res.is_ok() {
+			self.return_codes.insert(return_code, on_result);
+		}
+
+		res
 	}
 
 	fn send_message(&self, msg: &MessageP2F) { self.sender.send(msg) }
@@ -1055,6 +1143,24 @@ impl QintConnection {
 			&command,
 		);
 		let _ = self.send_ts_message(cmd, return_code);
+	}
+
+	fn for_other_connections<
+		P: tsclientlib::OutCommandExt,
+		F: FnOnce(&tsclientlib::data::Connection) -> Option<P> + Clone + Send + 'static,
+	>(
+		&self, f: F,
+	) {
+		let cons = self
+			.state
+			.connections
+			.lock()
+			.unwrap()
+			.iter()
+			.filter_map(|(id, addr)| if *id != self.id { Some(addr.clone()) } else { None })
+			.collect::<Vec<_>>();
+		let state = self.state.clone();
+		actix::spawn(async move { state.send_each_con(cons.into_iter(), f).await });
 	}
 }
 

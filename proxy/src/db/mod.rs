@@ -102,7 +102,12 @@ pub enum ChannelListTask {
 	/// Create the bookmark with the right channel reference.
 	CreateBookmark(ConnectedMsg),
 	/// Set the channel reference of the bookmark.
-	UpdateChannel { bookmark: i64, server: Vec<u8>, channel: String, channel_password: Option<String> },
+	UpdateChannel {
+		bookmark: i64,
+		server: Vec<u8>,
+		channel: String,
+		channel_password: Option<String>,
+	},
 }
 
 /// After all channels are available.
@@ -665,7 +670,9 @@ impl Handler<ConnectedMsg> for DbHandler {
 		// Set server password
 		if diesel::update(servers::table.find(server.as_slice()))
 			.set(servers::password.eq(msg.password.as_deref()))
-			.execute(&self.con)? != 1 {
+			.execute(&self.con)?
+			!= 1
+		{
 			bail!("Failed to update password of server, not found");
 		}
 
@@ -907,10 +914,10 @@ impl Handler<ChannelListMsg> for DbHandler {
 				// Update password only if it was correct
 				if current_channel.0 == channel as u64 {
 					if diesel::update(channels::table.filter(
-						channels::server.eq(&bookmark_server)
-							.and(channels::id.eq(channel))))
-						.set(channels::password.eq(bookmark_channel_password))
-						.execute(&self.con)? != 1
+						channels::server.eq(&bookmark_server).and(channels::id.eq(channel)),
+					))
+					.set(channels::password.eq(bookmark_channel_password))
+					.execute(&self.con)? != 1
 					{
 						bail!("Failed to update channel password for bookmark, not found");
 					}
