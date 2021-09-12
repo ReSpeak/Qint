@@ -838,6 +838,55 @@ impl QintConnection {
 								}
 							}
 						}
+					} else if let JsM2B::ClientMove(move_change) = &mut change {
+						// Add a password if we have one saved
+						if move_change.password.is_none() {
+							let server = state.server.public_key.to_short();
+							let channel = move_change.channel;
+							let logger = self.logger.clone();
+							ctx.spawn(wrap_future(self.state.database.send(db::RunOnDbMsg(move |db| {
+								use diesel::prelude::*;
+
+								use db::schema::channels;
+
+								channels::table.filter(channels::server.eq(&server).and(channels::id.eq(channel.0 as i64)))
+									.select(channels::password)
+									.first::<Option<String>>(&db.con)
+							}))).map(move |r, actor: &mut Self, _| {
+								let pw = match r {
+									Ok(Ok(r)) => r,
+									Ok(Err(e)) => {
+										error!(logger, "Failed to query database for channel password";
+											"error" => %e);
+										None
+									}
+									Err(_) => {
+										error!(logger, "Failed to query database for channel password");
+										None
+									}
+								};
+								if let JsM2B::ClientMove(change) = &mut change {
+									change.password = pw;
+								} else {
+									error!(logger, "Unexpected message, should be a client move");
+								}
+
+								if let Some(state) = actor.get_book() {
+									match change.to_packet(state) {
+										Ok(msg) => {
+											let _ = actor.send_ts_message(msg, return_code.as_deref());
+										}
+										Err(e) => {
+											actor.send_error(
+												return_code.as_deref(),
+												format!("Failed to create packet for change {:?}: {}", change, e),
+											);
+										}
+									}
+								}
+							}));
+							return;
+						}
 					}
 
 					match change.to_packet(state) {
