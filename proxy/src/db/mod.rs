@@ -12,7 +12,7 @@ use diesel::sqlite::SqliteConnection;
 use futures::prelude::*;
 use proxy_codegen::book_events::deserialize_u64;
 use serde::Deserialize;
-use slog::{error, info, trace, warn, Logger};
+use tracing::{error, info, trace, warn};
 use tsclientlib::data::Client;
 use tsclientlib::data::Connection as TsData;
 use tsclientlib::events::{Event, PropertyId, PropertyValue};
@@ -36,7 +36,6 @@ type DieselResult<T> = std::result::Result<T, diesel::result::Error>;
 diesel_migrations::embed_migrations!();
 
 pub struct DbHandler {
-	logger: Logger,
 	file_cache: Arc<FileCache>,
 	search: Option<Arc<Search>>,
 	secret: Secret,
@@ -45,7 +44,6 @@ pub struct DbHandler {
 }
 
 struct EventHandler<'a> {
-	logger: &'a Logger,
 	state: &'a QintState,
 	con: &'a TsConnection,
 	data: &'a TsData,
@@ -202,8 +200,8 @@ impl Message for RunMsg {
 
 impl DbHandler {
 	pub(crate) fn new(
-		logger: Logger, file_cache: Arc<FileCache>, search: Option<Arc<Search>>,
-		launch_config: &LaunchConfig, secret: Secret,
+		file_cache: Arc<FileCache>, search: Option<Arc<Search>>, launch_config: &LaunchConfig,
+		secret: Secret,
 	) -> Result<Self> {
 		let database_url = launch_config.config_path.join("storage.sqlite");
 		let con = SqliteConnection::establish(database_url.to_str().unwrap())?;
@@ -225,10 +223,10 @@ impl DbHandler {
 		embedded_migrations::run_with_output(&con, &mut s)?;
 		let s = std::str::from_utf8(&s)?;
 		if !s.is_empty() {
-			info!(logger, "Run database migrations"; "output" => s);
+			info!(output = s, "Run database migrations");
 		}
 
-		Ok(Self { logger, file_cache, search, secret, con, last_message_id: 0 })
+		Ok(Self { file_cache, search, secret, con, last_message_id: 0 })
 	}
 
 	/// Create a new chat entry in the database and returns the id.
@@ -677,7 +675,7 @@ impl Handler<ConnectedMsg> for DbHandler {
 		}
 
 		if let Some(id) = msg.bookmark {
-			trace!(self.logger, "Connected: Update used bookmark"; "bookmark" => id);
+			trace!(bookmark = id, "Connected: Update used bookmark");
 			// Update
 			if diesel::update(bookmarks::table.find(id))
 				.set((
@@ -708,8 +706,10 @@ impl Handler<ConnectedMsg> for DbHandler {
 			{
 				Ok(r) => r,
 				Err(_) => {
-					trace!(self.logger, "Connected: Identity not found, picking default";
-						"identity" => msg.identity);
+					trace!(
+						identity = msg.identity,
+						"Connected: Identity not found, picking default"
+					);
 					// Pick an existing identity
 					identities::table
 						.order(identities::id)
@@ -728,8 +728,7 @@ impl Handler<ConnectedMsg> for DbHandler {
 				match self.find_channel(server.as_slice(), channel) {
 					Ok(id) => {
 						channel_id = Some(id);
-						trace!(self.logger, "Connected: Found channel for bookmark";
-							"channel" => id);
+						trace!(channel = id, "Connected: Found channel for bookmark");
 						bookmarks::table
 							.filter(cmp.and(bookmarks::channel.eq(id)))
 							.select(bookmarks::id)
@@ -745,9 +744,11 @@ impl Handler<ConnectedMsg> for DbHandler {
 							.first::<i64>(&self.con)
 							.optional()?
 						{
-							trace!(self.logger, "Connected: Did not find channel for \
-								bookmark, but found bookmark without channel, updating later";
-								"other_bookmark" => id);
+							trace!(
+								other_bookmark = id,
+								"Connected: Did not find channel for bookmark, but found bookmark \
+								 without channel, updating later"
+							);
 							// Create or update later
 							let mut msg = msg;
 							msg.identity = identity;
@@ -755,7 +756,6 @@ impl Handler<ConnectedMsg> for DbHandler {
 							return Ok(Some(ChannelListTask::CreateBookmark(msg)));
 						} else {
 							trace!(
-								self.logger,
 								"Connected: Did not find channel for bookmark, creating without \
 								 channel"
 							);
@@ -774,7 +774,7 @@ impl Handler<ConnectedMsg> for DbHandler {
 
 			if let Some(id) = bookmark_id {
 				// Update
-				trace!(self.logger, "Connected: Update existing bookmark"; "bookmark" => id);
+				trace!(bookmark = id, "Connected: Update existing bookmark");
 				if diesel::update(bookmarks::table.find(id))
 					.set((
 						bookmarks::last_used.eq(Some(utc_time)),
@@ -814,8 +814,10 @@ impl Handler<ConnectedMsg> for DbHandler {
 						.first::<i64>(&self.con)
 				})?;
 
-				trace!(self.logger, "Connected: Created new bookmark"; "bookmark" => id,
-					"channel_id" => ?channel_id, "channel" => ?msg.channel.as_ref());
+				trace!(bookmark = id,
+					?channel_id, channel = ?msg.channel.as_ref(),
+					"Connected: Created new bookmark"
+				);
 				if msg.channel.is_some() && channel_id.is_none() {
 					Ok(Some(ChannelListTask::UpdateChannel {
 						bookmark: id,
@@ -849,8 +851,7 @@ impl Handler<ChannelListMsg> for DbHandler {
 						Ok(channel) => {
 							bookmark_channel = Some(channel);
 							// Create new bookmark with channel
-							trace!(self.logger, "ChannelList: Create new bookmark";
-								"channel" => channel);
+							trace!(channel, "ChannelList: Create new bookmark");
 							let bookmark = models::BookmarkInsert {
 								name: None,
 								username: &data.username,
@@ -870,9 +871,8 @@ impl Handler<ChannelListMsg> for DbHandler {
 							bookmark_channel = None;
 							if let Some(id) = data.bookmark {
 								// Update existing bookmark without channel
-								trace!(self.logger, "ChannelList: Update bookmark without \
-									channel";
-									"bookmark" => id, "channel" => channel);
+								trace!(bookmark = id, %channel, "ChannelList: Update bookmark \
+									without channel");
 								if diesel::update(bookmarks::table.find(id))
 									.set((
 										bookmarks::last_used.eq(Some(utc_time)),
@@ -939,10 +939,10 @@ impl Handler<RunMsg> for DbHandler {
 
 impl DbHandler {
 	pub(crate) fn handle_events(
-		logger: &Logger, state: &QintState, con: &TsConnection, data: &TsData, events: &[Event],
+		state: &QintState, con: &TsConnection, data: &TsData, events: &[Event],
 		connected_msg: Option<ConnectedMsg>, ws: Addr<crate::connection::QintConnection>,
 	) -> Result<()> {
-		let handler = EventHandler::new(logger, state, con, data);
+		let handler = EventHandler::new(state, con, data);
 
 		for e in events {
 			let r = match e {
@@ -1016,20 +1016,18 @@ impl DbHandler {
 				}
 			};
 
-			if let Err(e) = r {
-				error!(logger, "Failed to handle event for database"; "error" => %e);
+			if let Err(error) = r {
+				error!(%error, "Failed to handle event for database");
 			}
 		}
 
 		if let Some(msg) = connected_msg {
-			let logger = logger.clone();
 			actix::spawn(state.database.send(msg).map(move |r| match r {
-				Err(e) => warn!(logger, "Failed to save connection in database"; "error" => %e),
-				Ok(Err(e)) => warn!(logger, "Failed to save connection in database"; "error" => %e),
+				Err(error) => warn!(%error, "Failed to save connection in database"),
+				Ok(Err(error)) => warn!(%error, "Failed to save connection in database"),
 				Ok(Ok(Some(msg))) => {
 					actix::spawn(with_log!(
 						ws.send(crate::connection::SetChannelListTaskMsg(msg)),
-						logger,
 						"Failed to set update bookmark message"
 					));
 				}
@@ -1041,9 +1039,9 @@ impl DbHandler {
 	}
 
 	pub(crate) fn handle_message(
-		logger: &Logger, state: &QintState, con: &TsConnection, data: &TsData, msg: &InMessage,
+		state: &QintState, con: &TsConnection, data: &TsData, msg: &InMessage,
 	) -> Result<()> {
-		let handler = EventHandler::new(logger, state, con, data);
+		let handler = EventHandler::new(state, con, data);
 		if let InMessage::ChannelListFinished(_) = msg {
 			handler.handle_channellistfinished()
 		} else {
@@ -1052,9 +1050,9 @@ impl DbHandler {
 	}
 
 	pub fn create_client(
-		logger: &Logger, state: &QintState, con: &TsConnection, data: &TsData, client: &Client,
+		state: &QintState, con: &TsConnection, data: &TsData, client: &Client,
 	) -> Result<()> {
-		let handler = EventHandler::new(logger, state, con, data);
+		let handler = EventHandler::new(state, con, data);
 		handler.handle_add_client(client, true)
 	}
 
@@ -1073,9 +1071,8 @@ impl DbHandler {
 						Ok(())
 					};
 
-					if let Err(e) = r {
-						error!(handler.logger, "Failed to handle event for database";
-							"error" => %e);
+					if let Err(error) = r {
+						error!(%error, "Failed to handle event for database");
 					}
 				}
 			}
@@ -1146,12 +1143,12 @@ impl DbHandler {
 		if let Some(prev_avatar) = prev_avatar {
 			if prev_avatar != client.avatar {
 				// Remove cached avatar
-				if let Err(e) = self.file_cache.delete_file(
+				if let Err(error) = self.file_cache.delete_file(
 					server,
 					ChannelId(0),
 					&format!("/avatar_{}", client.uid.as_avatar()),
 				) {
-					warn!(self.logger, "Failed to delete cached file"; "error" => %e);
+					warn!(%error, "Failed to delete cached file");
 				}
 			}
 		}
@@ -1162,10 +1159,8 @@ impl DbHandler {
 }
 
 impl<'a> EventHandler<'a> {
-	fn new(
-		logger: &'a Logger, state: &'a QintState, con: &'a TsConnection, data: &'a TsData,
-	) -> Self {
-		Self { logger, state, con, data }
+	fn new(state: &'a QintState, con: &'a TsConnection, data: &'a TsData) -> Self {
+		Self { state, con, data }
 	}
 
 	fn run<
@@ -1173,13 +1168,12 @@ impl<'a> EventHandler<'a> {
 	>(
 		&self, f: F,
 	) {
-		let logger = self.logger.clone();
 		actix::spawn(self.state.database.send(RunMsg(Box::new(f))).map(move |r| match r {
-			Err(e) => {
-				error!(logger, "Failed to send to database"; "error" => %e);
+			Err(error) => {
+				error!(%error, "Failed to send to database");
 			}
-			Ok(Err(e)) => {
-				error!(logger, "Failed to write to database"; "error" => %e);
+			Ok(Err(error)) => {
+				error!(%error, "Failed to write to database");
 			}
 			_ => {}
 		}));
@@ -1406,12 +1400,12 @@ impl<'a> EventHandler<'a> {
 		};
 
 		// Remove cached avatar
-		if let Err(e) = self.state.file_cache.delete_file(
+		if let Err(error) = self.state.file_cache.delete_file(
 			&server_id,
 			ChannelId(0),
 			&format!("/avatar_{}", client_uid.as_avatar()),
 		) {
-			warn!(self.logger, "Failed to delete cached file"; "error" => %e);
+			warn!(%error, "Failed to delete cached file");
 		}
 
 		let client_avatar =

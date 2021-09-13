@@ -9,9 +9,9 @@ use qint_proxy::with_log;
 use qint_proxy::ConnectionId;
 use qint_proxy::FrontBridge;
 use qint_proxy::QintState;
-use slog::error;
 use thiserror::Error;
 use tokio::runtime::Handle;
+use tracing::error;
 
 use crate::filetransfer::FiletransferManager;
 
@@ -64,12 +64,11 @@ impl Handler<CreateWs> for QintCore {
 
 		let mut cons = self.state.connections.lock().unwrap();
 		if cons.contains_key(&id) || !id.is_valid() {
-			error!(self.state.logger, "Connection already in use. Duplicate create call?"; "error" => ?id);
+			error!(error = ?id, "Connection already in use. Duplicate create call?");
 			return Err(Error::ConnectionInUse);
 		}
 
-		let ws =
-			QintConnection::new(self.state.logger.clone(), self.state.clone(), id.clone(), sender);
+		let ws = QintConnection::new(self.state.clone(), id.clone(), sender);
 		let addr = ws.start();
 		cons.insert(id, addr);
 		Ok(())
@@ -84,7 +83,7 @@ impl QintCore {
 			match self.state.connections.lock().unwrap().get(&id) {
 				Some(con) => con.clone(),
 				None => {
-					error!(self.state.logger, "No con for msg found"; "error" => ?id);
+					error!(error = ?id, "No con for msg found");
 					return Err(Error::NoConnection);
 				}
 			}
@@ -92,7 +91,6 @@ impl QintCore {
 
 		self.handle.spawn(with_log!(
 			con.send(qint_proxy::connection::DisconnectMsg),
-			self.state.logger.clone(),
 			"Failed to send disconnect to connection"
 		));
 		Ok(())
@@ -102,13 +100,12 @@ impl QintCore {
 		let DispatchWsMsg { id, msg } = msg;
 
 		let con = self.state.get_connection(&id).ok_or_else(|| {
-			error!(self.state.logger, "No con for msg found"; "error" => ?id);
+			error!(error = ?id, "No con for msg found");
 			Error::NoConnection
 		})?;
 
 		self.handle.spawn(with_log!(
 			con.send(MessageF2PWrapper(msg)),
-			self.state.logger.clone(),
 			"Failed to forward Message to Proxy"
 		));
 		Ok(())

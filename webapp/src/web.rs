@@ -20,9 +20,9 @@ use qint_proxy::messages::ResultDetails;
 use qint_proxy::{ConnectionId, QintState};
 use rand::Rng;
 use serde::Deserialize;
-use slog::{debug, error, info, warn};
 use tokio::time::{self, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
+use tracing::{debug, error, info, warn};
 use tsclientlib::ChannelId;
 use tsclientlib::Error as TsError;
 use tsproto_types::crypto::EccKeyPubP256;
@@ -46,7 +46,7 @@ impl WebApp {
 	pub async fn serve(self) -> Result<()> {
 		let frontend_path = std::option_env!("FRONTEND_PATH").unwrap_or("../frontend/dist/");
 		let is_production = std::option_env!("FRONTEND_PATH").is_some();
-		info!(self.state.logger, "Serving frontend"; "path" => frontend_path);
+		info!(frontend_path, "Serving frontend");
 		let state2 = self.state.clone();
 		let addr = self.get_listen_address();
 		let token = self.get_token().to_string();
@@ -101,7 +101,7 @@ impl WebApp {
 		.await?;
 
 		// Quit all connections
-		info!(self.state.logger, "Closing remaining connections");
+		info!("Closing remaining connections");
 		{
 			let cons = self.state.connections.lock().unwrap();
 			for con in cons.values() {
@@ -137,8 +137,8 @@ async fn create_main_ws(
 ) -> impl Responder {
 	let webws = Ws::new((**state).clone());
 	match ws::start(webws, &req, stream) {
-		Err(e) => {
-			error!(state.logger, "Failed to create websocket actor"; "error" => %e);
+		Err(error) => {
+			error!(%error, "Failed to create websocket actor");
 			Either::Left(HttpResponse::InternalServerError().body("Failed to start connection"))
 		}
 		Ok(ws) => Either::Right(ws),
@@ -175,8 +175,8 @@ async fn download_file(
 	// Lookup in cache
 	let server = match con.send(qint_proxy::connection::GetPublicKeyMsg).await {
 		Ok(Ok(r)) => r,
-		Ok(Err(e)) => {
-			error!(state.logger, "Failed to get server public key"; "error" => %e);
+		Ok(Err(error)) => {
+			error!(%error, "Failed to get server public key");
 			return HttpResponse::Gone().json(result_details_gone());
 		}
 		Err(_) => {
@@ -205,7 +205,7 @@ async fn download_file(
 		return response.streaming(stream);
 	}
 
-	debug!(state.logger, "Downloading file"; "channel" => channel.0, "path" => &path);
+	debug!(channel = channel.0, %path, "Downloading file");
 	let DownloadFileContext { size, stream } = match con
 		.send(qint_proxy::connection::DownloadFile {
 			channel,
@@ -219,22 +219,22 @@ async fn download_file(
 		Err(_) => {
 			return HttpResponse::Gone().json(result_details_gone());
 		}
-		Ok(Err(qint_proxy::connection::Error::TsError(TsError::CommandError(err)))) => {
-			debug!(state.logger, "File download error"; "error" => %err, "path" => &path);
-			return match err.error {
+		Ok(Err(qint_proxy::connection::Error::TsError(TsError::CommandError(error)))) => {
+			debug!(%error, %path, "File download error");
+			return match error.error {
 				tsclientlib::TsError::FileInvalidPath => {
-					HttpResponse::NotFound().json(Into::<ResultDetails>::into(err))
+					HttpResponse::NotFound().json(Into::<ResultDetails>::into(error))
 				}
 				tsclientlib::TsError::PermissionsClientInsufficient => {
-					HttpResponse::Forbidden().json(Into::<ResultDetails>::into(err))
+					HttpResponse::Forbidden().json(Into::<ResultDetails>::into(error))
 				}
-				_ => HttpResponse::BadRequest().json(Into::<ResultDetails>::into(err)),
+				_ => HttpResponse::BadRequest().json(Into::<ResultDetails>::into(error)),
 			};
 		}
-		Ok(Err(e)) => {
-			error!(state.logger, "File download failed"; "error" => %e, "path" => &path);
+		Ok(Err(error)) => {
+			error!(%error, %path, "File download failed");
 			return HttpResponse::InternalServerError()
-				.json(ResultDetails::from_desc(format!("Failed to download file: {}", e)));
+				.json(ResultDetails::from_desc(format!("Failed to download file: {}", error)));
 		}
 		Ok(Ok(r)) => r,
 	};
@@ -273,16 +273,16 @@ async fn upload_file(
 		}
 	};
 
-	debug!(state.logger, "Uploading file"; "channel" => channel.0, "path" => &path);
+	debug!(channel = channel.0, %path, "Uploading file");
 	let size = if let Some(r) = req.headers().get(http::header::CONTENT_LENGTH) {
 		match r.to_str() {
-			Err(e) => {
-				warn!(state.logger, "Invalid content length header"; "error" => %e);
+			Err(error) => {
+				warn!(%error, "Invalid content length header");
 				return HttpResponse::BadRequest().body("Invalid content length header");
 			}
 			Ok(s) => match s.parse() {
-				Err(e) => {
-					warn!(state.logger, "Invalid content length header value"; "error" => %e);
+				Err(error) => {
+					warn!(%error, "Invalid content length header value");
 					return HttpResponse::BadRequest()
 						.body("Invalid content length header - not a number");
 				}
@@ -307,22 +307,22 @@ async fn upload_file(
 		Err(_) => {
 			return HttpResponse::Gone().json(result_details_gone());
 		}
-		Ok(Err(qint_proxy::connection::Error::TsError(TsError::CommandError(err)))) => {
-			debug!(state.logger, "File upload error"; "error" => %err, "path" => &path);
-			return match err.error {
+		Ok(Err(qint_proxy::connection::Error::TsError(TsError::CommandError(error)))) => {
+			debug!(%error, %path, "File upload error");
+			return match error.error {
 				tsclientlib::TsError::FileInvalidPath => {
-					HttpResponse::NotFound().json(Into::<ResultDetails>::into(err))
+					HttpResponse::NotFound().json(Into::<ResultDetails>::into(error))
 				}
 				tsclientlib::TsError::PermissionsClientInsufficient => {
-					HttpResponse::Forbidden().json(Into::<ResultDetails>::into(err))
+					HttpResponse::Forbidden().json(Into::<ResultDetails>::into(error))
 				}
-				_ => HttpResponse::BadRequest().json(Into::<ResultDetails>::into(err)),
+				_ => HttpResponse::BadRequest().json(Into::<ResultDetails>::into(error)),
 			};
 		}
-		Ok(Err(e)) => {
-			error!(state.logger, "File upload failed"; "error" => %e, "path" => &path);
+		Ok(Err(error)) => {
+			error!(%error, %path, "File upload failed");
 			return HttpResponse::InternalServerError()
-				.json(ResultDetails::from_desc(format!("Failed to upload file: {}", e)));
+				.json(ResultDetails::from_desc(format!("Failed to upload file: {}", error)));
 		}
 		Ok(Ok(r)) => r,
 	};
@@ -330,10 +330,10 @@ async fn upload_file(
 	let mut body_reader = tokio_util::io::StreamReader::new(body.map_err(|e| {
 		std::io::Error::new(std::io::ErrorKind::Other, format!("Payload error {}", e))
 	}));
-	if let Err(e) = tokio::io::copy(&mut body_reader, &mut stream).await {
-		warn!(state.logger, "File upload aborted"; "error" => %e);
+	if let Err(error) = tokio::io::copy(&mut body_reader, &mut stream).await {
+		warn!(%error, "File upload aborted");
 		return HttpResponse::BadGateway()
-			.json(ResultDetails::from_desc(format!("Upload failed: {}", e)));
+			.json(ResultDetails::from_desc(format!("Upload failed: {}", error)));
 	}
 	HttpResponse::Ok().json(ResultDetails::ok())
 }
@@ -372,10 +372,10 @@ async fn download_cache_file(
 async fn audio_reset(state: web::Data<Arc<QintState>>) -> impl Responder {
 	if let Some(ad) = &state.audio_data {
 		if ad.a2ts.send(qint_proxy::audio::ResetMsg).await.is_err() {
-			error!(state.logger, "Failed to reset audio pipeline");
+			error!("Failed to reset audio pipeline");
 			HttpResponse::InternalServerError()
 		} else if ad.ts2a.send(qint_proxy::audio::ResetMsg).await.is_err() {
-			error!(state.logger, "Failed to reset audio pipeline");
+			error!("Failed to reset audio pipeline");
 			HttpResponse::InternalServerError()
 		} else {
 			HttpResponse::Ok()
@@ -452,11 +452,11 @@ mod tests {
 	use awc::ws;
 	use futures::{SinkExt, StreamExt};
 	use juniper::http::GraphQLRequest;
+	use once_cell::sync::Lazy;
 	use qint_proxy::messages::{ConnectOptions, JsMessageTarget, MessageF2P, MessageP2F};
 	use qint_proxy::QintState;
 	use rand::Rng;
 	use serde::Deserialize;
-	use slog::{o, Drain, Logger};
 	use tokio::time;
 	use tsclientlib::ClientId;
 	use uuid::Uuid;
@@ -464,8 +464,9 @@ mod tests {
 	use crate::web::WebApp;
 	use crate::Args;
 
+	static TRACING: Lazy<()> = Lazy::new(|| tracing_subscriber::fmt().with_test_writer().init());
+
 	struct TestProxy {
-		logger: Logger,
 		port: u16,
 	}
 
@@ -486,17 +487,19 @@ mod tests {
 		client: Vec<u8>,
 	}
 
+	fn create_logger() { Lazy::force(&TRACING) }
+
 	impl TestProxy {
-		fn new(logger: Logger) -> Self {
+		fn new() -> Self {
 			let mut rng = rand::thread_rng();
-			Self { logger, port: rng.gen_range(1025..=65535) }
+			Self { port: rng.gen_range(1025..=65535) }
 		}
 
 		async fn create_connection(&self) -> Result<Connection> {
 			let client = awc::Client::default();
 			let id = Uuid::new_v4();
 			let url = format!("ws://127.0.0.1:{}/con/{}/ws?format=Json", self.port, id);
-			info!(self.logger, "Connecting to proxy"; "url" => &url);
+			info!(%url, "Connecting to proxy");
 			let (_resp, socket) = client
 				.ws(url)
 				.connect()
@@ -509,7 +512,7 @@ mod tests {
 		where for<'a> T: Deserialize<'a> {
 			let client = awc::Client::default();
 			let url = format!("http://127.0.0.1:{}/db", self.port);
-			debug!(self.logger, "GraphQL request"; "body" => serde_json::to_string(&request).unwrap());
+			debug!(body = serde_json::to_string(&request).unwrap(), "GraphQL request");
 			let mut resp = client
 				.post(url)
 				.send_json(request)
@@ -654,11 +657,10 @@ mod tests {
 		}
 
 		fn run(&self) -> impl Future<Output = Result<()>> {
-			let logger = self.logger.clone();
 			let port = self.port;
 			async move {
 				let dir = tempfile::Builder::new().prefix("qint-proxy").tempdir()?;
-				info!(logger, "Using config directory"; "dir" => dir.path().display());
+				info!("dir" => dir.path().display(), "Using config directory");
 				let args = Args {
 					listen_address: Some(format!("127.0.0.1:{}", port).parse().unwrap()),
 					default_identity: None,
@@ -671,7 +673,7 @@ mod tests {
 					no_open: true,
 					verbosity: 1,
 				};
-				let app = WebApp::new(QintState::new(logger, args.into())?);
+				let app = WebApp::new(QintState::new(args.into())?);
 				app.serve().await?;
 				dir.close()?;
 				Ok(())
@@ -680,10 +682,9 @@ mod tests {
 
 		fn run_log_errors(&self) -> impl Future<Output = ()> {
 			let fut = self.run();
-			let logger = self.logger.clone();
 			async move {
-				if let Err(e) = fut.await {
-					error!(logger, "Proxy encountered an error"; "error" => %e);
+				if let Err(error) = fut.await {
+					error!(%error, "Proxy encountered an error");
 				}
 			}
 		}
@@ -726,18 +727,12 @@ mod tests {
 		}
 	}
 
-	fn create_logger() -> Logger {
-		let decorator = slog_term::PlainDecorator::new(slog_term::TestStdoutWriter);
-		let drain = Mutex::new(slog_term::FullFormat::new(decorator).build()).fuse();
-
-		slog::Logger::root(drain, o!())
-	}
-
 	/// Check that connecting to a server adds this server to the recent connections and updates
 	/// it when reconnecting.
 	#[actix_rt::test]
 	async fn test_save_server() -> Result<()> {
-		let proxy = TestProxy::new(create_logger());
+		create_logger();
+		let proxy = TestProxy::new();
 		actix::spawn(proxy.run_log_errors());
 		// Wait for server to come up
 		time::sleep(Duration::from_millis(100)).await;
@@ -786,10 +781,10 @@ mod tests {
 	/// message.
 	#[actix_rt::test]
 	async fn test_save_client() -> Result<()> {
-		let logger = create_logger();
-		let proxy0 = TestProxy::new(logger.clone());
+		create_logger();
+		let proxy0 = TestProxy::new();
 		actix::spawn(proxy0.run_log_errors());
-		let proxy1 = TestProxy::new(logger);
+		let proxy1 = TestProxy::new();
 		actix::spawn(proxy1.run_log_errors());
 		// Wait for server to come up
 		time::sleep(Duration::from_millis(100)).await;

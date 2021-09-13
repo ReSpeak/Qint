@@ -29,12 +29,12 @@ use qint_proxy::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use slog::{debug, info, warn, Logger};
 use tauri::api::dialog::FileDialogBuilder;
 use tauri::{command, State, Window};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
+use tracing::{debug, info, warn};
 use tsclientlib::Error as TsError;
 use tsproto_types::{crypto::EccKeyPubP256, ChannelId};
 
@@ -67,7 +67,6 @@ where T: Debug
 }
 
 struct WindowBridge {
-	logger: Logger,
 	window: Window,
 	id: ConnectionId,
 }
@@ -78,17 +77,17 @@ type QCoreAddr = Addr<QintCore>;
 
 impl AppToFrontendBridge for WindowBridge {
 	fn send(&self, msg: &MessageP2F) {
-		debug!(self.logger, "Sending to frontend"; "msg" => ?msg);
+		debug!(?msg, "Sending to frontend");
 		let res = self.window.emit("ws", TauriWs { con: self.id, msg });
-		if let Err(e) = res {
-			warn!(self.logger, "Failed sending to frontend"; "error" => %e);
+		if let Err(error) = res {
+			warn!(%error, "Failed sending to frontend");
 		}
 	}
 
 	fn close(&self) {
 		let res = self.window.emit("ws_close", self.id);
-		if let Err(e) = res {
-			warn!(self.logger, "Failed sending to frontend"; "error" => %e);
+		if let Err(error) = res {
+			warn!(%error, "Failed sending to frontend");
 		}
 	}
 }
@@ -177,19 +176,19 @@ impl FileDialogBuilderExt for FileDialogBuilder {
 
 #[command]
 pub async fn create_ws(
-	logger: State<'_, Logger>, core: State<'_, QCoreAddr>, window: Window, con: ConnectionId,
+	core: State<'_, QCoreAddr>, window: Window, con: ConnectionId,
 ) -> Result<(), Error> {
-	info!(logger.inner().clone(), "Creating tauri connection"; "id" => ?con);
+	info!(id = ?con, "Creating tauri connection");
 
-	let sender = Box::new(WindowBridge { logger: logger.inner().clone(), window, id: con.clone() });
+	let sender = Box::new(WindowBridge { window, id: con.clone() });
 	core.send(CreateWs { id: con, sender }).await.unwrap()
 }
 
 #[command]
 pub fn close_ws(
-	logger: State<'_, Logger>, core: State<'_, QCore>, con: ConnectionId,
+	core: State<'_, QCore>, con: ConnectionId,
 ) -> Result<(), Error> {
-	info!(logger.inner().clone(), "Closing tauri connection"; "id" => ?con);
+	info!(id = ?con, "Closing tauri connection");
 	core.close_ws(CloseWs { id: con })
 }
 
@@ -234,17 +233,17 @@ async fn collect_to_bytes<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpi
 }
 
 fn format_tx_err<T>(
-	res: Result<Result<T, qint_proxy::connection::Error>, MailboxError>, logger: &Logger,
+	res: Result<Result<T, qint_proxy::connection::Error>, MailboxError>,
 ) -> Result<T, ResultDetails> {
 	match res {
 		Err(_) => Err("Mailbox error".into()),
-		Ok(Err(qint_proxy::connection::Error::TsError(TsError::CommandError(err)))) => {
-			debug!(logger, "Common Teamspeak error"; "error" => %err);
-			Err(err.into())
+		Ok(Err(qint_proxy::connection::Error::TsError(TsError::CommandError(error)))) => {
+			debug!(%error, "Common Teamspeak error");
+			Err(error.into())
 		}
-		Ok(Err(err)) => {
-			error!(logger, "Unknown Teamspeak error"; "error" => %err);
-			Err(format!("Unknown transfer err: {}", err).into())
+		Ok(Err(error)) => {
+			error!(%error, "Unknown Teamspeak error");
+			Err(format!("Unknown transfer err: {}", error).into())
 		}
 		Ok(Ok(r)) => Ok(r),
 	}
@@ -263,8 +262,8 @@ pub async fn download_bytes(
 	// Lookup in cache
 	let server = match con_addr.send(qint_proxy::connection::GetPublicKeyMsg).await {
 		Ok(Ok(r)) => r,
-		Ok(Err(e)) => {
-			error!(state.logger, "Failed to get server public key"; "error" => %e);
+		Ok(Err(error)) => {
+			error!(%error, "Failed to get server public key");
 			return Err("Failed to get server public key".into());
 		}
 		Err(_) => {
@@ -288,7 +287,6 @@ pub async fn download_bytes(
 				resume: existing.resume(),
 			})
 			.await,
-		&state.logger,
 	)?;
 
 	let stream = FramedRead::new(stream, BytesCodec::new()).map(|r| r.map(BytesMut::freeze));
@@ -343,7 +341,7 @@ pub async fn upload_bytes(
 
 	let con_addr = state.get_connection(&con).ok_or("Connection not found".to_string())?;
 
-	debug!(state.logger, "Uploading file"; "channel" => channel.0, "path" => &path);
+	debug!(channel = channel.0, %path, "Uploading file");
 	let ctx = format_tx_err(
 		con_addr
 			.send(qint_proxy::connection::UploadFile {
@@ -356,7 +354,6 @@ pub async fn upload_bytes(
 				size,
 			})
 			.await,
-		&state.logger,
 	)?;
 
 	core.filetransfer.add_upload(ctx, prepare);
@@ -447,7 +444,6 @@ pub async fn download_file(
 				resume: existing.resume(),
 			})
 			.await,
-		&state.logger,
 	)?;
 
 	core.filetransfer.add_download(ctx, prepare);
@@ -517,7 +513,7 @@ pub async fn upload_file(
 			}
 			path.push_str(&filename);
 
-			debug!(state.logger, "Uploading"; "local_file" => ?local_file, "path" => &path);
+			debug!(?local_file, %path, "Uploading");
 			let ctx = format_tx_err(
 				con_addr
 					.send(UploadFile {
@@ -530,7 +526,6 @@ pub async fn upload_file(
 						size,
 					})
 					.await,
-				&state.logger,
 			)?;
 
 			core.filetransfer.add_upload(ctx, prepare);
@@ -553,7 +548,7 @@ pub async fn upload_file(
 				format!("/icon_{}", u32::from_le_bytes(hash_bytes[0..4].try_into().unwrap()))
 			};
 
-			debug!(state.logger, "Uploading"; "feature" => ?feature, "path" => &path);
+			debug!(?feature, %path, "Uploading");
 			let ctx = format_tx_err(
 				con_addr
 					.send(UploadFile {
@@ -566,7 +561,6 @@ pub async fn upload_file(
 						size,
 					})
 					.await,
-				&state.logger,
 			)?;
 
 			let prepare =

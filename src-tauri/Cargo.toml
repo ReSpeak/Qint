@@ -26,26 +26,15 @@ qint-proxy = { path = "../proxy" }
 serde = { version = "1.0", features = [ "derive" ] }
 serde_json = "1.0"
 sha2 = "0.9"
-slog-async = "2"
-slog-envlogger = "2"
-slog-scope = "4"
-slog-stdlog = "4"
-slog-term = "2"
 structopt = { version = "0.3", default-features = false }
 tauri = { version = "1.0.0-beta.7", features = ["window-all", "dialog-all", "http-all", "notification-all", "system-tray"] }
 thiserror = "1"
 tokio = "1"
 tokio-util = { version = "0.6", features = [ "io" ] }
+tracing = "0.1"
+tracing-subscriber = "0.2"
 tsclientlib = { path = "../../tsclientlib/tsclientlib", features = [ "unstable" ] }
 tsproto-types = { path = "../../tsclientlib/utils/tsproto-types" }
-
-[dependencies.log]
-version = "0.4"
-features = [ "max_level_info", "release_max_level_info" ]
-
-[dependencies.slog]
-version = "2"
-features = [ "max_level_trace", "release_max_level_debug" ]
 
 [target."cfg(windows)".build-dependencies]
 winres = "0.1"

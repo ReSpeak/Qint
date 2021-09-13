@@ -9,10 +9,10 @@ use actix::*;
 use anyhow::{bail, format_err, Result};
 use futures::prelude::*;
 use proxy_codegen::book_events::{self, JsM2B};
-use slog::{debug, error, o, warn, Logger};
 use thiserror::Error;
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
+use tracing::{debug, error, info_span, warn, Span};
 use tsclientlib::events::Event as TsEvent;
 use tsclientlib::messages::s2c::InCommandErrorPart;
 use tsclientlib::prelude::*;
@@ -35,8 +35,8 @@ const RETURN_CODE_PREFIX: &str = "proxy:";
 
 /// A websocket connection
 pub struct QintConnection {
+	span: Span,
 	pub id: ConnectionId,
-	logger: Logger,
 	state: Arc<QintState>,
 	sender: FrontBridge,
 	connection: Option<Connection>,
@@ -117,7 +117,7 @@ impl Actor for QintConnection {
 			self.disconnect(ctx);
 			Running::Continue
 		} else {
-			debug!(self.logger, "Stopping QintConnection");
+			debug!(parent: &self.span, "Stopping QintConnection");
 			Running::Stop
 		}
 	}
@@ -173,12 +173,9 @@ impl<R: 'static, F: FnOnce(&mut QintConnection) -> R> Message for RunOnConMsg<R,
 }
 
 impl QintConnection {
-	pub fn new(
-		logger: Logger, state: Arc<QintState>, id: ConnectionId, sender: FrontBridge,
-	) -> Self {
-		let logger = logger.new(o!("id" => id.0.to_string()));
+	pub fn new(state: Arc<QintState>, id: ConnectionId, sender: FrontBridge) -> Self {
 		Self {
-			logger,
+			span: info_span!("QintConnection", id = %id.0),
 			state,
 			id,
 			sender,
@@ -225,14 +222,13 @@ impl QintConnection {
 	fn send_to_ts2a<T: Message<Result = Result<()>> + Send + 'static>(&self, msg: T)
 	where audio::ts_to_audio::TsToAudio: Handler<T> {
 		if let Some(ad) = &self.state.audio_data {
-			let logger = self.logger.clone();
 			actix::spawn(ad.ts2a.send(msg).map(move |r| match r {
 				Ok(Ok(())) => {}
-				Ok(Err(e)) => {
-					debug!(logger, "Audio output error"; "error" => %e);
+				Ok(Err(error)) => {
+					debug!(%error, "Audio output error");
 				}
 				Err(_) => {
-					warn!(logger, "Failed to send message to audio output handler");
+					warn!("Failed to send message to audio output handler");
 				}
 			}));
 		}
@@ -240,27 +236,25 @@ impl QintConnection {
 
 	fn send_to_a2ts<T: Message<Result = ()> + Send + 'static>(&self, msg: T)
 	where audio::audio_to_ts::AudioToTs: Handler<T> {
+		let _span = self.span.enter();
 		if let Some(ad) = &self.state.audio_data {
-			actix::spawn(with_log!(
-				ad.a2ts.send(msg),
-				self.logger.clone(),
-				"Failed to send audio to handler"
-			));
+			actix::spawn(with_log!(ad.a2ts.send(msg), "Failed to send audio to handler"));
 		}
 	}
 
 	fn send_to_a2ts_r<R: Send + 'static, T: Message<Result = R> + Send + 'static>(&self, msg: T)
 	where audio::audio_to_ts::AudioToTs: Handler<T> {
+		let _span = self.span.enter();
 		if let Some(ad) = &self.state.audio_data {
 			actix::spawn(with_log!(
 				ad.a2ts.send(msg),
-				self.logger.clone(),
 				"Failed to send message to audio input handler"
 			));
 		}
 	}
 
 	fn handle_event(&mut self, event: TsStreamItem, ctx: &mut <Self as Actor>::Context) {
+		let _span = self.span.clone().entered();
 		match event {
 			TsStreamItem::BookEvents(events) => {
 				let mut connected_msg = None;
@@ -308,7 +302,7 @@ impl QintConnection {
 									server_key,
 								});
 							}
-							None => error!(self.logger, "Failed to get server key"),
+							None => error!("Failed to get server key"),
 						}
 					}
 				}
@@ -316,8 +310,7 @@ impl QintConnection {
 				if let Some(con) = &self.connection {
 					if let Ok(data) = con.get_state() {
 						// Send to database
-						if let Err(e) = db::DbHandler::handle_events(
-							&self.logger,
+						if let Err(error) = db::DbHandler::handle_events(
 							&self.state,
 							con,
 							data,
@@ -325,7 +318,7 @@ impl QintConnection {
 							connected_msg,
 							ctx.address(),
 						) {
-							error!(self.logger, "Database failed to handle events"; "error" => %e);
+							error!(%error, "Database failed to handle events");
 						}
 
 						// Extend connection info packet for own client
@@ -353,8 +346,8 @@ impl QintConnection {
 
 										Some(e)
 									} else {
-										warn!(self.logger, "Event could not be converted for \
-											frontend"; "event" => ?e);
+										warn!(event = ?e, "Event could not be converted for \
+											frontend");
 										None
 									}
 								})
@@ -370,7 +363,6 @@ impl QintConnection {
 						if let Ok(data) = con.get_state() {
 							// Tell the database that all channels are now available
 							if let Some(task) = self.channel_list_finished_task.take() {
-								let logger = self.logger.clone();
 								let msg = ChannelListMsg {
 									current_channel: data
 										.clients
@@ -380,30 +372,24 @@ impl QintConnection {
 								};
 								actix::spawn(self.state.database.send(msg).map(move |r| match r {
 									Ok(Ok(())) => {}
-									Ok(Err(e)) => {
-										debug!(logger, "Failed to update bookmark"; "error" => %e);
+									Ok(Err(error)) => {
+										debug!(%error, "Failed to update bookmark");
 									}
 									Err(_) => {
-										warn!(logger, "Failed to send message to database");
+										warn!("Failed to send message to database");
 									}
 								}));
 							}
 
-							if let Err(e) = db::DbHandler::handle_message(
-								&self.logger,
-								&self.state,
-								con,
-								data,
-								&msg,
-							) {
-								error!(self.logger, "Database failed to handle message";
-									"error" => %e);
+							if let Err(error) =
+								db::DbHandler::handle_message(&self.state, con, data, &msg)
+							{
+								error!(%error, "Database failed to handle message");
 							}
 
 							// Subscribe to all channels
-							if let Err(e) = data.server.set_subscribed(true).send(con) {
-								error!(self.logger, "Failed to subscribe to server";
-									"error" => %e);
+							if let Err(error) = data.server.set_subscribed(true).send(con) {
+								error!(%error, "Failed to subscribe to server");
 							}
 						}
 					}
@@ -432,8 +418,7 @@ impl QintConnection {
 				} else if let Some(m) = book_events::convert_message(&msg) {
 					self.send_message(&MessageP2F::Message(m));
 				} else if !matches!(msg, InMessage::ClientNeededPermissions(_)) {
-					warn!(self.logger, "Message could not be converted for frontend";
-						"mesage" => ?msg);
+					warn!(message = ?msg, "Message could not be converted for frontend");
 				}
 			}
 			TsStreamItem::Audio(audio) => {
@@ -455,14 +440,13 @@ impl QintConnection {
 					let find_key = update_identity
 						.from_identity_with_find(con.get_options().get_identity().unwrap());
 					let event = db::UpdateIdentityMsg(find_key, update_identity);
-					let logger = self.logger.clone();
 					actix::spawn(self.state.database.send(event).map(move |r| match r {
 						Ok(Ok(())) => {}
-						Ok(Err(e)) => {
-							error!(logger, "Failed to handle event in database"; "error" => %e);
+						Ok(Err(error)) => {
+							error!(%error, "Failed to handle event in database");
 						}
 						Err(_) => {
-							error!(logger, "Failed to send event to database");
+							error!("Failed to send event to database");
 						}
 					}));
 				}
@@ -607,14 +591,15 @@ impl QintConnection {
 	}
 
 	fn disconnect(&mut self, ctx: &mut <Self as Actor>::Context) {
+		let _span = self.span.clone().entered();
 		self.set_audio_input_active(ctx, false);
 		self.set_audio_output_active(ctx, false);
 		self.talkers.clear();
 		if let Some(con) = &mut self.connection {
 			if con.get_state().is_ok() {
-				debug!(self.logger, "Sending disconnect packet");
-				if let Err(e) = con.disconnect(DisconnectOptions::new()) {
-					warn!(self.logger, "Failed to disconnect properly"; "error" => %e);
+				debug!("Sending disconnect packet");
+				if let Err(error) = con.disconnect(DisconnectOptions::new()) {
+					warn!(%error, "Failed to disconnect properly");
 					self.reset_connection();
 				} else {
 					// Wait until disconnected
@@ -624,16 +609,16 @@ impl QintConnection {
 				self.reset_connection();
 			}
 		}
-		debug!(self.logger, "Disconnecting QintConnection");
+		debug!("Disconnecting QintConnection");
 		self.sender.close();
 		ctx.stop();
 	}
 
 	/// Update channel password after successfully switching channels.
 	fn handle_channel_move_result(&mut self, channel: ChannelId, password: Option<String>) {
+		let _span = self.span.clone().entered();
 		if let Some(state) = self.get_book() {
 			let server = state.server.public_key.to_short();
-			let logger = self.logger.clone();
 			actix::spawn(
 				self.state
 					.database
@@ -652,16 +637,14 @@ impl QintConnection {
 						Ok(Ok(1)) => {}
 						Ok(Ok(_)) => {
 							error!(
-								logger,
 								"Failed to update channel password in database, channel not found"
 							);
 						}
-						Ok(Err(e)) => {
-							error!(logger, "Failed to update channel password in database"; "error" => %e);
+						Ok(Err(error)) => {
+							error!(%error, "Failed to update channel password in database");
 						}
-						Err(e) => {
-							error!(logger, "Failed to send channel password update to database";
-						"error" => %e);
+						Err(error) => {
+							error!(%error, "Failed to send channel password update to database");
 						}
 					}),
 			);
@@ -669,6 +652,7 @@ impl QintConnection {
 	}
 
 	fn handle_ws_message(&mut self, msg: MessageF2P, ctx: &mut <Self as Actor>::Context) {
+		let _span = self.span.clone().entered();
 		match msg {
 			MessageF2P::Connect(o) => {
 				let identity_id = o
@@ -691,7 +675,6 @@ impl QintConnection {
 							let mut options = tsclientlib::Connection::build(o.address.clone())
 								.name(o.name.clone())
 								.identity(identity)
-								.logger(actor.logger.clone())
 								.log_commands(o.log_commands || launch_config.verbosity > 0)
 								.log_packets(o.log_packets || launch_config.verbosity > 1)
 								.log_udp_packets(o.log_udp_packets || launch_config.verbosity > 2);
@@ -732,11 +715,11 @@ impl QintConnection {
 						})
 					})
 					.map(move |r, actor: &mut Self, _| {
-						if let Err(e) = r {
-							warn!(actor.logger, "Failed to connect"; "error" => %e);
+						if let Err(error) = r {
+							warn!(%error, "Failed to connect");
 							actor.send_message(&MessageP2F::Error(format!(
 								"Failed to connect ({})",
-								e
+								error
 							)));
 						}
 					}),
@@ -744,9 +727,8 @@ impl QintConnection {
 			}
 			MessageF2P::Disconnect(o) => {
 				if let Some(con) = &mut self.connection {
-					if let Err(e) = con.disconnect(o) {
-						error!(self.logger, "Failed to disconnect";
-							"error" => %e);
+					if let Err(error) = con.disconnect(o) {
+						error!(%error, "Failed to disconnect");
 					}
 				}
 			}
@@ -761,33 +743,29 @@ impl QintConnection {
 							self.send_to_ts2a(audio::ts_to_audio::SetVolumeMsg(id, volume));
 							if !created {
 								created = true;
-								if let Err(e) = db::DbHandler::create_client(
-									&self.logger,
+								if let Err(error) = db::DbHandler::create_client(
 									&self.state,
 									self.connection.as_ref().unwrap(),
 									state,
 									c,
 								) {
-									error!(self.logger, "Failed to create client in database";
-										"error" => %e);
+									error!(%error, "Failed to create client in database");
 								}
 							}
 						}
 					}
 				} else {
-					error!(self.logger, "Connection is not connected")
+					error!("Connection is not connected")
 				}
 
-				let logger = self.logger.clone();
 				actix::spawn(self.state.database.send(SetClientVolumeMsg(client, volume)).map(
 					move |r| match r {
 						Ok(Ok(())) => {}
-						Ok(Err(e)) => {
-							error!(logger, "Failed to update volume in database"; "error" => %e);
+						Ok(Err(error)) => {
+							error!(%error, "Failed to update volume in database");
 						}
-						Err(e) => {
-							error!(logger, "Failed to send volume update to database";
-								"error" => %e);
+						Err(error) => {
+							error!(%error, "Failed to send volume update to database");
 						}
 					},
 				));
@@ -880,7 +858,6 @@ impl QintConnection {
 						// Add a password if we have one saved
 						if move_change.password.is_none() {
 							let server = state.server.public_key.to_short();
-							let logger = self.logger.clone();
 							ctx.spawn(
 								wrap_future(self.state.database.send(db::RunOnDbMsg(move |db| {
 									use diesel::prelude::*;
@@ -899,26 +876,20 @@ impl QintConnection {
 								.map(move |r, actor: &mut Self, _| {
 									let pw = match r {
 										Ok(Ok(r)) => r,
-										Ok(Err(e)) => {
-											error!(logger, "Failed to query database for channel password";
-											"error" => %e);
+										Ok(Err(error)) => {
+											error!(%error, "Failed to query database for channel \
+												password");
 											None
 										}
 										Err(_) => {
-											error!(
-												logger,
-												"Failed to query database for channel password"
-											);
+											error!("Failed to query database for channel password");
 											None
 										}
 									};
 									if let JsM2B::ClientMove(change) = &mut change {
 										change.password = pw;
 									} else {
-										error!(
-											logger,
-											"Unexpected message, should be a client move"
-										);
+										error!("Unexpected message, should be a client move");
 									}
 									let _ = actor.send_change_with_result(
 										change,
@@ -955,6 +926,7 @@ impl QintConnection {
 	}
 
 	fn send_change(&mut self, change: JsM2B, return_code: Option<String>) -> Result<()> {
+		let _span = self.span.clone().entered();
 		if let Some(state) = self.get_book() {
 			match change.to_packet(state) {
 				Ok(msg) => self.send_ts_message(msg, return_code.as_deref()),
@@ -1008,13 +980,14 @@ impl QintConnection {
 				},
 			}));
 		} else {
-			warn!(self.logger, "Proxy error"; "error" => error);
+			warn!(parent: &self.span, %error, "Proxy error");
 		}
 	}
 
 	fn send_chat_message(
 		&mut self, target: MessageTarget, message: String, return_code: Option<&str>,
 	) {
+		let _span = self.span.clone().entered();
 		if let Some(state) = self.get_book() {
 			let msg = state.send_message(target, &message);
 			if self.send_ts_message(msg, return_code).is_err() {
@@ -1104,14 +1077,13 @@ impl QintConnection {
 				chat: ChatId { server, chat_type },
 				client_data,
 			};
-			let logger = self.logger.clone();
 			actix::spawn(self.state.database.send(msg).map(move |r| match r {
 				Ok(Ok(())) => {}
-				Ok(Err(e)) => {
-					error!(logger, "Failed to handle event in database"; "error" => %e);
+				Ok(Err(error)) => {
+					error!(%error, "Failed to handle event in database");
 				}
 				Err(_) => {
-					error!(logger, "Failed to send event to database");
+					error!("Failed to send event to database");
 				}
 			}));
 		} else {
@@ -1120,6 +1092,7 @@ impl QintConnection {
 	}
 
 	fn send_ts_message(&mut self, mut msg: OutCommand, return_code: Option<&str>) -> Result<()> {
+		let _span = self.span.clone().entered();
 		if let Some(code) = &return_code {
 			msg.write_arg("return_code", code);
 		}
@@ -1449,6 +1422,7 @@ impl ActorFuture<QintConnection> for ConnectionPoller {
 		self: Pin<&mut Self>, actor: &mut QintConnection,
 		ctx: &mut <QintConnection as Actor>::Context, task: &mut task::Context,
 	) -> Poll<Self::Output> {
+		let _span = actor.span.clone().entered();
 		loop {
 			let res = if let Some(con) = &mut actor.connection {
 				con.events().poll_next_unpin(task)
@@ -1463,8 +1437,8 @@ impl ActorFuture<QintConnection> for ConnectionPoller {
 					actor.disconnect(ctx);
 					break Poll::Ready(());
 				}
-				Poll::Ready(Some(Err(e))) => {
-					error!(actor.logger, "Connection failed"; "error" => %e);
+				Poll::Ready(Some(Err(error))) => {
+					error!(%error, "Connection failed");
 					actor.connection = None;
 
 					// Send to frontend
@@ -1473,10 +1447,10 @@ impl ActorFuture<QintConnection> for ConnectionPoller {
 					{
 						let mut ts_result = None;
 						let mut description = None;
-						if let TsclError::ConnectTs(e) = &e {
+						if let TsclError::ConnectTs(e) = &error {
 							ts_result = Some(*e);
 						} else {
-							description = Some(e.to_string());
+							description = Some(error.to_string());
 						}
 
 						actor.send_message(&MessageP2F::Result(ResultStruct {
@@ -1488,7 +1462,7 @@ impl ActorFuture<QintConnection> for ConnectionPoller {
 							},
 						}));
 					} else {
-						actor.send_message(&MessageP2F::Error(e.to_string()));
+						actor.send_message(&MessageP2F::Error(error.to_string()));
 					}
 					break Poll::Ready(());
 				}

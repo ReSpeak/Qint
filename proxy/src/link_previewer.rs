@@ -7,10 +7,9 @@ use reqwest::header::CONTENT_TYPE;
 use scraper::{ElementRef, Html, Selector};
 use serde::{Deserialize, Serialize};
 use sled::Db;
-use slog::{warn, Logger};
+use tracing::warn;
 
 pub struct LinkPreviewer {
-	logger: Logger,
 	/// Only one process can open the database at a time, if it failed at startup, this is `None`.
 	cache: Option<Db>,
 }
@@ -25,7 +24,7 @@ pub enum AnalyzeResult {
 }
 
 impl LinkPreviewer {
-	pub fn new(logger: Logger, cache_path: Option<PathBuf>) -> Self {
+	pub fn new(cache_path: Option<PathBuf>) -> Self {
 		let cache = cache_path.and_then(|mut cache_path| {
 			cache_path.push("urls.sled");
 
@@ -33,14 +32,13 @@ impl LinkPreviewer {
 
 			match config.open() {
 				Ok(r) => Some(r),
-				Err(e) => {
-					warn!(logger, "Failed to open url cache database, running without cache";
-						"error" => %e);
+				Err(error) => {
+					warn!(%error, "Failed to open url cache database, running without cache");
 					None
 				}
 			}
 		});
-		LinkPreviewer { logger, cache }
+		LinkPreviewer { cache }
 	}
 
 	pub async fn decode_and_analyze_link(&self, link: &str) -> AnalyzeResult {
@@ -64,11 +62,10 @@ impl LinkPreviewer {
 
 		if let Ok(cache_arr) = rmp_serde::to_vec(&result) {
 			if let Some(cache) = &self.cache {
-				if let Err(e) = cache.insert(link.as_bytes(), cache_arr.as_slice()) {
-					warn!(self.logger, "Failed to insert into link cache"; "url" => link,
-						"error" => %e);
-				} else if let Err(e) = cache.flush_async().await {
-					warn!(self.logger, "Failed to flush link cache"; "error" => %e);
+				if let Err(error) = cache.insert(link.as_bytes(), cache_arr.as_slice()) {
+					warn!(%error, url = link, "Failed to insert into link cache");
+				} else if let Err(error) = cache.flush_async().await {
+					warn!(%error, "Failed to flush link cache");
 				}
 			}
 		}

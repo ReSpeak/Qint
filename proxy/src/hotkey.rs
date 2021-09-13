@@ -3,7 +3,7 @@ use std::sync::Arc;
 use actix::Addr;
 use futures::{future, StreamExt};
 use serde::{Deserialize, Serialize};
-use slog::error;
+use tracing::error;
 use tsclientlib::prelude::*;
 
 use crate::connection::QintConnection;
@@ -98,7 +98,7 @@ impl Action {
 				let states = get_input_mute_states(state).await;
 				if states.is_empty() {
 					// No connections, toggle default
-					if let Err(e) = QintState::modify_settings(state, |settings| {
+					if let Err(error) = QintState::modify_settings(state, |settings| {
 						let mut state = settings.get_default_mute_states();
 						if state.input != MuteState::None {
 							state.input = MuteState::None;
@@ -108,7 +108,7 @@ impl Action {
 						settings.set_default_mute_states(state);
 						Ok(Default::default())
 					}) {
-						error!(state.logger, "Failed to change default mute state"; "error" => %e);
+						error!(%error, "Failed to change default mute state");
 					}
 					return;
 				}
@@ -150,7 +150,7 @@ impl Action {
 				let states = get_output_mute_states(state).await;
 				if states.is_empty() {
 					// No connections, toggle default
-					if let Err(e) = QintState::modify_settings(state, |settings| {
+					if let Err(error) = QintState::modify_settings(state, |settings| {
 						let mut state = settings.get_default_mute_states();
 						if state.output != MuteState::None {
 							state.output = MuteState::None;
@@ -160,7 +160,7 @@ impl Action {
 						settings.set_default_mute_states(state);
 						Ok(Default::default())
 					}) {
-						error!(state.logger, "Failed to change default mute state"; "error" => %e);
+						error!(%error, "Failed to change default mute state");
 					}
 					return;
 				}
@@ -192,13 +192,13 @@ impl Action {
 				let states = get_away_states(state).await;
 				if states.is_empty() {
 					// No connections, toggle default
-					if let Err(e) = QintState::modify_settings(state, |settings| {
+					if let Err(error) = QintState::modify_settings(state, |settings| {
 						let mut state = settings.get_default_mute_states();
 						state.away = !state.away;
 						settings.set_default_mute_states(state);
 						Ok(Default::default())
 					}) {
-						error!(state.logger, "Failed to change default mute state"; "error" => %e);
+						error!(%error, "Failed to change default mute state");
 					}
 					return;
 				}
@@ -458,9 +458,9 @@ mod imp {
 
 	use anyhow::Result;
 	use serde::{Deserialize, Serialize};
-	use slog::{debug, warn};
 	use tokio::io::{AsyncBufReadExt, BufReader};
 	use tokio::net::UnixListener;
+	use tracing::{debug, warn};
 
 	use super::HotkeyConfig;
 	use crate::QintState;
@@ -491,17 +491,14 @@ mod imp {
 				if std::path::Path::new(&path).exists() {
 					// Try to connect to see if the socket is alive
 					use std::os::unix::net::UnixStream;
-					if let Err(e) = UnixStream::connect(&path) {
-						debug!(state.logger, "Failed to connect to existing unix socket, removing";
-							"error" => %e);
-						if let Err(e) = std::fs::remove_file(&path) {
-							warn!(state.logger, "Failed to remove existing unix socket";
-								"error" => %e);
+					if let Err(error) = UnixStream::connect(&path) {
+						debug!(%error, "Failed to connect to existing unix socket, removing");
+						if let Err(error) = std::fs::remove_file(&path) {
+							warn!(%error, "Failed to remove existing unix socket");
 							return;
 						}
 					} else {
 						warn!(
-							state.logger,
 							"Failed to open hotkey unix socket, another process is already \
 							 listening"
 						);
@@ -511,8 +508,8 @@ mod imp {
 
 				let listener = match UnixListener::bind(&path) {
 					Ok(r) => r,
-					Err(e) => {
-						warn!(state.logger, "Failed to open hotkey unix socket"; "error" => %e);
+					Err(error) => {
+						warn!(%error, "Failed to open hotkey unix socket");
 						return;
 					}
 				};
@@ -520,23 +517,23 @@ mod imp {
 				loop {
 					match listener.accept().await {
 						Ok((stream, _)) => {
-							debug!(state.logger, "Accepted hotkey unix socket connection");
+							debug!("Accepted hotkey unix socket connection");
 							let state = state.clone();
 							tokio::spawn(async move {
 								let mut reader = BufReader::new(stream);
 								let mut buf = String::new();
 								loop {
-									if let Err(e) = reader.read_line(&mut buf).await {
-										debug!(state.logger, "Failed to read from hotkey unix socket \
-											connection"; "error" => %e);
+									if let Err(error) = reader.read_line(&mut buf).await {
+										debug!(%error, "Failed to read from hotkey unix socket \
+											connection");
 										return;
 									}
 									// Parse as action
 									let action: super::Action = match serde_json::from_str(&buf) {
 										Ok(r) => r,
-										Err(e) => {
-											warn!(state.logger, "Failed to parse from hotkey unix socket \
-												connection"; "error" => %e);
+										Err(error) => {
+											warn!(%error, "Failed to parse from hotkey unix socket \
+												connection");
 											return;
 										}
 									};
@@ -545,8 +542,8 @@ mod imp {
 								}
 							});
 						}
-						Err(e) => {
-							warn!(state.logger, "Failed to accept hotkey unix socket connection"; "error" => %e);
+						Err(error) => {
+							warn!(%error, "Failed to accept hotkey unix socket connection");
 						}
 					}
 				}

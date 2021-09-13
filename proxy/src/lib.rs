@@ -21,9 +21,9 @@ use serde::de::IntoDeserializer;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use shared::AudioDeviceList;
-use slog::{debug, error, info, warn, Logger};
 use thiserror::Error;
 use tokio::runtime::Handle;
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 pub mod audio;
@@ -56,11 +56,10 @@ git_testament::git_testament!(TESTAMENT);
 
 #[macro_export]
 macro_rules! with_log {
-	($fut:expr, $logger:expr, $err:expr) => {{
-		let logger = $logger;
+	($fut:expr, $err:expr) => {{
 		$fut.map(move |r| {
-			if let Err(e) = r {
-				error!(logger, $err; "error" => %e);
+			if let Err(error) = r {
+				tracing::error!(%error, $err);
 			}
 		})
 	}};
@@ -163,7 +162,6 @@ pub struct LaunchConfig {
 
 pub struct QintState {
 	pub handle: Handle,
-	pub logger: Logger,
 	/// The list of all currently existing connections
 	pub connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>,
 	pub audio_data: Option<audio::AudioData>,
@@ -235,8 +233,8 @@ impl QintState {
 		let (old_capture, old_playback) = settings.get_preferred_audio_device();
 
 		// Reload before changing to prevent overwriting changes from other processes
-		if let Err(e) = settings.load(&state.launch_config.read().unwrap().config_path) {
-			warn!(state.logger, "Failed to reload settings"; "error" => %e);
+		if let Err(error) = settings.load(&state.launch_config.read().unwrap().config_path) {
+			warn!(%error, "Failed to reload settings");
 		}
 
 		let changes = match f(&mut *settings) {
@@ -252,7 +250,6 @@ impl QintState {
 				if Some(v) != old_loudness_threshold {
 					state.handle.spawn(with_log!(
 						ad.a2ts.send(audio::audio_to_ts::SetLoudnessThresholdMsg(v)),
-						state.logger.clone(),
 						"Failed to apply loudness threshold"
 					));
 				}
@@ -262,7 +259,6 @@ impl QintState {
 				if Some(v) != old_vad_threshold {
 					state.handle.spawn(with_log!(
 						ad.a2ts.send(audio::audio_to_ts::SetVadThresholdMsg(v)),
-						state.logger.clone(),
 						"Failed to apply vad threshold"
 					));
 				}
@@ -272,7 +268,6 @@ impl QintState {
 				if Some(v) != old_global_volume {
 					state.handle.spawn(with_log!(
 						ad.ts2a.send(audio::ts_to_audio::SetGlobalVolumeMsg(v)),
-						state.logger.clone(),
 						"Failed to apply global volume"
 					));
 				}
@@ -282,14 +277,12 @@ impl QintState {
 			if old_capture != new_capture {
 				state.handle.spawn(with_log!(
 					ad.a2ts.send(audio::SetAudioDevice(new_capture)),
-					state.logger.clone(),
 					"Failed to set new capture device"
 				));
 			}
 			if old_playback != new_playback {
 				state.handle.spawn(with_log!(
 					ad.ts2a.send(audio::SetAudioDevice(new_playback)),
-					state.logger.clone(),
 					"Failed to set new playback device"
 				));
 			}
@@ -297,15 +290,15 @@ impl QintState {
 
 		if changes.hotkeys_changed {
 			if let Ok(hotkeys) = settings.get_hotkeys_config() {
-				if let Err(e) = state.hotkeys.apply_config(state, hotkeys) {
-					error!(state.logger, "Failed to apply new hotkeys"; "error" => %e);
+				if let Err(error) = state.hotkeys.apply_config(state, hotkeys) {
+					error!(%error, "Failed to apply new hotkeys");
 				}
 			}
 		}
 
-		if let Err(e) = save_result {
-			error!(state.logger, "Failed to save settings"; "error" => %e);
-			Err(SettingsUpdateError::InternalError(e))
+		if let Err(error) = save_result {
+			error!(%error, "Failed to save settings");
+			Err(SettingsUpdateError::InternalError(error))
 		} else {
 			Ok(())
 		}
@@ -333,18 +326,15 @@ impl QintState {
 	) {
 		let fut: FuturesUnordered<_> = cons
 			.map(|c| {
-				let logger = self.logger.clone();
 				let f = f.clone();
 				async move {
-					let logger2 = logger.clone();
-					if let Err(e) = c
+					if let Err(error) = c
 						.send(connection::RunOnConMsg(move |c| {
 							if let Some(con) = c.get_mut_connection() {
 								if let Ok(book) = con.get_state() {
 									if let Some(p) = f(book) {
-										if let Err(e) = p.send(con) {
-											warn!(logger2, "Failed to send message action";
-												"error" => %e);
+										if let Err(error) = p.send(con) {
+											warn!(%error, "Failed to send message action");
 										}
 									}
 								}
@@ -352,7 +342,7 @@ impl QintState {
 						}))
 						.await
 					{
-						warn!(logger, "Failed to run action"; "error" => %e);
+						warn!(%error, "Failed to run action");
 					}
 				}
 			})
@@ -373,13 +363,12 @@ impl QintState {
 		let fut: FuturesUnordered<_> = cons
 			.into_iter()
 			.map(|c| {
-				let logger = self.logger.clone();
 				let f = f.clone();
 				let c2 = c.clone();
 				async move {
 					match c.send(connection::RunOnConMsg(|con| f(con, c2))).await {
-						Err(e) => {
-							warn!(logger, "Failed to run action"; "error" => %e);
+						Err(error) => {
+							warn!(%error, "Failed to run action");
 							None
 						}
 						Ok(r) => Some(r),
@@ -483,8 +472,8 @@ impl QintState {
 		let mut res = Vec::new();
 		let dir = match path.read_dir() {
 			Ok(r) => r,
-			Err(e) => {
-				warn!(self.logger, "Failed to list plugins"; "dir" => ?path, "error" => %e);
+			Err(error) => {
+				warn!(dir = ?path, %error, "Failed to list plugins");
 				return Vec::new();
 			}
 		};
@@ -680,15 +669,16 @@ fn merge_json(a: &mut Value, b: &Value) {
 }
 
 impl QintState {
-	pub fn new(logger: Logger, args: Args) -> Result<Arc<Self>> {
+	pub fn new(args: Args) -> Result<Arc<Self>> {
 		#[cfg(debug_assertions)]
 		let profile = "Debug";
 		#[cfg(not(debug_assertions))]
 		let profile = "Release";
 
-		info!(logger, "qint";
-			"version" => git_testament::render_testament!(TESTAMENT),
-			"profile" => profile,
+		info!(
+			version = %git_testament::render_testament!(TESTAMENT),
+			profile = profile,
+			"qint"
 		);
 
 		let handle = Handle::current().clone(); // could also get as param
@@ -706,16 +696,16 @@ impl QintState {
 
 		// Load settings
 		let mut launch_config = LaunchConfig::default();
-		if let Err(e) = launch_config.load(&config_path) {
-			debug!(logger, "Failed to read launch config, using defaults"; "error" => %e);
+		if let Err(error) = launch_config.load(&config_path) {
+			debug!(%error, "Failed to read launch config, using defaults");
 			// Create settings directory
 			fs::create_dir_all(&config_path)?;
 		}
 
 		let settings = {
 			let mut set = Settings::default();
-			if let Err(e) = set.load(&config_path) {
-				info!(logger, "Failed to read settings, using defaults"; "error" => %e);
+			if let Err(error) = set.load(&config_path) {
+				info!(%error, "Failed to read settings, using defaults");
 			}
 			set
 		};
@@ -724,10 +714,9 @@ impl QintState {
 		let key_path = config_path.join("secret.key");
 		let secret = match fs::read(&key_path) {
 			Ok(r) => Secret::from_slice(&r)?,
-			Err(e) => {
-				warn!(logger, "Failed to read secret key, all your current \
-					identities cannot be used anymore, creating new secret";
-					"error" => %e);
+			Err(error) => {
+				warn!(%error, "Failed to read secret key, all your current \
+					identities cannot be used anymore, creating new secret");
 
 				let secret = Secret::new();
 				fs::write(&key_path, &secret.0)?;
@@ -767,28 +756,20 @@ impl QintState {
 			launch_config.plugin_path = launch_config.config_path.join("plugins");
 		}
 
-		let file_cache = Arc::new(FileCache::new(logger.clone(), launch_config.cache_path.clone()));
+		let file_cache = Arc::new(FileCache::new(launch_config.cache_path.clone()));
 
 		// Open search database
 		let (search, search_is_new) = if launch_config.no_search {
 			(None, false)
 		} else {
-			let (s, new) = search::Search::new(
-				logger.clone(),
-				&launch_config.cache_path.join(SEARCH_FILENAME),
-			)?;
+			let (s, new) = search::Search::new(&launch_config.cache_path.join(SEARCH_FILENAME))?;
 			(Some(Arc::new(s)), new)
 		};
 
 		// Open database
-		let database = db::DbHandler::new(
-			logger.clone(),
-			file_cache.clone(),
-			search.clone(),
-			&launch_config,
-			secret.clone(),
-		)?
-		.start();
+		let database =
+			db::DbHandler::new(file_cache.clone(), search.clone(), &launch_config, secret.clone())?
+				.start();
 
 		let connections = Arc::new(Mutex::new(HashMap::new()));
 
@@ -796,14 +777,14 @@ impl QintState {
 		let audio_data = if launch_config.no_audio {
 			None
 		} else {
-			Some(audio::start(logger.clone(), connections.clone(), &settings)?)
+			Some(audio::start(connections.clone(), &settings)?)
 		};
 
 		// Read hotkeys config
 		let hotkey_config = match settings.get_hotkeys_config() {
 			Ok(r) => r,
-			Err(e) => {
-				debug!(logger, "Failed to read hotkey config, ignoring"; "error" => %e);
+			Err(error) => {
+				debug!(%error, "Failed to read hotkey config, ignoring");
 				hotkey::HotkeyConfig::default()
 			}
 		};
@@ -813,7 +794,6 @@ impl QintState {
 			if let Some(threshold) = settings.get_loudness_threshold() {
 				handle.spawn(with_log!(
 					ad.a2ts.send(audio::audio_to_ts::SetLoudnessThresholdMsg(threshold)),
-					logger.clone(),
 					"Failed to apply loudness threshold"
 				));
 			}
@@ -821,7 +801,6 @@ impl QintState {
 			if let Some(threshold) = settings.get_vad_threshold() {
 				handle.spawn(with_log!(
 					ad.a2ts.send(audio::audio_to_ts::SetVadThresholdMsg(threshold)),
-					logger.clone(),
 					"Failed to apply loudness threshold"
 				));
 			}
@@ -829,21 +808,20 @@ impl QintState {
 			if let Some(volume) = settings.get_global_volume() {
 				handle.spawn(with_log!(
 					ad.ts2a.send(audio::ts_to_audio::SetGlobalVolumeMsg(volume)),
-					logger.clone(),
 					"Failed to apply global volume"
 				));
 			}
 		}
 
 		let graphql_schema = db::graphql::create_schema();
-		let link_previewer = LinkPreviewer::new(
-			logger.clone(),
-			if launch_config.no_link_cache { Some(launch_config.cache_path.clone()) } else { None },
-		);
+		let link_previewer = LinkPreviewer::new(if launch_config.no_link_cache {
+			Some(launch_config.cache_path.clone())
+		} else {
+			None
+		});
 
 		let state = Arc::new(QintState {
 			handle,
-			logger,
 			connections,
 			audio_data,
 			hotkeys,

@@ -16,7 +16,6 @@ use std::thread;
 use actix::prelude::*;
 use anyhow::format_err;
 use qint_proxy::QintState;
-use slog::{o, Drain};
 use structopt::StructOpt;
 use tauri::SystemTray;
 use tauri::SystemTrayEvent;
@@ -90,18 +89,8 @@ impl Into<qint_proxy::Args> for Args {
 }
 
 fn main() {
-	let logger = {
-		let decorator = slog_term::TermDecorator::new().build();
-		let drain = slog_term::CompactFormat::new(decorator).build();
-		let drain = slog_envlogger::new(drain).fuse();
-		let drain = slog_async::Async::new(drain).build().fuse();
-
-		slog::Logger::root(drain, o!())
-	};
-
-	let _scope_guard = slog_scope::set_global_logger(logger.clone());
-	// Ignore errors if a logger has already been set
-	let _ = slog_stdlog::init();
+	tracing_subscriber::fmt::init();
+	// TODO tracing stdlog
 
 	// Parse command line options
 	let args = Args::from_args();
@@ -109,13 +98,12 @@ fn main() {
 	let (app_addr, app_arc) = {
 		let (sender, receiver) = std::sync::mpsc::channel();
 
-		let logger2 = logger.clone();
 		thread::spawn(move || {
 			let mut runtime = Runtime::new().unwrap();
 			let local = tokio::task::LocalSet::new();
 			let handle = runtime.handle().clone();
 			local.block_on(&mut runtime, async move {
-				let state = QintState::new(logger2, args.into()).unwrap();
+				let state = QintState::new(args.into()).unwrap();
 				let app = QintCore::new(handle, state);
 				let app_arc = Arc::new(app.clone());
 				let app_addr = app.start();
@@ -134,7 +122,6 @@ fn main() {
 		.manage(app_arc.state.clone())
 		.manage(app_arc)
 		.manage(LoudnessShare::new())
-		.manage(logger)
 		.create_window(
 			"main",
 			WindowUrl::App("index.html".into()),

@@ -9,8 +9,8 @@ use anyhow::{format_err, Result};
 use ebur128::EbuR128;
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired, AudioStatus};
 use sdl2::AudioSubsystem;
-use slog::{debug, error, o, warn, Logger};
 use tokio::runtime::Handle;
+use tracing::{debug, error, info_span, warn, Span};
 use tsclientlib::ClientId;
 use tsproto_packets::packets::InAudioBuf;
 
@@ -26,7 +26,6 @@ pub struct SetGlobalVolumeMsg(pub f32);
 pub struct SetVolumeMsg(pub Id, pub f32);
 
 pub struct TsToAudio {
-	logger: Logger,
 	audio_subsystem: AudioSubsystem,
 	preferred_device: Option<String>,
 	device: Option<AudioDevice<SdlCallback>>,
@@ -39,7 +38,7 @@ pub struct TsToAudio {
 }
 
 struct SdlCallback {
-	logger: Logger,
+	span: Span,
 	data: Arc<Mutex<AudioHandler>>,
 	connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>,
 	loudness: HashMap<Id, EbuR128>,
@@ -73,10 +72,10 @@ impl Actor for TsToAudio {
 			if let Some(device) = &t2a.device {
 				let data_empty = t2a.data.lock().unwrap().get_queues().is_empty();
 				if device.status() == AudioStatus::Paused && !data_empty {
-					debug!(t2a.logger, "Resuming playback");
+					debug!("Resuming playback");
 					device.resume();
 				} else if device.status() == AudioStatus::Playing && data_empty {
-					debug!(t2a.logger, "Pausing playback");
+					debug!("Pausing playback");
 					device.pause();
 				}
 			}
@@ -86,14 +85,12 @@ impl Actor for TsToAudio {
 
 impl TsToAudio {
 	pub(crate) fn new(
-		logger: Logger, audio_subsystem: AudioSubsystem, preferred_device: Option<String>,
+		audio_subsystem: AudioSubsystem, preferred_device: Option<String>,
 		connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>, global_volume: f32,
 	) -> Result<Self> {
-		let logger = logger.new(o!("pipeline" => "ts-to-audio"));
-		let data = Arc::new(Mutex::new(AudioHandler::new(logger.clone())));
+		let data = Arc::new(Mutex::new(AudioHandler::new()));
 
 		Ok(Self {
-			logger,
 			audio_subsystem,
 			preferred_device,
 			device: None,
@@ -110,7 +107,6 @@ impl TsToAudio {
 			samples: Some(USUAL_SAMPLE_COUNT as u16),
 		};
 
-		let logger = self.logger.clone();
 		let data = self.data.clone();
 		let connections = self.connections.clone();
 		match self.audio_subsystem.open_playback(
@@ -119,10 +115,13 @@ impl TsToAudio {
 			|spec| {
 				// This spec will always be the desired spec, the sdl wrapper passes
 				// zero as `allowed_changes`.
-				debug!(logger, "Got playback spec"; "spec" => ?spec,
-				"driver" => self.audio_subsystem.current_audio_driver());
+				debug!(
+					?spec,
+					driver = self.audio_subsystem.current_audio_driver(),
+					"Got playback spec"
+				);
 				SdlCallback {
-					logger,
+					span: info_span!("ts-to-audio"),
 					data,
 					connections,
 					loudness: Default::default(),
@@ -132,9 +131,9 @@ impl TsToAudio {
 			},
 		) {
 			Ok(device) => self.device = Some(device),
-			Err(e) => {
+			Err(error) => {
 				self.device = None;
-				error!(self.logger, "Failed to open playback device"; "error" => %e);
+				error!(%error, "Failed to open playback device");
 			}
 		}
 	}
@@ -166,13 +165,11 @@ impl Handler<PlayMsg> for TsToAudio {
 									q.volume = v;
 								}
 							}
-							Ok(Err(e)) => {
-								warn!(this.logger, "Failed to get volume for \
-									client"; "error" => %e);
+							Ok(Err(error)) => {
+								warn!(%error, "Failed to get volume for client");
 							}
-							Err(e) => {
-								warn!(this.logger, "Failed to get volume for \
-									client"; "error" => %e);
+							Err(error) => {
+								warn!(%error, "Failed to get volume for client");
 							}
 						},
 					));
@@ -180,7 +177,7 @@ impl Handler<PlayMsg> for TsToAudio {
 			}
 
 			if device.status() == AudioStatus::Paused {
-				debug!(self.logger, "Resuming playback");
+				debug!("Resuming playback");
 				device.resume();
 			}
 		}
@@ -247,6 +244,7 @@ impl Handler<SetAudioDevice> for TsToAudio {
 impl AudioCallback for SdlCallback {
 	type Channel = f32;
 	fn callback(&mut self, buffer: &mut [Self::Channel]) {
+		let _span = self.span.enter();
 		// Clear buffer
 		for d in &mut *buffer {
 			*d = 0.0;
@@ -257,25 +255,24 @@ impl AudioCallback for SdlCallback {
 		let loudness = &mut self.loudness;
 		// Collect loudness per client per connection
 		let mut loudnesses = HashMap::new();
-		let logger = &self.logger;
 		let removed = data.fill_buffer_with_proc(buffer, |id, buf| {
 			let ebur128 = match loudness.entry(id.clone()) {
 				Entry::Occupied(e) => e.into_mut(),
 				Entry::Vacant(e) => {
 					match EbuR128::new(2, super::SAMPLE_RATE as u32, ebur128::Mode::M) {
-						Err(e) => {
-							warn!(logger, "Failed to create loudness measurement"; "error" => %e);
+						Err(error) => {
+							warn!(%error, "Failed to create loudness measurement");
 							return;
 						}
 						Ok(r) => e.insert(r),
 					}
 				}
 			};
-			if let Err(e) = ebur128.add_frames_f32(buf) {
-				warn!(logger, "Failed to measure loudness of client"; "error" => %e);
+			if let Err(error) = ebur128.add_frames_f32(buf) {
+				warn!(%error, "Failed to measure loudness of client");
 			}
 			match ebur128.loudness_momentary() {
-				Err(e) => warn!(logger, "Failed to measure loudness"; "error" => %e),
+				Err(error) => warn!(%error, "Failed to measure loudness"),
 				Ok(lufs) => {
 					let ls = loudnesses.entry(id.0).or_insert_with(HashMap::new);
 					ls.insert(id.1, lufs);

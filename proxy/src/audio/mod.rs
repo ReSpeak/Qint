@@ -5,10 +5,10 @@ use std::thread;
 use actix::*;
 use anyhow::Result;
 use futures::FutureExt;
-use slog::{error, Logger};
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 use tokio::task;
+use tracing::error;
 
 use crate::connection::QintConnection;
 use crate::{ConnectionId, Settings};
@@ -58,8 +58,7 @@ impl Message for SetAudioDevice {
 }
 
 pub(crate) fn start(
-	logger: Logger, connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>,
-	settings: &Settings,
+	connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>, settings: &Settings,
 ) -> Result<AudioData> {
 	let global_volume = settings.get_global_volume().unwrap_or(1.0);
 	let (capture, playback) = settings.get_preferred_audio_device();
@@ -77,15 +76,9 @@ pub(crate) fn start(
 	// Create thread local runtime for non-send tasks
 	// A channel size of 1 leads to audio drops when cpu is fully used
 	let (spawn_send, mut spawn_recv) = mpsc::channel(5);
-	let ts2a = TsToAudio::new(
-		logger.clone(),
-		audio_subsystem.clone(),
-		playback,
-		connections,
-		global_volume,
-	)?
-	.start();
-	let a2ts = AudioToTs::new(logger.clone(), audio_subsystem, capture, spawn_send)?.start();
+	let ts2a =
+		TsToAudio::new(audio_subsystem.clone(), playback, connections, global_volume)?.start();
+	let a2ts = AudioToTs::new(audio_subsystem, capture, spawn_send)?.start();
 
 	let a2ts2 = a2ts.clone();
 	thread::spawn(move || {
@@ -94,11 +87,9 @@ pub(crate) fn start(
 		// Run the local task set.
 		local.block_on(&mut runtime, async move {
 			while let Some(msg) = spawn_recv.recv().await {
-				let logger = logger.clone();
 				task::spawn_local(a2ts2.send(msg).map(move |r| match r {
 					Ok(()) => {}
-					Err(e) => error!(logger, "Failed to send audio data to Audio2TS \
-							pipeline"; "error" => %e),
+					Err(error) => error!(%error, "Failed to send audio data to Audio2TS pipeline"),
 				}));
 			}
 		});

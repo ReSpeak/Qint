@@ -20,11 +20,10 @@ use qint_proxy::{
 	AppToFrontendBridge, ConnectionId, QintState,
 };
 use serde::{Deserialize, Serialize};
-use slog::{debug, error, Logger};
 use thiserror::Error;
+use tracing::{debug, error};
 
 pub struct WsBridge {
-	pub logger: Logger,
 	pub ws: Addr<Ws>,
 	pub id: ConnectionId,
 }
@@ -92,7 +91,6 @@ impl AppToFrontendBridge for WsBridge {
 			self.ws.send(SendToFrontendMsg(
 				serde_json::to_string(&WsMsg { cmd: "ws", con: self.id.clone(), msg }).unwrap()
 			)),
-			self.logger.clone(),
 			"Failed to forward msg to frontend"
 		));
 	}
@@ -108,7 +106,6 @@ impl AppToFrontendBridge for WsBridge {
 			self.ws.send(SendToFrontendMsg(
 				serde_json::to_string(&WsMsg { cmd: "ws_close", con: self.id.clone() }).unwrap()
 			)),
-			self.logger.clone(),
 			"Failed to send close msg to websocket"
 		));
 	}
@@ -126,10 +123,8 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 			Ok(ws::Message::Text(msg)) => {
 				let msg: F2PMsg = match serde_json::from_str(&msg) {
 					Ok(r) => r,
-					Err(e) => {
-						let msg_str: &str = msg.as_ref();
-						error!(self.state.logger, "json deserializing error"; "error" => %e,
-							"message" => msg_str);
+					Err(error) => {
+						error!(%error, message = %msg, "json deserializing error");
 						ctx.close(None);
 						return;
 					}
@@ -166,7 +161,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 				);
 			}
 			Ok(ws::Message::Binary(_)) => {
-				error!(self.state.logger, "binary protocol not supported");
+				error!("binary protocol not supported");
 			}
 			Ok(ws::Message::Close(_)) => {
 				self.close();
@@ -187,14 +182,13 @@ impl Ws {
 	pub fn new(state: Arc<QintState>) -> Self { Self { state, connections: Default::default() } }
 
 	fn close(&self) {
-		debug!(self.state.logger, "Websocket closed");
+		debug!("Websocket closed");
 
 		// Close all connections for this websocket
 		let mut own_cons = self.connections.lock().unwrap();
 		for con in own_cons.drain() {
 			actix::spawn(with_log!(
 				con.1.send(DisconnectMsg),
-				self.state.logger.clone(),
 				"Failed to send disconnect msg to QintConnection"
 			));
 		}
@@ -217,14 +211,12 @@ impl Ws {
 
 				let mut cons = state.connections.lock().unwrap();
 				if cons.contains_key(&id) || !id.is_valid() {
-					error!(state.logger, "Connection already in use. Duplicate create call?"; "error" => ?id);
+					error!(error = ?id, "Connection already in use. Duplicate create call?");
 					return Err(Error::ConnectionInUse.into());
 				}
 
-				let sender =
-					Box::new(WsBridge { logger: state.logger.clone(), ws: addr, id: id.clone() });
-				let ws =
-					QintConnection::new(state.logger.clone(), state.clone(), id.clone(), sender);
+				let sender = Box::new(WsBridge { ws: addr, id: id.clone() });
+				let ws = QintConnection::new(state.clone(), id.clone(), sender);
 				let addr = ws.start();
 				connections.lock().unwrap().insert(id.clone(), addr.clone());
 				cons.insert(id, addr);
@@ -237,7 +229,7 @@ impl Ws {
 					match state.connections.lock().unwrap().get(&id) {
 						Some(con) => con.clone(),
 						None => {
-							error!(state.logger, "No con for msg found"; "error" => ?id);
+							error!(error = ?id, "No con for msg found");
 							return Err(Error::NoConnection.into());
 						}
 					}
@@ -245,7 +237,6 @@ impl Ws {
 
 				actix::spawn(with_log!(
 					con.send(qint_proxy::connection::DisconnectMsg),
-					state.logger.clone(),
 					"Failed to send disconnect to connection"
 				));
 				connections.lock().unwrap().remove(&id);
@@ -259,13 +250,12 @@ impl Ws {
 				let args: Args = serde_json::from_value(args)?;
 
 				let con = state.get_connection(&args.con).ok_or_else(|| {
-					error!(state.logger, "No con for msg found"; "error" => ?args.con);
+					error!(error = ?args.con, "No con for msg found");
 					Error::NoConnection
 				})?;
 
 				actix::spawn(with_log!(
 					con.send(MessageF2PWrapper(args.msg)),
-					state.logger.clone(),
 					"Failed to forward Message to Proxy"
 				));
 			}

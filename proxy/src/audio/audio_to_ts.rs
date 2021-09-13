@@ -11,8 +11,8 @@ use futures::prelude::*;
 use nnnoiseless::DenoiseState;
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired, AudioStatus};
 use sdl2::AudioSubsystem;
-use slog::{debug, error, o, trace, warn, Logger};
 use tokio::sync::mpsc;
+use tracing::{debug, error, info_span, trace, warn, Span};
 use tsproto_packets::packets::CodecType;
 
 use super::*;
@@ -56,7 +56,6 @@ const TALKING_TIME: u8 = 5;
 const LOUDNESS_END_MAGIC: f64 = -1000.0;
 
 pub struct AudioToTs {
-	logger: Logger,
 	audio_subsystem: AudioSubsystem,
 	preferred_device: Option<String>,
 	spawn_send: mpsc::Sender<PlayPacketMsg>,
@@ -83,7 +82,7 @@ pub struct AudioToTs {
 }
 
 struct SdlCallback {
-	logger: Logger,
+	span: Span,
 	channels: audiopus::Channels,
 	encoder: Option<Encoder>,
 	denoise: Box<DenoiseState<'static>>,
@@ -161,23 +160,21 @@ impl Handler<AddListenerMsg> for AudioToTs {
 			// Update is_talking for this connection
 			actix::spawn(with_log!(
 				msg.0.send(SetSelfTalkingMsg(self.is_talking)),
-				self.logger.clone(),
 				"Failed to set self talking status"
 			));
 		}
-		debug!(self.logger, "Add listener");
+		debug!("Add listener");
 	}
 }
 
 impl Handler<RemoveListenerMsg> for AudioToTs {
 	type Result = bool;
 	fn handle(&mut self, msg: RemoveListenerMsg, _: &mut Self::Context) -> Self::Result {
-		debug!(self.logger, "Removing listener");
+		debug!("Removing listener");
 		if self.is_talking {
 			// Update is_talking for this connection
 			actix::spawn(with_log!(
 				msg.0.send(SetSelfTalkingMsg(false)),
-				self.logger.clone(),
 				"Failed to set self talking status"
 			));
 		}
@@ -220,7 +217,6 @@ impl Handler<PlayPacketMsg> for AudioToTs {
 	type Result = ();
 	fn handle(&mut self, packet: PlayPacketMsg, _: &mut Self::Context) -> Self::Result {
 		// Write into packet sink
-		let logger = self.logger.clone();
 		let loudness = packet.loudness;
 		let vad = packet.vad.unwrap_or(0f32);
 
@@ -231,14 +227,12 @@ impl Handler<PlayPacketMsg> for AudioToTs {
 				} else {
 					actix::spawn(with_log!(
 						con.send(SendAudioMsg(codec, data.clone())),
-						logger.clone(),
 						"Failed to send audio packet"
 					));
 
 					if let Some(loudness) = loudness {
 						actix::spawn(with_log!(
 							con.send(CaptureLoudnessMsg(loudness, vad)),
-							logger.clone(),
 							"Failed to send loudness"
 						));
 					}
@@ -321,13 +315,10 @@ impl Handler<SetAudioDevice> for AudioToTs {
 
 impl AudioToTs {
 	pub(crate) fn new(
-		logger: Logger, audio_subsystem: AudioSubsystem, preferred_device: Option<String>,
+		audio_subsystem: AudioSubsystem, preferred_device: Option<String>,
 		spawn_send: mpsc::Sender<PlayPacketMsg>,
 	) -> Result<Self> {
-		let logger = logger.new(o!("pipeline" => "audio-to-ts"));
-
 		Ok(Self {
-			logger,
 			audio_subsystem,
 			preferred_device,
 			spawn_send,
@@ -358,8 +349,11 @@ impl AudioToTs {
 			.open_capture(self.preferred_device.as_deref(), &desired_spec, |spec| {
 				// This spec will always be the desired spec, the sdl wrapper
 				// passes zero as `allowed_changes`.
-				debug!(self.logger, "Got capture spec"; "spec" => ?spec,
-					"driver" => self.audio_subsystem.current_audio_driver());
+				debug!(
+					?spec,
+					driver = self.audio_subsystem.current_audio_driver(),
+					"Got capture spec"
+				);
 				let channels = if spec.channels == 1 {
 					audiopus::Channels::Mono
 				} else {
@@ -367,7 +361,6 @@ impl AudioToTs {
 				};
 
 				SdlCallback::new(
-					self.logger.clone(),
 					channels,
 					spawn_send,
 					self.vad_threshold.clone(),
@@ -382,9 +375,8 @@ impl AudioToTs {
 				self.device = Some(device);
 				self.update_device_state();
 			}
-			Err(e) => {
-				error!(self.logger, "Failed to open capture device";
-					"error" => %e);
+			Err(error) => {
+				error!(%error, "Failed to open capture device");
 			}
 		}
 	}
@@ -393,7 +385,6 @@ impl AudioToTs {
 		for con in &self.connections {
 			actix::spawn(with_log!(
 				con.send(SetSelfTalkingMsg(self.is_talking)),
-				self.logger.clone(),
 				"Failed to update self talking status"
 			));
 		}
@@ -412,19 +403,19 @@ impl AudioToTs {
 
 impl SdlCallback {
 	fn new(
-		logger: Logger, channels: audiopus::Channels, spawn_send: mpsc::Sender<PlayPacketMsg>,
+		channels: audiopus::Channels, spawn_send: mpsc::Sender<PlayPacketMsg>,
 		vad_threshold: Arc<AtomicU32>, loudness_threshold: Arc<AtomicU64>,
 		loudness_listening: Arc<AtomicBool>, packet_loss: Arc<AtomicU8>,
 	) -> Self {
 		let loudness = match EbuR128::new(1, super::SAMPLE_RATE as u32, ebur128::Mode::M) {
 			Ok(r) => Some(r),
-			Err(e) => {
-				warn!(logger, "Failed to create loudness measurement"; "error" => %e);
+			Err(error) => {
+				warn!(%error, "Failed to create loudness measurement");
 				None
 			}
 		};
 		Self {
-			logger,
+			span: info_span!("audio-to-ts"),
 			channels,
 			encoder: None,
 			denoise: DenoiseState::new(),
@@ -454,19 +445,19 @@ impl SdlCallback {
 	}
 
 	fn send_audio(&mut self, packet: PlayPacketMsg) {
-		if let Err(e) = self.spawn_send.try_send(packet) {
-			warn!(self.logger, "Failed to send audio packet"; "error" => %e);
+		if let Err(error) = self.spawn_send.try_send(packet) {
+			warn!(%error, "Failed to send audio packet");
 		}
 	}
 
 	fn measure_loudness(&mut self, buffer: &[f32]) -> Option<f64> {
 		if let Some(ebur128) = &mut self.loudness {
-			if let Err(e) = ebur128.add_frames_f32(buffer) {
-				warn!(self.logger, "Failed to measure loudness with new data"; "error" => %e);
+			if let Err(error) = ebur128.add_frames_f32(buffer) {
+				warn!(%error, "Failed to measure loudness with new data");
 			} else {
 				match ebur128.loudness_momentary() {
-					Err(e) => {
-						warn!(self.logger, "Failed to measure loudness"; "error" => %e);
+					Err(error) => {
+						warn!(%error, "Failed to measure loudness");
 					}
 					Ok(lufs) => return Some(lufs),
 				}
@@ -479,6 +470,7 @@ impl SdlCallback {
 impl AudioCallback for SdlCallback {
 	type Channel = f32;
 	fn callback(&mut self, buffer: &mut [Self::Channel]) {
+		let _span = self.span.clone().entered();
 		let did_talk = self.is_talking != 0;
 		let is_loudness_listening = self.loudness_listening.load(Ordering::Relaxed);
 		let mut loudness = None;
@@ -489,7 +481,7 @@ impl AudioCallback for SdlCallback {
 
 		// Denoise
 		if buffer.len() % DenoiseState::FRAME_SIZE != 0 {
-			warn!(self.logger, "Size not fitting for denoising");
+			warn!("Size not fitting for denoising");
 			vad_triggered = true;
 		} else {
 			// Scale to the expected range
@@ -504,7 +496,7 @@ impl AudioCallback for SdlCallback {
 				i.copy_from_slice(&self.denoise_buffer);
 			}
 			vad_probe /= (buffer.len() / DenoiseState::FRAME_SIZE) as f32;
-			trace!(self.logger, "Vad probe"; "value" => vad_probe);
+			trace!(%vad_probe);
 			vad = Some(vad_probe);
 			vad_triggered = vad_probe >= f32::from_bits(self.vad_threshold.load(Ordering::Relaxed));
 		}
@@ -541,7 +533,7 @@ impl AudioCallback for SdlCallback {
 		if self.is_talking == 0 {
 			if did_talk {
 				// Send empty packet to signal end
-				trace!(self.logger, "Sending last empty packet");
+				trace!("Sending last empty packet");
 				self.send_audio(PlayPacketMsg {
 					codec: Some(codec),
 					data: Some(Vec::new()),
@@ -559,8 +551,8 @@ impl AudioCallback for SdlCallback {
 			return;
 		}
 
-		if let Err(e) = self.create_encoder() {
-			error!(self.logger, "Failed to create opus encoder"; "error" => %e);
+		if let Err(error) = self.create_encoder() {
+			error!(%error, "Failed to create opus encoder");
 			return;
 		}
 
@@ -568,30 +560,30 @@ impl AudioCallback for SdlCallback {
 		let loss = self.packet_loss.load(Ordering::Relaxed);
 		let encoder = self.encoder.as_mut().unwrap();
 		if loss == 0 {
-			if let Err(e) = encoder.set_inband_fec(false) {
-				warn!(self.logger, "Failed to disable opus inband fec"; "error" => %e);
+			if let Err(error) = encoder.set_inband_fec(false) {
+				warn!(%error, "Failed to disable opus inband fec");
 			}
 		} else {
-			if let Err(e) = encoder.set_packet_loss_perc(loss) {
-				warn!(self.logger, "Failed to set opus packet loss"; "error" => %e, "loss" => loss);
+			if let Err(error) = encoder.set_packet_loss_perc(loss) {
+				warn!(%error, loss, "Failed to set opus packet loss");
 			}
-			if let Err(e) = encoder.set_inband_fec(true) {
-				warn!(self.logger, "Failed to enable opus inband fec"; "error" => %e);
+			if let Err(error) = encoder.set_inband_fec(true) {
+				warn!(%error, "Failed to enable opus inband fec");
 			}
 		}
 
 		if !did_talk {
 			// Send cached last buffer if there was one
 			if !self.last_buffer.is_empty() {
-				trace!(self.logger, "Start to talk: Sending cached last buffer");
+				trace!("Start to talk: Sending cached last buffer");
 				if self.last_buffer_is_upscaled {
 					for d in &mut self.last_buffer {
 						*d /= i16::max_value() as f32;
 					}
 				}
 				match encoder.encode_float(&self.last_buffer, &mut self.opus_output[..]) {
-					Err(e) => {
-						warn!(self.logger, "Failed to encode opus"; "error" => %e);
+					Err(error) => {
+						warn!(%error, "Failed to encode opus");
 					}
 					Ok(len) => {
 						self.send_audio(PlayPacketMsg {
@@ -610,12 +602,12 @@ impl AudioCallback for SdlCallback {
 		assert!(!is_upscaled);
 		let packet =
 			match self.encoder.as_ref().unwrap().encode_float(buffer, &mut self.opus_output[..]) {
-				Err(e) => {
-					warn!(self.logger, "Failed to encode opus"; "error" => %e);
+				Err(error) => {
+					warn!(%error, "Failed to encode opus");
 					None
 				}
 				Ok(len) => {
-					trace!(self.logger, "Sending packet");
+					trace!("Sending packet");
 					Some(self.opus_output[..len].to_vec())
 				}
 			};

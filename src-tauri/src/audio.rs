@@ -1,9 +1,10 @@
-use slog::Logger;
 use std::sync::{
 	atomic::{AtomicBool, Ordering},
 	Arc, Mutex,
 };
+
 use tauri::Window;
+use tracing::warn;
 
 use qint_proxy::{
 	audio::audio_to_ts::{AddLoudnessListenerMsg, LoudnessTrait},
@@ -26,14 +27,14 @@ impl LoudnessShare {
 			} else {
 				let listening = Arc::new(AtomicBool::new(true));
 				*current = Some(listening.clone());
-				LoudnessCallback { logger: state.logger.clone(), window, listening }
+				LoudnessCallback { window, listening }
 			}
 		};
 
 		if let Some(ad) = &state.audio_data {
 			match ad.a2ts.send(AddLoudnessListenerMsg(Box::new(callback))).await {
 				Ok(_handle) => {}
-				Err(e) => warn!(state.logger, "Failed add loudness listener"; "error" => %e),
+				Err(error) => warn!(%error, "Failed add loudness listener"),
 			}
 		}
 	}
@@ -47,7 +48,6 @@ impl LoudnessShare {
 }
 
 pub struct LoudnessCallback {
-	pub logger: Logger,
 	pub window: Window,
 	pub listening: Arc<AtomicBool>,
 }
@@ -58,8 +58,8 @@ struct LoudnessFrame(pub f64, pub f32);
 impl LoudnessTrait for LoudnessCallback {
 	fn send(&self, msg: CaptureLoudnessMsg) {
 		let res = self.window.emit("loudness", LoudnessFrame(msg.0, msg.1));
-		if let Err(e) = res {
-			warn!(self.logger, "Failed sending to frontend"; "error" => %e);
+		if let Err(error) = res {
+			warn!(%error, "Failed sending to frontend");
 		}
 	}
 

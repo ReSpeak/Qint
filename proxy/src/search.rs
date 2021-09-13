@@ -9,9 +9,9 @@ use futures::FutureExt;
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
 use serde::{Deserialize, Serialize};
-use slog::{debug, error, info, warn, Logger};
 use tantivy::schema::Schema;
 use tantivy::{Document, Index, IndexReader, IndexWriter, ReloadPolicy, SnippetGenerator};
+use tracing::{debug, debug_span, error, info, warn};
 use tsclientlib::Uid;
 use tsproto_types::crypto::EccKeyPubP256;
 
@@ -39,7 +39,6 @@ pub enum SearchResultId {
 }
 
 pub struct Search {
-	logger: Logger,
 	index: Index,
 	schema: Schema,
 	reader: IndexReader,
@@ -58,7 +57,7 @@ pub struct SearchResults {
 
 impl Search {
 	/// Creates a search databe and returns if it was newly created or not.
-	pub fn new(logger: Logger, path: &Path) -> Result<(Self, bool)> {
+	pub fn new(path: &Path) -> Result<(Self, bool)> {
 		let schema = Self::schema();
 		let mut index = None;
 		let mut is_new = false;
@@ -83,7 +82,6 @@ impl Search {
 
 		Ok((
 			Self {
-				logger,
 				index,
 				schema,
 				reader,
@@ -124,19 +122,17 @@ impl Search {
 
 	/// Setup default database settings.
 	pub fn start_setup(state: &Arc<QintState>) {
-		let logger = state.logger.clone();
-		let state2 = state.clone();
 		let search = if let Some(search) = state.search.clone() {
 			search
 		} else {
-			error!(state.logger, "Cannot setup database if it is not connected");
+			error!("Cannot setup database if it is not connected");
 			return;
 		};
 		actix::spawn(
 			state
 				.database
 				.send(db::RunOnDbMsg(move |db| -> Result<()> {
-					info!(state2.logger, "Setup search db");
+					info!("Setup search db");
 					// TODO Use some stop words and synonyms
 					//search.database.update_write(|w| search.index.settings_update(w, settings))?;
 
@@ -187,8 +183,7 @@ impl Search {
 							index_writer.add_document(doc);
 						}
 
-						debug!(state2.logger, "Writing messages into search db";
-							"count" => offset as usize + len);
+						debug!(count = offset as usize + len, "Writing messages into search db");
 						if len < INIT_BATCH_SIZE {
 							break;
 						}
@@ -219,8 +214,7 @@ impl Search {
 							index_writer.add_document(doc);
 						}
 
-						debug!(state2.logger, "Writing channels into search db";
-							"count" => offset as usize + len);
+						debug!(count = offset as usize + len, "Writing channels into search db");
 						if len < INIT_BATCH_SIZE {
 							break;
 						}
@@ -258,8 +252,7 @@ impl Search {
 							index_writer.add_document(doc);
 						}
 
-						debug!(state2.logger, "Writing clients into search db";
-							"count" => offset as usize + len);
+						debug!(count = offset as usize + len, "Writing clients into search db");
 						if len < INIT_BATCH_SIZE {
 							break;
 						}
@@ -292,8 +285,7 @@ impl Search {
 							index_writer.add_document(doc);
 						}
 
-						debug!(state2.logger, "Writing servers into search db";
-							"count" => offset as usize + len);
+						debug!(count = offset as usize + len, "Writing servers into search db");
 						if len < INIT_BATCH_SIZE {
 							break;
 						}
@@ -305,10 +297,10 @@ impl Search {
 					Ok(())
 				}))
 				.map(move |r| {
-					if let Err(e) = r {
-						warn!(logger, "Failed to setup search database"; "error" => %e);
-					} else if let Ok(Err(e)) = r {
-						warn!(logger, "Failed to fill search database"; "error" => %e);
+					if let Err(error) = r {
+						warn!(%error, "Failed to setup search database");
+					} else if let Ok(Err(error)) = r {
+						warn!(%error, "Failed to fill search database");
 					}
 				}),
 		);
@@ -318,7 +310,6 @@ impl Search {
 		// This potentially blocks for a while, so start a new thread.
 		let index = self.index.clone();
 		let writer = self.writer.clone();
-		let logger = self.logger.clone();
 		let will_commit = self.will_commit.clone();
 		std::thread::spawn(move || {
 			will_commit.fetch_add(1, Ordering::Relaxed);
@@ -328,8 +319,8 @@ impl Search {
 			} else {
 				let writer = match index.writer_with_num_threads(1, 3_000_000) {
 					Ok(r) => r,
-					Err(e) => {
-						error!(logger, "Failed to create search database writer"; "error" => %e);
+					Err(error) => {
+						error!(%error, "Failed to create search database writer");
 						return;
 					}
 				};
@@ -343,8 +334,8 @@ impl Search {
 				// This thread is the last, so commit and free the writer
 				let mut w = writer.lock().unwrap();
 				if let Some(mut w) = w.take() {
-					if let Err(e) = w.commit() {
-						error!(logger, "Failed to commit to search database"; "error" => %e);
+					if let Err(error) = w.commit() {
+						error!(%error, "Failed to commit to search database");
 					}
 				}
 			}
@@ -436,13 +427,7 @@ impl Search {
 		use tantivy::query::*;
 		use tantivy::schema::{IndexRecordOption, Term, Value};
 
-		debug!(self.logger, "Search"; "query" => query, "messages" => ?messages, "range" => ?range);
-		let mut time_reporter = slog_perf::TimeReporter::new_with_level(
-			"Search",
-			self.logger.clone(),
-			slog::Level::Debug,
-		);
-		time_reporter.start("");
+		let _span = debug_span!("Search", query, ?messages, ?range).entered();
 
 		let typ = self.schema.get_field("type").unwrap();
 		let channel_id = self.schema.get_field("channel_id").unwrap();
@@ -512,7 +497,7 @@ impl Search {
 			let t = if let Some(t) = t {
 				t
 			} else {
-				warn!(self.logger, "Search found entry without type");
+				warn!("Search found entry without type");
 				continue;
 			};
 
@@ -523,28 +508,28 @@ impl Search {
 					{
 						res.push(SearchResultId::Channel { server: server.clone(), id: *id });
 					} else {
-						warn!(self.logger, "Search found entry without id"; "type" => ?t);
+						warn!(typ = ?t, "Search found entry without id");
 					}
 				}
 				IndexEntryType::Client => {
 					if let Some(Value::Bytes(id)) = doc.get_first(client_uid) {
 						res.push(SearchResultId::Client(id.clone()));
 					} else {
-						warn!(self.logger, "Search found entry without id"; "type" => ?t);
+						warn!(typ = ?t, "Search found entry without id");
 					}
 				}
 				IndexEntryType::Message => {
 					if let Some(Value::U64(id)) = doc.get_first(message_id) {
 						res.push(SearchResultId::Message(*id));
 					} else {
-						warn!(self.logger, "Search found entry without id"; "type" => ?t);
+						warn!(typ = ?t, "Search found entry without id");
 					}
 				}
 				IndexEntryType::Server => {
 					if let Some(Value::Bytes(id)) = doc.get_first(server_key) {
 						res.push(SearchResultId::Server(id.clone()));
 					} else {
-						warn!(self.logger, "Search found entry without id"; "type" => ?t);
+						warn!(typ = ?t, "Search found entry without id");
 					}
 				}
 			}
@@ -556,8 +541,6 @@ impl Search {
 		name_snippet_generator.set_max_num_chars(1000);
 		let mut address_snippet_generator = SnippetGenerator::create(&searcher, &query, address)?;
 		address_snippet_generator.set_max_num_chars(1000);
-
-		time_reporter.finish();
 
 		Ok(SearchResults {
 			results: res,

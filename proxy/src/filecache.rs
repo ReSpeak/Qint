@@ -12,17 +12,16 @@ use anyhow::Result;
 use bytes::{Buf, Bytes, BytesMut};
 use futures::prelude::*;
 use futures::stream::Peekable;
-use slog::{debug, error, trace, Logger};
 use tokio::fs;
 use tokio::io::AsyncWrite;
 use tokio_util::codec::{BytesCodec, FramedRead};
+use tracing::{debug, error, trace};
 use tsclientlib::ChannelId;
 use tsproto_types::crypto::EccKeyPubP256;
 
 /// Files are stored in
 /// `<cache_path>/files/<base64 of server uid>/<channel_id>/<base64 of path>`.
 pub struct FileCache {
-	logger: Logger,
 	cache_path: PathBuf,
 }
 
@@ -40,7 +39,7 @@ struct FileWriter<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin> {
 }
 
 impl FileCache {
-	pub fn new(logger: Logger, cache_path: PathBuf) -> Self { Self { logger, cache_path } }
+	pub fn new(cache_path: PathBuf) -> Self { Self { cache_path } }
 
 	fn path_encode(data: &[u8]) -> String { base64::encode_config(data, base64::URL_SAFE_NO_PAD) }
 
@@ -58,16 +57,16 @@ impl FileCache {
 		file: impl Stream<Item = Result<Bytes, std::io::Error>> + Unpin,
 	) -> impl Stream<Item = Result<Bytes, std::io::Error>> {
 		let filepath = self.get_path(server, channel, path);
-		if let Err(e) = fs::create_dir_all(&filepath.parent().unwrap()).await {
-			error!(self.logger, "Failed to create cache directory"; "error" => %e);
+		if let Err(error) = fs::create_dir_all(&filepath.parent().unwrap()).await {
+			error!(%error, "Failed to create cache directory");
 			return file.left_stream();
 		}
 
-		debug!(self.logger, "Caching file"; "channel" => channel.0, "path" => %path, "localpath" => ?filepath);
+		debug!(channel = channel.0, %path, localpath = ?filepath, "Caching file");
 		match fs::File::create(&filepath).await {
 			Ok(r) => FileWriter::new(file, r, filepath).right_stream(),
-			Err(e) => {
-				error!(self.logger, "Failed to create cache file"; "error" => %e);
+			Err(error) => {
+				error!(%error, "Failed to create cache file");
 				file.left_stream()
 			}
 		}
@@ -81,7 +80,7 @@ impl FileCache {
 	) -> Result<bool> {
 		let filepath = self.get_path(server, channel, path);
 
-		debug!(self.logger, "Deleting cached file"; "channel" => channel.0, "path" => %path, "localpath" => ?filepath);
+		debug!(channel = channel.0, %path, localpath = ?filepath, "Deleting cached file");
 		if !filepath.exists() {
 			return Ok(false);
 		}
@@ -95,19 +94,19 @@ impl FileCache {
 		let filepath = self.get_path(server, channel, path);
 		let meta = match fs::metadata(&filepath).await {
 			Ok(r) => r,
-			Err(e) => {
-				debug!(self.logger, "File not in cache"; "path" => %path,"localpath" => ?filepath, "error" => %e);
+			Err(error) => {
+				debug!(%path, localpath = ?filepath, %error, "File not in cache");
 				return None;
 			}
 		};
 		match fs::File::open(&filepath).await {
-			Err(e) => {
-				error!(self.logger, "Failed to open cached file"; "error" => %e);
+			Err(error) => {
+				error!(%error, "Failed to open cached file");
 				None
 			}
 			Ok(file) => {
-				trace!(self.logger, "Found cached file"; "channel" => channel.0, "path" => %path,
-					"localpath" => ?filepath, "meta" => ?meta);
+				trace!(channel = channel.0, %path, localpath = ?filepath, ?meta,
+					"Found cached file");
 				let stream =
 					FramedRead::new(file, BytesCodec::new()).map(|r| r.map(BytesMut::freeze));
 				Some((meta.len(), stream))

@@ -6,8 +6,8 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use qint_proxy::QintState;
-use slog::{debug, error, o, Drain};
 use structopt::StructOpt;
+use tracing::{debug, error};
 use web::WebApp;
 
 mod web;
@@ -84,24 +84,16 @@ impl Into<qint_proxy::Args> for Args {
 async fn main() -> Result<()> { real_main().await }
 
 async fn real_main() -> Result<()> {
-	let logger = {
-		let decorator = slog_term::TermDecorator::new().build();
-		let drain = slog_term::CompactFormat::new(decorator).build();
-		let drain = slog_envlogger::new(drain).fuse();
-		let drain = slog_async::Async::new(drain).build().fuse();
+	tracing_subscriber::fmt::init();
 
-		slog::Logger::root(drain, o!())
-	};
-
-	let _scope_guard = slog_scope::set_global_logger(logger.clone());
-	// Ignore errors if a logger has already been set
-	let _ = slog_stdlog::init();
+	// TODO tracing stdlog
+	//let _ = slog_stdlog::init();
 
 	// Parse command line options
 	let args = Args::from_args();
 	let no_open = args.no_open;
 
-	let app = WebApp::new(QintState::new(logger.clone(), args.into())?);
+	let app = WebApp::new(QintState::new(args.into())?);
 
 	if !no_open {
 		// Open browser
@@ -120,9 +112,9 @@ async fn real_main() -> Result<()> {
 				format!("http://{}", addr)
 			};
 			let url = format!("{}/?token={}", url, token);
-			debug!(logger, "Opening url"; "url" => &url);
-			if let Err(e) = open::that(url) {
-				error!(logger, "Failed to open frontend in browser"; "error" => %e);
+			debug!(%url, "Opening url");
+			if let Err(error) = open::that(url) {
+				error!(%error, "Failed to open frontend in browser");
 			}
 		});
 	}
