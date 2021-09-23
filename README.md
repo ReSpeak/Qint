@@ -16,7 +16,7 @@ Run `./install_sdl.ps1`
  \--- OR ---  
 Download the `SDL2-devel-2.x.x-VC.zip` from [libsdl.org](https://www.libsdl.org).  
 From this file, copy `SDL2-2.x.x/lib/x64/*.lib` to `proxy-codegen/msvc/lib/64/`.  
-And copy `SDL2-2.x.x/lib/x64/*.dll` to `proxy-codegen/msvc/dll/64/` and `proxy-codegen/`.
+And copy `SDL2-2.x.x/lib/x64/*.dll` to `proxy-codegen/msvc/dll/64/`, `proxy-codegen/` and `src-tauri/`.
 
 ### macOS
 ```bash
@@ -39,16 +39,17 @@ git clone https://github.com/Flakebi/Qint.git
 ### Build and start the backend
 ```bash
 cd Qint/proxy
-env RUST_LOG=debug cargo run
+RUST_LOG=info cargo run
 # For release builds
 cargo build --release
 ```
 
-To activate logging for audio, use e.g. `RUST_LOG=debug,qint_proxy::audio::audio_to_ts=trace`.
+To activate more logging for qint and see sent commands or packets, use
+`RUST_LOG=tsproto=debug,ts_bookkeeping=debug,tsclientlib=debug,qint_proxy=debug,webapp=debug,warn cargo run -- -v`.
 
 By default, the proxy searches for the frontend in `../frontend/build`, where the frontend gets
 built by default. For packaging, it is useful to load the frontend for another directory, which can
-be set during compilation: `env FRONTEND_PATH=./frontend/ cargo build`
+be set during compilation: `FRONTEND_PATH=./frontend/ cargo build`
 
 ### Build the frontend
 Make sure to build the backend once before building the frontend, because the backend build
@@ -71,6 +72,12 @@ yarn format
 ```
 
 Now, you can use the client at [http://localhost:4422](http://localhost:4422).
+
+### Run with Tauri
+
+Install `WebView2` like described on the tauri page: https://tauri.studio/en/docs/getting-started/setup-windows/#4-install-webview2
+
+Build the frontend first, then run `cargo run` in the `src-tauri` folder.
 
 ### Enable logging in the frontend
 
@@ -106,11 +113,16 @@ keycode = "F11"
 action = { Away = "False" }
 ```
 
-On Linux/X11, shortcuts are currently not implemented.
-For Linux/Wayland, configure your compositor to make http requests, e.g. using curl:
+On Linux/X11, global shortcuts are not implemented, using the same way as wayland below is possible.
+For Linux/Wayland, configure your compositor to write to the socket or make http requests (http
+requests do not work when running tauri), e.g. with the following commands:
 ```bash
-curl -H "Content-Type: application/json" -X POST -d '{"InputMute":"Toggle"}' http://localhost:4422/shortcut
-curl -H "Content-Type: application/json" -X POST -d '{"Away":"True"}' http://localhost:4422/shortcut
+# For the unix socket
+echo '{"InputMute":null}' | nc -UN /tmp/qint-hotkeys
+
+# For web requests
+curl -H "Content-Type: application/json" -X POST -d '{"InputMute":null}' http://localhost:4422/shortcut
+curl -H "Content-Type: application/json" -X POST -d '{"Away":null}' http://localhost:4422/shortcut
 ```
 
 ## License
