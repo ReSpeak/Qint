@@ -5142,6 +5142,7 @@ dependencies = [
  "ignore",
  "notify-rust",
  "once_cell",
+ "open",
  "percent-encoding",
  "rand 0.8.4",
  "raw-window-handle",
