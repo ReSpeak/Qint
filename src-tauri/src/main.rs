@@ -17,6 +17,7 @@ use actix::prelude::*;
 use anyhow::format_err;
 use qint_proxy::QintState;
 use structopt::StructOpt;
+use tauri::PhysicalPosition;
 use tauri::SystemTray;
 use tauri::SystemTrayEvent;
 use tauri::SystemTrayMenu;
@@ -137,8 +138,9 @@ fn main() {
 			});
 		})
 		.system_tray(
-			SystemTray::new()
-				.with_menu(SystemTrayMenu::new().add_item(CustomMenuItem::new("exit", "Exit"))),
+			SystemTray::new().with_menu(SystemTrayMenu::new()
+			.add_item(CustomMenuItem::new("show", "Show"))
+			.add_item(CustomMenuItem::new("exit", "Exit")))
 		)
 		.on_system_tray_event(|app, event| match event {
 			SystemTrayEvent::LeftClick { position: _, size: _, .. } => {
@@ -149,6 +151,10 @@ fn main() {
 				window.set_focus().unwrap();
 			}
 			SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
+				"show" => {
+					let window = app.get_window("main").unwrap();
+					window.show().unwrap();
+				}
 				"exit" => {
 					app.exit(0);
 				}
@@ -156,12 +162,21 @@ fn main() {
 			},
 			_ => {}
 		})
-		.on_window_event(move |ev| match ev.event() {
-			WindowEvent::CloseRequested => {
-				println!("Close requested");
+		.on_window_event(move |ev| {
+			let window = ev.window();
+			match ev.event() {
+				WindowEvent::Resized(size) => { println!("Resize: {:?}", size); }
+				WindowEvent::CloseRequested => { println!("Close requested"); }
+				WindowEvent::Destroyed => { println!("Destroyed"); }
+				WindowEvent::Moved(pos) => {
+					println!("Moved {:?}", pos);
+					if pos == &(PhysicalPosition { x: -32000, y: -32000 }) {
+						println!("Minimized.");
+						window.hide().unwrap();
+					}
+				}
+				_ => {}
 			}
-			WindowEvent::Resized(_) => {}
-			_ => {}
 		})
 		.invoke_handler(tauri::generate_handler![
 			cmd::create_ws,
