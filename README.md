@@ -25,7 +25,7 @@ brew install sdl2 opus automake
 
 ### Ubuntu
 ```bash
-apt install libopus-dev libsdl2-dev libwebkit2gtk-4.0-dev
+apt install libopus-dev libsdl2-dev libwebkit2gtk-4.0-dev libappindicator3-dev
 ```
 
 ## Clone
