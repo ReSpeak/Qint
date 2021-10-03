@@ -635,6 +635,14 @@ impl Settings {
 			})
 			.unwrap_or((None, None))
 	}
+
+	pub fn get_minimize_to_tray(&self) -> Option<bool> {
+		self.0.as_object()?.get("app")?.as_object()?.get("minimizeToTray")?.as_bool()
+	}
+
+	pub fn get_close_to_tray(&self) -> Option<bool> {
+		self.0.as_object()?.get("app")?.as_object()?.get("closeToTray")?.as_bool()
+	}
 }
 
 impl MuteState {

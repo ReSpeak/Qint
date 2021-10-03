@@ -121,7 +121,7 @@ fn main() {
 	tauri::Builder::default()
 		.manage(app_addr)
 		.manage(app_arc.state.clone())
-		.manage(app_arc)
+		.manage(app_arc.clone())
 		.manage(LoudnessShare::new())
 		.create_window(
 			"main",
@@ -154,6 +154,7 @@ fn main() {
 				"show" => {
 					let window = app.get_window("main").unwrap();
 					window.show().unwrap();
+					window.set_focus().unwrap();
 				}
 				"exit" => {
 					app.exit(0);
@@ -166,13 +167,21 @@ fn main() {
 			let window = ev.window();
 			match ev.event() {
 				WindowEvent::Resized(size) => { println!("Resize: {:?}", size); }
-				WindowEvent::CloseRequested => { println!("Close requested"); }
+				WindowEvent::CloseRequested => {
+					println!("Close requested");
+					if let Some(true) = app_arc.state.settings.read().unwrap().get_close_to_tray() {
+						// TODO: Use ExitRequested to implement closeToTray (https://github.com/tauri-apps/tauri/pull/2293)
+					}
+				}
 				WindowEvent::Destroyed => { println!("Destroyed"); }
 				WindowEvent::Moved(pos) => {
 					println!("Moved {:?}", pos);
+					// Awful, windows-specific hack. See issue #37
 					if pos == &(PhysicalPosition { x: -32000, y: -32000 }) {
 						println!("Minimized.");
-						window.hide().unwrap();
+						if let Some(true) = app_arc.state.settings.read().unwrap().get_minimize_to_tray() {
+							window.hide().unwrap();
+						}
 					}
 				}
 				_ => {}
