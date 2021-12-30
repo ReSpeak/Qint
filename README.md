@@ -2,7 +2,17 @@
 Qint is an open-source TeamSpeak client that allows you to speak with other people over the internet.
 
 ## Screenshots
-![main ui](https://share.splamy.de/20/02/firefox_2020-02-02_19-06-04.png)
+### Login
+![Login](https://share.splamy.de/21/12/firefox_2021-12-30_08-57-19.png)
+### Main
+![Main](https://share.splamy.de/21/12/firefox_2021-12-30_08-55-40.png)
+### Search
+![Search](https://share.splamy.de/21/12/firefox_2021-12-30_08-58-56.png)
+
+### Filebrowser
+![Filebrowser](https://share.splamy.de/21/12/firefox_2021-12-30_09-00-11.png)
+### Channeleditor
+![Channeledit](https://share.splamy.de/21/12/firefox_2021-12-30_09-03-21.png)
 
 ## Dependencies
 - [Rust](https://rust-lang.org), preferred installation method is [rustup](https://rustup.rs)
