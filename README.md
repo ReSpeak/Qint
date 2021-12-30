@@ -1,5 +1,5 @@
 # Qint
-Qint is an open-source TeamSpeak client that allows you to speak with other people over the internet.
+Qint is a modern open-source alternative client for [TeamSpeak](https://teamspeak.com) servers that allows you to chat and speak with other people over the internet.
 
 ## Screenshots
 ### Login
