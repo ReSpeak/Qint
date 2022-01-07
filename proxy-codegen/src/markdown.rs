@@ -53,6 +53,7 @@ enum TableState {
 	Body,
 }
 
+#[derive(Clone, Debug)]
 enum RenderMdMeta {
 	None,
 	Code(String), // language
@@ -383,7 +384,7 @@ impl RenderMd {
 					// Do not render bb if inside code or link. We do not want to autodetect links
 					// inside a link.
 					let ignore_bb = self.spine.iter().any(|parent| {
-						matches!(parent.0, RenderMdMeta::Code(_)) || parent.1.tag == "a"
+						matches!(parent.0, RenderMdMeta::Code(_)) || parent.1.tag == "a" || parent.1.tag == "code"
 					});
 					self.text_state = self.text_state.when_none(TextKind::Normal(ignore_bb));
 					let cur_len = self.text_builder.len();
@@ -880,6 +881,14 @@ mod tests {
 			p(
 				r#"<em>this</em> <strong>will</strong> <strong>be</strong> <span style="color:red">interesting</span> 🙂"#
 			)
+		);
+	}
+
+	#[test]
+	fn ignore_bb_in_code() {
+		assert_eq!(
+			markdown("```\nThis is code [i]with bb that should not be parsed[/i]\n```"),
+			"<pre><code data-lang=\"\">This is code [i]with bb that should not be parsed[&#x2F;i]\n</code></pre>"
 		);
 	}
 

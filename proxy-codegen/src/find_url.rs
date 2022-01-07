@@ -42,7 +42,7 @@ lazy_static! {
 		#We accept any number of slugs, given we have a char after the slash
 		(?P<path>\/
 			#If we have endings like ?=fds include the ending
-			(?:[\w\d\?\-=#:%@&.,;+*/~()])*
+			(?:[\w\d\?\-=#:%@&!.,:;+*/~()])*
 			#The last char cannot be one of these symbols .,?!,-)]} exclude these
 			(?<![.,?!-)\]}]))?
 	").unwrap();
@@ -166,6 +166,10 @@ mod tests {
 		matches("https://www.google.de/maps/@38.708441,13.1891842,14z", &[(
 			(0, 52),
 			"https://www.google.de/maps/@38.708441,13.1891842,14z",
+		)]);
+		matches("https://godbolt.org/#g:!((g:!((g:!((h:code)))))),v4", &[(
+			(0, 51),
+			"https://godbolt.org/#g:!((g:!((g:!((h:code)))))),v4",
 		)]);
 		matches("a x.org f", &[((2, 7), "http://x.org")]);
 		matches("a b cde.de", &[((4, 10), "http://cde.de")]);
