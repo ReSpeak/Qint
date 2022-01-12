@@ -471,7 +471,7 @@
 	function updateTimer() {
 		if (timer !== undefined) clearInterval(timer);
 		// Throttle when stats are not open, we still need to update last active and online time
-		//timer = window.setInterval(updateClientInfo, statsOpen ? 1000 : 10000);
+		timer = window.setInterval(updateClientInfo, statsOpen ? 1000 : 10000);
 	}
 
 	function whisper() {
