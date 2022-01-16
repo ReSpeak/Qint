@@ -49,6 +49,7 @@ const LAUNCH_CONFIG_FILENAME: &str = "config.toml";
 // TODO Rename to settings.json
 const SETTINGS_FILENAME: &str = "transient.json";
 const SEARCH_FILENAME: &str = "search.db";
+#[cfg(not(windows))]
 const DEFAULT_HOTKEY_SOCKET_PATH: &str = "/tmp/qint-hotkeys";
 
 // The build environment of qint.
@@ -566,6 +567,7 @@ impl Settings {
 		Some(self.0.as_object()?.get("audio")?.as_object()?.get("vadThreshold")?.as_f64()? as f32)
 	}
 
+	#[cfg(not(windows))]
 	fn get_hotkey_socket_path(&self) -> Option<&str> {
 		Some(self.0.as_object()?.get("hotkey_socket_path")?.as_str()?)
 	}

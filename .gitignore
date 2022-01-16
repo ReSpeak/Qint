@@ -4,3 +4,5 @@ target/
 /proxy-codegen/msvc/
 /proxy-codegen/gnu-mingw/
 node_modules
+
+WinOverlay/
