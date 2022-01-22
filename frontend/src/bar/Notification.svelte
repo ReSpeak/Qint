@@ -1,7 +1,7 @@
 <svelte:options immutable />
 
 <script lang="ts">
-	import { Channel, Client, Server, ServerGroup } from "../book";
+	import { Book, Channel, Client, Server, ServerGroup } from "../book";
 	import { Connection } from "../connection";
 	import { TsNotification } from "../notifications";
 	import ClientName from "../ui/name/ClientName.svelte";
@@ -14,20 +14,10 @@
 
 	const args = notification.args;
 
-	// Make the svelte typechecker happy
-	function toClient(a: any): Client {
-		return a as Client;
+	function hasName(a: Invoker | Book): a is Invoker {
+		return "name" in a;
 	}
-	function toServer(a: any): Server {
-		return a as Server;
-	}
-	function getName(a: any): string {
-		return a.name;
-	}
-	function hasName(a: any): a is Invoker {
-		return a !== null && a !== undefined && "name" in a;
-	}
-	function getClientFromInvoker(i: any): Client | undefined {
+	function getClientFromInvoker(i: Invoker): Client | undefined {
 		return connection.book.getClient(i.id.toString());
 	}
 </script>
@@ -40,27 +30,28 @@
 </h6>
 <div class="content">
 	{#each notification.pieces as piece, i}
+		{@const arg = args[i]}
 		{piece}
-		{#if i < args.length}
-			{#if args[i] instanceof Client}
-				<ClientName client={toClient(args[i])} {connection} />
-			{:else if args[i] instanceof Server}
-				<ServerName server={toServer(args[i])} />
-			{:else if args[i] instanceof Channel}
-				<span class="channel">{getName(args[i])}</span>
-			{:else if args[i] instanceof ServerGroup}
-				<span class="serverGroup">{getName(args[i])}</span>
-			{:else if typeof args[i] === "string" || args[i] instanceof String}
-				{args[i]}
-			{:else if hasName(args[i])}
+		{#if arg != null}
+			{#if arg instanceof Client}
+				<ClientName client={arg} {connection} />
+			{:else if arg instanceof Server}
+				<ServerName server={arg} />
+			{:else if arg instanceof Channel}
+				<span class="channel">{arg.name}</span>
+			{:else if arg instanceof ServerGroup}
+				<span class="serverGroup">{arg.name}</span>
+			{:else if typeof arg === "string" || arg instanceof String}
+				{arg}
+			{:else if hasName(arg)}
 				<!-- Invoker -->
-				{#if getClientFromInvoker(args[i]) !== undefined}
-					<ClientName client={toClient(getClientFromInvoker(args[i]))} />
+				{#if getClientFromInvoker(arg) !== undefined}
+					<ClientName client={getClientFromInvoker(arg)!} />
 				{:else}
-					{getName(args[i])}
+					{arg.name}
 				{/if}
 			{:else}
-				<span class="unknown">{args[i]}</span>
+				<span class="unknown">{arg}</span>
 			{/if}
 		{/if}
 	{/each}
