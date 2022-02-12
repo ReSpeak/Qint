@@ -158,7 +158,7 @@ pub struct <#= struc.name #> {
 	<#= attr #>
 	pub <#= name #>: Option<<#= struct_type #>>,
 	<#
-		if self.has_render(&struc.name, &name.to_camel_case()) { #>
+		if self.has_render(&struc.name, &name.to_pascal_case()) { #>
 	#[serde(default, deserialize_with = "deserialize_some", skip_serializing_if = "Option::is_none")]
 	pub <#= name #>_rendered: Option<String>,
 		<# }

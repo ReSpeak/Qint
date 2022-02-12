@@ -276,7 +276,7 @@ fn get_all_arguments_ts(e: &Event, r: Option<&RuleKind>) -> String {
 		match r {
 			RuleKind::ArgumentMap { .. } | RuleKind::ArgumentFunction { .. } => {
 				args.push_str("\t\t");
-				args.push_str(&r.from_name().to_mixed_case());
+				args.push_str(&r.from_name().to_lower_camel_case());
 				args.push_str("?: ");
 				args.push_str(&r.get_type().to_ref(true).to_string());
 				args.push_str(";\n");

@@ -12,7 +12,7 @@ anyhow = "1"
 audiopus = "0.2"
 base64 = "0.13"
 bytes = "1"
-chacha20poly1305 = "0.8"
+chacha20poly1305 = "0.9"
 chrono = { version = "0.4", features = [ "serde" ] }
 diesel = { version = "1.4", features = [ "chrono", "sqlite" ] }
 diesel_migrations = "1.4"
@@ -31,18 +31,18 @@ num-derive = "0.3"
 num-traits = "0.2"
 percent-encoding = "2.1"
 proxy-codegen = { path = "../proxy-codegen" }
-pulldown-cmark = "0.8"
+pulldown-cmark = "0.9"
 rand = "0.8"
 regex = "1"
 reqwest = "0.11"
-rmp-serde = "0.15"
+rmp-serde = "1"
 scraper = "0.12"
-sdl2 = "0.34"
+sdl2 = "0.35"
 serde = { version = "1", features = [ "derive" ] }
 serde_ini = "0.2"
 serde_json = "1"
 sled = "0.34"
-tantivy = "0.15"
+tantivy = "0.16"
 thiserror = "1"
 time = "0.3"
 tokio = { version = "1", features = [ "fs" ] }
@@ -50,10 +50,10 @@ tokio-stream = "0.1"
 tokio-util = { version = "0.6", features = [ "io" ] }
 toml = "0.5"
 tracing = "0.1"
-tsclientlib = { path = "../../tsclientlib/tsclientlib", features = [ "unstable" ] }
-tsproto = { path = "../../tsclientlib/tsproto" }
-tsproto-packets = { path = "../../tsclientlib/utils/tsproto-packets" }
-tsproto-types = { path = "../../tsclientlib/utils/tsproto-types" }
+tsclientlib = { git = "https://github.com/ReSpeak/tsclientlib", features = [ "unstable" ] }
+tsproto = { git = "https://github.com/ReSpeak/tsclientlib" }
+tsproto-packets = { git = "https://github.com/ReSpeak/tsclientlib" }
+tsproto-types = { git = "https://github.com/ReSpeak/tsclientlib" }
 url = "2"
 uuid = { version = "0.8", features = [ "serde" ] }
 

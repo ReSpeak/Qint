@@ -17,8 +17,8 @@
 	function hasName(a: Invoker | Book): a is Invoker {
 		return "name" in a;
 	}
-	function getClientFromInvoker(i: Invoker): Client | undefined {
-		return connection.book.getClient(i.id.toString());
+	function getClientFromInvoker(i: Invoker): Client {
+		return connection.book.getClient(i.id.toString())!;
 	}
 </script>
 
@@ -46,7 +46,7 @@
 			{:else if hasName(arg)}
 				<!-- Invoker -->
 				{#if getClientFromInvoker(arg) !== undefined}
-					<ClientName client={getClientFromInvoker(arg)!} />
+					<ClientName client={getClientFromInvoker(arg)} />
 				{:else}
 					{arg.name}
 				{/if}

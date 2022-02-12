@@ -33,8 +33,8 @@ tokio = "1"
 tokio-util = { version = "0.6", features = [ "io" ] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = [ "env-filter" ] }
-tsclientlib = { path = "../../tsclientlib/tsclientlib", features = [ "unstable" ] }
-tsproto-types = { path = "../../tsclientlib/utils/tsproto-types" }
+tsclientlib = { git = "https://github.com/ReSpeak/tsclientlib", features = [ "unstable" ] }
+tsproto-types = { git = "https://github.com/ReSpeak/tsclientlib" }
 
 [target."cfg(windows)".build-dependencies]
 winres = "0.1"

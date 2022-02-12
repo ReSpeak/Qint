@@ -26,7 +26,7 @@ export enum <#= e.name #> {
 <# } #>
 }
 
-export function <#= e.name.to_mixed_case() #>GetDoc(v: <#= e.name #>): string {
+export function <#= e.name.to_lower_camel_case() #>GetDoc(v: <#= e.name #>): string {
 	switch(v) {
 <# for v in &e.variants { #>
 		case <#= e.name #>.<#= v.name #>:
@@ -38,14 +38,14 @@ export function <#= e.name.to_mixed_case() #>GetDoc(v: <#= e.name #>): string {
 <# } #>
 export const enum TsError {
 <# for v in &errors::DATA.0 { #>
-	<#= v.name.to_camel_case() #> = "<#= v.name.to_camel_case() #>",
+	<#= v.name.to_pascal_case() #> = "<#= v.name.to_pascal_case() #>",
 <# } #>
 }
 
 export function TsErrorDescription(error: TsError): string {
 	switch (error) {
 	<# for v in &errors::DATA.0 { #>
-		case TsError.<#= v.name.to_camel_case() #>: return "<#= v.doc #>";
+		case TsError.<#= v.name.to_pascal_case() #>: return "<#= v.doc #>";
 	<# } #>
 	}
 }
@@ -85,9 +85,9 @@ export class <#= struc.name #>Gen extends <#= struc.name #>Base {
 			}
 		}
 		#>
-	public readonly <#= p.name.to_mixed_case() #>!: <# struct_type.inner.fmt_ts(_fmt)?; #>;
+	public readonly <#= p.name.to_lower_camel_case() #>!: <# struct_type.inner.fmt_ts(_fmt)?; #>;
 		<# if self.has_render(&struc.name, &p.name) { #>
-	public readonly <#= p.name.to_mixed_case() #>Rendered!: string<# if p.opt { #> | null<# } #>;
+	public readonly <#= p.name.to_lower_camel_case() #>Rendered!: string<# if p.opt { #> | null<# } #>;
 	<# }
 	} #>
 
@@ -97,7 +97,7 @@ export class <#= struc.name #>Gen extends <#= struc.name #>Base {
 	for p in &struc.properties {
 		let struct_type = p.get_type()?;
 		let inner = struct_type.inner.peel_opt();
-		let name = p.name.to_mixed_case();
+		let name = p.name.to_lower_camel_case();
 		if let InnerRustType::Primitive(t) = inner {
 			if t == "OffsetDateTime" { #>
 		if (obj.<#= name #>)
@@ -209,9 +209,9 @@ export interface IMsg<#= msg.name #>Part {
 <# for a in &msg.attributes {
 	let field = self.messages.get_field(a);
 	let rust_type = field.get_type(a)?; #>
-	<#= field.pretty.to_mixed_case() #>: <# rust_type.inner.fmt_ts_opts(_fmt, false, false)?; #>;
+	<#= field.pretty.to_lower_camel_case() #>: <# rust_type.inner.fmt_ts_opts(_fmt, false, false)?; #>;
 	<# if self.has_render(&msg.name, &field.pretty) { #>
-	<#= field.pretty.to_mixed_case() #>Rendered: string<# if rust_type.is_opt() { #> | null<# } #>;
+	<#= field.pretty.to_lower_camel_case() #>Rendered: string<# if rust_type.is_opt() { #> | null<# } #>;
 <# }
 } #>
 }
@@ -254,7 +254,7 @@ export interface OChange<#= get_prefixed_name(e) #> {
 		match r {
 			RuleKind::ArgumentMap { .. } |
 			RuleKind::ArgumentFunction { .. } => { #>
-		<#= r.from_name().to_mixed_case() #>: <# r.get_type().inner.fmt_ts_opts(_fmt, false, true)?; #>;
+		<#= r.from_name().to_lower_camel_case() #>: <# r.get_type().inner.fmt_ts_opts(_fmt, false, true)?; #>;
 			<# }
 			_ => {}
 		}
@@ -263,7 +263,7 @@ export interface OChange<#= get_prefixed_name(e) #> {
 	// Event Props
 	for r in &e.rules {
 		#>
-		<#= r.from_name().to_mixed_case() #>?: <# r.get_type_no_option().inner.fmt_ts_opts(_fmt, false, true)?; #>;
+		<#= r.from_name().to_lower_camel_case() #>?: <# r.get_type_no_option().inner.fmt_ts_opts(_fmt, false, true)?; #>;
 	<# }
 #>
 	};

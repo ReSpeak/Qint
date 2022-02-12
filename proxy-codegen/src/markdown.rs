@@ -454,10 +454,8 @@ impl RenderMd {
 		match t {
 			Tag::Paragraph => (RenderMdMeta::None, VTag::new("p")),
 			Tag::Strikethrough => (RenderMdMeta::None, VTag::new("s")),
-			Tag::Heading(n) => {
-				assert!(n > 0); // TODO uuhm
-				assert!(n < 7);
-				(RenderMdMeta::None, VTag::new(&format!("h{}", n)))
+			Tag::Heading(n, _, _) => {
+				(RenderMdMeta::None, VTag::new(&n.to_string()))
 			}
 			Tag::BlockQuote => (RenderMdMeta::None, VTag::new("blockquote")),
 			Tag::CodeBlock(info) => {

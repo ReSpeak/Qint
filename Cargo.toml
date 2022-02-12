@@ -4,7 +4,7 @@ resolver = "2"
 
 [patch.crates-io]
 # Alternative branch uses cmake instead of autoconf, which works better for cross compilation
-audiopus = { git = "https://github.com/DoumanAsh/audiopus", rev = "775541995a33060dcf060cc71bacaaa033e72561" }
+audiopus = { git = "https://github.com/DoumanAsh/audiopus", branch = "better_sys" }
 opusic-sys = { git = "https://github.com/Flakebi/opusic-sys" }
 
 # Compile in release mode to speed up

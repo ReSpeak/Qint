@@ -11,7 +11,7 @@ use actix_web::*;
 use actix_web_actors::ws;
 use anyhow::Result;
 use futures::prelude::*;
-use http::{header::CACHE_CONTROL, header::ETAG, HeaderValue};
+use actix_web::http::header::{CACHE_CONTROL, ETAG, HeaderValue};
 use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
 use qint_proxy::connection::{DownloadFileContext, UploadFileContext};
@@ -445,7 +445,6 @@ fn check_authentication(token: &str, req: &actix_web::dev::ServiceRequest) -> Op
 #[cfg(test)]
 mod tests {
 	use std::future::Future;
-	use std::sync::Mutex;
 	use std::time::Duration;
 
 	use anyhow::{format_err, Result};
@@ -487,7 +486,7 @@ mod tests {
 		client: Vec<u8>,
 	}
 
-	fn create_logger() { Lazy::force(&TRACING) }
+	fn create_logger() { Lazy::force(&TRACING); }
 
 	impl TestProxy {
 		fn new() -> Self {
@@ -512,7 +511,7 @@ mod tests {
 		where for<'a> T: Deserialize<'a> {
 			let client = awc::Client::default();
 			let url = format!("http://127.0.0.1:{}/db", self.port);
-			debug!(body = serde_json::to_string(&request).unwrap(), "GraphQL request");
+			debug!(body = %serde_json::to_string(&request).unwrap(), "GraphQL request");
 			let mut resp = client
 				.post(url)
 				.send_json(request)
@@ -660,7 +659,7 @@ mod tests {
 			let port = self.port;
 			async move {
 				let dir = tempfile::Builder::new().prefix("qint-proxy").tempdir()?;
-				info!("dir" => dir.path().display(), "Using config directory");
+				info!(dir = %dir.path().display(), "Using config directory");
 				let args = Args {
 					listen_address: Some(format!("127.0.0.1:{}", port).parse().unwrap()),
 					default_identity: None,
