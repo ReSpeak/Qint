@@ -167,18 +167,19 @@ fn main() {
 			let window = ev.window();
 			match ev.event() {
 				WindowEvent::Resized(size) => { println!("Resize: {:?}", size); }
-				WindowEvent::CloseRequested => {
+				WindowEvent::CloseRequested { signal_tx, .. } => {
 					println!("Close requested");
 					if let Some(true) = app_arc.state.settings.read().unwrap().get_close_to_tray() {
-						// TODO: Use ExitRequested to implement closeToTray (https://github.com/tauri-apps/tauri/pull/2293)
+						println!("Closing to tray instead");
+						signal_tx.send(true).unwrap();
+						window.hide().unwrap();
 					}
 				}
 				WindowEvent::Destroyed => { println!("Destroyed"); }
 				WindowEvent::Moved(pos) => {
-					println!("Moved {:?}", pos);
 					// Awful, windows-specific hack. See issue #37
 					if pos == &(PhysicalPosition { x: -32000, y: -32000 }) {
-						println!("Minimized.");
+						println!("Moved to Minimized {:?}", pos);
 						if let Some(true) = app_arc.state.settings.read().unwrap().get_minimize_to_tray() {
 							window.hide().unwrap();
 						}

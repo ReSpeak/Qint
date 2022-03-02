@@ -52,7 +52,7 @@ pub struct LoudnessCallback {
 	pub listening: Arc<AtomicBool>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Copy, Clone)]
 struct LoudnessFrame(pub f64, pub f32);
 
 impl LoudnessTrait for LoudnessCallback {

@@ -78,7 +78,7 @@ type QCoreAddr = Addr<QintCore>;
 impl AppToFrontendBridge for WindowBridge {
 	fn send(&self, msg: &MessageP2F) {
 		debug!(?msg, "Sending to frontend");
-		let res = self.window.emit("ws", TauriWs { con: self.id, msg });
+		let res = self.window.emit("ws", &TauriWs { con: self.id, msg });
 		if let Err(error) = res {
 			warn!(%error, "Failed sending to frontend");
 		}
@@ -155,22 +155,6 @@ pub struct FileResponse {
 
 #[derive(Deserialize)]
 pub struct StringId(#[serde(deserialize_with = "deserialize_u64")] pub u64);
-
-trait FileDialogBuilderExt {
-	fn set_parent_ext(self, window: &Window) -> Self;
-}
-impl FileDialogBuilderExt for FileDialogBuilder {
-	#[cfg(any(windows, target_os = "macos"))]
-	fn set_parent_ext(self, window: &Window) -> Self {
-		if let Ok(handle) = &tauri::api::dialog::window_parent(&window) {
-			self.set_parent(handle)
-		} else {
-			self
-		}
-	}
-	#[cfg(not(any(windows, target_os = "macos")))]
-	fn set_parent_ext(self, _window: &Window) -> Self { self }
-}
 
 // === CMDS ===
 
@@ -365,7 +349,7 @@ pub async fn read_file(window: Window) -> Result<(String, String), String> {
 	let path_buf = tauri::async_runtime::spawn(async move {
 		let (tx, rx) = std::sync::mpsc::channel::<Option<PathBuf>>();
 		FileDialogBuilder::default()
-			.set_parent_ext(&window)
+			.set_parent(&window)
 			.add_filter("JavaScript File", &["js"])
 			.pick_file(move |p| {
 				let _ = tx.send(p);
@@ -419,7 +403,7 @@ pub async fn download_file(
 	let path_buf = tauri::async_runtime::spawn(async move {
 		let (tx, rx) = std::sync::mpsc::channel::<Option<PathBuf>>();
 		FileDialogBuilder::default()
-			.set_parent_ext(&window)
+			.set_parent(&window)
 			.set_file_name(&suggest_file)
 			.save_file(move |p| {
 				let _ = tx.send(p);
@@ -460,7 +444,7 @@ pub enum UploadFeature {
 async fn ask_for_files(multiple: bool, window: Window) -> Result<Vec<PathBuf>, String> {
 	let picked = tauri::async_runtime::spawn(async move {
 		let (tx, rx) = std::sync::mpsc::channel::<Vec<PathBuf>>();
-		let builder = FileDialogBuilder::default().set_parent_ext(&window);
+		let builder = FileDialogBuilder::default().set_parent(&window);
 		if multiple {
 			builder.pick_files(move |p| {
 				let picked = if let Some(vec) = p { vec } else { Vec::new() };
