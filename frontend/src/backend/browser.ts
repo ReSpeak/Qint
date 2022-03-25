@@ -309,7 +309,7 @@ export class BrowserBackendConnection
 	// TODO Consider actually hasing the icon file
 	private upload_feature_icon(file: File) {
 		// eslint-disable-next-line prefer-const
-		let number = javaHash(file.name);
+		let number = javaHash(file.name) >>> 0; // Convert to unsigned 32-bit int
 		// while (displayFiles.find((node) => node.name === name) !== undefined) {
 		// 	number++;
 		// 	number &= number; // Truncate to u32
