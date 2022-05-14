@@ -12,11 +12,27 @@ use tracing::error;
 
 use crate::connection::QintConnection;
 use crate::{ConnectionId, Settings};
+
 use audio_to_ts::AudioToTs;
 use ts_to_audio::TsToAudio;
 
-pub mod audio_to_ts;
-pub mod ts_to_audio;
+#[cfg(feature = "oboe")]
+pub mod audio_to_ts_oboe;
+#[cfg(feature = "sdl2")]
+pub mod audio_to_ts_sdl;
+#[cfg(feature = "oboe")]
+pub mod ts_to_audio_oboe;
+#[cfg(feature = "sdl2")]
+pub mod ts_to_audio_sdl;
+
+#[cfg(feature = "oboe")]
+pub use audio_to_ts_oboe as audio_to_ts;
+#[cfg(feature = "sdl2")]
+pub use audio_to_ts_sdl as audio_to_ts;
+#[cfg(feature = "oboe")]
+pub use ts_to_audio_oboe as ts_to_audio;
+#[cfg(feature = "sdl2")]
+pub use ts_to_audio_sdl as ts_to_audio;
 
 /// Sample rate is 48 kHz.
 const SAMPLE_RATE: usize = 48000;
@@ -63,12 +79,24 @@ pub(crate) fn start(
 	let global_volume = settings.get_global_volume().unwrap_or(1.0);
 	let (capture, playback) = settings.get_preferred_audio_device();
 
+	#[cfg(feature = "sdl2")]
 	let sdl_context = sdl2::init().unwrap();
 
+	#[cfg(feature = "sdl2")]
 	let audio_subsystem = sdl_context.audio().unwrap();
-	// SDL automatically disables the screensaver, enable it again
-	if let Ok(video_subsystem) = sdl_context.video() {
-		video_subsystem.enable_screen_saver();
+	#[cfg(feature = "sdl2")]
+	{
+		// SDL automatically disables the screensaver, enable it again
+		if let Ok(video_subsystem) = sdl_context.video() {
+			video_subsystem.enable_screen_saver();
+		}
+	}
+
+	#[cfg(feature = "oboe")]
+	{
+		/*if let Err(error) = oboe::DefaultStreamValues::init() {
+			// TODO log
+		}*/
 	}
 
 	let mut runtime = Runtime::new().unwrap();
@@ -76,9 +104,14 @@ pub(crate) fn start(
 	// Create thread local runtime for non-send tasks
 	// A channel size of 1 leads to audio drops when cpu is fully used
 	let (spawn_send, mut spawn_recv) = mpsc::channel(5);
-	let ts2a =
-		TsToAudio::new(audio_subsystem.clone(), playback, connections, global_volume)?.start();
+	#[cfg(feature = "sdl2")]
+	let ts2a = TsToAudio::new(audio_subsystem.clone(), playback, connections, global_volume)?.start();
+	#[cfg(feature = "oboe")]
+	let ts2a = TsToAudio::new(playback, connections, global_volume)?.start();
+	#[cfg(feature = "sdl2")]
 	let a2ts = AudioToTs::new(audio_subsystem, capture, spawn_send)?.start();
+	#[cfg(feature = "oboe")]
+	let a2ts = AudioToTs::new(capture, spawn_send)?.start();
 
 	let a2ts2 = a2ts.clone();
 	thread::spawn(move || {
