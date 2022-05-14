@@ -14,7 +14,7 @@ custom-protocol = [ "tauri/custom-protocol" ]
 default = [ "custom-protocol" ]
 
 [dependencies]
-actix = "0.12"
+actix = "0.13"
 actix-rt = "2"
 anyhow = "1"
 base64 = "0.13"
@@ -30,7 +30,7 @@ structopt = { version = "0.3", default-features = false }
 tauri = { version = "1.0.0-rc.1", features = ["window-all", "dialog-all", "http-all", "notification-all", "system-tray", "shell-open"] }
 thiserror = "1"
 tokio = "1"
-tokio-util = { version = "0.6", features = [ "io" ] }
+tokio-util = { version = "0.7", features = [ "io" ] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = [ "env-filter" ] }
 tsclientlib = { git = "https://github.com/ReSpeak/tsclientlib", features = [ "unstable" ] }

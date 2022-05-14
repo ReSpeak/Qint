@@ -858,7 +858,7 @@ impl SearchResult {
 		if let Some(gen) = snippet_generator {
 			// We want to highlight in the original message, so search the highlighted parts there.
 			let snippet = gen.snippet(&attr);
-			let s = snippet.fragments();
+			let s = snippet.fragment();
 			let mut highlights = snippet
 				.highlighted()
 				.iter()

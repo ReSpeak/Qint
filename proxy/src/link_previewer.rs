@@ -52,7 +52,7 @@ impl LinkPreviewer {
 	pub async fn analyze_link(&self, link: &str) -> AnalyzeResult {
 		if let Some(cached_value) = self.cache.as_ref().and_then(|c| c.get(link).ok().flatten()) {
 			let slice: &[u8] = cached_value.as_ref();
-			if let Ok(result) = rmp_serde::from_read_ref(slice) {
+			if let Ok(result) = rmp_serde::from_slice(slice) {
 				return result;
 			}
 		}

@@ -180,7 +180,9 @@ impl Search {
 							doc.add_u64(time, r.1.timestamp() as u64);
 							doc.add_text(content, r.2);
 
-							index_writer.add_document(doc);
+							if let Err(error) = index_writer.add_document(doc) {
+								warn!(%error, "Failed to save message batch in search db");
+							}
 						}
 
 						debug!(count = offset as usize + len, "Writing messages into search db");
@@ -211,7 +213,9 @@ impl Search {
 							doc.add_bytes(server_key, r.0);
 							doc.add_text(name, r.2);
 
-							index_writer.add_document(doc);
+							if let Err(error) = index_writer.add_document(doc) {
+								warn!(%error, "Failed to save channel batch in search db");
+							}
 						}
 
 						debug!(count = offset as usize + len, "Writing channels into search db");
@@ -249,7 +253,9 @@ impl Search {
 							doc.add_text(uid_field, uid);
 							doc.add_text(name, r.1);
 
-							index_writer.add_document(doc);
+							if let Err(error) = index_writer.add_document(doc) {
+								warn!(%error, "Failed to save client batch in search db");
+							}
 						}
 
 						debug!(count = offset as usize + len, "Writing clients into search db");
@@ -282,7 +288,9 @@ impl Search {
 							doc.add_text(name, r.2);
 							doc.add_text(address, r.1);
 
-							index_writer.add_document(doc);
+							if let Err(error) = index_writer.add_document(doc) {
+								warn!(%error, "Failed to save server batch in search db");
+							}
 						}
 
 						debug!(count = offset as usize + len, "Writing servers into search db");
@@ -327,7 +335,9 @@ impl Search {
 				*w = Some(writer);
 				w.as_mut().unwrap()
 			};
-			w2.add_document(doc);
+			if let Err(error) = w2.add_document(doc) {
+				warn!(%error, "Failed to save entry in search db");
+			}
 			drop(w);
 			std::thread::sleep(std::time::Duration::from_secs(1));
 			if will_commit.fetch_add(1, Ordering::Relaxed) == 0 {

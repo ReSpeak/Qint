@@ -9,7 +9,6 @@ use tsproto_structs::book_to_messages::{
 	self, BookToMessagesDeclarations, Event, RuleKind, RuleOp,
 };
 use tsproto_structs::messages::{self, Message, MessageDeclarations};
-use tsproto_structs::messages_to_book::{self, MessagesToBookDeclarations};
 use tsproto_structs::{InnerRustType, RustType};
 
 #[derive(Template)]
@@ -17,7 +16,6 @@ use tsproto_structs::{InnerRustType, RustType};
 #[derive(Debug)]
 pub struct BookEvents<'a> {
 	book: &'a BookDeclarations,
-	m2b: &'a MessagesToBookDeclarations<'a>,
 	b2m: &'a BookToMessagesDeclarations<'a>,
 	messages: &'a MessageDeclarations,
 	structs: JsStructs,
@@ -36,8 +34,6 @@ struct JsStruct {
 	name: &'static str,
 	/// Each id is a tuple of name and type.
 	ids: Vec<(&'static str, &'static str)>,
-	/// book structs that are aggregated in this js struct.
-	parts: Vec<&'static str>,
 }
 
 #[derive(Debug)]
@@ -66,7 +62,6 @@ impl Default for BookEvents<'static> {
 	fn default() -> Self {
 		Self {
 			book: &DATA,
-			m2b: &messages_to_book::DATA,
 			b2m: &book_to_messages::DATA,
 			messages: &messages::DATA,
 			structs: Default::default(),
@@ -88,32 +83,32 @@ impl Default for JsStructs {
 			JsStruct {
 				name: "Channel",
 				ids: vec![("Id", "ChannelId")],
-				parts: vec!["Channel", "OptionalChannelData"],
+				// parts: vec!["Channel", "OptionalChannelData"],
 			},
 			JsStruct {
 				name: "Client",
 				ids: vec![("Id", "ClientId")],
-				parts: vec!["Client", "OptionalClientData", "ConnectionClientData"],
+				// parts: vec!["Client", "OptionalClientData", "ConnectionClientData"],
 			},
 			JsStruct {
 				name: "ClientServerGroup",
 				ids: vec![("Client", "ClientId"), ("Group", "ServerGroupId")],
-				parts: vec![],
+				// parts: vec![],
 			},
 			JsStruct {
 				name: "Server",
 				ids: vec![],
-				parts: vec!["Server", "OptionalServerData", "Connection", "ConnectionServerData"],
+				// parts: vec!["Server", "OptionalServerData", "Connection", "ConnectionServerData"],
 			},
 			JsStruct {
 				name: "ServerGroup",
 				ids: vec![("Id", "ServerGroupId")],
-				parts: vec!["ServerGroup"],
+				// parts: vec!["ServerGroup"],
 			},
 			JsStruct {
 				name: "ChannelGroup",
 				ids: vec![("Id", "ChannelGroupId")],
-				parts: vec!["ChannelGroup"],
+				// parts: vec!["ChannelGroup"],
 			},
 		])
 	}

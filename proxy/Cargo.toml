@@ -6,7 +6,7 @@ edition = "2018"
 description = "Qint is a TeamSpeak client"
 
 [dependencies]
-actix = "0.12"
+actix = "0.13"
 actix-rt = "2"
 anyhow = "1"
 audiopus = "0.2"
@@ -19,14 +19,14 @@ diesel_migrations = "1.4"
 diesel-derive-enum = { version = "1", features = [ "sqlite" ] }
 directories-next = "2"
 ebur128 = "0.1"
-fancy-regex = "0.7"
+fancy-regex = "0.10"
 futures = "0.3"
 generic-array = "0.14"
 git-testament = "0.2"
 juniper = "0.15"
-libsqlite3-sys = { version = "0.18", features = [ "bundled" ] }
+libsqlite3-sys = { version = "0.22", features = [ "bundled" ] }
 livesplit-hotkey = { git = "https://github.com/LiveSplit/livesplit-core", rev = "624783aebf83fc23e040da174accffae44e5ed12", version = "0.5" }
-nnnoiseless = "0.3"
+nnnoiseless = "0.4"
 num-derive = "0.3"
 num-traits = "0.2"
 oboe = { version = "0.4", optional = true }
@@ -37,18 +37,18 @@ rand = "0.8"
 regex = "1"
 reqwest = "0.11"
 rmp-serde = "1"
-scraper = "0.12"
+scraper = "0.13"
 sdl2 = { version = "0.35", optional = true }
 serde = { version = "1", features = [ "derive" ] }
 serde_ini = "0.2"
 serde_json = "1"
 sled = "0.34"
-tantivy = "0.16"
+tantivy = "0.17"
 thiserror = "1"
 time = "0.3"
 tokio = { version = "1", features = [ "fs" ] }
 tokio-stream = "0.1"
-tokio-util = { version = "0.6", features = [ "io" ] }
+tokio-util = { version = "0.7", features = [ "io" ] }
 toml = "0.5"
 tracing = "0.1"
 tsclientlib = { git = "https://github.com/ReSpeak/tsclientlib", features = [ "unstable" ] }
@@ -56,13 +56,13 @@ tsproto = { git = "https://github.com/ReSpeak/tsclientlib" }
 tsproto-packets = { git = "https://github.com/ReSpeak/tsclientlib" }
 tsproto-types = { git = "https://github.com/ReSpeak/tsclientlib" }
 url = "2"
-uuid = { version = "0.8", features = [ "serde" ] }
+uuid = { version = "1", features = [ "serde" ] }
 
 # Fix resolver=2 with diesel
 [build-dependencies]
 diesel = { version = "1.4", features = [ "chrono", "sqlite" ] }
-libsqlite3-sys = { version = "0.18", features = [ "bundled" ] }
+libsqlite3-sys = { version = "0.22", features = [ "bundled" ] }
 
 [dev-dependencies]
 rand = "0.8"
-uuid = { version = "0.8", features = [ "v4" ] }
+uuid = { version = "1", features = [ "v4" ] }
