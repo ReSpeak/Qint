@@ -698,10 +698,13 @@ impl QintState {
 		} else {
 			let proj_dirs =
 				match directories_next::ProjectDirs::from("", DIR_ORGANIZATION, DIR_PROJECT) {
-					Some(r) => r,
-					None => bail!("Failed to get project directory"),
+					Some(r) => r.config_dir().into(),
+					None => {
+						warn!("Failed to get config directory, using current directory");
+						"".into()
+					}
 				};
-			proj_dirs.config_dir().into()
+			proj_dirs
 		};
 
 		// Load settings
@@ -729,7 +732,10 @@ impl QintState {
 					identities cannot be used anymore, creating new secret");
 
 				let secret = Secret::new();
-				fs::write(&key_path, &secret.0)?;
+				if let Err(error) = fs::write(&key_path, &secret.0) {
+					warn!(%error, "Failed to save secret key, all your \
+						identities will only be valid for the current session");
+				}
 
 				secret
 			}
@@ -772,8 +778,13 @@ impl QintState {
 		let (search, search_is_new) = if launch_config.no_search {
 			(None, false)
 		} else {
-			let (s, new) = search::Search::new(&launch_config.cache_path.join(SEARCH_FILENAME))?;
-			(Some(Arc::new(s)), new)
+			match search::Search::new(&launch_config.cache_path.join(SEARCH_FILENAME)) {
+				Ok((s, new)) => (Some(Arc::new(s)), new),
+				Err(error) => {
+					warn!(%error, "Failed to create search index, search will be unavailable");
+					(None, false)
+				}
+			}
 		};
 
 		// Open database

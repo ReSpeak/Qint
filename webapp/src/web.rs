@@ -8,10 +8,10 @@ use actix_web::middleware::Condition;
 use actix_web::web::{Data, Query};
 use actix_web::*;
 
+use actix_web::http::header::{HeaderValue, CACHE_CONTROL, ETAG};
 use actix_web_actors::ws;
 use anyhow::Result;
 use futures::prelude::*;
-use actix_web::http::header::{CACHE_CONTROL, ETAG, HeaderValue};
 use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
 use qint_proxy::connection::{DownloadFileContext, UploadFileContext};
@@ -62,7 +62,6 @@ impl WebApp {
 					error::InternalError::from_response(
 						err, HttpResponse::BadRequest().body(err_string)).into()
 				}))
-				.wrap(Condition::new(!is_production, Cors::permissive().max_age(3600)))
 				.wrap_fn(move |req, srv| {
 					if is_production {
 						if let Some(resp) = check_authentication(&token, &req) {
@@ -72,6 +71,7 @@ impl WebApp {
 					// Token is ok
 					future::Either::Right(srv.call(req))
 				})
+				.wrap(Condition::new(!is_production, Cors::permissive().max_age(3600)))
 				.app_data(Data::new(state))
 				.service(create_main_ws)
 				.service(audio_reset)
@@ -260,7 +260,7 @@ struct PutFileOptions {
 #[put("/con/{id}/file/{channel}/{path:.*}")]
 async fn upload_file(
 	state: web::Data<Arc<QintState>>, path: web::Path<(ConnectionId, u64, String)>,
-	req: web::HttpRequest, body: web::Payload, query_opt: Query<PutFileOptions>,
+	req: HttpRequest, body: web::Payload, query_opt: Query<PutFileOptions>,
 ) -> impl Responder {
 	let (id, channel, path) = path.into_inner();
 	let path = format!("/{}", path);

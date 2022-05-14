@@ -204,10 +204,18 @@ impl DbHandler {
 		secret: Secret,
 	) -> Result<Self> {
 		let database_url = launch_config.config_path.join("storage.sqlite");
-		let con = SqliteConnection::establish(database_url.to_str().unwrap())?;
+		let con = match SqliteConnection::establish(database_url.to_str().unwrap()) {
+			Ok(c) => {
+				// The database can be opened successfully, create backup
+				fs::copy(database_url, launch_config.config_path.join("storage.sqlite.bak"))?;
 
-		// The database can be opened successfully, create backup
-		fs::copy(database_url, launch_config.config_path.join("storage.sqlite.bak"))?;
+				c
+			}
+			Err(error) => {
+				warn!(%error, "Failed to open database, using in-memory storage");
+				SqliteConnection::establish(":memory:")?
+			}
+		};
 
 		// Enforce foreign keys constraints
 		// Enable wal mode for more concurrency and faster writes
