@@ -11,10 +11,10 @@
 			"targets": "all",
 			"identifier": "org.respeak.qint",
 			"icon": [
-				"../assets/16.png",
-				"../assets/32.png",
-				"../assets/48.png",
-				"../assets/icon.png",
+				"../assets/32x32.png",
+				"../assets/128x128.png",
+				"../assets/128x128@2x.png",
+				"../assets/icon.icns",
 				"../assets/icon.ico"
 			],
 			"resources": [],
