@@ -17,13 +17,10 @@ use actix::prelude::*;
 use anyhow::format_err;
 use qint_proxy::QintState;
 use structopt::StructOpt;
-use tauri::PhysicalPosition;
-use tauri::SystemTray;
-use tauri::SystemTrayEvent;
-use tauri::SystemTrayMenu;
-use tauri::WindowEvent;
-use tauri::WindowUrl;
-use tauri::{CustomMenuItem, Manager};
+use tauri::{
+	CustomMenuItem, Manager, PhysicalPosition, SystemTray, SystemTrayEvent, SystemTrayMenu,
+	WindowEvent, WindowUrl,
+};
 use tokio::runtime::Runtime;
 
 use crate::audio::LoudnessShare;
@@ -118,16 +115,11 @@ fn main() {
 		receiver.recv().unwrap()
 	};
 
-	tauri::Builder::default()
+	let app = tauri::Builder::default()
 		.manage(app_addr)
 		.manage(app_arc.state.clone())
 		.manage(app_arc.clone())
 		.manage(LoudnessShare::new())
-		.create_window(
-			"main",
-			WindowUrl::App("index.html".into()),
-			|window_builder, webview_attributes| (window_builder, webview_attributes),
-		)
 		.on_page_load(|window, _| {
 			if let Err(e) = window.set_title("Qint") {
 				println!("Failed to set title: {}", e);
@@ -138,12 +130,14 @@ fn main() {
 			});
 		})
 		.system_tray(
-			SystemTray::new().with_menu(SystemTrayMenu::new()
-			.add_item(CustomMenuItem::new("show", "Show"))
-			.add_item(CustomMenuItem::new("exit", "Exit")))
+			SystemTray::new().with_menu(
+				SystemTrayMenu::new()
+					.add_item(CustomMenuItem::new("show", "Show"))
+					.add_item(CustomMenuItem::new("exit", "Exit")),
+			),
 		)
 		.on_system_tray_event(|app, event| match event {
-			SystemTrayEvent::LeftClick { position: _, size: _, .. } => {
+			SystemTrayEvent::LeftClick { .. } => {
 				let window = app.get_window("main").unwrap();
 				window.set_skip_taskbar(false).unwrap();
 				window.unminimize().unwrap();
@@ -166,21 +160,27 @@ fn main() {
 		.on_window_event(move |ev| {
 			let window = ev.window();
 			match ev.event() {
-				WindowEvent::Resized(size) => { println!("Resize: {:?}", size); }
-				WindowEvent::CloseRequested { signal_tx, .. } => {
+				WindowEvent::Resized(size) => {
+					println!("Resize: {:?}", size);
+				}
+				WindowEvent::CloseRequested { api, .. } => {
 					println!("Close requested");
 					if let Some(true) = app_arc.state.settings.read().unwrap().get_close_to_tray() {
 						println!("Closing to tray instead");
-						signal_tx.send(true).unwrap();
+						api.prevent_close();
 						window.hide().unwrap();
 					}
 				}
-				WindowEvent::Destroyed => { println!("Destroyed"); }
+				WindowEvent::Destroyed => {
+					println!("Destroyed");
+				}
 				WindowEvent::Moved(pos) => {
 					// Awful, windows-specific hack. See issue #37
 					if pos == &(PhysicalPosition { x: -32000, y: -32000 }) {
 						println!("Moved to Minimized {:?}", pos);
-						if let Some(true) = app_arc.state.settings.read().unwrap().get_minimize_to_tray() {
+						if let Some(true) =
+							app_arc.state.settings.read().unwrap().get_minimize_to_tray()
+						{
 							window.hide().unwrap();
 						}
 					}
@@ -218,7 +218,14 @@ fn main() {
 			cmd::markdown,
 			cmd::set_loudness_callback,
 		])
-		.run(tauri::generate_context!())
+		.build(tauri::generate_context!())
 		.map_err(|e| format_err!("tauri error: {}", e))
 		.unwrap();
+
+	tauri::WindowBuilder::new(&app, "main", WindowUrl::App("index.html".into()))
+		.build()
+		.map_err(|e| format_err!("failed to build tauri window: {}", e))
+		.unwrap();
+
+	app.run(|_, _| {});
 }

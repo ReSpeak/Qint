@@ -169,9 +169,7 @@ pub async fn create_ws(
 }
 
 #[command]
-pub fn close_ws(
-	core: State<'_, QCore>, con: ConnectionId,
-) -> Result<(), Error> {
+pub fn close_ws(core: State<'_, QCore>, con: ConnectionId) -> Result<(), Error> {
 	info!(id = ?con, "Closing tauri connection");
 	core.close_ws(CloseWs { id: con })
 }
@@ -348,12 +346,12 @@ pub async fn upload_bytes(
 pub async fn read_file(window: Window) -> Result<(String, String), String> {
 	let path_buf = tauri::async_runtime::spawn(async move {
 		let (tx, rx) = std::sync::mpsc::channel::<Option<PathBuf>>();
-		FileDialogBuilder::default()
-			.set_parent(&window)
-			.add_filter("JavaScript File", &["js"])
-			.pick_file(move |p| {
-				let _ = tx.send(p);
-			});
+		let builder = FileDialogBuilder::default();
+		#[cfg(any(windows, target_os = "macos"))]
+		let builder = builder.set_parent(&window);
+		builder.add_filter("JavaScript File", &["js"]).pick_file(move |p| {
+			let _ = tx.send(p);
+		});
 		rx.recv().unwrap_or(None)
 	})
 	.await
@@ -402,12 +400,12 @@ pub async fn download_file(
 
 	let path_buf = tauri::async_runtime::spawn(async move {
 		let (tx, rx) = std::sync::mpsc::channel::<Option<PathBuf>>();
-		FileDialogBuilder::default()
-			.set_parent(&window)
-			.set_file_name(&suggest_file)
-			.save_file(move |p| {
-				let _ = tx.send(p);
-			});
+		let builder = FileDialogBuilder::default();
+		#[cfg(any(windows, target_os = "macos"))]
+		let builder = builder.set_parent(&window);
+		builder.set_file_name(&suggest_file).save_file(move |p| {
+			let _ = tx.send(p);
+		});
 		rx.recv().unwrap_or(None)
 	})
 	.await
@@ -444,7 +442,9 @@ pub enum UploadFeature {
 async fn ask_for_files(multiple: bool, window: Window) -> Result<Vec<PathBuf>, String> {
 	let picked = tauri::async_runtime::spawn(async move {
 		let (tx, rx) = std::sync::mpsc::channel::<Vec<PathBuf>>();
-		let builder = FileDialogBuilder::default().set_parent(&window);
+		let builder = FileDialogBuilder::default();
+		#[cfg(any(windows, target_os = "macos"))]
+		let builder = builder.set_parent(&window);
 		if multiple {
 			builder.pick_files(move |p| {
 				let picked = if let Some(vec) = p { vec } else { Vec::new() };

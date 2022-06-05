@@ -26,7 +26,7 @@ git-testament = "0.2"
 juniper = "0.15"
 libsqlite3-sys = { version = "0.22", features = [ "bundled" ] }
 livesplit-hotkey = { git = "https://github.com/LiveSplit/livesplit-core", rev = "624783aebf83fc23e040da174accffae44e5ed12", version = "0.5" }
-nnnoiseless = "0.4"
+nnnoiseless = { version = "0.4", default-features = false }
 num-derive = "0.3"
 num-traits = "0.2"
 oboe = { version = "0.4", optional = true }

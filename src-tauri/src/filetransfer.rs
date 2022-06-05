@@ -2,19 +2,15 @@ use anyhow::Error;
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::stream::StreamExt;
 use qint_proxy::connection::{DownloadFileContext, UploadFileContext};
-use std::io;
-use std::io::{ErrorKind, SeekFrom};
+use std::io::{self, ErrorKind};
 use std::ops::Range;
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
 use std::task::{Context, Poll};
-use std::time::Instant;
 use tokio::fs::File;
-use tokio::io::{AsyncRead, AsyncWrite, Interest, ReadBuf};
-use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
-use tokio::net::TcpStream;
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 
 pub struct FiletransferManager {
 	sender: Mutex<Sender<TransferAction>>,
