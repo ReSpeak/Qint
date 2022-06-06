@@ -62,8 +62,6 @@ impl Actor for TsToAudio {
 	type Context = Context<Self>;
 
 	fn started(&mut self, ctx: &mut Self::Context) {
-		self.open_playback();
-
 		ctx.run_interval(Duration::from_secs(1), |t2a, _| {
 			// Restart on errors
 			if t2a
@@ -78,7 +76,7 @@ impl Actor for TsToAudio {
 						&& state != StreamState::Pausing
 						&& state != StreamState::Paused
 				})
-				.unwrap_or(true)
+				.unwrap_or(false)
 			{
 				debug!("Re-opening playback");
 				// Try to reconnect to audio
@@ -91,11 +89,14 @@ impl Actor for TsToAudio {
 				if state != StreamState::Starting && state != StreamState::Started && !data_empty {
 					debug!(?state, "Resuming playback");
 					stream.start().unwrap();
+					debug!(?state, "Start returned");
 				} else if (state == StreamState::Starting || state == StreamState::Started)
 					&& data_empty
 				{
 					debug!(?state, "Pausing playback");
-					stream.pause().unwrap();
+					t2a.stop();
+					// Resuming a paused stream hangs the thread, so stop and re-open instead.
+					// stream.pause().unwrap();
 				}
 			}
 		});
@@ -120,11 +121,7 @@ impl TsToAudio {
 
 	fn open_playback(&mut self) {
 		// Stop previous stream
-		if let Some(mut stream) = self.stream.take() {
-			stream.stop().unwrap();
-			stream.close().unwrap();
-			// TODO Stop and close automatically on Drop
-		}
+		self.stop();
 
 		let callback = OboeCallback {
 			span: info_span!("ts-to-audio"),
@@ -149,6 +146,7 @@ impl TsToAudio {
 				if let Err(error) = stream.start() {
 					error!(%error, "Failed to start playback stream");
 				}
+				debug!("Initial start returned");
 				self.stream = Some(stream);
 			}
 			Err(error) => {
@@ -157,50 +155,63 @@ impl TsToAudio {
 			}
 		}
 	}
+
+	fn stop(&mut self) {
+		if let Some(mut stream) = self.stream.take() {
+			// TODO Error handling
+			stream.stop().unwrap();
+			stream.close().unwrap();
+			// TODO Stop and close automatically on Drop
+		}
+	}
 }
 
 impl Handler<PlayMsg> for TsToAudio {
 	type Result = Result<()>;
 	fn handle(&mut self, PlayMsg(id, packet): PlayMsg, ctx: &mut Self::Context) -> Self::Result {
-		if let Some(stream) = &mut self.stream {
-			let mut data = self.data.lock().unwrap();
-			if let Some(new_id) = data.handle_packet(id, packet)? {
-				let cons = self.connections.lock().unwrap();
-				let talkers = data
-					.get_queues()
-					.iter()
-					.filter_map(|((con, client), queue)| {
-						if *con == new_id.0 { Some((*client, queue.is_whispering())) } else { None }
-					})
-					.collect();
-				if let Some(con) = cons.get(&new_id.0) {
-					actix::spawn(con.send(TalkersChangedMsg(talkers)).map(|_| ()));
+		let mut data = self.data.lock().unwrap();
+		if let Some(new_id) = data.handle_packet(id, packet)? {
+			let cons = self.connections.lock().unwrap();
+			let talkers = data
+				.get_queues()
+				.iter()
+				.filter_map(|((con, client), queue)| {
+					if *con == new_id.0 { Some((*client, queue.is_whispering())) } else { None }
+				})
+				.collect();
+			if let Some(con) = cons.get(&new_id.0) {
+				actix::spawn(con.send(TalkersChangedMsg(talkers)).map(|_| ()));
 
-					// Get the volume of the new talker
-					ctx.spawn(fut::wrap_future(con.send(GetClientVolumeMsg(new_id.1))).map(
-						move |v, this: &mut Self, _| match v {
-							Ok(Ok(v)) => {
-								let mut data = this.data.lock().unwrap();
-								if let Some(q) = data.get_mut_queues().get_mut(&new_id) {
-									q.volume = v;
-								}
+				// Get the volume of the new talker
+				ctx.spawn(fut::wrap_future(con.send(GetClientVolumeMsg(new_id.1))).map(
+					move |v, this: &mut Self, _| match v {
+						Ok(Ok(v)) => {
+							let mut data = this.data.lock().unwrap();
+							if let Some(q) = data.get_mut_queues().get_mut(&new_id) {
+								q.volume = v;
 							}
-							Ok(Err(error)) => {
-								warn!(%error, "Failed to get volume for client");
-							}
-							Err(error) => {
-								warn!(%error, "Failed to get volume for client");
-							}
-						},
-					));
-				}
+						}
+						Ok(Err(error)) => {
+							warn!(%error, "Failed to get volume for client");
+						}
+						Err(error) => {
+							warn!(%error, "Failed to get volume for client");
+						}
+					},
+				));
 			}
+		}
+		drop(data);
 
+		if let Some(stream) = &mut self.stream {
 			let state = stream.get_state();
 			if state != StreamState::Starting && state != StreamState::Started {
 				debug!(?state, "Resuming playback");
 				stream.start().unwrap();
+				debug!(?state, "Start returned");
 			}
+		} else {
+			self.open_playback();
 		}
 		Ok(())
 	}
