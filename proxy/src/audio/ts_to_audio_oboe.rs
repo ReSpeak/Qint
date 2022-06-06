@@ -66,22 +66,36 @@ impl Actor for TsToAudio {
 
 		ctx.run_interval(Duration::from_secs(1), |t2a, _| {
 			// Restart on errors
-			/*if t2a.stream.as_ref().map(|d| d.get_state() == AudioStatus::Stopped).unwrap_or(true) {
+			if t2a
+				.stream
+				.as_ref()
+				.map(|d| {
+					let state = d.get_state();
+					debug!(?state, "Checking playback state");
+					state != StreamState::Open
+						&& state != StreamState::Starting
+						&& state != StreamState::Started
+						&& state != StreamState::Pausing
+						&& state != StreamState::Paused
+				})
+				.unwrap_or(true)
+			{
+				debug!("Re-opening playback");
 				// Try to reconnect to audio
 				t2a.open_playback();
-			}*/
+			}
 
 			if let Some(stream) = &mut t2a.stream {
 				let data_empty = t2a.data.lock().unwrap().get_queues().is_empty();
 				let state = stream.get_state();
 				if state != StreamState::Starting && state != StreamState::Started && !data_empty {
-					debug!("Resuming playback");
-					stream.request_start();
+					debug!(?state, "Resuming playback");
+					stream.start().unwrap();
 				} else if (state == StreamState::Starting || state == StreamState::Started)
 					&& data_empty
 				{
-					debug!("Pausing playback");
-					stream.request_pause();
+					debug!(?state, "Pausing playback");
+					stream.pause().unwrap();
 				}
 			}
 		});
@@ -105,6 +119,13 @@ impl TsToAudio {
 	}
 
 	fn open_playback(&mut self) {
+		// Stop previous stream
+		if let Some(mut stream) = self.stream.take() {
+			stream.stop().unwrap();
+			stream.close().unwrap();
+			// TODO Stop and close automatically on Drop
+		}
+
 		let callback = OboeCallback {
 			span: info_span!("ts-to-audio"),
 			data: self.data.clone(),
@@ -177,8 +198,8 @@ impl Handler<PlayMsg> for TsToAudio {
 
 			let state = stream.get_state();
 			if state != StreamState::Starting && state != StreamState::Started {
-				debug!("Resuming playback");
-				stream.request_start();
+				debug!(?state, "Resuming playback");
+				stream.start().unwrap();
 			}
 		}
 		Ok(())
@@ -250,6 +271,7 @@ impl AudioOutputCallback for OboeCallback {
 			std::slice::from_raw_parts_mut(buffer.as_mut_ptr() as *mut f32, buffer.len() * 2)
 		};
 		let _span = self.span.enter();
+		debug!(len = buffer.len(), "Filling audio playback buffer");
 		// Clear buffer
 		for d in &mut *buffer {
 			*d = 0.0;
