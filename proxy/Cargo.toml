@@ -12,7 +12,7 @@ anyhow = "1"
 audiopus = "0.2"
 base64 = "0.13"
 bytes = "1"
-chacha20poly1305 = "0.9"
+chacha20poly1305 = "0.10.0-pre"
 chrono = { version = "0.4", features = [ "serde" ] }
 diesel = { version = "1.4", features = [ "chrono", "sqlite" ] }
 diesel_migrations = "1.4"
@@ -26,7 +26,7 @@ git-testament = "0.2"
 juniper = "0.15"
 libsqlite3-sys = { version = "0.22", features = [ "bundled" ] }
 livesplit-hotkey = { git = "https://github.com/LiveSplit/livesplit-core", rev = "624783aebf83fc23e040da174accffae44e5ed12", version = "0.5" }
-nnnoiseless = { version = "0.4", default-features = false }
+nnnoiseless = { version = "0.5", default-features = false }
 num-derive = "0.3"
 num-traits = "0.2"
 oboe = { version = "0.4", optional = true }
@@ -43,7 +43,7 @@ serde = { version = "1", features = [ "derive" ] }
 serde_ini = "0.2"
 serde_json = "1"
 sled = "0.34"
-tantivy = "0.17"
+tantivy = "0.18"
 thiserror = "1"
 time = "0.3"
 tokio = { version = "1", features = [ "fs" ] }

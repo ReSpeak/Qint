@@ -125,6 +125,9 @@ impl TsToAudio {
 			.open_stream()
 		{
 			Ok(mut stream) => {
+				if let Err(error) = stream.start() {
+					error!(%error, "Failed to start playback stream");
+				}
 				self.stream = Some(stream);
 			}
 			Err(error) => {
