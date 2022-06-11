@@ -1,25 +1,18 @@
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
 
 use actix::*;
-use anyhow::{format_err, Result};
+use anyhow::Result;
 use audiopus::coder::Encoder;
 use ebur128::EbuR128;
 use futures::prelude::*;
 use nnnoiseless::DenoiseState;
-use oboe::{
-	AudioOutputCallback, AudioOutputStream, AudioOutputStreamSafe, AudioStream, AudioStreamAsync,
-	AudioStreamBase, AudioStreamBuilder, DataCallbackResult, DefaultStreamValues, Mono, Output,
-	PerformanceMode, SharingMode, Stereo,
-};
 use tokio::sync::mpsc;
 use tracing::{debug, error, info_span, trace, warn, Span};
 use tsproto_packets::packets::CodecType;
 
 use super::*;
-//use crate::loudness_ws::LoudnessService;
 use crate::connection::{CaptureLoudnessMsg, QintConnection, SendAudioMsg, SetSelfTalkingMsg};
 use crate::with_log;
 
@@ -58,8 +51,24 @@ const TALKING_TIME: u8 = 5;
 /// Magic value sent if the client stopped talking.
 const LOUDNESS_END_MAGIC: f64 = -1000.0;
 
-pub struct AudioToTs {
-	preferred_device: Option<String>,
+pub trait AudioToTsImpl: Unpin {
+	fn started(ts_to_audio: &mut AudioToTs<Self>, ctx: &mut Context<AudioToTs<Self>>)
+	where Self: Sized + 'static;
+
+	/// Re-open the playback device.
+	fn reset(ts_to_audio: &mut AudioToTs<Self>)
+	where Self: Sized;
+
+	/// To pause or unpause capturing, i.e. on mute or unmute
+	fn set_playing(ts_to_audio: &mut AudioToTs<Self>, playing: bool)
+	where Self: Sized + 'static;
+
+	fn get_audio_devices(ts_to_audio: &mut AudioToTs<Self>) -> Vec<String>
+	where Self: Sized;
+}
+
+pub struct AudioToTs<Impl> {
+	pub preferred_device: Option<String>,
 	spawn_send: mpsc::Sender<PlayPacketMsg>,
 	connections: HashSet<Addr<QintConnection>>,
 	loudness_cons: HashMap<usize, LoudnessListener>,
@@ -78,12 +87,13 @@ pub struct AudioToTs {
 	/// Packet loss in percent, 0-100.
 	packet_loss: Arc<AtomicU8>,
 
-	//stream: Option<AudioDevice<OboeCallback>>,
 	/// If we are actually talking and sending audio
 	is_talking: bool,
+
+	pub real_impl: Impl,
 }
 
-struct OboeCallback {
+pub struct AudioToTsCallback {
 	span: Span,
 	channels: audiopus::Channels,
 	encoder: Option<Encoder>,
@@ -111,19 +121,10 @@ struct OboeCallback {
 	spawn_send: mpsc::Sender<PlayPacketMsg>,
 }
 
-impl Actor for AudioToTs {
+impl<Impl: AudioToTsImpl + 'static> Actor for AudioToTs<Impl> {
 	type Context = Context<Self>;
 
-	fn started(&mut self, ctx: &mut Self::Context) {
-		self.open_capture();
-
-		ctx.run_interval(Duration::from_secs(1), |a2t, _| {
-			/*if a2t.device.as_ref().map(|d| d.status() == AudioStatus::Stopped).unwrap_or(true) {
-				// Try to reconnect to audio
-				a2t.open_capture();
-			}*/
-		});
-	}
+	fn started(&mut self, ctx: &mut Self::Context) { Impl::started(self, ctx); }
 }
 
 impl Message for AddListenerMsg {
@@ -153,7 +154,7 @@ impl Message for SetVadThresholdMsg {
 	type Result = ();
 }
 
-impl Handler<AddListenerMsg> for AudioToTs {
+impl<Impl: AudioToTsImpl + 'static> Handler<AddListenerMsg> for AudioToTs<Impl> {
 	type Result = ();
 	fn handle(&mut self, msg: AddListenerMsg, _: &mut Self::Context) -> Self::Result {
 		self.connections.insert(msg.0.clone());
@@ -169,7 +170,7 @@ impl Handler<AddListenerMsg> for AudioToTs {
 	}
 }
 
-impl Handler<RemoveListenerMsg> for AudioToTs {
+impl<Impl: AudioToTsImpl + 'static> Handler<RemoveListenerMsg> for AudioToTs<Impl> {
 	type Result = bool;
 	fn handle(&mut self, msg: RemoveListenerMsg, _: &mut Self::Context) -> Self::Result {
 		debug!("Removing listener");
@@ -186,7 +187,7 @@ impl Handler<RemoveListenerMsg> for AudioToTs {
 	}
 }
 
-impl Handler<AddLoudnessListenerMsg> for AudioToTs {
+impl<Impl: AudioToTsImpl + 'static> Handler<AddLoudnessListenerMsg> for AudioToTs<Impl> {
 	type Result = usize;
 	fn handle(&mut self, msg: AddLoudnessListenerMsg, _: &mut Self::Context) -> Self::Result {
 		self.loudness_id_cnt += 1;
@@ -198,7 +199,7 @@ impl Handler<AddLoudnessListenerMsg> for AudioToTs {
 	}
 }
 
-impl Handler<RemoveLoudnessListenerMsg> for AudioToTs {
+impl<Impl: AudioToTsImpl + 'static> Handler<RemoveLoudnessListenerMsg> for AudioToTs<Impl> {
 	type Result = bool;
 	fn handle(&mut self, msg: RemoveLoudnessListenerMsg, _: &mut Self::Context) -> Self::Result {
 		let r = self.loudness_cons.remove(&msg.0);
@@ -208,14 +209,14 @@ impl Handler<RemoveLoudnessListenerMsg> for AudioToTs {
 	}
 }
 
-impl Handler<SetPacketlossMsg> for AudioToTs {
+impl<Impl: AudioToTsImpl + 'static> Handler<SetPacketlossMsg> for AudioToTs<Impl> {
 	type Result = ();
 	fn handle(&mut self, msg: SetPacketlossMsg, _: &mut Self::Context) -> Self::Result {
 		self.packet_loss.store((msg.0 * 100.0) as u8, Ordering::Relaxed);
 	}
 }
 
-impl Handler<PlayPacketMsg> for AudioToTs {
+impl<Impl: AudioToTsImpl + 'static> Handler<PlayPacketMsg> for AudioToTs<Impl> {
 	type Result = ();
 	fn handle(&mut self, packet: PlayPacketMsg, _: &mut Self::Context) -> Self::Result {
 		// Write into packet sink
@@ -265,7 +266,7 @@ impl Handler<PlayPacketMsg> for AudioToTs {
 	}
 }
 
-impl Handler<SetLoudnessThresholdMsg> for AudioToTs {
+impl<Impl: AudioToTsImpl + 'static> Handler<SetLoudnessThresholdMsg> for AudioToTs<Impl> {
 	type Result = ();
 	fn handle(
 		&mut self, SetLoudnessThresholdMsg(thres): SetLoudnessThresholdMsg, _: &mut Self::Context,
@@ -274,7 +275,7 @@ impl Handler<SetLoudnessThresholdMsg> for AudioToTs {
 	}
 }
 
-impl Handler<SetVadThresholdMsg> for AudioToTs {
+impl<Impl: AudioToTsImpl + 'static> Handler<SetVadThresholdMsg> for AudioToTs<Impl> {
 	type Result = ();
 	fn handle(
 		&mut self, SetVadThresholdMsg(thres): SetVadThresholdMsg, _: &mut Self::Context,
@@ -283,43 +284,33 @@ impl Handler<SetVadThresholdMsg> for AudioToTs {
 	}
 }
 
-impl Handler<ResetMsg> for AudioToTs {
+impl<Impl: AudioToTsImpl + 'static> Handler<ResetMsg> for AudioToTs<Impl> {
 	type Result = ();
-	fn handle(&mut self, _: ResetMsg, _: &mut Self::Context) -> Self::Result {
-		self.open_capture();
-	}
+	fn handle(&mut self, _: ResetMsg, _: &mut Self::Context) -> Self::Result { Impl::reset(self); }
 }
 
-impl Handler<GetAudioDevices> for AudioToTs {
+impl<Impl: AudioToTsImpl + 'static> Handler<GetAudioDevices> for AudioToTs<Impl> {
 	type Result = Vec<String>;
 	fn handle(&mut self, _: GetAudioDevices, _: &mut Self::Context) -> Self::Result {
-		let mut devices = Vec::new();
-		/*if let Some(dev_cnt) = self.audio_subsystem.num_audio_capture_devices() {
-			for dev_index in 0..dev_cnt {
-				if let Ok(dev_name) = self.audio_subsystem.audio_capture_device_name(dev_index) {
-					devices.push(dev_name);
-				}
-			}
-		}*/
-		devices
+		Impl::get_audio_devices(self)
 	}
 }
 
-impl Handler<SetAudioDevice> for AudioToTs {
+impl<Impl: AudioToTsImpl + 'static> Handler<SetAudioDevice> for AudioToTs<Impl> {
 	type Result = ();
 	fn handle(&mut self, set: SetAudioDevice, _: &mut Self::Context) -> Self::Result {
 		if self.preferred_device != set.0 {
 			self.preferred_device = set.0;
-			self.open_capture();
+			Impl::reset(self);
 		}
 	}
 }
 
-impl AudioToTs {
+impl<Impl: AudioToTsImpl + 'static> AudioToTs<Impl> {
 	pub(crate) fn new(
-		preferred_device: Option<String>, spawn_send: mpsc::Sender<PlayPacketMsg>,
-	) -> Result<Self> {
-		Ok(Self {
+		real_impl: Impl, preferred_device: Option<String>, spawn_send: mpsc::Sender<PlayPacketMsg>,
+	) -> Self {
+		Self {
 			preferred_device,
 			spawn_send,
 			connections: Default::default(),
@@ -329,56 +320,21 @@ impl AudioToTs {
 			vad_threshold: Arc::new(AtomicU32::new(DEFAULT_VAD_THRESHOLD.to_bits())),
 			loudness_listening: Arc::new(AtomicBool::new(false)),
 			packet_loss: Arc::new(AtomicU8::new(0)),
-
-			//stream: None,
 			is_talking: false,
-		})
+
+			real_impl,
+		}
 	}
 
-	fn open_capture(&mut self) {
-		/*let desired_spec = AudioSpecDesired {
-			freq: Some(SAMPLE_RATE as i32),
-			channels: Some(1),
-			// Default sample size, 20 ms per packet
-			samples: Some(USUAL_SAMPLE_COUNT as u16),
-		};
-
-		let spawn_send = self.spawn_send.clone();
-		match self
-			.audio_subsystem
-			.open_capture(self.preferred_device.as_deref(), &desired_spec, |spec| {
-				// This spec will always be the desired spec, the sdl wrapper
-				// passes zero as `allowed_changes`.
-				debug!(
-					?spec,
-					driver = self.audio_subsystem.current_audio_driver(),
-					"Got capture spec"
-				);
-				let channels = if spec.channels == 1 {
-					audiopus::Channels::Mono
-				} else {
-					audiopus::Channels::Stereo
-				};
-
-				OboeCallback::new(
-					channels,
-					spawn_send,
-					self.vad_threshold.clone(),
-					self.loudness_threshold.clone(),
-					self.loudness_listening.clone(),
-					self.packet_loss.clone(),
-				)
-			})
-			.map_err(|e| format_err!("SDL error: {}", e))
-		{
-			Ok(device) => {
-				self.device = Some(device);
-				self.update_device_state();
-			}
-			Err(error) => {
-				error!(%error, "Failed to open capture device");
-			}
-		}*/
+	pub fn get_callback(&self, channels: audiopus::Channels) -> AudioToTsCallback {
+		AudioToTsCallback::new(
+			channels,
+			self.spawn_send.clone(),
+			self.vad_threshold.clone(),
+			self.loudness_threshold.clone(),
+			self.loudness_listening.clone(),
+			self.packet_loss.clone(),
+		)
 	}
 
 	fn update_talking(&self) {
@@ -390,18 +346,12 @@ impl AudioToTs {
 		}
 	}
 
-	fn update_device_state(&self) {
-		/*if let Some(device) = &self.device {
-			if self.connections.is_empty() && self.loudness_cons.is_empty() {
-				device.pause();
-			} else {
-				device.resume();
-			}
-		}*/
+	pub fn update_device_state(&mut self) {
+		Impl::set_playing(self, !self.connections.is_empty() || !self.loudness_cons.is_empty());
 	}
 }
 
-impl OboeCallback {
+impl AudioToTsCallback {
 	fn new(
 		channels: audiopus::Channels, spawn_send: mpsc::Sender<PlayPacketMsg>,
 		vad_threshold: Arc<AtomicU32>, loudness_threshold: Arc<AtomicU64>,
@@ -465,11 +415,13 @@ impl OboeCallback {
 		}
 		None
 	}
-}
 
-/*impl AudioCallback for OboeCallback {
-	type Channel = f32;
-	fn callback(&mut self, buffer: &mut [Self::Channel]) {
+	pub fn callback(&mut self, buffer: &[f32]) {
+		let mut data = buffer.to_vec();
+		self.callback_mut_buffer(&mut data);
+	}
+
+	pub fn callback_mut_buffer(&mut self, buffer: &mut [f32]) {
 		let _span = self.span.clone().entered();
 		let did_talk = self.is_talking != 0;
 		let is_loudness_listening = self.loudness_listening.load(Ordering::Relaxed);
@@ -624,4 +576,4 @@ impl OboeCallback {
 			});
 		}
 	}
-}*/
+}

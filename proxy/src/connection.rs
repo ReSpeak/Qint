@@ -220,7 +220,7 @@ impl QintConnection {
 	}
 
 	fn send_to_ts2a<T: Message<Result = Result<()>> + Send + 'static>(&self, msg: T)
-	where audio::ts_to_audio::TsToAudio: Handler<T> {
+	where audio::TsToAudio: Handler<T> {
 		if let Some(ad) = &self.state.audio_data {
 			actix::spawn(ad.ts2a.send(msg).map(move |r| match r {
 				Ok(Ok(())) => {}
@@ -235,7 +235,7 @@ impl QintConnection {
 	}
 
 	fn send_to_a2ts<T: Message<Result = ()> + Send + 'static>(&self, msg: T)
-	where audio::audio_to_ts::AudioToTs: Handler<T> {
+	where audio::AudioToTs: Handler<T> {
 		let _span = self.span.enter();
 		if let Some(ad) = &self.state.audio_data {
 			actix::spawn(with_log!(ad.a2ts.send(msg), "Failed to send audio to handler"));
@@ -243,7 +243,7 @@ impl QintConnection {
 	}
 
 	fn send_to_a2ts_r<R: Send + 'static, T: Message<Result = R> + Send + 'static>(&self, msg: T)
-	where audio::audio_to_ts::AudioToTs: Handler<T> {
+	where audio::AudioToTs: Handler<T> {
 		let _span = self.span.enter();
 		if let Some(ad) = &self.state.audio_data {
 			actix::spawn(with_log!(

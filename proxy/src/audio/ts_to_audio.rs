@@ -2,15 +2,12 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 use actix::*;
 use anyhow::{format_err, Result};
 use ebur128::EbuR128;
-use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired, AudioStatus};
-use sdl2::AudioSubsystem;
 use tokio::runtime::Handle;
-use tracing::{debug, error, info_span, warn, Span};
+use tracing::{info_span, warn, Span};
 use tsclientlib::ClientId;
 use tsproto_packets::packets::InAudioBuf;
 
@@ -25,19 +22,34 @@ pub struct PlayMsg(pub Id, pub InAudioBuf);
 pub struct SetGlobalVolumeMsg(pub f32);
 pub struct SetVolumeMsg(pub Id, pub f32);
 
-pub struct TsToAudio {
-	audio_subsystem: AudioSubsystem,
-	preferred_device: Option<String>,
-	device: Option<AudioDevice<SdlCallback>>,
-	data: Arc<Mutex<AudioHandler>>,
+pub trait TsToAudioImpl: Unpin {
+	fn started(ts_to_audio: &mut TsToAudio<Self>, ctx: &mut Context<TsToAudio<Self>>)
+	where Self: Sized + 'static;
+
+	/// Used to start playback if it was paused.
+	fn got_play_msg(ts_to_audio: &mut TsToAudio<Self>)
+	where Self: Sized;
+
+	/// Re-open the playback device.
+	fn reset(ts_to_audio: &mut TsToAudio<Self>)
+	where Self: Sized;
+
+	fn get_audio_devices(ts_to_audio: &mut TsToAudio<Self>) -> Vec<String>
+	where Self: Sized;
+}
+
+pub struct TsToAudio<Impl> {
+	pub preferred_device: Option<String>,
+	pub data: Arc<Mutex<AudioHandler>>,
 	connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>,
 	/// The global volume to multiply all output with.
 	///
 	/// This is actually a `f32`, there is no `AtomicF32` though.
 	global_volume: Arc<AtomicU32>,
+	pub real_impl: Impl,
 }
 
-struct SdlCallback {
+pub struct TsToAudioCallback {
 	span: Span,
 	data: Arc<Mutex<AudioHandler>>,
 	connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>,
@@ -56,93 +68,44 @@ impl Message for SetVolumeMsg {
 	type Result = Result<()>;
 }
 
-impl Actor for TsToAudio {
+impl<Impl: TsToAudioImpl + 'static> Actor for TsToAudio<Impl> {
 	type Context = Context<Self>;
 
-	fn started(&mut self, ctx: &mut Self::Context) {
-		self.open_playback();
-
-		ctx.run_interval(Duration::from_secs(1), |t2a, _| {
-			// Restart on errors
-			if t2a.device.as_ref().map(|d| d.status() == AudioStatus::Stopped).unwrap_or(true) {
-				// Try to reconnect to audio
-				t2a.open_playback();
-			}
-
-			if let Some(device) = &t2a.device {
-				let data_empty = t2a.data.lock().unwrap().get_queues().is_empty();
-				if device.status() == AudioStatus::Paused && !data_empty {
-					debug!("Resuming playback");
-					device.resume();
-				} else if device.status() == AudioStatus::Playing && data_empty {
-					debug!("Pausing playback");
-					device.pause();
-				}
-			}
-		});
-	}
+	fn started(&mut self, ctx: &mut Self::Context) { Impl::started(self, ctx); }
 }
 
-impl TsToAudio {
+impl<Impl: TsToAudioImpl> TsToAudio<Impl> {
 	pub(crate) fn new(
-		audio_subsystem: AudioSubsystem, preferred_device: Option<String>,
+		real_impl: Impl, preferred_device: Option<String>,
 		connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>, global_volume: f32,
-	) -> Result<Self> {
+	) -> Self {
 		let data = Arc::new(Mutex::new(AudioHandler::new()));
 
-		Ok(Self {
-			audio_subsystem,
+		Self {
 			preferred_device,
-			device: None,
 			data,
 			connections,
 			global_volume: Arc::new(AtomicU32::new(global_volume.to_bits())),
-		})
+			real_impl,
+		}
 	}
 
-	fn open_playback(&mut self) {
-		let desired_spec = AudioSpecDesired {
-			freq: Some(48000),
-			channels: Some(2),
-			samples: Some(USUAL_SAMPLE_COUNT as u16),
-		};
-
-		let data = self.data.clone();
-		let connections = self.connections.clone();
-		match self.audio_subsystem.open_playback(
-			self.preferred_device.as_deref(),
-			&desired_spec,
-			|spec| {
-				// This spec will always be the desired spec, the sdl wrapper passes
-				// zero as `allowed_changes`.
-				debug!(
-					?spec,
-					driver = self.audio_subsystem.current_audio_driver(),
-					"Got playback spec"
-				);
-				SdlCallback {
-					span: info_span!("ts-to-audio"),
-					data,
-					connections,
-					loudness: Default::default(),
-					handle: Handle::current(),
-					global_volume: self.global_volume.clone(),
-				}
-			},
-		) {
-			Ok(device) => self.device = Some(device),
-			Err(error) => {
-				self.device = None;
-				error!(%error, "Failed to open playback device");
-			}
+	pub fn get_callback(&self) -> TsToAudioCallback {
+		TsToAudioCallback {
+			span: info_span!("ts-to-audio"),
+			data: self.data.clone(),
+			connections: self.connections.clone(),
+			loudness: Default::default(),
+			handle: Handle::current(),
+			global_volume: self.global_volume.clone(),
 		}
 	}
 }
 
-impl Handler<PlayMsg> for TsToAudio {
+impl<Impl: TsToAudioImpl + 'static> Handler<PlayMsg> for TsToAudio<Impl> {
 	type Result = Result<()>;
 	fn handle(&mut self, PlayMsg(id, packet): PlayMsg, ctx: &mut Self::Context) -> Self::Result {
-		if let Some(device) = &self.device {
+		{
 			let mut data = self.data.lock().unwrap();
 			if let Some(new_id) = data.handle_packet(id, packet)? {
 				let cons = self.connections.lock().unwrap();
@@ -175,17 +138,13 @@ impl Handler<PlayMsg> for TsToAudio {
 					));
 				}
 			}
-
-			if device.status() == AudioStatus::Paused {
-				debug!("Resuming playback");
-				device.resume();
-			}
 		}
+		Impl::got_play_msg(self);
 		Ok(())
 	}
 }
 
-impl Handler<SetGlobalVolumeMsg> for TsToAudio {
+impl<Impl: TsToAudioImpl + 'static> Handler<SetGlobalVolumeMsg> for TsToAudio<Impl> {
 	type Result = ();
 	fn handle(
 		&mut self, SetGlobalVolumeMsg(volume): SetGlobalVolumeMsg, _: &mut Self::Context,
@@ -194,7 +153,7 @@ impl Handler<SetGlobalVolumeMsg> for TsToAudio {
 	}
 }
 
-impl Handler<SetVolumeMsg> for TsToAudio {
+impl<Impl: TsToAudioImpl + 'static> Handler<SetVolumeMsg> for TsToAudio<Impl> {
 	type Result = Result<()>;
 	fn handle(
 		&mut self, SetVolumeMsg(id, volume): SetVolumeMsg, _: &mut Self::Context,
@@ -209,41 +168,30 @@ impl Handler<SetVolumeMsg> for TsToAudio {
 	}
 }
 
-impl Handler<ResetMsg> for TsToAudio {
+impl<Impl: TsToAudioImpl + 'static> Handler<ResetMsg> for TsToAudio<Impl> {
 	type Result = ();
-	fn handle(&mut self, _: ResetMsg, _: &mut Self::Context) -> Self::Result {
-		self.open_playback();
-	}
+	fn handle(&mut self, _: ResetMsg, _: &mut Self::Context) -> Self::Result { Impl::reset(self); }
 }
 
-impl Handler<GetAudioDevices> for TsToAudio {
+impl<Impl: TsToAudioImpl + 'static> Handler<GetAudioDevices> for TsToAudio<Impl> {
 	type Result = Vec<String>;
 	fn handle(&mut self, _: GetAudioDevices, _: &mut Self::Context) -> Self::Result {
-		let mut devices = Vec::new();
-		if let Some(dev_cnt) = self.audio_subsystem.num_audio_playback_devices() {
-			for dev_index in 0..dev_cnt {
-				if let Ok(dev_name) = self.audio_subsystem.audio_playback_device_name(dev_index) {
-					devices.push(dev_name);
-				}
-			}
-		}
-		devices
+		Impl::get_audio_devices(self)
 	}
 }
 
-impl Handler<SetAudioDevice> for TsToAudio {
+impl<Impl: TsToAudioImpl + 'static> Handler<SetAudioDevice> for TsToAudio<Impl> {
 	type Result = ();
 	fn handle(&mut self, set: SetAudioDevice, _: &mut Self::Context) -> Self::Result {
 		if self.preferred_device != set.0 {
 			self.preferred_device = set.0;
-			self.open_playback();
+			Impl::reset(self);
 		}
 	}
 }
 
-impl AudioCallback for SdlCallback {
-	type Channel = f32;
-	fn callback(&mut self, buffer: &mut [Self::Channel]) {
+impl TsToAudioCallback {
+	pub fn callback(&mut self, buffer: &mut [f32]) {
 		let _span = self.span.enter();
 		// Clear buffer
 		for d in &mut *buffer {

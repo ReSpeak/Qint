@@ -13,26 +13,22 @@ use tracing::error;
 use crate::connection::QintConnection;
 use crate::{ConnectionId, Settings};
 
-use audio_to_ts::AudioToTs;
-use ts_to_audio::TsToAudio;
+pub mod audio_to_ts;
+pub mod ts_to_audio;
 
 #[cfg(feature = "oboe")]
-pub mod audio_to_ts_oboe;
+pub mod oboe;
 #[cfg(feature = "sdl2")]
-pub mod audio_to_ts_sdl;
-#[cfg(feature = "oboe")]
-pub mod ts_to_audio_oboe;
-#[cfg(feature = "sdl2")]
-pub mod ts_to_audio_sdl;
+pub mod sdl;
 
 #[cfg(feature = "oboe")]
-pub use audio_to_ts_oboe as audio_to_ts;
+pub type AudioToTs = audio_to_ts::AudioToTs<oboe::AudioToTsOboe>;
 #[cfg(feature = "sdl2")]
-pub use audio_to_ts_sdl as audio_to_ts;
+pub type AudioToTs = audio_to_ts::AudioToTs<sdl::AudioToTsSdl>;
 #[cfg(feature = "oboe")]
-pub use ts_to_audio_oboe as ts_to_audio;
+pub type TsToAudio = ts_to_audio::TsToAudio<oboe::TsToAudioOboe>;
 #[cfg(feature = "sdl2")]
-pub use ts_to_audio_sdl as ts_to_audio;
+pub type TsToAudio = ts_to_audio::TsToAudio<sdl::TsToAudioSdl>;
 
 /// Sample rate is 48 kHz.
 const SAMPLE_RATE: usize = 48000;
@@ -105,13 +101,19 @@ pub(crate) fn start(
 	// A channel size of 1 leads to audio drops when cpu is fully used
 	let (spawn_send, mut spawn_recv) = mpsc::channel(5);
 	#[cfg(feature = "sdl2")]
-	let ts2a = TsToAudio::new(audio_subsystem.clone(), playback, connections, global_volume)?.start();
+	let ts2a = TsToAudio::new(
+		sdl::TsToAudioSdl::new(audio_subsystem.clone())?,
+		playback,
+		connections,
+		global_volume,
+	)
+	.start();
 	#[cfg(feature = "oboe")]
-	let ts2a = TsToAudio::new(playback, connections, global_volume)?.start();
+	let ts2a = TsToAudio::new(oboe::TsToAudioOboe::new(), playback, connections, global_volume).start();
 	#[cfg(feature = "sdl2")]
-	let a2ts = AudioToTs::new(audio_subsystem, capture, spawn_send)?.start();
+	let a2ts = AudioToTs::new(sdl::AudioToTsSdl::new(audio_subsystem), capture, spawn_send).start();
 	#[cfg(feature = "oboe")]
-	let a2ts = AudioToTs::new(capture, spawn_send)?.start();
+	let a2ts = AudioToTs::new(oboe::AudioToTsOboe::new(), capture, spawn_send).start();
 
 	let a2ts2 = a2ts.clone();
 	thread::spawn(move || {
