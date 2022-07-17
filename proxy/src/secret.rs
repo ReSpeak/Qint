@@ -1,6 +1,6 @@
 use anyhow::{format_err, Result};
-use chacha20poly1305::aead::{AeadInPlace, NewAead};
-use chacha20poly1305::{ChaCha20Poly1305, Key};
+use chacha20poly1305::aead::AeadInPlace;
+use chacha20poly1305::{ChaCha20Poly1305, Key, KeyInit};
 use rand::Rng;
 
 #[derive(Clone)]

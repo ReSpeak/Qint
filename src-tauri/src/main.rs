@@ -17,10 +17,14 @@ use actix::prelude::*;
 use anyhow::format_err;
 use qint_proxy::QintState;
 use structopt::StructOpt;
-use tauri::{
-	CustomMenuItem, Manager, PhysicalPosition, SystemTray, SystemTrayEvent, SystemTrayMenu,
-	WindowEvent, WindowUrl,
-};
+use tauri::PhysicalPosition;
+use tauri::SystemTray;
+use tauri::SystemTrayEvent;
+use tauri::SystemTrayMenu;
+use tauri::WindowBuilder;
+use tauri::WindowEvent;
+use tauri::WindowUrl;
+use tauri::{CustomMenuItem, Manager};
 use tokio::runtime::Runtime;
 
 use crate::audio::LoudnessShare;
@@ -115,11 +119,17 @@ fn main() {
 		receiver.recv().unwrap()
 	};
 
-	let app = tauri::Builder::default()
+	tauri::Builder::default()
 		.manage(app_addr)
 		.manage(app_arc.state.clone())
 		.manage(app_arc.clone())
 		.manage(LoudnessShare::new())
+		.setup(|app| {
+			WindowBuilder::new(app, "main".to_string(), WindowUrl::App("index.html".into()))
+				.title("Qint")
+				.build()?;
+			Ok(())
+		})
 		.on_page_load(|window, _| {
 			if let Err(e) = window.set_title("Qint") {
 				println!("Failed to set title: {}", e);
@@ -137,7 +147,7 @@ fn main() {
 			),
 		)
 		.on_system_tray_event(|app, event| match event {
-			SystemTrayEvent::LeftClick { .. } => {
+			SystemTrayEvent::LeftClick { position: _, size: _, .. } => {
 				let window = app.get_window("main").unwrap();
 				window.set_skip_taskbar(false).unwrap();
 				window.unminimize().unwrap();
@@ -176,7 +186,7 @@ fn main() {
 				}
 				WindowEvent::Moved(pos) => {
 					// Awful, windows-specific hack. See issue #37
-					if pos == &(PhysicalPosition { x: -32000, y: -32000 }) {
+					if pos == &(PhysicalPosition::<i32> { x: -32000, y: -32000 }) {
 						println!("Moved to Minimized {:?}", pos);
 						if let Some(true) =
 							app_arc.state.settings.read().unwrap().get_minimize_to_tray()
@@ -218,14 +228,7 @@ fn main() {
 			cmd::markdown,
 			cmd::set_loudness_callback,
 		])
-		.build(tauri::generate_context!())
+		.run(tauri::generate_context!())
 		.map_err(|e| format_err!("tauri error: {}", e))
 		.unwrap();
-
-	tauri::WindowBuilder::new(&app, "main", WindowUrl::App("index.html".into()))
-		.build()
-		.map_err(|e| format_err!("failed to build tauri window: {}", e))
-		.unwrap();
-
-	app.run(|_, _| {});
 }
