@@ -76,6 +76,21 @@ impl Handler<CreateWs> for QintCore {
 }
 
 impl QintCore {
+	// pub fn create_ws(&self, msg: CreateWs) -> Result<(), Error> {
+	// 	let CreateWs { id, sender } = msg;
+
+	// 	let mut cons = self.state.connections.lock().unwrap();
+	// 	if cons.contains_key(&id) || !id.is_valid() {
+	// 		error!(error = ?id, "Connection already in use. Duplicate create call?");
+	// 		return Err(Error::ConnectionInUse);
+	// 	}
+
+	// 	let ws = QintConnection::new(self.state.clone(), id.clone(), sender);
+	// 	let addr = ws.start();
+	// 	cons.insert(id, addr);
+	// 	Ok(())
+	// }
+
 	pub fn close_ws(&self, msg: CloseWs) -> Result<(), Error> {
 		let CloseWs { id } = msg;
 

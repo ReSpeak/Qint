@@ -18,8 +18,9 @@
 	import { assert, focus, on } from "../util";
 	import type { IFileRequest } from "../backend/backend";
 	import DeleteConfirmButton from "../ui/util/DeleteConfirmButton.svelte";
-	import type { Writable } from "svelte/store";
+	import type { Readable, Writable } from "svelte/store";
 	import { Channel } from "../book";
+	import DropOverlay from "../ui/util/DropOverlay.svelte";
 
 	export let connection: Connection;
 	export let channelId: ChannelId;
@@ -52,9 +53,9 @@
 	$: {
 		on(channelId);
 		invalidateCache = true;
-		channelRaw = connection.book.channels.get(channelId)!;
+		channelRaw = connection.book.channels.get(channelId);
 		channel = channelRaw !== undefined ? $channelRaw : undefined;
-		setDisplayPath(channel?.lastFilePath ?? []);
+		setDisplayPath(channel!?.lastFilePath ?? []);
 	}
 	$: on($fileTreeCache, refreshCurrentFolder(true));
 
@@ -370,15 +371,7 @@
 	tabindex={0}
 	class="padBox">
 	{#if currentState === WorkState.DraggingFilesForUpload}
-		<div
-			on:dragleave={dragLeave}
-			on:dragover={dragOver}
-			on:drop={dragDrop}
-			class="fileDropOverlay">
-			<div class="fileDropInnerBorder">
-				<Icon name="file-upload-outline" size="12em" />
-			</div>
-		</div>
+		<DropOverlay on:dragleave={dragLeave} on:dragover={dragOver} on:drop={dragDrop} />
 	{/if}
 
 	<div class="buttons">

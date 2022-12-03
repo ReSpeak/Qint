@@ -41,10 +41,10 @@
 		if (node.selections.length !== 0) displayPanel = DisplayPanel.Main;
 	}
 
-	function startDragWindow(this: HTMLElement, ev: MouseEvent) {
+	async function startDragWindow(this: HTMLElement, ev: MouseEvent | TouchEvent) {
 		if (IS_TAURI) {
 			if ((ev.target as HTMLElement)?.dataset?.titledrag) {
-				appWindow.startDragging();
+				await appWindow.startDragging();
 			}
 		}
 	}

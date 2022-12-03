@@ -182,7 +182,7 @@ fn main() {
 			let window = ev.window();
 			match ev.event() {
 				WindowEvent::Resized(size) => {
-					println!("Resize: {:?}", size);
+					//println!("Resize: {:?}", size);
 				}
 				WindowEvent::CloseRequested { api, .. } => {
 					println!("Close requested");

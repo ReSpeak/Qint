@@ -2,3 +2,12 @@
 /dist/
 yarn-error.log
 book_events.ts
+
+# Yarn Berry
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions

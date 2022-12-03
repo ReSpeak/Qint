@@ -60,7 +60,8 @@ macro_rules! unwrap_send {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TauriWs<T>
-where T: Debug
+where
+	T: Debug,
 {
 	con: ConnectionId,
 	msg: T,
@@ -129,8 +130,12 @@ enum FileExistsAction {
 	Resume,
 }
 impl FileExistsAction {
-	fn overwrite(&self) -> bool { *self == FileExistsAction::Overwrite }
-	fn resume(&self) -> bool { *self == FileExistsAction::Resume }
+	fn overwrite(&self) -> bool {
+		*self == FileExistsAction::Overwrite
+	}
+	fn resume(&self) -> bool {
+		*self == FileExistsAction::Resume
+	}
 }
 
 #[derive(Debug, Serialize)]
@@ -186,7 +191,11 @@ pub async fn db(
 	state: State<'_, QState>, request: GraphQLRequest,
 ) -> Result<serde_json::Value, ()> {
 	let res = request.execute(&state.graphql_schema, &*state).await;
-	if res.is_ok() { Ok(serde_json::to_value(&res).unwrap()) } else { Err(()) }
+	if res.is_ok() {
+		Ok(serde_json::to_value(&res).unwrap())
+	} else {
+		Err(())
+	}
 }
 
 #[command]
@@ -346,12 +355,12 @@ pub async fn upload_bytes(
 pub async fn read_file(window: Window) -> Result<(String, String), String> {
 	let path_buf = tauri::async_runtime::spawn(async move {
 		let (tx, rx) = std::sync::mpsc::channel::<Option<PathBuf>>();
-		let builder = FileDialogBuilder::default();
-		#[cfg(any(windows, target_os = "macos"))]
-		let builder = builder.set_parent(&window);
-		builder.add_filter("JavaScript File", &["js"]).pick_file(move |p| {
-			let _ = tx.send(p);
-		});
+		let builder = FileDialogBuilder::default()
+			.set_parent(&window)
+			.add_filter("JavaScript File", &["js"])
+			.pick_file(move |p| {
+				let _ = tx.send(p);
+			});
 		rx.recv().unwrap_or(None)
 	})
 	.await
@@ -400,12 +409,12 @@ pub async fn download_file(
 
 	let path_buf = tauri::async_runtime::spawn(async move {
 		let (tx, rx) = std::sync::mpsc::channel::<Option<PathBuf>>();
-		let builder = FileDialogBuilder::default();
-		#[cfg(any(windows, target_os = "macos"))]
-		let builder = builder.set_parent(&window);
-		builder.set_file_name(&suggest_file).save_file(move |p| {
-			let _ = tx.send(p);
-		});
+		let builder = FileDialogBuilder::default()
+			.set_parent(&window)
+			.set_file_name(&suggest_file)
+			.save_file(move |p| {
+				let _ = tx.send(p);
+			});
 		rx.recv().unwrap_or(None)
 	})
 	.await
@@ -442,9 +451,7 @@ pub enum UploadFeature {
 async fn ask_for_files(multiple: bool, window: Window) -> Result<Vec<PathBuf>, String> {
 	let picked = tauri::async_runtime::spawn(async move {
 		let (tx, rx) = std::sync::mpsc::channel::<Vec<PathBuf>>();
-		let builder = FileDialogBuilder::default();
-		#[cfg(any(windows, target_os = "macos"))]
-		let builder = builder.set_parent(&window);
+		let builder = FileDialogBuilder::default().set_parent(&window);
 		if multiple {
 			builder.pick_files(move |p| {
 				let picked = if let Some(vec) = p { vec } else { Vec::new() };
@@ -600,10 +607,10 @@ pub async fn identity_update(
 ) -> Result<(), String> {
 	unwrap_send!(
 		state.database,
-		UpdateIdentityMsg(FindIdentity::ById(id.0), UpdateIdentity {
-			name: update.name,
-			..Default::default()
-		},)
+		UpdateIdentityMsg(
+			FindIdentity::ById(id.0),
+			UpdateIdentity { name: update.name, ..Default::default() },
+		)
 	)
 }
 
@@ -626,7 +633,9 @@ pub async fn run_hotkey(
 }
 
 #[command]
-pub fn plugin_list(state: State<'_, QState>) -> Vec<String> { state.plugin_list() }
+pub fn plugin_list(state: State<'_, QState>) -> Vec<String> {
+	state.plugin_list()
+}
 
 #[command]
 pub fn plugin_get(state: State<'_, QState>, name: String) -> Result<String, String> {
@@ -644,7 +653,9 @@ pub fn plugin_delete(state: State<QState>, name: String) -> Result<(), String> {
 }
 
 #[command]
-pub fn markdown(md: String) -> String { proxy_codegen::markdown::markdown(&md) }
+pub fn markdown(md: String) -> String {
+	proxy_codegen::markdown::markdown(&md)
+}
 
 #[command]
 pub async fn set_loudness_callback(

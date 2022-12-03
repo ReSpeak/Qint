@@ -18,5 +18,8 @@ export default defineConfig(({ command, mode }) => {
 			minify: false, // easier to debug in production
 			brotliSize: false,
 		},
+		server: {
+			port: 3000,
+		},
 	};
 });

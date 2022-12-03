@@ -411,6 +411,9 @@
 		line-height: initial;
 		border-right: none;
 
+		// For drop overlay
+		position: relative;
+
 		// The LazyList
 		> :global(.lazyList) {
 			flex: 1;

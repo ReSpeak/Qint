@@ -1,4 +1,4 @@
-<script lang="typescript">
+<script lang="ts">
 	import TabSlot from "../../ui/container/TabSlot.svelte";
 	import ChatInput from "../../ui/specialized/ChatInput.svelte";
 </script>
