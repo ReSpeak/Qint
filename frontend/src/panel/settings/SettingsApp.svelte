@@ -32,49 +32,51 @@
 			bind:checked={appSettings.askBeforeClosing}
 			on:change={syncSettings} />
 	</KeyValue>
-	<KeyValue label="Minimize to Tray">
-		<input
-			type="checkbox"
-			class="checkbox-switch is-info"
-			bind:checked={appSettings.minimizeToTray}
-			on:change={syncSettings} />
-	</KeyValue>
-	<KeyValue label="Close to Tray">
-		<input
-			type="checkbox"
-			class="checkbox-switch is-info"
-			bind:checked={appSettings.closeToTray}
-			on:change={syncSettings} />
-	</KeyValue>
+	{#if IS_TAURI}
+		<KeyValue label="Minimize to Tray">
+			<input
+				type="checkbox"
+				class="checkbox-switch is-info"
+				bind:checked={appSettings.minimizeToTray}
+				on:change={syncSettings} />
+		</KeyValue>
+		<KeyValue label="Close to Tray">
+			<input
+				type="checkbox"
+				class="checkbox-switch is-info"
+				bind:checked={appSettings.closeToTray}
+				on:change={syncSettings} />
+		</KeyValue>
+		<KeyValue label="Window Design" autoLabel={false}>
+			<div>
+				<input
+					type="radio"
+					id="tb1"
+					name="titleBarStyle"
+					bind:group={$titleBarStyle}
+					value={TitleBarStyle.Native}
+					on:change={syncSettings} />
+				<label for="tb1">Native</label>
+			</div>
+	
+			<div>
+				<input
+					type="radio"
+					id="tb2"
+					name="titleBarStyle"
+					bind:group={$titleBarStyle}
+					value={TitleBarStyle.Normal}
+					on:change={syncSettings} />
+				<label for="tb2">Normal</label>
+			</div>
+		</KeyValue>
+	{/if}
 	<KeyValue label="Developer Mode">
 		<input
 			type="checkbox"
 			class="checkbox-switch is-info"
 			bind:checked={$developMode}
 			on:change={syncSettings} />
-	</KeyValue>
-	<KeyValue label="Window Design" autoLabel={false}>
-		<div>
-			<input
-				type="radio"
-				id="tb1"
-				name="titleBarStyle"
-				bind:group={$titleBarStyle}
-				value={TitleBarStyle.Native}
-				on:change={syncSettings} />
-			<label for="tb1">Native</label>
-		</div>
-
-		<div>
-			<input
-				type="radio"
-				id="tb2"
-				name="titleBarStyle"
-				bind:group={$titleBarStyle}
-				value={TitleBarStyle.Normal}
-				on:change={syncSettings} />
-			<label for="tb2">Normal</label>
-		</div>
 	</KeyValue>
 	{#if !IS_TAURI}
 		{#if browserNotificationPermission === "default"}
