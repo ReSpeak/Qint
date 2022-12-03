@@ -351,6 +351,24 @@ impl QintState {
 		fut.collect::<()>().await;
 	}
 
+	/// Close all connection.
+	///
+	/// This waits for a maximum of 1 second until all connections are disconnected.
+	pub async fn close_all(&self) {
+		let cons = self.connections.lock().unwrap().values().cloned().collect::<Vec<_>>();
+		self.send_each_con(cons.into_iter(), |con| Some(con.disconnect(Default::default()))).await;
+		// Wait at max a second and poll
+		for _ in 0u8..100 {
+			{
+				let cons = self.connections.lock().unwrap();
+				if cons.is_empty() {
+					break;
+				}
+			}
+			tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+		}
+	}
+
 	/// Aggregate over all connections.
 	///
 	/// Ignore connections where sending the message fails.

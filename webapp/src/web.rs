@@ -102,23 +102,7 @@ impl WebApp {
 
 		// Quit all connections
 		info!("Closing remaining connections");
-		{
-			let cons = self.state.connections.lock().unwrap();
-			for con in cons.values() {
-				actix::spawn(con.send(qint_proxy::connection::DisconnectMsg).map(|_| ()));
-			}
-		}
-
-		// Wait at max a second and poll
-		for _ in 0u8..100 {
-			{
-				let cons = self.state.connections.lock().unwrap();
-				if cons.is_empty() {
-					break;
-				}
-			}
-			time::sleep(Duration::from_millis(10)).await;
-		}
+		self.state.close_all().await;
 
 		Ok(())
 	}

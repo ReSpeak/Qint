@@ -17,6 +17,7 @@ use actix::prelude::*;
 use anyhow::format_err;
 use qint_proxy::QintState;
 use structopt::StructOpt;
+use tauri::AppHandle;
 use tauri::PhysicalPosition;
 use tauri::SystemTray;
 use tauri::SystemTrayEvent;
@@ -97,7 +98,7 @@ fn main() {
 	// Parse command line options
 	let args = Args::from_args();
 
-	let (app_addr, app_arc) = {
+	let (app_addr, app_arc, handle) = {
 		let (sender, receiver) = std::sync::mpsc::channel();
 
 		thread::spawn(move || {
@@ -106,11 +107,11 @@ fn main() {
 			let handle = runtime.handle().clone();
 			local.block_on(&mut runtime, async move {
 				let state = QintState::new(args.into()).unwrap();
-				let app = QintCore::new(handle, state);
+				let app = QintCore::new(handle.clone(), state);
 				let app_arc = Arc::new(app.clone());
 				let app_addr = app.start();
 
-				sender.send((app_addr.clone(), app_arc.clone())).unwrap();
+				sender.send((app_addr.clone(), app_arc.clone(), handle)).unwrap();
 
 				QintCore::run(app_addr, app_arc).await;
 			});
@@ -118,6 +119,16 @@ fn main() {
 
 		receiver.recv().unwrap()
 	};
+
+	let state = app_arc.state.clone();
+	let do_exit = move |app: AppHandle| {
+		let state = state.clone();
+		handle.spawn(async move {
+			state.close_all().await;
+			app.exit(0);
+		});
+	};
+	let do_exit2 = do_exit.clone();
 
 	tauri::Builder::default()
 		.manage(app_addr)
@@ -146,7 +157,7 @@ fn main() {
 					.add_item(CustomMenuItem::new("exit", "Exit")),
 			),
 		)
-		.on_system_tray_event(|app, event| match event {
+		.on_system_tray_event(move |app, event| match event {
 			SystemTrayEvent::LeftClick { position: _, size: _, .. } => {
 				let window = app.get_window("main").unwrap();
 				window.set_skip_taskbar(false).unwrap();
@@ -161,7 +172,7 @@ fn main() {
 					window.set_focus().unwrap();
 				}
 				"exit" => {
-					app.exit(0);
+					do_exit(app.clone());
 				}
 				_ => {}
 			},
@@ -175,10 +186,12 @@ fn main() {
 				}
 				WindowEvent::CloseRequested { api, .. } => {
 					println!("Close requested");
+					api.prevent_close();
 					if let Some(true) = app_arc.state.settings.read().unwrap().get_close_to_tray() {
 						println!("Closing to tray instead");
-						api.prevent_close();
 						window.hide().unwrap();
+					} else {
+						do_exit2(ev.window().app_handle());
 					}
 				}
 				WindowEvent::Destroyed => {
