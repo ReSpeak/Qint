@@ -1,7 +1,5 @@
-use std::sync::{
-	atomic::{AtomicBool, Ordering},
-	Arc, Mutex,
-};
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
 
 use tauri::Window;
 use tracing::warn;
@@ -13,43 +11,34 @@ use qint_proxy::{
 };
 
 pub struct LoudnessShare {
-	pub current_listener: Mutex<Option<Arc<AtomicBool>>>,
+	pub current_listener: Arc<AtomicU32>,
 }
 
 impl LoudnessShare {
-	pub fn new() -> Self { Self { current_listener: Mutex::new(None) } }
+	pub fn new() -> Self { Self { current_listener: Default::default() } }
 
 	pub async fn enable(&self, state: &QintState, window: Window) {
-		let callback = {
-			let mut current = self.current_listener.lock().unwrap();
-			if current.is_some() {
-				return;
-			} else {
-				let listening = Arc::new(AtomicBool::new(true));
-				*current = Some(listening.clone());
-				LoudnessCallback { window, listening }
-			}
-		};
+		let own_id = self.current_listener.fetch_add(1, Ordering::Relaxed) + 1;
+		let callback =
+			LoudnessCallback { window, listening: self.current_listener.clone(), own_id };
 
 		if let Some(ad) = &state.audio_data {
-			match ad.a2ts.send(AddLoudnessListenerMsg(Box::new(callback))).await {
-				Ok(_handle) => {}
-				Err(error) => warn!(%error, "Failed add loudness listener"),
+			if let Err(error) = ad.a2ts.send(AddLoudnessListenerMsg(Box::new(callback))).await {
+				warn!(%error, "Failed add loudness listener");
 			}
 		}
 	}
 
 	pub fn disable(&self) {
-		let mut current = self.current_listener.lock().unwrap();
-		if let Some(listener) = current.take() {
-			listener.store(false, Ordering::Relaxed);
-		}
+		// Increase id, so the listener discards itself
+		self.current_listener.fetch_add(1, Ordering::Relaxed);
 	}
 }
 
-pub struct LoudnessCallback {
-	pub window: Window,
-	pub listening: Arc<AtomicBool>,
+struct LoudnessCallback {
+	window: Window,
+	listening: Arc<AtomicU32>,
+	own_id: u32,
 }
 
 #[derive(Serialize, Copy, Clone)]
@@ -63,5 +52,5 @@ impl LoudnessTrait for LoudnessCallback {
 		}
 	}
 
-	fn connected(&self) -> bool { self.listening.load(Ordering::Relaxed) }
+	fn connected(&self) -> bool { self.listening.load(Ordering::Relaxed) == self.own_id }
 }

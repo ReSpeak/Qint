@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use actix::prelude::*;
@@ -7,6 +8,8 @@ use anyhow::{bail, format_err, Result};
 use futures::FutureExt;
 use juniper::http::GraphQLRequest;
 use proxy_codegen::book_events::deserialize_u64;
+use qint_proxy::audio::audio_to_ts::{AddLoudnessListenerMsg, LoudnessTrait};
+use qint_proxy::connection::CaptureLoudnessMsg;
 use qint_proxy::{
 	connection::{DisconnectMsg, MessageF2PWrapper, QintConnection},
 	db::models::UpdateIdentity,
@@ -44,6 +47,10 @@ pub enum Error {
 	NoConnection,
 	#[error("Unknown command '{0}'")]
 	UnknownCommand(String),
+	#[error("Audio disabled")]
+	NoAudio,
+	#[error("Failed to setup audio listener")]
+	LoudnessListenerFailed,
 }
 
 #[derive(Deserialize)]
@@ -55,6 +62,8 @@ pub struct Ws {
 	state: Arc<QintState>,
 	/// All connections managed by this websocket
 	connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>,
+	/// The loudness listener that is running
+	loudness_listener: Arc<AtomicU32>,
 }
 
 impl Message for SendToFrontendMsg {
@@ -143,6 +152,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
 					actix::fut::wrap_future::<_, Self>(Self::handle_msg(
 						self.state.clone(),
 						self.connections.clone(),
+						self.loudness_listener.clone(),
 						msg.cmd,
 						msg.args,
 						ctx.address(),
@@ -179,7 +189,9 @@ impl Handler<SendToFrontendMsg> for Ws {
 }
 
 impl Ws {
-	pub fn new(state: Arc<QintState>) -> Self { Self { state, connections: Default::default() } }
+	pub fn new(state: Arc<QintState>) -> Self {
+		Self { state, connections: Default::default(), loudness_listener: Default::default() }
+	}
 
 	fn close(&self) {
 		debug!("Websocket closed");
@@ -194,10 +206,73 @@ impl Ws {
 		}
 	}
 
+	async fn enable_loudness_callback(
+		state: Arc<QintState>, loudness_listener: Arc<AtomicU32>, addr: Addr<Self>,
+	) -> Option<Result<serde_json::Value>> {
+		if let Some(ad) = &state.audio_data {
+			#[derive(Serialize)]
+			struct WsMsg {
+				cmd: &'static str,
+				msg: LoudnessFrame,
+			}
+			#[derive(Serialize, Copy, Clone)]
+			struct LoudnessFrame(f64, f32);
+
+			pub struct LoudnessCallback {
+				addr: Addr<Ws>,
+				own_id: u32,
+				listening: Arc<AtomicU32>,
+			}
+
+			impl LoudnessTrait for LoudnessCallback {
+				fn send(&self, msg: CaptureLoudnessMsg) {
+					let listening = self.listening.clone();
+					let own_id = self.own_id;
+					actix::spawn(
+						self.addr
+							.send(SendToFrontendMsg(
+								serde_json::to_string(&WsMsg {
+									cmd: "loudness",
+									msg: LoudnessFrame(msg.0, msg.1),
+								})
+								.unwrap(),
+							))
+							.map(move |r| {
+								if r.is_err() {
+									// Connection is probably gone, disable
+									let _ = listening.compare_exchange(
+										own_id,
+										own_id.wrapping_add(1),
+										Ordering::Relaxed,
+										Ordering::Relaxed,
+									);
+								}
+							}),
+					);
+				}
+
+				fn connected(&self) -> bool {
+					self.listening.load(Ordering::Relaxed) == self.own_id
+				}
+			}
+
+			let own_id = loudness_listener.fetch_add(1, Ordering::Relaxed) + 1;
+			let callback = LoudnessCallback { addr, listening: loudness_listener.clone(), own_id };
+
+			if ad.a2ts.send(AddLoudnessListenerMsg(Box::new(callback))).await.is_err() {
+				Some(Err(Error::LoudnessListenerFailed.into()))
+			} else {
+				None
+			}
+		} else {
+			Some(Err(Error::NoAudio.into()))
+		}
+	}
+
 	async fn handle_msg(
 		state: Arc<QintState>,
-		connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>, cmd: String,
-		args: serde_json::Value, addr: Addr<Self>,
+		connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>,
+		loudness_listener: Arc<AtomicU32>, cmd: String, args: serde_json::Value, addr: Addr<Self>,
 	) -> Result<serde_json::Value> {
 		#[derive(Deserialize)]
 		struct ConArgs {
@@ -402,17 +477,22 @@ impl Ws {
 				return Ok(serde_json::Value::String(proxy_codegen::markdown::markdown(&args.md)));
 			}
 			"set_loudness_callback" => {
-				/*#[derive(Deserialize)]
+				#[derive(Deserialize)]
 				struct Args {
 					enabled: bool,
 				}
 				let args: Args = serde_json::from_value(args)?;
 
 				if args.enabled {
-					listener.enable(&state, window).await;
+					if let Some(res) =
+						Self::enable_loudness_callback(state, loudness_listener, addr).await
+					{
+						return res;
+					}
 				} else {
-					listener.disable()
-				}*/
+					// Increase id, so the listener discards itself
+					loudness_listener.fetch_add(1, Ordering::Relaxed);
+				}
 			}
 			_ => {
 				return Err(Error::UnknownCommand(cmd.to_string()).into());
