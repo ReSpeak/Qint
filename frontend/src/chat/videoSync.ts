@@ -31,7 +31,7 @@ export class SyncState {
 	public pluginCmdUnsub?: () => void;
 	public enabled: boolean = false;
 	private debouncedEvent: VSyncEvent | undefined;
-	private lastReceivedSync: VSyncEvent = {};
+	private lastSetState: VSyncEvent = {};
 
 	constructor(
 		public nodeSel: NodeSelection,
@@ -81,10 +81,11 @@ export class SyncState {
 		const [target, targetClientId] = broadcastTarget;
 
 		// Prevent feedback loops
-		const diffEv = SyncState.diffSafe(ev, this.lastReceivedSync);
+		const diffEv = SyncState.diffSafe(ev, this.lastSetState);
 		if (Object.keys(diffEv).length === 0) return;
 		log("Syncing %o", diffEv);
 
+		SyncState.copySafe(ev, this.lastSetState);
 		this.nodeSel.connection.sendChange({
 			ConnectionPluginCommandRequest: {
 				name: vSyncCmdKey,
@@ -125,7 +126,7 @@ export class SyncState {
 	public receiveNewState(cmd: VSyncCmd): void {
 		if (cmd.video_key !== this.video_key) return;
 		log("Got sync %o", cmd);
-		SyncState.copySafe(cmd.event, this.lastReceivedSync);
+		SyncState.copySafe(cmd.event, this.lastSetState);
 		if (cmd.host) {
 			this.host = cmd.host;
 		}
