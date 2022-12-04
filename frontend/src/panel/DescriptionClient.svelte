@@ -607,21 +607,20 @@
 						bind:value={clientEdit.description} />
 				{:else}{$client.description}{/if}
 			</div>
+			<div>Online:</div>
+			<div title={$client.connectionData !== null ? ("ca. " + moment().subtract($client.connectionData.connectedTime).format(LONG_DATETIME)) : ""}>
+				{formatDuration($client.connectionData?.connectedTime)}
+			</div>
+			<div>Last active:</div>
+			<div title={$client.connectionData !== null ? ("ca. " + moment().subtract($client.connectionData.idleTime).format(LONG_DATETIME)) : ""}>
+				{formatDuration($client.connectionData?.idleTime)}
+			</div>
 			{#if ownClient}
 				<div>Total online time:</div>
 				<div>
 					{formatDuration($server.connectionData?.connectedTimeTotal)}
 				</div>
-			{:else}
-				<div>Online:</div>
-				<div title={$client.connectionData !== null ? ("ca. " + moment().subtract($client.connectionData.connectedTime).format(LONG_DATETIME)) : ""}>
-					{formatDuration($client.connectionData?.connectedTime)}
-				</div>
 			{/if}
-			<div>Last active:</div>
-			<div title={$client.connectionData !== null ? ("ca. " + moment().subtract($client.connectionData.idleTime).format(LONG_DATETIME)) : ""}>
-				{formatDuration($client.connectionData?.idleTime)}
-			</div>
 			{#if $developMode}
 				{#if $client.optionalData !== null}
 					<div>First connected:</div>
