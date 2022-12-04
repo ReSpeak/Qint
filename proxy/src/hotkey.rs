@@ -10,7 +10,7 @@ use crate::connection::QintConnection;
 use crate::MuteState;
 use crate::QintState;
 
-pub use imp::{Hotkeys, Hotkey};
+pub use imp::{Hotkey, Hotkeys};
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct UserHotkey {
@@ -462,6 +462,7 @@ mod imp {
 	use serde::{Deserialize, Serialize};
 	use tokio::io::{AsyncBufReadExt, BufReader};
 	use tokio::net::UnixListener;
+	use tokio::runtime::Handle;
 	use tracing::{debug, warn};
 
 	use super::HotkeyConfig;
@@ -471,17 +472,19 @@ mod imp {
 	pub struct Hotkey {}
 
 	#[derive(Debug)]
-	pub struct Hotkeys {}
+	pub struct Hotkeys {
+		handle: Handle,
+	}
 
 	pub fn _key_list() -> Vec<String> { Vec::new() }
 
 	impl Hotkeys {
-		pub fn new() -> Result<Self> { Ok(Self {}) }
+		pub fn new(handle: Handle) -> Result<Self> { Ok(Self { handle }) }
 
 		pub fn apply_config(&self, state: &Arc<QintState>, _: HotkeyConfig) -> Result<()> {
 			let state = Arc::clone(state);
 			// Listen on unix socket to support shortcuts on wayland
-			tokio::spawn(async move {
+			self.handle.spawn(async move {
 				let path = state
 					.settings
 					.read()

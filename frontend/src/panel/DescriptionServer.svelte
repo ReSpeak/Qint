@@ -295,7 +295,9 @@
 		{#if $server.optionalData !== null}
 			<div class="dataLine">
 				<div>Uptime:</div>
-				<div>{formatDuration($server.optionalData.uptime)}</div>
+				<div title={"ca. " + moment().subtract($server.optionalData.uptime).format(LONG_DATETIME)}>
+					{formatDuration($server.optionalData.uptime)}
+				</div>
 			</div>
 		{/if}
 		{#if editing}

@@ -4,7 +4,7 @@
 	import { Connection } from "../connection";
 	import type { ServerGroupId } from "../ts";
 	import moment from "moment";
-	import type { Duration, Moment } from "moment";
+	import type { Moment } from "moment";
 	import Icon from "../ui/icon/Icon.svelte";
 	import PlatformIcon from "../ui/icon/PlatformIcon.svelte";
 	import ServerGroupIcon from "../ui/icon/ServerGroupIcon.svelte";
@@ -54,8 +54,9 @@
 	let timer: number | undefined;
 	let showBigAvatar = false;
 
-	const serverGroups = connection.book.serverGroups;
 	let avatarPath: string | undefined;
+	$: serverGroups = connection.book.serverGroups;
+	$: server = connection.book.server;
 	$: isWhispering = connection.isWhispering;
 	$: ownClient = client.id === connection.book.ownClientId;
 	$: {
@@ -287,6 +288,16 @@
 	}
 
 	async function getConnectionData() {
+		if (ownClient) {
+			// Request for total online time
+			await connection
+				.sendChange({
+					ServerConnectionInfoRequest: {},
+				})
+				.catch((reason) => {
+					console.error("ServerConnectionInfoRequest failed: ", reason);
+				});
+		}
 		await connection
 			.sendChange({
 				ClientConnectionInfoRequest: {
@@ -351,12 +362,6 @@
 			packetCounts.map((x) => (x ? parseInt(x) : 0)).reduce((a, b) => a + b),
 			1
 		);
-	}
-
-	function formatAgo(duration: Duration | null | undefined, ago: boolean): string {
-		if (!duration) return "";
-		if (ago) return moment.duration(-duration.asSeconds(), "seconds").humanize(true);
-		else return moment.duration(duration.asSeconds(), "seconds").humanize();
 	}
 
 	async function uploadAvatar() {
@@ -602,10 +607,21 @@
 						bind:value={clientEdit.description} />
 				{:else}{$client.description}{/if}
 			</div>
-			<div>Online:</div>
-			<div>{formatDuration($client.connectionData?.connectedTime)}</div>
+			{#if ownClient}
+				<div>Total online time:</div>
+				<div>
+					{formatDuration($server.connectionData?.connectedTimeTotal)}
+				</div>
+			{:else}
+				<div>Online:</div>
+				<div title={$client.connectionData !== null ? ("ca. " + moment().subtract($client.connectionData.connectedTime).format(LONG_DATETIME)) : ""}>
+					{formatDuration($client.connectionData?.connectedTime)}
+				</div>
+			{/if}
 			<div>Last active:</div>
-			<div>{formatAgo($client.connectionData?.idleTime, true)}</div>
+			<div title={$client.connectionData !== null ? ("ca. " + moment().subtract($client.connectionData.idleTime).format(LONG_DATETIME)) : ""}>
+				{formatDuration($client.connectionData?.idleTime)}
+			</div>
 			{#if $developMode}
 				{#if $client.optionalData !== null}
 					<div>First connected:</div>

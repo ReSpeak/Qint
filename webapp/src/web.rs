@@ -20,7 +20,6 @@ use qint_proxy::messages::ResultDetails;
 use qint_proxy::{ConnectionId, QintState};
 use rand::Rng;
 use serde::Deserialize;
-use tokio::time::{self, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
 use tracing::{debug, error, info, warn};
 use tsclientlib::ChannelId;
