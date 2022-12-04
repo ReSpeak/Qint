@@ -10,17 +10,17 @@ use crate::connection::QintConnection;
 use crate::MuteState;
 use crate::QintState;
 
-pub use imp::{Hotkeys, KeyCode};
+pub use imp::{Hotkeys, Hotkey};
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-pub struct Hotkey {
-	pub keycode: KeyCode,
+pub struct UserHotkey {
+	pub keycode: Hotkey,
 	pub action: Action,
 }
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct HotkeyConfig {
-	pub actions: Vec<Hotkey>,
+	pub actions: Vec<UserHotkey>,
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Deserialize, Serialize)]
@@ -237,11 +237,12 @@ mod imp {
 	use super::HotkeyConfig;
 	use crate::QintState;
 
-	pub use livesplit_hotkey::KeyCode;
+	pub use livesplit_hotkey::Hotkey;
 
 	pub struct Hotkeys {
+		handle: Handle,
 		hook: Hook,
-		registered: Mutex<Vec<KeyCode>>,
+		registered: Mutex<Vec<Hotkey>>,
 	}
 
 	pub fn _key_list() -> Vec<String> {
@@ -424,8 +425,8 @@ mod imp {
 	}
 
 	impl Hotkeys {
-		pub fn new() -> Result<Self> {
-			Ok(Self { hook: Hook::new()?, registered: Vec::new().into() })
+		pub fn new(handle: Handle) -> Result<Self> {
+			Ok(Self { handle, hook: Hook::new()?, registered: Vec::new().into() })
 		}
 
 		pub fn apply_config(&self, state: &Arc<QintState>, config: HotkeyConfig) -> Result<()> {
@@ -438,9 +439,10 @@ mod imp {
 			for a in config.actions {
 				let action = a.action;
 				let state = state.clone();
-				let handle = Handle::current();
+				let handle = self.handle.clone();
 				self.hook.register(a.keycode, move || {
 					let state = state.clone();
+					println!("Hotkey pressed: {:?}", action);
 					handle.spawn(async move {
 						action.run(&state).await;
 					});
@@ -466,7 +468,7 @@ mod imp {
 	use crate::QintState;
 
 	#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Deserialize, Serialize)]
-	pub enum KeyCode {}
+	pub struct Hotkey {}
 
 	#[derive(Debug)]
 	pub struct Hotkeys {}

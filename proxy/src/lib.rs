@@ -827,7 +827,7 @@ impl QintState {
 				hotkey::HotkeyConfig::default()
 			}
 		};
-		let hotkeys = hotkey::Hotkeys::new()?;
+		let hotkeys = hotkey::Hotkeys::new(handle.clone())?;
 
 		if let Some(ad) = &audio_data {
 			if let Some(threshold) = settings.get_loudness_threshold() {

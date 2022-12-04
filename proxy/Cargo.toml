@@ -25,7 +25,7 @@ generic-array = "0.14"
 git-testament = "0.2"
 juniper = "0.15"
 libsqlite3-sys = { version = "0.22", features = [ "bundled" ] }
-livesplit-hotkey = { git = "https://github.com/LiveSplit/livesplit-core", rev = "624783aebf83fc23e040da174accffae44e5ed12", version = "0.5" }
+livesplit-hotkey = { git = "https://github.com/LiveSplit/livesplit-core", rev = "092e336e24abd26e97e5a2e55abb0bbd97ff0b44", version = "0.6" }
 nnnoiseless = { version = "0.5", default-features = false }
 num-derive = "0.3"
 num-traits = "0.2"
