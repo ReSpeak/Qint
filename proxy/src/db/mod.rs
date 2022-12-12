@@ -244,7 +244,7 @@ impl DbHandler {
 
 		// Make sure it does not count as read
 		let utc_time = Utc::now().naive_utc() - Duration::days(1);
-		let dummy_offset = FixedOffset::east(0);
+		let dummy_offset = FixedOffset::east_opt(0).unwrap();
 		let local_zone = Local::from_offset(&dummy_offset);
 		let utc_to_local_offset = local_zone.offset_from_utc_datetime(&utc_time).local_minus_utc();
 
@@ -1190,7 +1190,7 @@ impl<'a> EventHandler<'a> {
 	/// Returns the current time in utc and the offset.
 	fn get_now() -> (NaiveDateTime, i32) {
 		let utc_time = Utc::now().naive_utc();
-		let dummy_offset = FixedOffset::east(0);
+		let dummy_offset = FixedOffset::east_opt(0).unwrap();
 		let local_zone = Local::from_offset(&dummy_offset);
 		let utc_to_local_offset = local_zone.offset_from_utc_datetime(&utc_time).local_minus_utc();
 		(utc_time, utc_to_local_offset)

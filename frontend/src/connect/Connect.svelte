@@ -494,9 +494,10 @@
 	}
 
 	.connect-form > div input:not([type="checkbox"]),
-	.buttonGrid > button {
+	.buttonGrid button {
 		box-sizing: border-box;
 		width: 100%;
+		justify-content: center;
 	}
 
 	.buttonGrid > div {
