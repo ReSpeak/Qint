@@ -31,20 +31,23 @@
 			{#if editing}
 				<button
 					class="button is-small is-success"
-					on:click|stopPropagation={clickSaveChanges}>
+					on:click|stopPropagation={clickSaveChanges}
+				>
 					<Icon name="check" />
 					<span>Save</span>
 				</button>
 				<button
 					class="button is-small is-danger"
-					on:click|stopPropagation={() => (editing = false)}>
+					on:click|stopPropagation={() => (editing = false)}
+				>
 					<Icon name="close" />
 					<span>Cancel</span>
 				</button>
 			{:else}
 				<button
 					class="button is-small outline-button"
-					on:click|stopPropagation={clickEditMode}>
+					on:click|stopPropagation={clickEditMode}
+				>
 					<Icon name="pencil" />
 					<span>Edit</span>
 				</button>
@@ -58,7 +61,8 @@
 					<button
 						class="toolbutton is-small"
 						style="float: right;"
-						on:click={() => (changeRequest = undefined)}>
+						on:click={() => (changeRequest = undefined)}
+					>
 						<Icon name="close" />
 					</button>
 					<ChangeResult result={changeResult} />

@@ -14,7 +14,8 @@
 		<button
 			class="toolbutton is-small compact active"
 			on:click|stopPropagation={() =>
-				app.settings.ui._descriptionMode.set(DescriptionMode.None)}>
+				app.settings.ui._descriptionMode.set(DescriptionMode.None)}
+		>
 			<Icon name="close" />
 		</button>
 	</div>

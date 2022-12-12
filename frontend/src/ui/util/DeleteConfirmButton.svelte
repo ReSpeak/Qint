@@ -32,7 +32,8 @@
 			<button
 				{disabled}
 				class="button is-danger is-outlined"
-				on:click={() => (isConfirming = true)}>
+				on:click={() => (isConfirming = true)}
+			>
 				<Icon name="delete" />
 			</button>
 		</p>

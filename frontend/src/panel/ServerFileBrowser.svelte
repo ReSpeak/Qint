@@ -20,7 +20,8 @@
 	<StickySlot on:click={() => (avatarsOpen = true)}>
 		<button
 			class="button iconButton"
-			on:click|stopPropagation={() => (avatarsOpen = !avatarsOpen)}>
+			on:click|stopPropagation={() => (avatarsOpen = !avatarsOpen)}
+		>
 			<Icon name="chevron-right{avatarsOpen ? ' mdi-rotate-90' : ''}" />
 		</button>
 		<span>Avatars</span>

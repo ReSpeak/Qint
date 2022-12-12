@@ -22,7 +22,8 @@
 	}}
 	tabindex="0"
 	class="modal"
-	class:is-active={visible}>
+	class:is-active={visible}
+>
 	<div on:click={close} class="modal-background" />
 	<div class="modal-card">
 		<header class="modal-card-head">

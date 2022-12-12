@@ -159,11 +159,13 @@
 			{#if sel.node instanceof Channel}
 				{sel.node.name} on <ServerName
 					connection={sel.connection}
-					server={sel.connection.book.server} />
+					server={sel.connection.book.server}
+				/>
 			{:else if sel.node instanceof Client}
 				<ClientName connection={sel.connection} client={sel.node} /> on <ServerName
 					connection={sel.connection}
-					server={sel.connection.book.server} />
+					server={sel.connection.book.server}
+				/>
 			{:else if sel.node instanceof Server}
 				<ServerName connection={sel.connection} server={sel.node} />
 			{:else}
@@ -190,17 +192,20 @@
 			<button class="button is-small is-info" on:click={muteClients}>
 				<Icon name={allClientsMuted ? "microphone-off" : "microphone"} />
 				<span
-					>{#if allClientsMuted}Unmute{:else}Mute{/if}</span>
+					>{#if allClientsMuted}Unmute{:else}Mute{/if}</span
+				>
 			</button>
 			<button
 				class="button is-small is-warning"
-				on:click={() => kickClients(Reason.KickChannel)}>
+				on:click={() => kickClients(Reason.KickChannel)}
+			>
 				<Icon name="shoe-formal" />
 				<span>Kick Channel</span>
 			</button>
 			<button
 				class="button is-small is-danger"
-				on:click={() => kickClients(Reason.KickServer)}>
+				on:click={() => kickClients(Reason.KickServer)}
+			>
 				<Icon name="shoe-formal" />
 				<span>Kick Server</span>
 			</button>

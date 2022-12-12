@@ -250,7 +250,11 @@
 	<div bind:this={div} tabindex="0" on:contextmenu={onContextMenu}>
 		{#if contextMenuVisible && connection.isOnline()}
 			<ContextMenuContainer>
-				<ContextMenuChannel {connection} {channel} on:switchChannel={() => switchChannel()} />
+				<ContextMenuChannel
+					{connection}
+					{channel}
+					on:switchChannel={() => switchChannel()}
+				/>
 			</ContextMenuContainer>
 		{/if}
 		<div
@@ -261,12 +265,14 @@
 			on:svddrag={dragStart}
 			on:svddrop={dragDrop}
 			data-type="channel"
-			data-key={$channel.id}>
+			data-key={$channel.id}
+		>
 			<button
 				class="button collapseButton noBut"
 				class:haschildren={$channels.length !== 0 || $clients.length !== 0}
 				class:spacer={spacerType !== SpacerType.None}
-				on:click={() => (collapsed = !collapsed)}>
+				on:click={() => (collapsed = !collapsed)}
+			>
 				<Icon name="chevron-right{collapsed ? '' : ' mdi-rotate-90'}" />
 				<TsIcon type="channel" source={$channel} {connection} />
 			</button>
@@ -279,7 +285,8 @@
 				on:mousedown={preventScrollClick}
 				on:click={setChat}
 				on:auxclick={setChat}
-				on:dblclick={switchChannel}>
+				on:dblclick={switchChannel}
+			>
 				{#if showId}
 					[<HighlightString filter={thisFilter} content={$channel.id.toString()} />]
 				{/if}
@@ -299,7 +306,8 @@
 				on:keydown={(e) => {
 					if (e.key === "Escape") closeAskPassword();
 				}}
-				tabindex="0">
+				tabindex="0"
+			>
 				<HoverContainer {div} closeButton={true} on:close={closeAskPassword}>
 					{#if error !== undefined}
 						<ChangeResult result={error} />
@@ -313,7 +321,8 @@
 								class="input"
 								type="password"
 								title="Password"
-								placeholder="Password" />
+								placeholder="Password"
+							/>
 						</div>
 						<div class="control">
 							<button class="button" name="switch" type="submit">
@@ -339,7 +348,8 @@
 					filter={childrenFilter}
 					{client}
 					{channel}
-					bind:filterShow={client.filterShow} />
+					bind:filterShow={client.filterShow}
+				/>
 			{/each}
 		{/if}
 		{#each $channels as c (c.id)}
@@ -348,7 +358,8 @@
 				filter={childrenFilter}
 				{filterStartFromRoot}
 				channel={c}
-				bind:filterShow={c.filterShow} />
+				bind:filterShow={c.filterShow}
+			/>
 		{/each}
 	</ul>
 </li>

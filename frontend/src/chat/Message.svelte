@@ -32,12 +32,14 @@
 			class:messageSending={message.status === MessageStatus.Sending}
 			class:messageError={message.status === MessageStatus.Error}
 			class:isPoke={message.isPoke}
-			class:viewRaw>
+			class:viewRaw
+		>
 			<div class="messageRendered">
 				<RenderedText
 					{connection}
 					text={messageHighlightedContent || message.rendered}
-					bind:links />
+					bind:links
+				/>
 				{#each linksArr as { link, title } (link)}
 					<LinkPreview {link} textContent={title} {connection} />
 				{/each}
@@ -56,7 +58,8 @@
 					<button
 						class="button is-small is-rounded"
 						on:click={() => (viewRaw = !viewRaw)}
-						title="It’s raw!">
+						title="It’s raw!"
+					>
 						<Icon raw="🥩" />
 					</button>
 				</div>

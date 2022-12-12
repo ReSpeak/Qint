@@ -136,14 +136,16 @@
 			items={captureDevices}
 			display={(d) => (d === null ? "System Default" : d)}
 			bind:selected={selectedCaptureDevice}
-			on:change={changeAudioDevice} />
+			on:change={changeAudioDevice}
+		/>
 	</KeyValue>
 	<KeyValue label="Playback Device">
 		<DropDown
 			items={playbackDevices}
 			display={(d) => (d === null ? "System Default" : d)}
 			bind:selected={selectedPlaybackDevice}
-			on:change={changeAudioDevice} />
+			on:change={changeAudioDevice}
+		/>
 	</KeyValue>
 
 	<KeyValue label="Global Volume">
@@ -155,7 +157,8 @@
 				bind:value={globalVolume}
 				display={(n) => `${n} dB`}
 				tooltip={true}
-				on:input={updateGlobalVolume} />
+				on:input={updateGlobalVolume}
+			/>
 		</div>
 	</KeyValue>
 	<KeyValue label="Loudness">
@@ -169,7 +172,8 @@
 						bind:value={loudnessThreshold}
 						display={(n) => `${n}${NARROW_NO_BREAK_SPACE}LUFS`}
 						tooltip={true}
-						on:input={updateLoudness} />
+						on:input={updateLoudness}
+					/>
 				</div>
 			</div>
 			<div class="field" style="flex:1;">
@@ -187,7 +191,8 @@
 							"#555555",
 						],
 						[loudnessThreshold, "Your talking threshold", "#aa3333"],
-					]} />
+					]}
+				/>
 			</div>
 		</div>
 	</KeyValue>
@@ -203,7 +208,8 @@
 							bind:value={vadThreshold}
 							display={(n) => `${Math.floor(n * 100)}${NARROW_NO_BREAK_SPACE}%`}
 							tooltip={true}
-							on:input={updateVad} />
+							on:input={updateVad}
+						/>
 					</div>
 				</div>
 				<div class="field" style="flex:1;">
@@ -222,7 +228,8 @@
 							[0.0, "#025189"],
 							[0.7, "#81C6EB"],
 							[1, "#20FF20"],
-						]} />
+						]}
+					/>
 				</div>
 			</div>
 		</KeyValue>

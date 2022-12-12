@@ -32,7 +32,8 @@
 			visible = false;
 		}
 	}}
-	tabindex="0">
+	tabindex="0"
+>
 	<div class="modal-background" />
 	<!-- svelte-ignore a11y-missing-attribute -->
 	<div class="custom-content" class:stretch>

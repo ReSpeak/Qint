@@ -72,9 +72,7 @@
 
 <div class="searchResults">
 	<div class="toolbar">
-		<button
-			class="toolbutton is-small compact active"
-			on:click={() => app.showMainPanel()}>
+		<button class="toolbutton is-small compact active" on:click={() => app.showMainPanel()}>
 			<Icon name="close" />
 		</button>
 	</div>
@@ -93,7 +91,8 @@
 			bind:this={searchList}
 			fetchElements={fetchMessageElements}
 			suggestJumpStart={true}
-			let:item>
+			let:item
+		>
 			<div slot="loading" class="searchFiller">
 				<span>Loading ...</span>
 				<Icon name="orbit mdi-spin" />

@@ -21,7 +21,7 @@
 	let videoControl: IVideoControl | undefined | null;
 	let vSync: SyncState | undefined;
 	let additionalData: string;
-	let nodeSel: NodeSelection | undefined = get(app.selectedNode).getSingleSelection();;
+	let nodeSel: NodeSelection | undefined = get(app.selectedNode).getSingleSelection();
 
 	let detectedType: "youtube" | "media";
 	let video_key: string;
@@ -117,7 +117,8 @@
 					<img
 						class="fixedSize"
 						src="https://i.ytimg.com/vi/{video_key}/mqdefault.jpg"
-						alt="Click to load video" />
+						alt="Click to load video"
+					/>
 					<div class="playButton">
 						<Icon name="play" size="2em" />
 					</div>
@@ -131,7 +132,8 @@
 					src="https://www.youtube.com/embed/{video_key}?enablejsapi=1&rel=0&modestbranding=1&playsinline=1&controls=1&autoplay=1{additionalData}"
 					frameborder="0"
 					allowfullscreen
-					playsinline />
+					playsinline
+				/>
 			{/if}
 		{/if}
 		<div class="videoTools">
@@ -140,7 +142,8 @@
 					class="videoButton"
 					class:syncOn={vSync?.enabled}
 					title="Sync video playback"
-					on:click={toggleVSync}>
+					on:click={toggleVSync}
+				>
 					<Icon name="account-multiple" />
 				</button>
 			{/if}
@@ -148,7 +151,8 @@
 				class="videoButton"
 				href={videoSrc}
 				target="_blank"
-				title="Open original link in new tab">
+				title="Open original link in new tab"
+			>
 				<Icon name="open-in-new" />
 			</a>
 		</div>

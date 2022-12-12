@@ -236,7 +236,8 @@
 							type="text"
 							autocomplete="bookmarkName"
 							title="Bookmark"
-							placeholder="Bookmark name" />
+							placeholder="Bookmark name"
+						/>
 						<Icon name="label-outline" isLeft />
 					</p>
 				</div>
@@ -252,7 +253,8 @@
 						type="text"
 						autocomplete="nickname"
 						title="Username"
-						placeholder="Username" />
+						placeholder="Username"
+					/>
 					<Icon name={CLIENT_ICON} isLeft />
 				</p>
 			</div>
@@ -269,7 +271,8 @@
 						type="text"
 						autocomplete="off"
 						title="Server address"
-						placeholder="Server" />
+						placeholder="Server"
+					/>
 					<Icon name={SERVER_ICON} isLeft />
 				</p>
 			</div>
@@ -277,7 +280,8 @@
 				<button
 					class="button collapseButton noBut"
 					type="button"
-					on:click={() => (showDetails = !showDetails)}>
+					on:click={() => (showDetails = !showDetails)}
+				>
 					<Icon name="chevron-right{!showDetails ? '' : ' mdi-rotate-90'}" />
 					Details
 				</button>
@@ -293,7 +297,8 @@
 							type="password"
 							autocomplete="current-password"
 							title="Server password"
-							placeholder="Server password" />
+							placeholder="Server password"
+						/>
 						<Icon name={SERVER_ICON} isLeft />
 					</p>
 				</div>
@@ -307,7 +312,8 @@
 							type="password"
 							autocomplete="off"
 							title="Channel password"
-							placeholder="Channel password" />
+							placeholder="Channel password"
+						/>
 						<Icon name={CHANNEL_ICON} isLeft />
 					</p>
 				</div>
@@ -319,7 +325,8 @@
 								display={(i) => i.name}
 								compare={(a, b) => a.id === b?.id}
 								bind:selected={identity}
-								on:change={onIdentityChange} />
+								on:change={onIdentityChange}
+							/>
 						{/if}
 					{/await}
 				</div>
@@ -330,7 +337,8 @@
 					class:is-primary={editing === undefined}
 					class:is-success={editing !== undefined}
 					name="connect"
-					type="submit">
+					type="submit"
+				>
 					{#if editing !== undefined}
 						Save
 					{:else}
@@ -342,13 +350,15 @@
 						<button
 							class="button is-primary"
 							name="cancel"
-							on:click|preventDefault={() => (editing = undefined)}>
+							on:click|preventDefault={() => (editing = undefined)}
+						>
 							Cancel
 						</button>
 						<button
 							class="button is-danger"
 							name="remove"
-							on:click|preventDefault={deleteBookmark}>
+							on:click|preventDefault={deleteBookmark}
+						>
 							Delete Bookmark
 						</button>
 					</div>
@@ -364,7 +374,8 @@
 							{connection}
 							filter={channelPart}
 							filterStartFromRoot={true}
-							{channel} />
+							{channel}
+						/>
 					{/each}
 				</ul>
 			</div>
@@ -383,7 +394,8 @@
 							<UiBookmark
 								bookmark={item}
 								bind:connectData={data}
-								on:edit={() => editBookmark(item)} />
+								on:edit={() => editBookmark(item)}
+							/>
 						{/each}
 					</div>
 				</div>

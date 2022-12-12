@@ -16,7 +16,8 @@
 			<TsIcon
 				type="channel"
 				source={content.Channel.channel}
-				connection={new OfflineConnection(content.Channel.server.publicKeyStr)} />
+				connection={new OfflineConnection(content.Channel.server.publicKeyStr)}
+			/>
 		{:else if "Client" in content}
 			<!-- Icon of which server? -->
 			<Icon name={CLIENT_ICON} />
@@ -24,7 +25,8 @@
 			<TsIcon
 				type="server"
 				source={content.Server.server}
-				connection={new OfflineConnection(content.Server.server.publicKeyStr)} />
+				connection={new OfflineConnection(content.Server.server.publicKeyStr)}
+			/>
 		{/if}
 	</div>
 	<div class="resultName">

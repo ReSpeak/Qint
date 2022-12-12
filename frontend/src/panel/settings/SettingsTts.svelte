@@ -26,7 +26,8 @@
 			display={(v) => v.name}
 			compare={(a, b) => a.voiceURI === b?.voiceURI}
 			bind:selected={synthSett.voice}
-			on:change={() => syncSettings()} />
+			on:change={() => syncSettings()}
+		/>
 	</KeyValue>
 	<KeyValue label="Speed" labelStyle="is-normal">
 		<Slider
@@ -35,7 +36,8 @@
 			step={0.1}
 			bind:value={synthSett.speed}
 			tooltip={true}
-			on:change={() => syncSettings()} />
+			on:change={() => syncSettings()}
+		/>
 	</KeyValue>
 	<KeyValue label="Volume" labelStyle="is-normal">
 		<Slider
@@ -44,7 +46,8 @@
 			step={0.05}
 			bind:value={synthSett.volume}
 			tooltip={true}
-			on:change={() => syncSettings()} />
+			on:change={() => syncSettings()}
+		/>
 	</KeyValue>
 	<KeyValue label="Preview" narrow={false} labelStyle="is-normal">
 		<div class="is-horizontal field">

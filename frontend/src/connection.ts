@@ -156,8 +156,7 @@ export class Connection implements IConnection {
 	}
 
 	private onClose(): void {
-		if (!this.getState().errored)
-			this._state.update((s) => s.setDisconnected());
+		if (!this.getState().errored) this._state.update((s) => s.setDisconnected());
 		// Plugins
 		for (const plugin of app.plugins) {
 			try {

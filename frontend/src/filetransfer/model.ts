@@ -1,12 +1,11 @@
 interface IFileSource {
-    readonly type: string;
+	readonly type: string;
 }
 
 class LocalFiles implements IFileSource {
-    get type(): "local" { return "local" };
+	get type(): "local" {
+		return "local";
+	}
 
-    constructor(
-        public filePaths: string[]
-    ) { }
+	constructor(public filePaths: string[]) {}
 }
-

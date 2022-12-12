@@ -36,7 +36,9 @@ export interface IInvokeConnection {
 }
 
 export class InvokeBackend<T extends IInvokeConnection> {
-	public get name() { return this.inner.name; }
+	public get name() {
+		return this.inner.name;
+	}
 
 	public readonly loudnessListener = fnBroadcast<[LoudnessData]>();
 	public connections: Map<string, InvokeBackendConnection> = new Map();

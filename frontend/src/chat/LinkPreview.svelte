@@ -26,7 +26,8 @@
 			src={result.imageSrc}
 			alt={textContent}
 			title="Click to enlarge"
-			on:click={() => (showBig = true)} />
+			on:click={() => (showBig = true)}
+		/>
 		{#if showBig}
 			<ImageModal src={result.imageSrc} bind:visible={showBig} />
 		{/if}

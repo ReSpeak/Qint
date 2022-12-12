@@ -25,12 +25,16 @@
 <TabSlot title="Notifications">
 	<table class="table">
 		<thead>
-			<tr
-				><td /><td>Text to speech</td><td>Notification</td><td
-					><abbr title="Notify only if it affects your client or your current channel"
-						>Only relevant notifcations</abbr
-					></td
-				></tr>
+			<tr>
+				<td />
+				<td>Text to speech</td>
+				<td>Notification</td>
+				<td>
+					<abbr title="Notify only if it affects your client or your current channel">
+						Only relevant notifcations
+					</abbr>
+				</td>
+			</tr>
 		</thead>
 		<tbody>
 			{#each notificationCategories as cat}
@@ -48,7 +52,8 @@
 								type="checkbox"
 								class="checkbox-switch is-info"
 								bind:checked={cat.attr.tts}
-								on:change={syncSettings} />
+								on:change={syncSettings}
+							/>
 						</div>
 					</td>
 					<td>
@@ -57,7 +62,8 @@
 								type="checkbox"
 								class="checkbox-switch is-info"
 								bind:checked={cat.attr.notification}
-								on:change={syncSettings} />
+								on:change={syncSettings}
+							/>
 						</div>
 					</td>
 					<td>
@@ -67,7 +73,8 @@
 									type="checkbox"
 									class="checkbox-switch is-info"
 									bind:checked={cat.attr.onlyRelevant}
-									on:change={syncSettings} />
+									on:change={syncSettings}
+								/>
 							</div>
 						{/if}
 					</td>

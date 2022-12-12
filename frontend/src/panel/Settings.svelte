@@ -15,9 +15,7 @@
 </script>
 
 <div class="settings">
-	<button
-		class="toolbutton is-small compact active"
-		on:click={() => app.showMainPanel()}>
+	<button class="toolbutton is-small compact active" on:click={() => app.showMainPanel()}>
 		<Icon name="close" />
 	</button>
 	<TabList _style="height:100%;">

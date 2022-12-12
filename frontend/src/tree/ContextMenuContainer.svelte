@@ -19,7 +19,8 @@
 	on:click={onClick}
 	tabindex="0"
 	class="context menu"
-	style="left: {mX}px; top: {mY}px;">
+	style="left: {mX}px; top: {mY}px;"
+>
 	<slot />
 </div>
 

@@ -72,15 +72,17 @@
 		class="button stickyLine"
 		class:selectedServerChat
 		tabindex="0"
-		on:contextmenu={onContextMenu}>
+		on:contextmenu={onContextMenu}
+	>
 		<TsIcon type="server" source={$server} {connection} />
 		<div class="serverName">
 			<ServerName server={$server} {connection} handleClicks={false} />
 		</div>
 		<div class="buttons">
 			{#if !$state.connected}
-				<button class="button is-danger is-small" on:click|stopPropagation={cancel}
-					>Cancel</button>
+				<button class="button is-danger is-small" on:click|stopPropagation={cancel}>
+					Cancel
+				</button>
 			{/if}
 		</div>
 		<span class="icons">

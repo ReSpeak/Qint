@@ -71,7 +71,8 @@
 				items={[...hotkeySubjects.keys()]}
 				display={(i) => hotkeySubjects.get(i) ?? "<?>"}
 				on:change={onDropdownChange}
-				bind:selected={selectedSubject} />
+				bind:selected={selectedSubject}
+			/>
 		</div>
 		<div class="control">
 			<input bind:this={input} class="input" value={hotkeyToString(hotkey)} />

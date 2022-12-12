@@ -75,21 +75,24 @@
 		class="inlineButton"
 		class:active={inputMuted}
 		on:click={() => changeOwnClient({ inputMuted: !inputMuted })}
-		title="Mute microphone">
+		title="Mute microphone"
+	>
 		<Icon name={inputMuted ? "microphone-off" : "microphone"} />
 	</div>
 	<div
 		class="inlineButton"
 		class:active={outputMuted}
 		on:click={() => changeOwnClient({ outputMuted: !outputMuted })}
-		title="Mute output">
+		title="Mute output"
+	>
 		<Icon name={outputMuted ? "volume-off" : "volume-high"} />
 	</div>
 	<div
 		class="inlineButton"
 		class:active={isAway}
 		on:click={() => changeOwnClient({ away: isAway ? null : "" })}
-		title="Toggle away">
+		title="Toggle away"
+	>
 		<Icon name={isAway ? "sleep" : "sleep-off"} />
 	</div>
 </div>

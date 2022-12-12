@@ -66,21 +66,24 @@
 	class:tinyStyle={true}
 	class:bigDesign={false}
 	class:smallDesign={true}
-	on:mousedown={startDragWindow}>
+	on:mousedown={startDragWindow}
+>
 	<div class="leftBlock">
 		<div class="inlineButtons">
 			<div
 				class="inlineButton"
 				class:active={showSidebar}
 				on:click={() => toggleSidebar(!showSidebar)}
-				title="Channel tree">
+				title="Channel tree"
+			>
 				<Icon name="file-tree" />
 			</div>
 			<div
 				class="inlineButton"
 				class:active={displayPanel === DisplayPanel.Connect}
 				on:click={() => togglePanel(DisplayPanel.Connect)}
-				title="Connect to a new server">
+				title="Connect to a new server"
+			>
 				<Icon name="plus" />
 			</div>
 		</div>
@@ -95,7 +98,8 @@
 			class="inlineButton"
 			class:active={displayPanel === DisplayPanel.Settings}
 			on:click={() => togglePanel(DisplayPanel.Settings)}
-			title="Settings">
+			title="Settings"
+		>
 			<Icon name="cog" />
 		</div>
 	</div>

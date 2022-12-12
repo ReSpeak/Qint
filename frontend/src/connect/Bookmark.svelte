@@ -54,7 +54,8 @@
 	class="bookmarkItem"
 	on:click={doConnect}
 	title={bookmark.server?.name}
-	class:bookmark={bookmark.bookmark}>
+	class:bookmark={bookmark.bookmark}
+>
 	<div class="bookmarkIcon">
 		<TsIcon type="server" source={{ icon: bookmark.server?.icon }} {connection} />
 	</div>

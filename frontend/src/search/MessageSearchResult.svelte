@@ -17,7 +17,8 @@
 				<TsIcon
 					type="client"
 					source={content.message.invoker}
-					connection={new OfflineConnection(content.server)} />
+					connection={new OfflineConnection(content.server)}
+				/>
 			{:else}
 				<Icon name={SERVER_ICON} />
 			{/if}
@@ -36,7 +37,8 @@
 		connection={new OfflineConnection(content.server)}
 		messageHighlightedContent={content.highlightedContent === null
 			? undefined
-			: content.highlightedContent} />
+			: content.highlightedContent}
+	/>
 </div>
 
 <style lang="scss">

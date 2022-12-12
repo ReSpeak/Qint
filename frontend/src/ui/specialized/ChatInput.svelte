@@ -260,7 +260,8 @@
 		on:paste={handlePaste}
 		class="input textBox"
 		name="message"
-		contenteditable="true" />
+		contenteditable="true"
+	/>
 </div>
 
 <style lang="scss">

@@ -43,14 +43,16 @@
 	class="inlineButton"
 	class:active={infoActive}
 	on:click={() => setDescriptionMode(DescriptionMode.Info)}
-	title="Details">
+	title="Details"
+>
 	<Icon name="information-outline" />
 </div>
 <div
 	class="inlineButton"
 	class:active={editActive}
 	on:click={() => setDescriptionMode(DescriptionMode.Edit)}
-	title="Edit">
+	title="Edit"
+>
 	<Icon name="pencil" />
 </div>
 {#if !(selected.node instanceof Client)}
@@ -58,7 +60,8 @@
 		class="inlineButton"
 		class:active={filesActive}
 		on:click={() => setDescriptionMode(DescriptionMode.Files)}
-		title="Browse files">
+		title="Browse files"
+	>
 		<Icon name="folder" />
 	</div>
 {/if}

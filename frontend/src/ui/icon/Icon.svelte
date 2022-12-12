@@ -16,7 +16,8 @@
 	{:else}
 		<i
 			class="mdi mdi-{name ?? 'dummy'}"
-			style="font-size:{typeof size === 'number' ? size + 'px' : size};{style}" />
+			style="font-size:{typeof size === 'number' ? size + 'px' : size};{style}"
+		/>
 	{/if}
 </span>
 

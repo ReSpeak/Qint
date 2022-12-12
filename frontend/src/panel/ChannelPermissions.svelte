@@ -61,7 +61,8 @@
 			<button
 				class="toolbutton is-small"
 				style="float: right;"
-				on:click={() => (loadPermissions = undefined)}>
+				on:click={() => (loadPermissions = undefined)}
+			>
 				<Icon name="close" />
 			</button>
 			<ChangeResult result={changeResult} />

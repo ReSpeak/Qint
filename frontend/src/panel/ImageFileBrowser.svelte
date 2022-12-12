@@ -223,13 +223,15 @@
 	on:blur={() => (fileBrowserHasFocus = false)}
 	on:focus={() => (fileBrowserHasFocus = true)}
 	tabindex={0}
-	class="padBox">
+	class="padBox"
+>
 	{#if currentState === WorkState.DraggingFilesForUpload}
 		<div
 			on:dragleave={dragLeave}
 			on:dragover={dragOver}
 			on:drop={dragDrop}
-			class="fileDropOverlay">
+			class="fileDropOverlay"
+		>
 			<div class="fileDropInnerBorder">
 				<Icon name="file-upload-outline" size="12em" />
 			</div>
@@ -245,7 +247,8 @@
 				title="Upload files"
 				on:click={() => uploadFiles()}
 				class:is-info={is_uploading}
-				class="button">
+				class="button"
+			>
 				<Icon name={is_uploading ? "orbit mdi-spin" : "upload"} />
 			</button>
 		{/if}
@@ -253,7 +256,8 @@
 			<DeleteConfirmButton
 				disabled={fileSelection.length === 0}
 				bind:isConfirming={isConfirmingDelete}
-				on:delete={deleteFiles} />
+				on:delete={deleteFiles}
+			/>
 		{/if}
 	</div>
 
@@ -267,13 +271,15 @@
 						class="image"
 						class:selected={fileSelection.includes(file)}
 						on:click={() => onFileClick(file)}
-						on:dblclick={() => onFileDblClick(file)}>
+						on:dblclick={() => onFileDblClick(file)}
+					>
 						{#await getPath(file.name) then path}
 							<img
 								src={path}
 								alt={file.name}
 								title={file.name}
-								style="max-width: {maxSize}; max-height: {maxSize};" />
+								style="max-width: {maxSize}; max-height: {maxSize};"
+							/>
 						{/await}
 					</span>
 				{/if}

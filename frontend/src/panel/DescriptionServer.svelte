@@ -188,20 +188,23 @@
 			{#if editing}
 				<button
 					class="button is-small is-success"
-					on:click|stopPropagation={clickSaveChanges}>
+					on:click|stopPropagation={clickSaveChanges}
+				>
 					<Icon name="check" />
 					<span>Save</span>
 				</button>
 				<button
 					class="button is-small is-danger"
-					on:click|stopPropagation={() => (editing = false)}>
+					on:click|stopPropagation={() => (editing = false)}
+				>
 					<Icon name="close" />
 					<span>Cancel</span>
 				</button>
 			{:else}
 				<button
 					class="button is-small outline-button"
-					on:click|stopPropagation={clickEditMode}>
+					on:click|stopPropagation={clickEditMode}
+				>
 					<Icon name="pencil" />
 					<span>Edit</span>
 				</button>
@@ -215,7 +218,8 @@
 					<button
 						class="toolbutton is-small"
 						style="float: right;"
-						on:click={() => (changeRequest = undefined)}>
+						on:click={() => (changeRequest = undefined)}
+					>
 						<Icon name="close" />
 					</button>
 					<ChangeResult result={changeResult} />
@@ -251,7 +255,8 @@
 					path={["0", "icons"]}
 					canShowBig={false}
 					forSelection={true}
-					bind:selection={iconSelection} />
+					bind:selection={iconSelection}
+				/>
 			</div>
 		{/if}
 		{#if editing}
@@ -261,7 +266,8 @@
 					id="edit_phoneticName"
 					class="input"
 					bind:value={servEdit.phoneticName}
-					placeholder="Same as name by default" />
+					placeholder="Same as name by default"
+				/>
 			</div>
 		{/if}
 		{#if editing}
@@ -295,7 +301,10 @@
 		{#if $server.optionalData !== null}
 			<div class="dataLine">
 				<div>Uptime:</div>
-				<div title={"ca. " + moment().subtract($server.optionalData.uptime).format(LONG_DATETIME)}>
+				<div
+					title={"ca. " +
+						moment().subtract($server.optionalData.uptime).format(LONG_DATETIME)}
+				>
 					{formatDuration($server.optionalData.uptime)}
 				</div>
 			</div>
@@ -307,7 +316,8 @@
 					id="edit_maxClients"
 					class="input"
 					type="number"
-					bind:value={servEdit.maxClients} />
+					bind:value={servEdit.maxClients}
+				/>
 			</div>
 			<div class="dataLine">
 				<label for="edit_reservedSlots">Reserved slots:</label>
@@ -315,7 +325,8 @@
 					id="edit_reservedSlots"
 					class="input"
 					type="number"
-					bind:value={servEditOpt.reservedSlots} />
+					bind:value={servEditOpt.reservedSlots}
+				/>
 			</div>
 		{:else}
 			<div class="dataLine">
@@ -360,7 +371,8 @@
 						<img
 							src={$server.hostbuttonGfxUrl}
 							alt={$server.hostbuttonTooltip}
-							class="hostbutton" />
+							class="hostbutton"
+						/>
 					</a>
 				</div>
 			{/if}
@@ -386,7 +398,8 @@
 				<DropDown
 					id="edit_hostmessageMode"
 					bind:selected={servEdit.hostmessageMode}
-					items={enumValues(HostMessageMode)} />
+					items={enumValues(HostMessageMode)}
+				/>
 			</div>
 
 			<div class="dataLine">
@@ -401,14 +414,16 @@
 				<input
 					id="edit_hostbannerGfxUrl"
 					class="input"
-					bind:value={servEdit.hostbannerGfxUrl} />
+					bind:value={servEdit.hostbannerGfxUrl}
+				/>
 			</div>
 			<div class="dataLine">
 				<label for="edit_hostbannerMode">Mode:</label>
 				<DropDown
 					id="edit_hostbannerMode"
 					bind:selected={servEdit.hostbannerMode}
-					items={enumValues(HostBannerMode)} />
+					items={enumValues(HostBannerMode)}
+				/>
 			</div>
 
 			<div class="dataLine">
@@ -423,14 +438,16 @@
 				<input
 					id="edit_hostbuttonGfxUrl"
 					class="input"
-					bind:value={servEdit.hostbuttonGfxUrl} />
+					bind:value={servEdit.hostbuttonGfxUrl}
+				/>
 			</div>
 			<div class="dataLine">
 				<label for="edit_hostbuttonTooltip">Tooltip:</label>
 				<input
 					id="edit_hostbuttonTooltip"
 					class="input"
-					bind:value={servEdit.hostbuttonTooltip} />
+					bind:value={servEdit.hostbuttonTooltip}
+				/>
 			</div>
 		</div>
 
@@ -441,7 +458,8 @@
 				<DropDown
 					id="edit_codecEncryptionMode"
 					bind:selected={servEdit.codecEncryptionMode}
-					items={enumValues(CodecEncryptionMode)} />
+					items={enumValues(CodecEncryptionMode)}
+				/>
 			</div>
 
 			<div class="dataLine">
@@ -456,12 +474,14 @@
 							placeholder={server.optionalData?.hasPassword &&
 							servEditOpt.hasPassword !== false
 								? PASSWORD_PLACEHOLDER
-								: ""} />
+								: ""}
+						/>
 					</div>
 					{#if server.optionalData?.hasPassword && servEditOpt.hasPassword !== false}
 						<div class="control">
-							<button class="button" on:click={editClearPasword}
-								><Icon name={CLEAR_ICON} /></button>
+							<button class="button" on:click={editClearPasword}>
+								<Icon name={CLEAR_ICON} />
+							</button>
 						</div>
 					{/if}
 				</div>

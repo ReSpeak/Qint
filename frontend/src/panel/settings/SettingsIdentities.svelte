@@ -105,7 +105,8 @@
 						class:is-active={selectedIndex === index}
 						on:click={() => {
 							selectIndex(index);
-						}}>
+						}}
+					>
 						<Icon name="account" />
 						<span class:isSelected={selectedIndex === index}>{identity.name}</span>
 					</a>
@@ -168,7 +169,8 @@
 						<button
 							type="button"
 							class="button is-danger"
-							on:click={() => deleteIdentity()}>
+							on:click={() => deleteIdentity()}
+						>
 							<Icon name="delete" />
 							<span>Delete</span>
 						</button>
@@ -180,7 +182,8 @@
 							title="Export this identity"
 							on:click={() => {
 								/* TODO */
-							}}>
+							}}
+						>
 							<Icon name="file-export-outline" />
 							<span>Export</span>
 							<!-- TODO add dropdown with -->

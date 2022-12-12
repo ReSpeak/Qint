@@ -37,7 +37,8 @@
 		<HotkeyField
 			{hotkey}
 			on:change={() => syncHotkeys()}
-			on:remove={() => deleteHotkey(index)} />
+			on:remove={() => deleteHotkey(index)}
+		/>
 	{/each}
 
 	<KeyValue label="Add hotkey" labelStyle="is-normal">

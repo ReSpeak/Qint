@@ -7,7 +7,8 @@
 		on:dragleave|preventDefault
 		on:dragover|preventDefault
 		on:drop|preventDefault
-		class="fileDropOverlay">
+		class="fileDropOverlay"
+	>
 		<div class="fileDropInnerBorder">
 			<Icon name="file-upload-outline" size="12em" />
 		</div>

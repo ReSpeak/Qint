@@ -183,7 +183,8 @@
 					<a
 						class="panel-block"
 						class:is-active={selectedPlugin === plugin}
-						on:click={() => (selectedPlugin = plugin)}>
+						on:click={() => (selectedPlugin = plugin)}
+					>
 						<Icon name="toy-brick-outline" />
 						<span class:isSelected={selectedPlugin === plugin}>{plugin}</span>
 					</a>
@@ -192,7 +193,8 @@
 					<a
 						class="panel-block"
 						class:is-active={selectedPlugin === plugin}
-						on:click={() => (selectedPlugin = plugin)}>
+						on:click={() => (selectedPlugin = plugin)}
+					>
 						<Icon name="toy-brick-outline" />
 						<span class:isSelected={selectedPlugin === plugin}>{plugin}</span>
 					</a>
@@ -219,7 +221,8 @@
 						type="submit"
 						class="button is-success"
 						disabled={!(selectedPlugin in editingPlugins) &&
-							selectedPluginName === selectedPlugin}>
+							selectedPluginName === selectedPlugin}
+					>
 						<Icon name="content-save" />
 						<span>Save</span>
 					</button>
@@ -235,7 +238,8 @@
 						class="textarea editArea"
 						on:keyup={editAreaChanged}
 						on:change={editAreaChanged}
-						disabled={isLoading} />
+						disabled={isLoading}
+					/>
 				</div>
 			{/if}
 		</form>

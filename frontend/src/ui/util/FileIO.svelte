@@ -44,9 +44,11 @@
 	bind:this={uploader}
 	on:change={uploadFilesCallback}
 	type="file"
-	multiple />
+	multiple
+/>
 <iframe
 	title="Dummy Downloader"
 	style="display: none;"
 	bind:this={downloader}
-	sandbox="allow-downloads" />
+	sandbox="allow-downloads"
+/>

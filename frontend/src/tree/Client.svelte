@@ -201,7 +201,8 @@
 			on:svddrag={dragStart}
 			on:svddrop={dragDrop}
 			data-type="client"
-			data-key={$client.id}>
+			data-key={$client.id}
+		>
 			<!--<div class:talking={$client.talking !== TalkState.Off} class="talkWave" />-->
 			<div class="talkWave talking">
 				<VoiceGraph
@@ -209,7 +210,8 @@
 					style="width: 100%; height: 100%"
 					min={LOUDNESS_MIN}
 					max={LOUDNESS_MAX}
-					count={LOUDNESS_HISTORY} />
+					count={LOUDNESS_HISTORY}
+				/>
 			</div>
 			<TsIcon type="client" source={$client} {connection} />
 			<span class="nameBox" style="color:{$client.color};">
@@ -223,7 +225,8 @@
 					<Icon
 						name={clientProperties[0]}
 						style={clientProperties[1]}
-						title={clientProperties[2]} />
+						title={clientProperties[2]}
+					/>
 				{/if}
 				{#each sortedServerGroups as grp (grp)}
 					<ServerGroupIcon id={grp} {connection} />

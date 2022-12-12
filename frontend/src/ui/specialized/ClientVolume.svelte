@@ -50,7 +50,8 @@
 		bind:value={clientVolume}
 		display={(n) => `${n} dB`}
 		tooltip={true}
-		on:input={updateVolume} />
+		on:input={updateVolume}
+	/>
 </div>
 
 <style lang="scss">

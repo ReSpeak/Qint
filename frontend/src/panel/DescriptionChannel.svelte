@@ -239,20 +239,23 @@
 			{#if editing}
 				<button
 					class="button is-small is-success"
-					on:click|stopPropagation={clickSaveChanges}>
+					on:click|stopPropagation={clickSaveChanges}
+				>
 					<Icon name="check" />
 					<span>Save</span>
 				</button>
 				<button
 					class="button is-small is-danger"
-					on:click|stopPropagation={() => (editing = false)}>
+					on:click|stopPropagation={() => (editing = false)}
+				>
 					<Icon name="close" />
 					<span>Cancel</span>
 				</button>
 			{:else}
 				<button
 					class="button is-small outline-button"
-					on:click|stopPropagation={clickEditMode}>
+					on:click|stopPropagation={clickEditMode}
+				>
 					<Icon name="pencil" />
 					<span>Edit</span>
 				</button>
@@ -266,7 +269,8 @@
 					<button
 						class="toolbutton is-small"
 						style="float: right;"
-						on:click={() => (changeRequest = undefined)}>
+						on:click={() => (changeRequest = undefined)}
+					>
 						<Icon name="close" />
 					</button>
 					<ChangeResult result={changeResult} />
@@ -280,7 +284,8 @@
 					<TsIcon
 						type="channel"
 						source={{ icon: iconPathToId(iconSelection) }}
-						{connection} />
+						{connection}
+					/>
 				</button>
 			{:else}
 				<TsIcon type="channel" source={$channel} {connection} />
@@ -305,7 +310,8 @@
 					path={["0", "icons"]}
 					canShowBig={false}
 					forSelection={true}
-					bind:selection={iconSelection} />
+					bind:selection={iconSelection}
+				/>
 			</div>
 		{/if}
 
@@ -341,7 +347,8 @@
 					id="edit_codec"
 					bind:selected={chanEdit.codec}
 					items={codecOpt}
-					display={codecToName} />
+					display={codecToName}
+				/>
 			</div>
 			<div class="dataLine">
 				<label for="edit_codecQuality">Codec quality:</label>
@@ -352,12 +359,14 @@
 						max={10}
 						step={1}
 						tooltip={true}
-						bind:value={chanEdit.codecQuality} />
+						bind:value={chanEdit.codecQuality}
+					/>
 				</div>
 			</div>
 			<div
 				class="dataLine"
-				class:disabled={server.codecEncryptionMode !== CodecEncryptionMode.PerChannel}>
+				class:disabled={server.codecEncryptionMode !== CodecEncryptionMode.PerChannel}
+			>
 				<label for="channel_codec_encrypted">Voice encrypted:</label>
 				{#if server.codecEncryptionMode === CodecEncryptionMode.ForcedOff}
 					<i>(Serverwide disabled)</i>
@@ -368,7 +377,8 @@
 						id="channel_codec_encrypted"
 						type="checkbox"
 						class="checkbox-switch is-info"
-						bind:checked={chanEdit._isEncrypted} />
+						bind:checked={chanEdit._isEncrypted}
+					/>
 				{/if}
 			</div>
 		{:else}
@@ -394,7 +404,8 @@
 						id="edit_neededTalkPower"
 						class="input"
 						type="number"
-						bind:value={chanEdit.neededTalkPower} />
+						bind:value={chanEdit.neededTalkPower}
+					/>
 				{:else}
 					<div>{$channel.neededTalkPower}</div>
 				{/if}
@@ -409,32 +420,38 @@
 		{#if editing}
 			<div class="dataLine">
 				<label for="edit_maxClients" title="Maximum amount of clients in this channel"
-					>Max clients:</label>
+					>Max clients:</label
+				>
 				<DropDown
 					id="edit_maxClients"
 					bind:selected={chanEditMaxClientsMode}
-					items={enumValues(MaxClientsMode)} />
+					items={enumValues(MaxClientsMode)}
+				/>
 				{#if chanEditMaxClientsMode === MaxClientsMode.Limited}
 					<input
 						class="input maxClientsLimit"
 						type="number"
-						bind:value={chanEditMaxClientsLimit} />
+						bind:value={chanEditMaxClientsLimit}
+					/>
 				{/if}
 			</div>
 			<div class="dataLine">
 				<label
 					for="edit_maxFamilyClients"
 					title="Maximum amount of clients in this channel and all subchannels combined"
-					>Max family clients:</label>
+					>Max family clients:</label
+				>
 				<DropDown
 					id="edit_maxFamilyClients"
 					bind:selected={chanEditMaxFamilyClientsMode}
-					items={enumValues(MaxClientsMode)} />
+					items={enumValues(MaxClientsMode)}
+				/>
 				{#if chanEditMaxFamilyClientsMode === MaxClientsMode.Limited}
 					<input
 						class="input maxClientsLimit"
 						type="number"
-						bind:value={chanEditMaxFamilyClientsLimit} />
+						bind:value={chanEditMaxFamilyClientsLimit}
+					/>
 				{/if}
 			</div>
 		{:else}
@@ -464,12 +481,14 @@
 							bind:value={chanEdit._password}
 							placeholder={channel.hasPassword && chanEdit.hasPassword !== false
 								? PASSWORD_PLACEHOLDER
-								: ""} />
+								: ""}
+						/>
 					</div>
 					{#if channel.hasPassword && chanEdit.hasPassword !== false}
 						<div class="control">
 							<button class="button" on:click={editClearPasword}
-								><Icon name={CLEAR_ICON} /></button>
+								><Icon name={CLEAR_ICON} /></button
+							>
 						</div>
 					{/if}
 				</div>
@@ -488,7 +507,8 @@
 				{:else}
 					<RenderedText
 						{connection}
-						text={$channel.optionalData?.descriptionRendered ?? ""} />
+						text={$channel.optionalData?.descriptionRendered ?? ""}
+					/>
 				{/if}
 			{/await}
 		{/if}

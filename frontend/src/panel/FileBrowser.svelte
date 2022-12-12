@@ -369,7 +369,8 @@
 	on:blur={() => (fileBrowserHasFocus = false)}
 	on:focus={() => (fileBrowserHasFocus = true)}
 	tabindex={0}
-	class="padBox">
+	class="padBox"
+>
 	{#if currentState === WorkState.DraggingFilesForUpload}
 		<DropOverlay on:dragleave={dragLeave} on:dragover={dragOver} on:drop={dragDrop} />
 	{/if}
@@ -382,13 +383,15 @@
 			title="Upload files"
 			on:click={() => askUpload()}
 			class:is-info={is_uploading}
-			class="button">
+			class="button"
+		>
 			<Icon name={is_uploading ? "orbit mdi-spin" : "upload"} />
 		</button>
 		<button
 			class="button"
 			class:is-info={currentState === WorkState.CreatingNewFolder}
-			on:click={createNewFolderClick}>
+			on:click={createNewFolderClick}
+		>
 			<Icon name="folder-plus" />
 		</button>
 		<!-- <div style="flex:1;" /> -->
@@ -396,13 +399,15 @@
 			class="button"
 			disabled={fileSelection.length !== 1}
 			class:is-info={currentState === WorkState.EditingFile}
-			on:click={clickEditFile}>
+			on:click={clickEditFile}
+		>
 			<Icon name="pen" />
 		</button>
 		<DeleteConfirmButton
 			disabled={fileSelection.length === 0}
 			bind:isConfirming={isConfirmingDelete}
-			on:delete={deleteFiles} />
+			on:delete={deleteFiles}
+		/>
 	</div>
 
 	<nav class="breadcrumb" aria-label="path">
@@ -414,7 +419,8 @@
 					data-key="/"
 					class="crumb home"
 					class:crubclickable={path.length > 0}
-					class:selected={path.length === 0}>
+					class:selected={path.length === 0}
+				>
 					<Icon name="folder-home" />
 					<span>{channel?.name ?? "Server"}</span>
 				</div>
@@ -425,7 +431,8 @@
 						on:click={() => goUp(dep + 1)}
 						data-type="folder"
 						data-key={pathJoin(...path.slice(0, dep + 1))}
-						class="crumb crubclickable">
+						class="crumb crubclickable"
+					>
 						{folder}
 					</div>
 				</li>
@@ -451,7 +458,8 @@
 		on:selectionChanged={selectionChanged}
 		on:dragEnter={dropTargetEnter}
 		on:dragLeave={dropTargetLeave}
-		on:dragDrop={dropRowsToTarget}>
+		on:dragDrop={dropRowsToTarget}
+	>
 		{#if currentState === WorkState.CreatingNewFolder}
 			<tr>
 				<td style="vertical-align: middle;">
@@ -463,12 +471,14 @@
 						on:keydown={(e) => {
 							if (e.key === "Escape") createNewFolderClick();
 						}}
-						class="flex">
+						class="flex"
+					>
 						<input
 							in:focus|local
 							class="input mr-2"
 							type="text"
-							bind:value={createNewFolderName} />
+							bind:value={createNewFolderName}
+						/>
 						<button class="button" type="submit">
 							<Icon name="check" />
 						</button>

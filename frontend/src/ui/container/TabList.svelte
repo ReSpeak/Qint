@@ -54,7 +54,8 @@
 						on:click={() => {
 							activeId = id;
 							tryRestoreTab = undefined;
-						}}>
+						}}
+					>
 						{title}
 					</a>
 				</li>

@@ -312,7 +312,8 @@
 			{fetchElements}
 			suggestJumpEnd={true}
 			notifyViewChanged={chatData !== undefined && $chatData.unreadCount > 0}
-			let:item>
+			let:item
+		>
 			<div slot="loading" class="chatFiller">
 				<span>Loading ...</span>
 				<Icon name="orbit mdi-spin" />
@@ -344,7 +345,8 @@
 			<UiMessage
 				message={item}
 				unread={chatData !== undefined && item.date > $chatData.lastRead}
-				connection={sel.connection} />
+				connection={sel.connection}
+			/>
 		</LazyList>
 		<form class="chat-form" class:hidden={!canChatHere} on:submit|preventDefault={sendMessage}>
 			{#if sendError !== undefined}
@@ -357,7 +359,8 @@
 					hasHistory={true}
 					on:submit={sendMessage}
 					on:structureChanged={chatboxContentChanged}
-					on:historyMove={chatboxHistoryMove}>
+					on:historyMove={chatboxHistoryMove}
+				>
 					<svelte:fragment slot="placeholder">
 						<span>Send&nbsp;to&nbsp;</span>
 						{#if sel.node instanceof Client}
@@ -374,7 +377,8 @@
 					class:is-loading={isSending}
 					name="send"
 					type="submit"
-					style="height: auto;">Send</button>
+					style="height: auto;">Send</button
+				>
 			</div>
 		</form>
 		{#if $developMode}
@@ -382,7 +386,8 @@
 				<div class="sendCombo">
 					<ChatInput bind:value={command} />
 					<button class="button" name="send" type="submit" style="height: auto;"
-						>Send Command</button>
+						>Send Command</button
+					>
 				</div>
 			</form>
 		{/if}

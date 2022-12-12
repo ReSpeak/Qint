@@ -30,7 +30,8 @@
 			type="checkbox"
 			class="checkbox-switch is-info"
 			bind:checked={appSettings.askBeforeClosing}
-			on:change={syncSettings} />
+			on:change={syncSettings}
+		/>
 	</KeyValue>
 	{#if IS_TAURI}
 		<KeyValue label="Minimize to Tray">
@@ -38,14 +39,16 @@
 				type="checkbox"
 				class="checkbox-switch is-info"
 				bind:checked={appSettings.minimizeToTray}
-				on:change={syncSettings} />
+				on:change={syncSettings}
+			/>
 		</KeyValue>
 		<KeyValue label="Close to Tray">
 			<input
 				type="checkbox"
 				class="checkbox-switch is-info"
 				bind:checked={appSettings.closeToTray}
-				on:change={syncSettings} />
+				on:change={syncSettings}
+			/>
 		</KeyValue>
 		<KeyValue label="Window Design" autoLabel={false}>
 			<div>
@@ -55,10 +58,11 @@
 					name="titleBarStyle"
 					bind:group={$titleBarStyle}
 					value={TitleBarStyle.Native}
-					on:change={syncSettings} />
+					on:change={syncSettings}
+				/>
 				<label for="tb1">Native</label>
 			</div>
-	
+
 			<div>
 				<input
 					type="radio"
@@ -66,7 +70,8 @@
 					name="titleBarStyle"
 					bind:group={$titleBarStyle}
 					value={TitleBarStyle.Normal}
-					on:change={syncSettings} />
+					on:change={syncSettings}
+				/>
 				<label for="tb2">Normal</label>
 			</div>
 		</KeyValue>
@@ -76,13 +81,15 @@
 			type="checkbox"
 			class="checkbox-switch is-info"
 			bind:checked={$developMode}
-			on:change={syncSettings} />
+			on:change={syncSettings}
+		/>
 	</KeyValue>
 	{#if !IS_TAURI}
 		{#if browserNotificationPermission === "default"}
 			<KeyValue label="">
-				<button class="button is-warning" on:click={enableBrowserNotifications}
-					>Enable browser notifications</button>
+				<button class="button is-warning" on:click={enableBrowserNotifications}>
+					Enable browser notifications
+				</button>
 			</KeyValue>
 		{:else if browserNotificationPermission === "denied"}
 			<article class="message is-warning">
@@ -91,7 +98,8 @@
 					<button
 						class="delete"
 						aria-label="delete"
-						on:click={updateNotificationSetting} />
+						on:click={updateNotificationSetting}
+					/>
 				</div>
 				<div class="message-body">
 					Your browser blocked notifications for this page. If you want to use them,

@@ -503,20 +503,23 @@
 			{#if editing}
 				<button
 					class="button is-small is-success"
-					on:click|stopPropagation={clickSaveChanges}>
+					on:click|stopPropagation={clickSaveChanges}
+				>
 					<Icon name="check" />
 					<span>Save</span>
 				</button>
 				<button
 					class="button is-small is-danger"
-					on:click|stopPropagation={() => (editing = false)}>
+					on:click|stopPropagation={() => (editing = false)}
+				>
 					<Icon name="close" />
 					<span>Cancel</span>
 				</button>
 			{:else}
 				<button
 					class="button is-small outline-button"
-					on:click|stopPropagation={clickEditMode}>
+					on:click|stopPropagation={clickEditMode}
+				>
 					<Icon name="pencil" />
 					<span>Edit</span>
 				</button>
@@ -530,7 +533,8 @@
 					<button
 						class="toolbutton is-small"
 						style="float: right;"
-						on:click={() => (changeRequest = undefined)}>
+						on:click={() => (changeRequest = undefined)}
+					>
 						<Icon name="close" />
 					</button>
 					<ChangeResult result={changeResult} />
@@ -544,7 +548,8 @@
 					<TsIcon
 						type="client"
 						source={{ icon: iconPathToId(iconSelection) }}
-						{connection} />
+						{connection}
+					/>
 				</button>
 			{:else}
 				<TsIcon type="client" source={{ icon: $client.icon }} {connection} />
@@ -554,7 +559,8 @@
 					<Icon
 						name="information-outline"
 						title="Change is not visible for others"
-						style="margin-right: 0.5em;" />
+						style="margin-right: 0.5em;"
+					/>
 				{/if}
 				<input class="input" type="text" bind:value={clientSpecialEdit.name} />
 			{:else}
@@ -567,7 +573,8 @@
 			{#if $client.optionalData !== null}
 				<PlatformIcon
 					platform={$client.optionalData.platform}
-					version={$client.optionalData.version} />
+					version={$client.optionalData.version}
+				/>
 			{/if}
 		</div>
 
@@ -578,7 +585,8 @@
 					path={["0", "icons"]}
 					canShowBig={false}
 					forSelection={true}
-					bind:selection={iconSelection} />
+					bind:selection={iconSelection}
+				/>
 			</div>
 		{/if}
 
@@ -587,14 +595,16 @@
 				<label for="edit_phoneticName">
 					Phonetic name{#if !ownClient}<Icon
 							name="information-outline"
-							title="Change is not visible for others" />{/if}:
+							title="Change is not visible for others"
+						/>{/if}:
 				</label>
 				<div>
 					<input
 						id="edit_phoneticName"
 						class="input"
 						type="text"
-						bind:value={clientSpecialEdit.phoneticName} />
+						bind:value={clientSpecialEdit.phoneticName}
+					/>
 				</div>
 			{/if}
 			<label for="edit_description">Description:</label>
@@ -604,15 +614,26 @@
 						id="edit_description"
 						class="input"
 						type="text"
-						bind:value={clientEdit.description} />
+						bind:value={clientEdit.description}
+					/>
 				{:else}{$client.description}{/if}
 			</div>
 			<div>Online:</div>
-			<div title={$client.connectionData !== null ? ("ca. " + moment().subtract($client.connectionData.connectedTime).format(LONG_DATETIME)) : ""}>
+			<div
+				title={$client.connectionData !== null
+					? "ca. " +
+					  moment().subtract($client.connectionData.connectedTime).format(LONG_DATETIME)
+					: ""}
+			>
 				{formatDuration($client.connectionData?.connectedTime)}
 			</div>
 			<div>Last active:</div>
-			<div title={$client.connectionData !== null ? ("ca. " + moment().subtract($client.connectionData.idleTime).format(LONG_DATETIME)) : ""}>
+			<div
+				title={$client.connectionData !== null
+					? "ca. " +
+					  moment().subtract($client.connectionData.idleTime).format(LONG_DATETIME)
+					: ""}
+			>
 				{formatDuration($client.connectionData?.idleTime)}
 			</div>
 			{#if ownClient}
@@ -651,13 +672,15 @@
 						id="client_channel_commander"
 						type="checkbox"
 						class="checkbox-switch is-info"
-						bind:checked={clientSpecialEdit.isChannelCommander} />
+						bind:checked={clientSpecialEdit.isChannelCommander}
+					/>
 				</div>
 				<div>Avatar:</div>
 				<div>
 					{#if ownClient}
 						<button class="button is-small is-info" on:click={() => uploadAvatar()}
-							>Upload</button>
+							>Upload</button
+						>
 					{/if}
 					{#if avatarPath}
 						<button class="button is-small is-danger" on:click={deleteAvatar}>
@@ -673,7 +696,8 @@
 				src={avatarPath}
 				alt="Client avatar"
 				title="Click to enlarge"
-				on:click={() => (showBigAvatar = true)} />
+				on:click={() => (showBigAvatar = true)}
+			/>
 		{/if}
 		<div class="serverGroups">
 			<div>Server Groups:</div>
@@ -686,7 +710,8 @@
 								class="checkbox-switch is-info"
 								id={"group" + grp.inner.id}
 								on:input={(e) => changeServerGroup(e, grp.inner.id, !grp.isMember)}
-								checked={grp.isMember} />
+								checked={grp.isMember}
+							/>
 						</div>
 						<div class="serverGroupSpacing" />
 						<div class="serverGroupIcon">
@@ -721,7 +746,8 @@
 				</button>
 				<button
 					class="button is-small is-warning"
-					on:click={() => kick(Reason.KickChannel)}>
+					on:click={() => kick(Reason.KickChannel)}
+				>
 					<Icon name="shoe-formal" />
 					<span>Kick Channel</span>
 				</button>
@@ -748,7 +774,8 @@
 						class="input pokeInput"
 						type="text"
 						bind:this={pokeInput}
-						bind:value={pokeMessage} />
+						bind:value={pokeMessage}
+					/>
 					<button type="submit" slot="footer" class="button is-success">Poke</button>
 				</Modal>
 			</form>

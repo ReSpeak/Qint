@@ -118,7 +118,8 @@
 							id={"perm" + perm}
 							class="input"
 							type="number"
-							bind:value={allPermissions[perm].permissionValue} />
+							bind:value={allPermissions[perm].permissionValue}
+						/>
 					</td>
 					<td>
 						<button on:click={() => resetPerm(perm)}><Icon name="undo" /></button>

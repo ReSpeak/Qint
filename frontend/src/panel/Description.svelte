@@ -23,7 +23,8 @@
 		<DescriptionChannel
 			connection={selection.connection}
 			channel={selection.node}
-			bind:editing />
+			bind:editing
+		/>
 	{:else if selection.node instanceof Server && selection.connection !== undefined}
 		<DescriptionServer connection={selection.connection} server={selection.node} bind:editing />
 	{:else if selection.node instanceof GraphQlServer}

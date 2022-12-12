@@ -183,10 +183,8 @@ export class App {
 	}
 
 	public showMainPanel() {
-		if (get(this.connections).length === 0)
-			this.displayPanel.set(DisplayPanel.Connect);
-		else
-			this.displayPanel.set(DisplayPanel.Main)
+		if (get(this.connections).length === 0) this.displayPanel.set(DisplayPanel.Connect);
+		else this.displayPanel.set(DisplayPanel.Main);
 	}
 
 	public addNotification(n: [Connection, TsNotification]): void {

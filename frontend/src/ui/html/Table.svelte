@@ -265,13 +265,15 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 					<th
 						on:click={(e) => handleClickCol(e, col)}
 						class:isSortable={col.sort !== undefined}
-						class={col.headerClass}>
+						class={col.headerClass}
+					>
 						{#if col.customRender === true}
 							<slot name="headerCell" {col} />
 						{:else}{col.title}{/if}
 						{#if sortBy === col.key}
-							<slot name="orderIcon" {sortOrder}
-								>{sortOrder === SortOrder.Asc ? "▲" : "▼"}</slot>
+							<slot name="orderIcon" {sortOrder}>
+								{sortOrder === SortOrder.Asc ? "▲" : "▼"}
+							</slot>
 						{/if}
 					</th>
 				{/each}
@@ -288,13 +290,15 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 					on:dblclick={(e) => handleClickRow(e, row, true)}
 					class:selected={row.selected}
 					data-type={rowOptions.dataType ? rowOptions.dataType(row.t) : null}
-					data-key={rowOptions.dataValue ? rowOptions.dataValue(row.t) : null}>
+					data-key={rowOptions.dataValue ? rowOptions.dataValue(row.t) : null}
+				>
 					{#each columns as col}
 						<td
 							on:click={(e) => {
 								handleClickCell(e, row, col.key);
 							}}
-							class={col.class}>
+							class={col.class}
+						>
 							{#if col.customRender === true}
 								<slot name="colCell" {col} row={row.t} />
 							{:else}

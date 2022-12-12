@@ -135,14 +135,16 @@
 		bind:showSidebar={$showSidebar}
 		bind:displayPanel={$displayPanel}
 		bind:connectData
-		bind:filter />
+		bind:filter
+	/>
 
 	<Sidebar
 		{connections}
 		notifications={app.nofifications}
 		{filter}
 		visible={$showSidebar}
-		{showConnect} />
+		{showConnect}
+	/>
 	<div class="displayPanel">
 		{#if $displayPanel === DisplayPanel.Main}
 			<Chat {chat} />
