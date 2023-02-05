@@ -26,11 +26,11 @@ jobs:
         path: tsclientlib
     - name: Install deps
       run: |
-        version="2.0.16"
+        version="2.26.2"
         zipDownloadPath="./target/sdl.zip"
         mkdir -p ./target
         rm -f $zipDownloadPath
-        wget "https://www.libsdl.org/release/SDL2-devel-$version-VC.zip" -o $zipDownloadPath
+        curl "https://www.libsdl.org/release/SDL2-devel-$version-VC.zip" -o $zipDownloadPath
         unzip -f $zipDownloadPath -d "./target/sdl/"
         mkdir -p "./proxy-codegen/msvc/lib/64"
         mkdir -p "./proxy-codegen/msvc/dll/64"
