@@ -1,0 +1,48 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  FRONTEND_PATH: './ui/'
+
+jobs:
+  build:
+
+    runs-on: self-hosted
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        path: Qint
+    - uses: actions/checkout@v3
+      with:
+        repository: https://github.com/ReSpeak/tsclientlib
+        submodules: true
+        path: tsclientlib
+    - name: Build Backend
+      run: |
+        cd ./Qint/webapp
+        RUSTFLAGS="-C link-args=-lssp -C link-args=-s" cargo build --release --target=x86_64-pc-windows-gnu
+    - name: Build Frontend
+      run: |
+        cd ./Qint/frontend
+        yarn
+        yarn build
+    - name: Package
+      run: |
+        rm -rf ~/Qint/target/publish
+        mkdir -p ~/Qint/target/publish/ui
+        cp ~/Qint/target/x86_64-pc-windows-gnu/release/webapp.exe ~/Qint/target/publish/
+        #cp ~/Qint/target/x86_64-pc-windows-gnu/release/WebView2Loader.dll ~/Qint/target/publish/
+        cp ~/Qint/proxy-codegen/SDL2.dll ~/Qint/target/publish/
+        cp /usr/lib/gcc/x86_64-w64-mingw32/10-win32/libssp-0.dll ~/Qint/target/publish/
+        cp -r ~/Qint/frontend/dist/* ~/Qint/target/publish/ui/
+        cd ~/Qint/target/publish/
+        rm ~/out/Qint.zip
+        mv webapp.exe qint.exe
+        zip ~/out/Qint.zip ui qint.exe libssp-0.dll SDL2.dll -r -9
