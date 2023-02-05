@@ -24,6 +24,21 @@ jobs:
         repository: ReSpeak/tsclientlib
         submodules: true
         path: tsclientlib
+    - name: Install deps
+      run: |
+        version="2.0.16"
+        zipDownloadPath="./target/sdl.zip"
+        mkdir -p ./target
+        rm -f $zipDownloadPath
+        wget "https://www.libsdl.org/release/SDL2-devel-$version-VC.zip" -o $zipDownloadPath
+        unzip -f $zipDownloadPath -d "./target/sdl/"
+        mkdir -p "./proxy-codegen/msvc/lib/64"
+        mkdir -p "./proxy-codegen/msvc/dll/64"
+        cp "./target/sdl/SDL2-$version/lib/x64/*.lib" "./proxy-codegen/msvc/lib/64/"
+        cp "./target/sdl/SDL2-$version/lib/x64/*.dll" "./proxy-codegen/msvc/lib/64/"
+        cp "./target/sdl/SDL2-$version/lib/x64/*.dll" "./proxy-codegen/"
+        rm -f $zipDownloadPath
+        rm -rf "./target/sdl"
     - name: Build Backend
       run: |
         cd ./Qint/webapp
