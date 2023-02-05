@@ -28,18 +28,29 @@ jobs:
       run: |
         cd ./Qint
         version="2.26.2"
-        zipDownloadPath="./target/sdl.zip"
-        mkdir -p ./target/sdl
-        rm -f $zipDownloadPath
-        curl "https://www.libsdl.org/release/SDL2-devel-$version-VC.zip" -o $zipDownloadPath
-        unzip -o $zipDownloadPath -d ./target/sdl/
+        sdlVC="./target/sdl.zip"
+        sdlMinGW="./target/sdl.tar.gz"
+        mkdir -p ./target/sdlVC
+        mkdir -p ./target/sdlMinGW
+        rm -f $sdlVC
+        rm -f $sdlMinGW
+        curl "https://www.libsdl.org/release/SDL2-devel-$version-VC.zip" -o $sdlVC
+        curl "https://www.libsdl.org/release/SDL2-devel-$version-mingw.tar.gz" -o $sdlMinGW
+        unzip -o $sdlVC -d ./target/sdlVC/
+        tar -xf $sdlMinGW -C ./target/sdlMinGW/
         mkdir -p ./proxy-codegen/msvc/lib/64
         mkdir -p ./proxy-codegen/msvc/dll/64
-        cp ./target/sdl/SDL2-$version/lib/x64/*.lib ./proxy-codegen/msvc/lib/64/
-        cp ./target/sdl/SDL2-$version/lib/x64/*.dll ./proxy-codegen/msvc/lib/64/
-        cp ./target/sdl/SDL2-$version/lib/x64/*.dll ./proxy-codegen/
-        rm -f $zipDownloadPath
-        rm -rf ./target/sdl
+        mkdir -p ./proxy-codegen/gnu-mingw/lib/64
+        mkdir -p ./proxy-codegen/gnu-mingw/dll/64
+        cp ./target/sdlVC/SDL2-$version/lib/x64/*.lib ./proxy-codegen/msvc/lib/64/
+        cp ./target/sdlVC/SDL2-$version/lib/x64/*.dll ./proxy-codegen/msvc/bin/64/
+        cp ./target/sdlMinGW/SDL2-$version/x86_64-w64-mingw32/lib/*.a ./proxy-codegen/gnu-mingw/lib/64/
+        cp ./target/sdlMinGW/SDL2-$version/x86_64-w64-mingw32/bin/*.dll ./proxy-codegen/gnu-mingw/bin/64/
+        cp ./target/sdlMinGW/SDL2-$version/x86_64-w64-mingw32/bin/*.dll ./proxy-codegen/
+        rm -f $sdlVC
+        rm -f $sdlMinGW
+        rm -rf ./target/sdlVC
+        rm -rf ./target/sdlMinGW
     - name: Build Backend
       run: |
         cd ./Qint/webapp
