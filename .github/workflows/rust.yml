@@ -21,7 +21,7 @@ jobs:
         path: Qint
     - uses: actions/checkout@v3
       with:
-        repository: https://github.com/ReSpeak/tsclientlib
+        repository: ReSpeak/tsclientlib
         submodules: true
         path: tsclientlib
     - name: Build Backend
