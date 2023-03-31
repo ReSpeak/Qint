@@ -62,14 +62,14 @@ jobs:
         yarn build
     - name: Package
       run: |
-        rm -rf ~/Qint/target/publish
-        mkdir -p ~/Qint/target/publish/ui
-        cp ~/Qint/target/x86_64-pc-windows-gnu/release/webapp.exe ~/Qint/target/publish/
-        #cp ~/Qint/target/x86_64-pc-windows-gnu/release/WebView2Loader.dll ~/Qint/target/publish/
-        cp ~/Qint/proxy-codegen/SDL2.dll ~/Qint/target/publish/
-        cp /usr/lib/gcc/x86_64-w64-mingw32/10-win32/libssp-0.dll ~/Qint/target/publish/
-        cp -r ~/Qint/frontend/dist/* ~/Qint/target/publish/ui/
-        cd ~/Qint/target/publish/
-        rm ~/out/Qint.zip
+        cd ./Qint
+        rm -rf ./target/publish
+        mkdir -p ./target/publish/ui
+        cp ./target/x86_64-pc-windows-gnu/release/webapp.exe ./target/publish/
+        #cp ./target/x86_64-pc-windows-gnu/release/WebView2Loader.dll ./target/publish/
+        cp ./proxy-codegen/SDL2.dll ./target/publish/
+        cp /usr/lib/gcc/x86_64-w64-mingw32/10-win32/libssp-0.dll ./target/publish/
+        cp -r ./frontend/dist/* ./target/publish/ui/
+        cd ./target/publish/
         mv webapp.exe qint.exe
-        zip ~/out/Qint.zip ui qint.exe libssp-0.dll SDL2.dll -r -9
+        zip ./Qint.zip ui qint.exe libssp-0.dll SDL2.dll -r -9
