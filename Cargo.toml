@@ -7,6 +7,15 @@ resolver = "2"
 audiopus = { git = "https://github.com/DoumanAsh/audiopus", branch = "better_sys" }
 opusic-sys = { git = "https://github.com/Flakebi/opusic-sys" }
 
+# Use local copy of tsclientlib
+#[patch."https://github.com/ReSpeak/tsclientlib"]
+#tsclientlib = { path = "../tsclientlib/tsclientlib" }
+#tsproto = { path = "../tsclientlib/tsproto" }
+#ts-bookkeeping = { path = "../tsclientlib/utils/ts-bookkeeping" }
+#tsproto-packets = { path = "../tsclientlib/utils/tsproto-packets" }
+#tsproto-structs = { path = "../tsclientlib/utils/tsproto-structs" }
+#tsproto-types = { path = "../tsclientlib/utils/tsproto-types" }
+
 # Compile in release mode to speed up
 [profile.dev.package.audiopus]
 opt-level = 3
