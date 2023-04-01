@@ -68,7 +68,7 @@ jobs:
         cp ./target/x86_64-pc-windows-gnu/release/webapp.exe ./target/publish/
         #cp ./target/x86_64-pc-windows-gnu/release/WebView2Loader.dll ./target/publish/
         cp ./proxy-codegen/SDL2.dll ./target/publish/
-        cp /usr/lib/gcc/x86_64-w64-mingw32/10-win32/libssp-0.dll ./target/publish/
+        cp /usr/x86_64-w64-mingw32/bin/libssp-0.dll ./target/publish/
         cp -r ./frontend/dist/* ./target/publish/ui/
         cd ./target/publish/
         mv webapp.exe qint.exe
