@@ -53,6 +53,7 @@ struct EventHandler<'a> {
 #[derive(Clone, Debug)]
 pub struct GetIdentityAndServerMsg {
 	pub id: u64,
+	pub bookmark_id: Option<u64>,
 	pub create: bool,
 	pub address: String,
 }
@@ -407,10 +408,18 @@ impl Handler<GetIdentityAndServerMsg> for DbHandler {
 		use schema::identities::dsl::*;
 
 		// Search server
-		let server = bookmarks::table
-			.filter(bookmarks::address.eq(&msg.address))
-			.select(bookmarks::server)
-			.first::<Option<Vec<u8>>>(&self.con)
+		let server_query = if let Some(bookmark_id) = msg.bookmark_id {
+			bookmarks::table
+				.filter(bookmarks::id.eq(bookmark_id as i64))
+				.select(bookmarks::server)
+				.first::<Option<Vec<u8>>>(&self.con)
+		} else {
+			bookmarks::table
+				.filter(bookmarks::address.eq(&msg.address))
+				.select(bookmarks::server)
+				.first::<Option<Vec<u8>>>(&self.con)
+		};
+		let server = server_query
 			.optional()?
 			.flatten()
 			.map(|key| EccKeyPubP256::from_short(&key).map(|key| UidBuf(key.get_uid_no_base64())))
@@ -689,6 +698,7 @@ impl Handler<ConnectedMsg> for DbHandler {
 				.set((
 					bookmarks::last_used.eq(Some(utc_time)),
 					bookmarks::timezone.eq(utc_to_local_offset),
+					bookmarks::server.eq(Some(server.clone())),
 				))
 				.execute(&self.con)?
 				!= 1

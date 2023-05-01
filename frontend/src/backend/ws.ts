@@ -141,7 +141,10 @@ export interface ResultDetails {
 	tsResult?: TsError;
 	missingPermission?: number;
 	description?: string;
+	lib?: LibError;
 }
+
+export type LibError = { serverUidMismatch: { expected: string; actual: string } };
 
 export interface InResult {
 	Result: {

@@ -53,6 +53,14 @@
 		connection.close();
 	}
 
+	function trustNewIdentity() {
+		// Reconnect without setting the identity
+		const data = get(connection.connectOptions).clone();
+		data.ignoreIdentityMismatch = true;
+		app.connect(data);
+		connection.close();
+	}
+
 	function onContextMenu(e: MouseEvent) {
 		if (!contextMenuVisible) {
 			showContextMenu(e, () => (contextMenuVisible = false));
@@ -78,7 +86,7 @@
 		<div class="serverName">
 			<ServerName server={$server} {connection} handleClicks={false} />
 		</div>
-		<div class="buttons">
+		<div class="buttons bar-buttons">
 			{#if !$state.connected}
 				<button class="button is-danger is-small" on:click|stopPropagation={cancel}>
 					Cancel
@@ -102,7 +110,26 @@
 				{#if typeof $state.error === "string"}
 					{$state.error}
 				{:else if $state.error !== undefined}
-					<ChangeResult result={$state.error} />
+					{#if $state.error.lib !== undefined && "serverUidMismatch" in $state.error.lib}
+						A new server is running at this address. This could mean someone is
+						hijacking your connection.
+						<div class="buttons">
+							<button
+								class="button is-info is-small"
+								on:click|stopPropagation={cancel}
+							>
+								Cancel the connection
+							</button>
+							<button
+								class="button is-warning is-small"
+								on:click|stopPropagation={trustNewIdentity}
+							>
+								Trust the new server
+							</button>
+						</div>
+					{:else}
+						<ChangeResult result={$state.error} />
+					{/if}
 				{/if}
 			{:else}
 				<Loader text={"Connecting ..."} />
@@ -149,8 +176,8 @@
 		padding: 1em;
 	}
 
-	.buttons,
-	.button {
+	.bar-buttons.buttons,
+	.bar-buttons .button {
 		margin-bottom: 0 !important;
 	}
 </style>

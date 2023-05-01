@@ -26,7 +26,9 @@ use tsproto_packets::packets::{AudioData, CodecType, OutAudio, OutCommand, OutPa
 use tsproto_types::crypto::EccKeyPubP256;
 
 use crate::db::{ChannelListMsg, ChannelListTask, ChatId, ChatType, SetClientVolumeMsg};
-use crate::messages::{self, MessageF2P, MessageP2F, ResultDetails, ResultStruct, WhisperData};
+use crate::messages::{
+	self, LibError, MessageF2P, MessageP2F, ResultDetails, ResultStruct, WhisperData,
+};
 use crate::{audio, db, with_log, ConnectionId, FrontBridge, QintState};
 
 type ReturnCodeListener = Box<dyn FnOnce(&mut QintConnection, &InCommandErrorPart)>;
@@ -266,11 +268,7 @@ impl QintConnection {
 						{
 							self.send_message(&MessageP2F::Result(ResultStruct {
 								return_code,
-								details: ResultDetails {
-									ts_result: None,
-									missing_permission: None,
-									description: None,
-								},
+								details: ResultDetails::default(),
 							}));
 						}
 
@@ -406,6 +404,7 @@ impl QintConnection {
 										ts_result: Some(e.id),
 										missing_permission: e.missing_permission_id,
 										description: None,
+										lib: None,
 									},
 								}));
 							}
@@ -664,6 +663,7 @@ impl QintConnection {
 							.database
 							.send(db::GetIdentityAndServerMsg {
 								id: identity_id,
+								bookmark_id: o.bookmark,
 								create: true,
 								address: o.address.clone(),
 							})
@@ -977,6 +977,7 @@ impl QintConnection {
 					ts_result: None,
 					missing_permission: None,
 					description: Some(error),
+					lib: None,
 				},
 			}));
 		} else {
@@ -1446,11 +1447,26 @@ impl ActorFuture<QintConnection> for ConnectionPoller {
 						actor.connect_options.as_mut().and_then(|o| o.return_code.take())
 					{
 						let mut ts_result = None;
-						let mut description = None;
-						if let TsclError::ConnectTs(e) = &error {
-							ts_result = Some(*e);
-						} else {
-							description = Some(error.to_string());
+						let description = Some(error.to_string());
+						let mut lib = None;
+						match error {
+							TsclError::ConnectTs(e) => {
+								ts_result = Some(e);
+							}
+							TsclError::ConnectFailed { errors, .. } => {
+								for e in errors {
+									match e {
+										TsclError::ServerUidMismatch(mismatch) => {
+											lib = Some(LibError::ServerUidMismatch {
+												actual: mismatch,
+											});
+											break;
+										}
+										_ => {}
+									}
+								}
+							}
+							_ => {}
 						}
 
 						actor.send_message(&MessageP2F::Result(ResultStruct {
@@ -1459,6 +1475,7 @@ impl ActorFuture<QintConnection> for ConnectionPoller {
 								ts_result,
 								missing_permission: None,
 								description,
+								lib,
 							},
 						}));
 					} else {

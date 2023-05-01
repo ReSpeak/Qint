@@ -8,7 +8,7 @@ use proxy_codegen::book_events::{
 use serde::{Deserialize, Serialize};
 use tsclientlib::{
 	ChannelId, ClientId, CommandError, DisconnectOptions, Error as TsclError, MessageTarget,
-	Permission, TsError, Version,
+	Permission, TsError, UidBuf, Version,
 };
 
 use super::connection::Error as WsError;
@@ -86,6 +86,7 @@ pub struct ResultStruct {
 
 /// Usually, either `ts_result` (and optionally `missing_permission`) or `description` is set.
 /// If all are `None`, the result is success.
+/// `lib` provides more information if
 #[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResultDetails {
@@ -95,6 +96,14 @@ pub struct ResultDetails {
 	pub missing_permission: Option<Permission>,
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub description: Option<String>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub lib: Option<LibError>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum LibError {
+	ServerUidMismatch { actual: UidBuf },
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -223,6 +232,7 @@ impl From<&CommandError> for ResultDetails {
 			ts_result: Some(err.error),
 			missing_permission: err.missing_permission,
 			description: None,
+			lib: None,
 		}
 	}
 }

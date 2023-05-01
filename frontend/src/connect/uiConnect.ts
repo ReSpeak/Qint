@@ -28,7 +28,8 @@ export class ConnectData {
 		public outputMuted?: MuteState,
 		public away?: string,
 		public password?: string,
-		public channelPassword?: string
+		public channelPassword?: string,
+		public ignoreIdentityMismatch?: boolean
 	) {}
 
 	public clone(): ConnectData {
@@ -64,7 +65,7 @@ export class ConnectData {
 				away: this.away,
 				password: this.password,
 				channelPassword: this.channelPassword,
-				ignoreIdentityMismatch: false,
+				ignoreIdentityMismatch: this.ignoreIdentityMismatch ?? false,
 				logCommands: false,
 				logPackets: false,
 				logUdpPackets: false,

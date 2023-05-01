@@ -406,8 +406,10 @@
 					</div>
 					<div class="message-body">
 						<span>Failed to fetch bookmarks, is Qint running?</span>
-						<br />
-						<span>Reason: {bookmarkError.message}</span>
+						{#if bookmarkError.message !== undefined}
+							<br />
+							<span>Reason: {bookmarkError.message}</span>
+						{/if}
 					</div>
 				</article>
 			{/await}
