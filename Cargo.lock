@@ -6297,8 +6297,7 @@ dependencies = [
 [[package]]
 name = "webview2-com-sys"
 version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aac48ef20ddf657755fdcda8dfed2a7b4fc7e4581acce6fe9b88c3d64f29dee7"
+source = "git+https://github.com/Flakebi/webview2-rs#ff889c1bbb9f156ad79219c3c71c8283f76fe0ff"
 dependencies = [
  "regex",
  "serde",

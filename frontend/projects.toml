@@ -1,0 +1,10 @@
+[frontend]
+name = "frontend"
+relPath = ""
+subsystem = "nodejs"
+translator = "package-json"
+translators = ["package-json"]
+
+[frontend.subsystemInfo]
+noDev = true
+nodejs = 18

@@ -3,43 +3,65 @@
   description = "Qint TeamSpeak client";
 
   inputs = {
-    naersk = {
-      url = "github:yusdacra/naersk/feat/cargolock-git-deps";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    fenix = {
-      url = "github:nix-community/fenix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    flake-utils = {
-      url = "github:numtide/flake-utils";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    fenix.url = "github:nix-community/fenix";
+    flake-utils.url = "github:numtide/flake-utils";
+    naersk.url = "github:nix-community/naersk";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+
+    naersk.inputs.nixpkgs.follows = "nixpkgs";
+    fenix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = { self, nixpkgs, naersk, fenix, flake-utils }: flake-utils.lib.eachDefaultSystem (system: let
-    pkgs = nixpkgs.legacyPackages.${system};
-    toolchain = with fenix.packages.${system}; combine [
-      minimal.rustc
-      minimal.cargo
-      targets.x86_64-pc-windows-gnu.latest.rust-std
-    ];
-    naersk-lib = naersk.lib.${system};
+    pkgs = (import nixpkgs) {
+      inherit system;
+    };
+
+    native-toolchain = with fenix.packages.${system};
+      combine [
+        minimal.rustc
+        minimal.cargo
+        complete.clippy
+        latest.rustfmt
+      ];
+
+    mingw-toolchain = with fenix.packages.${system};
+      combine [
+        minimal.rustc
+        minimal.cargo
+        targets.x86_64-pc-windows-gnu.latest.rust-std
+      ];
+
+    naersk-lib = naersk.lib.${system}.override {
+      cargo = native-toolchain;
+      rustc = native-toolchain;
+    };
     naersk-lib-win = naersk.lib.${system}.override {
-      cargo = toolchain;
-      rustc = toolchain;
+      cargo = mingw-toolchain;
+      rustc = mingw-toolchain;
+    };
+
+    sdlVersion = "2.26.5";
+
+    sdl-mingw = pkgs.fetchurl {
+      url = "https://www.libsdl.org/release/SDL2-devel-${sdlVersion}-mingw.tar.gz";
+      hash = "sha256-sO/fq5+qrrS0nVFFEriV0W/a/XBJYDKhMr2fS5jw9ME=";
     };
 
     defaultBuildArgs = {
       pname = "qint";
       root = ./.;
       gitSubmodules = true;
+      strictDeps = true;
 
       nativeBuildInputs = with pkgs; [
         cmake
         perl
         pkg-config
       ];
+
+      # Deny warnings and clippy warnings
+      RUSTFLAGS = [ "-Dwarnings" ];
     };
 
     defaultLinuxBuildArgs = defaultBuildArgs // {
@@ -63,46 +85,164 @@
 
       # Needed so bindgen can find libclang.so
       LIBCLANG_PATH="${pkgs.llvmPackages_latest.libclang.lib}/lib";
+
+      doCheck = true;
+
+      cargoTestCommands = tests: tests ++ [
+        # Run clippy lints
+        "cargo $cargo_options clippy $cargo_test_options --all-targets"
+        # Check formatting
+        "cargo $cargo_options fmt --all --check"
+      ];
     };
 
-    # Pre-generate book_events.ts
-    book_events = naersk-lib.buildPackage (defaultLinuxBuildArgs // {
-      overrideMain = oldAttrs: {
-        cargo_build_options = [ "$cargo_release" ''-j "$NIX_BUILD_CORES"'' "--out-dir" "out" "--message-format=$cargo_message_format" "-p" "proxy-codegen" ];
+    # Create a fixed-output derivation from yarn install
+    fetchYarnModulesPackage = { lib, stdenvNoCC, writeScript, yarn }: {
+      pname,
+      version,
+      hash,
+      packageJSON,
+      yarnLock,
+      yarnRc,
+      yarnFolder,
+      yarnFlags ? []
+    }: stdenvNoCC.mkDerivation {
+      inherit pname version packageJSON yarnLock yarnRc yarnFolder;
 
-        installPhase = ''
-          cp frontend/src/book_events.ts $out
+      yarnFlags = lib.escapeShellArgs yarnFlags;
+
+      builder = writeScript "fetch-yarn-modules" ''
+        source $stdenv/setup
+
+        ln -s "$packageJSON" package.json
+        cp "$yarnLock" yarn.lock
+        cp "$yarnRc" .yarnrc.yml
+        cp -r "$yarnFolder" .yarn
+        chmod -R +w .yarn
+
+        # yarn needs a home directory
+        export HOME="$(mktemp -d)"
+
+        yarn install --immutable $yarnFlags
+
+        if [ -z "$skipPostFetch" ]; then
+          runHook postFetch
+        fi
+
+        mv node_modules $out
+      '';
+
+      outputHashAlgo = null;
+      outputHash = if hash == "" then lib.fakeHash else hash;
+      outputHashMode = "recursive";
+
+      nativeBuildInputs = [ yarn ];
+    };
+
+    fetchYarnModules = pkgs.callPackage fetchYarnModulesPackage {};
+
+    yarnModules = fetchYarnModules {
+      pname = "qint-frontend-modules";
+      version = "1.0";
+      # hash = lib.fakeHash;
+      hash = "sha256-moaLE+sqI/Mbp2OhOFRIJInN3SYaDHC6bMgasM7QCsM=";
+
+      packageJSON = "${self}/frontend/package.json";
+      yarnLock = "${self}/frontend/yarn.lock";
+      yarnRc = "${self}/frontend/.yarnrc.yml";
+      yarnFolder = "${self}/frontend/.yarn";
+    };
+
+    build-frontend = book_events: pkgs.runCommand "build-qint-frontend" {
+      nativeBuildInputs = with pkgs; [ yarn ];
+      src = "${self}/frontend";
+    } ''
+      cp -r "$src/." .
+      cp -r ${yarnModules} node_modules
+
+      chmod -R +w .
+      cp ${book_events} src/book_events.ts
+
+      yarn run build
+
+      mv dist $out
+    '';
+
+    win-pkg = naersk-lib-win.buildPackage (defaultBuildArgs // {
+      # Production path
+      FRONTEND_PATH = "./ui/";
+
+      depsBuildBuild = with pkgs; [
+        pkgsCross.mingwW64.stdenv.cc
+        pkgsCross.mingwW64.windows.pthreads
+      ];
+
+      # Only build webapp
+      # cargoBuildOptions = opts: opts ++ [ "--package" "webapp" ];
+
+      nativeBuildInputs = defaultBuildArgs.nativeBuildInputs ++ (with pkgs; [
+        # We need Wine to run tests:
+        wineWowPackages.stable
+      ]);
+
+      # Tells Cargo that we're building for Windows.
+      # (https://doc.rust-lang.org/cargo/reference/config.html#buildtarget)
+      CARGO_BUILD_TARGET = "x86_64-pc-windows-gnu";
+
+      # Fix some `extern` functions couldn't be found; some native libraries may need to be installed or have their path specified
+      # when using C dependencies
+      TARGET_CC = "x86_64-w64-mingw32-gcc";
+      TARGET_CXX = "x86_64-w64-mingw32-g++";
+
+      # Tells Cargo that it should use Wine to run tests.
+      # (https://doc.rust-lang.org/cargo/reference/config.html#targettriplerunner)
+      CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER = pkgs.writeShellScript "wine-wrapper" ''
+        export WINEPREFIX="$(mktemp -d)"
+        exec wine64 $@
+      '';
+
+      # Fix undefined reference to `__stack_chk_fail' and mingw ld segmentation fault.
+      RUSTFLAGS = "-C link-args=-lssp -C link-args=-s";
+
+      overrideMain = oldAttrs: oldAttrs // {
+        postPatch = ''
+          substituteInPlace src-tauri/tauri.conf.json \
+            --replace ../frontend/dist ${frontend}
+        '';
+
+        # Extract sdl
+        preBuild = ''
+          ${pkgs.gnutar}/bin/tar xf ${sdl-mingw}
+          mkdir -p proxy-codegen/gnu-mingw/{lib,dll}/64
+          mv SDL2-${sdlVersion}/x86_64-w64-mingw32/lib/*.a proxy-codegen/gnu-mingw/lib/64/
+          mv SDL2-${sdlVersion}/x86_64-w64-mingw32/bin/SDL2.dll proxy-codegen/gnu-mingw/dll/64/
         '';
       };
     });
+
+    # Generate just book_events.ts
+    book_events = naersk-lib.buildPackage (defaultLinuxBuildArgs // {
+      cargoBuildOptions = opts: opts ++ [ "--package" "proxy-codegen" ];
+
+      overrideMain = oldAttrs: oldAttrs // {
+        doCheck = false;
+
+        installPhase = ''
+          mkdir -p $out
+          cp frontend/src/book_events.ts $out/
+        '';
+      };
+    });
+
+    frontend = build-frontend "${book_events}/book_events.ts";
   in rec {
-    defaultPackage = packages.x86_64-pc-windows-gnu;
+    defaultPackage = packages.win;
 
-    packages.book_events = book_events;
-    packages.frontend = pkgs.mkYarnPackage {
-      pname = "qint-frontend";
-      src = ./frontend;
-    
-      postPatch = ''
-        cp ${book_events} src/book_events.ts
-        substituteInPlace svelte.config.js \
-          --replace node_modules "$node_modules\", \"$node_modules/.."
-      '';
-
-      buildPhase = ''
-        yarn build
-      '';
-    
-      installPhase = ''
-        mv deps/qint_frontend/dist $out
-      '';
-    
-      distPhase = "\n";
-    };
+    packages.frontend = frontend;
 
     packages.qint = naersk-lib.buildPackage (defaultLinuxBuildArgs // {
       # Only set for main derivation
-      overrideMain = oldAttrs: {
+      overrideMain = oldAttrs: oldAttrs // {
         postPatch = ''
           substituteInPlace src-tauri/tauri.conf.json \
             --replace ../frontend/dist ${packages.frontend}
@@ -112,6 +252,7 @@
       };
     });
 
+    packages.win-pkg = win-pkg;
     # The rust compiler is internally a cross compiler, so a single
     # toolchain can be used to compile multiple targets. In a hermetic
     # build system like nix flakes, there's effectively one package for
@@ -119,53 +260,17 @@
     # i.e.: nix build .#packages.x86_64-linux.x86_64-pc-windows-gnu
     # where x86_64-linux is the host and x86_64-pc-windows-gnu is the
     # target
-    packages.x86_64-pc-windows-gnu = naersk-lib-win.buildPackage (defaultBuildArgs // {
-      nativeBuildInputs = defaultBuildArgs.nativeBuildInputs ++ (with pkgs; [
-        pkgsCross.mingwW64.stdenv.cc
-        # Used for running tests.
-        wineWowPackages.stable
-        # wineWowPackages is overkill, but it's built in CI for nixpkgs,
-        # so it doesn't need to be built from source. It needs to provide
-        # wine64 not just wine. An alternative would be this:
-        # (wineMinimal.override { wineBuild = "wine64"; })
-      ]);
+    packages.win = pkgs.runCommand "qint-win" {} ''
+      mkdir -p $out
+      mkdir -p Qint
+      cp ${win-pkg}/bin/* Qint/
+      cp -ar ${frontend}/ Qint/ui
+      ${pkgs.zip}/bin/zip -r $out/Qint.zip Qint
+    '';
 
-      buildInputs = with pkgs.pkgsCross.mingwW64.windows; [ mingw_w64_headers mingw_w64_pthreads pthreads ];
-
-      # Configures the target which will be built.
-      # ref: https://doc.rust-lang.org/cargo/reference/config.html#buildtarget
-      CARGO_BUILD_TARGET = "x86_64-pc-windows-gnu";
-
-      # Configures the linker which will be used. cc.targetPrefix is
-      # sometimes different than the targets used by rust. i.e.: the
-      # mingw-w64 linker is "x86_64-w64-mingw32-gcc" whereas the rust
-      # target is "x86_64-pc-windows-gnu".
-      #
-      # This is only necessary if rustc doesn't already know the correct linker to use.
-      #
-      # ref: https://doc.rust-lang.org/cargo/reference/config.html#targettriplelinker
-      # CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER = with pkgs.pkgsCross.mingwW64.stdenv;
-      #   "${cc}/bin/${cc.targetPrefix}gcc";
-
-      # Configures the script which should be used to run tests. Since
-      # this is compiled for 64-bit Windows, use wine64 to run the tests.
-      # ref: https://doc.rust-lang.org/cargo/reference/config.html#targettriplerunner
-      CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER = pkgs.writeScript "wine-wrapper" ''
-        # Without this, wine will error out when attempting to create the
-        # prefix in the build's homeless shelter.
-        export WINEPREFIX="$(mktemp -d)"
-        exec wine64 $@
-      '';
-
-      preBuild = ''
-        export CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUSTFLAGS="-C link-args=''$(echo $NIX_LDFLAGS | tr ' ' '\n' | grep -- '^-L' | tr '\n' ' ')"
-        export NIX_LDFLAGS=
-      '';
-
-      #doCheck = true;
-
-      # Multi-stage builds currently fail for mingwW64.
-      singleStep = true;
-    });
+    checks.typos = pkgs.runCommand "check-typos" {} ''
+      ${pkgs.typos}/bin/typos ${self}
+      mkdir -p $out
+    '';
   });
 }
