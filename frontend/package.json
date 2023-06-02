@@ -48,5 +48,6 @@
 		"lint": "eslint --ignore-path .gitignore .",
 		"format": "prettier --ignore-path ./.gitignore --write .",
 		"tauri": "tauri"
-	}
+	},
+	"packageManager": "yarn@3.6.0"
 }
