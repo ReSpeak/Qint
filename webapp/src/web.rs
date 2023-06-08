@@ -427,6 +427,7 @@ fn check_authentication(token: &str, req: &actix_web::dev::ServiceRequest) -> Op
 /// this is used to access messages.
 #[cfg(test)]
 mod tests {
+	use std::borrow::Cow;
 	use std::future::Future;
 	use std::time::Duration;
 
@@ -436,14 +437,15 @@ mod tests {
 	use juniper::http::GraphQLRequest;
 	use once_cell::sync::Lazy;
 	use qint_proxy::messages::{ConnectOptions, JsMessageTarget, MessageF2P, MessageP2F};
-	use qint_proxy::QintState;
+	use qint_proxy::{ConnectionId, QintState};
 	use rand::Rng;
-	use serde::Deserialize;
+	use serde::{Deserialize, Serialize};
 	use tokio::time;
 	use tsclientlib::ClientId;
 	use uuid::Uuid;
 
 	use crate::web::WebApp;
+	use crate::websocket::{ConArgs, F2PMsg, P2FMsg, PassWsMsgArgs};
 	use crate::Args;
 
 	static TRACING: Lazy<()> = Lazy::new(|| tracing_subscriber::fmt().with_test_writer().init());
@@ -454,6 +456,8 @@ mod tests {
 
 	struct Connection {
 		socket: actix_codec::Framed<awc::BoxedSocket, ws::Codec>,
+		id: ConnectionId,
+		return_code: u32,
 	}
 
 	#[derive(Deserialize)]
@@ -479,15 +483,17 @@ mod tests {
 
 		async fn create_connection(&self) -> Result<Connection> {
 			let client = awc::Client::default();
-			let id = Uuid::new_v4();
-			let url = format!("ws://127.0.0.1:{}/con/{}/ws?format=Json", self.port, id);
+			let id = ConnectionId(Uuid::new_v4());
+			let url = format!("ws://127.0.0.1:{}/ws", self.port);
 			info!(%url, "Connecting to proxy");
 			let (_resp, socket) = client
 				.ws(url)
 				.connect()
 				.await
 				.map_err(|e| format_err!("Websocket client error: {:?}", e))?;
-			Ok(Connection { socket })
+			let mut con = Connection { socket, return_code: 0, id };
+			con.send_raw("create_ws", ConArgs { con: con.id }).await?;
+			Ok(con)
 		}
 
 		async fn graphql<T>(&self, request: &GraphQLRequest) -> Result<T>
@@ -674,7 +680,7 @@ mod tests {
 
 	impl Connection {
 		async fn connect(&mut self) -> Result<ClientId> {
-			self.send(&MessageF2P::Connect(ConnectOptions {
+			self.send(MessageF2P::Connect(ConnectOptions {
 				address: "localhost".to_string(),
 				name: "Test".to_string(),
 				..Default::default()
@@ -682,27 +688,42 @@ mod tests {
 			.await?;
 			loop {
 				let msg = self.recv().await?;
-				if let MessageP2F::Connected { own_client, .. } = msg {
+				if let Some(MessageP2F::Connected { own_client, .. }) = msg {
 					return Ok(ClientId(own_client.parse().unwrap()));
-				} else if let MessageP2F::Error(e) = msg {
+				} else if let Some(MessageP2F::Error(e)) = msg {
 					bail!("Got proxy error: {}", e);
 				}
 			}
 		}
 
-		async fn send(&mut self, msg: &MessageF2P) -> Result<()> {
-			println!("Sending message to proxy: {}", serde_json::to_string(msg).unwrap());
+		async fn send_raw<M: Serialize>(&mut self, cmd: &str, msg: M) -> Result<()> {
+			let msg_str = serde_json::to_string(&msg).unwrap();
+			info!(%cmd, msg = %msg_str, "Sending message to proxy");
+			let return_code = self.return_code;
+			self.return_code += 1;
+			let msg = F2PMsg {
+				cmd: cmd.into(),
+				return_code: return_code.to_string(),
+				args: serde_json::to_value(msg)?.into(),
+			};
 			self.socket
-				.send(ws::Message::Text(serde_json::to_string(msg)?.into()))
+				.send(ws::Message::Text(serde_json::to_string(&msg)?.into()))
 				.await
 				.map_err(|e| format_err!("Websocket client protocol error: {:?}", e))?;
 			Ok(())
 		}
 
-		async fn recv(&mut self) -> Result<MessageP2F> {
+		async fn send(&mut self, msg: MessageF2P) -> Result<()> {
+			self.send_raw("pass_ws_msg", PassWsMsgArgs { con: self.id, msg }).await
+		}
+
+		async fn recv(&mut self) -> Result<Option<MessageP2F>> {
 			match self.socket.next().await {
 				Some(Ok(ws::Frame::Text(msg))) => {
-					Ok(serde_json::from_str(std::str::from_utf8(&msg)?)?)
+					let msg = std::str::from_utf8(&msg)?;
+					info!(%msg, "Received message from proxy");
+					let msg: P2FMsg = serde_json::from_str(msg)?;
+					Ok(msg.msg.map(Cow::into_owned))
 				}
 				f => bail!("Websocket client received unexpected packet: {:?}", f),
 			}
@@ -777,7 +798,7 @@ mod tests {
 
 		// con0 sends a message to con1
 		let msg = "Hello 1";
-		con0.send(&MessageF2P::SendMessage {
+		con0.send(MessageF2P::SendMessage {
 			target: JsMessageTarget::Client(con1_id),
 			message: msg.to_string(),
 			return_code: None,

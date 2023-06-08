@@ -48,7 +48,7 @@ pub enum MessageF2P {
 }
 
 /// A message sent over a websocket connection from the proxy to the frontend.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub enum MessageP2F {
 	/// The connection failed. The websocket connection should be closed
@@ -76,7 +76,7 @@ pub enum MessageP2F {
 }
 
 // Has to be an extra struct for flatten to work
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ResultStruct {
 	pub return_code: String,
@@ -87,7 +87,7 @@ pub struct ResultStruct {
 /// Usually, either `ts_result` (and optionally `missing_permission`) or `description` is set.
 /// If all are `None`, the result is success.
 /// `lib` provides more information if
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResultDetails {
 	#[serde(default, skip_serializing_if = "Option::is_none")]
@@ -100,7 +100,7 @@ pub struct ResultDetails {
 	pub lib: Option<LibError>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum LibError {
 	ServerUidMismatch { actual: UidBuf },

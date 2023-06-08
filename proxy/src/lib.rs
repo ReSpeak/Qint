@@ -67,7 +67,7 @@ macro_rules! with_log {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
-pub struct ConnectionId(Uuid);
+pub struct ConnectionId(pub Uuid);
 
 #[derive(Clone, Debug)]
 pub struct Args {

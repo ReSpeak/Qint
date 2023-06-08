@@ -147,7 +147,7 @@ pub mod js_structs {
 		serialize_some_some_u64, serialize_some_u64};
 
 <# for struc in &structs { #>
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct <#= struc.name #> {
 	<# for p in &struc.properties {
@@ -235,7 +235,7 @@ pub enum JsPropertyId {
 	ServerIp(IpAddr),
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum JsProperty {
 <# for struc in &structs { #>
 	<#= struc.name #>(js_structs::<#= struc.name #>),

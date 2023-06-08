@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
@@ -31,12 +32,30 @@ pub struct WsBridge {
 	pub id: ConnectionId,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct F2PMsg {
-	cmd: String,
-	return_code: String,
-	args: serde_json::Value,
+pub(crate) struct F2PMsg {
+	pub(crate) cmd: String,
+	pub(crate) return_code: String,
+	pub(crate) args: serde_json::Value,
+}
+
+#[derive(Deserialize, Serialize)]
+pub(crate) struct P2FMsg<'a> {
+	pub(crate) cmd: Cow<'static, str>,
+	pub(crate) con: Option<ConnectionId>,
+	pub(crate) msg: Option<Cow<'a, MessageP2F>>,
+}
+
+#[derive(Deserialize, Serialize)]
+pub(crate) struct PassWsMsgArgs {
+	pub(crate) con: ConnectionId,
+	pub(crate) msg: MessageF2P,
+}
+
+#[derive(Deserialize, Serialize)]
+pub(crate) struct ConArgs {
+	pub(crate) con: ConnectionId,
 }
 
 #[derive(Debug, Error)]
@@ -89,31 +108,28 @@ macro_rules! unwrap_send {
 
 impl AppToFrontendBridge for WsBridge {
 	fn send(&self, msg: &MessageP2F) {
-		#[derive(Serialize)]
-		struct WsMsg<'a> {
-			cmd: &'static str,
-			con: ConnectionId,
-			msg: &'a MessageP2F,
-		}
-
 		actix::spawn(with_log!(
 			self.ws.send(SendToFrontendMsg(
-				serde_json::to_string(&WsMsg { cmd: "ws", con: self.id.clone(), msg }).unwrap()
+				serde_json::to_string(&P2FMsg {
+					cmd: "ws".into(),
+					con: Some(self.id.clone()),
+					msg: Some(Cow::Borrowed(msg)),
+				})
+				.unwrap()
 			)),
 			"Failed to forward msg to frontend"
 		));
 	}
 
 	fn close(&self) {
-		#[derive(Serialize)]
-		struct WsMsg {
-			cmd: &'static str,
-			con: ConnectionId,
-		}
-
 		actix::spawn(with_log!(
 			self.ws.send(SendToFrontendMsg(
-				serde_json::to_string(&WsMsg { cmd: "ws_close", con: self.id.clone() }).unwrap()
+				serde_json::to_string(&P2FMsg {
+					cmd: "ws_close".into(),
+					con: Some(self.id.clone()),
+					msg: None,
+				})
+				.unwrap()
 			)),
 			"Failed to send close msg to websocket"
 		));
@@ -274,11 +290,6 @@ impl Ws {
 		connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>,
 		loudness_listener: Arc<AtomicU32>, cmd: String, args: serde_json::Value, addr: Addr<Self>,
 	) -> Result<serde_json::Value> {
-		#[derive(Deserialize)]
-		struct ConArgs {
-			con: ConnectionId,
-		}
-
 		match cmd.as_str() {
 			"create_ws" => {
 				let args: ConArgs = serde_json::from_value(args)?;
@@ -317,12 +328,7 @@ impl Ws {
 				connections.lock().unwrap().remove(&id);
 			}
 			"pass_ws_msg" => {
-				#[derive(Deserialize)]
-				struct Args {
-					con: ConnectionId,
-					msg: MessageF2P,
-				}
-				let args: Args = serde_json::from_value(args)?;
+				let args: PassWsMsgArgs = serde_json::from_value(args)?;
 
 				let con = state.get_connection(&args.con).ok_or_else(|| {
 					error!(error = ?args.con, "No con for msg found");

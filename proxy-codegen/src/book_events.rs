@@ -14,7 +14,7 @@ use tsclientlib::TsError as Error;
 use tsclientlib::*;
 use tsproto_packets::packets::OutCommand;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum JsEvent {
 	PropertyAdded {
 		id: JsPropertyId,
