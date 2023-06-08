@@ -27,8 +27,10 @@ pub enum TransferAction {
 pub struct TransferId(u32);
 
 struct TransferContext {
+	#[allow(unused)]
 	id: TransferId,
 	done: bool,
+	#[allow(unused)]
 	kind: TxDirection,
 	src_stream: Pin<Box<dyn AsyncRead>>,
 	dst_stream: Pin<Box<dyn AsyncWrite>>,

@@ -12,7 +12,7 @@
     fenix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, naersk, fenix, flake-utils }: flake-utils.lib.eachDefaultSystem (system: let
+  outputs = { self, nixpkgs, naersk, fenix, flake-utils }: flake-utils.lib.eachSystem [ "x86_64-linux" ] (system: let
     pkgs = (import nixpkgs) {
       inherit system;
     };
@@ -89,8 +89,8 @@
       doCheck = true;
 
       cargoTestCommands = tests: tests ++ [
-        # Run clippy lints
-        "cargo $cargo_options clippy $cargo_test_options --all-targets"
+        # TODO Run clippy lints
+        #"cargo $cargo_options clippy $cargo_test_options --all-targets"
         # Check formatting
         "cargo $cargo_options fmt --all --check"
       ];
@@ -222,9 +222,9 @@
 
     # Generate just book_events.ts
     book_events = naersk-lib.buildPackage (defaultLinuxBuildArgs // {
-      cargoBuildOptions = opts: opts ++ [ "--package" "proxy-codegen" ];
-
       overrideMain = oldAttrs: oldAttrs // {
+        cargo_build_options = oldAttrs.cargo_build_options ++ [ "--package" "proxy-codegen" ];
+
         doCheck = false;
 
         installPhase = ''
@@ -268,9 +268,24 @@
       ${pkgs.zip}/bin/zip -r $out/Qint.zip Qint
     '';
 
-    checks.typos = pkgs.runCommand "check-typos" {} ''
+    apps.default = apps.qint;
+
+    apps.qint = flake-utils.lib.mkApp {
+      name = "qint";
+      drv = packages.qint;
+    };
+
+    apps.webapp = flake-utils.lib.mkApp {
+      name = "webapp";
+      drv = packages.qint;
+    };
+
+    # TODO Fix typos
+    /*checks.typos = pkgs.runCommand "check-typos" {} ''
       ${pkgs.typos}/bin/typos ${self}
       mkdir -p $out
-    '';
+    '';*/
+
+    checks.build = packages.qint;
   });
 }

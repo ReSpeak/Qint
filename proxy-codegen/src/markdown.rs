@@ -293,7 +293,8 @@ impl<TStack> Render<TStack> {
 					.iter()
 					.map(|h| Range {
 						start: h.start.saturating_sub(m.start),
-						end: std::cmp::min(h.end - m.start, text.len()), // TODO is text.len() right here?
+						end: std::cmp::min(h.end - m.start, text.len()), /* TODO is text.len()
+						                                                  * right here? */
 					})
 					.collect::<Vec<_>>();
 
@@ -384,7 +385,8 @@ impl RenderMd {
 					// Do not render bb if inside code or link. We do not want to autodetect links
 					// inside a link.
 					let ignore_bb = self.spine.iter().any(|parent| {
-						matches!(parent.0, RenderMdMeta::Code(_)) || parent.1.tag == "a" || parent.1.tag == "code"
+						matches!(parent.0, RenderMdMeta::Code(_))
+							|| parent.1.tag == "a" || parent.1.tag == "code"
 					});
 					self.text_state = self.text_state.when_none(TextKind::Normal(ignore_bb));
 					let cur_len = self.text_builder.len();
@@ -454,9 +456,7 @@ impl RenderMd {
 		match t {
 			Tag::Paragraph => (RenderMdMeta::None, VTag::new("p")),
 			Tag::Strikethrough => (RenderMdMeta::None, VTag::new("s")),
-			Tag::Heading(n, _, _) => {
-				(RenderMdMeta::None, VTag::new(&n.to_string()))
-			}
+			Tag::Heading(n, _, _) => (RenderMdMeta::None, VTag::new(&n.to_string())),
 			Tag::BlockQuote => (RenderMdMeta::None, VTag::new("blockquote")),
 			Tag::CodeBlock(info) => {
 				let el = VTag::new("code");
@@ -886,7 +886,8 @@ mod tests {
 	fn ignore_bb_in_code() {
 		assert_eq!(
 			markdown("```\nThis is code [i]with bb that should not be parsed[/i]\n```"),
-			"<pre><code data-lang=\"\">This is code [i]with bb that should not be parsed[&#x2F;i]\n</code></pre>"
+			"<pre><code data-lang=\"\">This is code [i]with bb that should not be \
+			 parsed[&#x2F;i]\n</code></pre>"
 		);
 	}
 

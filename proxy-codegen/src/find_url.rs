@@ -65,7 +65,8 @@ pub fn find_urls(text: &str) -> Vec<(Range<usize>, Url)> {
 
 		if let Ok(mut url) = Url::parse(&url) {
 			if !has_scheme {
-				// If there is no scheme, check if ending is tld and there is no / before to detect file paths
+				// If there is no scheme, check if ending is tld and there is no / before to detect
+				// file paths
 				if global_range.start > 0 && text.as_bytes()[global_range.start - 1] == b'/' {
 					continue;
 				}

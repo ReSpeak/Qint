@@ -98,7 +98,8 @@ impl Default for JsStructs {
 			JsStruct {
 				name: "Server",
 				ids: vec![],
-				// parts: vec!["Server", "OptionalServerData", "Connection", "ConnectionServerData"],
+				// parts: vec!["Server", "OptionalServerData", "Connection",
+				// "ConnectionServerData"],
 			},
 			JsStruct {
 				name: "ServerGroup",

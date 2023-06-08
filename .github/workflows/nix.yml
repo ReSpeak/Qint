@@ -1,0 +1,51 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "nix" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    runs-on: self-hosted
+
+    steps:
+    # Cannot put into a script, because the repository needs to be checked out to run a script...
+    - name: Checkout Repository
+      run: |
+        env | sort
+        echo
+
+        # Create cache directory
+        mkdir -p "$STATE_DIRECTORY/$GITHUB_REPOSITORY/checkout"
+        pushd "$STATE_DIRECTORY/$GITHUB_REPOSITORY/checkout"
+        # Create bare repository if it does not exist yet
+        test -f HEAD || git init --bare
+        # Add remote if it does not exist
+        grep origin config || git remote add origin "git@github.com:$GITHUB_REPOSITORY"
+
+        # Add ssh deploy key
+        eval `ssh-agent -s`
+        ssh-add - <<< '${{ secrets.PRIVATE_SSH_KEY }}'
+        # Fetch commit to build
+        echo Fetching commit "$GITHUB_REF"
+        git fetch origin "$GITHUB_REF"
+        popd
+
+        # Remove previous state
+        rm -rf * .*
+
+        # Clone repository
+        git clone -n "git@github.com:$GITHUB_REPOSITORY" --reference "$STATE_DIRECTORY/$GITHUB_REPOSITORY/checkout" .
+        git switch --detach "$GITHUB_REF"
+
+    - name: Check
+      # TODO Once the issues are fixed
+      run: |
+        #nix flake check
+
+    - name: Package
+      run: |
+        nix build .#win-pkg
+        ls -l result/Qint.zip

@@ -113,7 +113,7 @@ fn main() {
 
 				sender.send((app_addr.clone(), app_arc.clone(), handle)).unwrap();
 
-				QintCore::run(app_addr, app_arc).await;
+				QintCore::run(app_arc).await;
 			});
 		});
 
@@ -181,7 +181,7 @@ fn main() {
 		.on_window_event(move |ev| {
 			let window = ev.window();
 			match ev.event() {
-				WindowEvent::Resized(size) => {
+				WindowEvent::Resized(_size) => {
 					//println!("Resize: {:?}", size);
 				}
 				WindowEvent::CloseRequested { api, .. } => {
