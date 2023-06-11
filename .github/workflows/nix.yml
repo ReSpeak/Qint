@@ -2,13 +2,13 @@ name: Rust
 
 on:
   push:
-    branches: [ "nix" ]
+    branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
 
 jobs:
   build:
-    runs-on: self-hosted
+    runs-on: [self-hosted, nix]
 
     steps:
     # Cannot put into a script, because the repository needs to be checked out to run a script...
@@ -38,14 +38,33 @@ jobs:
 
         # Clone repository
         git clone -n "git@github.com:$GITHUB_REPOSITORY" --reference "$STATE_DIRECTORY/$GITHUB_REPOSITORY/checkout" .
-        git switch --detach "$GITHUB_REF"
+        git fetch origin "$GITHUB_REF"
+        git switch --detach FETCH_HEAD
+
+    - name: Build frontend and replace hash
+      run: |
+        nix build .#yarnModules -L 2>&1 | tee log
+
+        # Extract wanted hash from log
+        nodeModulesHash="$(sed -n 's/^ *got: *\(sha256-.*\)$/\1/p' log)"
+        echo Got hash "$nodeModulesHash"
+
+        # Replace hash in flake.nix
+        sed -i "s#hash = pkgs.lib.fakeHash;#hash = \"$nodeModulesHash\";#g" flake.nix
 
     - name: Check
-      # TODO Once the issues are fixed
       run: |
-        #nix flake check
+        nix flake check -L
 
     - name: Package
+      if: github.event_name != 'pull_request'
       run: |
-        nix build .#win-pkg
-        ls -l result/Qint.zip
+        nix build .#win-webapp-package -L
+        rm -f /var/www/html/flakebi/ci/Qint-webapp.zip
+        cp result/Qint-webapp.zip /var/www/html/flakebi/ci/
+        chmod a+r /var/www/html/flakebi/ci/Qint-webapp.zip
+
+        nix build .#win-tauri-package -L
+        rm -f /var/www/html/flakebi/ci/Qint.zip
+        cp result/Qint.zip /var/www/html/flakebi/ci/
+        chmod a+r /var/www/html/flakebi/ci/Qint.zip

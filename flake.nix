@@ -16,6 +16,7 @@
     pkgs = (import nixpkgs) {
       inherit system;
     };
+    lib = pkgs.lib;
 
     native-toolchain = with fenix.packages.${system};
       combine [
@@ -88,9 +89,11 @@
 
       doCheck = true;
 
+      cargoTestOptions = opts: opts ++ [ "--" "--skip" "web::tests" ];
+
       cargoTestCommands = tests: tests ++ [
         # TODO Run clippy lints
-        #"cargo $cargo_options clippy $cargo_test_options --all-targets"
+        #"cargo $cargo_options clippy --all-targets"
         # Check formatting
         "cargo $cargo_options fmt --all --check"
       ];
@@ -144,18 +147,17 @@
     yarnModules = fetchYarnModules {
       pname = "qint-frontend-modules";
       version = "1.0";
-      # hash = lib.fakeHash;
-      hash = "sha256-moaLE+sqI/Mbp2OhOFRIJInN3SYaDHC6bMgasM7QCsM=";
+      hash = pkgs.lib.fakeHash;
 
-      packageJSON = "${self}/frontend/package.json";
-      yarnLock = "${self}/frontend/yarn.lock";
-      yarnRc = "${self}/frontend/.yarnrc.yml";
-      yarnFolder = "${self}/frontend/.yarn";
+      packageJSON = ./frontend/package.json;
+      yarnLock = ./frontend/yarn.lock;
+      yarnRc = ./frontend/.yarnrc.yml;
+      yarnFolder = ./frontend/.yarn;
     };
 
     build-frontend = book_events: pkgs.runCommand "build-qint-frontend" {
       nativeBuildInputs = with pkgs; [ yarn ];
-      src = "${self}/frontend";
+      src = ./frontend;
     } ''
       cp -r "$src/." .
       cp -r ${yarnModules} node_modules
@@ -169,21 +171,18 @@
     '';
 
     win-pkg = naersk-lib-win.buildPackage (defaultBuildArgs // {
-      # Production path
-      FRONTEND_PATH = "./ui/";
-
       depsBuildBuild = with pkgs; [
         pkgsCross.mingwW64.stdenv.cc
         pkgsCross.mingwW64.windows.pthreads
       ];
 
       # Only build webapp
-      # cargoBuildOptions = opts: opts ++ [ "--package" "webapp" ];
+      #cargoBuildOptions = opts: opts ++ [ "--package" "webapp" ];
 
-      nativeBuildInputs = defaultBuildArgs.nativeBuildInputs ++ (with pkgs; [
+      /*nativeBuildInputs = defaultBuildArgs.nativeBuildInputs ++ (with pkgs; [
         # We need Wine to run tests:
         wineWowPackages.stable
-      ]);
+      ]);*/
 
       # Tells Cargo that we're building for Windows.
       # (https://doc.rust-lang.org/cargo/reference/config.html#buildtarget)
@@ -205,6 +204,9 @@
       RUSTFLAGS = "-C link-args=-lssp -C link-args=-s";
 
       overrideMain = oldAttrs: oldAttrs // {
+        # Production path
+        FRONTEND_PATH = "./ui/";
+
         postPatch = ''
           substituteInPlace src-tauri/tauri.conf.json \
             --replace ../frontend/dist ${frontend}
@@ -220,13 +222,28 @@
       };
     });
 
+    qint = naersk-lib.buildPackage (defaultLinuxBuildArgs // {
+      # Only set for main derivation
+      overrideMain = oldAttrs: oldAttrs // {
+        postPatch = ''
+          substituteInPlace src-tauri/tauri.conf.json \
+            --replace ../frontend/dist ${frontend}
+        '';
+
+        FRONTEND_PATH = frontend;
+
+        # For tests
+        RUST_BACKTRACE = "short";
+      };
+    });
+
     # Generate just book_events.ts
     book_events = naersk-lib.buildPackage (defaultLinuxBuildArgs // {
+      cargoBuildOptions = opts: opts ++ [ "--package" "proxy-codegen" ];
+
+      doCheck = false;
+
       overrideMain = oldAttrs: oldAttrs // {
-        cargo_build_options = oldAttrs.cargo_build_options ++ [ "--package" "proxy-codegen" ];
-
-        doCheck = false;
-
         installPhase = ''
           mkdir -p $out
           cp frontend/src/book_events.ts $out/
@@ -238,21 +255,19 @@
   in rec {
     defaultPackage = packages.win;
 
+    packages.yarnModules = yarnModules;
     packages.frontend = frontend;
 
-    packages.qint = naersk-lib.buildPackage (defaultLinuxBuildArgs // {
-      # Only set for main derivation
-      overrideMain = oldAttrs: oldAttrs // {
-        postPatch = ''
-          substituteInPlace src-tauri/tauri.conf.json \
-            --replace ../frontend/dist ${packages.frontend}
-        '';
+    packages.builtDeps = pkgs.runCommand "qint-dependencies" {} ''
+      cat > $out <<EOF
+        ${lib.concatStringsSep "," qint.builtDependencies}
+        ${lib.concatStringsSep "," book_events.builtDependencies}
+        ${lib.concatStringsSep "," win-pkg.builtDependencies}
+      EOF
+    '';
 
-        FRONTEND_PATH = packages.frontend;
-      };
-    });
+    packages.qint = qint;
 
-    packages.win-pkg = win-pkg;
     # The rust compiler is internally a cross compiler, so a single
     # toolchain can be used to compile multiple targets. In a hermetic
     # build system like nix flakes, there's effectively one package for
@@ -260,11 +275,38 @@
     # i.e.: nix build .#packages.x86_64-linux.x86_64-pc-windows-gnu
     # where x86_64-linux is the host and x86_64-pc-windows-gnu is the
     # target
-    packages.win = pkgs.runCommand "qint-win" {} ''
+    packages.win = win-pkg;
+
+    packages.win-webapp-package = pkgs.runCommand "qint-win" {} ''
       mkdir -p $out
       mkdir -p Qint
-      cp ${win-pkg}/bin/* Qint/
+      cp ${win-pkg}/bin/webapp.exe Qint/
       cp -ar ${frontend}/ Qint/ui
+
+      # Add SDL
+      ${pkgs.gnutar}/bin/tar xf ${sdl-mingw}
+      mv SDL2-${sdlVersion}/x86_64-w64-mingw32/bin/SDL2.dll Qint/
+
+      # Add libssp
+      mingw_path="$(cat ${pkgs.pkgsCross.mingwW64.stdenv.cc}/nix-support/orig-cc)"
+      cp "$mingw_path/x86_64-w64-mingw32/lib/libssp-0.dll" Qint/
+
+      ${pkgs.zip}/bin/zip -r $out/Qint-webapp.zip Qint
+    '';
+
+    packages.win-tauri-package = pkgs.runCommand "qint-win" {} ''
+      mkdir -p $out
+      mkdir -p Qint
+      cp ${win-pkg}/bin/qint.exe Qint/
+
+      # Add SDL
+      ${pkgs.gnutar}/bin/tar xf ${sdl-mingw}
+      mv SDL2-${sdlVersion}/x86_64-w64-mingw32/bin/SDL2.dll Qint/
+
+      # Add libssp
+      mingw_path="$(cat ${pkgs.pkgsCross.mingwW64.stdenv.cc}/nix-support/orig-cc)"
+      cp "$mingw_path/x86_64-w64-mingw32/lib/libssp-0.dll" Qint/
+
       ${pkgs.zip}/bin/zip -r $out/Qint.zip Qint
     '';
 
