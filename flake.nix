@@ -219,6 +219,10 @@
           mv SDL2-${sdlVersion}/x86_64-w64-mingw32/lib/*.a proxy-codegen/gnu-mingw/lib/64/
           mv SDL2-${sdlVersion}/x86_64-w64-mingw32/bin/SDL2.dll proxy-codegen/gnu-mingw/dll/64/
         '';
+
+        postInstall = ''
+          install -t $out/bin target/x86_64-pc-windows-gnu/release/build/webview2-com-sys-*/out/x64/WebView2Loader.dll
+        '';
       };
     });
 
@@ -302,6 +306,9 @@
       # Add SDL
       ${pkgs.gnutar}/bin/tar xf ${sdl-mingw}
       mv SDL2-${sdlVersion}/x86_64-w64-mingw32/bin/SDL2.dll Qint/
+
+      # Add webview
+      cp ${win-pkg}/bin/WebView2Loader.dll Qint/
 
       # Add libssp
       mingw_path="$(cat ${pkgs.pkgsCross.mingwW64.stdenv.cc}/nix-support/orig-cc)"
