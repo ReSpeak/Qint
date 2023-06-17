@@ -5,7 +5,6 @@
 		getActionSubject,
 		hotkeyToString,
 		hotkeySubjects,
-		translateJsKeyToWindows,
 		isHotkeyComplete,
 	} from "./hotkey";
 	import type { Hotkey } from "../../settings";
@@ -28,14 +27,14 @@
 
 	function onKeyHook(e: KeyboardEvent) {
 		e.preventDefault();
-		hotkey.keycode = translateJsKeyToWindows(e.code);
+		hotkey.keycode = e.code;
 		hotkey._ctrl = e.ctrlKey;
 		hotkey._shift = e.shiftKey;
 		hotkey._alt = e.altKey;
 		hotkey._meta = e.metaKey;
 
 		input.value = hotkeyToString(hotkey);
-		log("KeyData %j", hotkey);
+		log("KeyData %j, e { code: %j, key: %j }", hotkey, e.code, e.key);
 		if (isHotkeyComplete(hotkey)) dispatch("change");
 	}
 
@@ -65,7 +64,7 @@
 </script>
 
 <KeyValue label="">
-	<div class="is-horizontal field">
+	<div class="is-horizontal field" style="gap: 4px;">
 		<div class="control">
 			<DropDown
 				items={[...hotkeySubjects.keys()]}

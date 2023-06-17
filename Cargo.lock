@@ -1558,13 +1558,15 @@ dependencies = [
 
 [[package]]
 name = "evdev"
-version = "0.11.4"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21eef104bd659ef808f1f84bed9a924e1aebcdd066845b377cd3b52cc497bb9f"
+checksum = "2bed59fcc8cfd6b190814a509018388462d3b203cf6dd10db5c00087e72a83f3"
 dependencies = [
  "bitvec",
+ "cfg-if",
  "libc",
  "nix 0.23.2",
+ "thiserror",
 ]
 
 [[package]]
@@ -2787,8 +2789,9 @@ checksum = "b64f40e5e03e0d54f03845c8197d0291253cdbedfb1cb46b13c2c117554a9f4c"
 
 [[package]]
 name = "livesplit-hotkey"
-version = "0.6.0"
-source = "git+https://github.com/LiveSplit/livesplit-core?rev=092e336e24abd26e97e5a2e55abb0bbd97ff0b44#092e336e24abd26e97e5a2e55abb0bbd97ff0b44"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81b7f15d5cd8cd2bcc4458c6e1f6527c46630abb8904cc3d4677bddbbd692c47"
 dependencies = [
  "bitflags",
  "cfg-if",
