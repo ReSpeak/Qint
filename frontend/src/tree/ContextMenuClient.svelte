@@ -40,8 +40,8 @@
 	<ClientVolume client={$client} {connection} />
 {/if}
 {#if $developMode || !ownClient}
-	<form on:submit|preventDefault={onPokeSend}>
-		<button type="submit" class="toolbutton" title="Poke">
+	<div>
+		<button class="toolbutton" title="Poke" on:click={onPokeSend}>
 			<Icon name="hand-pointing-right" />
 		</button>
 		<input
@@ -51,7 +51,7 @@
 			bind:this={pokeInput}
 			bind:value={pokeMessage}
 		/>
-	</form>
+	</div>
 {/if}
 <button on:click={() => kick(Reason.KickChannel)}>
 	<Icon name="shoe-formal" />Kick from channel
