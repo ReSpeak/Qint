@@ -34,7 +34,9 @@
 		background: $background;
 		display: flex;
 		flex-direction: column;
-		gap: 0.5em;
+		gap: 0.3em;
+		margin-bottom: 0.3em;
+		box-shadow: rgb(0 0 0 / 25%) 3px 3px 6px 4px;
 	}
 
 	.context :global(button) {
@@ -42,6 +44,9 @@
 		border: none;
 		color: $text;
 		text-align: start;
+		display: flex;
+		align-items: center;
+		gap: 0.5em;
 	}
 
 	.context :global(button:hover) {

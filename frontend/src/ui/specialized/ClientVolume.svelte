@@ -8,6 +8,8 @@
 
 	export let connection: Connection;
 	export let client: Client;
+	export let isInline: Boolean = false;
+
 	const minVolume = MIN_VOLUME_DB;
 	const maxVolume = -MIN_VOLUME_DB;
 	let clientVolume = factorToDb(client.volume);
@@ -36,7 +38,7 @@
 </script>
 
 <div class="volumeControl">
-	<button class="volume button" on:click={toggleVolume}>
+	<button class="volume" class:button={!isInline} on:click={toggleVolume}>
 		{#if clientVolume === minVolume}
 			<Icon name="volume-off" />
 		{:else}
@@ -51,6 +53,7 @@
 		display={(n) => `${n} dB`}
 		tooltip={true}
 		on:input={updateVolume}
+		isInline={isInline}
 	/>
 </div>
 

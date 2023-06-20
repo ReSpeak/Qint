@@ -6,6 +6,7 @@
 	export let tooltip: boolean = false;
 	export let display: (n: number) => string = (n) => String(n);
 	export let id: string | undefined = undefined;
+	export let isInline: Boolean = false;
 
 	let slider!: HTMLElement;
 	let tooltip_left = 0;
@@ -22,6 +23,7 @@
 		type="range"
 		class="slider is-fullwidth"
 		class:has-output-tooltip={tooltip}
+		class:input-inline={isInline}
 		{min}
 		{max}
 		bind:value
@@ -30,7 +32,7 @@
 		on:input
 	/>
 	{#if tooltip}
-		<output style="left:calc({tooltip_left}px + 0.5rem);">{display(value)}</output>
+		<output class:output-inline={isInline} style="left:calc({tooltip_left}px + 0.5rem);">{display(value)}</output>
 	{/if}
 </div>
 
@@ -38,7 +40,8 @@
 	.bslider {
 		display: flex;
 		position: relative;
-		margin: 0 1em;
+		flex-grow: 1;
+		margin-right: .5em;
 	}
 
 	output {
@@ -46,4 +49,19 @@
 		width: auto !important;
 		line-height: 0.5rem !important;
 	}
+
+	.input-inline {
+		margin: 0;
+		min-height: 0;
+	}
+
+	.output-inline {
+		top: -2.0em !important;
+		display: none;
+	}
+
+	.bslider:hover .output-inline {
+		display: block;
+	}
+
 </style>

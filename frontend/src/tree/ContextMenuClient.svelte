@@ -37,11 +37,11 @@
 	<QuickActionButtons selected={new NodeSelection(connection, client)} />
 </div>
 {#if !ownClient}
-	<ClientVolume client={$client} {connection} />
+	<ClientVolume client={$client} {connection} isInline />
 {/if}
 {#if $developMode || !ownClient}
-	<div>
-		<button class="toolbutton" title="Poke" on:click={onPokeSend}>
+	<div class="poke-wrapper">
+		<button title="Poke" on:click={onPokeSend}>
 			<Icon name="hand-pointing-right" />
 		</button>
 		<input
@@ -53,6 +53,7 @@
 		/>
 	</div>
 {/if}
+<hr/>
 <button on:click={() => kick(Reason.KickChannel)}>
 	<Icon name="shoe-formal" />Kick from channel
 </button>
@@ -63,7 +64,20 @@
 
 <style lang="scss">
 	.poke-input {
-		margin: 0 0.5em;
 		width: 200px;
+		height: 1.8em;
+		margin-right: 0.5em;
+	}
+
+	.poke-wrapper {
+		display: flex;
+		align-items: center;
+	}
+
+	hr {
+		background-color: #656565;
+		margin: 0 .5em;
+		min-height: 1px;
+		height: 1px;
 	}
 </style>
