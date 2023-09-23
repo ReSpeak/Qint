@@ -437,7 +437,7 @@
 
 	.errorHoverContainer :global(.hover),
 	.errorHoverContainer :global(.hover .corner) {
-		background-color: mix($background, $danger, 50) !important;
+		background-color: mix($background, $danger, 50%) !important;
 	}
 
 	.errorHoverContainer :global(.hover) {

@@ -40,8 +40,12 @@
 	<ClientVolume client={$client} {connection} isInline />
 {/if}
 {#if $developMode || !ownClient}
-	<div class="poke-wrapper">
-		<button title="Poke" on:click={onPokeSend}>
+	<form class="poke-wrapper">
+		<!-- Submitting the form by pressing enter triggers the click event on the submit button.
+		     It also triggers the global click handler to close the context menu, so the submit
+		     event on the form is never triggered.
+		-->
+		<button title="Poke" type="submit" on:click={onPokeSend}>
 			<Icon name="hand-pointing-right" />
 		</button>
 		<input
@@ -51,7 +55,7 @@
 			bind:this={pokeInput}
 			bind:value={pokeMessage}
 		/>
-	</div>
+	</form>
 {/if}
 <hr/>
 <button on:click={() => kick(Reason.KickChannel)}>
