@@ -12,6 +12,8 @@
 	// represents the element type.
 	type T = $$Generic;
 	interface $$Slots {
+		loading: {};
+		empty: {};
 		default: { item: T };
 	}
 

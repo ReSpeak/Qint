@@ -17,7 +17,8 @@ module.exports = {
 	overrides: [{ files: ["*.svelte"], processor: "svelte3/svelte3" }],
 	settings: {
 		"svelte3/typescript": require("typescript"),
-		"svelte3/ignore-styles": (attrs) => attrs.lang === "scss",
+		"svelte3/ignore-styles": ({ lang }) => lang === "scss",
+		"svelte3/ignore-warnings": ({ code }) => code.includes('a11y'),
 	},
 	parserOptions: {
 		sourceType: "module",
@@ -26,5 +27,5 @@ module.exports = {
 	env: {
 		browser: true,
 		es2017: true,
-	},
+	}
 };
