@@ -18,7 +18,6 @@ use anyhow::format_err;
 use qint_proxy::QintState;
 use structopt::StructOpt;
 use tauri::AppHandle;
-use tauri::PhysicalPosition;
 use tauri::SystemTray;
 use tauri::SystemTrayEvent;
 use tauri::SystemTrayMenu;
@@ -26,6 +25,7 @@ use tauri::WindowBuilder;
 use tauri::WindowEvent;
 use tauri::WindowUrl;
 use tauri::{CustomMenuItem, Manager};
+use tauri::{PhysicalPosition, PhysicalSize};
 use tokio::runtime::Runtime;
 
 use crate::audio::LoudnessShare;
@@ -90,6 +90,8 @@ impl Into<qint_proxy::Args> for Args {
 		}
 	}
 }
+
+const WINDOW_EVENT_DEBUG_PRINTS: bool = false;
 
 fn main() {
 	tracing_subscriber::fmt::init();
@@ -181,30 +183,59 @@ fn main() {
 		.on_window_event(move |ev| {
 			let window = ev.window();
 			match ev.event() {
-				WindowEvent::Resized(_size) => {
-					//println!("Resize: {:?}", size);
-				}
+				WindowEvent::Resized(_size) => {}
 				WindowEvent::CloseRequested { api, .. } => {
-					println!("Close requested");
+					if WINDOW_EVENT_DEBUG_PRINTS {
+						println!("Close requested");
+					}
 					api.prevent_close();
 					if let Some(true) = app_arc.state.settings.read().unwrap().get_close_to_tray() {
-						println!("Closing to tray instead");
+						if WINDOW_EVENT_DEBUG_PRINTS {
+							println!("Closing to tray instead");
+						}
 						window.hide().unwrap();
 					} else {
 						do_exit2(ev.window().app_handle());
 					}
 				}
+				WindowEvent::Focused(focus) => {
+					if *focus && window.is_visible().unwrap() {
+						let pos = window.inner_position().unwrap();
+						// Recover from Windows-D or Windows-M broken minimize
+						if pos.x == -32000 && pos.y == -32000 {
+							if WINDOW_EVENT_DEBUG_PRINTS {
+								println!("Restore window to default position and size");
+							}
+							//window.set_skip_taskbar(false).unwrap();
+							window.set_position(PhysicalPosition::new(300, 300)).unwrap();
+							window.set_size(PhysicalSize::new(800, 600)).unwrap();
+							// When we don't call show the minimize button can get bricked...
+							window.show().unwrap();
+						}
+					}
+				}
 				WindowEvent::Destroyed => {
-					println!("Destroyed");
+					if WINDOW_EVENT_DEBUG_PRINTS {
+						println!("Destroyed");
+					}
 				}
 				WindowEvent::Moved(pos) => {
-					// Awful, windows-specific hack. See issue #37
-					if pos == &(PhysicalPosition::<i32> { x: -32000, y: -32000 }) {
-						println!("Moved to Minimized {:?}", pos);
+					// Handling Windows minimize
+					// Caused by
+					// - pressing the UI minimize button on the windows "native" design
+					// - pressing Windows-D or Windows-M
+					if pos.x == -32000 && pos.y == -32000 {
 						if let Some(true) =
 							app_arc.state.settings.read().unwrap().get_minimize_to_tray()
 						{
+							if WINDOW_EVENT_DEBUG_PRINTS {
+								println!("Hide window");
+							}
 							window.hide().unwrap();
+							// Skip taskbar is required with Windows-D / M on the "normal" window design
+							window.set_skip_taskbar(true).unwrap();
+						} else if WINDOW_EVENT_DEBUG_PRINTS {
+							println!("Windows minimize");
 						}
 					}
 				}
