@@ -177,7 +177,7 @@ impl Search {
 							let mut doc = Document::default();
 							doc.add_u64(typ, IndexEntryType::Message.to_u64().unwrap());
 							doc.add_u64(message_id, r.0 as u64);
-							doc.add_u64(time, r.1.timestamp() as u64);
+							doc.add_u64(time, r.1.and_utc().timestamp() as u64);
 							doc.add_text(content, r.2);
 
 							if let Err(error) = index_writer.add_document(doc) {
@@ -403,7 +403,7 @@ impl Search {
 			IndexEntryType::Message.to_u64().unwrap(),
 		);
 		doc.add_u64(self.schema.get_field("message_id").unwrap(), id);
-		doc.add_u64(self.schema.get_field("time").unwrap(), time.timestamp() as u64);
+		doc.add_u64(self.schema.get_field("time").unwrap(), time.and_utc().timestamp() as u64);
 		doc.add_text(self.schema.get_field("content").unwrap(), content);
 
 		self.write(doc);

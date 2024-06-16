@@ -1,6 +1,7 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
+use serde::Serialize;
 use tauri::Window;
 use tracing::warn;
 

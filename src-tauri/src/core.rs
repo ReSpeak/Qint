@@ -9,6 +9,7 @@ use qint_proxy::with_log;
 use qint_proxy::ConnectionId;
 use qint_proxy::FrontBridge;
 use qint_proxy::QintState;
+use serde::Serialize;
 use thiserror::Error;
 use tokio::runtime::Handle;
 use tracing::error;

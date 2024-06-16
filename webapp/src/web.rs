@@ -111,7 +111,9 @@ impl WebApp {
 		settings.listen_address
 	}
 
-	pub fn get_token(&self) -> &str { &self.token }
+	pub fn get_token(&self) -> &str {
+		&self.token
+	}
 }
 
 #[get("/ws")]
@@ -136,7 +138,9 @@ struct GetFileOptions {
 	cache: bool,
 }
 
-fn result_details_gone() -> ResultDetails { "gone".into() }
+fn result_details_gone() -> ResultDetails {
+	"gone".into()
+}
 
 #[get("/con/{id}/file/{channel}/{path:.*}")]
 async fn download_file(
@@ -431,7 +435,7 @@ mod tests {
 	use std::future::Future;
 	use std::time::Duration;
 
-	use anyhow::{format_err, Result};
+	use anyhow::{bail, format_err, Result};
 	use awc::ws;
 	use futures::{SinkExt, StreamExt};
 	use juniper::http::GraphQLRequest;
@@ -441,6 +445,7 @@ mod tests {
 	use rand::Rng;
 	use serde::{Deserialize, Serialize};
 	use tokio::time;
+	use tracing::{debug, error, info};
 	use tsclientlib::ClientId;
 	use uuid::Uuid;
 
@@ -473,7 +478,9 @@ mod tests {
 		client: Vec<u8>,
 	}
 
-	fn create_logger() { Lazy::force(&TRACING); }
+	fn create_logger() {
+		Lazy::force(&TRACING);
+	}
 
 	impl TestProxy {
 		fn new() -> Self {
@@ -497,7 +504,9 @@ mod tests {
 		}
 
 		async fn graphql<T>(&self, request: &GraphQLRequest) -> Result<T>
-		where for<'a> T: Deserialize<'a> {
+		where
+			for<'a> T: Deserialize<'a>,
+		{
 			let client = awc::Client::default();
 			let url = format!("http://127.0.0.1:{}/db", self.port);
 			debug!(body = %serde_json::to_string(&request).unwrap(), "GraphQL request");

@@ -21,7 +21,7 @@ use qint_proxy::{
 	identities::import_ts_identities_from_string,
 	messages::{MessageF2P, MessageP2F},
 	shared::UpdateIdentityOptions,
-	AppToFrontendBridge, ConnectionId, QintState,
+	with_log, AppToFrontendBridge, ConnectionId, QintState,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -138,7 +138,9 @@ impl AppToFrontendBridge for WsBridge {
 
 impl Actor for Ws {
 	type Context = ws::WebsocketContext<Self>;
-	fn stopped(&mut self, _: &mut Self::Context) { self.close(); }
+	fn stopped(&mut self, _: &mut Self::Context) {
+		self.close();
+	}
 }
 
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
@@ -413,10 +415,10 @@ impl Ws {
 
 				unwrap_send!(
 					state.database,
-					UpdateIdentityMsg(FindIdentity::ById(args.id.0), UpdateIdentity {
-						name: args.update.name,
-						..Default::default()
-					},)
+					UpdateIdentityMsg(
+						FindIdentity::ById(args.id.0),
+						UpdateIdentity { name: args.update.name, ..Default::default() },
+					)
 				)
 			}
 			"identity_delete" => {

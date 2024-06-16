@@ -1,7 +1,8 @@
-use anyhow::Error;
+use anyhow::{bail, Error};
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::stream::StreamExt;
 use qint_proxy::connection::{DownloadFileContext, UploadFileContext};
+use serde::{Deserialize, Serialize};
 use std::io::{self, ErrorKind};
 use std::ops::Range;
 use std::path::Path;
@@ -65,7 +66,9 @@ enum TxDirection {
 }
 
 impl UploadPrepare {
-	pub fn get_size(&self) -> u64 { self.size }
+	pub fn get_size(&self) -> u64 {
+		self.size
+	}
 }
 
 type FiletransferList = Vec<TransferContext>;
