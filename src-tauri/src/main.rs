@@ -272,6 +272,8 @@ fn main() {
 			cmd::markdown,
 			cmd::set_loudness_callback,
 		])
+		// This allows triggering hotkeys while Window is focused
+		.device_event_filter(tauri::DeviceEventFilter::Always)
 		.run(tauri::generate_context!())
 		.map_err(|e| format_err!("tauri error: {}", e))
 		.unwrap();

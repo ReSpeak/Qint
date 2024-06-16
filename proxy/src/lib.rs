@@ -290,9 +290,14 @@ impl QintState {
 		}
 
 		if changes.hotkeys_changed {
-			if let Ok(hotkeys) = settings.get_hotkeys_config() {
-				if let Err(error) = state.hotkeys.apply_config(state, hotkeys) {
-					error!(%error, "Failed to apply new hotkeys");
+			match settings.get_hotkeys_config() {
+				Ok(hotkeys) => {
+					if let Err(error) = state.hotkeys.apply_config(state, hotkeys) {
+						error!(%error, "Failed to apply new hotkeys");
+					}
+				}
+				Err(error) => {
+					error!(%error, "Failed to read hotkeys config");
 				}
 			}
 		}

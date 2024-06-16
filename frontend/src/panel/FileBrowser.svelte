@@ -198,7 +198,7 @@
 		};
 	}
 
-	const sortOpt = { sensitivity: "base" };
+	const sortOpt: Intl.CollatorOptions = { sensitivity: "base" };
 	const columns: IColumns<FileTreeNode> = [
 		{
 			key: "type",
