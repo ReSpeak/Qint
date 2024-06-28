@@ -151,8 +151,15 @@
 
       packageJSON = ./frontend/package.json;
       yarnLock = ./frontend/yarn.lock;
-      yarnRc = ./frontend/.yarnrc.yml;
-      yarnFolder = ./frontend/.yarn;
+      # Rename paths illegally starting with .
+      yarnRc = builtins.path {
+        name = "frontend-yarnrc";
+        path = ./frontend/.yarnrc.yml;
+      };
+      yarnFolder = builtins.path {
+        name = "frontend-yarn";
+        path = ./frontend/.yarn;
+      };
     };
 
     build-frontend = book_events: pkgs.runCommand "build-qint-frontend" {
