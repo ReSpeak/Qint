@@ -161,77 +161,125 @@
 	}
 
 	function handlePaste(e: ClipboardEvent) {
-		e.stopPropagation();
-		e.preventDefault();
 		const clipboardData = e.clipboardData || ((window as any).clipboardData as DataTransfer);
 
-		const types = new Set<string>();
-		for (const type of clipboardData.items) {
-			types.add(type.type);
+		let anyImageType: string | undefined;
+		for (const item of clipboardData.items) {
+			if (item.type.startsWith("image/")) {
+				anyImageType = item.type;
+				break;
+			}
 		}
 
-		if (types.size === 0) return;
+		if (clipboardData.types.includes("text/plain")) {
+			dispatchPaste("text/plain", clipboardData.getData("text/plain"));
+		} else if (anyImageType !== undefined) {
+			const urlSourceDirect = URL.createObjectURL(clipboardData.files[0]);
+			handleImagePasteAsync({ type: anyImageType, url: urlSourceDirect });
+		} else {
+			handleImagePasteAsync(undefined);
+		}
+	}
 
+	// Modern browsers don't also expose text/html when copying an image, so we try to read from the clipboard API
+	async function handleImagePasteAsync(directImage: { type: string; url: string } | undefined) {
+		let clipboardData: ClipboardItems | undefined = undefined;
+
+		try {
+			clipboardData = await navigator.clipboard.read();
+		} catch (e) {
+			log("Clipboard API not available");
+		}
+
+		if (clipboardData !== undefined && clipboardData.length > 0) {
+			let clipItem = clipboardData[0];
+			let anyImageType = clipItem.types.find((x) => x.startsWith("image/"));
+
+			if (clipItem.types.includes("text/html")) {
+				const blob = await clipItem.getType("text/html");
+				const html = await blob.text();
+				if (dispatchPaste("text/html", html)) {
+					if (directImage) {
+						URL.revokeObjectURL(directImage.url);
+					}
+					return;
+				}
+			}
+			if (anyImageType !== undefined && directImage === undefined) {
+				const blob = await clipItem.getType(anyImageType);
+				directImage = { type: anyImageType, url: URL.createObjectURL(blob) };
+			}
+		}
+
+		if (directImage) {
+			dispatchPaste(directImage.type, directImage.url);
+		}
+	}
+
+	function dispatchPaste(type: string, data: string) {
 		const range = window.getSelection()!.getRangeAt(0);
 
 		// processing clipboard data and inserting it
-		if (types.has("text/plain")) {
-			const text_plain = clipboardData.getData("text/plain");
+		if (type === "text/plain") {
+			const text_plain = data;
 			log("pasting as text: %s", text_plain);
 			document.execCommand("insertText", false, text_plain);
 			if (BROWSER !== Browser.Firefox) {
 				cleanNode(self);
 			}
-		} else if (types.has("image/png")) {
-			let hasHtmlNode = false;
-			if (types.has("text/html")) {
-				// TODO check if src: data
-				const text_html = clipboardData.getData("text/html");
-				const domparser = new DOMParser();
-				const dom = domparser.parseFromString(text_html, "text/html");
-				const domImg = dom.querySelector("img");
-				log("pasting as html %o", domImg);
-				if (
-					domImg?.src &&
-					(domImg.src.startsWith("http://") || domImg.src.startsWith("https://"))
-				) {
-					const qintImg = domImg.dataset.qintimg
-						? ` data-qintimg="${escapeHtml(domImg.dataset.qintimg)}"`
-						: "";
-					const imgHtml = `<img src="${escapeHtml(domImg.src)}"${qintImg}/>`;
-					document.execCommand("insertHtml", false, imgHtml);
-					hasHtmlNode = true;
+		} else if (type === "text/html") {
+			// TODO check if src: data
+			const text_html = data;
+			const domparser = new DOMParser();
+			const dom = domparser.parseFromString(text_html, "text/html");
+			const domImg = dom.querySelector("img");
+			log("pasting as html %o", domImg);
+			if (
+				domImg?.src &&
+				(domImg.src.startsWith("http://") || domImg.src.startsWith("https://"))
+			) {
+				const qintImg = domImg.dataset.qintimg
+					? ` data-qintimg="${escapeHtml(domImg.dataset.qintimg)}"`
+					: "";
+				const imgHtml = `<img src="${escapeHtml(domImg.src)}"${qintImg}/>`;
+				document.execCommand("insertHtml", false, imgHtml);
+			} else {
+				return false;
+			}
+		} else if (type.startsWith("image/")) {
+			log("pasting as image");
+			const fileUrl = data;
+
+			const loaderImg = document.createElement("img");
+			const displayImg = document.createElement("img");
+			loaderImg.onload = () => {
+				const canvas = document.createElement("canvas");
+				canvas.width = loaderImg.naturalWidth;
+				canvas.height = loaderImg.naturalHeight;
+				const ctx = canvas.getContext("2d")!;
+				if (type !== "image/jpeg") {
+					ctx.fillStyle = "white";
+					ctx.fillRect(0, 0, canvas.width, canvas.height);
 				}
-			}
-			if (!hasHtmlNode) {
-				log("pasting as image");
-				const file = clipboardData.files[0];
-				// TODO free object somewhen
-				const fileUrl = URL.createObjectURL(file);
+				ctx.drawImage(loaderImg, 0, 0);
+				const imgData = canvas.toDataURL("image/jpeg", 0.9);
+				displayImg.src = imgData;
 
-				const loaderImg = document.createElement("img");
-				const displayImg = document.createElement("img");
-				loaderImg.onload = () => {
-					const canvas = document.createElement("canvas");
-					canvas.width = loaderImg.naturalWidth;
-					canvas.height = loaderImg.naturalHeight;
-					canvas.getContext("2d")!.drawImage(loaderImg, 0, 0);
-					const imgData = canvas.toDataURL("image/jpeg", 0.9);
-					displayImg.src = imgData;
-
-					// const blob = new Blob(
-					// 	[Uint8Array.from(atob(imgData.split(",")[1]), (c) => c.charCodeAt(0))],
-					// 	{ type: "image/jpeg" }
-					// );
-					// log("Blob", blob);
-					// TODO move to a 'final' block.
-					URL.revokeObjectURL(fileUrl);
-				};
-				loaderImg.onerror = () => URL.revokeObjectURL(fileUrl);
-				loaderImg.onabort = () => URL.revokeObjectURL(fileUrl);
-				loaderImg.src = fileUrl;
-				range.insertNode(displayImg);
-			}
+				// const blob = new Blob(
+				// 	[Uint8Array.from(atob(imgData.split(",")[1]), (c) => c.charCodeAt(0))],
+				// 	{ type: "image/jpeg" }
+				// );
+				// log("Blob", blob);
+				// TODO move to a 'final' block.
+				URL.revokeObjectURL(fileUrl);
+			};
+			loaderImg.onerror = () => URL.revokeObjectURL(fileUrl);
+			loaderImg.onabort = () => URL.revokeObjectURL(fileUrl);
+			loaderImg.src = fileUrl;
+			range.insertNode(displayImg);
+		} else {
+			log("Unknown paste type %s", type);
+			return false;
 		}
 		// deselect the inserted data and put the cursor after it
 		range.collapse(false);
@@ -241,6 +289,8 @@
 		if (expectQuickPaste) {
 			dispatch("submit");
 		}
+
+		return true;
 	}
 
 	onMount(() => {
@@ -257,11 +307,9 @@
 		bind:this={self}
 		on:keydown={onChatKeyDown}
 		on:input={textChanged}
-		on:paste={handlePaste}
+		on:paste|preventDefault|stopPropagation={handlePaste}
 		class="input textBox"
-		name="message"
-		contenteditable="true"
-	/>
+		contenteditable="true" />
 </div>
 
 <style lang="scss">
