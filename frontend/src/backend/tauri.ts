@@ -11,7 +11,7 @@ import {
 } from "./backend";
 import { listen } from "@tauri-apps/api/event";
 import debug from "debug";
-import { invoke } from "@tauri-apps/api/tauri";
+import { invoke } from "@tauri-apps/api/core";
 import { ReturnCodeTracker } from "./returnCodeTracker";
 import {
 	IInvokeConnection,

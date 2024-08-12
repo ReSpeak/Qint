@@ -1,35 +1,35 @@
 <script lang="ts">
 	import Icon from "../ui/icon/Icon.svelte";
 	import { app } from "../app";
-	import { appWindow } from "@tauri-apps/api/window";
+	import { getCurrentWindow } from "@tauri-apps/api/window";
 
 	let isMaximized = false;
 	const appSettings = app.settings.app;
 
 	async function updateWindowState() {
-		isMaximized = await appWindow.isMaximized();
+		isMaximized = await getCurrentWindow().isMaximized();
 	}
 
 	async function toTray() {
-		await appWindow.setSkipTaskbar(true);
-		await appWindow.hide();
+		await getCurrentWindow().setSkipTaskbar(true);
+		await getCurrentWindow().hide();
 	}
 
 	async function minimize() {
 		if (appSettings.minimizeToTray) {
 			await toTray();
 		} else {
-			await appWindow.minimize();
+			await getCurrentWindow().minimize();
 		}
 	}
 
 	async function maximize() {
 		await updateWindowState();
 		if (isMaximized) {
-			await appWindow.unmaximize();
+			await getCurrentWindow().unmaximize();
 			isMaximized = false;
 		} else {
-			await appWindow.maximize();
+			await getCurrentWindow().maximize();
 			isMaximized = true;
 		}
 	}
@@ -39,7 +39,7 @@
 			await toTray();
 		} else {
 			app.close();
-			await appWindow.close();
+			await getCurrentWindow().close();
 		}
 	}
 

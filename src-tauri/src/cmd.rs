@@ -29,8 +29,8 @@ use qint_proxy::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use tauri::api::dialog::FileDialogBuilder;
-use tauri::{command, State, Window};
+use tauri::{command, Emitter, Manager, State, Window};
+use tauri_plugin_dialog::DialogExt;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
@@ -355,18 +355,17 @@ pub async fn upload_bytes(
 pub async fn read_file(window: Window) -> Result<(String, String), String> {
 	let path_buf = tauri::async_runtime::spawn(async move {
 		let (tx, rx) = std::sync::mpsc::channel::<Option<PathBuf>>();
-		FileDialogBuilder::default()
-			.set_parent(&window)
-			.add_filter("JavaScript File", &["js"])
-			.pick_file(move |p| {
-				let _ = tx.send(p);
-			});
+		window.app_handle().dialog().file().add_filter("JavaScript File", &["js"]).pick_file(
+			move |p| {
+				let _ = tx.send(p.map(|p| p.path));
+			},
+		);
 		rx.recv().unwrap_or(None)
 	})
 	.await
 	.unwrap();
 	if let Some(path_buf) = path_buf {
-		let content = tauri::api::file::read_string(&path_buf).map_err(|err| err.to_string())?;
+		let content = std::fs::read_to_string(&path_buf).map_err(|err| err.to_string())?;
 		let file = if let Some(file) = path_buf.file_name() {
 			file.to_string_lossy()
 		} else {
@@ -409,11 +408,9 @@ pub async fn download_file(
 
 	let path_buf = tauri::async_runtime::spawn(async move {
 		let (tx, rx) = std::sync::mpsc::channel::<Option<PathBuf>>();
-		FileDialogBuilder::default().set_parent(&window).set_file_name(&suggest_file).save_file(
-			move |p| {
-				let _ = tx.send(p);
-			},
-		);
+		window.app_handle().dialog().file().set_file_name(&suggest_file).save_file(move |p| {
+			let _ = tx.send(p);
+		});
 		rx.recv().unwrap_or(None)
 	})
 	.await
@@ -450,15 +447,16 @@ pub enum UploadFeature {
 async fn ask_for_files(multiple: bool, window: Window) -> Result<Vec<PathBuf>, String> {
 	let picked = tauri::async_runtime::spawn(async move {
 		let (tx, rx) = std::sync::mpsc::channel::<Vec<PathBuf>>();
-		let builder = FileDialogBuilder::default().set_parent(&window);
+		let builder = window.app_handle().dialog().file();
 		if multiple {
 			builder.pick_files(move |p| {
-				let picked = if let Some(vec) = p { vec } else { Vec::new() };
+				let picked =
+					p.map(|p| p.into_iter().map(|r| r.path).collect::<Vec<_>>()).unwrap_or_default();
 				let _ = tx.send(picked);
 			});
 		} else {
 			builder.pick_file(move |p| {
-				let picked = if let Some(p) = p { vec![p] } else { Vec::new() };
+				let picked = p.map(|p| vec![p.path]).unwrap_or_default();
 				let _ = tx.send(picked);
 			});
 		}

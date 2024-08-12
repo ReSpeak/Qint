@@ -1,8 +1,3 @@
-use anyhow::{bail, Error};
-use futures::channel::mpsc::{channel, Receiver, Sender};
-use futures::stream::StreamExt;
-use qint_proxy::connection::{DownloadFileContext, UploadFileContext};
-use serde::{Deserialize, Serialize};
 use std::io::{self, ErrorKind};
 use std::ops::Range;
 use std::path::Path;
@@ -10,6 +5,12 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
 use std::task::{Context, Poll};
+
+use anyhow::{bail, Error};
+use futures::channel::mpsc::{channel, Receiver, Sender};
+use futures::stream::StreamExt;
+use qint_proxy::connection::{DownloadFileContext, UploadFileContext};
+use serde::{Deserialize, Serialize};
 use tokio::fs::File;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 

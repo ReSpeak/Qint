@@ -19,7 +19,7 @@ export const CLEAR_ICON = "broom";
 
 // the rpc field gets injected by the tauri runtime so it's a good indicator if
 // we are running withing the tauri app.
-export const IS_TAURI = "__TAURI__" in window;
+export const IS_TAURI = "__TAURI_INTERNALS__" in window;
 export const LONG_DATETIME = "dddd, MMMM Do YYYY, HH:mm:ss UTCZ";
 export const MIN_VOLUME_DB = -30;
 export const PASSWORD_PLACEHOLDER = "**********";

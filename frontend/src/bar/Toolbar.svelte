@@ -6,7 +6,7 @@
 	import MuteButtons from "./MuteButtons.svelte";
 	import { ConnectData } from "../connect/uiConnect";
 	import Searchbar from "./Searchbar.svelte";
-	import { appWindow } from "@tauri-apps/api/window";
+	import { getCurrentWindow } from "@tauri-apps/api/window";
 	import { TitleBarStyle } from "../settings";
 	import TitleButtons from "./TitleButtons.svelte";
 	import { get } from "svelte/store";
@@ -44,7 +44,7 @@
 	async function startDragWindow(this: HTMLElement, ev: MouseEvent | TouchEvent) {
 		if (IS_TAURI) {
 			if ((ev.target as HTMLElement)?.dataset?.titledrag) {
-				await appWindow.startDragging();
+				await getCurrentWindow().startDragging();
 			}
 		}
 	}
@@ -52,9 +52,9 @@
 	$: {
 		if (IS_TAURI) {
 			if ($titleBarStyle === TitleBarStyle.Native) {
-				appWindow.setDecorations(true);
+				getCurrentWindow().setDecorations(true);
 			} else {
-				appWindow.setDecorations(false);
+				getCurrentWindow().setDecorations(false);
 			}
 		}
 	}

@@ -190,10 +190,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tauri-apps/api@npm:1.2.0":
-  version: 1.2.0
-  resolution: "@tauri-apps/api@npm:1.2.0"
-  checksum: 15b0b805d9a30dce4e722b48330566cb95d79f92d626741f49735dfb7e7a044836a7c45a0537e03fd0acb48965c723ff31a6931289f81c9bcafa4e13c3a2aa2b
+"@tauri-apps/api@npm:2.0.0-rc.0":
+  version: 2.0.0-rc.0
+  resolution: "@tauri-apps/api@npm:2.0.0-rc.0"
+  checksum: 1476731b05b39ce69922b266743b349e35b07a9797432bdff8d83972c2eb560a229360f0d04b5d8fc14a836e5e7628e880120b0466e20d36dfc49a6a5c1e72fa
   languageName: node
   linkType: hard
 
@@ -2283,7 +2283,7 @@ __metadata:
   dependencies:
     "@mdi/font": 7.0.96
     "@sveltejs/vite-plugin-svelte": 1.4.0
-    "@tauri-apps/api": 1.2.0
+    "@tauri-apps/api": 2.0.0-rc.0
     "@types/chroma-js": 2.1.4
     "@types/debug": 4.1.7
     "@types/katex": 0.14.0

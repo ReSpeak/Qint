@@ -4,14 +4,13 @@ version = "0.1.0"
 authors = [ "Flakebi <flakebi@t-online.de>" ]
 description = ""
 edition = "2018"
-build = "src/build.rs"
+
+[lib]
+name = "qint_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "1.5.2", features = [] }
-
-[features]
-custom-protocol = [ "tauri/custom-protocol" ]
-default = [ "custom-protocol" ]
+tauri-build = { version = "2.0.0-rc.2", features = [] }
 
 [dependencies]
 actix = "0.13"
@@ -27,7 +26,11 @@ serde = { version = "1.0", features = [ "derive" ] }
 serde_json = "1.0"
 sha2 = "0.10"
 structopt = { version = "0.3", default-features = false }
-tauri = { version = "1.6.8", features = ["dialog-all", "http-all", "notification-all", "shell-open", "system-tray", "window-all"] }
+tauri = { version = "2.0.0-rc.2", features = ["tray-icon"] }
+tauri-plugin-dialog = "2.0.0-rc.0"
+tauri-plugin-http = "2.0.0-rc.0"
+tauri-plugin-notification = "2.0.0-rc.0"
+tauri-plugin-shell = "2.0.0-rc.0"
 thiserror = "1"
 tokio = "1"
 tokio-util = { version = "0.7", features = [ "io" ] }
@@ -36,5 +39,8 @@ tracing-subscriber = { version = "0.3", features = [ "env-filter" ] }
 tsclientlib = { git = "https://github.com/ReSpeak/tsclientlib", features = [ "unstable" ] }
 tsproto-types = { git = "https://github.com/ReSpeak/tsclientlib" }
 
-[target."cfg(windows)".build-dependencies]
-winres = "0.1"
+[features]
+# this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.
+# If you use cargo directly instead of tauri's cli you can use this feature flag to switch between tauri's `dev` and `build` modes.
+# DO NOT REMOVE!!
+custom-protocol = [ "tauri/custom-protocol" ]
