@@ -3,10 +3,8 @@ members = ["proxy-codegen", "proxy", "src-tauri", "webapp"]
 resolver = "2"
 
 [patch.crates-io]
-# Alternative branch uses cmake instead of autoconf, which works better for cross compilation
-audiopus = { git = "https://github.com/DoumanAsh/audiopus", branch = "better_sys" }
-opusic-sys = { git = "https://github.com/Flakebi/opusic-sys" }
-webview2-com-sys = { git = "https://github.com/Flakebi/webview2-rs" }
+# Use cmake to build opus instead of autoconf, this works better for cross compilation
+audiopus = { git = "https://github.com/Flakebi/audiopus" }
 
 # Use local copy of tsclientlib
 #[patch."https://github.com/ReSpeak/tsclientlib"]
@@ -26,7 +24,6 @@ opt-level = 3
 opt-level = 3
 
 [profile.release]
-debug = true
 panic = "abort"
 
 [profile.dev]

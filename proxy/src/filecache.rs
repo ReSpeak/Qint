@@ -9,6 +9,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use anyhow::Result;
+use base64::prelude::*;
 use bytes::{Buf, Bytes, BytesMut};
 use futures::prelude::*;
 use futures::stream::Peekable;
@@ -41,7 +42,7 @@ struct FileWriter<S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin> {
 impl FileCache {
 	pub fn new(cache_path: PathBuf) -> Self { Self { cache_path } }
 
-	fn path_encode(data: &[u8]) -> String { base64::encode_config(data, base64::URL_SAFE_NO_PAD) }
+	fn path_encode(data: &[u8]) -> String { BASE64_URL_SAFE_NO_PAD.encode(data) }
 
 	fn get_path(&self, server: &EccKeyPubP256, channel: ChannelId, path: &str) -> PathBuf {
 		assert!(path.starts_with("/"), "Invalid path: {}", path);

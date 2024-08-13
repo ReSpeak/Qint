@@ -5,6 +5,7 @@ use std::{fmt::Debug, sync::Arc};
 
 use actix::Addr;
 use actix::MailboxError;
+use base64::prelude::*;
 use bytes::{Bytes, BytesMut};
 use futures::{Stream, StreamExt};
 use juniper::http::GraphQLRequest;
@@ -300,7 +301,8 @@ pub async fn download_bytes_from_cache(
 	let state = state.inner();
 	let FileCacheRequest { con, channel, path } = req;
 
-	let server = match base64::decode_config(&con, base64::URL_SAFE_NO_PAD)
+	let server = match BASE64_URL_SAFE_NO_PAD
+		.decode(&con)
 		.map_err(|e| e.into())
 		.and_then(|id| EccKeyPubP256::from_short(&id))
 	{
@@ -408,6 +410,8 @@ pub async fn download_file(
 
 	let path_buf = tauri::async_runtime::spawn(async move {
 		let (tx, rx) = std::sync::mpsc::channel::<Option<PathBuf>>();
+		// TODO Not working on mobile
+		#[cfg(desktop)]
 		window.app_handle().dialog().file().set_file_name(&suggest_file).save_file(move |p| {
 			let _ = tx.send(p);
 		});
@@ -450,8 +454,9 @@ async fn ask_for_files(multiple: bool, window: Window) -> Result<Vec<PathBuf>, S
 		let builder = window.app_handle().dialog().file();
 		if multiple {
 			builder.pick_files(move |p| {
-				let picked =
-					p.map(|p| p.into_iter().map(|r| r.path).collect::<Vec<_>>()).unwrap_or_default();
+				let picked = p
+					.map(|p| p.into_iter().map(|r| r.path).collect::<Vec<_>>())
+					.unwrap_or_default();
 				let _ = tx.send(picked);
 			});
 		} else {

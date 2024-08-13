@@ -10,12 +10,15 @@ use std::thread;
 use actix::prelude::*;
 use qint_proxy::QintState;
 use structopt::StructOpt;
+#[cfg(desktop)]
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
+#[cfg(desktop)]
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::AppHandle;
 use tauri::Listener;
 use tauri::Manager;
 use tauri::WindowEvent;
+#[cfg(desktop)]
 use tauri::{PhysicalPosition, PhysicalSize};
 use tokio::runtime::Runtime;
 
@@ -134,37 +137,40 @@ pub fn run() {
 		.manage(app_arc.clone())
 		.manage(LoudnessShare::new())
 		.setup(|app| {
-			let show = MenuItemBuilder::with_id("show", "Show").build(app)?;
-			let exit = MenuItemBuilder::with_id("exit", "Exit").build(app)?;
-			TrayIconBuilder::with_id("qint")
-				.menu(&MenuBuilder::new(app).items(&[&show, &exit]).build()?)
-				.on_menu_event(move |app, event| match event.id().as_ref() {
-					"show" => {
-						let window = app.get_webview_window("main").unwrap();
-						window.show().unwrap();
-						window.set_focus().unwrap();
-					}
-					"exit" => {
-						do_exit(app.clone());
-					}
-					_ => {}
-				})
-				.on_tray_icon_event(move |tray, event| match event {
-					TrayIconEvent::Click {
-						button: MouseButton::Left,
-						button_state: MouseButtonState::Up,
-						..
-					} => {
-						if let Some(window) = tray.app_handle().get_webview_window("main") {
-							let _ = window.set_skip_taskbar(false);
-							let _ = window.unminimize();
-							let _ = window.show();
-							let _ = window.set_focus();
+			#[cfg(desktop)]
+			{
+				let show = MenuItemBuilder::with_id("show", "Show").build(app)?;
+				let exit = MenuItemBuilder::with_id("exit", "Exit").build(app)?;
+				TrayIconBuilder::with_id("qint")
+					.menu(&MenuBuilder::new(app).items(&[&show, &exit]).build()?)
+					.on_menu_event(move |app, event| match event.id().as_ref() {
+						"show" => {
+							let window = app.get_webview_window("main").unwrap();
+							window.show().unwrap();
+							window.set_focus().unwrap();
 						}
-					}
-					_ => {}
-				})
-				.build(app)?;
+						"exit" => {
+							do_exit(app.clone());
+						}
+						_ => {}
+					})
+					.on_tray_icon_event(move |tray, event| match event {
+						TrayIconEvent::Click {
+							button: MouseButton::Left,
+							button_state: MouseButtonState::Up,
+							..
+						} => {
+							if let Some(window) = tray.app_handle().get_webview_window("main") {
+								let _ = window.set_skip_taskbar(false);
+								let _ = window.unminimize();
+								let _ = window.show();
+								let _ = window.set_focus();
+							}
+						}
+						_ => {}
+					})
+					.build(app)?;
+			}
 
 			Ok(())
 		})
@@ -185,11 +191,13 @@ pub fn run() {
 						if WINDOW_EVENT_DEBUG_PRINTS {
 							println!("Closing to tray instead");
 						}
+						#[cfg(desktop)]
 						window.hide().unwrap();
 					} else {
 						do_exit2(window.app_handle().clone());
 					}
 				}
+				#[cfg(desktop)]
 				WindowEvent::Focused(focus) => {
 					if *focus && window.is_visible().unwrap() {
 						let pos = window.inner_position().unwrap();
@@ -211,6 +219,7 @@ pub fn run() {
 						println!("Destroyed");
 					}
 				}
+				#[cfg(desktop)]
 				WindowEvent::Moved(pos) => {
 					// Handling Windows minimize
 					// Caused by

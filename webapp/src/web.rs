@@ -11,6 +11,7 @@ use actix_web::*;
 use actix_web::http::header::{HeaderValue, CACHE_CONTROL, ETAG};
 use actix_web_actors::ws;
 use anyhow::Result;
+use base64::prelude::*;
 use futures::prelude::*;
 use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
@@ -332,7 +333,8 @@ async fn download_cache_file(
 ) -> impl Responder {
 	let (id, channel, path) = path.into_inner();
 	let path = format!("/{}", path);
-	let server = match base64::decode_config(&id, base64::URL_SAFE_NO_PAD)
+	let server = match BASE64_URL_SAFE_NO_PAD
+		.decode(&id)
 		.map_err(|e| e.into())
 		.and_then(|id| EccKeyPubP256::from_short(&id))
 	{
@@ -437,6 +439,7 @@ mod tests {
 
 	use anyhow::{bail, format_err, Result};
 	use awc::ws;
+	use base64::prelude::*;
 	use futures::{SinkExt, StreamExt};
 	use juniper::http::GraphQLRequest;
 	use once_cell::sync::Lazy;
@@ -823,16 +826,18 @@ mod tests {
 		let key1 = proxy1.get_client_server_key().await?;
 
 		// Check for the message in the database of con0
-		let msgs =
-			proxy0.get_messages(&key0.server, "CLIENT", &base64::encode(&key1.client)).await?;
+		let msgs = proxy0
+			.get_messages(&key0.server, "CLIENT", &BASE64_STANDARD.encode(&key1.client))
+			.await?;
 		assert_eq!(msgs.len(), 1, "Message not saved in the database");
 		assert_eq!(msgs[0].0, key0.client, "Sender uid is wrong");
 		assert_eq!(msgs[0].2, msg, "Message is wrong");
 		assert!(msgs[0].1.starts_with("Test"), "Client name has to start with 'Test'");
 
 		// Check for the message in the database of con1
-		let msgs =
-			proxy1.get_messages(&key0.server, "CLIENT", &base64::encode(&key0.client)).await?;
+		let msgs = proxy1
+			.get_messages(&key0.server, "CLIENT", &BASE64_STANDARD.encode(&key0.client))
+			.await?;
 		assert_eq!(msgs.len(), 1, "Message not saved in the database");
 		assert_eq!(msgs[0].0, key0.client, "Sender uid is wrong");
 		assert_eq!(msgs[0].2, msg, "Message is wrong");

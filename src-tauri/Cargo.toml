@@ -1,6 +1,6 @@
 [package]
 name = "qint"
-version = "0.1.0"
+version = "0.1.1"
 authors = [ "Flakebi <flakebi@t-online.de>" ]
 description = ""
 edition = "2018"
@@ -10,23 +10,22 @@ name = "qint_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.0.0-rc.2", features = [] }
+tauri-build = { version = "2.0.0-rc.4", features = [] }
 
 [dependencies]
 actix = "0.13"
 actix-rt = "2"
 anyhow = "1"
-base64 = "0.13"
+base64 = "0.22"
 bytes = "1"
 futures = "0.3"
 juniper = "0.15"
 proxy-codegen = { path = "../proxy-codegen" }
-qint-proxy = { path = "../proxy", features = ["sdl2"] }
 serde = { version = "1.0", features = [ "derive" ] }
 serde_json = "1.0"
 sha2 = "0.10"
 structopt = { version = "0.3", default-features = false }
-tauri = { version = "2.0.0-rc.2", features = ["tray-icon"] }
+tauri = { version = "2.0.0-rc.4", features = ["tray-icon"] }
 tauri-plugin-dialog = "2.0.0-rc.0"
 tauri-plugin-http = "2.0.0-rc.0"
 tauri-plugin-notification = "2.0.0-rc.0"
@@ -36,8 +35,17 @@ tokio = "1"
 tokio-util = { version = "0.7", features = [ "io" ] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = [ "env-filter" ] }
-tsclientlib = { git = "https://github.com/ReSpeak/tsclientlib", features = [ "unstable" ] }
 tsproto-types = { git = "https://github.com/ReSpeak/tsclientlib" }
+
+[target."cfg(not(target_os = \"android\"))".dependencies]
+qint-proxy = { path = "../proxy", features = ["sdl2"] }
+tsclientlib = { git = "https://github.com/ReSpeak/tsclientlib", features = [ "unstable" ] }
+
+[target."cfg(target_os = \"android\")".dependencies]
+qint-proxy = { path = "../proxy", features = ["oboe"] }
+tsclientlib = { git = "https://github.com/ReSpeak/tsclientlib", default-features = false, features = [ "audio", "unstable" ] }
+# Use rustls for easier cross-compiling
+reqwest = { version = "0.12", default-features = false, features = ["charset", "http2", "rustls-tls"] }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.

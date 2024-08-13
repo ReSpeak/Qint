@@ -5,6 +5,7 @@ use std::convert::TryInto;
 use std::sync::Arc;
 
 use anyhow::format_err;
+use base64::prelude::*;
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use juniper::{EmptySubscription, FieldError, RootNode, ID};
@@ -121,7 +122,7 @@ fn get_chat_ids(
 		}
 		GMessageTarget::Client => {
 			let id = if let Some(id) = id {
-				base64::decode(id.as_bytes())?
+				BASE64_STANDARD.decode(id.as_bytes())?
 			} else {
 				return Err(format_err!("Client message target needs id").into());
 			};
@@ -739,7 +740,7 @@ impl SearchResult {
 			SearchResultId::Client(ref id) => {
 				let id = id.clone();
 				match attr {
-					"uid" => Ok(Some(base64::encode(&id))),
+					"uid" => Ok(Some(BASE64_STANDARD.encode(&id))),
 					"name" => Ok(Some(
 						state
 							.database

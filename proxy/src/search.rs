@@ -3,6 +3,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
+use base64::prelude::*;
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use futures::FutureExt;
@@ -246,7 +247,7 @@ impl Search {
 
 						// Insert into search database
 						for r in res {
-							let uid = base64::encode_config(&r.0, base64::URL_SAFE_NO_PAD);
+							let uid = BASE64_URL_SAFE_NO_PAD.encode(&r.0);
 							let mut doc = Document::default();
 							doc.add_u64(typ, IndexEntryType::Client.to_u64().unwrap());
 							doc.add_bytes(client_uid, r.0);

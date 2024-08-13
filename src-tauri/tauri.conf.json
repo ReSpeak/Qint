@@ -1,6 +1,6 @@
 {
   "productName": "Qint",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "identifier": "org.respeak.qint",
   "build": {
     "frontendDist": [
@@ -27,7 +27,6 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
     "icon": [
       "../assets/32x32.png",
       "../assets/128x128.png",

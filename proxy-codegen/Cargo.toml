@@ -13,7 +13,7 @@ nom = "7.0.0-alpha2"
 pulldown-cmark = "0.9"
 serde = { version = "1", features = [ "derive" ] }
 time = "0.3"
-tsclientlib = { git = "https://github.com/ReSpeak/tsclientlib", features = [ "unstable" ] }
+tsclientlib = { git = "https://github.com/ReSpeak/tsclientlib", default-features = false, features = [ "unstable" ] }
 tsproto = { git = "https://github.com/ReSpeak/tsclientlib" }
 tsproto-packets = { git = "https://github.com/ReSpeak/tsclientlib" }
 tsproto-types = { git = "https://github.com/ReSpeak/tsclientlib" }
@@ -22,4 +22,4 @@ url = "2"
 [build-dependencies]
 heck = "0.4"
 t4rust-derive = "0.3"
-tsproto-structs = { git = "https://github.com/ReSpeak/tsclientlib", version = "0.2" }
+tsproto-structs = { git = "https://github.com/ReSpeak/tsclientlib" }
