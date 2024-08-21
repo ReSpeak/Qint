@@ -61,6 +61,13 @@ By default, the proxy searches for the frontend in `../frontend/build`, where th
 built by default. For packaging, it is useful to load the frontend for another directory, which can
 be set during compilation: `FRONTEND_PATH=./frontend/ cargo build`
 
+#### Android
+
+To build for android:
+```bash
+cargo tauri android build
+```
+
 ### Build the frontend
 Make sure to build the backend once before building the frontend, because the backend build
 autogenerates the `book_events.ts` file of the frontend.
