@@ -5,13 +5,13 @@ use std::ops::Range;
 
 use lazy_static::lazy_static;
 use nom::{
+	IResult,
 	bytes::complete::escaped,
 	bytes::complete::take,
 	character::complete::none_of,
 	character::complete::{alpha1, char},
 	combinator::opt,
 	error::ErrorKind,
-	IResult,
 };
 use pulldown_cmark::{Alignment, CodeBlockKind, Event, LinkType, Options, Parser, Tag};
 
@@ -256,7 +256,7 @@ impl<TStack> Render<TStack> {
 	}
 
 	/// Add `http://` to a linke if it has no scheme
-	fn link_add_scheme(href: &str) -> Cow<str> {
+	fn link_add_scheme(href: &str) -> Cow<'_, str> {
 		if !href.contains("://") {
 			Cow::Owned(format!("http://{}", href))
 		} else {
@@ -386,7 +386,8 @@ impl RenderMd {
 					// inside a link.
 					let ignore_bb = self.spine.iter().any(|parent| {
 						matches!(parent.0, RenderMdMeta::Code(_))
-							|| parent.1.tag == "a" || parent.1.tag == "code"
+							|| parent.1.tag == "a"
+							|| parent.1.tag == "code"
 					});
 					self.text_state = self.text_state.when_none(TextKind::Normal(ignore_bb));
 					let cur_len = self.text_builder.len();
@@ -708,7 +709,7 @@ fn error<'a, T>() -> IResult<&'a str, T> {
 	Err(nom::Err::Error(nom::error::Error { input: "", code: ErrorKind::Tag }))
 }
 
-fn nom_bb_read(bb: &str) -> Vec<BBSegment> {
+fn nom_bb_read(bb: &str) -> Vec<BBSegment<'_>> {
 	let mut segs = vec![];
 	let mut cur = bb;
 	while !cur.is_empty() {
@@ -735,7 +736,7 @@ fn nom_bb_skip(s: &str) -> IResult<&str, &str> { take(1usize)(s) }
 
 fn nom_bb_text(s: &str) -> IResult<&str, &str> { escaped(none_of("\\["), '\\', take(1usize))(s) }
 
-fn nom_bb_tag(s: &str) -> IResult<&str, BBSegment> {
+fn nom_bb_tag(s: &str) -> IResult<&'_ str, BBSegment<'_>> {
 	let (s, _) = char('[')(s)?;
 	let (s, close) = opt(char('/'))(s)?;
 	let close = close.is_some();

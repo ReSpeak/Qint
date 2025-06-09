@@ -5,6 +5,7 @@ resolver = "2"
 [patch.crates-io]
 # Use cmake to build opus instead of autoconf, this works better for cross compilation
 audiopus = { git = "https://github.com/Flakebi/audiopus" }
+tauri-plugin = { git = "https://github.com/Flakebi/tauri-plugin" }
 
 # Use local copy of tsclientlib
 #[patch."https://github.com/ReSpeak/tsclientlib"]

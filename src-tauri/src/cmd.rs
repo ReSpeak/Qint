@@ -11,33 +11,33 @@ use futures::{Stream, StreamExt};
 use juniper::http::GraphQLRequest;
 use proxy_codegen::book_events::deserialize_id;
 use proxy_codegen::book_events::deserialize_u64;
-use qint_proxy::connection::{DownloadFileContext, UploadFile};
-use qint_proxy::messages::ResultDetails;
 use qint_proxy::MuteStates;
 use qint_proxy::SettingsUpdateError;
+use qint_proxy::connection::{DownloadFileContext, UploadFile};
+use qint_proxy::messages::ResultDetails;
 use qint_proxy::{
+	AppToFrontendBridge, ConnectionId, QintState,
 	db::{
-		models::UpdateIdentity, DeleteIdentityMsg, FindIdentity, GenrateNewIdentityMsg,
-		GetIdentitiesMsg, UpdateIdentityMsg,
+		DeleteIdentityMsg, FindIdentity, GenrateNewIdentityMsg, GetIdentitiesMsg,
+		UpdateIdentityMsg, models::UpdateIdentity,
 	},
 	filecache::guess_content_type,
-	identities::{import_ts_identities_from_string, ApiIdentity},
+	identities::{ApiIdentity, import_ts_identities_from_string},
 	link_previewer::AnalyzeResult,
 	messages::{MessageF2P, MessageP2F},
 	shared::{AudioDeviceList, UpdateIdentityOptions},
-	AppToFrontendBridge, ConnectionId, QintState,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use tauri::{command, Emitter, Manager, State, Window};
-use tauri_plugin_dialog::DialogExt;
+use tauri::{Emitter, Manager, State, Window, command};
+use tauri_plugin_dialog::{DialogExt, FilePath};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
 use tracing::{debug, error, info, warn};
 use tsclientlib::Error as TsError;
-use tsproto_types::{crypto::EccKeyPubP256, ChannelId};
+use tsproto_types::{ChannelId, crypto::EccKeyPubP256};
 
 use crate::audio::LoudnessShare;
 use crate::core::{CloseWs, CreateWs, DispatchWsMsg, Error, QintCore};
@@ -61,8 +61,7 @@ macro_rules! unwrap_send {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TauriWs<T>
-where
-	T: Debug,
+where T: Debug
 {
 	con: ConnectionId,
 	msg: T,
@@ -131,12 +130,8 @@ enum FileExistsAction {
 	Resume,
 }
 impl FileExistsAction {
-	fn overwrite(&self) -> bool {
-		*self == FileExistsAction::Overwrite
-	}
-	fn resume(&self) -> bool {
-		*self == FileExistsAction::Resume
-	}
+	fn overwrite(&self) -> bool { *self == FileExistsAction::Overwrite }
+	fn resume(&self) -> bool { *self == FileExistsAction::Resume }
 }
 
 #[derive(Debug, Serialize)]
@@ -192,11 +187,7 @@ pub async fn db(
 	state: State<'_, QState>, request: GraphQLRequest,
 ) -> Result<serde_json::Value, ()> {
 	let res = request.execute(&state.graphql_schema, &*state).await;
-	if res.is_ok() {
-		Ok(serde_json::to_value(&res).unwrap())
-	} else {
-		Err(())
-	}
+	if res.is_ok() { Ok(serde_json::to_value(&res).unwrap()) } else { Err(()) }
 }
 
 #[command]
@@ -359,7 +350,8 @@ pub async fn read_file(window: Window) -> Result<(String, String), String> {
 		let (tx, rx) = std::sync::mpsc::channel::<Option<PathBuf>>();
 		window.app_handle().dialog().file().add_filter("JavaScript File", &["js"]).pick_file(
 			move |p| {
-				let _ = tx.send(p.map(|p| p.path));
+				let path = if let Some(FilePath::Path(p)) = p { Some(p) } else { None };
+				let _ = tx.send(path);
 			},
 		);
 		rx.recv().unwrap_or(None)
@@ -413,7 +405,8 @@ pub async fn download_file(
 		// TODO Not working on mobile
 		#[cfg(desktop)]
 		window.app_handle().dialog().file().set_file_name(&suggest_file).save_file(move |p| {
-			let _ = tx.send(p);
+			let path = if let Some(FilePath::Path(p)) = p { Some(p) } else { None };
+			let _ = tx.send(path);
 		});
 		rx.recv().unwrap_or(None)
 	})
@@ -455,14 +448,18 @@ async fn ask_for_files(multiple: bool, window: Window) -> Result<Vec<PathBuf>, S
 		if multiple {
 			builder.pick_files(move |p| {
 				let picked = p
-					.map(|p| p.into_iter().map(|r| r.path).collect::<Vec<_>>())
+					.map(|p| {
+						p.into_iter()
+							.filter_map(|r| if let FilePath::Path(p) = r { Some(p) } else { None })
+							.collect::<Vec<_>>()
+					})
 					.unwrap_or_default();
 				let _ = tx.send(picked);
 			});
 		} else {
 			builder.pick_file(move |p| {
-				let picked = p.map(|p| vec![p.path]).unwrap_or_default();
-				let _ = tx.send(picked);
+				let path = if let Some(FilePath::Path(p)) = p { vec![p] } else { Vec::new() };
+				let _ = tx.send(path);
 			});
 		}
 		rx.recv().unwrap_or(Vec::new())
@@ -609,10 +606,10 @@ pub async fn identity_update(
 ) -> Result<(), String> {
 	unwrap_send!(
 		state.database,
-		UpdateIdentityMsg(
-			FindIdentity::ById(id.0),
-			UpdateIdentity { name: update.name, ..Default::default() },
-		)
+		UpdateIdentityMsg(FindIdentity::ById(id.0), UpdateIdentity {
+			name: update.name,
+			..Default::default()
+		},)
 	)
 }
 
@@ -635,9 +632,7 @@ pub async fn run_hotkey(
 }
 
 #[command]
-pub fn plugin_list(state: State<'_, QState>) -> Vec<String> {
-	state.plugin_list()
-}
+pub fn plugin_list(state: State<'_, QState>) -> Vec<String> { state.plugin_list() }
 
 #[command]
 pub fn plugin_get(state: State<'_, QState>, name: String) -> Result<String, String> {
@@ -655,9 +650,7 @@ pub fn plugin_delete(state: State<QState>, name: String) -> Result<(), String> {
 }
 
 #[command]
-pub fn markdown(md: String) -> String {
-	proxy_codegen::markdown::markdown(&md)
-}
+pub fn markdown(md: String) -> String { proxy_codegen::markdown::markdown(&md) }
 
 #[command]
 pub async fn set_loudness_callback(

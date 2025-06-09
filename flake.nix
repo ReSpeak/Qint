@@ -80,7 +80,7 @@
         libopus
         openssl
         SDL2
-        webkitgtk
+        webkitgtk_4_1
         zlib
       ];
 
@@ -99,52 +99,40 @@
       ];
     };
 
-    # Create a fixed-output derivation from yarn install
-    fetchYarnModulesPackage = { lib, stdenvNoCC, writeScript, yarn }: {
-      pname,
-      version,
-      hash,
-      packageJSON,
-      yarnLock,
-      yarnRc,
-      yarnFolder,
-      yarnFlags ? []
-    }: stdenvNoCC.mkDerivation {
-      inherit pname version packageJSON yarnLock yarnRc yarnFolder;
-
-      yarnFlags = lib.escapeShellArgs yarnFlags;
-
-      builder = writeScript "fetch-yarn-modules" ''
-        source $stdenv/setup
-
-        ln -s "$packageJSON" package.json
-        cp "$yarnLock" yarn.lock
-        cp "$yarnRc" .yarnrc.yml
-        cp -r "$yarnFolder" .yarn
-        chmod -R +w .yarn
-
-        # yarn needs a home directory
-        export HOME="$(mktemp -d)"
-
-        yarn install --immutable $yarnFlags
-
-        if [ -z "$skipPostFetch" ]; then
-          runHook postFetch
-        fi
-
-        mv node_modules $out
-      '';
-
-      outputHashAlgo = null;
-      outputHash = if hash == "" then lib.fakeHash else hash;
+    node_modules = pkgs.stdenv.mkDerivation (finalAttrs: {
+      pname = "qint-frontend-node_modules";
+      version = "1.0.0";
+      outputHash = "sha256-egfWdejkeq+7ugcGl54CWylmkYbhzCC1M45Ehswq8+M=";
+      outputHashAlgo = "sha256";
       outputHashMode = "recursive";
 
-      nativeBuildInputs = [ yarn ];
-    };
+      src = "${self}/frontend";
 
-    fetchYarnModules = pkgs.callPackage fetchYarnModulesPackage {};
+      nativeBuildInputs = with pkgs; [
+        bun
+      ];
+      dontConfigure = true;
+      dontFixup = true;
 
-    yarnModules = fetchYarnModules {
+      buildPhase = ''
+        runHook preBuild
+
+        bun install --no-progress --frozen-lockfile
+
+        runHook postBuild
+      '';
+
+      installPhase = ''
+        runHook preInstall
+
+        mkdir -p $out
+        cp -R ./node_modules $out
+
+        runHook postInstall
+      '';
+    });
+
+    /*yarnModules = fetchYarnModules {
       pname = "qint-frontend-modules";
       version = "1.0";
       hash = pkgs.lib.fakeHash;
@@ -160,19 +148,20 @@
         name = "frontend-yarn";
         path = ./frontend/.yarn;
       };
-    };
+    };*/
 
     build-frontend = book_events: pkgs.runCommand "build-qint-frontend" {
-      nativeBuildInputs = with pkgs; [ yarn ];
+      nativeBuildInputs = with pkgs; [ bun nodejs ];
       src = ./frontend;
     } ''
       cp -r "$src/." .
-      cp -r ${yarnModules} node_modules
+      ln -s ${node_modules}/node_modules ./
 
       chmod -R +w .
       cp ${book_events} src/book_events.ts
 
-      yarn run build
+      # bun run build
+      node node_modules/.bin/rsbuild build
 
       mv dist $out
     '';
@@ -216,7 +205,8 @@
 
         postPatch = ''
           substituteInPlace src-tauri/tauri.conf.json \
-            --replace ../frontend/dist ${frontend}
+            --replace-fail ../frontend/dist ${frontend}
+          ln -s /build/source /build/dummy-src
         '';
 
         # Extract sdl
@@ -238,7 +228,8 @@
       overrideMain = oldAttrs: oldAttrs // {
         postPatch = ''
           substituteInPlace src-tauri/tauri.conf.json \
-            --replace ../frontend/dist ${frontend}
+            --replace-fail ../frontend/dist ${frontend}
+          ln -s /build/source /build/dummy-src
         '';
 
         FRONTEND_PATH = frontend;
@@ -266,7 +257,7 @@
   in rec {
     defaultPackage = packages.win;
 
-    packages.yarnModules = yarnModules;
+    packages.node_modules = node_modules;
     packages.frontend = frontend;
 
     packages.builtDeps = pkgs.runCommand "qint-dependencies" {} ''
