@@ -4,8 +4,6 @@
 	"tabWidth": 4,
 	"semi": true,
 	"singleQuote": false,
-	"svelteSortOrder": "scripts-markup-styles",
-	"svelteStrictMode": false,
-	"svelteBracketNewLine": false,
+	"bracketSameLine": true,
 	"printWidth": 100
 }

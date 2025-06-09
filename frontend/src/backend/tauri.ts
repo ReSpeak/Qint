@@ -21,7 +21,7 @@ import {
 } from "./invokeConnection";
 const log = debug("TAURI");
 
-if (DEBUG_UTIL) {
+if (typeof DEBUG_UTIL !== "undefined") {
 	(window as any).invoke = invoke;
 }
 

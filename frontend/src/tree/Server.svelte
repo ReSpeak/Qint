@@ -147,6 +147,7 @@
 {/if}
 
 <style lang="scss">
+	@use "../index.scss" as *;
 	@import "./tree_shared";
 
 	ul {

@@ -23,8 +23,8 @@ import { ReturnCodeTracker } from "./returnCodeTracker";
 import FileIO from "../ui/util/FileIO.svelte";
 const log = debug("BROWSER-WS");
 
-const IS_SNOWPACK = (import.meta as any).hot;
-const BASE_ADDRESS = IS_SNOWPACK ? "http://localhost:4422" : "";
+const IS_DEVSERVER = (import.meta as any).webpackHot;
+const BASE_ADDRESS = IS_DEVSERVER ? "http://localhost:4422" : "";
 
 type WsP2FMsg = { cmd: string; returnCode?: string; con?: string; msg?: any };
 

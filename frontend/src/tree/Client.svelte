@@ -256,6 +256,7 @@
 </li>
 
 <style lang="scss">
+	@use "../index.scss" as *;
 	@import "./tree";
 
 	.talkWave {
@@ -266,7 +267,7 @@
 		bottom: 0;
 		left: 0;
 
-		//background-image: url("/talking.svg");
+		//background-image: url("../assets/talking.svg");
 		background-size: 100% auto;
 		//-webkit-mask-image: radial-gradient(rgba(0, 0, 0, 1), rgba(0, 0, 0, 0));
 		//mask-image: radial-gradient(rgba(0, 0, 0, 1), rgba(0, 0, 0, 0));

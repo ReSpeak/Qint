@@ -33,6 +33,8 @@
 </aside>
 
 <style lang="scss">
+	@use "../index.scss" as *;
+
 	.sidebar {
 		display: inline-flex;
 		flex-direction: column;

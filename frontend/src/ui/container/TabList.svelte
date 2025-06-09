@@ -68,7 +68,8 @@
 </div>
 
 <style lang="scss">
-	@import "./style/global_mixin";
+	@use "../../index.scss" as *;
+	@import "../../style/global_mixin";
 
 	.tabList {
 		display: grid;

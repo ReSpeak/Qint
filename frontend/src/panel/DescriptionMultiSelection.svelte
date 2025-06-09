@@ -247,6 +247,8 @@
 {/if}
 
 <style lang="scss">
+	@use "../index.scss" as *;
+
 	span.is-loading {
 		@include loader;
 		margin-right: 0.5em;

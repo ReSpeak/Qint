@@ -35,15 +35,17 @@
 {/if}
 
 <style lang="scss">
+	@use "../index.scss" as *;
+
 	:global(.dataLine) {
 		display: flex;
 		align-items: center;
 		//flex-wrap: nowrap;
 		margin-bottom: 0.5em;
+	}
 
-		> :global(:first-child) {
-			margin-right: 1em;
-		}
+	:global(.dataLine > :first-child) {
+		margin-right: 1em;
 	}
 
 	// Multiline text areas
@@ -72,9 +74,9 @@
 	:global(.descGroup) {
 		padding: 1em;
 		white-space: nowrap;
+	}
 
-		:global(&.editing) > :global(*:not(:last-child)) {
-			margin-bottom: 0.5em;
-		}
+	:global(.descGroup.editing > *:not(:last-child)) {
+		margin-bottom: 0.5em;
 	}
 </style>

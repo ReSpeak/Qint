@@ -418,12 +418,14 @@
 </div>
 
 <style lang="scss">
+	@use "../index.scss" as *;
+
 	/* background.jpg: https://www.goodfreephotos.com/other-landscapes/scenic-view-of-the-mountains-and-pond-landscape.jpg.php */
 	/* background-dark.jpg: https://www.goodfreephotos.com/canada/alberta/jasper-national-park/night-landscape-reflection-and-aurora-in-jasper-national-park-alberta-canada.jpg.php */
-	$background-image: "/background-dark.jpg";
+	$background-image: url("../assets/background-dark.jpg");
 
 	.connect-container {
-		background: url($background-image) repeat fixed center center / cover;
+		background: $background-image repeat fixed center center / cover;
 		overflow: auto;
 
 		> div {
@@ -441,7 +443,7 @@
 
 		&::before {
 			filter: blur(5px);
-			background: url($background-image) repeat fixed center center / cover;
+			background: $background-image repeat fixed center center / cover;
 			content: "";
 			position: absolute;
 			top: 0;

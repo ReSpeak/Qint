@@ -1,8 +1,9 @@
 import { importModule } from "@uupaa/dynamic-import-polyfill";
 import { backend } from "./backend/backend";
 import { Connection } from "./connection";
-import { InMsg } from "./backend/ws";
-import { NotificationHandler, TsNotification } from "./notifications";
+import type { InMsg } from "./backend/ws";
+import { TsNotification } from "./notifications";
+import type { NotificationHandler } from "./notifications";
 import debug from "debug";
 const log = debug("PLUGIN"),
 	error = debug("error:PLUGIN");

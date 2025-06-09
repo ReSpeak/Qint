@@ -247,6 +247,8 @@
 </TabSlot>
 
 <style lang="scss">
+	@use "../../index.scss" as *;
+
 	.layout {
 		width: 100%;
 		height: 100%;

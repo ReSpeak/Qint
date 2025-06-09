@@ -1,16 +1,17 @@
 import "./extensions";
 import UiApp from "./UiApp.svelte";
-//import App from "./Playground.svelte";
+import { mount } from 'svelte';
 import { get } from "svelte/store";
 import { app } from "./app";
 import { ConnectData } from "./connect/uiConnect";
 import debug from "debug";
 import { backend } from "./backend/backend";
 import { IS_TAURI } from "./util";
+import "./index.css";
 
 if (localStorage.getItem("debug") === null) debug.enable("error:*");
 
-if (DEBUG_UTIL) {
+if (typeof DEBUG_UTIL !== "undefined") {
 	(window as any).qint = app; // DEBUG
 	(window as any).get = get; // DEBUG
 	(window as any).debug = debug; // DEBUG
@@ -21,7 +22,8 @@ if (DEBUG_UTIL) {
 	};
 }
 
-console.log("BUILD", BUILD_ENV, BUILD_DAT);
+if (typeof BUILD_ENV !== "undefined")
+	console.log("BUILD", BUILD_ENV, BUILD_DAT);
 console.log(`Using ${backend.name} backend`);
 app.settings.synth.init();
 
@@ -54,7 +56,7 @@ if (loc && loc !== "" && loc !== "#") {
 	}
 }
 
-const uiApp = new UiApp({
+const uiApp = mount(UiApp, {
 	target: document.body,
 });
 

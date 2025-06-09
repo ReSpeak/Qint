@@ -1,0 +1,8 @@
+@import "bulmaswatch/cyborg/_variables";
+@import "bulma/sass/utilities/controls";
+@import "bulma/sass/utilities/extends";
+
+$scheme-main: $grey-accent;
+$input-color: $text;
+$input-icon-color: darken($text, 25);
+$input-icon-active-color: darken($text, 10);

@@ -160,6 +160,8 @@
 </div>
 
 <style lang="scss">
+	@use "../index.scss" as *;
+
 	// Adjusts the horizontal width of the box (including the command buttons)
 	.chatVideoWrap {
 		display: flex;

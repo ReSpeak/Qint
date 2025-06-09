@@ -365,6 +365,7 @@
 </li>
 
 <style lang="scss">
+	@use "../index.scss" as *;
 	@import "./tree";
 
 	.collapseButton {
@@ -405,7 +406,7 @@
 		}
 	}
 
-	.menu-list li ul {
+	:global(.menu-list) li ul {
 		margin: 0 0 0 0.9em;
 		padding-left: 0.1em;
 	}

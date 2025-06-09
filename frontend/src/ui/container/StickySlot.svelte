@@ -16,6 +16,8 @@
 <div class="stickyDummy" />
 
 <style lang="scss">
+	@use "../../index.scss" as *;
+
 	.stickySlot {
 		z-index: 300;
 		display: block;

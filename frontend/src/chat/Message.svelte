@@ -69,6 +69,7 @@
 </div>
 
 <style lang="scss">
+	@use "../index.scss" as *;
 	@import "../style/global_mixin";
 	@import "./chat_style";
 	$row-pad: 0.25em;

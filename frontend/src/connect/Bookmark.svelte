@@ -75,6 +75,8 @@
 </div>
 
 <style lang="scss">
+	@use "../index.scss" as *;
+
 	.bookmarkItem {
 		@extend %unselectable;
 		cursor: pointer;

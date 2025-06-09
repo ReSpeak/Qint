@@ -397,6 +397,7 @@
 </div>
 
 <style lang="scss">
+	@use "../index.scss" as *;
 	@import "./chat_style";
 
 	.invoker-row {

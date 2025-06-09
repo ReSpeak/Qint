@@ -1,45 +1,25 @@
 {
-	"compilerOptions": {
-		"moduleResolution": "node",
-		"module": "es2020",
-		//"lib": ["es2020"],
-		"target": "es2020",
-		/**
-			svelte-preprocess cannot figure out whether you have a value or a type, so tell TypeScript
-			to enforce using \`import type\` instead of \`import\` for Types.
-		*/
-		//"importsNotUsedAsValues": "error",
-		"isolatedModules": true,
-		"resolveJsonModule": true,
-		/**
-			To have warnings/errors of the Svelte compiler at the correct position,
-			enable source maps by default.
-		*/
-		"sourceMap": true,
-		"esModuleInterop": true,
-		"skipLibCheck": true,
-		"forceConsistentCasingInFileNames": true,
-		"baseUrl": ".",
-		"allowJs": true,
-		"checkJs": true,
+  "compilerOptions": {
+    "lib": ["DOM", "ES2020"],
+    "target": "ES2020",
+    "noEmit": true,
+    "skipLibCheck": true,
+    // svelte-preprocess cannot figure out whether you have a value or a type, so tell TypeScript
+    // to enforce using `import type` instead of `import` for Types.
+    "verbatimModuleSyntax": true,
+    "useDefineForClassFields": true,
 
-		/* Strict Type-Checking Options */
-		"strict": true /* Enable all strict type-checking options. */,
-		"noImplicitAny": true /* Raise error on expressions and declarations with an implied 'any' type. */,
-		"strictNullChecks": true /* Enable strict null checks. */,
-		"strictFunctionTypes": true /* Enable strict checking of function types. */,
-		"strictBindCallApply": true /* Enable strict 'bind', 'call', and 'apply' methods on functions. */,
-		"strictPropertyInitialization": true /* Enable strict checking of property initialization in classes. */,
-		"noImplicitThis": true /* Raise error on 'this' expressions with an implied 'any' type. */,
-		"alwaysStrict": true /* Parse in strict mode and emit "use strict" for each source file. */,
+    /* modules */
+    "module": "ESNext",
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
 
-		/* Additional Checks */
-		// "noUnusedLocals": true,             /* Report errors on unused locals. */
-		// "noUnusedParameters": true,         /* Report errors on unused parameters. */
-		"noImplicitReturns": true /* Report error when not all code paths in function return a value. */,
-		"noFallthroughCasesInSwitch": true /* Report errors for fallthrough cases in switch statement. */,
-		"allowUnusedLabels": true,
-		"noImplicitOverride": true
-	},
-	"include": ["src/**/*.d.ts", "src/**/*.js", "src/**/*.ts", "src/**/*.svelte"]
+    /* type checking */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "include": ["src"]
 }

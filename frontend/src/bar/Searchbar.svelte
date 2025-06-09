@@ -15,6 +15,8 @@
 </aside>
 
 <style lang="scss">
+	@use "../index.scss" as *;
+
 	.searchbar {
 		background-color: $box-background-color;
 	}

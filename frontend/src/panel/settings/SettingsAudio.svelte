@@ -237,6 +237,9 @@
 </TabSlot>
 
 <style lang="scss">
+	@use "../../index.scss" as *;
+	@use "sass:math";
+
 	.volumeControl {
 		display: flex;
 		align-items: center;
@@ -248,7 +251,7 @@
 		> .volumeControl {
 			position: absolute;
 			$heigth: 200px;
-			$heigth2: math.div($heigth, 2);
+			$heigth2: #{math.div($heigth, 2)};
 			width: $heigth;
 			transform: translate(-50%, -50%) translate(0, $heigth2) rotate(270deg);
 

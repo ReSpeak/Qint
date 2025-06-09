@@ -313,6 +313,8 @@
 </div>
 
 <style lang="scss">
+	@use "../../index.scss" as *;
+
 	.bInput {
 		width: 100%;
 		position: relative;

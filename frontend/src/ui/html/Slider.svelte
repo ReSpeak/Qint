@@ -50,7 +50,7 @@
 		line-height: 0.5rem !important;
 	}
 
-	.input-inline {
+	.slider.input-inline {
 		margin: 0;
 		min-height: 0;
 	}

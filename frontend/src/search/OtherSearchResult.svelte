@@ -43,6 +43,7 @@
 </div>
 
 <style lang="scss">
+	@use "../index.scss" as *;
 	@import "../style/global_mixin";
 
 	.searchResult {

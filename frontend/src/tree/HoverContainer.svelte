@@ -23,6 +23,8 @@
 </div>
 
 <style lang="scss">
+	@use "../index.scss" as *;
+
 	.hover {
 		position: fixed;
 		z-index: 20;

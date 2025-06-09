@@ -536,6 +536,8 @@
 </StickyList>
 
 <style lang="scss">
+	@use "../index.scss" as *;
+
 	.description {
 		margin: 1em;
 	}

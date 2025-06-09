@@ -315,6 +315,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 </div>
 
 <style lang="scss">
+	@use "../../index.scss" as *;
 	@import "../../style/global_mixin";
 
 	table {

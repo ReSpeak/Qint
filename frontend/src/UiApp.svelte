@@ -10,7 +10,6 @@
 	import { DisplayPanel } from "./panel/panel";
 	import { app } from "./app";
 	import Connect from "./connect/Connect.svelte";
-	import GlobalCss from "./GlobalCss.svelte";
 	import GlobalScss from "./GlobalScss.svelte";
 	import { ConnectData, MuteState } from "./connect/uiConnect";
 	import { DescriptionMode } from "./settings";
@@ -171,13 +170,14 @@
 		{/if}
 	</div>
 </div>
-<GlobalCss />
-<GlobalScss />
 {#if !IS_TAURI}
 	<FileIO bind:this={fileIo} />
 {/if}
 
+<GlobalScss />
 <style lang="scss">
+	@use "index.scss" as *;
+
 	.appContainer {
 		display: grid;
 		grid-template-rows: max-content 1fr;

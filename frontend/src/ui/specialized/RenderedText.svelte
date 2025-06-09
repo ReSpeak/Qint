@@ -135,6 +135,8 @@
 {/if}
 
 <style lang="scss">
+	@use "../../index.scss" as *;
+
 	.textRendered {
 		white-space: pre-wrap;
 		word-wrap: break-word;

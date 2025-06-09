@@ -838,6 +838,8 @@
 </StickyList>
 
 <style lang="scss">
+	@use "../index.scss" as *;
+
 	.statsTable {
 		display: grid;
 		grid-template-columns: repeat(4, max-content);

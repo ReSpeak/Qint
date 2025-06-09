@@ -1,10 +1,7 @@
 <style global lang="scss">
 	@import "highlight.js/styles/vs2015";
 
-	$scheme-main: $grey-accent;
-	$input-color: $text;
-	$input-icon-color: darken($text, 25);
-	$input-icon-active-color: darken($text, 10);
+	@import "./index";
 
 	@import "bulma/sass/base/_all";
 	@import "bulma/sass/components/breadcrumb";
@@ -12,6 +9,7 @@
 	@import "bulma/sass/components/menu";
 	@import "bulma/sass/components/message";
 	@import "bulma/sass/components/modal";
+	@import "bulma/sass/components/navbar";
 	@import "bulma/sass/components/panel";
 	@import "bulma/sass/components/tabs";
 	@import "bulma/sass/elements/box";
@@ -32,6 +30,11 @@
 	@import "bulma-slider/src/sass/index";
 	@import "bulma-switch/src/sass/index";
 	@import "bulmaswatch/cyborg/_overrides";
+
+	$scheme-main: $grey-accent;
+	$input-color: $text;
+	$input-icon-color: darken($text, 25);
+	$input-icon-active-color: darken($text, 10);
 
 	@import "./style/checkbox-switch";
 	@import "./style/global";
