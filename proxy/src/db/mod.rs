@@ -3,20 +3,21 @@ use std::result;
 use std::sync::Arc;
 
 use actix::*;
-use anyhow::{bail, format_err, Result};
+use anyhow::{Result, bail, format_err};
 use chrono::offset::{FixedOffset, TimeZone};
 use chrono::{Duration, Local, NaiveDateTime, Utc};
 use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
+use diesel_migrations::MigrationHarness;
 use futures::prelude::*;
 use proxy_codegen::book_events::deserialize_u64;
 use serde::Deserialize;
 use tracing::{error, info, trace, warn};
+use tsclientlib::Connection as TsConnection;
 use tsclientlib::data::Client;
 use tsclientlib::data::Connection as TsData;
 use tsclientlib::events::{Event, PropertyId, PropertyValue};
-use tsclientlib::Connection as TsConnection;
 use tsclientlib::{ChannelId, ClientId, Identity, InMessage, Invoker, MessageTarget, UidBuf};
 use tsproto_types::crypto::EccKeyPubP256;
 
@@ -31,9 +32,10 @@ pub(crate) mod graphql;
 pub mod models;
 pub mod schema;
 
-type DieselResult<T> = std::result::Result<T, diesel::result::Error>;
+pub const MIGRATIONS: diesel_migrations::EmbeddedMigrations =
+	diesel_migrations::embed_migrations!();
 
-diesel_migrations::embed_migrations!();
+type DieselResult<T> = std::result::Result<T, diesel::result::Error>;
 
 pub struct DbHandler {
 	file_cache: Arc<FileCache>,
@@ -205,7 +207,7 @@ impl DbHandler {
 		secret: Secret,
 	) -> Result<Self> {
 		let database_url = launch_config.config_path.join("storage.sqlite");
-		let con = match SqliteConnection::establish(database_url.to_str().unwrap()) {
+		let mut con = match SqliteConnection::establish(database_url.to_str().unwrap()) {
 			Ok(c) => {
 				// The database can be opened successfully, create backup
 				fs::copy(database_url, launch_config.config_path.join("storage.sqlite.bak"))?;
@@ -228,11 +230,11 @@ impl DbHandler {
 		)?;
 
 		// Run migrations
-		let mut s = Vec::new();
-		embedded_migrations::run_with_output(&con, &mut s)?;
-		let s = std::str::from_utf8(&s)?;
-		if !s.is_empty() {
-			info!(output = s, "Run database migrations");
+		let migrated = con
+			.run_pending_migrations(MIGRATIONS)
+			.map_err(|e| format_err!("Failed to run migrations: {}", e))?;
+		if !migrated.is_empty() {
+			info!(output = ?migrated, "Run database migrations");
 		}
 
 		Ok(Self { file_cache, search, secret, con, last_message_id: 0 })
@@ -240,7 +242,7 @@ impl DbHandler {
 
 	/// Create a new chat entry in the database and returns the id.
 	/// This has to be executed inside a transaction.
-	fn create_chat(&self) -> DieselResult<i64> {
+	fn create_chat(con: &mut SqliteConnection) -> DieselResult<i64> {
 		use schema::chats;
 
 		// Make sure it does not count as read
@@ -251,49 +253,49 @@ impl DbHandler {
 
 		diesel::insert_into(chats::table)
 			.values(&(chats::last_read.eq(&utc_time), chats::timezone.eq(utc_to_local_offset)))
-			.execute(&self.con)?;
-		chats::table.order(chats::id.desc()).select(chats::id).first::<i64>(&self.con)
+			.execute(con)?;
+		chats::table.order(chats::id.desc()).select(chats::id).first::<i64>(con)
 	}
 
-	fn get_or_create_chat(&self, id: &ChatId) -> DieselResult<i64> {
+	fn get_or_create_chat(&mut self, id: &ChatId) -> DieselResult<i64> {
 		use schema::{channel_chats, client_chats, client_pokes, server_chats};
 
 		match &id.chat_type {
 			ChatType::Server => {
-				self.con.transaction::<_, diesel::result::Error, _>(|| {
+				self.con.transaction::<_, diesel::result::Error, _>(|con| {
 					if let Some(chat) = server_chats::table
 						.find(id.server.to_short().as_slice())
 						.select(server_chats::chat)
-						.first::<i64>(&self.con)
+						.first::<i64>(con)
 						.optional()?
 					{
 						Ok(chat)
 					} else {
 						// Create new chat
-						let chat = self.create_chat()?;
+						let chat = Self::create_chat(con)?;
 
 						diesel::insert_into(server_chats::table)
 							.values(&(
 								server_chats::server.eq(id.server.to_short().as_slice()),
 								server_chats::chat.eq(chat),
 							))
-							.execute(&self.con)?;
+							.execute(con)?;
 						Ok(chat)
 					}
 				})
 			}
 			ChatType::Channel(channel) => {
-				self.con.transaction::<_, diesel::result::Error, _>(|| {
+				self.con.transaction::<_, diesel::result::Error, _>(|con| {
 					if let Some(chat) = channel_chats::table
 						.find((id.server.to_short().as_slice(), *channel as i64))
 						.select(channel_chats::chat)
-						.first::<i64>(&self.con)
+						.first::<i64>(con)
 						.optional()?
 					{
 						Ok(chat)
 					} else {
 						// Create new chat
-						let chat = self.create_chat()?;
+						let chat = Self::create_chat(con)?;
 
 						diesel::insert_into(channel_chats::table)
 							.values(&(
@@ -301,23 +303,23 @@ impl DbHandler {
 								channel_chats::channel.eq(*channel as i64),
 								channel_chats::chat.eq(chat),
 							))
-							.execute(&self.con)?;
+							.execute(con)?;
 						Ok(chat)
 					}
 				})
 			}
 			ChatType::Client(client) => {
-				self.con.transaction::<_, diesel::result::Error, _>(|| {
+				self.con.transaction::<_, diesel::result::Error, _>(|con| {
 					if let Some(chat) = client_chats::table
 						.find((id.server.to_short().as_slice(), &client))
 						.select(client_chats::chat)
-						.first::<i64>(&self.con)
+						.first::<i64>(con)
 						.optional()?
 					{
 						Ok(chat)
 					} else {
 						// Create new chat
-						let chat = self.create_chat()?;
+						let chat = Self::create_chat(con)?;
 
 						diesel::insert_into(client_chats::table)
 							.values(&(
@@ -325,23 +327,23 @@ impl DbHandler {
 								client_chats::client.eq(&client),
 								client_chats::chat.eq(chat),
 							))
-							.execute(&self.con)?;
+							.execute(con)?;
 						Ok(chat)
 					}
 				})
 			}
 			ChatType::Poke(client) => {
-				self.con.transaction::<_, diesel::result::Error, _>(|| {
+				self.con.transaction::<_, diesel::result::Error, _>(|con| {
 					if let Some(chat) = client_pokes::table
 						.find((id.server.to_short().as_slice(), &client))
 						.select(client_pokes::chat)
-						.first::<i64>(&self.con)
+						.first::<i64>(con)
 						.optional()?
 					{
 						Ok(chat)
 					} else {
 						// Create new chat
-						let chat = self.create_chat()?;
+						let chat = Self::create_chat(con)?;
 
 						diesel::insert_into(client_pokes::table)
 							.values(&(
@@ -349,7 +351,7 @@ impl DbHandler {
 								client_pokes::client.eq(&client),
 								client_pokes::chat.eq(chat),
 							))
-							.execute(&self.con)?;
+							.execute(con)?;
 						Ok(chat)
 					}
 				})
@@ -358,7 +360,7 @@ impl DbHandler {
 	}
 
 	/// Name can be an id if it starts with `/`, otherwise a path to a channel, separated by `/`.
-	fn find_channel(&self, server: &[u8], channel: &str) -> Result<i64> {
+	fn find_channel(&mut self, server: &[u8], channel: &str) -> Result<i64> {
 		use diesel::dsl::{exists, select};
 		use schema::channels;
 
@@ -369,7 +371,7 @@ impl DbHandler {
 			if select(exists(
 				channels::table.filter(channels::server.eq(&server).and(channels::id.eq(id))),
 			))
-			.get_result(&self.con)?
+			.get_result(&mut self.con)?
 			{
 				Ok(id)
 			} else {
@@ -385,14 +387,14 @@ impl DbHandler {
 						channels::table
 							.filter(cmp.and(channels::parent.eq(p)))
 							.select(channels::id)
-							.first::<i64>(&self.con)?,
+							.first::<i64>(&mut self.con)?,
 					);
 				} else {
 					parent = Some(
 						channels::table
 							.filter(cmp.and(channels::parent.is_null()))
 							.select(channels::id)
-							.first::<i64>(&self.con)?,
+							.first::<i64>(&mut self.con)?,
 					);
 				}
 			}
@@ -412,12 +414,12 @@ impl Handler<GetIdentityAndServerMsg> for DbHandler {
 			bookmarks::table
 				.filter(bookmarks::id.eq(bookmark_id as i64))
 				.select(bookmarks::server)
-				.first::<Option<Vec<u8>>>(&self.con)
+				.first::<Option<Vec<u8>>>(&mut self.con)
 		} else {
 			bookmarks::table
 				.filter(bookmarks::address.eq(&msg.address))
 				.select(bookmarks::server)
-				.first::<Option<Vec<u8>>>(&self.con)
+				.first::<Option<Vec<u8>>>(&mut self.con)
 		};
 		let server = server_query
 			.optional()?
@@ -426,11 +428,11 @@ impl Handler<GetIdentityAndServerMsg> for DbHandler {
 			.transpose()?;
 
 		// Search identity
-		match identities.find(msg.id as i64).first::<models::Identity>(&self.con) {
+		match identities.find(msg.id as i64).first::<models::Identity>(&mut self.con) {
 			Ok(r) => r.into_identity(&self.secret).map(|i| (i, server)),
 			Err(_) => {
 				// Pick an existing identity if one exists
-				if let Ok(r) = identities.order(id).first::<models::Identity>(&self.con) {
+				if let Ok(r) = identities.order(id).first::<models::Identity>(&mut self.con) {
 					return r.into_identity(&self.secret).map(|i| (i, server));
 				}
 				if !msg.create {
@@ -459,11 +461,11 @@ impl DbHandler {
 		let client_key = pub_key.to_short();
 
 		//Check if a client with that uid already exists and create it if not
-		self.con.transaction::<_, diesel::result::Error, _>(|| {
+		self.con.transaction::<_, diesel::result::Error, _>(|con| {
 			match diesel::select(diesel::dsl::exists(
 				schema::clients::table.filter(schema::clients::uid.eq(&client_uid)),
 			))
-			.get_result(&self.con)
+			.get_result(con)
 			{
 				Ok(false) => {
 					let cli = models::ClientInsert {
@@ -473,7 +475,7 @@ impl DbHandler {
 						custom_name: None,
 						custom_phonetic_name: None,
 					};
-					diesel::insert_into(schema::clients::table).values(&cli).execute(&self.con)
+					diesel::insert_into(schema::clients::table).values(&cli).execute(con)
 				}
 				Ok(true) => Ok(0),
 				Err(err) => Err(err),
@@ -481,7 +483,9 @@ impl DbHandler {
 		})?;
 
 		let new_identity = models::NewIdentity::new_with_name(&identity, &msg.name, &self.secret)?;
-		diesel::insert_into(schema::identities::table).values(&new_identity).execute(&self.con)?;
+		diesel::insert_into(schema::identities::table)
+			.values(&new_identity)
+			.execute(&mut self.con)?;
 
 		Ok(client_uid)
 	}
@@ -493,15 +497,15 @@ impl Handler<GetIdentitiesMsg> for DbHandler {
 		use schema::identities::dsl::*;
 
 		let query = match msg.0 {
-			FindIdentity::All => identities.load::<models::Identity>(&self.con),
+			FindIdentity::All => identities.load::<models::Identity>(&mut self.con),
 			FindIdentity::ById(by_id) => {
-				identities.find(by_id as i64).load::<models::Identity>(&self.con)
+				identities.find(by_id as i64).load::<models::Identity>(&mut self.con)
 			}
 			FindIdentity::ByUid(by_uid) => {
-				identities.filter(client.eq(by_uid)).load::<models::Identity>(&self.con)
+				identities.filter(client.eq(by_uid)).load::<models::Identity>(&mut self.con)
 			}
 			FindIdentity::ByName(by_name) => {
-				identities.filter(name.eq(by_name)).load::<models::Identity>(&self.con)
+				identities.filter(name.eq(by_name)).load::<models::Identity>(&mut self.con)
 			}
 		}?;
 
@@ -535,11 +539,11 @@ impl Handler<UpdateIdentityMsg> for DbHandler {
 			FindIdentity::ById(ident_id) => {
 				diesel::update(identities.filter(id.eq(ident_id as i64)))
 					.set(&update)
-					.execute(&self.con)?
+					.execute(&mut self.con)?
 			}
 			FindIdentity::ByUid(uid) => diesel::update(identities.filter(client.eq(&uid)))
 				.set(&update)
-				.execute(&self.con)?,
+				.execute(&mut self.con)?,
 			_ => bail!("Not allowed identity update key"),
 		};
 
@@ -559,10 +563,10 @@ impl Handler<DeleteIdentityMsg> for DbHandler {
 
 		match find {
 			FindIdentity::ById(ident_id) => {
-				diesel::delete(identities.filter(id.eq(ident_id as i64))).execute(&self.con)?
+				diesel::delete(identities.filter(id.eq(ident_id as i64))).execute(&mut self.con)?
 			}
 			FindIdentity::ByUid(uid) => {
-				diesel::delete(identities.filter(client.eq(&uid))).execute(&self.con)?
+				diesel::delete(identities.filter(client.eq(&uid))).execute(&mut self.con)?
 			}
 			_ => bail!("Not allowed identity update key"),
 		};
@@ -584,7 +588,8 @@ impl Handler<GenrateNewIdentityMsg> for DbHandler {
 			phonetic_nickname: None,
 		})?;
 
-		let ident_db = identities.filter(client.eq(uid)).first::<models::Identity>(&self.con)?;
+		let ident_db =
+			identities.filter(client.eq(uid)).first::<models::Identity>(&mut self.con)?;
 
 		Ok(crate::identities::ApiIdentity::from_identity(
 			ident_db.id as u64,
@@ -598,7 +603,7 @@ impl Handler<GetClientVolumeMsg> for DbHandler {
 	type Result = Result<Option<f32>>;
 	fn handle(&mut self, msg: GetClientVolumeMsg, _: &mut Self::Context) -> Self::Result {
 		use schema::clients::dsl::*;
-		Ok(clients.find(&msg.0.0).select(volume).first::<f32>(&self.con).optional()?)
+		Ok(clients.find(&msg.0.0).select(volume).first::<f32>(&mut self.con).optional()?)
 	}
 }
 
@@ -607,7 +612,7 @@ impl Handler<SetClientVolumeMsg> for DbHandler {
 	fn handle(&mut self, msg: SetClientVolumeMsg, _: &mut Self::Context) -> Self::Result {
 		use schema::clients::dsl::*;
 		let res =
-			diesel::update(clients.find(&msg.0.0)).set(volume.eq(msg.1)).execute(&self.con)?;
+			diesel::update(clients.find(&msg.0.0)).set(volume.eq(msg.1)).execute(&mut self.con)?;
 		if res != 1 {
 			bail!("Failed to find client in database");
 		}
@@ -652,15 +657,15 @@ impl Handler<WriteMessageMsg> for DbHandler {
 			time: &utc_time,
 			timezone: utc_to_local_offset,
 		};
-		let message_id = self.con.transaction::<_, diesel::result::Error, _>(|| {
-			diesel::insert_into(messages::table).values(&msg).execute(&self.con)?;
-			messages::table.order(messages::id.desc()).select(messages::id).first::<i64>(&self.con)
+		let message_id = self.con.transaction::<_, diesel::result::Error, _>(|con| {
+			diesel::insert_into(messages::table).values(&msg).execute(con)?;
+			messages::table.order(messages::id.desc()).select(messages::id).first::<i64>(con)
 		})?;
 
 		// Update last read from the chat
 		diesel::update(chats::table.find(chat))
 			.set((chats::last_read.eq(&utc_time), chats::timezone.eq(utc_to_local_offset)))
-			.execute(&self.con)?;
+			.execute(&mut self.con)?;
 
 		// Add to search db
 		if let Some(search) = &self.search {
@@ -685,7 +690,7 @@ impl Handler<ConnectedMsg> for DbHandler {
 		// Set server password
 		if diesel::update(servers::table.find(server.as_slice()))
 			.set(servers::password.eq(msg.password.as_deref()))
-			.execute(&self.con)?
+			.execute(&mut self.con)?
 			!= 1
 		{
 			bail!("Failed to update password of server, not found");
@@ -700,7 +705,7 @@ impl Handler<ConnectedMsg> for DbHandler {
 					bookmarks::timezone.eq(utc_to_local_offset),
 					bookmarks::server.eq(Some(server.clone())),
 				))
-				.execute(&self.con)?
+				.execute(&mut self.con)?
 				!= 1
 			{
 				bail!("Failed to update time of bookmark {}, not found", id);
@@ -720,7 +725,7 @@ impl Handler<ConnectedMsg> for DbHandler {
 			let identity = match identities::table
 				.find(msg.identity as i64)
 				.select(identities::id)
-				.first::<i64>(&self.con)
+				.first::<i64>(&mut self.con)
 			{
 				Ok(r) => r,
 				Err(_) => {
@@ -732,7 +737,7 @@ impl Handler<ConnectedMsg> for DbHandler {
 					identities::table
 						.order(identities::id)
 						.select(identities::id)
-						.first::<i64>(&self.con)?
+						.first::<i64>(&mut self.con)?
 				}
 			};
 
@@ -750,7 +755,7 @@ impl Handler<ConnectedMsg> for DbHandler {
 						bookmarks::table
 							.filter(cmp.and(bookmarks::channel.eq(id)))
 							.select(bookmarks::id)
-							.first::<i64>(&self.con)
+							.first::<i64>(&mut self.con)
 							.optional()?
 					}
 					// Ignore missing channels, create a new bookmark for now
@@ -759,7 +764,7 @@ impl Handler<ConnectedMsg> for DbHandler {
 						if let Some(id) = bookmarks::table
 							.filter(cmp.and(bookmarks::channel.is_null()))
 							.select(bookmarks::id)
-							.first::<i64>(&self.con)
+							.first::<i64>(&mut self.con)
 							.optional()?
 						{
 							trace!(
@@ -786,7 +791,7 @@ impl Handler<ConnectedMsg> for DbHandler {
 				bookmarks::table
 					.filter(cmp.and(bookmarks::channel.is_null()))
 					.select(bookmarks::id)
-					.first::<i64>(&self.con)
+					.first::<i64>(&mut self.con)
 					.optional()?
 			};
 
@@ -798,7 +803,8 @@ impl Handler<ConnectedMsg> for DbHandler {
 						bookmarks::last_used.eq(Some(utc_time)),
 						bookmarks::timezone.eq(utc_to_local_offset),
 					))
-					.execute(&self.con)? != 1
+					.execute(&mut self.con)?
+					!= 1
 				{
 					bail!("Failed to update time of bookmark {}, not found", id);
 				}
@@ -824,12 +830,12 @@ impl Handler<ConnectedMsg> for DbHandler {
 					timezone: utc_to_local_offset,
 					server: Some(server.as_slice()),
 				};
-				let id = self.con.transaction::<_, diesel::result::Error, _>(|| {
-					diesel::insert_into(bookmarks::table).values(&bookmark).execute(&self.con)?;
+				let id = self.con.transaction::<_, diesel::result::Error, _>(|con| {
+					diesel::insert_into(bookmarks::table).values(&bookmark).execute(con)?;
 					bookmarks::table
 						.order(bookmarks::id.desc())
 						.select(bookmarks::id)
-						.first::<i64>(&self.con)
+						.first::<i64>(con)
 				})?;
 
 				trace!(bookmark = id,
@@ -883,7 +889,7 @@ impl Handler<ChannelListMsg> for DbHandler {
 							};
 							diesel::insert_into(bookmarks::table)
 								.values(&bookmark)
-								.execute(&self.con)?;
+								.execute(&mut self.con)?;
 						}
 						Err(_) => {
 							bookmark_channel = None;
@@ -896,7 +902,7 @@ impl Handler<ChannelListMsg> for DbHandler {
 										bookmarks::last_used.eq(Some(utc_time)),
 										bookmarks::timezone.eq(utc_to_local_offset),
 									))
-									.execute(&self.con)? != 1
+									.execute(&mut self.con)? != 1
 								{
 									bail!("Failed to update time of bookmark {}, not found", id);
 								}
@@ -920,7 +926,8 @@ impl Handler<ChannelListMsg> for DbHandler {
 				bookmark_channel_password = channel_password;
 				if diesel::update(bookmarks::table.find(bookmark))
 					.set(bookmarks::channel.eq(channel))
-					.execute(&self.con)? != 1
+					.execute(&mut self.con)?
+					!= 1
 				{
 					bail!("Failed to update channel of bookmark {}, not found", bookmark);
 				}
@@ -935,7 +942,8 @@ impl Handler<ChannelListMsg> for DbHandler {
 						channels::server.eq(&bookmark_server).and(channels::id.eq(channel)),
 					))
 					.set(channels::password.eq(bookmark_channel_password))
-					.execute(&self.con)? != 1
+					.execute(&mut self.con)?
+						!= 1
 					{
 						bail!("Failed to update channel password for bookmark, not found");
 					}
@@ -1098,7 +1106,7 @@ impl DbHandler {
 	}
 
 	fn add_client_internal(
-		&self, create: bool, server: &EccKeyPubP256, client: &ClientData,
+		&mut self, create: bool, server: &EccKeyPubP256, client: &ClientData,
 	) -> Result<()> {
 		use schema::clients::dsl::*;
 		use schema::servers_clients;
@@ -1106,7 +1114,7 @@ impl DbHandler {
 		// Check if we already know this client, the update will return 1 changed row on success
 		if diesel::update(clients.filter(uid.eq(&client.uid.0)))
 			.set(name.eq(&client.name))
-			.execute(&self.con)?
+			.execute(&mut self.con)?
 			!= 1
 		{
 			if !create {
@@ -1120,7 +1128,7 @@ impl DbHandler {
 				custom_name: None,
 				custom_phonetic_name: None,
 			};
-			diesel::insert_into(schema::clients::table).values(&client).execute(&self.con)?;
+			diesel::insert_into(schema::clients::table).values(&client).execute(&mut self.con)?;
 		}
 
 		// Add to search db
@@ -1155,7 +1163,7 @@ impl DbHandler {
 					.and(servers_clients::client.eq(&client.uid.0)),
 			)
 			.select(servers_clients::avatar)
-			.first::<Option<String>>(&self.con)
+			.first::<Option<String>>(&mut self.con)
 			.optional()?;
 
 		if let Some(prev_avatar) = prev_avatar {
@@ -1171,7 +1179,9 @@ impl DbHandler {
 			}
 		}
 
-		diesel::replace_into(servers_clients::table).values(&server_client).execute(&self.con)?;
+		diesel::replace_into(servers_clients::table)
+			.values(&server_client)
+			.execute(&mut self.con)?;
 		Ok(())
 	}
 }
@@ -1222,7 +1232,7 @@ impl<'a> EventHandler<'a> {
 			// Check if we already know that server, the update will return 1 changed row on success
 			if diesel::update(servers.filter(public_key.eq(key.to_short().as_slice())))
 				.set((name.eq(&server_name), address.eq(&addr), icon.eq(&icon_id)))
-				.execute(&db.con)?
+				.execute(&mut db.con)?
 				!= 1
 			{
 				let server_key = key.to_short();
@@ -1233,7 +1243,7 @@ impl<'a> EventHandler<'a> {
 					icon: icon_id,
 					password: None,
 				};
-				diesel::insert_into(schema::servers::table).values(&server).execute(&db.con)?;
+				diesel::insert_into(schema::servers::table).values(&server).execute(&mut db.con)?;
 			}
 			// Add to search db
 			if let Some(search) = search {
@@ -1252,7 +1262,7 @@ impl<'a> EventHandler<'a> {
 			use schema::servers::dsl::*;
 			if diesel::update(servers.filter(public_key.eq(key.to_short().as_slice())))
 				.set(name.eq(&server_name))
-				.execute(&db.con)?
+				.execute(&mut db.con)?
 				!= 1
 			{
 				bail!(
@@ -1274,7 +1284,7 @@ impl<'a> EventHandler<'a> {
 			use schema::servers::dsl::*;
 			if diesel::update(servers.filter(public_key.eq(key.to_short().as_slice())))
 				.set(icon.eq(&icon_id))
-				.execute(&db.con)?
+				.execute(&mut db.con)?
 				!= 1
 			{
 				bail!("Failed to update server icon to {:?}, server {:?} not found", icon_id, key);
@@ -1366,7 +1376,7 @@ impl<'a> EventHandler<'a> {
 				servers_clients::last_seen.eq(utc_time),
 				servers_clients::timezone.eq(utc_to_local_offset),
 			))
-			.execute(&db.con)?;
+			.execute(&mut db.con)?;
 			Ok(())
 		});
 		Ok(())
@@ -1399,7 +1409,7 @@ impl<'a> EventHandler<'a> {
 				servers_clients::last_seen.eq(utc_time),
 				servers_clients::timezone.eq(utc_to_local_offset),
 			))
-			.execute(&db.con)?;
+			.execute(&mut db.con)?;
 			Ok(())
 		});
 		Ok(())
@@ -1437,7 +1447,7 @@ impl<'a> EventHandler<'a> {
 				),
 			)
 			.set(avatar.eq(&client_avatar))
-			.execute(&db.con)?;
+			.execute(&mut db.con)?;
 			Ok(())
 		});
 		Ok(())
@@ -1464,7 +1474,7 @@ impl<'a> EventHandler<'a> {
 					.filter(server.eq(server_id.to_short().as_slice()).and(client.eq(&client_uid))),
 			)
 			.set(icon.eq(&client_icon))
-			.execute(&db.con)?;
+			.execute(&mut db.con)?;
 			Ok(())
 		});
 		Ok(())
@@ -1487,7 +1497,7 @@ impl<'a> EventHandler<'a> {
 			// Update, ignored if not exists
 			diesel::update(clients.filter(uid.eq(&client_uid)))
 				.set(name.eq(&client_name))
-				.execute(&db.con)?;
+				.execute(&mut db.con)?;
 			Ok(())
 		});
 		Ok(())
@@ -1523,7 +1533,7 @@ impl<'a> EventHandler<'a> {
 				icon.eq(&icon_id),
 				deleted.eq(false),
 			))
-			.execute(&db.con)?
+			.execute(&mut db.con)?
 				!= 1
 			{
 				let server_key = ch_server.to_short();
@@ -1537,7 +1547,9 @@ impl<'a> EventHandler<'a> {
 					deleted: false,
 					password: None,
 				};
-				diesel::replace_into(schema::channels::table).values(&channel).execute(&db.con)?;
+				diesel::replace_into(schema::channels::table)
+					.values(&channel)
+					.execute(&mut db.con)?;
 			}
 
 			// Add to search db
@@ -1562,7 +1574,7 @@ impl<'a> EventHandler<'a> {
 					.filter(server.eq(ch_server.to_short().as_slice()).and(id.eq(ch_id.0 as i64))),
 			)
 			.set(deleted.eq(true))
-			.execute(&db.con)?
+			.execute(&mut db.con)?
 				!= 1
 			{
 				bail!(
@@ -1592,7 +1604,7 @@ impl<'a> EventHandler<'a> {
 					.filter(server.eq(server_id.to_short().as_slice()).and(id.eq(ch_id.0 as i64))),
 			)
 			.set(parent.eq(ch_parent.0 as i64))
-			.execute(&db.con)?;
+			.execute(&mut db.con)?;
 			Ok(())
 		});
 		Ok(())
@@ -1614,7 +1626,7 @@ impl<'a> EventHandler<'a> {
 					.filter(server.eq(server_id.to_short().as_slice()).and(id.eq(ch_id.0 as i64))),
 			)
 			.set(order_id.eq(ch_order.0 as i64))
-			.execute(&db.con)?;
+			.execute(&mut db.con)?;
 			Ok(())
 		});
 		Ok(())
@@ -1636,7 +1648,7 @@ impl<'a> EventHandler<'a> {
 					.filter(server.eq(server_id.to_short().as_slice()).and(id.eq(ch_id.0 as i64))),
 			)
 			.set(name.eq(&ch_name))
-			.execute(&db.con)?;
+			.execute(&mut db.con)?;
 			Ok(())
 		});
 		Ok(())
@@ -1658,7 +1670,7 @@ impl<'a> EventHandler<'a> {
 					.filter(server.eq(server_id.to_short().as_slice()).and(id.eq(ch_id.0 as i64))),
 			)
 			.set(icon.eq(&ch_icon))
-			.execute(&db.con)?;
+			.execute(&mut db.con)?;
 			Ok(())
 		});
 		Ok(())
@@ -1723,12 +1735,14 @@ impl<'a> EventHandler<'a> {
 		let message = message.to_string();
 		self.run(move |db, _| {
 			use diesel::dsl::not;
+			use diesel::sql_types::Bool;
 			use schema::messages;
 
 			let chat = db.get_or_create_chat(&ChatId { server, chat_type: chat })?;
 
 			let (utc_time, utc_to_local_offset) = Self::get_now();
-			db.last_message_id = db.con.transaction::<_, diesel::result::Error, _>(|| {
+			let orig_last_message_id = db.last_message_id;
+			db.last_message_id = db.con.transaction::<_, diesel::result::Error, _>(|con| {
 				let invoker_uid = invoker_uid.as_deref();
 				if own_message {
 					// Check if the message is already in the database
@@ -1740,48 +1754,46 @@ impl<'a> EventHandler<'a> {
 					// Update status
 					let res = diesel::update(messages::table.filter(cmp))
 						.set(messages::status.eq(MessageStatus::Success))
-						.execute(&db.con)?;
+						.execute(con)?;
 
 					if res != 0 {
 						// Successfully updated
 						return messages::table
 							.order(messages::id.desc())
 							.select(messages::id)
-							.first::<i64>(&db.con);
+							.first::<i64>(con);
 					}
 				}
 
 				// Check if the message is already in the database
 				let start_check_time = utc_time - Duration::seconds(1);
 
-				// Compare uid and name: messages::invoker == invoker_uid
-				// But with null == null
-				//
-				// https://stackoverflow.com/questions/10416789/how-to-rewrite-is-distinct-from-and-is-not-distinct-from
-				// a IS NOT DISTINCT FROM b can be rewritten as:
-				// (NOT (a <> b OR a IS NULL OR b IS NULL) OR (a IS NULL AND b IS NULL))
-				let invoker_cmp = not(messages::invoker
-					.ne(&invoker_uid)
-					.or(messages::invoker.is_null())
-					.or(invoker_uid.is_none()))
-				.or(messages::invoker.is_null().and(invoker_uid.is_none()));
-				let name_cmp = not(messages::invoker_name
-					.ne(&invoker_name)
-					.or(messages::invoker_name.is_null())
-					.or(invoker_name.is_none()))
-				.or(messages::invoker_name.is_null().and(invoker_name.is_none()));
-
 				let cmp = messages::chat
 					.eq(chat)
-					.and(invoker_cmp)
-					.and(name_cmp)
+					// Compare uid and name: messages::invoker == invoker_uid
+					// But with null == null
+					//
+					// https://stackoverflow.com/questions/10416789/how-to-rewrite-is-distinct-from-and-is-not-distinct-from
+					// a IS NOT DISTINCT FROM b can be rewritten as:
+					// (NOT (a <> b OR a IS NULL OR b IS NULL) OR (a IS NULL AND b IS NULL))
+					.and::<_, Bool>(not(messages::invoker
+						.ne(&invoker_uid)
+						.or(messages::invoker.is_null())
+						.or::<_, Bool>(invoker_uid.is_none()))
+						.or::<_, Bool>(messages::invoker.is_null().and::<_, Bool>(invoker_uid.is_none())).assume_not_null())
+					// Same pattern for name
+					.and::<_, Bool>(not(messages::invoker_name
+						.ne(&invoker_name)
+						.or(messages::invoker_name.is_null())
+						.or::<_, Bool>(invoker_name.is_none()))
+						.or::<_, Bool>(messages::invoker_name.is_null().and::<_, Bool>(invoker_name.is_none())).assume_not_null())
 					.and(messages::content.eq(&message))
 					.and(messages::time.gt(&start_check_time))
-					.and(messages::id.ge(db.last_message_id));
+					.and(messages::id.ge(orig_last_message_id));
 				let id = messages::table
 					.filter(cmp)
 					.select(messages::id)
-					.first::<i64>(&db.con)
+					.first::<i64>(con)
 					.optional()?;
 
 				if let Some(id) = id {
@@ -1798,11 +1810,11 @@ impl<'a> EventHandler<'a> {
 					time: &utc_time,
 					timezone: utc_to_local_offset,
 				};
-				diesel::insert_into(messages::table).values(&message).execute(&db.con)?;
+				diesel::insert_into(messages::table).values(&message).execute(con)?;
 				messages::table
 					.order(messages::id.desc())
 					.select(messages::id)
-					.first::<i64>(&db.con)
+					.first::<i64>(con)
 			})?;
 			// Add to search db
 			if let Some(search) = search {
@@ -1831,7 +1843,7 @@ impl<'a> EventHandler<'a> {
 				),
 			)
 			.set(channels::deleted.eq(true))
-			.execute(&db.con)?;
+			.execute(&mut db.con)?;
 			Ok(())
 		});
 

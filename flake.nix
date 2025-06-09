@@ -235,6 +235,7 @@
         FRONTEND_PATH = frontend;
 
         # For tests
+        LD_LIBRARY_PATH = pkgs.makeLibraryPath (with pkgs; [ SDL2 ]);
         RUST_BACKTRACE = "short";
       };
     });
@@ -289,10 +290,6 @@
       ${pkgs.gnutar}/bin/tar xf ${sdl-mingw}
       mv SDL2-${sdlVersion}/x86_64-w64-mingw32/bin/SDL2.dll Qint/
 
-      # Add libssp
-      mingw_path="$(cat ${pkgs.pkgsCross.mingwW64.stdenv.cc}/nix-support/orig-cc)"
-      cp "$mingw_path/x86_64-w64-mingw32/lib/libssp-0.dll" Qint/
-
       ${pkgs.zip}/bin/zip -r $out/Qint-webapp.zip Qint
     '';
 
@@ -307,10 +304,6 @@
 
       # Add webview
       cp ${win-pkg}/bin/WebView2Loader.dll Qint/
-
-      # Add libssp
-      mingw_path="$(cat ${pkgs.pkgsCross.mingwW64.stdenv.cc}/nix-support/orig-cc)"
-      cp "$mingw_path/x86_64-w64-mingw32/lib/libssp-0.dll" Qint/
 
       ${pkgs.zip}/bin/zip -r $out/Qint.zip Qint
     '';

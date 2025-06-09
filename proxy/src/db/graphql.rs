@@ -8,16 +8,16 @@ use anyhow::format_err;
 use base64::prelude::*;
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
-use juniper::{EmptySubscription, FieldError, RootNode, ID};
+use juniper::{EmptySubscription, FieldError, ID, RootNode};
 use proxy_codegen::markdown::markdown_highlighted;
 use tantivy::SnippetGenerator;
 use tsproto_types::crypto::EccKeyPubP256;
 
 use super::models::MessageStatus;
 use super::schema::bookmarks;
-use super::{models, schema, DbHandler, RunOnDbMsg};
-use crate::search::SearchResultId;
+use super::{DbHandler, RunOnDbMsg, models, schema};
 use crate::QintState;
+use crate::search::SearchResultId;
 
 const BOOKMARKS_LIMIT: i64 = 20;
 const MESSAGES_LIMIT: i64 = 50;
@@ -78,7 +78,7 @@ struct UpdateBookmark {
 }
 
 #[derive(Debug, AsChangeset)]
-#[table_name = "bookmarks"]
+#[diesel(table_name = bookmarks)]
 struct UpdateBookmarkDb {
 	name: Option<String>,
 	username: Option<String>,
@@ -106,7 +106,7 @@ fn get_chat_ids(
 				.filter(server_chats::server.eq(server))
 				.inner_join(chats::table)
 				.select(chats::id);
-			query.first::<i64>(&db.con).optional()?.into_iter().map(|i| (i, false)).collect()
+			query.first::<i64>(&mut db.con).optional()?.into_iter().map(|i| (i, false)).collect()
 		}
 		GMessageTarget::Channel => {
 			let id = if let Some(id) = id {
@@ -118,7 +118,7 @@ fn get_chat_ids(
 				.filter(channel_chats::server.eq(server).and(channel_chats::channel.eq(id)))
 				.inner_join(chats::table)
 				.select(chats::id);
-			query.first::<i64>(&db.con).optional()?.into_iter().map(|i| (i, false)).collect()
+			query.first::<i64>(&mut db.con).optional()?.into_iter().map(|i| (i, false)).collect()
 		}
 		GMessageTarget::Client => {
 			let id = if let Some(id) = id {
@@ -130,13 +130,13 @@ fn get_chat_ids(
 				.filter(client_chats::server.eq(server).and(client_chats::client.eq(&id)))
 				.inner_join(chats::table)
 				.select(chats::id);
-			let chat = query.first::<i64>(&db.con).optional()?;
+			let chat = query.first::<i64>(&mut db.con).optional()?;
 
 			let query = client_pokes::table
 				.filter(client_pokes::server.eq(server).and(client_pokes::client.eq(&id)))
 				.inner_join(chats::table)
 				.select(chats::id);
-			let poke = query.first::<i64>(&db.con).optional()?;
+			let poke = query.first::<i64>(&mut db.con).optional()?;
 			chat.into_iter()
 				.map(|i| (i, false))
 				.chain(poke.into_iter().map(|i| (i, true)))
@@ -169,7 +169,7 @@ impl Bookmark {
 
 						let query = channels::table
 							.filter(channels::server.eq(server).and(channels::id.eq(id)));
-						GResult::Ok(Channel(query.first::<models::Channel>(&db.con)?))
+						GResult::Ok(Channel(query.first::<models::Channel>(&mut db.con)?))
 					}))
 					.await??;
 				Ok(Some(res))
@@ -190,7 +190,7 @@ impl Bookmark {
 				use schema::identities;
 
 				let query = identities::table.filter(identities::id.eq(id));
-				GResult::Ok(Identity(query.first::<models::Identity>(&db.con)?))
+				GResult::Ok(Identity(query.first::<models::Identity>(&mut db.con)?))
 			}))
 			.await??;
 		Ok(res)
@@ -211,7 +211,7 @@ impl Bookmark {
 					use schema::servers;
 
 					let query = servers::table.filter(servers::public_key.eq(id));
-					GResult::Ok(Server(query.first::<models::Server>(&db.con)?))
+					GResult::Ok(Server(query.first::<models::Server>(&mut db.con)?))
 				}))
 				.await??;
 			Ok(Some(res))
@@ -233,7 +233,7 @@ impl Channel {
 				use schema::servers;
 
 				let query = servers::table.filter(servers::public_key.eq(id));
-				GResult::Ok(Server(query.first::<models::Server>(&db.con)?))
+				GResult::Ok(Server(query.first::<models::Server>(&mut db.con)?))
 			}))
 			.await??;
 		Ok(Some(res))
@@ -261,7 +261,7 @@ impl Channel {
 					.select(chats::all_columns);
 				GResult::Ok(
 					query
-						.first::<models::Chat>(&db.con)
+						.first::<models::Chat>(&mut db.con)
 						.optional()?
 						.map(|c| Chat(vec![(c, false)])),
 				)
@@ -284,7 +284,7 @@ impl Channel {
 					let (name, new_parent) = channels::table
 						.find((&id, parent_id))
 						.select((channels::name, channels::parent))
-						.first::<(String, Option<i64>)>(&db.con)?;
+						.first::<(String, Option<i64>)>(&mut db.con)?;
 					parent = new_parent;
 					path = format!("{}/{}", name, path);
 				}
@@ -339,7 +339,7 @@ impl Chat {
 					query
 						.filter(messages::time.lt(t).and(messages::id.lt(i)))
 						.order((messages::time.desc(), messages::id.desc()))
-						.load::<models::Message>(&db.con)
+						.load::<models::Message>(&mut db.con)
 						.map(|mut m| {
 							m.reverse();
 							m
@@ -348,11 +348,11 @@ impl Chat {
 					query
 						.filter(messages::time.gt(t).and(messages::id.gt(i)))
 						.order((messages::time, messages::id))
-						.load::<models::Message>(&db.con)
+						.load::<models::Message>(&mut db.con)
 				} else {
 					query
 						.order((messages::time.desc(), messages::id.desc()))
-						.load::<models::Message>(&db.con)
+						.load::<models::Message>(&mut db.con)
 						.map(|mut m| {
 							m.reverse();
 							m
@@ -385,7 +385,7 @@ impl Chat {
 					.filter(chats::id.eq_any(ids).and(messages::time.gt(chats::last_read)))
 					.count();
 
-				query.get_result(&db.con)
+				query.get_result(&mut db.con)
 			}))
 			.await??;
 		Ok(res.try_into()?)
@@ -406,31 +406,35 @@ impl Chat {
 			.iter()
 			.filter_map(|(c, p)| if !*p { Some(c.id) } else { None })
 			.collect::<Vec<_>>();
+		if ids.is_empty() {
+			return Ok(None);
+		}
+
 		let res = state
 			.database
 			.send(RunOnDbMsg(move |db| {
 				use diesel::dsl::sql;
 				use schema::messages;
+				assert_eq!(ids.len(), 1, "Expect only a single chat");
 
 				let query = messages::table
-					.filter(messages::chat.eq_any(ids).and(messages::invoker.eq(&from)))
+					.filter(messages::chat.eq(ids[0]).and(messages::invoker.eq(&from)))
 					// Deduplicate messages
 					.group_by(messages::content)
 					.order((messages::time.desc(), messages::id.desc()))
 					.offset(i64::from(id))
-					.select((
-						sql::<diesel::sql_types::BigInt>("max(messages.id)"), messages::chat,
-						messages::invoker, messages::invoker_name, messages::content,
-						messages::status, sql::<diesel::sql_types::Timestamp>("max(messages.time)"),
-						messages::timezone,
-					));
+					.select(sql::<diesel::sql_types::BigInt>("max(messages.id)"));
+				let msg_id = query.first::<i64>(&mut db.con).optional()?;
+				let msg = msg_id
+					.map(|msg_id| {
+						messages::table
+							.find(msg_id)
+							.first::<models::Message>(&mut db.con)
+							.map(|msg| Message { msg, is_poke: false })
+					})
+					.transpose()?;
 
-				GResult::Ok(
-					query
-						.first::<models::Message>(&db.con)
-						.optional()?
-						.map(|msg| Message { msg, is_poke: false }),
-				)
+				GResult::Ok(msg)
 			}))
 			.await??;
 		Ok(res)
@@ -463,13 +467,13 @@ impl Client {
 					.filter(client_chats::server.eq(&server).and(client_chats::client.eq(&id)))
 					.inner_join(chats::table)
 					.select(chats::all_columns);
-				let chat = query.first::<models::Chat>(&db.con).optional()?;
+				let chat = query.first::<models::Chat>(&mut db.con).optional()?;
 
 				let query = client_pokes::table
 					.filter(client_pokes::server.eq(&server).and(client_pokes::client.eq(&id)))
 					.inner_join(chats::table)
 					.select(chats::all_columns);
-				let poke = query.first::<models::Chat>(&db.con).optional()?;
+				let poke = query.first::<models::Chat>(&mut db.con).optional()?;
 				let chats = chat
 					.into_iter()
 					.map(|i| (i, false))
@@ -501,7 +505,7 @@ impl Identity {
 				use schema::clients;
 
 				let query = clients::table.filter(clients::uid.eq(id));
-				GResult::Ok(Client(query.first::<models::Client>(&db.con)?))
+				GResult::Ok(Client(query.first::<models::Client>(&mut db.con)?))
 			}))
 			.await??;
 		Ok(res)
@@ -553,7 +557,7 @@ impl Message {
 							),
 						)
 						.select(servers_clients::all_columns);
-					GResult::Ok(ServerClient(query.first::<models::ServersClients>(&db.con)?))
+					GResult::Ok(ServerClient(query.first::<models::ServersClients>(&mut db.con)?))
 				}))
 				.await??;
 			Ok(Some(res))
@@ -600,7 +604,7 @@ impl Server {
 					.select(chats::all_columns);
 				GResult::Ok(
 					query
-						.first::<models::Chat>(&db.con)
+						.first::<models::Chat>(&mut db.con)
 						.optional()?
 						.map(|c| Chat(vec![(c, false)])),
 				)
@@ -619,9 +623,9 @@ impl Server {
 
 				let query = channels::table.filter(channels::server.eq(id));
 				let res = if include_deleted {
-					query.load::<models::Channel>(&db.con)
+					query.load::<models::Channel>(&mut db.con)
 				} else {
-					query.filter(channels::deleted.eq(false)).load::<models::Channel>(&db.con)
+					query.filter(channels::deleted.eq(false)).load::<models::Channel>(&mut db.con)
 				};
 				GResult::Ok(res?.into_iter().map(Channel).collect())
 			}))
@@ -641,7 +645,7 @@ impl Server {
 				let query = servers_clients::table.filter(servers_clients::server.eq(id));
 				GResult::Ok(
 					query
-						.load::<models::ServersClients>(&db.con)?
+						.load::<models::ServersClients>(&mut db.con)?
 						.into_iter()
 						.map(ServerClient)
 						.collect(),
@@ -662,7 +666,7 @@ impl ServerClient {
 				use schema::servers;
 
 				let query = servers::table.filter(servers::public_key.eq(id));
-				GResult::Ok(Server(query.first::<models::Server>(&db.con)?))
+				GResult::Ok(Server(query.first::<models::Server>(&mut db.con)?))
 			}))
 			.await??;
 		Ok(res)
@@ -676,7 +680,7 @@ impl ServerClient {
 				use schema::clients;
 
 				let query = clients::table.filter(clients::uid.eq(id));
-				GResult::Ok(Client(query.first::<models::Client>(&db.con)?))
+				GResult::Ok(Client(query.first::<models::Client>(&mut db.con)?))
 			}))
 			.await??;
 		Ok(res)
@@ -709,7 +713,7 @@ impl SearchResult {
 								messages::table
 									.find(id as i64)
 									.select(messages::content)
-									.first::<String>(&db.con)?,
+									.first::<String>(&mut db.con)?,
 							)
 						}))
 						.await??,
@@ -728,7 +732,7 @@ impl SearchResult {
 									channels::table
 										.find((server, id as i64))
 										.select(channels::name)
-										.first::<String>(&db.con)?,
+										.first::<String>(&mut db.con)?,
 								)
 							}))
 							.await??,
@@ -751,7 +755,7 @@ impl SearchResult {
 									clients::table
 										.find(id)
 										.select(clients::name)
-										.first::<String>(&db.con)?,
+										.first::<String>(&mut db.con)?,
 								)
 							}))
 							.await??,
@@ -765,7 +769,7 @@ impl SearchResult {
 								clients::table
 									.find(id)
 									.select(clients::custom_name.nullable())
-									.first::<Option<String>>(&db.con)?,
+									.first::<Option<String>>(&mut db.con)?,
 							)
 						}))
 						.await??),
@@ -778,7 +782,7 @@ impl SearchResult {
 								clients::table
 									.find(id)
 									.select(clients::custom_phonetic_name.nullable())
-									.first::<Option<String>>(&db.con)?,
+									.first::<Option<String>>(&mut db.con)?,
 							)
 						}))
 						.await??),
@@ -804,7 +808,7 @@ impl SearchResult {
 										servers::table
 											.find(id)
 											.select(servers::name)
-											.first::<String>(&db.con)?,
+											.first::<String>(&mut db.con)?,
 									)
 								}))
 								.await??,
@@ -822,7 +826,7 @@ impl SearchResult {
 										servers::table
 											.find(id)
 											.select(servers::address)
-											.first::<String>(&db.con)?,
+											.first::<String>(&mut db.con)?,
 									)
 								}))
 								.await??,
@@ -892,7 +896,7 @@ impl SearchResult {
 					GResult::Ok(
 						messages::table
 							.find(id)
-							.first::<models::Message>(&db.con)
+							.first::<models::Message>(&mut db.con)
 							.map(|msg| Message { msg, is_poke: false })?,
 					)
 				}))
@@ -914,7 +918,10 @@ impl SearchResult {
 					use schema::channels;
 
 					GResult::Ok(
-						channels::table.find(id).first::<models::Channel>(&db.con).map(Channel)?,
+						channels::table
+							.find(id)
+							.first::<models::Channel>(&mut db.con)
+							.map(Channel)?,
 					)
 				}))
 				.await??,
@@ -935,7 +942,7 @@ impl SearchResult {
 					use schema::clients;
 
 					GResult::Ok(
-						clients::table.find(id).first::<models::Client>(&db.con).map(Client)?,
+						clients::table.find(id).first::<models::Client>(&mut db.con).map(Client)?,
 					)
 				}))
 				.await??,
@@ -956,7 +963,7 @@ impl SearchResult {
 					use schema::servers;
 
 					GResult::Ok(
-						servers::table.find(id).first::<models::Server>(&db.con).map(Server)?,
+						servers::table.find(id).first::<models::Server>(&mut db.con).map(Server)?,
 					)
 				}))
 				.await??,
@@ -983,9 +990,9 @@ impl Query {
 							.and(bookmarks::last_used.gt(Some(last.naive_utc()))),
 					)
 					.or_filter(not(bookmarks::bookmark).and(book))
-					.load::<Bookmark>(&db.con)
+					.load::<Bookmark>(&mut db.con)
 				} else*/ {
-					query.load::<models::Bookmark>(&db.con)
+					query.load::<models::Bookmark>(&mut db.con)
 				}?.into_iter().map(Bookmark).collect();
 
 				GResult::Ok(result)
@@ -1000,7 +1007,7 @@ impl Query {
 			.database
 			.send(RunOnDbMsg(|db| {
 				let query = bookmarks::table.order(bookmarks::last_used.desc());
-				let result = query.first::<models::Bookmark>(&db.con).optional()?.map(Bookmark);
+				let result = query.first::<models::Bookmark>(&mut db.con).optional()?.map(Bookmark);
 
 				GResult::Ok(result)
 			}))
@@ -1023,7 +1030,7 @@ impl Query {
 					GResult::Ok(Some(Chat(
 						chats::table
 							.filter(chats::id.eq_any(&chat_ids))
-							.get_results::<models::Chat>(&db.con)?
+							.get_results::<models::Chat>(&mut db.con)?
 							.into_iter()
 							.map(|c| {
 								let is_poke =
@@ -1048,7 +1055,7 @@ impl Query {
 				use schema::servers;
 
 				let query = servers::table.filter(servers::public_key.eq(server));
-				GResult::Ok(Server(query.first::<models::Server>(&db.con)?))
+				GResult::Ok(Server(query.first::<models::Server>(&mut db.con)?))
 			}))
 			.await??;
 		Ok(res)
@@ -1066,7 +1073,7 @@ impl Query {
 						.select(bookmarks::server)
 						.single_value()),
 				);
-				GResult::Ok(query.first::<models::Server>(&db.con).optional()?.map(Server))
+				GResult::Ok(query.first::<models::Server>(&mut db.con).optional()?.map(Server))
 			}))
 			.await??;
 		Ok(res)
@@ -1080,7 +1087,7 @@ impl Query {
 				use schema::clients;
 
 				let query = clients::table.filter(clients::uid.eq(client));
-				GResult::Ok(Client(query.first::<models::Client>(&db.con)?))
+				GResult::Ok(Client(query.first::<models::Client>(&mut db.con)?))
 			}))
 			.await??;
 		Ok(res)
@@ -1130,7 +1137,7 @@ impl Mutation {
 					let server = bookmarks::table
 						.filter(bookmarks::id.eq(id))
 						.select(bookmarks::server)
-						.first::<Option<Vec<u8>>>(&db.con)?;
+						.first::<Option<Vec<u8>>>(&mut db.con)?;
 
 					let server = if let Some(s) = server {
 						s
@@ -1145,7 +1152,7 @@ impl Mutation {
 					let res = channels::table
 						.filter(channels::id.eq(ch_id).and(channels::server.eq(server)))
 						.select(diesel::dsl::count_star())
-						.execute(&db.con)?;
+						.execute(&mut db.con)?;
 					if res == 0 {
 						return Err(format_err!("Cannot set channel: Does not exist").into());
 					}
@@ -1165,7 +1172,7 @@ impl Mutation {
 
 				let res = diesel::update(bookmarks::table.filter(bookmarks::id.eq(id)))
 					.set(db_update)
-					.execute(&db.con)?;
+					.execute(&mut db.con)?;
 
 				GResult::Ok(res)
 			}))
@@ -1184,7 +1191,7 @@ impl Mutation {
 			.send(RunOnDbMsg(move |db| {
 				let id = id.parse::<u64>()? as i64;
 				let res = diesel::delete(bookmarks::table.filter(bookmarks::id.eq(id)))
-					.execute(&db.con)?;
+					.execute(&mut db.con)?;
 
 				GResult::Ok(res)
 			}))
@@ -1216,11 +1223,11 @@ impl Mutation {
 					let (last_read, timezone) = messages::table
 						.find(message)
 						.select((messages::time, messages::timezone))
-						.first::<(NaiveDateTime, i32)>(&db.con)?;
+						.first::<(NaiveDateTime, i32)>(&mut db.con)?;
 
 					diesel::update(chats::table.filter(chats::id.eq_any(&chat_ids)))
 						.set((chats::last_read.eq(last_read), chats::timezone.eq(timezone)))
-						.execute(&db.con)?;
+						.execute(&mut db.con)?;
 
 					let query = messages::table
 						.inner_join(chats::table)
@@ -1229,7 +1236,7 @@ impl Mutation {
 						)
 						.count();
 
-					GResult::Ok(query.get_result(&db.con)?)
+					GResult::Ok(query.get_result(&mut db.con)?)
 				} else {
 					GResult::Ok(0)
 				}

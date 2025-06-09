@@ -1,4 +1,6 @@
-table! {
+// @generated automatically by Diesel CLI.
+
+diesel::table! {
 	bookmarks (id) {
 		id -> BigInt,
 		name -> Nullable<Text>,
@@ -13,7 +15,7 @@ table! {
 	}
 }
 
-table! {
+diesel::table! {
 	channel_chats (server, channel) {
 		server -> Binary,
 		channel -> BigInt,
@@ -21,7 +23,7 @@ table! {
 	}
 }
 
-table! {
+diesel::table! {
 	channels (server, id) {
 		server -> Binary,
 		id -> BigInt,
@@ -34,7 +36,7 @@ table! {
 	}
 }
 
-table! {
+diesel::table! {
 	chats (id) {
 		id -> BigInt,
 		last_read -> Timestamp,
@@ -42,7 +44,7 @@ table! {
 	}
 }
 
-table! {
+diesel::table! {
 	client_chats (server, client) {
 		server -> Binary,
 		client -> Binary,
@@ -50,7 +52,7 @@ table! {
 	}
 }
 
-table! {
+diesel::table! {
 	client_pokes (server, client) {
 		server -> Binary,
 		client -> Binary,
@@ -58,7 +60,7 @@ table! {
 	}
 }
 
-table! {
+diesel::table! {
 	clients (uid) {
 		uid -> Binary,
 		name -> Text,
@@ -69,7 +71,7 @@ table! {
 	}
 }
 
-table! {
+diesel::table! {
 	events (id) {
 		id -> BigInt,
 		server -> Nullable<Binary>,
@@ -84,7 +86,7 @@ table! {
 	}
 }
 
-table! {
+diesel::table! {
 	identities (id) {
 		id -> BigInt,
 		private_key -> Binary,
@@ -95,7 +97,7 @@ table! {
 	}
 }
 
-table! {
+diesel::table! {
 	messages (id) {
 		id -> BigInt,
 		chat -> BigInt,
@@ -108,14 +110,14 @@ table! {
 	}
 }
 
-table! {
+diesel::table! {
 	server_chats (server) {
 		server -> Binary,
 		chat -> BigInt,
 	}
 }
 
-table! {
+diesel::table! {
 	servers (public_key) {
 		public_key -> Binary,
 		name -> Text,
@@ -125,7 +127,7 @@ table! {
 	}
 }
 
-table! {
+diesel::table! {
 	servers_clients (server, client) {
 		server -> Binary,
 		client -> Binary,
@@ -136,26 +138,16 @@ table! {
 	}
 }
 
-joinable!(bookmarks -> identities (identity));
-joinable!(bookmarks -> servers (server));
-joinable!(channel_chats -> chats (chat));
-joinable!(channels -> servers (server));
-joinable!(client_chats -> chats (chat));
-joinable!(client_chats -> clients (client));
-joinable!(client_chats -> servers (server));
-joinable!(client_pokes -> chats (chat));
-joinable!(client_pokes -> clients (client));
-joinable!(client_pokes -> servers (server));
-joinable!(events -> servers (server));
-joinable!(identities -> clients (client));
-joinable!(messages -> chats (chat));
-joinable!(messages -> clients (invoker));
-joinable!(server_chats -> chats (chat));
-joinable!(server_chats -> servers (server));
-joinable!(servers_clients -> clients (client));
-joinable!(servers_clients -> servers (server));
+diesel::joinable!(bookmarks -> identities (identity));
+diesel::joinable!(bookmarks -> servers (server));
+diesel::joinable!(channel_chats -> chats (chat));
+diesel::joinable!(channels -> servers (server));
+diesel::joinable!(client_chats -> chats (chat));
+diesel::joinable!(client_pokes -> chats (chat));
+diesel::joinable!(messages -> chats (chat));
+diesel::joinable!(server_chats -> chats (chat));
 
-allow_tables_to_appear_in_same_query!(
+diesel::allow_tables_to_appear_in_same_query!(
 	bookmarks,
 	channel_chats,
 	channels,

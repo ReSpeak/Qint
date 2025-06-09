@@ -1,7 +1,5 @@
 #[macro_use]
 extern crate diesel;
-#[macro_use]
-extern crate diesel_migrations;
 
 use std::collections::HashMap;
 use std::fs;
@@ -12,7 +10,7 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use actix::prelude::*;
 use actix::{Actor, Addr};
-use anyhow::{bail, format_err, Result};
+use anyhow::{Result, bail, format_err};
 use audio::GetAudioDevices;
 use futures::prelude::*;
 use futures::stream::FuturesUnordered;

@@ -6,21 +6,21 @@ use std::task::{self, Poll};
 
 use actix::fut::wrap_future;
 use actix::*;
-use anyhow::{bail, format_err, Result};
+use anyhow::{Result, bail, format_err};
 use futures::prelude::*;
 use proxy_codegen::book_events::{self, JsM2B};
 use thiserror::Error;
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
-use tracing::{debug, error, info_span, warn, Span};
+use tracing::{Span, debug, error, info_span, warn};
+use tsclientlib::StreamItem as TsStreamItem;
 use tsclientlib::events::Event as TsEvent;
 use tsclientlib::messages::s2c::InCommandErrorPart;
 use tsclientlib::prelude::*;
-use tsclientlib::StreamItem as TsStreamItem;
 use tsclientlib::{
-	events, AudioEvent, ChannelId, ClientId, Connection, ConnectionStats, DisconnectOptions,
+	AudioEvent, ChannelId, ClientId, Connection, ConnectionStats, DisconnectOptions,
 	Error as TsclError, FileDownloadResult, FileUploadResult, FiletransferHandle, InMessage,
-	MessageTarget, TsError, UidBuf,
+	MessageTarget, TsError, UidBuf, events,
 };
 use tsproto_packets::packets::{AudioData, CodecType, OutAudio, OutCommand, OutPacket};
 use tsproto_types::crypto::EccKeyPubP256;
@@ -29,7 +29,7 @@ use crate::db::{ChannelListMsg, ChannelListTask, ChatId, ChatType, SetClientVolu
 use crate::messages::{
 	self, LibError, MessageF2P, MessageP2F, ResultDetails, ResultStruct, WhisperData,
 };
-use crate::{audio, db, with_log, ConnectionId, FrontBridge, QintState};
+use crate::{ConnectionId, FrontBridge, QintState, audio, db, with_log};
 
 type ReturnCodeListener = Box<dyn FnOnce(&mut QintConnection, &InCommandErrorPart)>;
 
@@ -630,7 +630,7 @@ impl QintConnection {
 							channels::server.eq(&server).and(channels::id.eq(channel.0 as i64)),
 						))
 						.set(channels::password.eq(password))
-						.execute(&db.con)
+						.execute(&mut db.con)
 					}))
 					.map(move |r| match r {
 						Ok(Ok(1)) => {}
@@ -871,7 +871,7 @@ impl QintConnection {
 												.and(channels::id.eq(channel.0 as i64)),
 										)
 										.select(channels::password)
-										.first::<Option<String>>(&db.con)
+										.first::<Option<String>>(&mut db.con)
 								})))
 								.map(move |r, actor: &mut Self, _| {
 									let pw = match r {

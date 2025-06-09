@@ -41,7 +41,7 @@ jobs:
 
     - name: Build frontend and replace hash
       run: |
-        nix build .#yarnModules -L 2>&1 | tee log
+        nix build .#node_modules -L 2>&1 | tee log
 
         # Extract wanted hash from log
         nodeModulesHash="$(sed -n 's/^ *got: *\(sha256-.*\)$/\1/p' log)"

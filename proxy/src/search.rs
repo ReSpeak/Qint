@@ -16,7 +16,7 @@ use tracing::{debug, debug_span, error, info, warn};
 use tsclientlib::Uid;
 use tsproto_types::crypto::EccKeyPubP256;
 
-use crate::{db, QintState, Result};
+use crate::{QintState, Result, db};
 
 /// Add documents in batches when creating the database.
 const INIT_BATCH_SIZE: usize = 1000;
@@ -170,7 +170,7 @@ impl Search {
 							.order(messages::id)
 							.offset(offset)
 							.limit(INIT_BATCH_SIZE as i64);
-						let res = query.load::<(i64, NaiveDateTime, String)>(&db.con)?;
+						let res = query.load::<(i64, NaiveDateTime, String)>(&mut db.con)?;
 						let len = res.len();
 
 						// Insert into search database
@@ -203,7 +203,7 @@ impl Search {
 							.order(channels::id)
 							.offset(offset)
 							.limit(INIT_BATCH_SIZE as i64);
-						let res = query.load::<(Vec<u8>, i64, String)>(&db.con)?;
+						let res = query.load::<(Vec<u8>, i64, String)>(&mut db.con)?;
 						let len = res.len();
 
 						// Insert into search database
@@ -241,8 +241,9 @@ impl Search {
 							.order(clients::uid)
 							.offset(offset)
 							.limit(INIT_BATCH_SIZE as i64);
-						let res = query
-							.load::<(Vec<u8>, String, Option<String>, Option<String>)>(&db.con)?;
+						let res = query.load::<(Vec<u8>, String, Option<String>, Option<String>)>(
+							&mut db.con,
+						)?;
 						let len = res.len();
 
 						// Insert into search database
@@ -276,7 +277,7 @@ impl Search {
 							.order(servers::public_key)
 							.offset(offset)
 							.limit(INIT_BATCH_SIZE as i64);
-						let res = query.load::<(Vec<u8>, String, String)>(&db.con)?;
+						let res = query.load::<(Vec<u8>, String, String)>(&mut db.con)?;
 						let len = res.len();
 
 						// Insert into search database

@@ -7,7 +7,7 @@ use juniper::GraphQLEnum;
 use serde::{Deserialize, Serialize};
 use tsproto_types::crypto::EccKeyPrivP256;
 
-use super::{schema::*, FindIdentity};
+use super::{FindIdentity, schema::*};
 use crate::secret::Secret;
 
 #[derive(Queryable)]
@@ -21,7 +21,7 @@ pub struct Client {
 }
 
 #[derive(Insertable)]
-#[table_name = "clients"]
+#[diesel(table_name = clients)]
 pub struct ClientInsert<'a> {
 	pub uid: &'a [u8],
 	pub name: &'a str,
@@ -31,7 +31,7 @@ pub struct ClientInsert<'a> {
 }
 
 #[derive(Clone, Identifiable, Queryable)]
-#[table_name = "identities"]
+#[diesel(table_name = identities)]
 pub struct Identity {
 	pub id: i64,
 	pub private_key: Vec<u8>,
@@ -56,7 +56,7 @@ pub struct Server {
 }
 
 #[derive(Insertable)]
-#[table_name = "servers"]
+#[diesel(table_name = servers)]
 pub struct ServerInsert<'a> {
 	pub public_key: &'a [u8],
 	pub name: &'a str,
@@ -78,7 +78,7 @@ pub struct Channel {
 }
 
 #[derive(Insertable)]
-#[table_name = "channels"]
+#[diesel(table_name = channels)]
 pub struct ChannelInsert<'a> {
 	pub server: &'a [u8],
 	pub id: i64,
@@ -91,7 +91,7 @@ pub struct ChannelInsert<'a> {
 }
 
 #[derive(Debug, Insertable)]
-#[table_name = "bookmarks"]
+#[diesel(table_name = bookmarks)]
 pub struct BookmarkInsert<'a> {
 	pub name: Option<&'a str>,
 	pub username: &'a str,
@@ -127,7 +127,7 @@ pub struct Message {
 }
 
 #[derive(Debug, Insertable)]
-#[table_name = "messages"]
+#[diesel(table_name = messages)]
 pub struct MessageInsert<'a> {
 	pub chat: i64,
 	pub invoker: Option<&'a [u8]>,
@@ -152,7 +152,7 @@ pub struct Event {
 }
 
 #[derive(Insertable)]
-#[table_name = "identities"]
+#[diesel(table_name = identities)]
 pub struct NewIdentity<'a> {
 	pub private_key: Vec<u8>,
 	pub name: &'a str,
@@ -166,7 +166,7 @@ pub struct NewIdentity<'a> {
 }
 
 #[derive(AsChangeset, Default)]
-#[table_name = "identities"]
+#[diesel(table_name = identities)]
 pub struct UpdateIdentity {
 	pub name: Option<String>,
 	pub counter: Option<i64>,
@@ -184,7 +184,7 @@ pub struct ServersClients {
 }
 
 #[derive(Debug, Insertable)]
-#[table_name = "servers_clients"]
+#[diesel(table_name = servers_clients)]
 pub struct ServersClientsInsert<'a> {
 	pub server: &'a [u8],
 	pub client: &'a [u8],
