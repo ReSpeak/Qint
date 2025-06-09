@@ -59,6 +59,7 @@
         cmake
         perl
         pkg-config
+        cargo-tauri
       ];
 
       # Deny warnings and clippy warnings
@@ -102,7 +103,7 @@
     node_modules = pkgs.stdenv.mkDerivation (finalAttrs: {
       pname = "qint-frontend-node_modules";
       version = "1.0.0";
-      outputHash = "sha256-egfWdejkeq+7ugcGl54CWylmkYbhzCC1M45Ehswq8+M=";
+      outputHash = pkgs.lib.fakeHash;
       outputHashAlgo = "sha256";
       outputHashMode = "recursive";
 
@@ -132,24 +133,6 @@
       '';
     });
 
-    /*yarnModules = fetchYarnModules {
-      pname = "qint-frontend-modules";
-      version = "1.0";
-      hash = pkgs.lib.fakeHash;
-
-      packageJSON = ./frontend/package.json;
-      yarnLock = ./frontend/yarn.lock;
-      # Rename paths illegally starting with .
-      yarnRc = builtins.path {
-        name = "frontend-yarnrc";
-        path = ./frontend/.yarnrc.yml;
-      };
-      yarnFolder = builtins.path {
-        name = "frontend-yarn";
-        path = ./frontend/.yarn;
-      };
-    };*/
-
     build-frontend = book_events: pkgs.runCommand "build-qint-frontend" {
       nativeBuildInputs = with pkgs; [ bun nodejs ];
       src = ./frontend;
@@ -171,9 +154,6 @@
         pkgsCross.mingwW64.stdenv.cc
         pkgsCross.mingwW64.windows.pthreads
       ];
-
-      # Only build webapp
-      #cargoBuildOptions = opts: opts ++ [ "--package" "webapp" ];
 
       /*nativeBuildInputs = defaultBuildArgs.nativeBuildInputs ++ (with pkgs; [
         # We need Wine to run tests:
@@ -215,6 +195,15 @@
           mkdir -p proxy-codegen/gnu-mingw/{lib,dll}/64
           mv SDL2-${sdlVersion}/x86_64-w64-mingw32/lib/*.a proxy-codegen/gnu-mingw/lib/64/
           mv SDL2-${sdlVersion}/x86_64-w64-mingw32/bin/SDL2.dll proxy-codegen/gnu-mingw/dll/64/
+        '';
+
+        # Tauri build
+        postBuild = ''
+          # Is overwritten during build
+          chmod u+w target/x86_64-pc-windows-gnu/release/WebView2Loader.dll
+          pushd src-tauri
+          cargo tauri build --no-bundle --target "$CARGO_BUILD_TARGET"
+          popd
         '';
 
         postInstall = ''

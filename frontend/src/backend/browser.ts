@@ -1,6 +1,6 @@
-import { ResultDetails } from "./ws";
+import type { ResultDetails } from "./ws";
 import { assert, hasProperty, hexEncode, javaHash, PromiseParts } from "../util";
-import {
+import type {
 	AskReadResult,
 	IBackend,
 	IBackendConnection,

@@ -1,14 +1,13 @@
-import { RustAnalyzeResult } from "../chat/previewAnalyzer";
-import { MuteStates } from "../connect/uiConnect";
-import { ApiIdentity } from "../panel/settings/identity";
-import { Uid } from "../ts";
+import type { RustAnalyzeResult } from "../chat/previewAnalyzer";
+import type { MuteStates } from "../connect/uiConnect";
+import type { ApiIdentity } from "../panel/settings/identity";
+import type { Uid } from "../ts";
 import { IS_TAURI } from "../util";
-//import { BrowserBackend } from "./browser";
 import { BrowserBackend } from "./browser";
 import { TauriBackend } from "./tauri";
-import { InMsg, OutMsg } from "./ws";
-import { HotkeyAction } from "../settings";
-import { IPlugin } from "../plugins";
+import type { InMsg, OutMsg } from "./ws";
+import type { HotkeyAction } from "../settings";
+import type { IPlugin } from "../plugins";
 import { ReturnCodeTracker } from "./returnCodeTracker";
 
 export const backend: IBackend = IS_TAURI ? new TauriBackend() : new BrowserBackend();

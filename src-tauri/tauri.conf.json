@@ -1,25 +1,22 @@
 {
+  "$schema": "https://schema.tauri.app/config/2",
   "productName": "Qint",
   "version": "0.1.1",
   "identifier": "org.respeak.qint",
   "build": {
-    "frontendDist": [
-      "../frontend/dist"
-    ],
-    "devUrl": "http://localhost:3000"
+    "devUrl": "http://localhost:3000",
+    "frontendDist": "../frontend/dist"
   },
   "app": {
     "windows": [
       {
         "title": "Qint",
         "width": 800,
-        "height": 600,
-        "resizable": true,
-        "fullscreen": false
+        "height": 600
       }
     ],
     "security": {
-      "csp": "default-src blob: data: filesystem: ws: http: https: tauri: 'unsafe-eval' 'unsafe-inline'"
+      "csp": "default-src blob: data: filesystem: ws: http: https: tauri: 'unsafe-eval' 'unsafe-inline'; script-src blob:"
     },
     "trayIcon": {
       "iconPath": "../assets/icon.ico"
@@ -27,6 +24,7 @@
   },
   "bundle": {
     "active": true,
+    "targets": "all",
     "icon": [
       "../assets/32x32.png",
       "../assets/128x128.png",

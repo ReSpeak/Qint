@@ -1,1 +1,0 @@
-{"main-capability":{"identifier":"main-capability","description":"Capability for the main window","local":true,"windows":["main"],"permissions":["core:window:default","core:event:allow-listen","core:window:allow-set-decorations","http:default","notification:default","dialog:default","shell:default"]}}
