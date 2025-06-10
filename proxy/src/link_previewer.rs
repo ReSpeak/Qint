@@ -1,7 +1,7 @@
 use std::option::Option;
 use std::path::PathBuf;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use percent_encoding::percent_decode_str;
 use reqwest::header::CONTENT_TYPE;
 use scraper::{ElementRef, Html, Selector};

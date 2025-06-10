@@ -5,23 +5,25 @@ use std::sync::{Arc, Mutex};
 
 use actix::prelude::*;
 use actix_web_actors::ws;
-use anyhow::{bail, format_err, Result};
+use anyhow::{Result, bail, format_err};
 use futures::FutureExt;
 use juniper::http::GraphQLRequest;
 use proxy_codegen::book_events::deserialize_u64;
 use qint_proxy::audio::audio_to_ts::{AddLoudnessListenerMsg, LoudnessTrait};
 use qint_proxy::connection::CaptureLoudnessMsg;
 use qint_proxy::{
+	AppToFrontendBridge, ConnectionId, QintState,
 	connection::{DisconnectMsg, MessageF2PWrapper, QintConnection},
 	db::models::UpdateIdentity,
 	db::{
-		DeleteIdentityMsg, FindIdentity, GenrateNewIdentityMsg, GetIdentitiesMsg, UpdateIdentityMsg,
+		DeleteIdentityMsg, FindIdentity, GenerateNewIdentityMsg, GetIdentitiesMsg,
+		UpdateIdentityMsg,
 	},
 	hotkey::Action,
 	identities::import_ts_identities_from_string,
 	messages::{MessageF2P, MessageP2F},
 	shared::UpdateIdentityOptions,
-	with_log, AppToFrontendBridge, ConnectionId, QintState,
+	with_log,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -138,9 +140,7 @@ impl AppToFrontendBridge for WsBridge {
 
 impl Actor for Ws {
 	type Context = ws::WebsocketContext<Self>;
-	fn stopped(&mut self, _: &mut Self::Context) {
-		self.close();
-	}
+	fn stopped(&mut self, _: &mut Self::Context) { self.close(); }
 }
 
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
@@ -385,7 +385,7 @@ impl Ws {
 			}
 			"identity_create" => {
 				// TODO -> Gen*e*rate
-				unwrap_send!(state.database, GenrateNewIdentityMsg())
+				unwrap_send!(state.database, GenerateNewIdentityMsg())
 			}
 			"identity_import" => {
 				#[derive(Deserialize)]
@@ -415,10 +415,10 @@ impl Ws {
 
 				unwrap_send!(
 					state.database,
-					UpdateIdentityMsg(
-						FindIdentity::ById(args.id.0),
-						UpdateIdentity { name: args.update.name, ..Default::default() },
-					)
+					UpdateIdentityMsg(FindIdentity::ById(args.id.0), UpdateIdentity {
+						name: args.update.name,
+						..Default::default()
+					},)
 				)
 			}
 			"identity_delete" => {

@@ -19,7 +19,7 @@ export const EDIT_ICON = "pencil-outline";
 export const CLEAR_ICON = "broom";
 
 // the rpc field gets injected by the tauri runtime so it's a good indicator if
-// we are running withing the tauri app.
+// we are running within the tauri app.
 export const IS_TAURI = "__TAURI_INTERNALS__" in window;
 export const LONG_DATETIME = "dddd, MMMM Do YYYY, HH:mm:ss UTCZ";
 export const MIN_VOLUME_DB = -30;
@@ -631,7 +631,7 @@ export function formatSi(num: number, decimals: number = 0): string {
 }
 
 export enum Browser {
-	Unknwon,
+	Unknown,
 	Opera,
 	Chrome,
 	Safari,
@@ -654,7 +654,7 @@ function detectBrowser(): Browser {
 	) {
 		return Browser.IE;
 	} else {
-		return Browser.Unknwon;
+		return Browser.Unknown;
 	}
 }
 

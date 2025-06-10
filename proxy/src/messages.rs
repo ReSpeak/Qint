@@ -2,8 +2,8 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 
 use proxy_codegen::book_events::{
-	deserialize_id, deserialize_set_id, deserialize_some_u64, serialize_id, serialize_set_id,
-	serialize_some_u64, JsEvent, JsInMessage, JsM2B,
+	JsEvent, JsInMessage, JsM2B, deserialize_id, deserialize_set_id, deserialize_some_u64,
+	serialize_id, serialize_set_id, serialize_some_u64,
 };
 use serde::{Deserialize, Serialize};
 use tsclientlib::{

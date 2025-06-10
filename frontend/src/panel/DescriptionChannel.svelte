@@ -145,7 +145,7 @@
 		return diff;
 	}
 
-	function editClearPasword() {
+	function editClearPassword() {
 		chanEdit.hasPassword = false;
 		chanEdit._password = "";
 	}
@@ -486,7 +486,7 @@
 					</div>
 					{#if channel.hasPassword && chanEdit.hasPassword !== false}
 						<div class="control">
-							<button class="button" on:click={editClearPasword}
+							<button class="button" on:click={editClearPassword}
 								><Icon name={CLEAR_ICON} /></button
 							>
 						</div>

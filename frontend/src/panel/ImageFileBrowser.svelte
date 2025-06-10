@@ -120,7 +120,7 @@
 		}
 		currentState = WorkState.None;
 		isConfirmingDelete = false;
-		refreshFiles(false); // TODO apply in chage instead
+		refreshFiles(false); // TODO apply in change instead
 	}
 
 	const is_uploading: boolean = false; // TODO
@@ -133,7 +133,7 @@
 			console.log(err);
 			return;
 		}
-		refreshFiles(false); // TODO apply in chage instead
+		refreshFiles(false); // TODO apply in change instead
 	}
 
 	function dragEnter(e: DragEvent) {

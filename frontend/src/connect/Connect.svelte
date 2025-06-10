@@ -389,7 +389,7 @@
 				<div>Loading…</div>
 			{:then bookmarks}
 				<div class="viewContainer">
-					<div class="scollPane">
+					<div class="scrollPane">
 						{#each bookmarks as item}
 							<UiBookmark
 								bookmark={item}
@@ -547,7 +547,7 @@
 		margin-bottom: 5em;
 	}
 
-	.bookmark-list .scollPane {
+	.bookmark-list .scrollPane {
 		min-height: 30vh;
 		max-height: 50vh;
 	}
@@ -561,7 +561,7 @@
 	}
 
 	@media (min-width: 35em) {
-		.bookmark-list .scollPane,
+		.bookmark-list .scrollPane,
 		.bookmark-list .message {
 			padding: 1em 8em 4em 8em;
 		}
@@ -575,7 +575,7 @@
 		overflow-y: hidden;
 	}
 
-	.scollPane {
+	.scrollPane {
 		position: relative;
 		overflow-y: auto;
 	}

@@ -69,11 +69,11 @@ async function analyzeLinkInBackend(link: string): Promise<AnalyzeResult> {
 	return rustResultToAnalyzeResult(data);
 }
 
-const Unknown: UnknwonResult = {
+const Unknown: UnknownResult = {
 	kind: undefined,
 };
 
-type AnalyzeResult = ImageResult | SiteResult | VideoResult | UnknwonResult;
+type AnalyzeResult = ImageResult | SiteResult | VideoResult | UnknownResult;
 export type EmbedTypes = "youtube";
 
 export type RustAnalyzeResult =
@@ -82,7 +82,7 @@ export type RustAnalyzeResult =
 	| { Video: string }
 	| { Site: { title: string; image_src: string; description: string | null } };
 
-interface UnknwonResult {
+interface UnknownResult {
 	kind: undefined;
 }
 

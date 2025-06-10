@@ -309,11 +309,11 @@
       drv = packages.qint;
     };
 
-    # TODO Fix typos
-    /*checks.typos = pkgs.runCommand "check-typos" {} ''
-      ${pkgs.typos}/bin/typos ${self}
+    checks.typos = pkgs.runCommand "check-typos" {} ''
+      cd ${self}
+      ${lib.getExe pkgs.typos}
       mkdir -p $out
-    '';*/
+    '';
 
     checks.build = packages.qint;
   });

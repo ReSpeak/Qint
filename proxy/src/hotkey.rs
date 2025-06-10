@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
 use actix::Addr;
-use futures::{future, StreamExt};
+use futures::{StreamExt, future};
 use serde::{Deserialize, Serialize};
 use tracing::error;
 use tsclientlib::prelude::*;
 
-use crate::connection::QintConnection;
 use crate::MuteState;
 use crate::QintState;
+use crate::connection::QintConnection;
 
 pub use imp::{Hotkey, Hotkeys};
 

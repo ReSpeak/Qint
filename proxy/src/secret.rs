@@ -1,4 +1,4 @@
-use anyhow::{format_err, Result};
+use anyhow::{Result, format_err};
 use chacha20poly1305::aead::AeadInPlace;
 use chacha20poly1305::{ChaCha20Poly1305, Key, KeyInit};
 use rand::Rng;

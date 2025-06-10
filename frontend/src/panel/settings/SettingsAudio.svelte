@@ -250,10 +250,10 @@
 
 		> .volumeControl {
 			position: absolute;
-			$heigth: 200px;
-			$heigth2: #{math.div($heigth, 2)};
-			width: $heigth;
-			transform: translate(-50%, -50%) translate(0, $heigth2) rotate(270deg);
+			$height: 200px;
+			$height2: #{math.div($height, 2)};
+			width: $height;
+			transform: translate(-50%, -50%) translate(0, $height2) rotate(270deg);
 
 			> :global(.bslider) {
 				flex: 1;

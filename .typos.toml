@@ -1,0 +1,6 @@
+[files]
+extend-exclude = ["frontend/src/sas-emoji.json", "proxy-codegen/domains.txt"]
+
+[default.extend-words]
+typ = "typ"
+struc = "struc"

@@ -18,7 +18,7 @@ use qint_proxy::messages::ResultDetails;
 use qint_proxy::{
 	AppToFrontendBridge, ConnectionId, QintState,
 	db::{
-		DeleteIdentityMsg, FindIdentity, GenrateNewIdentityMsg, GetIdentitiesMsg,
+		DeleteIdentityMsg, FindIdentity, GenerateNewIdentityMsg, GetIdentitiesMsg,
 		UpdateIdentityMsg, models::UpdateIdentity,
 	},
 	filecache::guess_content_type,
@@ -582,7 +582,7 @@ pub async fn get_audio_device_list(state: State<'_, QState>) -> Result<AudioDevi
 
 #[command]
 pub async fn identity_create(state: State<'_, QState>) -> Result<ApiIdentity, String> {
-	unwrap_send!(state.database, GenrateNewIdentityMsg())
+	unwrap_send!(state.database, GenerateNewIdentityMsg())
 }
 
 #[command]

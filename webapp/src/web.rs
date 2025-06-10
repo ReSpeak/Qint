@@ -8,13 +8,13 @@ use actix_web::middleware::Condition;
 use actix_web::web::{Data, Query};
 use actix_web::*;
 
-use actix_web::http::header::{HeaderValue, CACHE_CONTROL, ETAG};
+use actix_web::http::header::{CACHE_CONTROL, ETAG, HeaderValue};
 use actix_web_actors::ws;
 use anyhow::Result;
 use base64::prelude::*;
 use futures::prelude::*;
-use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
+use juniper::http::graphiql::graphiql_source;
 use qint_proxy::connection::{DownloadFileContext, UploadFileContext};
 use qint_proxy::filecache::guess_content_type;
 use qint_proxy::messages::ResultDetails;
@@ -112,9 +112,7 @@ impl WebApp {
 		settings.listen_address
 	}
 
-	pub fn get_token(&self) -> &str {
-		&self.token
-	}
+	pub fn get_token(&self) -> &str { &self.token }
 }
 
 #[get("/ws")]
@@ -139,9 +137,7 @@ struct GetFileOptions {
 	cache: bool,
 }
 
-fn result_details_gone() -> ResultDetails {
-	"gone".into()
-}
+fn result_details_gone() -> ResultDetails { "gone".into() }
 
 #[get("/con/{id}/file/{channel}/{path:.*}")]
 async fn download_file(
@@ -437,7 +433,7 @@ mod tests {
 	use std::future::Future;
 	use std::time::Duration;
 
-	use anyhow::{bail, format_err, Result};
+	use anyhow::{Result, bail, format_err};
 	use awc::ws;
 	use base64::prelude::*;
 	use futures::{SinkExt, StreamExt};
@@ -452,9 +448,9 @@ mod tests {
 	use tsclientlib::ClientId;
 	use uuid::Uuid;
 
+	use crate::Args;
 	use crate::web::WebApp;
 	use crate::websocket::{ConArgs, F2PMsg, P2FMsg, PassWsMsgArgs};
-	use crate::Args;
 
 	static TRACING: Lazy<()> = Lazy::new(|| tracing_subscriber::fmt().with_test_writer().init());
 
@@ -481,9 +477,7 @@ mod tests {
 		client: Vec<u8>,
 	}
 
-	fn create_logger() {
-		Lazy::force(&TRACING);
-	}
+	fn create_logger() { Lazy::force(&TRACING); }
 
 	impl TestProxy {
 		fn new() -> Self {
@@ -507,9 +501,7 @@ mod tests {
 		}
 
 		async fn graphql<T>(&self, request: &GraphQLRequest) -> Result<T>
-		where
-			for<'a> T: Deserialize<'a>,
-		{
+		where for<'a> T: Deserialize<'a> {
 			let client = awc::Client::default();
 			let url = format!("http://127.0.0.1:{}/db", self.port);
 			debug!(body = %serde_json::to_string(&request).unwrap(), "GraphQL request");

@@ -109,7 +109,8 @@ pub(crate) fn start(
 	)
 	.start();
 	#[cfg(feature = "oboe")]
-	let ts2a = TsToAudio::new(oboe::TsToAudioOboe::new(), playback, connections, global_volume).start();
+	let ts2a =
+		TsToAudio::new(oboe::TsToAudioOboe::new(), playback, connections, global_volume).start();
 	#[cfg(feature = "sdl2")]
 	let a2ts = AudioToTs::new(sdl::AudioToTsSdl::new(audio_subsystem), capture, spawn_send).start();
 	#[cfg(feature = "oboe")]

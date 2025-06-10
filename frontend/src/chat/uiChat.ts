@@ -66,7 +66,7 @@ export class Chat {
 		if (selected === undefined) return Chat.EmptyFetch;
 		const publicKey = selected.connection?.book.server.publicKey;
 		if (publicKey === undefined) {
-			error("Cannot get messages for a non-existant connection");
+			error("Cannot get messages for a non-existent connection");
 			return Chat.EmptyFetch;
 		}
 
@@ -188,7 +188,7 @@ export class Chat {
 		if (selected === undefined) return;
 		const publicKey = selected.connection?.book.server.publicKey;
 		if (publicKey === undefined) {
-			error("Cannot get messages for a non-existant connection");
+			error("Cannot get messages for a non-existent connection");
 			return;
 		}
 		const res = await backend.graphql(
@@ -211,7 +211,7 @@ export class Chat {
 		if (selected === undefined) return undefined;
 		const publicKey = selected.connection?.book.server.publicKey;
 		if (publicKey === undefined) {
-			error("Cannot get send history for a non-existant connection");
+			error("Cannot get send history for a non-existent connection");
 			return undefined;
 		}
 

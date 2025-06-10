@@ -4,16 +4,16 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use actix::*;
-use anyhow::{format_err, Result};
+use anyhow::{Result, format_err};
 use ebur128::EbuR128;
 use tokio::runtime::Handle;
-use tracing::{info_span, warn, Span};
+use tracing::{Span, info_span, warn};
 use tsclientlib::ClientId;
 use tsproto_packets::packets::InAudioBuf;
 
 use super::*;
-use crate::connection::{GetClientVolumeMsg, LoudnessesMsg, QintConnection, TalkersChangedMsg};
 use crate::ConnectionId;
+use crate::connection::{GetClientVolumeMsg, LoudnessesMsg, QintConnection, TalkersChangedMsg};
 
 type Id = (ConnectionId, ClientId);
 type AudioHandler = tsclientlib::audio::AudioHandler<Id>;

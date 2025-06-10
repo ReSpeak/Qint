@@ -139,7 +139,7 @@
 		return diff;
 	}
 
-	function editClearPasword() {
+	function editClearPassword() {
 		servEditOpt.hasPassword = false;
 		servEdit._password = "";
 	}
@@ -479,7 +479,7 @@
 					</div>
 					{#if server.optionalData?.hasPassword && servEditOpt.hasPassword !== false}
 						<div class="control">
-							<button class="button" on:click={editClearPasword}>
+							<button class="button" on:click={editClearPassword}>
 								<Icon name={CLEAR_ICON} />
 							</button>
 						</div>

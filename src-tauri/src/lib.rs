@@ -10,14 +10,14 @@ use std::thread;
 use actix::prelude::*;
 use qint_proxy::QintState;
 use structopt::StructOpt;
-#[cfg(desktop)]
-use tauri::menu::{MenuBuilder, MenuItemBuilder};
-#[cfg(desktop)]
-use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::AppHandle;
 use tauri::Listener;
 use tauri::Manager;
 use tauri::WindowEvent;
+#[cfg(desktop)]
+use tauri::menu::{MenuBuilder, MenuItemBuilder};
+#[cfg(desktop)]
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 #[cfg(desktop)]
 use tauri::{PhysicalPosition, PhysicalSize};
 use tokio::runtime::Runtime;

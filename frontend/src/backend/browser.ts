@@ -305,8 +305,8 @@ export class BrowserBackendConnection
 		}
 	}
 
-	// TODO Consider piping the array of existing values to this funtion
-	// TODO Consider actually hasing the icon file
+	// TODO Consider piping the array of existing values to this function
+	// TODO Consider actually hashing the icon file
 	private upload_feature_icon(file: File) {
 		// eslint-disable-next-line prefer-const
 		let number = javaHash(file.name) >>> 0; // Convert to unsigned 32-bit int

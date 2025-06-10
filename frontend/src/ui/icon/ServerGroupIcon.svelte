@@ -44,7 +44,7 @@
 	}
 
 	.serverGroupIcon {
-		/* Otherwise the hight is more than it needs to be */
+		/* Otherwise the height is more than it needs to be */
 		display: flex;
 	}
 </style>

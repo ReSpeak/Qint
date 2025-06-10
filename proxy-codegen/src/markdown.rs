@@ -255,7 +255,7 @@ impl<TStack> Render<TStack> {
 		}
 	}
 
-	/// Add `http://` to a linke if it has no scheme
+	/// Add `http://` to a link if it has no scheme
 	fn link_add_scheme(href: &str) -> Cow<'_, str> {
 		if !href.contains("://") {
 			Cow::Owned(format!("http://{}", href))

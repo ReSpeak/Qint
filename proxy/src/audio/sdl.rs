@@ -1,9 +1,9 @@
 use std::time::Duration;
 
 use actix::{AsyncContext, Context};
-use anyhow::{format_err, Result};
-use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired, AudioStatus};
+use anyhow::{Result, format_err};
 use sdl2::AudioSubsystem;
+use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired, AudioStatus};
 use tracing::{debug, error};
 
 use super::audio_to_ts::*;

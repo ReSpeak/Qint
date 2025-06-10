@@ -160,7 +160,7 @@
 				<span>Import</span>
 				TODO add dropdown with
 				Import AS:
-				- Teampseak file
+				- Teamspeak file
 				- Any string
 				/button> -->
 
@@ -188,7 +188,7 @@
 							<span>Export</span>
 							<!-- TODO add dropdown with -->
 							<!-- Export AS: -->
-							<!-- - Teampseak file -->
+							<!-- - Teamspeak file -->
 							<!-- - Obfuscated string ? -->
 						</button>
 

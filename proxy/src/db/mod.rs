@@ -81,7 +81,7 @@ pub struct GetClientVolumeMsg(pub UidBuf);
 pub struct SetClientVolumeMsg(pub UidBuf, pub f32);
 pub struct UpdateIdentityMsg(pub FindIdentity, pub models::UpdateIdentity);
 pub struct DeleteIdentityMsg(pub FindIdentity);
-pub struct GenrateNewIdentityMsg();
+pub struct GenerateNewIdentityMsg();
 pub struct RunOnDbMsg<I: 'static, E: 'static, F: FnOnce(&mut DbHandler) -> result::Result<I, E>>(
 	pub F,
 );
@@ -174,7 +174,7 @@ impl Message for UpdateIdentityMsg {
 impl Message for DeleteIdentityMsg {
 	type Result = Result<()>;
 }
-impl Message for GenrateNewIdentityMsg {
+impl Message for GenerateNewIdentityMsg {
 	type Result = Result<crate::identities::ApiIdentity>;
 }
 impl Message for GetClientVolumeMsg {
@@ -574,9 +574,9 @@ impl Handler<DeleteIdentityMsg> for DbHandler {
 	}
 }
 
-impl Handler<GenrateNewIdentityMsg> for DbHandler {
+impl Handler<GenerateNewIdentityMsg> for DbHandler {
 	type Result = Result<crate::identities::ApiIdentity>;
-	fn handle(&mut self, _: GenrateNewIdentityMsg, _: &mut Self::Context) -> Self::Result {
+	fn handle(&mut self, _: GenerateNewIdentityMsg, _: &mut Self::Context) -> Self::Result {
 		use schema::identities::dsl::*;
 
 		let identity = tsclientlib::Identity::create();

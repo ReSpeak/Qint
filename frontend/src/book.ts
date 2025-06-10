@@ -134,7 +134,7 @@ export class Book {
 	): void {
 		const channel = this.channels.get(id);
 		if (channel === undefined) {
-			error(`Cannot update non-existant channel ${id}`);
+			error(`Cannot update non-existent channel ${id}`);
 			return;
 		}
 		const oldParent = channel.parent;
@@ -195,7 +195,7 @@ export class Book {
 	public updateClient(id: ClientId, obj: Partial<Client> | Partial<book_events.ClientGen>): void {
 		const client = this.getClient(id);
 		if (client === undefined) {
-			error(`Cannot update non-existant client ${id}`);
+			error(`Cannot update non-existent client ${id}`);
 			return;
 		}
 		const oldChannel = client.channel;
@@ -232,7 +232,7 @@ export class Book {
 	public addClientServerGroup(id: ClientId, group: ServerGroupId): void {
 		const client = this.getClient(id);
 		if (client === undefined) {
-			error(`Cannot update non-existant client ${id}`);
+			error(`Cannot update non-existent client ${id}`);
 			return;
 		}
 		if (!client.serverGroups.includes(group)) {
@@ -244,7 +244,7 @@ export class Book {
 	public removeClientServerGroup(id: ClientId, group: ServerGroupId): void {
 		const client = this.getClient(id);
 		if (client === undefined) {
-			error(`Cannot update non-existant client ${id}`);
+			error(`Cannot update non-existent client ${id}`);
 			return;
 		}
 		client.serverGroups.remove_item(group);
@@ -445,7 +445,7 @@ export class Book {
 			if (i === -1 || oldTalkers[i][1] !== isWhispering) {
 				const client = this.getClient(id);
 				if (client === undefined) {
-					error(`Cannot update non-existant client ${id}`);
+					error(`Cannot update non-existent client ${id}`);
 					continue;
 				}
 				client.update({ talking: isWhispering ? TalkState.Whisper : TalkState.Voice });
@@ -458,7 +458,7 @@ export class Book {
 		for (const [id] of oldTalkers) {
 			const client = this.getClient(id);
 			if (client === undefined) {
-				error(`Cannot update non-existant client ${id}`);
+				error(`Cannot update non-existent client ${id}`);
 				continue;
 			}
 			client.update({ talking: TalkState.Off });

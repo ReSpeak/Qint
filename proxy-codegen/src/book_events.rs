@@ -3,14 +3,14 @@ use std::convert::{TryFrom, TryInto};
 use std::hash::Hash;
 use std::net::IpAddr;
 
-use anyhow::{format_err, Result};
+use anyhow::{Result, format_err};
 use serde::de::Error as SerdeError;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use time::{Duration, OffsetDateTime};
+use tsclientlib::TsError as Error;
 use tsclientlib::data::Connection;
 use tsclientlib::events::{Event, ExtraInfo, PropertyId, PropertyValueRef};
 use tsclientlib::prelude::*;
-use tsclientlib::TsError as Error;
 use tsclientlib::*;
 use tsproto_packets::packets::OutCommand;
 

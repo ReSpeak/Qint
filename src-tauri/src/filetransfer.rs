@@ -2,12 +2,12 @@ use std::io::{self, ErrorKind};
 use std::ops::Range;
 use std::path::Path;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::task::{Context, Poll};
 
-use anyhow::{bail, Error};
-use futures::channel::mpsc::{channel, Receiver, Sender};
+use anyhow::{Error, bail};
+use futures::channel::mpsc::{Receiver, Sender, channel};
 use futures::stream::StreamExt;
 use qint_proxy::connection::{DownloadFileContext, UploadFileContext};
 use serde::{Deserialize, Serialize};
@@ -67,9 +67,7 @@ enum TxDirection {
 }
 
 impl UploadPrepare {
-	pub fn get_size(&self) -> u64 {
-		self.size
-	}
+	pub fn get_size(&self) -> u64 { self.size }
 }
 
 type FiletransferList = Vec<TransferContext>;
@@ -84,13 +82,13 @@ impl FiletransferManager {
 		}
 	}
 
-	pub fn next_tranfer_id(&self) -> TransferId {
+	pub fn next_transfer_id(&self) -> TransferId {
 		TransferId(self.transfer_counter.fetch_add(1, Ordering::Relaxed))
 	}
 
-	pub fn add_download(&self, ctx: DownloadFileContext, donwload_prep: DownloadPrepare) {
+	pub fn add_download(&self, ctx: DownloadFileContext, download_prep: DownloadPrepare) {
 		let mut sender = self.sender.lock().unwrap();
-		sender.try_send(TransferAction::Download(ctx, donwload_prep)).unwrap();
+		sender.try_send(TransferAction::Download(ctx, download_prep)).unwrap();
 	}
 
 	pub async fn prepare_download(&self, local_path: &Path) -> Result<DownloadPrepare, Error> {
@@ -113,7 +111,7 @@ impl FiletransferManager {
 		// 	bail!("Failed to seek");
 		// }
 
-		Ok(DownloadPrepare { id: self.next_tranfer_id(), file: Box::pin(local_stream) })
+		Ok(DownloadPrepare { id: self.next_transfer_id(), file: Box::pin(local_stream) })
 	}
 
 	pub fn add_upload(&self, ctx: UploadFileContext, upload_prep: UploadPrepare) {
@@ -137,12 +135,16 @@ impl FiletransferManager {
 		let meta = local_stream.metadata().await?;
 		let size = meta.len();
 
-		Ok(UploadPrepare { id: self.next_tranfer_id(), file: Box::pin(local_stream), size })
+		Ok(UploadPrepare { id: self.next_transfer_id(), file: Box::pin(local_stream), size })
 	}
 
 	pub fn prepare_upload_from_bytes(&self, data: Vec<u8>) -> Result<UploadPrepare, Error> {
 		let size = data.len() as u64;
-		Ok(UploadPrepare { id: self.next_tranfer_id(), file: Box::pin(AsyncBuffer(data, 0)), size })
+		Ok(UploadPrepare {
+			id: self.next_transfer_id(),
+			file: Box::pin(AsyncBuffer(data, 0)),
+			size,
+		})
 	}
 
 	pub async fn transfer_loop(&self) {

@@ -44,7 +44,7 @@ pub struct Search {
 	schema: Schema,
 	reader: IndexReader,
 	writer: Arc<Mutex<Option<IndexWriter>>>,
-	/// If a commit is curently scheduled for execution.
+	/// If a commit is currently scheduled for execution.
 	will_commit: Arc<AtomicUsize>,
 }
 
@@ -496,7 +496,7 @@ impl Search {
 			&query,
 			&TopDocs::with_limit(range.end - range.start)
 			.and_offset(range.start)
-			// Sort descreasing by time
+			// Sort decreasing by time
 			.order_by_u64_field(time),
 		)?;
 

@@ -1,14 +1,14 @@
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use serde::Serialize;
 use tauri::{Emitter, Window};
 use tracing::warn;
 
 use qint_proxy::{
+	QintState,
 	audio::audio_to_ts::{AddLoudnessListenerMsg, LoudnessTrait},
 	connection::CaptureLoudnessMsg,
-	QintState,
 };
 
 pub struct LoudnessShare {

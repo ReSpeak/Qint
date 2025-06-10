@@ -1,6 +1,6 @@
 use std::collections::HashSet;
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, AtomicU64, Ordering};
 
 use actix::*;
 use anyhow::Result;
@@ -9,7 +9,7 @@ use ebur128::EbuR128;
 use futures::prelude::*;
 use nnnoiseless::DenoiseState;
 use tokio::sync::mpsc;
-use tracing::{debug, error, info_span, trace, warn, Span};
+use tracing::{Span, debug, error, info_span, trace, warn};
 use tsproto_packets::packets::CodecType;
 
 use super::*;
@@ -72,7 +72,7 @@ pub struct AudioToTs<Impl> {
 	spawn_send: mpsc::Sender<PlayPacketMsg>,
 	connections: HashSet<Addr<QintConnection>>,
 	loudness_cons: HashMap<usize, LoudnessListener>,
-	/// When enabled will send all loudness packets regardles of their activation
+	/// When enabled will send all loudness packets regardless of their activation
 	/// values.
 	loudness_listening: Arc<AtomicBool>,
 	loudness_id_cnt: usize,
@@ -565,7 +565,8 @@ impl AudioToTsCallback {
 			};
 
 		// TODO: consider not sending the packed at all if we coudn't encode the audio data
-		// otherwise this could result in confusing visuals showing playback but not seding anything
+		// otherwise this could result in confusing visuals showing playback but not sending
+		// anything
 		if packet.is_some() || loudness.is_some() || vad.is_some() {
 			self.send_audio(PlayPacketMsg {
 				codec: Some(codec),

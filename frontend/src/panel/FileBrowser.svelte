@@ -88,7 +88,7 @@
 				password: "", // TODO
 				path: getPath,
 			};
-			// - TODO handle empty result error explicitely instead of implicitely
+			// - TODO handle empty result error explicitly instead of implicitly
 			// (currently the `fileTreeCache.clear` at the to ensures that in case
 			// of an empty folder nothing gets shown)
 			// - TODO handle error show when missing permission instead of

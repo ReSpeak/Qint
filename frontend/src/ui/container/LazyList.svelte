@@ -20,7 +20,7 @@
 	// The golden handbook for js/css:
 	// - pan.scrollHeight, // complete content
 	// - pan.scrollTop,    // current scroll position
-	// - pan.scrollTopMax, // max scoll position
+	// - pan.scrollTopMax, // max scroll position
 	// - pan.offsetHeight, // container height
 	// - pan.clientHeight, // inner view height (after subtracting border/padding)
 	// ! ELEM.offsetTop    // is the top of a element measured from the top of the first position:relative parent.
@@ -45,7 +45,7 @@
 	let elems: T[] = [];
 
 	const pxBeforeLoad = 500; // TODO? could be adjusted dynamically
-	/** The minimum amout of items that must be at least `minPxDistanceToRemove`
+	/** The minimum amount of items that must be at least `minPxDistanceToRemove`
 	 * will be removed when out of view */
 	const minItemsToRemove = 20;
 	/** How far the item at index `minItemsToRemove` has to be out of view to be removed */
@@ -128,7 +128,7 @@
 	// *** Private functions ***
 
 	function setPanScrollTop(scrollTop: number) {
-		// Why?, you might ask. Because `pan.scollTop = x;` will cause svelte to invalidate `pan`.
+		// Why?, you might ask. Because `pan.scrollTop = x;` will cause svelte to invalidate `pan`.
 		const panl = pan;
 		panl.scrollTop = scrollTop;
 	}

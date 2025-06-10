@@ -1,4 +1,4 @@
-use crate::{db::AddIdentityMsg, QintState};
+use crate::{QintState, db::AddIdentityMsg};
 use anyhow::Result;
 use proxy_codegen::book_events::{deserialize_u64, serialize_u64};
 use serde::{Deserialize, Serialize};

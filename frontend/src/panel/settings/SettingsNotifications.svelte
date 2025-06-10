@@ -31,7 +31,7 @@
 				<td>Notification</td>
 				<td>
 					<abbr title="Notify only if it affects your client or your current channel">
-						Only relevant notifcations
+						Only relevant notifications
 					</abbr>
 				</td>
 			</tr>

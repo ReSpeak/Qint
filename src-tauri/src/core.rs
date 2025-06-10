@@ -2,13 +2,13 @@ use std::sync::Arc;
 
 use actix::prelude::*;
 use futures::prelude::*;
+use qint_proxy::ConnectionId;
+use qint_proxy::FrontBridge;
+use qint_proxy::QintState;
 use qint_proxy::connection::MessageF2PWrapper;
 use qint_proxy::connection::QintConnection;
 use qint_proxy::messages::MessageF2P;
 use qint_proxy::with_log;
-use qint_proxy::ConnectionId;
-use qint_proxy::FrontBridge;
-use qint_proxy::QintState;
 use serde::Serialize;
 use thiserror::Error;
 use tokio::runtime::Handle;
