@@ -48,7 +48,7 @@ jobs:
         echo Got hash "$nodeModulesHash"
 
         # Replace hash in flake.nix
-        sed -i "s#hash = pkgs.lib.fakeHash;#hash = \"$nodeModulesHash\";#g" flake.nix
+        sed -i "s#pkgs.lib.fakeHash#\"$nodeModulesHash\"#g" flake.nix
 
     - name: Check
       run: |

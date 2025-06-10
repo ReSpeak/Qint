@@ -224,7 +224,7 @@
         FRONTEND_PATH = frontend;
 
         # For tests
-        LD_LIBRARY_PATH = pkgs.makeLibraryPath (with pkgs; [ SDL2 ]);
+        LD_LIBRARY_PATH = lib.makeLibraryPath defaultLinuxBuildArgs.buildInputs;
         RUST_BACKTRACE = "short";
       };
     });
