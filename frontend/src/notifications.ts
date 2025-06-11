@@ -12,6 +12,7 @@ import debug from "debug";
 import { NotificationCategory } from "./settings";
 import { Moment } from "moment";
 import moment from "moment";
+import { IS_TAURI } from "./util";
 const error = debug("error:NTFY");
 
 type NotificationArg =
@@ -941,11 +942,12 @@ async function defaultNotificationHandler(
 
 		if (!handled) app.settings.synth.trySpeak(tts.toString(con, true));
 	}
-	if (settings.notification && Notification.permission === "granted") {
+	if (settings.notification && (IS_TAURI || Notification.permission === "granted")) {
 		//  By default, set server name as title, tts as content and server as icon
-		const iconPath = notification?.icon
+		const iconPath = (notification?.icon
 			? await getClientIconPath(con, notification.icon)
-			: await getIconPath(con, con.book.server);
+			: await getIconPath(con, con.book.server)) ?? "/icon.png";
+		console.log(iconPath);
 		const options = {
 			body:
 				notification === undefined

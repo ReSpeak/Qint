@@ -18,7 +18,7 @@
     "core:window:allow-start-dragging",
     "core:event:allow-listen",
     "http:default",
-    "notification:default",
+    "notification:allow-notify",
     "dialog:default",
     "opener:default",
     {
