@@ -20,6 +20,23 @@
     "http:default",
     "notification:default",
     "dialog:default",
-    "shell:default"
+    "opener:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "mailto:*"
+        },
+        {
+          "url": "tel:*"
+        },
+        {
+          "url": "https://*"
+        },
+        {
+          "url": "http://*"
+        }
+      ]
+    }
   ]
 }

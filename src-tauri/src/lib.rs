@@ -131,7 +131,7 @@ pub fn run() {
 		.plugin(tauri_plugin_dialog::init())
 		.plugin(tauri_plugin_http::init())
 		.plugin(tauri_plugin_notification::init())
-		.plugin(tauri_plugin_shell::init())
+		.plugin(tauri_plugin_opener::init())
 		.manage(app_addr)
 		.manage(app_arc.state.clone())
 		.manage(app_arc.clone())
