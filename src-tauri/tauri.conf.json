@@ -17,9 +17,6 @@
     ],
     "security": {
       "csp": "default-src blob: data: filesystem: ws: http: https: tauri: 'unsafe-eval' 'unsafe-inline'; script-src blob:"
-    },
-    "trayIcon": {
-      "iconPath": "../assets/icon.ico"
     }
   },
   "bundle": {

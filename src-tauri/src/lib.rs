@@ -141,7 +141,9 @@ pub fn run() {
 			{
 				let show = MenuItemBuilder::with_id("show", "Show").build(app)?;
 				let exit = MenuItemBuilder::with_id("exit", "Exit").build(app)?;
-				TrayIconBuilder::with_id("qint")
+				TrayIconBuilder::new()
+					.icon_as_template(false)
+					.icon(tauri::image::Image::from_bytes(include_bytes!("../../assets/32x32.png")).unwrap())
 					.menu(&MenuBuilder::new(app).items(&[&show, &exit]).build()?)
 					.on_menu_event(move |app, event| match event.id().as_ref() {
 						"show" => {

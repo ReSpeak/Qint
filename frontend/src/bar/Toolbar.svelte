@@ -41,14 +41,6 @@
 		if (node.selections.length !== 0) displayPanel = DisplayPanel.Main;
 	}
 
-	async function startDragWindow(this: HTMLElement, ev: MouseEvent | TouchEvent) {
-		if (IS_TAURI) {
-			if ((ev.target as HTMLElement)?.dataset?.titledrag) {
-				await getCurrentWindow().startDragging();
-			}
-		}
-	}
-
 	$: {
 		if (IS_TAURI) {
 			if ($titleBarStyle === TitleBarStyle.Native) {
@@ -66,7 +58,6 @@
 	class:tinyStyle={true}
 	class:bigDesign={false}
 	class:smallDesign={true}
-	on:mousedown={startDragWindow}
 >
 	<div class="leftBlock">
 		<div class="inlineButtons">
@@ -87,13 +78,13 @@
 				<Icon name="plus" />
 			</div>
 		</div>
-		<div class="flex1" data-titledrag="1" />
+		<div class="flex1" data-tauri-drag-region />
 		<MuteButtons bind:connectData />
 	</div>
-	<div class="flex1" data-titledrag="1" />
+	<div class="flex1" data-tauri-drag-region />
 	<div class="inlineButtons">
 		<Searchbar bind:filter visible={true} />
-		<div class="dragSpace" data-titledrag="1" />
+		<div class="dragSpace" data-tauri-drag-region />
 		<div
 			class="inlineButton"
 			class:active={displayPanel === DisplayPanel.Settings}
