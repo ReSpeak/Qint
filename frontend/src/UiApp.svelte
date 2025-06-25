@@ -119,11 +119,24 @@
 		}
 	}
 
+	// Audio is recorded by the backend but we still need to request permissions on Android.
+	// Do this in the frontend because it's easier.
+	async function requestAudioPermissions() {
+		if (IS_TAURI && navigator.userAgent.toLowerCase().indexOf("android") > -1) {
+			try {
+				const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+			} catch (e) {
+				console.log("Failed to request audio permissions", e);
+			}
+		}
+	}
+
 	onMount(() => {
 		if (backend instanceof BrowserBackend) {
 			backend.fileIo = fileIo;
 		}
 		updateGlobalMuteState();
+		requestAudioPermissions();
 		const unsub = app.updateMuteState.subscribe(updateGlobalMuteState);
 		return unsub;
 	});
