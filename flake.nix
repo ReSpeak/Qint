@@ -371,5 +371,12 @@
       '';
 
       checks.build = packages.qint;
-    });
+    })
+    // {
+      nixosModules.default = {pkgs, ...}: {
+        environment.systemPackages = [
+          self.packages.${pkgs.stdenv.hostPlatform.system}.default
+        ];
+      };
+    };
 }
