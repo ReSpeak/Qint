@@ -235,7 +235,7 @@
       qint = naersk-lib.buildPackage (defaultLinuxBuildArgs
         // {
           pname = "qint";
-          nativeBuildInputs = defaultLinuxBuildArgs.nativeBuildInputs ++ [pkgs.copyDesktopItems];
+          nativeBuildInputs = defaultLinuxBuildArgs.nativeBuildInputs ++ (with pkgs; [copyDesktopItems makeWrapper]);
           # Only set for main derivation
           overrideMain = oldAttrs:
             oldAttrs
@@ -252,23 +252,19 @@
                 popd
               '';
 
+              postInstall = ''
+                wrapProgram $out/bin/qint \
+                  --set __NV_DISABLE_EXPLICIT_SYNC 1 \
+                  --set SDL_AUDIO_DRIVER "pulseaudio" \
+                  --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath defaultLinuxBuildArgs.buildInputs}
+              '';
+
               FRONTEND_PATH = frontend;
 
               # For tests
               LD_LIBRARY_PATH = lib.makeLibraryPath defaultLinuxBuildArgs.buildInputs;
               RUST_BACKTRACE = "short";
             };
-
-          installPhase = ''
-            runHook preInstall
-
-            wrapProgram $out/bin/qint \
-              --set __NV_DISABLE_EXPLICIT_SYNC 1 \
-              --set SDL_AUDIO_DRIVER "pulseaudio" \
-              --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath defaultLinuxBuildArgs.buildInputs}
-
-            runHook postInstall
-          '';
 
           desktopItems = [
             (pkgs.makeDesktopItem
