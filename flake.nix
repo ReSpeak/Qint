@@ -70,7 +70,8 @@
       nativeBuildInputs = defaultBuildArgs.nativeBuildInputs ++ (with pkgs; [
         llvmPackages_latest.clang
         llvmPackages_latest.lld
-      ]);
+		autoPatchelfHook # Make SDL2 available after build
+	  ]);
 
       buildInputs = with pkgs; [
         dbus
@@ -103,7 +104,7 @@
     node_modules = pkgs.stdenv.mkDerivation (finalAttrs: {
       pname = "qint-frontend-node_modules";
       version = "1.0.0";
-      outputHash = pkgs.lib.fakeHash;
+      outputHash = "sha256-egfWdejkeq+7ugcGl54CWylmkYbhzCC1M45Ehswq8+M=";
       outputHashAlgo = "sha256";
       outputHashMode = "recursive";
 
