@@ -56,6 +56,18 @@
         hash = "sha256-sO/fq5+qrrS0nVFFEriV0W/a/XBJYDKhMr2fS5jw9ME=";
       };
 
+      run-libpaths = with pkgs; [
+        SDL2
+        cairo
+        gdk-pixbuf
+        glib
+        gtk3
+        libayatana-appindicator
+        libsoup_3
+        openssl
+        webkitgtk_4_1
+      ];
+
       defaultBuildArgs = {
         pname = "qint";
         root = ./.;
@@ -81,21 +93,19 @@
             ++ (with pkgs; [
               llvmPackages_latest.clang
               llvmPackages_latest.lld
-              autoPatchelfHook # Make SDL2 available after build
+              wrapGAppsHook4
+              # autoPatchelfHook # Make SDL2 available after build
             ]);
 
-          buildInputs = with pkgs; [
-            dbus
-            glib-networking
-            gtk3
-            gtksourceview
-            libappindicator
-            libopus
-            openssl
-            SDL2
-            webkitgtk_4_1
-            zlib
-          ];
+          buildInputs = with pkgs;
+            [
+              dbus
+              glib-networking
+              gtksourceview
+              libopus
+              zlib
+            ]
+            ++ run-libpaths;
 
           # Needed so bindgen can find libclang.so
           LIBCLANG_PATH = "${pkgs.llvmPackages_latest.libclang.lib}/lib";
@@ -252,17 +262,26 @@
                 popd
               '';
 
-              postInstall = ''
+              postFixup = ''
                 wrapProgram $out/bin/qint \
                   --set __NV_DISABLE_EXPLICIT_SYNC 1 \
                   --set SDL_AUDIO_DRIVER "pulseaudio" \
-                  --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath defaultLinuxBuildArgs.buildInputs}
+                  --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath run-libpaths}
+
+                wrapProgram $out/bin/webapp \
+                  --set SDL_AUDIO_DRIVER "pulseaudio" \
+                  --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath run-libpaths}
+              '';
+
+              postInstall = ''
+                install -Dm644 assets/128x128.png $out/share/icons/hicolor/128x128/apps/qint.png
+                install -Dm644 assets/128x128@2x.png $out/share/icons/hicolor/256x256/apps/qint.png
               '';
 
               FRONTEND_PATH = frontend;
 
               # For tests
-              LD_LIBRARY_PATH = lib.makeLibraryPath defaultLinuxBuildArgs.buildInputs;
+              LD_LIBRARY_PATH = lib.makeLibraryPath run-libpaths;
               RUST_BACKTRACE = "short";
             };
 
@@ -271,9 +290,11 @@
               {
                 name = "Qint";
                 exec = "qint";
+                icon = "qint";
                 comment = "Mit Qint wird alles besser!";
                 desktopName = "Qint";
                 categories = ["Development"];
+                type = "Application";
               })
           ];
         });
