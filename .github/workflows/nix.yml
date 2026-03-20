@@ -8,61 +8,46 @@ on:
 
 jobs:
   build:
-    runs-on: [self-hosted, nix]
+    runs-on: ubuntu-latest
 
     steps:
-    # Cannot put into a script, because the repository needs to be checked out to run a script...
-    - name: Checkout Repository
+    - uses: actions/checkout@v4
+    - uses: nixbuild/nix-quick-install-action@v34
+      with:
+        nix_conf: |
+          keep-env-derivations = true
+          keep-outputs = true
+
+    # - name: Build frontend and replace hash
+    #   run: |
+    #     nix build .#node_modules -L 2>&1 | tee log
+    #
+    #     # Extract wanted hash from log
+    #     nodeModulesHash="$(sed -n 's/^ *got: *\(sha256-.*\)$/\1/p' log)"
+    #     echo Got hash "$nodeModulesHash"
+    #
+    #     # Replace hash in flake.nix
+    #     sed -i "s#pkgs.lib.fakeHash#\"$nodeModulesHash\"#g" flake.nix
+
+    # - name: Check
+    #   run: |
+    #     nix flake check -L
+
+    - name: Build Linux
       run: |
-        env | sort
-        echo
+        nix build
 
-        # Set github url with credentials
-        REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY"
-
-        # Create cache directory
-        mkdir -p "$STATE_DIRECTORY/$GITHUB_REPOSITORY/checkout"
-        pushd "$STATE_DIRECTORY/$GITHUB_REPOSITORY/checkout"
-        # Create bare repository if it does not exist yet
-        test -f HEAD || git init --bare
-
-        # Fetch commit to build
-        echo Fetching commit "$GITHUB_REF"
-        git fetch "$REPO_URL" "$GITHUB_REF"
-        popd
-
-        # Remove previous state
-        rm -rf * .*
-
-        # Clone repository
-        git clone -n "$REPO_URL" --reference "$STATE_DIRECTORY/$GITHUB_REPOSITORY/checkout" .
-        git fetch "$REPO_URL" "$GITHUB_REF"
-        git switch --detach FETCH_HEAD
-
-    - name: Build frontend and replace hash
+    - name: Build Windows
       run: |
-        nix build .#node_modules -L 2>&1 | tee log
+        nix build .#win-tauri-package
 
-        # Extract wanted hash from log
-        nodeModulesHash="$(sed -n 's/^ *got: *\(sha256-.*\)$/\1/p' log)"
-        echo Got hash "$nodeModulesHash"
-
-        # Replace hash in flake.nix
-        sed -i "s#pkgs.lib.fakeHash#\"$nodeModulesHash\"#g" flake.nix
-
-    - name: Check
-      run: |
-        nix flake check -L
-
-    - name: Package
-      if: github.event_name != 'pull_request'
-      run: |
-        nix build .#win-webapp-package -L
-        rm -f /var/www/html/flakebi/ci/Qint-webapp.zip
-        cp result/Qint-webapp.zip /var/www/html/flakebi/ci/
-        chmod a+r /var/www/html/flakebi/ci/Qint-webapp.zip
-
-        nix build .#win-tauri-package -L
-        rm -f /var/www/html/flakebi/ci/Qint.zip
-        cp result/Qint.zip /var/www/html/flakebi/ci/
-        chmod a+r /var/www/html/flakebi/ci/Qint.zip
+    # - name: Setup Attic cache
+    #   uses: ryanccn/attic-action@v0
+    #   with:
+    #     endpoint: ${{ vars.ATTIC_ENDPOINT }}
+    #     cache: ${{ vars.ATTIC_CACHE }}
+    #     token: ${{ secrets.ATTIC_TOKEN }}
+    #     skip-push: true
+    #
+    # - name: Push Cache
+    #   run: attic push respeak ./result
