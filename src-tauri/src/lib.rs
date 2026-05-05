@@ -25,7 +25,7 @@ use tokio::runtime::Runtime;
 use crate::audio::LoudnessShare;
 use crate::core::QintCore;
 
-#[derive(Clone, Debug, StructOpt)]
+#[derive(Clone, Debug, Default, StructOpt)]
 #[structopt(author, about)]
 struct Args {
 	/// The id of the identity that is used by default
@@ -93,7 +93,17 @@ pub fn run() {
 	// TODO tracing stdlog
 
 	// Parse command line options
+	#[cfg(not(mobile))]
 	let args = Args::from_args();
+
+	#[cfg(mobile)]
+	let args = {
+		let mut args = Args::default();
+		// TODO Do not hardcode, but use Android API
+		args.config_path = Some("/data/data/org.respeak.qint/files".into());
+		args.cache_path = Some("/data/data/org.respeak.qint/cache".into());
+		args
+	};
 
 	let (app_addr, app_arc, handle) = {
 		let (sender, receiver) = std::sync::mpsc::channel();

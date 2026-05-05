@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Icon from "../ui/icon/Icon.svelte";
 	import { DisplayPanel } from "../panel/panel";
-	import { IS_TAURI } from "../util";
+	import { IS_TAURI, isMobile } from "../util";
 	import { app, NodeSelections } from "../app";
 	import MuteButtons from "./MuteButtons.svelte";
 	import { ConnectData } from "../connect/uiConnect";
@@ -95,7 +95,7 @@
 		</div>
 	</div>
 
-	{#if IS_TAURI && $titleBarStyle !== TitleBarStyle.Native}
+	{#if IS_TAURI && !isMobile() && $titleBarStyle !== TitleBarStyle.Native}
 		<TitleButtons />
 	{/if}
 </div>

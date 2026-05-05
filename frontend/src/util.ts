@@ -310,6 +310,11 @@ export function focus(node: Element, _args: any): Record<string, never> {
 	return {};
 }
 
+export function isMobile(): boolean {
+	const platform = ((window.navigator as any).oscpu ?? window.navigator.userAgent).toLowerCase();
+	return platform.includes("android") || platform.includes("ios");
+}
+
 export function getDefaultVersion(): Version {
 	const platform = ((window.navigator as any).oscpu ?? window.navigator.userAgent).toLowerCase();
 	if (platform.includes("windows")) {

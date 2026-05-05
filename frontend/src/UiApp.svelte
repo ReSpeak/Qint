@@ -19,7 +19,7 @@
 	import { derived, writable } from "svelte/store";
 	import type { Readable, Writable } from "svelte/store";
 	import FileIO from "./ui/util/FileIO.svelte";
-	import { IS_TAURI } from "./util";
+	import { IS_TAURI, isMobile } from "./util";
 	import { BrowserBackend } from "./backend/browser";
 	import QuickActionBar from "./bar/QuickActionBar.svelte";
 
@@ -122,7 +122,7 @@
 	// Audio is recorded by the backend but we still need to request permissions on Android.
 	// Do this in the frontend because it's easier.
 	async function requestAudioPermissions() {
-		if (IS_TAURI && navigator.userAgent.toLowerCase().indexOf("android") > -1) {
+		if (IS_TAURI && isMobile()) {
 			try {
 				const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 			} catch (e) {

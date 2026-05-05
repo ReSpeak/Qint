@@ -67,7 +67,7 @@ macro_rules! with_log {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct ConnectionId(pub Uuid);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Args {
 	/// The address where the server listens
 	pub listen_address: Option<SocketAddr>,
