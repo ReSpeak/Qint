@@ -178,6 +178,9 @@
         // {
           depsBuildBuild = with pkgs; [
             pkgsCross.mingwW64.stdenv.cc
+          ];
+
+          buildInputs = with pkgs; [
             pkgsCross.mingwW64.windows.pthreads
           ];
 
@@ -205,7 +208,8 @@
           '';
 
           # Fix undefined reference to `__stack_chk_fail' and mingw ld segmentation fault.
-          RUSTFLAGS = "-C link-args=-lssp -C link-args=-s";
+          # See https://github.com/nix-community/naersk/issues/371 for pthreads
+          RUSTFLAGS = "-C link-args=-lssp -C link-args=-s -L native=${pkgs.pkgsCross.mingwW64.windows.pthreads}/lib";
 
           overrideMain = oldAttrs:
             oldAttrs
