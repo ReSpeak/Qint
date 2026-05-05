@@ -413,7 +413,7 @@ impl Chat {
 		let res = state
 			.database
 			.send(RunOnDbMsg(move |db| {
-				use diesel::dsl::sql;
+				use diesel::dsl::max;
 				use schema::messages;
 				assert_eq!(ids.len(), 1, "Expect only a single chat");
 
@@ -421,10 +421,10 @@ impl Chat {
 					.filter(messages::chat.eq(ids[0]).and(messages::invoker.eq(&from)))
 					// Deduplicate messages
 					.group_by(messages::content)
-					.order((messages::time.desc(), messages::id.desc()))
-					.offset(i64::from(id))
-					.select(sql::<diesel::sql_types::BigInt>("max(messages.id)"));
-				let msg_id = query.first::<i64>(&mut db.con).optional()?;
+					.select(max(messages::id))
+					.order((max(messages::time).desc(), max(messages::id).desc()))
+					.offset(i64::from(id));
+				let msg_id = query.first::<Option<i64>>(&mut db.con)?;
 				let msg = msg_id
 					.map(|msg_id| {
 						messages::table

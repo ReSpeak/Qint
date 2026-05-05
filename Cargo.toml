@@ -5,10 +5,6 @@ resolver = "2"
 [patch.crates-io]
 # Use cmake to build opus instead of autoconf, this works better for cross compilation
 audiopus = { git = "https://github.com/Flakebi/audiopus" }
-# Until https://github.com/DoumanAsh/opusic-sys/pull/18 is merged
-opusic-sys = { git = "https://github.com/Flakebi/opusic-sys" }
-# Fix windows cross-compilation
-crunchy = { git = "https://github.com/Flakebi/crunchy" }
 # Fix modifying src directory
 tauri-plugin = { git = "https://github.com/Flakebi/tauri-plugin" }
 

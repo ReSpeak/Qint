@@ -166,13 +166,8 @@ impl FiletransferManager {
 				Self::transfer_all_ticks(&mut transfer_list).await;
 			}
 
-			while let Ok(next) = receiver.try_next() {
-				if let Some(action) = next {
-					Self::handle_action(&mut transfer_list, action);
-				} else {
-					println!("FileTransfer channel closed");
-					return;
-				}
+			while let Ok(action) = receiver.try_recv() {
+				Self::handle_action(&mut transfer_list, action);
 			}
 		}
 	}
