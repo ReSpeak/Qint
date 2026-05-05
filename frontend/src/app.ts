@@ -35,7 +35,7 @@ export class App {
 	public readonly chat: Chat = new Chat(this.selectedNode);
 	public readonly settings: Settings = new Settings();
 	// List of displayed notifications. Sorted by descending time, the latest comes first.
-	public readonly nofifications: Writable<[number, Connection, TsNotification][]> = writable([]);
+	public readonly notifications: Writable<[number, Connection, TsNotification][]> = writable([]);
 	private notificationId = 0;
 	public plugins: IPlugin[] = [];
 	public settingsLoaded = fnBroadcast();
@@ -188,7 +188,7 @@ export class App {
 	}
 
 	public addNotification(n: [Connection, TsNotification]): void {
-		this.nofifications.update((ns) => {
+		this.notifications.update((ns) => {
 			if (ns.length > 50) ns.pop();
 			return [[this.notificationId++, ...n], ...ns];
 		});

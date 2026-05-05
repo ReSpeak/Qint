@@ -142,7 +142,7 @@
 		}
 		historyIndex = undefined;
 		expectQuickPaste = e.key?.toLowerCase() === "v" && e.shiftKey && e.ctrlKey;
-		log("qick:%s shift:%s ctrl:%s", expectQuickPaste, e.shiftKey, e.ctrlKey);
+		log("quick:%s shift:%s ctrl:%s", expectQuickPaste, e.shiftKey, e.ctrlKey);
 	}
 
 	function cleanNode(node: Node) {

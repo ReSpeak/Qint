@@ -12,7 +12,7 @@
 		on,
 		PASSWORD_PLACEHOLDER,
 	} from "../util";
-	import type { RequiredNN, Writeable } from "../util";
+	import type { RequiredNN, Writable } from "../util";
 	import DropDown from "../ui/html/DropDown.svelte";
 	import Icon from "../ui/icon/Icon.svelte";
 	import PlatformIcon from "../ui/icon/PlatformIcon.svelte";
@@ -49,10 +49,10 @@
 	$: on($server, $server.optionalData === null ? getOptionalData() : undefined);
 
 	// THIS IS NOT A FULL SERVER OBJECT
-	type EditProps = Omit<Writeable<RequiredNN<Server>>, ""> & {
+	type EditProps = Omit<Writable<RequiredNN<Server>>, ""> & {
 		_password: string;
 	};
-	type EditPropsOpt = Writeable<RequiredNN<OptionalServerDataGen>>;
+	type EditPropsOpt = Writable<RequiredNN<OptionalServerDataGen>>;
 	let [servEdit, servEditOpt] = createPropsCopy();
 	let changeRequest: ChangePromise | undefined;
 	let iconSelection: string | undefined = undefined;

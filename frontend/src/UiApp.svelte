@@ -152,7 +152,7 @@
 
 	<Sidebar
 		{connections}
-		notifications={app.nofifications}
+		notifications={app.notifications}
 		{filter}
 		visible={$showSidebar}
 		{showConnect}

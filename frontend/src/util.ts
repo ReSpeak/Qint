@@ -40,7 +40,7 @@ export const LOUDNESS_UPDATE_MS = 20;
 export const BROWSER = detectBrowser();
 
 export type RequiredNN<T> = { [P in keyof T]: NonNullable<T[P]> };
-export type Writeable<T> = { -readonly [P in keyof T]: Writeable<T[P]> };
+export type Writable<T> = { -readonly [P in keyof T]: Writable<T[P]> };
 
 export interface EmojiData {
 	number: number;

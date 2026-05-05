@@ -22,7 +22,7 @@
 		iconPathToId,
 		PASSWORD_PLACEHOLDER,
 	} from "../util";
-	import type { RequiredNN, Writeable } from "../util";
+	import type { RequiredNN, Writable } from "../util";
 	import type { Duration } from "moment";
 	import ChangeResult from "../ui/specialized/ChangeResult.svelte";
 	import ImageFileBrowser from "./ImageFileBrowser.svelte";
@@ -49,7 +49,7 @@
 
 	// THIS IS NOT A FULL CHANNEL OBJECT
 	type EditProps = Omit<
-		Writeable<RequiredNN<Channel>>,
+		Writable<RequiredNN<Channel>>,
 		"description" | "isUnencrypted" | "deleteDelay" | "channelType" | "isDefault"
 	> & {
 		_description: string;
