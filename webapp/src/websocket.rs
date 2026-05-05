@@ -4,7 +4,6 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use actix::prelude::*;
-use actix_web_actors::ws;
 use anyhow::{Result, bail, format_err};
 use futures::FutureExt;
 use juniper::http::GraphQLRequest;
@@ -30,7 +29,7 @@ use thiserror::Error;
 use tracing::{debug, error};
 
 pub struct WsBridge {
-	pub ws: Addr<Ws>,
+	pub ws: actix_ws::Session,
 	pub id: ConnectionId,
 }
 
@@ -77,18 +76,13 @@ pub enum Error {
 #[derive(Deserialize)]
 pub struct StringId(#[serde(deserialize_with = "deserialize_u64")] pub u64);
 
-pub struct SendToFrontendMsg(pub String);
-
 pub struct Ws {
 	state: Arc<QintState>,
+	session: actix_ws::Session,
 	/// All connections managed by this websocket
 	connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>,
 	/// The loudness listener that is running
 	loudness_listener: Arc<AtomicU32>,
-}
-
-impl Message for SendToFrontendMsg {
-	type Result = ();
 }
 
 macro_rules! unwrap_send {
@@ -110,108 +104,56 @@ macro_rules! unwrap_send {
 
 impl AppToFrontendBridge for WsBridge {
 	fn send(&self, msg: &MessageP2F) {
+		let mut ws = self.ws.clone();
+		let id = self.id.clone();
+		let msg = msg.clone();
 		actix::spawn(with_log!(
-			self.ws.send(SendToFrontendMsg(
-				serde_json::to_string(&P2FMsg {
-					cmd: "ws".into(),
-					con: Some(self.id.clone()),
-					msg: Some(Cow::Borrowed(msg)),
-				})
-				.unwrap()
-			)),
+			async move {
+				ws.text(
+					serde_json::to_string(&P2FMsg {
+						cmd: "ws".into(),
+						con: Some(id),
+						msg: Some(Cow::Owned(msg)),
+					})
+					.unwrap(),
+				)
+				.await
+			},
 			"Failed to forward msg to frontend"
 		));
 	}
 
 	fn close(&self) {
+		let mut ws = self.ws.clone();
+		let id = self.id.clone();
 		actix::spawn(with_log!(
-			self.ws.send(SendToFrontendMsg(
-				serde_json::to_string(&P2FMsg {
-					cmd: "ws_close".into(),
-					con: Some(self.id.clone()),
-					msg: None,
-				})
-				.unwrap()
-			)),
+			async move {
+				ws.text(
+					serde_json::to_string(&P2FMsg {
+						cmd: "ws_close".into(),
+						con: Some(id),
+						msg: None,
+					})
+					.unwrap(),
+				)
+				.await
+			},
 			"Failed to send close msg to websocket"
 		));
 	}
 }
 
-impl Actor for Ws {
-	type Context = ws::WebsocketContext<Self>;
-	fn stopped(&mut self, _: &mut Self::Context) { self.close(); }
-}
-
-impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Ws {
-	fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
-		match msg {
-			Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
-			Ok(ws::Message::Text(msg)) => {
-				let msg: F2PMsg = match serde_json::from_str(&msg) {
-					Ok(r) => r,
-					Err(error) => {
-						error!(%error, message = %msg, "json deserializing error");
-						ctx.close(None);
-						return;
-					}
-				};
-
-				#[derive(Serialize)]
-				#[serde(rename_all = "camelCase")]
-				struct WsMsg<'a> {
-					cmd: &'static str,
-					return_code: &'a str,
-					msg: serde_json::Value,
-				}
-
-				let return_code = msg.return_code;
-				ctx.spawn(
-					actix::fut::wrap_future::<_, Self>(Self::handle_msg(
-						self.state.clone(),
-						self.connections.clone(),
-						self.loudness_listener.clone(),
-						msg.cmd,
-						msg.args,
-						ctx.address(),
-					))
-					.map(move |res, _, ctx| {
-						let resp = match res {
-							Ok(r) => WsMsg { cmd: "resp", return_code: &return_code, msg: r },
-							Err(e) => WsMsg {
-								cmd: "resp_err",
-								return_code: &return_code,
-								msg: serde_json::Value::String(e.to_string()),
-							},
-						};
-						ctx.text(serde_json::to_string(&resp).unwrap());
-					}),
-				);
-			}
-			Ok(ws::Message::Binary(_)) => {
-				error!("binary protocol not supported");
-			}
-			Ok(ws::Message::Close(_)) => {
-				self.close();
-			}
-			_ => {}
+impl Ws {
+	pub fn new(state: Arc<QintState>, session: actix_ws::Session) -> Self {
+		Self {
+			state,
+			connections: Default::default(),
+			loudness_listener: Default::default(),
+			session,
 		}
 	}
-}
 
-impl Handler<SendToFrontendMsg> for Ws {
-	type Result = ();
-	fn handle(&mut self, msg: SendToFrontendMsg, ctx: &mut Self::Context) -> Self::Result {
-		ctx.text(msg.0);
-	}
-}
-
-impl Ws {
-	pub fn new(state: Arc<QintState>) -> Self {
-		Self { state, connections: Default::default(), loudness_listener: Default::default() }
-	}
-
-	fn close(&self) {
+	pub fn close(&self) {
 		debug!("Websocket closed");
 
 		// Close all connections for this websocket
@@ -224,8 +166,63 @@ impl Ws {
 		}
 	}
 
+	pub async fn on_msg(
+		&mut self, msg: Result<actix_ws::Message, actix_ws::ProtocolError>,
+	) -> Result<()> {
+		match msg {
+			Ok(actix_ws::Message::Ping(msg)) => self.session.pong(&msg).await?,
+			Ok(actix_ws::Message::Text(msg)) => {
+				let msg: F2PMsg = match serde_json::from_str(&msg) {
+					Ok(r) => r,
+					Err(error) => {
+						error!(%error, message = %msg, "json deserializing error");
+						self.session.clone().close(None).await?;
+						return Ok(());
+					}
+				};
+
+				#[derive(Serialize)]
+				#[serde(rename_all = "camelCase")]
+				struct WsMsg<'a> {
+					cmd: &'static str,
+					return_code: &'a str,
+					msg: serde_json::Value,
+				}
+
+				let return_code = msg.return_code;
+				let mut session = self.session.clone();
+				let res = Self::handle_msg(
+					self.state.clone(),
+					self.connections.clone(),
+					self.loudness_listener.clone(),
+					msg.cmd,
+					msg.args,
+					self.session.clone(),
+				)
+				.await;
+				let resp = match res {
+					Ok(r) => WsMsg { cmd: "resp", return_code: &return_code, msg: r },
+					Err(e) => WsMsg {
+						cmd: "resp_err",
+						return_code: &return_code,
+						msg: serde_json::Value::String(e.to_string()),
+					},
+				};
+				session.text(serde_json::to_string(&resp).unwrap()).await?;
+			}
+			Ok(actix_ws::Message::Binary(_)) => {
+				error!("binary protocol not supported");
+			}
+			Ok(actix_ws::Message::Close(_)) => {
+				self.close();
+			}
+			_ => {}
+		}
+		Ok(())
+	}
+
 	async fn enable_loudness_callback(
-		state: Arc<QintState>, loudness_listener: Arc<AtomicU32>, addr: Addr<Self>,
+		state: Arc<QintState>, loudness_listener: Arc<AtomicU32>, session: actix_ws::Session,
 	) -> Option<Result<serde_json::Value>> {
 		if let Some(ad) = &state.audio_data {
 			#[derive(Serialize)]
@@ -237,7 +234,7 @@ impl Ws {
 			struct LoudnessFrame(f64, f32);
 
 			pub struct LoudnessCallback {
-				addr: Addr<Ws>,
+				session: actix_ws::Session,
 				own_id: u32,
 				listening: Arc<AtomicU32>,
 			}
@@ -246,15 +243,16 @@ impl Ws {
 				fn send(&self, msg: CaptureLoudnessMsg) {
 					let listening = self.listening.clone();
 					let own_id = self.own_id;
-					actix::spawn(
-						self.addr
-							.send(SendToFrontendMsg(
+					let mut session = self.session.clone();
+					actix::spawn(async move {
+						session
+							.text(
 								serde_json::to_string(&WsMsg {
 									cmd: "loudness",
 									msg: LoudnessFrame(msg.0, msg.1),
 								})
 								.unwrap(),
-							))
+							)
 							.map(move |r| {
 								if r.is_err() {
 									// Connection is probably gone, disable
@@ -265,8 +263,9 @@ impl Ws {
 										Ordering::Relaxed,
 									);
 								}
-							}),
-					);
+							})
+							.await
+					});
 				}
 
 				fn connected(&self) -> bool {
@@ -275,7 +274,8 @@ impl Ws {
 			}
 
 			let own_id = loudness_listener.fetch_add(1, Ordering::Relaxed) + 1;
-			let callback = LoudnessCallback { addr, listening: loudness_listener.clone(), own_id };
+			let callback =
+				LoudnessCallback { session, listening: loudness_listener.clone(), own_id };
 
 			if ad.a2ts.send(AddLoudnessListenerMsg(Box::new(callback))).await.is_err() {
 				Some(Err(Error::LoudnessListenerFailed.into()))
@@ -290,7 +290,8 @@ impl Ws {
 	async fn handle_msg(
 		state: Arc<QintState>,
 		connections: Arc<Mutex<HashMap<ConnectionId, Addr<QintConnection>>>>,
-		loudness_listener: Arc<AtomicU32>, cmd: String, args: serde_json::Value, addr: Addr<Self>,
+		loudness_listener: Arc<AtomicU32>, cmd: String, args: serde_json::Value,
+		session: actix_ws::Session,
 	) -> Result<serde_json::Value> {
 		match cmd.as_str() {
 			"create_ws" => {
@@ -303,7 +304,7 @@ impl Ws {
 					return Err(Error::ConnectionInUse.into());
 				}
 
-				let sender = Box::new(WsBridge { ws: addr, id: id.clone() });
+				let sender = Box::new(WsBridge { ws: session, id: id.clone() });
 				let ws = QintConnection::new(state.clone(), id.clone(), sender);
 				let addr = ws.start();
 				connections.lock().unwrap().insert(id.clone(), addr.clone());
@@ -493,7 +494,7 @@ impl Ws {
 
 				if args.enabled {
 					if let Some(res) =
-						Self::enable_loudness_callback(state, loudness_listener, addr).await
+						Self::enable_loudness_callback(state, loudness_listener, session).await
 					{
 						return res;
 					}

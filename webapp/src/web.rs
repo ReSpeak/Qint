@@ -9,7 +9,6 @@ use actix_web::web::{Data, Query};
 use actix_web::*;
 
 use actix_web::http::header::{CACHE_CONTROL, ETAG, HeaderValue};
-use actix_web_actors::ws;
 use anyhow::Result;
 use base64::prelude::*;
 use futures::prelude::*;
@@ -119,14 +118,30 @@ impl WebApp {
 async fn create_main_ws(
 	state: web::Data<Arc<QintState>>, req: HttpRequest, stream: web::Payload,
 ) -> impl Responder {
-	let webws = Ws::new((**state).clone());
-	match ws::start(webws, &req, stream) {
+	let (response, session, mut msg_stream) = match actix_ws::handle(&req, stream) {
+		Ok(r) => r,
 		Err(error) => {
 			error!(%error, "Failed to create websocket actor");
-			Either::Left(HttpResponse::InternalServerError().body("Failed to start connection"))
+			return Either::Left(
+				HttpResponse::InternalServerError().body("Failed to start connection"),
+			);
 		}
-		Ok(ws) => Either::Right(ws),
-	}
+	};
+
+	actix::spawn(async move {
+		let mut webws = Ws::new((**state).clone(), session.clone());
+		while let Some(msg) = msg_stream.recv().await {
+			if let Err(error) = webws.on_msg(msg).await {
+				error!(%error, "Failed to handle websocket message");
+				break;
+			}
+		}
+
+		webws.close();
+		let _ = session.close(None).await;
+	});
+
+	Either::Right(response)
 }
 
 #[derive(Deserialize)]
@@ -434,7 +449,6 @@ mod tests {
 	use std::time::Duration;
 
 	use anyhow::{Result, bail, format_err};
-	use awc::ws;
 	use base64::prelude::*;
 	use futures::{SinkExt, StreamExt};
 	use juniper::http::GraphQLRequest;
@@ -459,7 +473,7 @@ mod tests {
 	}
 
 	struct Connection {
-		socket: actix_codec::Framed<awc::BoxedSocket, ws::Codec>,
+		socket: actix_codec::Framed<awc::BoxedSocket, actix_http::ws::Codec>,
 		id: ConnectionId,
 		return_code: u32,
 	}
@@ -711,7 +725,7 @@ mod tests {
 				args: serde_json::to_value(msg)?.into(),
 			};
 			self.socket
-				.send(ws::Message::Text(serde_json::to_string(&msg)?.into()))
+				.send(actix_ws::Message::Text(serde_json::to_string(&msg)?.into()))
 				.await
 				.map_err(|e| format_err!("Websocket client protocol error: {:?}", e))?;
 			Ok(())
@@ -723,7 +737,7 @@ mod tests {
 
 		async fn recv(&mut self) -> Result<Option<MessageP2F>> {
 			match self.socket.next().await {
-				Some(Ok(ws::Frame::Text(msg))) => {
+				Some(Ok(actix_http::ws::Frame::Text(msg))) => {
 					let msg = std::str::from_utf8(&msg)?;
 					info!(%msg, "Received message from proxy");
 					let msg: P2FMsg = serde_json::from_str(msg)?;

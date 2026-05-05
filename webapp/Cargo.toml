@@ -7,10 +7,10 @@ edition = "2018"
 actix = "0.13"
 actix-cors = "0.6"
 actix-files = "0.6"
-actix-http = "3"
+actix-http = { version = "3", features = ["ws"] }
 # Exclude zstd from dependencies because a newer version is pulled in by tauri and milli
 actix-web = { version = "4", default-features = false, features = ["compress-brotli", "cookies", "macros"] }
-actix-web-actors = "4"
+actix-ws = "0.4"
 actix-router = "0.5"
 actix-rt = "2"
 anyhow = "1"
