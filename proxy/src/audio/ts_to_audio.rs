@@ -3,7 +3,6 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
-use actix::*;
 use anyhow::{Result, format_err};
 use ebur128::EbuR128;
 use tokio::runtime::Handle;
