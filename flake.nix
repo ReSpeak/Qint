@@ -59,10 +59,12 @@
       run-libpaths = with pkgs; [
         SDL2
         cairo
+        dbus
         gdk-pixbuf
         glib
         gtk3
         libayatana-appindicator
+        # libdecor # doesn't work, still returns error, maybe sub-dependency missing?
         libsoup_3
         openssl
         webkitgtk_4_1
