@@ -158,19 +158,19 @@ export class SettingsUi {
 	constructor() {
 		Object.defineProperties(this, {
 			descriptionMode: {
-				get: function (): DescriptionMode {
+				get: function(): DescriptionMode {
 					return get(this._descriptionMode);
 				},
-				set: function (val: DescriptionMode) {
+				set: function(val: DescriptionMode) {
 					this._descriptionMode.set(val);
 				},
 				enumerable: true,
 			},
 			developMode: {
-				get: function (): boolean {
+				get: function(): boolean {
 					return get(this._developMode);
 				},
-				set: function (val: boolean) {
+				set: function(val: boolean) {
 					this._developMode.set(val);
 				},
 				enumerable: true,
@@ -222,10 +222,10 @@ export class SettingsApp {
 	constructor() {
 		Object.defineProperties(this, {
 			titleBarStyle: {
-				get: function (): TitleBarStyle {
+				get: function(): TitleBarStyle {
 					return get(this._titleBarStyle);
 				},
-				set: function (val: TitleBarStyle) {
+				set: function(val: TitleBarStyle) {
 					this._titleBarStyle.set(val);
 				},
 				enumerable: true,

@@ -24,7 +24,7 @@
 		<DropDown
 			items={$voices}
 			display={(v) => v.name}
-			compare={(a, b) => a.voiceURI === b?.voiceURI}
+			compare={(a, b) => a.voiceURI === b?.voiceURI && a.name === b?.name}
 			bind:selected={synthSett.voice}
 			on:change={() => syncSettings()}
 		/>
