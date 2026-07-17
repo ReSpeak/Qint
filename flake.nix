@@ -70,6 +70,13 @@
         webkitgtk_4_1
       ];
 
+      gstPlugins = with pkgs.gst_all_1; [
+        gstreamer
+        gst-plugins-base
+        gst-plugins-good
+        gst-plugins-bad
+      ];
+
       defaultBuildArgs = {
         pname = "qint";
         root = ./.;
@@ -272,10 +279,12 @@
                 wrapProgram $out/bin/qint \
                   --set __NV_DISABLE_EXPLICIT_SYNC 1 \
                   --set SDL_AUDIO_DRIVER "pulseaudio" \
+                  --prefix GST_PLUGIN_SYSTEM_PATH_1_0 : ${lib.makeSearchPath "lib/gstreamer-1.0" (map lib.getLib gstPlugins)} \
                   --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath run-libpaths}
 
                 wrapProgram $out/bin/webapp \
                   --set SDL_AUDIO_DRIVER "pulseaudio" \
+                  --prefix GST_PLUGIN_SYSTEM_PATH_1_0 : ${lib.makeSearchPath "lib/gstreamer-1.0" (map lib.getLib gstPlugins)} \
                   --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath run-libpaths}
               '';
 
