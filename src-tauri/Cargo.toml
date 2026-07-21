@@ -31,21 +31,23 @@ structopt = { version = "0.3", default-features = false }
 tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-http = "2"
+tauri-plugin-log = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-opener = "2"
 thiserror = "1"
 tokio = "1"
 tokio-util = { version = "0.7", features = [ "io" ] }
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = [ "env-filter" ] }
 tsproto-types = { git = "https://github.com/ReSpeak/tsclientlib" }
 
 [target."cfg(not(target_os = \"android\"))".dependencies]
 qint-proxy = { path = "../proxy", features = ["sdl2"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = [ "env-filter" ] }
 tsclientlib = { git = "https://github.com/ReSpeak/tsclientlib", features = [ "unstable" ] }
 
 [target."cfg(target_os = \"android\")".dependencies]
 qint-proxy = { path = "../proxy", features = ["oboe"] }
+tracing = { version = "0.1", features = [ "log" ] }
 tsclientlib = { git = "https://github.com/ReSpeak/tsclientlib", default-features = false, features = [ "audio", "unstable" ] }
 # Use rustls for easier cross-compiling
 reqwest = { version = "0.12", default-features = false, features = ["charset", "http2", "rustls-tls"] }

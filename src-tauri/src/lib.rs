@@ -21,6 +21,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 #[cfg(desktop)]
 use tauri::{PhysicalPosition, PhysicalSize};
 use tokio::runtime::Runtime;
+use tracing::error;
 
 use crate::audio::LoudnessShare;
 use crate::core::QintCore;
@@ -89,8 +90,37 @@ const WINDOW_EVENT_DEBUG_PRINTS: bool = false;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+	// Enable logging and panic messages on mobile
+	#[cfg(mobile)]
+	std::panic::set_hook(Box::new(move |panic| {
+		let backtrace = std::backtrace::Backtrace::capture();
+
+		let message = match (
+			panic.payload().downcast_ref::<&str>(),
+			panic.payload().downcast_ref::<String>(),
+		) {
+			(Some(s), _) => s.to_string(),
+			(_, Some(s)) => s.clone(),
+			(None, None) => "Unknown".to_string(),
+		};
+
+		let Some(l) = panic.location() else {
+			error!("Panic: {:?}, message {}, backtrace:\n{:#?}", panic, message, backtrace);
+			return;
+		};
+
+		error!(
+			"Panic: {:?}, message {}, file: {}, line: {}, col: {}, backtrace:\n{:#?}",
+			panic,
+			message,
+			l.file(),
+			l.line(),
+			l.column(),
+			backtrace,
+		);
+	}));
+	#[cfg(not(mobile))]
 	tracing_subscriber::fmt::init();
-	// TODO tracing stdlog
 
 	// Parse command line options
 	#[cfg(not(mobile))]
@@ -109,22 +139,24 @@ pub fn run() {
 		let (sender, receiver) = std::sync::mpsc::channel();
 
 		thread::spawn(move || {
-			let mut runtime = Runtime::new().unwrap();
+			let mut runtime = Runtime::new().expect("Failed to create runtime");
 			let local = tokio::task::LocalSet::new();
 			let handle = runtime.handle().clone();
 			local.block_on(&mut runtime, async move {
-				let state = QintState::new(args.into()).unwrap();
+				let state = QintState::new(args.into()).expect("Failed to create QintState");
 				let app = QintCore::new(handle.clone(), state);
 				let app_arc = Arc::new(app.clone());
 				let app_addr = app.start();
 
-				sender.send((app_addr.clone(), app_arc.clone(), handle)).unwrap();
+				sender
+					.send((app_addr.clone(), app_arc.clone(), handle))
+					.expect("Failed to send app addr");
 
 				QintCore::run(app_arc).await;
 			});
 		});
 
-		receiver.recv().unwrap()
+		receiver.recv().expect("Failed to receive app addr")
 	};
 
 	let state = app_arc.state.clone();
@@ -137,7 +169,10 @@ pub fn run() {
 	};
 	let do_exit2 = do_exit.clone();
 
-	tauri::Builder::default()
+	let builder = tauri::Builder::default();
+	#[cfg(mobile)]
+	let builder = builder.plugin(tauri_plugin_log::Builder::new().build());
+	builder
 		.plugin(tauri_plugin_dialog::init())
 		.plugin(tauri_plugin_http::init())
 		.plugin(tauri_plugin_notification::init())
@@ -153,13 +188,13 @@ pub fn run() {
 				let exit = MenuItemBuilder::with_id("exit", "Exit").build(app)?;
 				TrayIconBuilder::new()
 					.icon_as_template(false)
-					.icon(tauri::image::Image::from_bytes(include_bytes!("../../assets/32x32.png")).unwrap())
+					.icon(tauri::image::Image::from_bytes(include_bytes!("../../assets/32x32.png")).expect("Failed to load tray image"))
 					.menu(&MenuBuilder::new(app).items(&[&show, &exit]).build()?)
 					.on_menu_event(move |app, event| match event.id().as_ref() {
 						"show" => {
-							let window = app.get_webview_window("main").unwrap();
-							window.show().unwrap();
-							window.set_focus().unwrap();
+							let window = app.get_webview_window("main").expect("Failed to get main webview");
+							window.show().expect("Failed to show window");
+							window.set_focus().expect("Failed to focus window");
 						}
 						"exit" => {
 							do_exit(app.clone());
@@ -199,30 +234,30 @@ pub fn run() {
 						println!("Close requested");
 					}
 					api.prevent_close();
-					if let Some(true) = app_arc.state.settings.read().unwrap().get_close_to_tray() {
+					if let Some(true) = app_arc.state.settings.read().expect("Failed to get settings").get_close_to_tray() {
 						if WINDOW_EVENT_DEBUG_PRINTS {
 							println!("Closing to tray instead");
 						}
 						#[cfg(desktop)]
-						window.hide().unwrap();
+						window.hide().expect("Failed to hide window");
 					} else {
 						do_exit2(window.app_handle().clone());
 					}
 				}
 				#[cfg(desktop)]
 				WindowEvent::Focused(focus) => {
-					if *focus && window.is_visible().unwrap() {
-						let pos = window.inner_position().unwrap();
+					if *focus && window.is_visible().expect("Failed to get is_visible") {
+						let pos = window.inner_position().expect("Failed to get position");
 						// Recover from Windows-D or Windows-M broken minimize
 						if pos.x == -32000 && pos.y == -32000 {
 							if WINDOW_EVENT_DEBUG_PRINTS {
 								println!("Restore window to default position and size");
 							}
 							//window.set_skip_taskbar(false).unwrap();
-							window.set_position(PhysicalPosition::new(300, 300)).unwrap();
-							window.set_size(PhysicalSize::new(800, 600)).unwrap();
+							window.set_position(PhysicalPosition::new(300, 300)).expect("Failed to set position");
+							window.set_size(PhysicalSize::new(800, 600)).expect("Failed to set size");
 							// When we don't call show the minimize button can get bricked...
-							window.show().unwrap();
+							window.show().expect("Failed to show window");
 						}
 					}
 				}
@@ -239,15 +274,15 @@ pub fn run() {
 					// - pressing Windows-D or Windows-M
 					if pos.x == -32000 && pos.y == -32000 {
 						if let Some(true) =
-							app_arc.state.settings.read().unwrap().get_minimize_to_tray()
+							app_arc.state.settings.read().expect("Failed to read settings").get_minimize_to_tray()
 						{
 							if WINDOW_EVENT_DEBUG_PRINTS {
 								println!("Hide window");
 							}
-							window.hide().unwrap();
+							window.hide().expect("Failed to hide window");
 							// Skip taskbar is required with Windows-D / M on the "normal" window
 							// design
-							window.set_skip_taskbar(true).unwrap();
+							window.set_skip_taskbar(true).expect("Failed to set skip_taskbar");
 						} else if WINDOW_EVENT_DEBUG_PRINTS {
 							println!("Windows minimize");
 						}
