@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::mem;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, AtomicU64, Ordering};
 
@@ -102,6 +103,7 @@ pub struct AudioToTsCallback {
 	loudness_threshold: Arc<AtomicU64>,
 	loudness_listening: Arc<AtomicBool>,
 	packet_loss: Arc<AtomicU8>,
+	tmp_input: Vec<f32>,
 	opus_output: [u8; MAX_OPUS_FRAME_SIZE],
 	/// The last captured buffer if we are not talking.
 	///
@@ -344,9 +346,11 @@ impl<Impl: AudioToTsImpl + 'static> AudioToTs<Impl> {
 		}
 	}
 
-	pub fn update_device_state(&mut self) {
-		Impl::set_playing(self, !self.connections.is_empty() || !self.loudness_cons.is_empty());
+	pub fn should_play(&self) -> bool {
+		!self.connections.is_empty() || !self.loudness_cons.is_empty()
 	}
+
+	pub fn update_device_state(&mut self) { Impl::set_playing(self, self.should_play()); }
 }
 
 impl AudioToTsCallback {
@@ -373,6 +377,7 @@ impl AudioToTsCallback {
 			loudness_threshold,
 			loudness_listening,
 			packet_loss,
+			tmp_input: Default::default(),
 			opus_output: [0; MAX_OPUS_FRAME_SIZE],
 			last_buffer: Default::default(),
 			last_buffer_is_upscaled: false,
@@ -415,11 +420,20 @@ impl AudioToTsCallback {
 	}
 
 	pub fn callback(&mut self, buffer: &[f32]) {
-		let mut data = buffer.to_vec();
-		self.callback_mut_buffer(&mut data);
+		let mut tmp_input = mem::take(&mut self.tmp_input);
+		tmp_input.extend_from_slice(buffer);
+
+		while tmp_input.len() >= USUAL_SAMPLE_COUNT {
+			self.callback_impl(&mut tmp_input[..USUAL_SAMPLE_COUNT]);
+			tmp_input.drain(..USUAL_SAMPLE_COUNT);
+		}
+		self.tmp_input = tmp_input;
 	}
 
-	pub fn callback_mut_buffer(&mut self, buffer: &mut [f32]) {
+	pub fn callback_mut_buffer(&mut self, buffer: &mut [f32]) { self.callback(buffer); }
+
+	/// Reads the first USUAL_SAMPLE_COUNT from tmp_input
+	fn callback_impl(&mut self, buffer: &mut [f32]) {
 		let _span = self.span.clone().entered();
 		let did_talk = self.is_talking != 0;
 		let is_loudness_listening = self.loudness_listening.load(Ordering::Relaxed);
@@ -431,7 +445,11 @@ impl AudioToTsCallback {
 
 		// Denoise
 		if buffer.len() % DenoiseState::FRAME_SIZE != 0 {
-			warn!("Size not fitting for denoising");
+			warn!(
+				len = buffer.len(),
+				expected_frame_size = DenoiseState::FRAME_SIZE,
+				"Size not fitting for denoising"
+			);
 			vad_triggered = true;
 		} else {
 			// Scale to the expected range

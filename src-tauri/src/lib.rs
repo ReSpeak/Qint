@@ -20,6 +20,8 @@ use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 #[cfg(desktop)]
 use tauri::{PhysicalPosition, PhysicalSize};
+#[cfg(mobile)]
+use tauri_plugin_log::log::LevelFilter;
 use tokio::runtime::Runtime;
 use tracing::error;
 
@@ -171,7 +173,15 @@ pub fn run() {
 
 	let builder = tauri::Builder::default();
 	#[cfg(mobile)]
-	let builder = builder.plugin(tauri_plugin_log::Builder::new().build());
+	let builder = builder.plugin(
+		tauri_plugin_log::Builder::new()
+			.level(LevelFilter::Warn)
+			.level_for("tsproto", LevelFilter::Debug)
+			.level_for("ts_bookkeeping", LevelFilter::Debug)
+			.level_for("tsclientlib", LevelFilter::Debug)
+			.level_for("qint_proxy", LevelFilter::Debug)
+			.build(),
+	);
 	builder
 		.plugin(tauri_plugin_dialog::init())
 		.plugin(tauri_plugin_http::init())

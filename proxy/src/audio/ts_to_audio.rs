@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use anyhow::{Result, format_err};
 use ebur128::EbuR128;
 use tokio::runtime::Handle;
-use tracing::{Span, info_span, warn};
+use tracing::{Span, info_span, trace, warn};
 use tsclientlib::ClientId;
 use tsproto_packets::packets::InAudioBuf;
 
@@ -192,6 +192,7 @@ impl<Impl: TsToAudioImpl + 'static> Handler<SetAudioDevice> for TsToAudio<Impl> 
 impl TsToAudioCallback {
 	pub fn callback(&mut self, buffer: &mut [f32]) {
 		let _span = self.span.enter();
+		trace!(len = buffer.len(), "Filling playback buffer");
 		// Clear buffer
 		for d in &mut *buffer {
 			*d = 0.0;

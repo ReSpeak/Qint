@@ -14,6 +14,7 @@ base64 = "0.22"
 bytes = "1"
 chacha20poly1305 = "0.10.0-pre"
 chrono = { version = "0.4", features = [ "serde" ] }
+cpal = { version = "0.18", features = [ "pipewire", "realtime-dbus" ] }
 diesel = { version = "2", features = [ "chrono", "sqlite" ] }
 diesel_migrations = "2"
 diesel-derive-enum = { version = "2", features = [ "sqlite" ] }
@@ -29,7 +30,6 @@ livesplit-hotkey = { version = "0.7" }
 nnnoiseless = { version = "0.5", default-features = false }
 num-derive = "0.4"
 num-traits = "0.2"
-oboe = { version = "0.6", optional = true, features = [ "shared-stdcxx" ] }
 percent-encoding = "2.1"
 proxy-codegen = { path = "../proxy-codegen" }
 pulldown-cmark = "0.9"
@@ -38,7 +38,6 @@ regex = "1"
 reqwest = { version = "0.12", default-features = false }
 rmp-serde = "1"
 scraper = "0.13"
-sdl2 = { version = "0.37", optional = true }
 serde = { version = "1", features = [ "derive" ] }
 serde_ini = "0.2"
 serde_json = "1"

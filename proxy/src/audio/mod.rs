@@ -21,6 +21,8 @@ pub mod oboe;
 #[cfg(feature = "sdl2")]
 pub mod sdl;
 
+pub mod cpal;
+
 #[cfg(feature = "oboe")]
 pub type AudioToTs = audio_to_ts::AudioToTs<oboe::AudioToTsOboe>;
 #[cfg(feature = "sdl2")]
@@ -29,6 +31,9 @@ pub type AudioToTs = audio_to_ts::AudioToTs<sdl::AudioToTsSdl>;
 pub type TsToAudio = ts_to_audio::TsToAudio<oboe::TsToAudioOboe>;
 #[cfg(feature = "sdl2")]
 pub type TsToAudio = ts_to_audio::TsToAudio<sdl::TsToAudioSdl>;
+
+pub type AudioToTs = audio_to_ts::AudioToTs<cpal::AudioToTsCpal>;
+pub type TsToAudio = ts_to_audio::TsToAudio<cpal::TsToAudioCpal>;
 
 /// Sample rate is 48 kHz.
 const SAMPLE_RATE: usize = 48000;
@@ -39,7 +44,7 @@ const SAMPLE_RATE: usize = 48000;
 /// This means 1920 samples and 7.5 kiB.
 const USUAL_FRAME_SIZE: usize = SAMPLE_RATE / 50;
 
-/// The number of samples to use for SDL output.
+/// The number of samples to use for output.
 ///
 /// This is the [`USUAL_FRAME_SIZE`] divided by the number of channels.
 ///
@@ -115,6 +120,17 @@ pub(crate) fn start(
 	let a2ts = AudioToTs::new(sdl::AudioToTsSdl::new(audio_subsystem), capture, spawn_send).start();
 	#[cfg(feature = "oboe")]
 	let a2ts = AudioToTs::new(oboe::AudioToTsOboe::new(), capture, spawn_send).start();
+
+	let ts2a = TsToAudio::new(
+		cpal::TsToAudioCpal::new(::cpal::default_host()),
+		playback,
+		connections,
+		global_volume,
+	)
+	.start();
+	let a2ts =
+		AudioToTs::new(cpal::AudioToTsCpal::new(::cpal::default_host()), capture, spawn_send)
+			.start();
 
 	let a2ts2 = a2ts.clone();
 	thread::spawn(move || {

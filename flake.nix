@@ -57,7 +57,6 @@
       };
 
       run-libpaths = with pkgs; [
-        SDL2
         cairo
         dbus
         gdk-pixbuf
@@ -108,10 +107,12 @@
 
           buildInputs = with pkgs;
             [
+              alsa-lib
               dbus
               glib-networking
               gtksourceview
               libopus
+              pipewire
               zlib
             ]
             ++ run-libpaths;
