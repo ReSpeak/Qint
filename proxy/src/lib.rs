@@ -87,9 +87,7 @@ pub struct Args {
 	/// If no value is given, this is the path of the config file plus `plugins/`.
 	pub plugin_path: Option<String>,
 	/// Do not capture and play audio.
-	// This is used for testing, which cannot initialize SDL.
-	// SDL must only be initialized once per process, at the same time, it can only be used from a
-	// single thread, which does not work well with parallel tests.
+	// This is used for testing.
 	pub no_audio: bool,
 	/// Do not open database to search messages.
 	pub no_search: bool,

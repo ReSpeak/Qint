@@ -16,21 +16,7 @@ use crate::{ConnectionId, Settings};
 pub mod audio_to_ts;
 pub mod ts_to_audio;
 
-#[cfg(feature = "oboe")]
-pub mod oboe;
-#[cfg(feature = "sdl2")]
-pub mod sdl;
-
 pub mod cpal;
-
-#[cfg(feature = "oboe")]
-pub type AudioToTs = audio_to_ts::AudioToTs<oboe::AudioToTsOboe>;
-#[cfg(feature = "sdl2")]
-pub type AudioToTs = audio_to_ts::AudioToTs<sdl::AudioToTsSdl>;
-#[cfg(feature = "oboe")]
-pub type TsToAudio = ts_to_audio::TsToAudio<oboe::TsToAudioOboe>;
-#[cfg(feature = "sdl2")]
-pub type TsToAudio = ts_to_audio::TsToAudio<sdl::TsToAudioSdl>;
 
 pub type AudioToTs = audio_to_ts::AudioToTs<cpal::AudioToTsCpal>;
 pub type TsToAudio = ts_to_audio::TsToAudio<cpal::TsToAudioCpal>;
@@ -80,46 +66,11 @@ pub(crate) fn start(
 	let global_volume = settings.get_global_volume().unwrap_or(1.0);
 	let (capture, playback) = settings.get_preferred_audio_device();
 
-	#[cfg(feature = "sdl2")]
-	let sdl_context = sdl2::init().unwrap();
-
-	#[cfg(feature = "sdl2")]
-	let audio_subsystem = sdl_context.audio().unwrap();
-	#[cfg(feature = "sdl2")]
-	{
-		// SDL automatically disables the screensaver, enable it again
-		if let Ok(video_subsystem) = sdl_context.video() {
-			video_subsystem.enable_screen_saver();
-		}
-	}
-
-	#[cfg(feature = "oboe")]
-	{
-		/*if let Err(error) = oboe::DefaultStreamValues::init() {
-			// TODO log
-		}*/
-	}
-
 	let mut runtime = Runtime::new().unwrap();
 
 	// Create thread local runtime for non-send tasks
 	// A channel size of 1 leads to audio drops when cpu is fully used
 	let (spawn_send, mut spawn_recv) = mpsc::channel(5);
-	#[cfg(feature = "sdl2")]
-	let ts2a = TsToAudio::new(
-		sdl::TsToAudioSdl::new(audio_subsystem.clone())?,
-		playback,
-		connections,
-		global_volume,
-	)
-	.start();
-	#[cfg(feature = "oboe")]
-	let ts2a =
-		TsToAudio::new(oboe::TsToAudioOboe::new(), playback, connections, global_volume).start();
-	#[cfg(feature = "sdl2")]
-	let a2ts = AudioToTs::new(sdl::AudioToTsSdl::new(audio_subsystem), capture, spawn_send).start();
-	#[cfg(feature = "oboe")]
-	let a2ts = AudioToTs::new(oboe::AudioToTsOboe::new(), capture, spawn_send).start();
 
 	let ts2a = TsToAudio::new(
 		cpal::TsToAudioCpal::new(::cpal::default_host()),

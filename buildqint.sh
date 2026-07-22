@@ -45,12 +45,11 @@ rm -rf ~/Qint/target/publish
 mkdir -p ~/Qint/target/publish/ui
 cp ~/Qint/target/x86_64-pc-windows-gnu/release/webapp.exe ~/Qint/target/publish/
 #cp ~/Qint/target/x86_64-pc-windows-gnu/release/WebView2Loader.dll ~/Qint/target/publish/
-cp ~/Qint/proxy-codegen/SDL2.dll ~/Qint/target/publish/
 cp /usr/lib/gcc/x86_64-w64-mingw32/10-win32/libssp-0.dll ~/Qint/target/publish/
 cp -r ~/Qint/frontend/dist/* ~/Qint/target/publish/ui/
 cd ~/Qint/target/publish/
 rm ~/out/Qint.zip
 mv webapp.exe qint.exe
-zip ~/out/Qint.zip ui qint.exe libssp-0.dll SDL2.dll -r -9
+zip ~/out/Qint.zip ui qint.exe libssp-0.dll -r -9
 
 echo ">>> Done!"

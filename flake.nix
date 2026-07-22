@@ -49,13 +49,6 @@
         rustc = mingw-toolchain;
       };
 
-      sdlVersion = "2.26.5";
-
-      sdl-mingw = pkgs.fetchurl {
-        url = "https://www.libsdl.org/release/SDL2-devel-${sdlVersion}-mingw.tar.gz";
-        hash = "sha256-sO/fq5+qrrS0nVFFEriV0W/a/XBJYDKhMr2fS5jw9ME=";
-      };
-
       run-libpaths = with pkgs; [
         cairo
         dbus
@@ -102,7 +95,6 @@
               llvmPackages_latest.clang
               llvmPackages_latest.lld
               wrapGAppsHook4
-              # autoPatchelfHook # Make SDL2 available after build
             ]);
 
           buildInputs = with pkgs;
@@ -233,14 +225,6 @@
                 ln -s /build/source /build/dummy-src
               '';
 
-              # Extract sdl
-              preBuild = ''
-                ${pkgs.gnutar}/bin/tar xf ${sdl-mingw}
-                mkdir -p proxy-codegen/gnu-mingw/{lib,dll}/64
-                mv SDL2-${sdlVersion}/x86_64-w64-mingw32/lib/*.a proxy-codegen/gnu-mingw/lib/64/
-                mv SDL2-${sdlVersion}/x86_64-w64-mingw32/bin/SDL2.dll proxy-codegen/gnu-mingw/dll/64/
-              '';
-
               # Tauri build
               postBuild = ''
                 # Is overwritten during build
@@ -279,12 +263,10 @@
               postFixup = ''
                 wrapProgram $out/bin/qint \
                   --set __NV_DISABLE_EXPLICIT_SYNC 1 \
-                  --set SDL_AUDIO_DRIVER "pulseaudio" \
                   --prefix GST_PLUGIN_SYSTEM_PATH_1_0 : ${lib.makeSearchPath "lib/gstreamer-1.0" (map lib.getLib gstPlugins)} \
                   --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath run-libpaths}
 
                 wrapProgram $out/bin/webapp \
-                  --set SDL_AUDIO_DRIVER "pulseaudio" \
                   --prefix GST_PLUGIN_SYSTEM_PATH_1_0 : ${lib.makeSearchPath "lib/gstreamer-1.0" (map lib.getLib gstPlugins)} \
                   --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath run-libpaths}
               '';
@@ -363,10 +345,6 @@
         cp ${win-pkg}/bin/webapp.exe Qint/
         cp -ar ${frontend}/ Qint/ui
 
-        # Add SDL
-        ${pkgs.gnutar}/bin/tar xf ${sdl-mingw}
-        mv SDL2-${sdlVersion}/x86_64-w64-mingw32/bin/SDL2.dll Qint/
-
         ${pkgs.zip}/bin/zip -r $out/Qint-webapp.zip Qint
       '';
 
@@ -374,10 +352,6 @@
         mkdir -p $out
         mkdir -p Qint
         cp ${win-pkg}/bin/qint.exe Qint/
-
-        # Add SDL
-        ${pkgs.gnutar}/bin/tar xf ${sdl-mingw}
-        mv SDL2-${sdlVersion}/x86_64-w64-mingw32/bin/SDL2.dll Qint/
 
         # Add webview
         cp ${win-pkg}/bin/WebView2Loader.dll Qint/

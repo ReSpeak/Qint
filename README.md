@@ -19,20 +19,12 @@ We are currently not open for Issues/Feature-Requests/Pull-Requests.
 
 ## Dependencies
 - [Rust](https://rust-lang.org), preferred installation method is [rustup](https://rustup.rs)
-- [SDL2](https://www.libsdl.org), Windows installation guide is [below](#windows)
 - [OpenSSL](https://www.openssl.org) 1.1, on Linux only
 - [libopus](https://opus-codec.org), on Linux only
 
-### Windows
-Run `./install_sdl.ps1`  
- \--- OR ---  
-Download the `SDL2-devel-2.x.x-VC.zip` from [libsdl.org](https://www.libsdl.org).  
-From this file, copy `SDL2-2.x.x/lib/x64/*.lib` to `proxy-codegen/msvc/lib/64/`.  
-And copy `SDL2-2.x.x/lib/x64/*.dll` to `proxy-codegen/msvc/dll/64/`, `proxy-codegen/` and `src-tauri/`.
-
 ### Ubuntu
 ```bash
-apt install libopus-dev libsdl2-dev libwebkit2gtk-4.0-dev libappindicator3-dev
+apt install libopus-dev libasound2-dev libwebkit2gtk-4.0-dev libappindicator3-dev
 ```
 
 ## Build and run Qint

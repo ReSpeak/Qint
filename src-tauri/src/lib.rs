@@ -23,6 +23,7 @@ use tauri::{PhysicalPosition, PhysicalSize};
 #[cfg(mobile)]
 use tauri_plugin_log::log::LevelFilter;
 use tokio::runtime::Runtime;
+#[cfg(mobile)]
 use tracing::error;
 
 use crate::audio::LoudnessShare;
@@ -51,9 +52,7 @@ struct Args {
 	#[structopt(long)]
 	plugin_path: Option<String>,
 	/// Do not capture and play audio.
-	// This is used for testing, which cannot initialize SDL.
-	// SDL must only be initialized once per process, at the same time, it can only be used from a
-	// single thread, which does not work well with parallel tests.
+	// This is used for testing.
 	#[structopt(long)]
 	no_audio: bool,
 	/// Do not open database to search messages.

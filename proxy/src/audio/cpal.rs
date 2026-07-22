@@ -4,7 +4,7 @@ use actix::{AsyncContext, Context};
 use anyhow::format_err;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Host, Stream, StreamConfig};
-use tracing::{debug, error, trace, warn};
+use tracing::{debug, error, warn};
 
 use super::audio_to_ts::*;
 use super::ts_to_audio::*;
