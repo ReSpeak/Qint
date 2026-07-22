@@ -195,6 +195,11 @@
 		display: grid;
 		grid-template-rows: max-content 1fr;
 
+		padding-top: constant(safe-area-inset-top);
+		padding-top: env(safe-area-inset-top);
+		padding-bottom: constant(safe-area-inset-bottom);
+		padding-bottom: env(safe-area-inset-bottom);
+
 		position: absolute;
 		top: 0;
 		right: 0;
