@@ -22,6 +22,10 @@
     flake-utils.lib.eachSystem ["x86_64-linux"] (system: let
       pkgs = (import nixpkgs) {
         inherit system;
+        config  = {
+          allowUnfree = true;
+          android_sdk.accept_license = true;
+        };
       };
       lib = pkgs.lib;
 
@@ -316,6 +320,109 @@
 
       frontend = build-frontend "${book_events}/book_events.ts";
     in rec {
+      # devShell for general development and android compilation
+      devShells.android = let
+        android = pkgs.androidenv.composeAndroidPackages {
+          # The build complains with the needed versions if they do not exist
+          platformVersions = [ "36" ];
+          buildToolsVersions = [ "35.0.0" ];
+          abiVersions = [ "armeabi-v7a" "arm64-v8a" "x86" "x86_64"];
+          includeNDK = true;
+        };
+
+        # To prevent "TLS support is not available"
+        # Fix small font: https://github.com/tauri-apps/tauri/issues/7354
+        # Run with: wrap target/release/qint
+        wrap = pkgs.stdenvNoCC.mkDerivation {
+          name = "wrap";
+          buildInputs = with pkgs; [ wrapGAppsHook3 ];
+          unpackPhase = "true";
+          text = ''
+            #!/bin/sh
+            "$@"
+          '';
+          installPhase = ''
+            runHook preInstallPhase
+            mkdir -p $out/bin
+            echo "$text" > $out/bin/wrap
+            chmod +x $out/bin/wrap
+            runHook postInstallPhase
+          '';
+        };
+
+        ldLibraryPathHook = pkgs.writeText "ld-library-path-hook.sh" ''
+          addLdLibraryPath () {
+              if [ -z ''${LD_LIBRARY_PATH+x} ]; then
+                  export LD_LIBRARY_PATH=
+              fi
+              if [ -d "$1/lib" ]; then
+                  export LD_LIBRARY_PATH="$1/lib''${LD_LIBRARY_PATH:+:}$LD_LIBRARY_PATH"
+              fi
+          }
+          runBinary() {
+              LD_LIBRARY_PATH=$LD_LIBRARY_PATH $(< "$NIX_CC/nix-support/dynamic-linker") "$@"
+          }
+          addEnvHooks "$targetOffset" addLdLibraryPath
+        '';
+      in
+      pkgs.mkShell {
+        packages = with pkgs; [
+          ldLibraryPathHook
+          android.androidsdk
+          android.ndk-bundle
+          bundletool
+          aapt
+          openjdk17-bootstrap # jarsigner
+
+          alsa-lib
+          cargo-tauri
+          cmake
+          dbus
+          glib-networking
+          gtk3
+          gtksourceview
+          libayatana-appindicator
+          libxml2
+          perl
+          pkg-config
+          libopus
+          openssl
+          pipewire
+          webkitgtk_4_1
+          wrap
+          libxscrnsaver
+          libxdmcp
+          zlib
+        ]
+        ++ (with gst_all_1; [
+          gstreamer
+          gst-plugins-base
+          gst-plugins-good
+          gst-plugins-bad
+        ]);
+
+        # Needed so bindgen can find libclang.so
+        LIBCLANG_PATH = "${pkgs.llvmPackages_latest.libclang.lib}/lib";
+
+        # Android
+        ANDROID_HOME = "${android.androidsdk}/libexec/android-sdk";
+        ANDROID_NDK_HOME = "${android.androidsdk}/libexec/android-sdk/ndk-bundle";
+        # Override the aapt2 binary that gradle uses with the patched one from the sdk
+        GRADLE_OPTS = "-Dorg.gradle.project.android.aapt2FromMavenOverride=${android.androidsdk}/libexec/android-sdk/build-tools/35.0.0/aapt2";
+
+        # rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+        # Build app:
+        # JAVA_HOME= cargo touri android build
+        # Or for just aarch64: JAVA_HOME= cargo touri android build -t aarch64
+        # Sign apk:
+        # $ANDROID_HOME/build-tools/35.0.0/zipalign -v -p 4 src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk aligned.apk
+        # PATH=$PATH:$JAVA_HOME/bin $ANDROID_HOME/build-tools/35.0.0/apksigner sign --ks <keys>.jks --out signed.apk aligned.apk
+        # Install:
+        # adb install signed.apk
+        # Sign app bundle
+        # jarsigner -keystore <keys>.jks app-universal-release.aab default
+      };
+
       packages.default = packages.qint;
       packages.node_modules = node_modules;
       packages.frontend = frontend;
