@@ -318,7 +318,7 @@
 				<span>Loading ...</span>
 				<Icon name="orbit mdi-spin" />
 			</div>
-			<div slot="empty" class="chatFiller">Chat history empty ¯\_(ツ)_/¯</div>
+			<div slot="empty" class="chatFiller">Chat history empty ¯\\_(ツ)_/¯</div>
 			{#if item.displayDateSeparator}
 				<div title={item.date.format("L")} class="chat-date">
 					<div class="chat-date-line" />
