@@ -59,12 +59,18 @@ impl WebApp {
 				.app_data(web::JsonConfig::default().error_handler(|err, _| {
 					let err_string = err.to_string();
 					error::InternalError::from_response(
-						err, HttpResponse::BadRequest().body(err_string)).into()
+						err,
+						HttpResponse::BadRequest().body(err_string),
+					)
+					.into()
 				}))
 				.wrap_fn(move |req, srv| {
 					if is_production {
 						if let Some(resp) = check_authentication(&token, &req) {
-							return future::Either::Left(future::ok(ServiceResponse::new(req.into_parts().0, resp)));
+							return future::Either::Left(future::ok(ServiceResponse::new(
+								req.into_parts().0,
+								resp,
+							)));
 						}
 					}
 					// Token is ok

@@ -495,9 +495,9 @@ impl Search {
 		let top_docs = searcher.search(
 			&query,
 			&TopDocs::with_limit(range.end - range.start)
-			.and_offset(range.start)
-			// Sort decreasing by time
-			.order_by_u64_field(time),
+				.and_offset(range.start)
+				// Sort decreasing by time
+				.order_by_u64_field(time),
 		)?;
 
 		let mut res = Vec::new();

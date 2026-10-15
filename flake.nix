@@ -54,6 +54,7 @@
       };
 
       run-libpaths = with pkgs; [
+        alsa-lib
         cairo
         dbus
         gdk-pixbuf
@@ -61,8 +62,10 @@
         gtk3
         libayatana-appindicator
         # libdecor # doesn't work, still returns error, maybe sub-dependency missing?
+        libopus
         libsoup_3
         openssl
+        pipewire
         webkitgtk_4_1
       ];
 
@@ -103,12 +106,9 @@
 
           buildInputs = with pkgs;
             [
-              alsa-lib
               dbus
               glib-networking
-              gtksourceview
-              libopus
-              pipewire
+              gtksourceview4
               zlib
             ]
             ++ run-libpaths;
@@ -133,7 +133,7 @@
       node_modules = pkgs.stdenv.mkDerivation (finalAttrs: {
         pname = "qint-frontend-node_modules";
         version = "1.0.0";
-        outputHash = "sha256-egfWdejkeq+7ugcGl54CWylmkYbhzCC1M45Ehswq8+M=";
+        outputHash = "sha256-moBfS0DVFPOsprT3tProuAYlESM0EYKck+c65sspyrQ=";
         outputHashAlgo = "sha256";
         outputHashMode = "recursive";
 
@@ -380,7 +380,7 @@
           dbus
           glib-networking
           gtk3
-          gtksourceview
+          gtksourceview4
           libayatana-appindicator
           libxml2
           perl

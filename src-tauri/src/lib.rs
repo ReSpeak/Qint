@@ -197,11 +197,15 @@ pub fn run() {
 				let exit = MenuItemBuilder::with_id("exit", "Exit").build(app)?;
 				TrayIconBuilder::new()
 					.icon_as_template(false)
-					.icon(tauri::image::Image::from_bytes(include_bytes!("../../assets/32x32.png")).expect("Failed to load tray image"))
+					.icon(
+						tauri::image::Image::from_bytes(include_bytes!("../../assets/32x32.png"))
+							.expect("Failed to load tray image"),
+					)
 					.menu(&MenuBuilder::new(app).items(&[&show, &exit]).build()?)
 					.on_menu_event(move |app, event| match event.id().as_ref() {
 						"show" => {
-							let window = app.get_webview_window("main").expect("Failed to get main webview");
+							let window =
+								app.get_webview_window("main").expect("Failed to get main webview");
 							window.show().expect("Failed to show window");
 							window.set_focus().expect("Failed to focus window");
 						}
@@ -243,7 +247,13 @@ pub fn run() {
 						println!("Close requested");
 					}
 					api.prevent_close();
-					if let Some(true) = app_arc.state.settings.read().expect("Failed to get settings").get_close_to_tray() {
+					if let Some(true) = app_arc
+						.state
+						.settings
+						.read()
+						.expect("Failed to get settings")
+						.get_close_to_tray()
+					{
 						if WINDOW_EVENT_DEBUG_PRINTS {
 							println!("Closing to tray instead");
 						}
@@ -263,8 +273,12 @@ pub fn run() {
 								println!("Restore window to default position and size");
 							}
 							//window.set_skip_taskbar(false).unwrap();
-							window.set_position(PhysicalPosition::new(300, 300)).expect("Failed to set position");
-							window.set_size(PhysicalSize::new(800, 600)).expect("Failed to set size");
+							window
+								.set_position(PhysicalPosition::new(300, 300))
+								.expect("Failed to set position");
+							window
+								.set_size(PhysicalSize::new(800, 600))
+								.expect("Failed to set size");
 							// When we don't call show the minimize button can get bricked...
 							window.show().expect("Failed to show window");
 						}
@@ -282,8 +296,12 @@ pub fn run() {
 					// - pressing the UI minimize button on the windows "native" design
 					// - pressing Windows-D or Windows-M
 					if pos.x == -32000 && pos.y == -32000 {
-						if let Some(true) =
-							app_arc.state.settings.read().expect("Failed to read settings").get_minimize_to_tray()
+						if let Some(true) = app_arc
+							.state
+							.settings
+							.read()
+							.expect("Failed to read settings")
+							.get_minimize_to_tray()
 						{
 							if WINDOW_EVENT_DEBUG_PRINTS {
 								println!("Hide window");

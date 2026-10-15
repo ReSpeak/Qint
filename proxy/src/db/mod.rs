@@ -902,7 +902,8 @@ impl Handler<ChannelListMsg> for DbHandler {
 										bookmarks::last_used.eq(Some(utc_time)),
 										bookmarks::timezone.eq(utc_to_local_offset),
 									))
-									.execute(&mut self.con)? != 1
+									.execute(&mut self.con)?
+									!= 1
 								{
 									bail!("Failed to update time of bookmark {}, not found", id);
 								}
@@ -1776,17 +1777,27 @@ impl<'a> EventHandler<'a> {
 					// https://stackoverflow.com/questions/10416789/how-to-rewrite-is-distinct-from-and-is-not-distinct-from
 					// a IS NOT DISTINCT FROM b can be rewritten as:
 					// (NOT (a <> b OR a IS NULL OR b IS NULL) OR (a IS NULL AND b IS NULL))
-					.and::<_, Bool>(not(messages::invoker
-						.ne(&invoker_uid)
-						.or(messages::invoker.is_null())
-						.or::<_, Bool>(invoker_uid.is_none()))
-						.or::<_, Bool>(messages::invoker.is_null().and::<_, Bool>(invoker_uid.is_none())).assume_not_null())
+					.and::<_, Bool>(
+						not(messages::invoker
+							.ne(&invoker_uid)
+							.or(messages::invoker.is_null())
+							.or::<_, Bool>(invoker_uid.is_none()))
+						.or::<_, Bool>(
+							messages::invoker.is_null().and::<_, Bool>(invoker_uid.is_none()),
+						)
+						.assume_not_null(),
+					)
 					// Same pattern for name
-					.and::<_, Bool>(not(messages::invoker_name
-						.ne(&invoker_name)
-						.or(messages::invoker_name.is_null())
-						.or::<_, Bool>(invoker_name.is_none()))
-						.or::<_, Bool>(messages::invoker_name.is_null().and::<_, Bool>(invoker_name.is_none())).assume_not_null())
+					.and::<_, Bool>(
+						not(messages::invoker_name
+							.ne(&invoker_name)
+							.or(messages::invoker_name.is_null())
+							.or::<_, Bool>(invoker_name.is_none()))
+						.or::<_, Bool>(
+							messages::invoker_name.is_null().and::<_, Bool>(invoker_name.is_none()),
+						)
+						.assume_not_null(),
+					)
 					.and(messages::content.eq(&message))
 					.and(messages::time.gt(&start_check_time))
 					.and(messages::id.ge(orig_last_message_id));
@@ -1811,10 +1822,7 @@ impl<'a> EventHandler<'a> {
 					timezone: utc_to_local_offset,
 				};
 				diesel::insert_into(messages::table).values(&message).execute(con)?;
-				messages::table
-					.order(messages::id.desc())
-					.select(messages::id)
-					.first::<i64>(con)
+				messages::table.order(messages::id.desc()).select(messages::id).first::<i64>(con)
 			})?;
 			// Add to search db
 			if let Some(search) = search {

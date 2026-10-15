@@ -873,34 +873,40 @@ impl QintConnection {
 										.select(channels::password)
 										.first::<Option<String>>(&mut db.con)
 								})))
-								.map(move |r, actor: &mut Self, _| {
-									let pw = match r {
-										Ok(Ok(r)) => r,
-										Ok(Err(error)) => {
-											error!(%error, "Failed to query database for channel \
+								.map(
+									move |r, actor: &mut Self, _| {
+										let pw = match r {
+											Ok(Ok(r)) => r,
+											Ok(Err(error)) => {
+												error!(%error, "Failed to query database for channel \
 												password");
-											None
-										}
-										Err(_) => {
-											error!("Failed to query database for channel password");
-											None
-										}
-									};
-									if let JsM2B::ClientMove(change) = &mut change {
-										change.password = pw;
-									} else {
-										error!("Unexpected message, should be a client move");
-									}
-									let _ = actor.send_change_with_result(
-										change,
-										return_code,
-										Box::new(move |actor, res| {
-											if res.id == TsError::Ok {
-												actor.handle_channel_move_result(channel, password);
+												None
 											}
-										}),
-									);
-								}),
+											Err(_) => {
+												error!(
+													"Failed to query database for channel password"
+												);
+												None
+											}
+										};
+										if let JsM2B::ClientMove(change) = &mut change {
+											change.password = pw;
+										} else {
+											error!("Unexpected message, should be a client move");
+										}
+										let _ = actor.send_change_with_result(
+											change,
+											return_code,
+											Box::new(move |actor, res| {
+												if res.id == TsError::Ok {
+													actor.handle_channel_move_result(
+														channel, password,
+													);
+												}
+											}),
+										);
+									},
+								),
 							);
 							return;
 						}

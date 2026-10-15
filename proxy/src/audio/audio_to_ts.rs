@@ -454,7 +454,7 @@ impl AudioToTsCallback {
 		} else {
 			// Scale to the expected range
 			for d in &mut *buffer {
-				*d *= i16::max_value() as f32;
+				*d *= i16::MAX as f32;
 			}
 			is_upscaled = true;
 
@@ -472,7 +472,7 @@ impl AudioToTsCallback {
 		if vad_triggered || self.is_talking > 1 || is_loudness_listening {
 			if is_upscaled {
 				for d in &mut *buffer {
-					*d /= i16::max_value() as f32;
+					*d /= i16::MAX as f32;
 				}
 				is_upscaled = false;
 			}
@@ -546,7 +546,7 @@ impl AudioToTsCallback {
 				trace!("Start to talk: Sending cached last buffer");
 				if self.last_buffer_is_upscaled {
 					for d in &mut self.last_buffer {
-						*d /= i16::max_value() as f32;
+						*d /= i16::MAX as f32;
 					}
 				}
 				match encoder.encode_float(&self.last_buffer, &mut self.opus_output[..]) {
