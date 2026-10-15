@@ -3,17 +3,20 @@
   description = "Qint TeamSpeak client";
 
   inputs = {
+    bun2nix.url = "github:nix-community/bun2nix?ref=2.1.2";
     fenix.url = "github:nix-community/fenix";
     flake-utils.url = "github:numtide/flake-utils";
     naersk.url = "github:nix-community/naersk";
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
+    bun2nix.inputs.nixpkgs.follows = "nixpkgs";
     naersk.inputs.nixpkgs.follows = "nixpkgs";
     fenix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = {
     self,
+    bun2nix,
     nixpkgs,
     naersk,
     fenix,
@@ -22,6 +25,7 @@
     flake-utils.lib.eachSystem ["x86_64-linux"] (system: let
       pkgs = (import nixpkgs) {
         inherit system;
+        overlays = [bun2nix.overlays.default];
         config  = {
           allowUnfree = true;
           android_sdk.accept_license = true;
@@ -130,28 +134,23 @@
             ];
         };
 
-      node_modules = pkgs.stdenv.mkDerivation (finalAttrs: {
+      node_modules = pkgs.stdenv.mkDerivation {
         pname = "qint-frontend-node_modules";
         version = "1.0.0";
-        outputHash = "sha256-moBfS0DVFPOsprT3tProuAYlESM0EYKck+c65sspyrQ=";
-        outputHashAlgo = "sha256";
-        outputHashMode = "recursive";
 
         src = "${self}/frontend";
 
-        nativeBuildInputs = with pkgs; [
-          bun
+        nativeBuildInputs = [
+          pkgs.bun2nix.hook
         ];
+
+        bunDeps = pkgs.bun2nix.fetchBunDeps {
+          bunNix = ./frontend/bun.nix;
+        };
+
         dontConfigure = true;
         dontFixup = true;
-
-        buildPhase = ''
-          runHook preBuild
-
-          bun install --no-progress --frozen-lockfile
-
-          runHook postBuild
-        '';
+        dontUseBunBuild = true;
 
         installPhase = ''
           runHook preInstall
@@ -161,7 +160,7 @@
 
           runHook postInstall
         '';
-      });
+      };
 
       build-frontend = book_events:
         pkgs.runCommand "build-qint-frontend" {
