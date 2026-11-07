@@ -68,6 +68,11 @@ impl Search {
 				// Check if the schema matches the current schema
 				if i.schema() == schema {
 					index = Some(i);
+				} else {
+					// The index is only a cache of the database, so rebuild it
+					info!("Search index schema changed, rebuilding");
+					drop(i);
+					std::fs::remove_dir_all(path)?;
 				}
 			}
 		}
@@ -111,8 +116,10 @@ impl Search {
 		// Channel/Client description
 		schema_builder.add_text_field("description", TEXT);
 		schema_builder.add_text_field("name", TEXT);
-		// Message time
-		schema_builder.add_u64_field("time", FAST);
+		// Message time, or index time for other entries. Every entry needs one: mixing 0 with
+		// timestamps makes tantivy 0.18 overflow when serializing the fast field.
+		// Renamed from "time" to force rebuilding old indexes that contain zeros.
+		schema_builder.add_u64_field("sort_time", FAST);
 		// Channel topic
 		schema_builder.add_text_field("topic", TEXT);
 		// Server/Client uid
@@ -156,7 +163,8 @@ impl Search {
 					let content = search.schema.get_field("content").unwrap();
 					//let description = search.schema.get_field("description").unwrap();
 					let name = search.schema.get_field("name").unwrap();
-					let time = search.schema.get_field("time").unwrap();
+					let time = search.schema.get_field("sort_time").unwrap();
+					let now = chrono::Utc::now().timestamp() as u64;
 					//let topic = search.schema.get_field("topic").unwrap();
 					let uid_field = search.schema.get_field("uid").unwrap();
 
@@ -210,6 +218,7 @@ impl Search {
 						for r in res {
 							let mut doc = Document::default();
 							doc.add_u64(typ, IndexEntryType::Channel.to_u64().unwrap());
+							doc.add_u64(time, now);
 							doc.add_u64(channel_id, r.1 as u64);
 							doc.add_bytes(server_key, r.0);
 							doc.add_text(name, r.2);
@@ -251,6 +260,7 @@ impl Search {
 							let uid = BASE64_URL_SAFE_NO_PAD.encode(&r.0);
 							let mut doc = Document::default();
 							doc.add_u64(typ, IndexEntryType::Client.to_u64().unwrap());
+							doc.add_u64(time, now);
 							doc.add_bytes(client_uid, r.0);
 							doc.add_text(uid_field, uid);
 							doc.add_text(name, r.1);
@@ -285,6 +295,7 @@ impl Search {
 							let uid = EccKeyPubP256::from_short(&r.0)?.get_uid();
 							let mut doc = Document::default();
 							doc.add_u64(typ, IndexEntryType::Server.to_u64().unwrap());
+							doc.add_u64(time, now);
 							doc.add_bytes(server_key, r.0);
 							doc.add_text(uid_field, uid);
 							doc.add_text(name, r.2);
@@ -316,7 +327,11 @@ impl Search {
 		);
 	}
 
-	fn write(&self, doc: Document) {
+	fn write(&self, mut doc: Document) {
+		let time = self.schema.get_field("sort_time").unwrap();
+		if doc.get_first(time).is_none() {
+			doc.add_u64(time, chrono::Utc::now().timestamp() as u64);
+		}
 		// This potentially blocks for a while, so start a new thread.
 		let index = self.index.clone();
 		let writer = self.writer.clone();
@@ -331,6 +346,7 @@ impl Search {
 					Ok(r) => r,
 					Err(error) => {
 						error!(%error, "Failed to create search database writer");
+						will_commit.fetch_sub(1, Ordering::Relaxed);
 						return;
 					}
 				};
@@ -342,7 +358,7 @@ impl Search {
 			}
 			drop(w);
 			std::thread::sleep(std::time::Duration::from_secs(1));
-			if will_commit.fetch_add(1, Ordering::Relaxed) == 0 {
+			if will_commit.fetch_sub(1, Ordering::Relaxed) == 1 {
 				// This thread is the last, so commit and free the writer
 				let mut w = writer.lock().unwrap();
 				if let Some(mut w) = w.take() {
@@ -405,7 +421,7 @@ impl Search {
 			IndexEntryType::Message.to_u64().unwrap(),
 		);
 		doc.add_u64(self.schema.get_field("message_id").unwrap(), id);
-		doc.add_u64(self.schema.get_field("time").unwrap(), time.and_utc().timestamp() as u64);
+		doc.add_u64(self.schema.get_field("sort_time").unwrap(), time.and_utc().timestamp() as u64);
 		doc.add_text(self.schema.get_field("content").unwrap(), content);
 
 		self.write(doc);
@@ -451,7 +467,7 @@ impl Search {
 		let content = self.schema.get_field("content").unwrap();
 		let description = self.schema.get_field("description").unwrap();
 		let name = self.schema.get_field("name").unwrap();
-		let time = self.schema.get_field("time").unwrap();
+		let time = self.schema.get_field("sort_time").unwrap();
 		let topic = self.schema.get_field("topic").unwrap();
 		let uid = self.schema.get_field("uid").unwrap();
 
@@ -560,5 +576,39 @@ impl Search {
 			name_snippet_generator,
 			address_snippet_generator,
 		})
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn live_message_is_searchable() {
+		let dir = std::env::temp_dir().join(format!("qint-search-{}", uuid::Uuid::new_v4()));
+		let (search, _) = Search::new(&dir).unwrap();
+		search.add_message(1, chrono::Utc::now().naive_utc(), "hello world".into()).unwrap();
+		search.add_message(2, chrono::Utc::now().naive_utc(), "hello again".into()).unwrap();
+		let key = tsproto_types::crypto::EccKeyPrivP256::create().to_pub();
+		search.add_channel(key, 1, "hello channel".into(), None, None).unwrap();
+		std::thread::sleep(std::time::Duration::from_secs(3));
+		search.reader.reload().unwrap();
+		let messages = search.search("hello", 0..10, true).unwrap();
+		let others = search.search("hello", 0..10, false).unwrap();
+		let _ = std::fs::remove_dir_all(&dir);
+		assert_eq!(messages.results.len(), 2);
+		assert_eq!(others.results.len(), 1);
+	}
+
+	#[test]
+	fn rebuilds_index_with_old_schema() {
+		let dir = std::env::temp_dir().join(format!("qint-search-{}", uuid::Uuid::new_v4()));
+		std::fs::create_dir_all(&dir).unwrap();
+		let mut old = Schema::builder();
+		old.add_u64_field("time", tantivy::schema::FAST);
+		Index::create_in_dir(&dir, old.build()).unwrap();
+		let res = Search::new(&dir);
+		let _ = std::fs::remove_dir_all(&dir);
+		assert!(res.unwrap().1);
 	}
 }
