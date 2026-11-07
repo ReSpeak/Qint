@@ -9,7 +9,7 @@
 
 	export let link: string;
 	export let textContent: string;
-	export let connection: IConnection;
+	export let connection: IConnection | undefined;
 
 	let showBig = false;
 

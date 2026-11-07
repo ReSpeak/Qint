@@ -8,7 +8,8 @@
 	import type { IConnection } from "../../connection";
 	import { extensionToIcon } from "../../panel/fileUtil";
 
-	export let connection: IConnection;
+	/** Undefined for non-TeamSpeak chats, disables ts3file handling. */
+	export let connection: IConnection | undefined;
 	export let text: string;
 	export let links: LinksMap = new Map();
 
@@ -55,7 +56,7 @@
 				a.classList.add("file_download");
 				a.onclick = function (e) {
 					e.preventDefault();
-					if (connection.isOnline()) {
+					if (connection?.isOnline()) {
 						const proxyFileSrc = schemeToLink(scheme);
 						if (proxyFileSrc !== null) {
 							connection.backend.ask_download(proxyFileSrc);
@@ -90,7 +91,9 @@
 			const scheme = parseTsScheme(src);
 			if (scheme !== null) {
 				const req = schemeToLink(scheme);
-				if (req !== null) {
+				if (connection === undefined) {
+					img.remove();
+				} else if (req !== null) {
 					connection
 						.fileProvider(req)
 						.then((proxyFileSrc) => {

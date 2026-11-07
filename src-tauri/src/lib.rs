@@ -11,6 +11,7 @@ use actix::prelude::*;
 use qint_proxy::QintState;
 use structopt::StructOpt;
 use tauri::AppHandle;
+use tauri::Emitter;
 use tauri::Listener;
 use tauri::Manager;
 use tauri::WindowEvent;
@@ -25,6 +26,7 @@ use tauri_plugin_log::log::LevelFilter;
 use tokio::runtime::Runtime;
 #[cfg(mobile)]
 use tracing::error;
+use tracing::warn;
 
 use crate::audio::LoudnessShare;
 use crate::core::QintCore;
@@ -191,6 +193,23 @@ pub fn run() {
 		.manage(app_arc.clone())
 		.manage(LoudnessShare::new())
 		.setup(|app| {
+			let app_handle = app.handle().clone();
+			let mut matrix_events = app.state::<Arc<QintState>>().matrix.events.subscribe();
+			tauri::async_runtime::spawn(async move {
+				use tokio::sync::broadcast::error::RecvError;
+				loop {
+					match matrix_events.recv().await {
+						Ok(ev) => {
+							if let Err(error) = app_handle.emit("matrix", &ev) {
+								warn!(%error, "Failed sending matrix event to frontend");
+							}
+						}
+						Err(RecvError::Lagged(_)) => {}
+						Err(RecvError::Closed) => break,
+					}
+				}
+			});
+
 			#[cfg(desktop)]
 			{
 				let show = MenuItemBuilder::with_id("show", "Show").build(app)?;
@@ -347,6 +366,13 @@ pub fn run() {
 			cmd::plugin_delete,
 			cmd::markdown,
 			cmd::set_loudness_callback,
+			cmd::matrix_status,
+			cmd::matrix_login_password,
+			cmd::matrix_login_sso,
+			cmd::matrix_logout,
+			cmd::matrix_set_room,
+			cmd::matrix_messages,
+			cmd::matrix_send,
 		])
 		// This allows triggering hotkeys while Window is focused
 		.device_event_filter(tauri::DeviceEventFilter::Always)

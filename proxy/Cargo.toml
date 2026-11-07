@@ -25,7 +25,7 @@ futures = "0.3"
 generic-array = "0.14"
 git-testament = "0.2"
 juniper = "0.15"
-libsqlite3-sys = { version = "0.33", features = [ "bundled" ] }
+libsqlite3-sys = { version = "0.38", features = [ "bundled" ] }
 livesplit-hotkey = { version = "0.7" }
 nnnoiseless = { version = "0.5", default-features = false }
 num-derive = "0.4"
@@ -45,7 +45,7 @@ sled = "0.34"
 tantivy = "0.18"
 thiserror = "1"
 time = "0.3"
-tokio = { version = "1", features = [ "fs" ] }
+tokio = { version = "1", features = [ "fs", "sync" ] }
 tokio-stream = "0.1"
 tokio-util = { version = "0.7", features = [ "io" ] }
 toml = "0.5"
@@ -56,11 +56,12 @@ tsproto-packets = { git = "https://github.com/ReSpeak/tsclientlib" }
 tsproto-types = { git = "https://github.com/ReSpeak/tsclientlib" }
 url = "2"
 uuid = { version = "1", features = [ "serde" ] }
+matrix-sdk = { version = "0.19.1", default-features = false, features = ["e2e-encryption", "automatic-room-key-forwarding", "sqlite", "rustls-aws-lc-rs", "sso-login", "markdown"] }
 
 # Fix resolver=2 with diesel
 [build-dependencies]
 diesel = { version = "2", features = [ "chrono", "sqlite" ] }
-libsqlite3-sys = { version = "0.33", features = [ "bundled" ] }
+libsqlite3-sys = { version = "0.38", features = [ "bundled" ] }
 
 [dev-dependencies]
 rand = "0.8"

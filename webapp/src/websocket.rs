@@ -145,6 +145,29 @@ impl AppToFrontendBridge for WsBridge {
 
 impl Ws {
 	pub fn new(state: Arc<QintState>, session: actix_ws::Session) -> Self {
+		let mut matrix_events = state.matrix.events.subscribe();
+		let mut matrix_session = session.clone();
+		actix::spawn(async move {
+			use tokio::sync::broadcast::error::RecvError;
+			#[derive(Serialize)]
+			struct WsMsg<'a> {
+				cmd: &'static str,
+				msg: &'a qint_proxy::matrix::MatrixEvent,
+			}
+			loop {
+				match matrix_events.recv().await {
+					Ok(ev) => {
+						let msg = serde_json::to_string(&WsMsg { cmd: "matrix", msg: &ev }).unwrap();
+						// Websocket is closed
+						if matrix_session.text(msg).await.is_err() {
+							break;
+						}
+					}
+					Err(RecvError::Lagged(_)) => {}
+					Err(RecvError::Closed) => break,
+				}
+			}
+		});
 		Self {
 			state,
 			connections: Default::default(),
@@ -484,6 +507,56 @@ impl Ws {
 				let args: Args = serde_json::from_value(args)?;
 
 				return Ok(serde_json::Value::String(proxy_codegen::markdown::markdown(&args.md)));
+			}
+			"matrix_status" => {
+				return Ok(serde_json::to_value(&state.matrix.status().await)?);
+			}
+			"matrix_login_password" => {
+				#[derive(Deserialize)]
+				struct Args {
+					homeserver: String,
+					user: String,
+					password: String,
+				}
+				let args: Args = serde_json::from_value(args)?;
+				state.matrix.login_password(&args.homeserver, &args.user, &args.password).await?;
+			}
+			"matrix_login_sso" => {
+				#[derive(Deserialize)]
+				struct Args {
+					homeserver: String,
+				}
+				let args: Args = serde_json::from_value(args)?;
+				return Ok(serde_json::Value::String(
+					state.matrix.clone().login_sso(&args.homeserver).await?,
+				));
+			}
+			"matrix_logout" => {
+				state.matrix.logout().await?;
+			}
+			"matrix_set_room" => {
+				#[derive(Deserialize)]
+				struct Args {
+					room: String,
+				}
+				let args: Args = serde_json::from_value(args)?;
+				state.matrix.set_room(&args.room).await?;
+			}
+			"matrix_messages" => {
+				#[derive(Deserialize)]
+				struct Args {
+					from: Option<String>,
+				}
+				let args: Args = serde_json::from_value(args)?;
+				return Ok(serde_json::to_value(&state.matrix.messages(args.from).await?)?);
+			}
+			"matrix_send" => {
+				#[derive(Deserialize)]
+				struct Args {
+					text: String,
+				}
+				let args: Args = serde_json::from_value(args)?;
+				state.matrix.send(&args.text).await?;
 			}
 			"set_loudness_callback" => {
 				#[derive(Deserialize)]

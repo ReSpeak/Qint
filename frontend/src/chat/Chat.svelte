@@ -1,6 +1,7 @@
 <script lang="ts">
 	// Use scroll-anchoring https://blog.eqrion.net/pin-to-bottom/
 	import UiMessage from "./Message.svelte";
+	import ChatModeSwitch from "./ChatModeSwitch.svelte";
 	import Icon from "../ui/icon/Icon.svelte";
 	import TsIcon from "../ui/icon/TsIcon.svelte";
 	import ClientName from "../ui/name/ClientName.svelte";
@@ -372,13 +373,19 @@
 						{/if}
 					</svelte:fragment>
 				</ChatInput>
-				<button
-					class="button outline-button"
-					class:is-loading={isSending}
-					name="send"
-					type="submit"
-					style="height: auto;">Send</button
-				>
+				<div class="sendButtons">
+					<button
+						class="button outline-button"
+						class:is-loading={isSending}
+						name="send"
+						type="submit"
+						title="Send"
+						aria-label="Send"
+					>
+						<Icon name="send" />
+					</button>
+					<ChatModeSwitch />
+				</div>
 			</div>
 		</form>
 		{#if $developMode}
@@ -397,100 +404,5 @@
 </div>
 
 <style lang="scss">
-	@use "../index.scss" as *;
-	@import "./chat_style";
-
-	.invoker-row {
-		@include invoker-row;
-	}
-
-	.chat :global(.chat-left-col) {
-		@include chat-left-col;
-		width: 48px;
-	}
-
-	.chat {
-		overflow: hidden;
-		display: flex;
-		flex-direction: column;
-		justify-content: flex-end;
-		line-height: initial;
-		border-right: none;
-
-		// For drop overlay
-		position: relative;
-
-		// The LazyList
-		> :global(.lazyList) {
-			flex: 1;
-		}
-	}
-
-	.chat-form {
-		display: flex;
-		flex-direction: column;
-		height: auto;
-
-		margin: 0.5em;
-		margin-top: 0;
-
-		:global(img) {
-			max-height: min(50vh, 100%);
-			max-width: min(50vw, 100%);
-		}
-	}
-
-	.sendCombo {
-		display: flex;
-		box-shadow: 0px -5px 20px -5px rgba(0, 0, 0, 0.3);
-		max-height: 50vh;
-	}
-
-	.sendError {
-		border-radius: 0.25em;
-		background-color: $red;
-		margin-bottom: 0.5em;
-		padding: 0.25em;
-	}
-
-	.chat :global(.scrollPane:last-child) {
-		padding-bottom: 0.5em;
-	}
-
-	.chat-date {
-		flex: 1;
-		display: flex;
-		align-items: center;
-
-		@include block-margin;
-		text-align: center;
-		color: mix($text, $background, 60%);
-	}
-
-	.chat-date-line {
-		flex: 1;
-		border-top: 1px solid mix($text, $background, 60%);
-		margin: {
-			left: 0.5em;
-			right: 0.5em;
-		}
-	}
-
-	.chatFiller {
-		@extend %unselectable;
-		width: 100%;
-		height: 100%;
-		padding: 0 1em 3em 1em;
-		display: flex;
-		flex-direction: column;
-		justify-content: flex-end;
-		align-items: center;
-		color: gray;
-		font-size: xx-large;
-		white-space: nowrap;
-
-		:global(.icon) {
-			font-size: 72px;
-		}
-	}
+	@import "./chat_panel";
 </style>
