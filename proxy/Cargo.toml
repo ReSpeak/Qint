@@ -50,7 +50,7 @@ tokio-stream = "0.1"
 tokio-util = { version = "0.7", features = [ "io" ] }
 toml = "0.5"
 tracing = "0.1"
-tsclientlib = { git = "https://github.com/ReSpeak/tsclientlib", default-features = false, features = [ "unstable", "audiopus-unstable" ] }
+tsclientlib = { git = "https://github.com/ReSpeak/tsclientlib", default-features = false, features = [ "audio", "unstable", "audiopus-unstable" ] }
 tsproto = { git = "https://github.com/ReSpeak/tsclientlib" }
 tsproto-packets = { git = "https://github.com/ReSpeak/tsclientlib" }
 tsproto-types = { git = "https://github.com/ReSpeak/tsclientlib" }
