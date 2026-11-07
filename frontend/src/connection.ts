@@ -1,10 +1,11 @@
 import { ResultDetails, OutMsg, InMsg } from "./backend/ws";
 import { get, writable, Writable, Readable } from "svelte/store";
-import { Book, Channel, ChatData, Client } from "./book";
+import { Book, Channel, ChatData, Client, ITreeNode } from "./book";
+import { ClientBase } from "./bookBase";
 import { oneshot, fnBroadcast, LOUDNESS_MIN, Lazy } from "./util";
 import { handleMessage } from "./notifications";
 import { backend, IBackendConnection, IFileRequest } from "./backend/backend";
-import { app } from "./app";
+import { app, NodeSelection, NodeSelections } from "./app";
 import { ConnectData, MuteState } from "./connect/uiConnect";
 import {
 	OChange,
@@ -331,6 +332,24 @@ export class Connection implements IConnection {
 			client.updateChat(ChatData.fromGraphql(clientData.data.chat));
 	}
 
+	/** A reconnect rebuilds the book, so point selections at the new nodes, otherwise they keep watching dead stores. */
+	private refreshSelections(): void {
+		const sels = get(app.selectedNode).selections.flatMap((sel) => {
+			if (sel.connection !== this) return [sel];
+			const old = sel.node;
+			let node: ITreeNode | undefined = old;
+			if (old instanceof Channel) node = this.book.getChannel(old.id);
+			// Client ids change on reconnect, the uid does not
+			else if (old instanceof Client)
+				node = [...this.book.clients.values()].find((c) => ClientBase.equals(c, old));
+			if (node === undefined) return [];
+			node.update({ isSelected: true });
+			return [new NodeSelection(this, node)];
+		});
+		// Set directly, selectNode skips selections that compare equal by id
+		app.selectedNode.set(new NodeSelections(sels));
+	}
+
 	private renderRequested = false;
 
 	private applyLoudnesses(loudnesses: Record<ClientId, number>): void {
@@ -569,6 +588,7 @@ export class Connection implements IConnection {
 
 			if ("ChannelListFinished" in message) {
 				this._state.update((s) => s.setChannelListFinished());
+				this.refreshSelections();
 				this.updateAllUnreadCounts();
 			} else if ("ChannelPermList" in message) {
 				this.channelPermCache.set(message.ChannelPermList);
