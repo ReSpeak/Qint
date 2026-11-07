@@ -393,6 +393,7 @@
 
 	// Resize/Scroll events
 	let docked = false;
+	let lastScrollTop = 0;
 	let allowRelock = true;
 
 	let lockIndex: number | undefined;
@@ -420,15 +421,14 @@
 
 	function handle_scroll() {
 		//console.log("scroll", "locked", lockIndex);
+		// Content can grow (late images/previews) before this event runs, so only
+		// undock when the user actually scrolled up, not when the bottom moved away.
+		// Checked outside allowRelock so a user scroll during resizing isn't lost.
+		const atBottom = pan.scrollTop >= pan.scrollHeight - pan.clientHeight - 1;
+		docked = atBottom || (docked && pan.scrollTop >= lastScrollTop);
+		lastScrollTop = pan.scrollTop;
 		if (allowRelock) {
 			setLockPos();
-			if (pan.scrollTop === pan.scrollHeight - pan.clientHeight) {
-				//if (docked === false) log("docked");
-				docked = true;
-			} else {
-				//if (docked === true) log("undocked");
-				docked = false;
-			}
 			start_fill();
 		}
 		recheckJumpButton();
