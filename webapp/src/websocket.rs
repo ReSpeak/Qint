@@ -198,17 +198,22 @@ impl Ws {
 					msg.cmd,
 					msg.args,
 					self.session.clone(),
-				)
-				.await;
-				let resp = match res {
-					Ok(r) => WsMsg { cmd: "resp", return_code: &return_code, msg: r },
-					Err(e) => WsMsg {
-						cmd: "resp_err",
-						return_code: &return_code,
-						msg: serde_json::Value::String(e.to_string()),
+				);
+				// Spawn, so a slow request (e.g. peek_link) does not block all following messages
+				actix::spawn(with_log!(
+					async move {
+						let resp = match res.await {
+							Ok(r) => WsMsg { cmd: "resp", return_code: &return_code, msg: r },
+							Err(e) => WsMsg {
+								cmd: "resp_err",
+								return_code: &return_code,
+								msg: serde_json::Value::String(e.to_string()),
+							},
+						};
+						session.text(serde_json::to_string(&resp).unwrap()).await
 					},
-				};
-				session.text(serde_json::to_string(&resp).unwrap()).await?;
+					"Failed to send response to websocket"
+				));
 			}
 			Ok(actix_ws::Message::Binary(_)) => {
 				error!("binary protocol not supported");
