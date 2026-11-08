@@ -26,7 +26,7 @@
       pkgs = (import nixpkgs) {
         inherit system;
         overlays = [bun2nix.overlays.default];
-        config  = {
+        config = {
           allowUnfree = true;
           android_sdk.accept_license = true;
         };
@@ -318,35 +318,35 @@
         });
 
       frontend = build-frontend "${book_events}/book_events.ts";
+
+      # To prevent "TLS support is not available"
+      # Fix small font: https://github.com/tauri-apps/tauri/issues/7354
+      # Run with: wrap target/release/qint
+      wrap = pkgs.stdenvNoCC.mkDerivation {
+        name = "wrap";
+        buildInputs = with pkgs; [wrapGAppsHook4]; # Was wrapGAppsHook3, testing v4
+        unpackPhase = "true";
+        text = ''
+          #!/bin/sh
+          "$@"
+        '';
+        installPhase = ''
+          runHook preInstallPhase
+          mkdir -p $out/bin
+          echo "$text" > $out/bin/wrap
+          chmod +x $out/bin/wrap
+          runHook postInstallPhase
+        '';
+      };
     in rec {
       # devShell for general development and android compilation
       devShells.android = let
         android = pkgs.androidenv.composeAndroidPackages {
           # The build complains with the needed versions if they do not exist
-          platformVersions = [ "36" ];
-          buildToolsVersions = [ "35.0.0" ];
-          abiVersions = [ "armeabi-v7a" "arm64-v8a" "x86" "x86_64"];
+          platformVersions = ["36"];
+          buildToolsVersions = ["35.0.0"];
+          abiVersions = ["armeabi-v7a" "arm64-v8a" "x86" "x86_64"];
           includeNDK = true;
-        };
-
-        # To prevent "TLS support is not available"
-        # Fix small font: https://github.com/tauri-apps/tauri/issues/7354
-        # Run with: wrap target/release/qint
-        wrap = pkgs.stdenvNoCC.mkDerivation {
-          name = "wrap";
-          buildInputs = with pkgs; [ wrapGAppsHook3 ];
-          unpackPhase = "true";
-          text = ''
-            #!/bin/sh
-            "$@"
-          '';
-          installPhase = ''
-            runHook preInstallPhase
-            mkdir -p $out/bin
-            echo "$text" > $out/bin/wrap
-            chmod +x $out/bin/wrap
-            runHook postInstallPhase
-          '';
         };
 
         ldLibraryPathHook = pkgs.writeText "ld-library-path-hook.sh" ''
@@ -364,62 +364,97 @@
           addEnvHooks "$targetOffset" addLdLibraryPath
         '';
       in
-      pkgs.mkShell {
-        packages = with pkgs; [
-          ldLibraryPathHook
-          android.androidsdk
-          android.ndk-bundle
-          bundletool
-          aapt
-          openjdk17-bootstrap # jarsigner
+        pkgs.mkShell {
+          packages = with pkgs;
+            [
+              ldLibraryPathHook
+              android.androidsdk
+              android.ndk-bundle
+              bundletool
+              aapt
+              openjdk17-bootstrap # jarsigner
 
-          alsa-lib
-          cargo-tauri
-          cmake
-          dbus
-          glib-networking
-          gtk3
-          gtksourceview4
-          libayatana-appindicator
-          libxml2
-          perl
-          pkg-config
-          libopus
-          openssl
-          pipewire
-          webkitgtk_4_1
-          wrap
-          libxscrnsaver
-          libxdmcp
-          zlib
-        ]
-        ++ (with gst_all_1; [
-          gstreamer
-          gst-plugins-base
-          gst-plugins-good
-          gst-plugins-bad
-        ]);
+              alsa-lib
+              cargo-tauri
+              cmake
+              dbus
+              glib-networking
+              gtk3
+              gtksourceview4
+              libayatana-appindicator
+              libxml2
+              perl
+              pkg-config
+              libopus
+              openssl
+              pipewire
+              webkitgtk_4_1
+              wrap
+              libxscrnsaver
+              libxdmcp
+              zlib
+            ]
+            ++ (with gst_all_1; [
+              gstreamer
+              gst-plugins-base
+              gst-plugins-good
+              gst-plugins-bad
+            ]);
 
-        # Needed so bindgen can find libclang.so
-        LIBCLANG_PATH = "${pkgs.llvmPackages_latest.libclang.lib}/lib";
+          # Needed so bindgen can find libclang.so
+          LIBCLANG_PATH = "${pkgs.llvmPackages_latest.libclang.lib}/lib";
 
-        # Android
-        ANDROID_HOME = "${android.androidsdk}/libexec/android-sdk";
-        ANDROID_NDK_HOME = "${android.androidsdk}/libexec/android-sdk/ndk-bundle";
-        # Override the aapt2 binary that gradle uses with the patched one from the sdk
-        GRADLE_OPTS = "-Dorg.gradle.project.android.aapt2FromMavenOverride=${android.androidsdk}/libexec/android-sdk/build-tools/35.0.0/aapt2";
+          # Android
+          ANDROID_HOME = "${android.androidsdk}/libexec/android-sdk";
+          ANDROID_NDK_HOME = "${android.androidsdk}/libexec/android-sdk/ndk-bundle";
+          # Override the aapt2 binary that gradle uses with the patched one from the sdk
+          GRADLE_OPTS = "-Dorg.gradle.project.android.aapt2FromMavenOverride=${android.androidsdk}/libexec/android-sdk/build-tools/35.0.0/aapt2";
 
-        # rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
-        # Build app:
-        # JAVA_HOME= cargo touri android build
-        # Or for just aarch64: JAVA_HOME= cargo touri android build -t aarch64
-        # Sign apk:
-        # $ANDROID_HOME/build-tools/35.0.0/zipalign -v -p 4 src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk aligned.apk
-        # PATH=$PATH:$JAVA_HOME/bin $ANDROID_HOME/build-tools/35.0.0/apksigner sign --ks <keys>.jks --out signed.apk aligned.apk
-        # Install:
-        # adb install signed.apk
-        # Sign app bundle
-        # jarsigner -keystore <keys>.jks app-universal-release.aab default
+          # rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+          # Build app:
+          # JAVA_HOME= cargo touri android build
+          # Or for just aarch64: JAVA_HOME= cargo touri android build -t aarch64
+          # Sign apk:
+          # $ANDROID_HOME/build-tools/35.0.0/zipalign -v -p 4 src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk aligned.apk
+          # PATH=$PATH:$JAVA_HOME/bin $ANDROID_HOME/build-tools/35.0.0/apksigner sign --ks <keys>.jks --out signed.apk aligned.apk
+          # Install:
+          # adb install signed.apk
+          # Sign app bundle
+          # jarsigner -keystore <keys>.jks app-universal-release.aab default
+        };
+
+      devShells.default = pkgs.mkShell {
+        packages = with pkgs;
+          [
+            bun
+            # libxml2 ??
+            # libclang + include paths for bindgen (pipewire-sys, libspa-sys)
+            rustPlatform.bindgenHook # ??
+            # xorg.libXScrnSaver # ??
+            # xorg.libXdmcp # ??
+            wrap
+          ]
+          ++ defaultLinuxBuildArgs.nativeBuildInputs
+          ++ defaultLinuxBuildArgs.buildInputs
+          ++ gstPlugins;
+
+        # https://github.com/imagemin/optipng-bin/issues/108
+        shellHook = ''
+          LD=$CC
+
+          # Fix small font: https://github.com/tauri-apps/tauri/issues/7354
+          XDG_DATA_DIRS="${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}:$XDG_DATA_DIRS"
+
+          export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [pkgs.libayatana-appindicator pkgs.gtk3]}"
+        '';
+
+        # To prevent "TLS support is not available"
+        GIO_MODULE_DIR = "${pkgs.glib-networking}/lib/gio/modules";
+        GIO_EXTRA_MODULES = "${pkgs.gtk3}/lib/gio/modules";
+
+        # Workaround sdl bug with pipewire
+        SDL_AUDIO_DRIVER = "pulseaudio";
+        RUST_LOG = "tsproto=debug,ts_bookkeeping=debug,tsclientlib=debug,qint_proxy=debug,webapp=debug,warn";
       };
 
       packages.default = packages.qint;
