@@ -1,5 +1,7 @@
 <script lang="ts">
 	import Chat from "./chat/Chat.svelte";
+	import MatrixChat from "./chat/MatrixChat.svelte";
+	import { matrixStatus } from "./matrix";
 	import Settings from "./panel/Settings.svelte";
 	import Sidebar from "./bar/Sidebar.svelte";
 	import Toolbar from "./bar/Toolbar.svelte";
@@ -12,7 +14,7 @@
 	import Connect from "./connect/Connect.svelte";
 	import GlobalScss from "./GlobalScss.svelte";
 	import { ConnectData, MuteState } from "./connect/uiConnect";
-	import { DescriptionMode } from "./settings";
+	import { ChatMode, DescriptionMode } from "./settings";
 	import { Channel, Server } from "./book";
 	import { backend } from "./backend/backend";
 	import { onMount } from "svelte";
@@ -34,6 +36,7 @@
 	const displayPanel = app.displayPanel;
 
 	const descriptionMode = ui._descriptionMode;
+	const chatMode = app.settings.chat._chatMode;
 	let columnStyle = "";
 	let connectData = new ConnectData("", "");
 	let fileIo: FileIO;
@@ -159,7 +162,11 @@
 	/>
 	<div class="displayPanel">
 		{#if $displayPanel === DisplayPanel.Main}
-			<Chat {chat} />
+			{#if $chatMode === ChatMode.Matrix && $matrixStatus.loggedIn}
+				<MatrixChat />
+			{:else}
+				<Chat {chat} />
+			{/if}
 			{#if $descriptionMode !== DescriptionMode.None}
 				<div class="description">
 					{#if $descriptionMode === DescriptionMode.Files && sel !== undefined && (sel.node instanceof Channel || sel.node instanceof Server)}

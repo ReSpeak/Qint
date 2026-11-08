@@ -193,11 +193,28 @@ export class SettingsUi {
 	}
 }
 
+export const enum ChatMode {
+	TeamSpeak = "TeamSpeak",
+	Matrix = "Matrix",
+}
+
 export class SettingsChat {
 	private _parent: Settings;
+	public readonly _chatMode = writable(ChatMode.TeamSpeak);
 
 	constructor(parent: Settings) {
 		this._parent = parent;
+		Object.defineProperties(this, {
+			chatMode: {
+				get: function(): ChatMode {
+					return get(this._chatMode);
+				},
+				set: function(val: ChatMode) {
+					this._chatMode.set(val);
+				},
+				enumerable: true,
+			},
+		});
 	}
 
 	public save(text: string | undefined, selection: NodeSelection): void {

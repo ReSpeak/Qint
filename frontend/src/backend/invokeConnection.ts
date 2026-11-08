@@ -15,6 +15,9 @@ import {
 	LoudnessData,
 	LoudnessEvent,
 	LoudnessUnsubscribe,
+	MatrixEvent,
+	MatrixMessages,
+	MatrixStatus,
 	msgFn,
 	UpdateIdentityOptions,
 } from "./backend";
@@ -41,6 +44,7 @@ export class InvokeBackend<T extends IInvokeConnection> {
 	}
 
 	public readonly loudnessListener = fnBroadcast<[LoudnessData]>();
+	public readonly matrixListener = fnBroadcast<[MatrixEvent]>();
 	public connections: Map<string, InvokeBackendConnection> = new Map();
 
 	constructor(public inner: T) {
@@ -159,6 +163,38 @@ export class InvokeBackend<T extends IInvokeConnection> {
 				this.inner.invoke("set_loudness_callback", { enabled: false });
 			}
 		};
+	}
+
+	public matrix_status(): Promise<MatrixStatus> {
+		return this.inner.invoke("matrix_status");
+	}
+
+	public matrix_login_password(homeserver: string, user: string, password: string): Promise<void> {
+		return this.inner.invoke("matrix_login_password", { homeserver, user, password });
+	}
+
+	public matrix_login_sso(homeserver: string): Promise<string> {
+		return this.inner.invoke("matrix_login_sso", { homeserver });
+	}
+
+	public matrix_logout(): Promise<void> {
+		return this.inner.invoke("matrix_logout");
+	}
+
+	public matrix_set_room(room: string): Promise<void> {
+		return this.inner.invoke("matrix_set_room", { room });
+	}
+
+	public matrix_messages(from?: string): Promise<MatrixMessages> {
+		return this.inner.invoke("matrix_messages", { from: from ?? null });
+	}
+
+	public matrix_send(text: string): Promise<void> {
+		return this.inner.invoke("matrix_send", { text });
+	}
+
+	public on_matrix_event(callback: (ev: MatrixEvent) => void): () => void {
+		return this.matrixListener.subscribe(callback);
 	}
 }
 

@@ -12,7 +12,7 @@
 	const log = debug("VIDEO");
 
 	export let videoSrc: string;
-	export let connection: IConnection;
+	export let connection: IConnection | undefined;
 	export let embed: EmbedTypes | undefined;
 
 	let preview_only = true;
@@ -77,7 +77,7 @@
 	}
 
 	async function toggleVSync() {
-		if (!connection.isOnline()) return;
+		if (!connection?.isOnline()) return;
 		if (preview_only) {
 			preview_only = false;
 			await tick();

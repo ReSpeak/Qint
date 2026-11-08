@@ -60,6 +60,9 @@ class BrowserInvokeConnection implements IInvokeConnection {
 				case "loudness":
 					this.backend.loudnessListener.call(msg.msg);
 					break;
+				case "matrix":
+					this.backend.matrixListener.call(msg.msg);
+					break;
 				case "ws_close": {
 					log("Closing event: %o", msg);
 					const conId = msg.con!;

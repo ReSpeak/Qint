@@ -47,6 +47,16 @@ export interface IBackend {
 	plugin_load(name: string): Promise<IPlugin>;
 	get_markdown_transformer(): IMarkdownTransform;
 	get_loudness_listener(callback: LoudnessEvent): LoudnessUnsubscribe;
+	matrix_status(): Promise<MatrixStatus>;
+	matrix_login_password(homeserver: string, user: string, password: string): Promise<void>;
+	/** Returns the url to open in a browser. */
+	matrix_login_sso(homeserver: string): Promise<string>;
+	matrix_logout(): Promise<void>;
+	matrix_set_room(room: string): Promise<void>;
+	/** Older messages, newest first. */
+	matrix_messages(from?: string): Promise<MatrixMessages>;
+	matrix_send(text: string): Promise<void>;
+	on_matrix_event(callback: (ev: MatrixEvent) => void): () => void;
 }
 
 export interface IBackendConnection {
@@ -127,3 +137,29 @@ export interface IMarkdownTransform {
 export type LoudnessData = [loudness: number, vad: number];
 export type LoudnessEvent = (ev: LoudnessData) => void;
 export type LoudnessUnsubscribe = () => void;
+
+export interface MatrixStatus {
+	loggedIn: boolean;
+	userId?: string;
+	homeserver?: string;
+	roomId?: string;
+	rooms: { id: string; name: string }[];
+}
+
+export interface MatrixMessage {
+	id: string;
+	roomId: string;
+	sender: string;
+	senderName: string;
+	body: string;
+	rendered: string;
+	/** Milliseconds since unix epoch */
+	time: number;
+}
+
+export interface MatrixMessages {
+	messages: MatrixMessage[];
+	endToken?: string;
+}
+
+export type MatrixEvent = { type: "Status" } | { type: "Message"; data: MatrixMessage };

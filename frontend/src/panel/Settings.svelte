@@ -5,6 +5,7 @@
 	import SettingsTts from "./settings/SettingsTts.svelte";
 	import SettingsHotkeys from "./settings/SettingsHotkeys.svelte";
 	import SettingsIdentities from "./settings/SettingsIdentities.svelte";
+	import SettingsMatrix from "./settings/SettingsMatrix.svelte";
 	import SettingsNotifications from "./settings/SettingsNotifications.svelte";
 	import SettingsPlugins from "./settings/SettingsPlugins.svelte";
 	import SettingsDeveloper from "./settings/SettingsDeveloper.svelte";
@@ -24,6 +25,7 @@
 		<SettingsTts />
 		<SettingsHotkeys />
 		<SettingsIdentities />
+		<SettingsMatrix />
 		<SettingsNotifications />
 		<SettingsPlugins />
 		{#if $developMode}

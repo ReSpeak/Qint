@@ -6,6 +6,7 @@ import {
 	ICacheFileRequest,
 	IFileRequest,
 	LoudnessData,
+	MatrixEvent,
 	TransferResult,
 	UploadFeature,
 } from "./backend";
@@ -132,6 +133,8 @@ export class TauriBackend extends InvokeBackend<TauriInvokeConnection> implement
 			const data = ev.payload;
 			this.loudnessListener.call(data);
 		});
+
+		listen<MatrixEvent>("matrix", (ev) => this.matrixListener.call(ev.payload));
 
 		listen<string[]>("tauri://file-drop", (data) => {
 			console.log("tauri://file-drop", data);

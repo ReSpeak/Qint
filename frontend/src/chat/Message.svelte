@@ -12,7 +12,7 @@
 	export let unread: boolean = false;
 	export let message: Message;
 	export let messageHighlightedContent: string | undefined = undefined;
-	export let connection: IConnection;
+	export let connection: IConnection | undefined;
 	export let timeFormat: string = "HH:mm";
 
 	let viewRaw = false;

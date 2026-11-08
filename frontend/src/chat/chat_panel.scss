@@ -1,0 +1,136 @@
+// Shared layout of the chat panels (TeamSpeak and Matrix)
+@use "../index.scss" as *;
+@import "./chat_style";
+
+.invoker-row {
+	@include invoker-row;
+}
+
+.chat :global(.chat-left-col) {
+	@include chat-left-col;
+	width: 48px;
+}
+
+.chat {
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-end;
+	line-height: initial;
+	border-right: none;
+
+	// For drop overlay
+	position: relative;
+
+	// The LazyList
+	> :global(.lazyList) {
+		flex: 1;
+	}
+}
+
+.chat-form {
+	display: flex;
+	flex-direction: column;
+	height: auto;
+
+	margin: 0.5em;
+	margin-top: 0;
+
+	:global(img) {
+		max-height: min(50vh, 100%);
+		max-width: min(50vw, 100%);
+	}
+}
+
+.sendCombo {
+	display: flex;
+	box-shadow: 0px -5px 20px -5px rgba(0, 0, 0, 0.3);
+	max-height: 50vh;
+}
+
+.sendError {
+	border-radius: 0.25em;
+	background-color: $red;
+	margin-bottom: 0.5em;
+	padding: 0.25em;
+}
+
+.chat :global(.scrollPane:last-child) {
+	padding-bottom: 0.5em;
+}
+
+.chat-date {
+	flex: 1;
+	display: flex;
+	align-items: center;
+
+	@include block-margin;
+	text-align: center;
+	color: mix($text, $background, 60%);
+}
+
+.chat-date-line {
+	flex: 1;
+	border-top: 1px solid mix($text, $background, 60%);
+	margin: {
+		left: 0.5em;
+		right: 0.5em;
+	}
+}
+
+.chatFiller {
+	@extend %unselectable;
+	width: 100%;
+	height: 100%;
+	padding: 0 1em 3em 1em;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-end;
+	align-items: center;
+	color: gray;
+	font-size: xx-large;
+	white-space: nowrap;
+
+	:global(.icon) {
+		font-size: 72px;
+	}
+}
+
+// Send button and mode switch as one joined button group
+.sendButtons {
+	display: flex;
+
+	:global(.button) {
+		height: 100%;
+	}
+
+	> :global(:not(:last-child)),
+	> :global(:not(:last-child) .button) {
+		border-top-right-radius: 0;
+		border-bottom-right-radius: 0;
+	}
+
+	> :global(:not(:first-child)),
+	> :global(:not(:first-child) .button) {
+		border-top-left-radius: 0;
+		border-bottom-left-radius: 0;
+	}
+
+	// .outline-button has a left margin, only keep it towards the input.
+	// Overlap the borders so the divider is a single line.
+	> :global(:not(:first-child)) {
+		margin-left: -1px;
+	}
+
+	> :global(:not(:first-child) .button) {
+		margin-left: 0;
+		// Thin mode switch next to the main send action
+		padding-left: 0.25em;
+		padding-right: 0.25em;
+	}
+
+	> :global(.button:first-child) {
+		padding-left: 1.25em;
+		padding-right: 1.25em;
+	}
+}

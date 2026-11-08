@@ -24,6 +24,7 @@ use qint_proxy::{
 	filecache::guess_content_type,
 	identities::{ApiIdentity, import_ts_identities_from_string},
 	link_previewer::AnalyzeResult,
+	matrix::{MatrixMessages, MatrixStatus},
 	messages::{MessageF2P, MessageP2F},
 	shared::{AudioDeviceList, UpdateIdentityOptions},
 };
@@ -662,4 +663,43 @@ pub async fn set_loudness_callback(
 		listener.disable()
 	}
 	Ok(())
+}
+
+#[command]
+pub async fn matrix_status(state: State<'_, QState>) -> Result<MatrixStatus, ()> {
+	Ok(state.matrix.status().await)
+}
+
+#[command]
+pub async fn matrix_login_password(
+	state: State<'_, QState>, homeserver: String, user: String, password: String,
+) -> Result<(), String> {
+	state.matrix.login_password(&homeserver, &user, &password).await.map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn matrix_login_sso(state: State<'_, QState>, homeserver: String) -> Result<String, String> {
+	state.matrix.clone().login_sso(&homeserver).await.map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn matrix_logout(state: State<'_, QState>) -> Result<(), String> {
+	state.matrix.logout().await.map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn matrix_set_room(state: State<'_, QState>, room: String) -> Result<(), String> {
+	state.matrix.set_room(&room).await.map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn matrix_messages(
+	state: State<'_, QState>, from: Option<String>,
+) -> Result<MatrixMessages, String> {
+	state.matrix.messages(from).await.map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn matrix_send(state: State<'_, QState>, text: String) -> Result<(), String> {
+	state.matrix.send(&text).await.map_err(|e| e.to_string())
 }

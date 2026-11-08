@@ -5,6 +5,7 @@
 
 	@import "bulma/sass/base/_all";
 	@import "bulma/sass/components/breadcrumb";
+	@import "bulma/sass/components/dropdown";
 	@import "bulma/sass/components/media";
 	@import "bulma/sass/components/menu";
 	@import "bulma/sass/components/message";

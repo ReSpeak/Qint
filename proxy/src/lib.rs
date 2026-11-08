@@ -31,6 +31,7 @@ pub mod filecache;
 pub mod hotkey;
 pub mod identities;
 pub mod link_previewer;
+pub mod matrix;
 pub mod messages;
 pub mod search;
 pub mod secret;
@@ -170,6 +171,7 @@ pub struct QintState {
 	pub file_cache: Arc<FileCache>,
 	pub link_previewer: link_previewer::LinkPreviewer,
 	pub secret: Secret,
+	pub matrix: Arc<matrix::Matrix>,
 	pub search: Option<Arc<search::Search>>,
 }
 
@@ -860,6 +862,10 @@ impl QintState {
 			None
 		});
 
+		let matrix =
+			matrix::Matrix::new(launch_config.config_path.clone(), secret.clone(), handle.clone());
+		handle.spawn(matrix.clone().restore());
+
 		let state = Arc::new(QintState {
 			handle,
 			connections,
@@ -872,6 +878,7 @@ impl QintState {
 			file_cache,
 			link_previewer,
 			secret,
+			matrix,
 			search,
 		});
 
